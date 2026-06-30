@@ -33,7 +33,9 @@ CB_SA="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
 for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/artifactregistry.writer; do
   gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
     --member="serviceAccount:${CB_SA}" \
-    --role="$ROLE" --quiet
+    --role="$ROLE" \
+    --condition=None \
+    --quiet
 done
 
 echo ""
