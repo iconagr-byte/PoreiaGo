@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Voyage - Προφίλ</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config from Style Guidance -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary": "#7d5800",
+                    "primary-container": "#0077b6",
+                    "tertiary": "#266449",
+                    "inverse-on-surface": "#f3f0f2",
+                    "surface-container-high": "#eae7ea",
+                    "outline-variant": "#bfc7d1",
+                    "on-secondary-fixed": "#271900",
+                    "on-primary-container": "#f3f7ff",
+                    "surface-variant": "#e4e2e4",
+                    "inverse-surface": "#303032",
+                    "surface-dim": "#dcd9dc",
+                    "on-secondary": "#ffffff",
+                    "inverse-primary": "#94ccff",
+                    "surface-container-highest": "#e4e2e4",
+                    "on-secondary-fixed-variant": "#5e4100",
+                    "surface-container": "#f0edef",
+                    "secondary-fixed": "#ffdea9",
+                    "secondary-container": "#ffb702",
+                    "on-error": "#ffffff",
+                    "surface-tint": "#006399",
+                    "on-error-container": "#93000a",
+                    "on-tertiary-fixed-variant": "#0e5138",
+                    "primary-fixed-dim": "#94ccff",
+                    "error": "#ba1a1a",
+                    "outline": "#707881",
+                    "on-tertiary-fixed": "#002114",
+                    "secondary-fixed-dim": "#ffba27",
+                    "on-tertiary": "#ffffff",
+                    "on-surface": "#1b1b1d",
+                    "on-primary-fixed": "#001d32",
+                    "on-tertiary-container": "#dfffeb",
+                    "on-surface-variant": "#404850",
+                    "on-primary": "#ffffff",
+                    "on-background": "#1b1b1d",
+                    "primary": "#005d90",
+                    "surface-bright": "#fcf8fb",
+                    "surface-container-lowest": "#ffffff",
+                    "background": "#fcf8fb",
+                    "tertiary-fixed-dim": "#95d4b3",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed": "#b1f0ce",
+                    "surface-container-low": "#f6f3f5",
+                    "on-secondary-container": "#6b4b00",
+                    "on-primary-fixed-variant": "#004b74",
+                    "primary-fixed": "#cde5ff",
+                    "surface": "#fcf8fb",
+                    "tertiary-container": "#417d61"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "24px",
+                    "lg": "48px",
+                    "gutter": "24px",
+                    "base": "8px",
+                    "margin-desktop": "64px",
+                    "xs": "4px",
+                    "xl": "80px",
+                    "sm": "12px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "label-sm": [
+                            "Inter"
+                    ],
+                    "headline-lg-mobile": [
+                            "Montserrat"
+                    ],
+                    "label-md": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ],
+                    "headline-lg": [
+                            "Montserrat"
+                    ],
+                    "headline-xl": [
+                            "Montserrat"
+                    ],
+                    "headline-md": [
+                            "Montserrat"
+                    ]
+            },
+            "fontSize": {
+                    "label-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "1.2",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "28px",
+                            {
+                                    "lineHeight": "1.3",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "1.2",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "1.6",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "1.6",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "1.3",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-xl": [
+                            "48px",
+                            {
+                                    "lineHeight": "1.2",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "1.4",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        /* Smooth scrolling and hide scrollbar for horizontal lists if any */
+        html { scroll-behavior: smooth; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Ambient shadow utility from design system */
+        .shadow-ambient {
+            box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen pb-[100px] md:pb-0">
+<!-- TopAppBar (Mobile) - Extracted from JSON -->
+<header class="md:hidden fixed top-0 w-full z-50 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md bg-transparent flex justify-between items-center px-margin-mobile h-16 w-full">
+<button class="material-symbols-outlined text-primary dark:text-inverse-primary hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-all duration-300 ease-in-out">travel_explore</button>
+<span class="font-headline-md-mobile text-headline-md-mobile font-bold text-primary dark:text-primary-fixed-dim">Voyage</span>
+<button class="material-symbols-outlined text-primary dark:text-inverse-primary hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-all duration-300 ease-in-out">notifications</button>
+</header>
+<!-- Top Navigation (Desktop Pivot) -->
+<header class="hidden md:flex fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-md h-20 items-center justify-between px-margin-desktop shadow-ambient">
+<div class="flex items-center gap-sm text-primary">
+<span class="material-symbols-outlined text-[32px]">travel_explore</span>
+<span class="font-headline-lg font-bold">Voyage</span>
+</div>
+<nav class="flex gap-lg font-label-md text-label-md">
+<a class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-xs" href="#">Αρχική</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-xs" href="#">Αναζήτηση</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-xs" href="#">Κρατήσεις</a>
+<a class="text-primary font-bold flex items-center gap-xs" href="#">Προφίλ</a>
+</nav>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">notifications</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-[80px] md:pt-[120px] max-w-5xl mx-auto px-margin-mobile md:px-margin-desktop">
+<!-- Profile Header Section -->
+<section class="flex flex-col items-center text-center mb-xl">
+<div class="relative group cursor-pointer">
+<img alt="User Avatar" class="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover shadow-ambient border-4 border-surface group-hover:scale-105 transition-transform duration-300" data-alt="A professional, high-quality headshot portrait of a confident woman in her 30s. The lighting is soft, natural, and flattering, casting gentle shadows that define her features against a slightly blurred, bright modern office background. The overall aesthetic is optimistic, clean, and perfectly aligned with a light-mode premium travel platform profile avatar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsxwoQ_MIYcCinfT-RnPjxTTvUiLLvgbwZIuyUAn6uBzxojWJXtqoGx4KtQkIQw34OXG-vm_o1SB0TN_rPLSiVAfTCApgTzmFD09RMpfonyk2yRb_HV2xDrU8J6EodXuwMDxp5LLbQdLt-KsaYCyBwZg9q0c84-dw7ijEW18GLGMYXFNN0qtpIXDkuMQylJ3fzKKmBewoQKCGCg5eg6HrgL73MwfliXDmmSsaixBIt7Sc8nwiUZW5DgO-8qGDnG0wf2cJFzvXAj6Q3"/>
+<button class="absolute bottom-2 right-2 bg-primary text-on-primary rounded-full p-2 shadow-lg material-symbols-outlined text-[20px] hover:bg-primary-container hover:text-on-primary-container transition-colors">edit</button>
+</div>
+<h1 class="font-headline-xl md:font-headline-xl text-on-surface mt-md tracking-tight">Elena Rostova</h1>
+<p class="font-body-lg text-outline mt-xs flex items-center gap-xs justify-center">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+                Premium Μέλος από το 2021
+            </p>
+</section>
+<!-- Bento Grid Options (High-end UI Pattern replacing standard list) -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
+<!-- My Bookings -->
+<a class="group bg-surface rounded-xl shadow-ambient p-md flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300 border border-transparent hover:border-surface-variant" href="#">
+<div class="flex items-center justify-between mb-lg">
+<div class="bg-primary-container/10 text-primary p-sm rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">confirmation_number</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">arrow_forward</span>
+</div>
+<div>
+<h3 class="font-headline-md md:font-headline-md text-on-surface mb-xs">Οι Κρατήσεις μου</h3>
+<p class="font-body-md text-on-surface-variant">Διαχείριση επερχόμενων ταξιδιών και ιστορικού</p>
+</div>
+</a>
+<!-- Saved Destinations -->
+<a class="group bg-surface rounded-xl shadow-ambient p-md flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300 border border-transparent hover:border-surface-variant" href="#">
+<div class="flex items-center justify-between mb-lg">
+<div class="bg-secondary-container/10 text-secondary p-sm rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">favorite</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">arrow_forward</span>
+</div>
+<div>
+<h3 class="font-headline-md md:font-headline-md text-on-surface mb-xs">Αποθηκευμένοι Προορισμοί</h3>
+<p class="font-body-md text-on-surface-variant">Επιλεγμένες λίστες με τους αγαπημένους σας προορισμούς</p>
+</div>
+</a>
+<!-- Payment Methods -->
+<a class="group bg-surface rounded-xl shadow-ambient p-md flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300 border border-transparent hover:border-surface-variant" href="#">
+<div class="flex items-center justify-between mb-lg">
+<div class="bg-tertiary-container/10 text-tertiary p-sm rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">credit_card</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">arrow_forward</span>
+</div>
+<div>
+<h3 class="font-headline-md md:font-headline-md text-on-surface mb-xs">Τρόποι Πληρωμής</h3>
+<p class="font-body-md text-on-surface-variant">Διαχείριση καρτών και πληροφοριών χρέωσης</p>
+</div>
+</a>
+<!-- Settings -->
+<a class="group bg-surface rounded-xl shadow-ambient p-md flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300 border border-transparent hover:border-surface-variant" href="#">
+<div class="flex items-center justify-between mb-lg">
+<div class="bg-surface-variant text-on-surface-variant p-sm rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">settings</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">arrow_forward</span>
+</div>
+<div>
+<h3 class="font-headline-md md:font-headline-md text-on-surface mb-xs">Ρυθμίσεις</h3>
+<p class="font-body-md text-on-surface-variant">Προτιμήσεις λογαριασμού και ειδοποιήσεις</p>
+</div>
+</a>
+<!-- Help & Support -->
+<a class="group bg-surface rounded-xl shadow-ambient p-md flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300 border border-transparent hover:border-surface-variant lg:col-span-2" href="#">
+<div class="flex items-center justify-between mb-lg">
+<div class="bg-primary/5 text-primary p-sm rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">support_agent</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">arrow_forward</span>
+</div>
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-md">
+<div>
+<h3 class="font-headline-md md:font-headline-md text-on-surface mb-xs">Βοήθεια &amp; Υποστήριξη</h3>
+<p class="font-body-md text-on-surface-variant">Επικοινωνήστε με τους εκπροσώπους μας για βοήθεια 24/7</p>
+</div>
+<button class="bg-primary text-on-primary font-label-md text-label-md px-md py-sm rounded-full w-fit hover:bg-primary-container hover:text-on-primary-container transition-colors">Επικοινωνήστε μαζί μας</button>
+</div>
+</a>
+</section>
+<!-- Danger Zone / Log Out -->
+<section class="mt-xl mb-lg flex justify-center">
+<button class="flex items-center gap-xs font-label-md text-label-md text-error hover:bg-error-container hover:text-on-error-container px-md py-sm rounded-full transition-colors">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+                Αποσύνδεση
+            </button>
+</section>
+</main>
+<!-- BottomNavBar (Mobile) - Extracted from JSON -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 shadow-[0px_-2px_10px_rgba(0,0,0,0.05)] bg-surface dark:bg-inverse-surface shadow-lg flex justify-around items-center px-4 py-2 w-full font-label-md text-label-md text-primary dark:text-inverse-primary">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined mb-1">home</span>
+<span>Αρχική</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined mb-1">search</span>
+<span>Αναζήτηση</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined mb-1">confirmation_number</span>
+<span>Κρατήσεις</span>
+</a>
+<!-- Active Tab: Profile -->
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary-container text-on-primary-container dark:text-on-primary-container rounded-full px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">person</span>
+<span>Προφίλ</span>
+</a>
+</nav>
+</body></html>

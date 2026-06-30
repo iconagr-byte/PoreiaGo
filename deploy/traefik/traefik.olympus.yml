@@ -1,0 +1,43 @@
+# Project OLYMPUS — Traefik with on-demand TLS for custom agency domains
+# Mount as /etc/traefik/traefik.yml in docker-compose.olympus.yml
+
+api:
+  dashboard: true
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: olympus_edge
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "${ACME_EMAIL:-ops@olympus-saas.com}"
+      storage: /acme/acme.json
+      tlsChallenge: {}
+  ondemand:
+    acme:
+      email: "${ACME_EMAIL:-ops@olympus-saas.com}"
+      storage: /acme/on-demand.json
+      onDemand: true
+      tlsChallenge: {}
+
+log:
+  level: INFO
+
+accessLog: {}

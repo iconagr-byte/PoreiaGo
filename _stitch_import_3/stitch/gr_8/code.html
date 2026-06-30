@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Voyage - Ειδοποιήσεις</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#7d5800",
+                        "primary-container": "#0077b6",
+                        "tertiary": "#266449",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7ea",
+                        "outline-variant": "#bfc7d1",
+                        "on-secondary-fixed": "#271900",
+                        "on-primary-container": "#f3f7ff",
+                        "surface-variant": "#e4e2e4",
+                        "inverse-surface": "#303032",
+                        "surface-dim": "#dcd9dc",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#94ccff",
+                        "surface-container-highest": "#e4e2e4",
+                        "on-secondary-fixed-variant": "#5e4100",
+                        "surface-container": "#f0edef",
+                        "secondary-fixed": "#ffdea9",
+                        "secondary-container": "#ffb702",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#006399",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#0e5138",
+                        "primary-fixed-dim": "#94ccff",
+                        "error": "#ba1a1a",
+                        "outline": "#707881",
+                        "on-tertiary-fixed": "#002114",
+                        "secondary-fixed-dim": "#ffba27",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#1b1b1d",
+                        "on-primary-fixed": "#001d32",
+                        "on-tertiary-container": "#dfffeb",
+                        "on-surface-variant": "#404850",
+                        "on-primary": "#ffffff",
+                        "on-background": "#1b1b1d",
+                        "primary": "#005d90",
+                        "surface-bright": "#fcf8fb",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#fcf8fb",
+                        "tertiary-fixed-dim": "#95d4b3",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#b1f0ce",
+                        "surface-container-low": "#f6f3f5",
+                        "on-secondary-container": "#6b4b00",
+                        "on-primary-fixed-variant": "#004b74",
+                        "primary-fixed": "#cde5ff",
+                        "surface": "#fcf8fb",
+                        "tertiary-container": "#417d61"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "lg": "48px",
+                        "gutter": "24px",
+                        "base": "8px",
+                        "margin-desktop": "64px",
+                        "xs": "4px",
+                        "xl": "80px",
+                        "sm": "12px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Montserrat"],
+                        "headline-xl": ["Montserrat"],
+                        "headline-md": ["Montserrat"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-xl": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Subtle lift animation for cards */
+        .notification-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+        .notification-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0px 15px 45px rgba(0, 0, 0, 0.08);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background min-h-screen antialiased">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md flex justify-between items-center px-margin-mobile h-16 bg-transparent">
+<button aria-label="Explore" class="p-2 -ml-2 rounded-full hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out text-on-surface-variant dark:text-outline-variant">
+<span class="material-symbols-outlined">travel_explore</span>
+</button>
+<span class="font-headline-md-mobile text-headline-md-mobile font-bold text-primary dark:text-primary-fixed-dim">Voyage</span>
+<button aria-label="Notifications" class="p-2 -mr-2 rounded-full hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out text-primary dark:text-inverse-primary">
+<span class="material-symbols-outlined fill">notifications</span>
+</button>
+</header>
+<!-- Main Content -->
+<main class="pt-[88px] pb-xl px-margin-mobile md:px-margin-desktop max-w-3xl mx-auto">
+<!-- Header Section -->
+<div class="mb-lg">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-background mb-4">Ενημερώσεις</h1>
+<!-- Filter Chips -->
+<div class="flex gap-sm overflow-x-auto pb-2 scrollbar-hide">
+<button class="px-4 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md whitespace-nowrap shadow-sm">Όλα</button>
+<button class="px-4 py-2 rounded-full bg-surface text-on-surface-variant border border-outline-variant font-label-md text-label-md whitespace-nowrap hover:bg-surface-container transition-colors">Κρατήσεις</button>
+<button class="px-4 py-2 rounded-full bg-surface text-on-surface-variant border border-outline-variant font-label-md text-label-md whitespace-nowrap hover:bg-surface-container transition-colors">Προσφορές</button>
+</div>
+</div>
+<!-- Notification List -->
+<div class="flex flex-col gap-md">
+<!-- Section: Today -->
+<div>
+<h2 class="font-label-md text-label-md text-outline mb-sm uppercase tracking-wider pl-1">ΣΗΜΕΡΑ</h2>
+<div class="flex flex-col gap-sm">
+<!-- Item: Booking Confirmation (Unread) -->
+<div class="notification-card bg-primary-container/5 rounded-xl p-sm md:p-md border border-primary/10 flex gap-4 items-start relative overflow-hidden cursor-pointer">
+<!-- Unread Indicator -->
+<div class="absolute top-1/2 -translate-y-1/2 left-2 w-2 h-2 rounded-full bg-primary"></div>
+<div class="w-12 h-12 rounded-full bg-tertiary/10 text-tertiary flex items-center justify-center flex-shrink-0 ml-2">
+<span class="material-symbols-outlined fill">check_circle</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start gap-2 mb-1">
+<h3 class="font-label-md text-label-md text-on-surface truncate">Επιβεβαίωση Κράτησης: Βίλα στο Μπαλί</h3>
+<span class="font-label-sm text-label-sm text-primary whitespace-nowrap">10:42 ΠΜ</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">Η διαμονή σας στο Azure Water Villas έχει επιβεβαιωθεί για 12 Οκτ - 18 Οκτ. Ο οικοδεσπότης σας, Wayan, σας έστειλε ένα μήνυμα καλωσορίσματος.</p>
+</div>
+</div>
+<!-- Item: Price Drop with Image -->
+<div class="notification-card bg-surface rounded-xl p-sm md:p-md shadow-[0px_10px_30px_rgba(0,0,0,0.05)] flex gap-4 items-start cursor-pointer">
+<div class="w-12 h-12 rounded-full bg-secondary-container/20 text-secondary flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined fill">trending_down</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start gap-2 mb-1">
+<h3 class="font-label-md text-label-md text-on-surface truncate">Ειδοποίηση Πτώσης Τιμής: Παρίσι</h3>
+<span class="font-label-sm text-label-sm text-outline whitespace-nowrap">2:15 ΜΜ</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-3 line-clamp-2">Οι πτήσεις για Παρίσι για τις αποθηκευμένες ημερομηνίες σας μόλις έπεσαν κατά 140$. Κάντε κράτηση τώρα για να εξασφαλίσετε αυτή την τιμή.</p>
+<!-- Embedded Media -->
+<div class="h-32 rounded-lg bg-surface-container-low overflow-hidden relative">
+<img alt="A stunning, high-quality photograph of the Eiffel Tower in Paris along the Seine river during a bright, sunny day. The sky is a clear, vibrant blue. The composition is clean and modern, suitable for a premium travel app interface, showcasing the iconic architecture with a light and airy aesthetic." class="w-full h-full object-cover" data-alt="A stunning, high-quality photograph of the Eiffel Tower in Paris along the Seine river during a bright, sunny day. The sky is a clear, vibrant blue. The composition is clean and modern, suitable for a premium travel app interface, showcasing the iconic architecture with a light and airy aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuALyKzo4J9dpfGtJmgj7t3GoHO6qvWwhU2kbKCuLess7kl2UiWB6-BmiofWC3P74CLC_tt2xusQUdecqoi4xuTZ22mjoK--GKSqiZM-hr96fGSVpif4rSsNCAj2kp1rQkmWesZmbvnwQ-5XRa4Ikj_9ubk2Bedy1V7cJIk5Qw0-JxHmKqOQiKRkeWRs1Fz8w9RVisYS7QWWjId9pnIGJOHGHbrTdVjfsy5MRyUtKQAjZ7rQQEa4b2V6iZH-uGU9qo2Zh3rGbw8A8E_y"/>
+<div class="absolute bottom-2 right-2 bg-surface/90 backdrop-blur px-2 py-1 rounded font-label-sm text-label-sm text-on-surface font-semibold shadow-sm">
+                                    Τώρα $480
+                                </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Section: Yesterday -->
+<div class="mt-md">
+<h2 class="font-label-md text-label-md text-outline mb-sm uppercase tracking-wider pl-1">ΧΘΕΣ</h2>
+<div class="flex flex-col gap-sm">
+<!-- Item: App Update -->
+<div class="notification-card bg-surface rounded-xl p-sm md:p-md shadow-[0px_5px_20px_rgba(0,0,0,0.03)] flex gap-4 items-start cursor-pointer">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center flex-shrink-0 border border-outline-variant/30">
+<span class="material-symbols-outlined">system_update</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start gap-2 mb-1">
+<h3 class="font-label-md text-label-md text-on-surface truncate">Ενημέρωση Εφαρμογής: Έκδοση 4.2</h3>
+<span class="font-label-sm text-label-sm text-outline whitespace-nowrap">Χθες</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">Προσθέσαμε έναν διαδραστικό δημιουργό δρομολογίου και διορθώσαμε μερικά σφάλματα για να κάνουμε τον σχεδιασμό σας πιο ομαλό.</p>
+</div>
+</div>
+<!-- Item: Itinerary Reminder -->
+<div class="notification-card bg-surface rounded-xl p-sm md:p-md shadow-[0px_5px_20px_rgba(0,0,0,0.03)] flex gap-4 items-start cursor-pointer">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 text-primary flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined">flight_takeoff</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start gap-2 mb-1">
+<h3 class="font-label-md text-label-md text-on-surface truncate">Επερχόμενο Ταξίδι: Τόκιο</h3>
+<span class="font-label-sm text-label-sm text-outline whitespace-nowrap">Χθες</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">Η πτήση σας για Τόκιο NRT αναχωρεί σε 48 ώρες. Βεβαιωθείτε ότι το διαβατήριό σας και τα ταξιδιωτικά σας έγγραφα είναι έτοιμα.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

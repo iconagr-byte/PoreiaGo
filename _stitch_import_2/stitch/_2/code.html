@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Voyage - Sign Up</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Design System Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#7d5800",
+                        "primary-container": "#0077b6",
+                        "tertiary": "#266449",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7ea",
+                        "outline-variant": "#bfc7d1",
+                        "on-secondary-fixed": "#271900",
+                        "on-primary-container": "#f3f7ff",
+                        "surface-variant": "#e4e2e4",
+                        "inverse-surface": "#303032",
+                        "surface-dim": "#dcd9dc",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#94ccff",
+                        "surface-container-highest": "#e4e2e4",
+                        "on-secondary-fixed-variant": "#5e4100",
+                        "surface-container": "#f0edef",
+                        "secondary-fixed": "#ffdea9",
+                        "secondary-container": "#ffb702",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#006399",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#0e5138",
+                        "primary-fixed-dim": "#94ccff",
+                        "error": "#ba1a1a",
+                        "outline": "#707881",
+                        "on-tertiary-fixed": "#002114",
+                        "secondary-fixed-dim": "#ffba27",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#1b1b1d",
+                        "on-primary-fixed": "#001d32",
+                        "on-tertiary-container": "#dfffeb",
+                        "on-surface-variant": "#404850",
+                        "on-primary": "#ffffff",
+                        "on-background": "#1b1b1d",
+                        "primary": "#005d90",
+                        "surface-bright": "#fcf8fb",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#fcf8fb",
+                        "tertiary-fixed-dim": "#95d4b3",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#b1f0ce",
+                        "surface-container-low": "#f6f3f5",
+                        "on-secondary-container": "#6b4b00",
+                        "on-primary-fixed-variant": "#004b74",
+                        "primary-fixed": "#cde5ff",
+                        "surface": "#fcf8fb",
+                        "tertiary-container": "#417d61"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "lg": "48px",
+                        "gutter": "24px",
+                        "base": "8px",
+                        "margin-desktop": "64px",
+                        "xs": "4px",
+                        "xl": "80px",
+                        "sm": "12px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Montserrat"],
+                        "headline-xl": ["Montserrat"],
+                        "headline-md": ["Montserrat"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-xl": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Custom Utilities for subtle interactions */
+        .glass-input:focus-within {
+            box-shadow: 0 0 0 4px rgba(0, 93, 144, 0.1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background antialiased min-h-screen flex flex-col lg:flex-row">
+<!-- Note: TopAppBar and BottomNavBar are deliberately suppressed here per the 'Automatic Suppression' 
+         rule for Linear/Transactional screens (Sign-up). The canvas is prioritized for the onboarding flow. -->
+<!-- Left Visual Anchor (Desktop) / Top Hero (Mobile) -->
+<div class="w-full h-[309px] lg:h-screen lg:w-5/12 xl:w-1/2 relative overflow-hidden flex-shrink-0 bg-surface-container">
+<img class="absolute inset-0 w-full h-full object-cover" data-alt="A breathtaking, wide-angle shot of a serene mountainous landscape reflecting in a crystal-clear alpine lake during golden hour. The scene evokes a profound sense of wanderlust, tranquility, and premium travel. The lighting is soft, warm, and inviting, contrasting beautifully with the crisp, cool blues of the water and sky. This high-quality photography embodies a professional, modern lifestyle aesthetic, perfectly suited for an aspirational travel agency platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC31n1Sh3vKXe75UVc_cPmd8PlrKDQ88o9G92HuCcYe3dbaYtNCR7P2CEoLr0E50NHR_M8pqAoZEQzfCUN_uX0iYNRA6bkQL7KXASKuPWwmGQZpinGCOZV9SdnlhZxgp4Iv9zGV-SxHS0JbE2cUx-bquCbpoxCcsFchyZzhtQPGeaYzR-ta5avbu0VcnMFIxeMQZR_hOiP51HZfU3TRs1oc8GZN30xNOKEmC8iIBDC3B-JoZZ7IYbnJFGVeSZ7MsuqMdhh8-ypE0hAH"/>
+<!-- Ambient Overlay -->
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent lg:bg-gradient-to-r lg:from-black/40 lg:to-transparent"></div>
+<!-- Brand Moment -->
+<div class="absolute bottom-margin-mobile left-margin-mobile right-margin-mobile lg:bottom-margin-desktop lg:left-margin-desktop text-on-primary">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile lg:font-headline-xl lg:text-headline-xl mb-xs lg:mb-sm">Discover the Unseen</h2>
+<p class="font-body-md text-body-md lg:font-body-lg lg:text-body-lg text-on-primary/90 max-w-md">Curated experiences for the modern explorer. Start your journey today.</p>
+</div>
+</div>
+<!-- Right Form Canvas -->
+<div class="w-full lg:w-7/12 xl:w-1/2 flex flex-col justify-start lg:justify-center items-center px-margin-mobile py-lg md:px-margin-desktop bg-surface rounded-t-[32px] lg:rounded-none -mt-8 lg:mt-0 relative z-10 flex-grow shadow-[0px_-20px_40px_rgba(0,0,0,0.05)] lg:shadow-none">
+<div class="w-full max-w-[440px] space-y-md lg:space-y-lg">
+<!-- Header -->
+<div class="text-center lg:text-left">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile lg:font-headline-lg lg:text-headline-lg text-on-surface mb-xs">Create Account</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Join Voyage for frictionless, premium travel planning.</p>
+</div>
+<!-- Sign Up Form -->
+<form class="space-y-sm lg:space-y-md">
+<!-- Full Name -->
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface block ml-1">Full Name</label>
+<div class="relative glass-input transition-all duration-300 rounded-[16px]">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none">person</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-[16px] py-4 pl-12 pr-4 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary transition-colors placeholder:text-outline-variant" placeholder="Jane Doe" type="text"/>
+</div>
+</div>
+<!-- Email -->
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface block ml-1">Email Address</label>
+<div class="relative glass-input transition-all duration-300 rounded-[16px]">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none">mail</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-[16px] py-4 pl-12 pr-4 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary transition-colors placeholder:text-outline-variant" placeholder="jane@example.com" type="email"/>
+</div>
+</div>
+<!-- Phone Number -->
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface block ml-1">Phone Number</label>
+<div class="relative glass-input transition-all duration-300 rounded-[16px]">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none">call</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-[16px] py-4 pl-12 pr-4 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary transition-colors placeholder:text-outline-variant" placeholder="+1 (555) 000-0000" type="tel"/>
+</div>
+</div>
+<!-- Password -->
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface block ml-1">Password</label>
+<div class="relative glass-input transition-all duration-300 rounded-[16px]">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none">lock</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-[16px] py-4 pl-12 pr-12 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary transition-colors placeholder:text-outline-variant" id="password-input" placeholder="••••••••" type="password"/>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 text-outline-variant hover:text-on-surface transition-colors focus:outline-none" onclick="togglePassword()" type="button">
+<span class="material-symbols-outlined" id="password-icon">visibility_off</span>
+</button>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant ml-1 mt-1">Must be at least 8 characters long.</p>
+</div>
+<!-- Action Button -->
+<div class="pt-sm">
+<button class="w-full bg-primary text-on-primary font-label-md text-label-md rounded-full py-4 px-6 shadow-[0px_10px_30px_rgba(0,93,144,0.15)] hover:-translate-y-[2px] hover:shadow-[0px_15px_40px_rgba(0,93,144,0.25)] hover:bg-on-primary-fixed-variant active:translate-y-0 active:shadow-none transition-all duration-300 ease-out" type="button">
+                        Create Account
+                    </button>
+</div>
+</form>
+<!-- Footer Navigation -->
+<div class="text-center pt-md border-t border-surface-container-high">
+<p class="font-body-md text-body-md text-on-surface-variant">
+                    Already have an account? 
+                    <a class="font-label-md text-label-md text-primary hover:text-on-primary-fixed-variant transition-colors ml-1" href="#">Log in</a>
+</p>
+</div>
+</div>
+</div>
+<!-- Inline script for micro-interactions -->
+<script>
+        function togglePassword() {
+            const input = document.getElementById('password-input');
+            const icon = document.getElementById('password-icon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility_off';
+            }
+        }
+    </script>
+</body></html>

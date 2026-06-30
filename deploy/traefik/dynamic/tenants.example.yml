@@ -1,0 +1,28 @@
+# Copy to tenants.yml and adjust BASE_DOMAIN when using wildcard DNS + DNS-01 cert.
+# Requires wildcard certificate on *.aerostride.app (Let's Encrypt DNS challenge).
+#
+# With HTTP-01 only, add one router per tenant Host(`slug.aerostride.app`) instead.
+
+http:
+  routers:
+  # All tenant subdomains → same React/nginx static bundle
+    tenant-app:
+      rule: HostRegexp(`{subdomain:[a-z0-9-]+}.aerostride.app`) && !Host(`api.aerostride.app`)
+      entryPoints:
+        - websecure
+      service: tenant-frontend
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: aerostride.app
+            sans:
+              - "*.aerostride.app"
+      middlewares:
+        - security-headers@file
+
+  services:
+    tenant-frontend:
+      loadBalancer:
+        servers:
+          # Points at the `frontend` service from docker-compose.prod.yml
+          - url: http://frontend:80

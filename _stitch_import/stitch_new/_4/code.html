@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html lang="el"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Προσφορές - Voyage</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#303032",
+                        "surface-container-high": "#eae7ea",
+                        "on-surface": "#1b1b1d",
+                        "on-primary-fixed-variant": "#004b74",
+                        "secondary-fixed-dim": "#ffba27",
+                        "on-primary-fixed": "#001d32",
+                        "surface-container-low": "#f6f3f5",
+                        "secondary-container": "#ffb702",
+                        "outline-variant": "#bfc7d1",
+                        "error-container": "#ffdad6",
+                        "inverse-primary": "#94ccff",
+                        "on-tertiary-container": "#dfffeb",
+                        "secondary": "#7d5800",
+                        "on-secondary-container": "#6b4b00",
+                        "surface": "#fcf8fb",
+                        "primary-container": "#0077b6",
+                        "surface-tint": "#006399",
+                        "surface-container": "#f0edef",
+                        "on-error": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#fcf8fb",
+                        "on-surface-variant": "#404850",
+                        "on-secondary-fixed-variant": "#5e4100",
+                        "outline": "#707881",
+                        "on-primary-container": "#f3f7ff",
+                        "surface-variant": "#e4e2e4",
+                        "on-secondary": "#ffffff",
+                        "primary": "#005d90",
+                        "tertiary": "#266449",
+                        "surface-container-highest": "#e4e2e4",
+                        "on-primary": "#ffffff",
+                        "on-background": "#1b1b1d",
+                        "secondary-fixed": "#ffdea9",
+                        "tertiary-fixed": "#b1f0ce",
+                        "on-tertiary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed": "#002114",
+                        "on-tertiary-fixed-variant": "#0e5138",
+                        "tertiary-container": "#417d61",
+                        "primary-fixed-dim": "#94ccff",
+                        "surface-dim": "#dcd9dc",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed": "#271900",
+                        "tertiary-fixed-dim": "#95d4b3",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-bright": "#fcf8fb",
+                        "primary-fixed": "#cde5ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "80px",
+                        "md": "24px",
+                        "lg": "48px",
+                        "xs": "4px",
+                        "margin-desktop": "64px",
+                        "base": "8px",
+                        "margin-mobile": "16px",
+                        "sm": "12px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Montserrat"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "headline-md": ["Montserrat"],
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-xl": ["Montserrat"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "500" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-xl": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-md antialiased pb-24 md:pb-0">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md bg-transparent flat no shadows flex justify-between items-center px-margin-mobile h-16 w-full hidden md:flex">
+<button aria-label="leading icon" class="hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-all duration-300 ease-in-out text-on-surface-variant dark:text-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">travel_explore</span>
+</button>
+<div class="font-headline-md-mobile text-headline-md-mobile font-bold text-primary dark:text-primary-fixed-dim font-headline-md-mobile text-headline-md-mobile text-center flex-grow">
+            Voyage
+        </div>
+<button aria-label="trailing icon" class="hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-all duration-300 ease-in-out text-on-surface-variant dark:text-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
+</button>
+</header>
+<!-- Mobile Header (Since it's a specific Promo screen, we might want a simpler header with a back button or just the title) -->
+<header class="md:hidden sticky top-0 z-40 bg-surface/90 backdrop-blur-sm px-margin-mobile py-4 flex items-center justify-between border-b border-surface-container-low">
+<h1 class="font-headline-md-mobile text-headline-md-mobile text-on-surface">Προσφορές</h1>
+<button class="p-2 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</header>
+<main class="md:pt-24 md:max-w-7xl md:mx-auto md:px-margin-desktop">
+<!-- Promo Banners Grid -->
+<div class="p-margin-mobile md:p-0 grid grid-cols-1 md:grid-cols-2 gap-margin-mobile md:gap-gutter">
+<!-- Banner 1: Early Bird -->
+<div class="relative rounded-xl overflow-hidden shadow-[0px_10px_30px_rgba(0,0,0,0.05)] group md:col-span-2 h-[350px] md:h-[450px]">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="A breathtaking view of a pristine white sand beach in the Mediterranean, bathed in golden hour sunlight. Crystal clear, bright turquoise waters gently lap the shore. In the foreground, a stylish striped beach umbrella and two empty sun loungers invite relaxation. The scene evokes a premium, serene, and optimistic summer holiday vibe, aligning with the bright, airy aesthetic of the travel agency UI." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDglX9VvDGm6ZZwhAaoXJ5EjLHSdVWa8sQaTLQbRGABNvUT5q4bdAyUla40R-eFm7Z3Srnm7CyVsgOUO6wTF9zIChKWt2WLe4uqRBBtlYjjs8xlJ40DlgtY4UWGsAEv-XB-mJsJWVdJxcj2HIVWOpIfTXC9MLOWapEot16s_bBj_DdwbtWyumpT0MlHGbXpHlFG1v7Lo3cBO5KQv9-P1kmD04m46K0rdmBOXMUSIJLiiPQievuUGXls6zn5o8oSVigTq4S0M_1g0qK6');">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+<!-- Tag -->
+<div class="absolute top-margin-mobile left-margin-mobile bg-secondary-container text-on-secondary-container px-sm py-xs rounded-full font-label-sm text-label-sm shadow-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">wb_sunny</span>
+                    Καλοκαίρι
+                </div>
+<div class="absolute bottom-margin-mobile left-margin-mobile right-margin-mobile text-white">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl mb-xs drop-shadow-md">Early Bird -20%</h2>
+<p class="font-body-md text-body-md text-surface-container-low mb-sm max-w-md drop-shadow-md">Προλάβετε τις καλύτερες τιμές για τις καλοκαιρινές σας διακοπές στους πιο δημοφιλείς προορισμούς.</p>
+<button class="bg-secondary-container hover:bg-[#e6a500] text-[#1D1D1F] font-label-md text-label-md px-md py-sm rounded-lg transition-colors shadow-lg active:scale-95 flex items-center gap-2 w-fit">
+                        Κλείσε τώρα <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Banner 2: Last Minute -->
+<div class="relative rounded-xl overflow-hidden shadow-[0px_10px_30px_rgba(0,0,0,0.05)] group h-[280px] md:h-[400px]">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="A romantic, cinematic shot of a cobblestone street in a classic European city like Paris or Rome during early evening. Warm, glowing lights from inviting cafes spill onto the street. The architecture is elegant and historic, softly out of focus in the background to create depth. The mood is sophisticated, spontaneous, and enticing, fitting the premium lifestyle edge of the travel brand." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB1nChplOcmwaHvDxV6xX4rB6fRR9ddy8CVSS2rZWbNew24kQZNNLzRr9Cd3vUJj9NyAZTXvwVDAbAqCEMkwrFsGyTwrAmAed4m6sd6fFD1D6BofkGnZwc2jYG4T6G9_ql7yNTYeW--2FonMJGprwnK-ndcVaAOxhfPOdYHnUf3OMPnljzrRWUFmUw9LTNnCPbwHRc-3iPiZQ-lXEXitUSh1Eqte4ic5wvky4H5vTSRMDO57Km1INjQZm4lnJ-diokq7Y-gGrQbmK6-');">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<div class="absolute bottom-margin-mobile left-margin-mobile right-margin-mobile text-white">
+<div class="bg-error/90 text-on-error px-2 py-1 rounded text-xs inline-block mb-2 font-bold uppercase tracking-wider">Μονο 3 θεσεις</div>
+<h3 class="font-headline-md text-headline-md mb-xs drop-shadow-md">Last Minute Deals</h3>
+<p class="font-body-md text-body-md text-surface-container-low mb-sm drop-shadow-md line-clamp-2">Απίστευτες ευκαιρίες για αποδράσεις σε μαγευτικές ευρωπαϊκές πρωτεύουσες.</p>
+<button class="bg-secondary-container hover:bg-[#e6a500] text-[#1D1D1F] font-label-md text-label-md px-sm py-2 rounded-lg transition-colors shadow-lg active:scale-95 flex items-center gap-1 w-full justify-center">
+                        Δες προσφορές
+                    </button>
+</div>
+</div>
+<!-- Banner 3: Flash Sale -->
+<div class="relative rounded-xl overflow-hidden shadow-[0px_10px_30px_rgba(0,0,0,0.05)] group h-[280px] md:h-[400px]">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="A dynamic, high-contrast image of a luxury resort pool area at night. Underwater lighting illuminates the pool in vibrant turquoise hues, contrasting with the sleek, modern architecture of the resort. A few palm trees are silhouetted against the night sky. The image conveys an exclusive, urgent, and premium atmosphere, perfectly aligned with a high-end, time-limited flash sale concept for a travel agency." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBWWSZE57W5HK8VtYfnaAHZtU64nJCU1uqbk0uaT9vrllxVn0qCIuDO3SX6t06f1cWduZtRkaWFCdpdLSJhmEVLENNJSxAYUc7Fk8tCDz-slmw9LR8Kg3XXGE1Rw75B4HWxZoChxfSRB9681o1aV0nNJJ3eljKNHQDMMUaxvjjwPqLnr14eH9iX8EyJAAByC6Kp1OI8AdIL8zsN09yrnt72k4zBKTDGc7_5bQUqNbYvrPU1cStdqNO_LBhqhwHHFY0RPpTf5xh8XhWC');">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-[#001d32]/90 via-[#001d32]/40 to-transparent"></div>
+<div class="absolute top-margin-mobile right-margin-mobile bg-white/20 backdrop-blur-md text-white border border-white/30 px-3 py-1 rounded-full flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] animate-pulse">timer</span>
+<span class="font-label-md text-label-md font-mono" id="countdown">23:59:59</span>
+</div>
+<div class="absolute bottom-margin-mobile left-margin-mobile right-margin-mobile text-white">
+<h3 class="font-headline-md text-headline-md mb-xs drop-shadow-md text-secondary-fixed-dim">Flash Sale</h3>
+<p class="font-body-md text-body-md text-surface-container-low mb-sm drop-shadow-md">Αποκλειστικές τιμές για τις επόμενες 24 ώρες. Μην το χάσεις!</p>
+<button class="bg-secondary-container hover:bg-[#e6a500] text-[#1D1D1F] font-label-md text-label-md px-sm py-2 rounded-lg transition-colors shadow-lg active:scale-95 flex items-center gap-1 w-full justify-center">
+                        Ανακάλυψε τες
+                    </button>
+</div>
+</div>
+</div>
+<!-- Additional Categories (Bento style) -->
+<div class="p-margin-mobile md:p-0 md:mt-margin-desktop mt-8">
+<h2 class="font-headline-md-mobile text-headline-md-mobile md:font-headline-md md:text-headline-md text-on-surface mb-margin-mobile">Περισσότερες Επιλογές</h2>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-[0px_10px_30px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center text-center gap-2 hover:-translate-y-1 transition-transform cursor-pointer border border-surface-variant/50">
+<div class="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">flight</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface">Πτήσεις</span>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-[0px_10px_30px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center text-center gap-2 hover:-translate-y-1 transition-transform cursor-pointer border border-surface-variant/50">
+<div class="w-12 h-12 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">hotel</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface">Ξενοδοχεία</span>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile only) -->
+<nav class="fixed bottom-0 w-full z-50 shadow-[0px_-2px_10px_rgba(0,0,0,0.05)] bg-surface dark:bg-inverse-surface flex justify-around items-center px-4 py-2 w-full md:hidden pb-safe">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200 rounded-lg p-1" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200 rounded-lg p-1" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">search</span>
+<span class="font-label-sm text-label-sm">Search</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary-container text-on-primary-container dark:text-on-primary-container rounded-full px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">confirmation_number</span>
+<span class="font-label-sm text-label-sm">Bookings</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200 rounded-lg p-1" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">person</span>
+<span class="font-label-sm text-label-sm">Profile</span>
+</a>
+</nav>
+<script>
+        // Simple countdown logic for Flash Sale
+        function updateCountdown() {
+            const countdownEl = document.getElementById('countdown');
+            if(!countdownEl) return;
+            
+            let [hours, minutes, seconds] = countdownEl.innerText.split(':').map(Number);
+            
+            if (hours === 0 && minutes === 0 && seconds === 0) return;
+
+            seconds--;
+            if (seconds < 0) {
+                seconds = 59;
+                minutes--;
+                if (minutes < 0) {
+                    minutes = 59;
+                    hours--;
+                }
+            }
+            
+            countdownEl.innerText = 
+                String(hours).padStart(2, '0') + ':' + 
+                String(minutes).padStart(2, '0') + ':' + 
+                String(seconds).padStart(2, '0');
+        }
+
+        setInterval(updateCountdown, 1000);
+    </script>
+</body></html>

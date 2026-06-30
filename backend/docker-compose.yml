@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: aerostride_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aerostride_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepassword}
+      POSTGRES_DB: ${POSTGRES_DB:-aerostride_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - aerostride_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: aerostride_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - aerostride_network
+
+  web:
+    build: .
+    container_name: aerostride_fastapi
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aerostride_user}:${POSTGRES_PASSWORD:-securepassword}@db:5432/${POSTGRES_DB:-aerostride_db}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+    networks:
+      - aerostride_network
+
+volumes:
+  postgres_data:
+
+networks:
+  aerostride_network:
+    driver: bridge

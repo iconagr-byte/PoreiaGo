@@ -1,0 +1,152 @@
+# Project OLYMPUS — full enterprise stack (local / staging)
+# Usage: docker compose -f docker-compose.olympus.yml up -d
+
+name: project-olympus
+
+services:
+  traefik:
+    image: traefik:v3.2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-dev@olympus-saas.com}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./deploy/traefik/traefik.olympus.yml:/etc/traefik/traefik.yml:ro
+      - ./deploy/traefik/dynamic:/etc/traefik/dynamic:ro
+      - traefik_acme:/acme
+    networks:
+      - olympus_edge
+
+  db:
+    image: postgis/postgis:15-3.3
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-olympus_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-olympus_dev_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-olympus_master}
+    ports:
+      - "5432:5432"
+    volumes:
+      - olympus_pg_data:/var/lib/postgresql/data
+      - ./deploy/postgres/init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-olympus_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - olympus_internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - olympus_internal
+
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-olympus_user}:${POSTGRES_PASSWORD:-olympus_dev_pass}@db:5432/${POSTGRES_DB:-olympus_master}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-change-me-olympus-dev}
+      OLYMPUS_BASE_DOMAIN: ${OLYMPUS_BASE_DOMAIN:-olympus-saas.com}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.olympus-api-host.rule=Host(`api.${OLYMPUS_BASE_DOMAIN:-olympus-saas.com}`) || Host(`api.localhost`)
+      - traefik.http.routers.olympus-api-host.entrypoints=websecure
+      - traefik.http.routers.olympus-api-host.tls.certresolver=letsencrypt
+      - traefik.http.services.olympus-api-host.loadbalancer.server.port=8000
+    networks:
+      - olympus_edge
+      - olympus_internal
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["celery", "-A", "workers.celery_app", "worker", "--loglevel=info"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-olympus_user}:${POSTGRES_PASSWORD:-olympus_dev_pass}@db:5432/${POSTGRES_DB:-olympus_master}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+      - db
+    networks:
+      - olympus_internal
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["celery", "-A", "workers.celery_app", "beat", "--loglevel=info"]
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - olympus_internal
+
+  aade-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "app.workers.aade_consumer"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-olympus_user}:${POSTGRES_PASSWORD:-olympus_dev_pass}@db:5432/${POSTGRES_DB:-olympus_master}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+      - db
+    networks:
+      - olympus_internal
+
+  telemetry-consumer:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["python", "-c", "import asyncio; from travel_platform.telemetry.processor import run_consumer; asyncio.run(run_consumer())"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-olympus_user}:${POSTGRES_PASSWORD:-olympus_dev_pass}@db:5432/${POSTGRES_DB:-olympus_master}
+    depends_on:
+      - redis
+    networks:
+      - olympus_internal
+
+volumes:
+  olympus_pg_data:
+  traefik_acme:
+
+networks:
+  olympus_edge:
+    driver: bridge
+  olympus_internal:
+    driver: bridge

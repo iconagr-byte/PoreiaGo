@@ -1,0 +1,49 @@
+# Custom tenant domains — on-demand TLS (TLS-ALPN-01)
+# Traefik asks FastAPI before issuing cert for unknown Host
+
+http:
+  routers:
+    olympus-custom-domains:
+      rule: HostRegexp(`{host:.+}`) && !HostRegexp(`{sub:[a-z0-9-]+}.olympus-saas.com`) && !Host(`api.olympus-saas.com`)
+      entryPoints:
+        - websecure
+      service: olympus-api
+      priority: 1
+      tls:
+        certResolver: ondemand
+        domains:
+          - main: "{host}"
+      middlewares:
+        - security-headers@file
+
+    olympus-wildcard-tenants:
+      rule: HostRegexp(`{sub:[a-z0-9-]+}.olympus-saas.com`) && !Host(`api.olympus-saas.com`)
+      entryPoints:
+        - websecure
+      service: olympus-frontend
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "olympus-saas.com"
+            sans:
+              - "*.olympus-saas.com"
+
+  services:
+    olympus-api:
+      loadBalancer:
+        servers:
+          - url: "http://web:8000"
+    olympus-frontend:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:80"
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true
+
+  certificates:
+    - certFile: /etc/traefik/certs/local-dev.crt
+      keyFile: /etc/traefik/certs/local-dev.key

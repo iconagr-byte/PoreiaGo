@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="GPS ������">
+  <rect width="512" height="512" rx="96" fill="#0a0a0a"/>
+  <circle cx="256" cy="268" r="168" fill="#0040df"/>
+  <circle cx="256" cy="268" r="168" fill="none" stroke="#facc15" stroke-width="20"/>
+  <!-- GPS pin -->
+  <path fill="#facc15" d="M256 88c-38 0-68 30-68 68 0 52 68 120 68 120s68-68 68-120c0-38-30-68-68-68zm0 92a24 24 0 1 1 0-48 24 24 0 0 1 0 48z"/>
+  <!-- Bus body -->
+  <rect x="148" y="228" width="216" height="128" rx="28" fill="#facc15"/>
+  <rect x="168" y="248" width="176" height="72" rx="12" fill="#0a0a0a" opacity="0.25"/>
+  <circle cx="196" cy="368" r="28" fill="#171717" stroke="#facc15" stroke-width="8"/>
+  <circle cx="316" cy="368" r="28" fill="#171717" stroke="#facc15" stroke-width="8"/>
+  <rect x="168" y="210" width="176" height="36" rx="10" fill="#ffffff"/>
+</svg>

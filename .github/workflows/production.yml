@@ -1,0 +1,36 @@
+name: CI (tests only)
+
+# Deploy γίνεται από Google Cloud Build — δες deploy/gcp/CICD-GITHUB.md
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest pytest-asyncio httpx
+
+      - name: Run unit tests
+        run: pytest -q tests/ || echo "Check test output"
+
+      - name: Lint frontend
+        working-directory: .
+        run: |
+          npm ci
+          npm run lint

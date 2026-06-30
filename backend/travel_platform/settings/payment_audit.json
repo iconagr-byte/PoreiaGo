@@ -1,0 +1,16 @@
+[
+  {
+    "id": "492c296c2e86491d",
+    "at": "2026-06-28T21:48:53.705641+00:00",
+    "action": "fiscal_receipt_retry",
+    "booking_id": "B-1",
+    "amount_eur": 50.0,
+    "reference": null,
+    "actor_id": null,
+    "detail": null,
+    "metadata": {
+      "invoice_id": "2b35ea61-6645-40ee-8174-e15c32b03fdf",
+      "trigger": "manual"
+    }
+  }
+]

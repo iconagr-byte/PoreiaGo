@@ -1,0 +1,11 @@
+# Dev overlay — publish API on localhost (use with: make stack-full)
+# Hybrid dev (API on host) uses make dev-infra only — no web container needed.
+
+services:
+  web:
+    ports:
+      - "8000:8000"
+
+  traefik:
+    profiles:
+      - edge

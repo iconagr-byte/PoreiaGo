@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Booking Confirmed - Voyage</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings:
+            'FILL' 0,
+            'wght' 400,
+            'GRAD' 0,
+            'opsz' 24;
+        }
+        
+        .success-animation {
+            animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        
+        @keyframes popIn {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#7d5800",
+                        "primary-container": "#0077b6",
+                        "tertiary": "#266449",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7ea",
+                        "outline-variant": "#bfc7d1",
+                        "on-secondary-fixed": "#271900",
+                        "on-primary-container": "#f3f7ff",
+                        "surface-variant": "#e4e2e4",
+                        "inverse-surface": "#303032",
+                        "surface-dim": "#dcd9dc",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#94ccff",
+                        "surface-container-highest": "#e4e2e4",
+                        "on-secondary-fixed-variant": "#5e4100",
+                        "surface-container": "#f0edef",
+                        "secondary-fixed": "#ffdea9",
+                        "secondary-container": "#ffb702",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#006399",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#0e5138",
+                        "primary-fixed-dim": "#94ccff",
+                        "error": "#ba1a1a",
+                        "outline": "#707881",
+                        "on-tertiary-fixed": "#002114",
+                        "secondary-fixed-dim": "#ffba27",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#1b1b1d",
+                        "on-primary-fixed": "#001d32",
+                        "on-tertiary-container": "#dfffeb",
+                        "on-surface-variant": "#404850",
+                        "on-primary": "#ffffff",
+                        "on-background": "#1b1b1d",
+                        "primary": "#005d90",
+                        "surface-bright": "#fcf8fb",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#fcf8fb",
+                        "tertiary-fixed-dim": "#95d4b3",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#b1f0ce",
+                        "surface-container-low": "#f6f3f5",
+                        "on-secondary-container": "#6b4b00",
+                        "on-primary-fixed-variant": "#004b74",
+                        "primary-fixed": "#cde5ff",
+                        "surface": "#fcf8fb",
+                        "tertiary-container": "#417d61"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "lg": "48px",
+                        "gutter": "24px",
+                        "base": "8px",
+                        "margin-desktop": "64px",
+                        "xs": "4px",
+                        "xl": "80px",
+                        "sm": "12px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Montserrat"],
+                        "headline-xl": ["Montserrat"],
+                        "headline-md": ["Montserrat"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-xl": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col justify-center items-center p-margin-mobile md:p-margin-desktop antialiased">
+<!-- Transactional Screen - No Global Nav Shell -->
+<main class="w-full max-w-[600px] flex flex-col items-center">
+<!-- Success Animation/Icon -->
+<div class="success-animation flex items-center justify-center w-32 h-32 rounded-full bg-tertiary-container/10 mb-lg">
+<span class="material-symbols-outlined text-tertiary text-6xl" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<!-- Header -->
+<div class="text-center mb-xl success-animation" style="animation-delay: 0.1s;">
+<h1 class="font-headline-xl text-headline-xl text-on-background mb-sm hidden md:block">Booking Confirmed!</h1>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background mb-sm block md:hidden">Booking Confirmed!</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Your adventure awaits. We've sent a confirmation email to you.</p>
+</div>
+<!-- Summary Card -->
+<div class="w-full bg-surface-container-lowest rounded-xl shadow-[0px_10px_30px_rgba(0,0,0,0.05)] p-md mb-xl success-animation" style="animation-delay: 0.2s;">
+<div class="flex items-center space-x-md mb-md pb-md border-b border-surface-variant">
+<div class="w-20 h-20 rounded-lg overflow-hidden shrink-0">
+<img alt="Paris" class="w-full h-full object-cover" data-alt="A bright, airy photograph of the Eiffel Tower in Paris on a sunny day. The image is taken from an interesting, slightly low angle, showing the intricate ironwork against a clear blue sky. The lighting is soft and natural, fitting a premium travel brand aesthetic with high clarity and a modern, optimistic mood." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDT_lhaEcQtXlTdig5KdMdbxG99BIXXzjdfBJYI88Z6Ku1Y6wX31XR7sj1ccDOljnnArxDzSjYdOa8tJHMK6UYg51LZpVbbPnxK6g7W8oixIbJvlFrvEj13wl8AbeB8fzyX1FP4Y6hX_yrYH9LW7wGYfDiKfyhiiQeyqNGyVZ9cX56IvbTBtSFeZnMb0S107FZnzRK3GAJYhHP00X_IT743GEjFoU-WZFlOYTFobD_nTdP_Li8CZkb4U2gC06Sflb8Z5SnNdtpvVd8s"/>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-xs hidden md:block">Paris Getaway</h3>
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-xs block md:hidden">Paris Getaway</h3>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-lg" data-icon="location_on">location_on</span> Paris, France
+                    </p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-md">
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-xs">DATES</p>
+<p class="font-body-md text-body-md text-on-surface font-medium">Oct 12 - Oct 18</p>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-xs">GUESTS</p>
+<p class="font-body-md text-body-md text-on-surface font-medium">2 Adults</p>
+</div>
+<div class="col-span-2">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-xs">BOOKING REFERENCE</p>
+<p class="font-body-md text-body-md text-primary font-medium tracking-wider">#VYG-9824-FR</p>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="w-full flex flex-col sm:flex-row gap-sm success-animation" style="animation-delay: 0.3s;">
+<button class="flex-1 bg-primary text-on-primary font-label-md text-label-md py-4 px-6 rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="description">description</span> View Itinerary
+            </button>
+<button class="flex-1 bg-transparent border-2 border-primary text-primary font-label-md text-label-md py-4 px-6 rounded-lg hover:bg-primary/5 transition-colors flex items-center justify-center gap-2">
+                Return to Home
+            </button>
+</div>
+</main>
+</body></html>

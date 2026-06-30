@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demo Εισιτήριο — PoreiaGo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #e8eaef;
+      color: #111;
+    }
+  </style>
+</head>
+<body>
+  <p style="text-align:center;color:#555;font-size:14px;margin-bottom:20px;">
+    Demo εισιτήριο (στατικό HTML) — <strong>Ctrl+P</strong> για εκτύπωση / PDF
+  </p>
+  <div id="ticket"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    const booking = {
+      company: 'PoreiaGo Travel',
+      trip: 'Ημερήσια στα Μετέωρα',
+      date: 'Κυριακή, 15 Ιουνίου 2026',
+      time: '08:00',
+      passenger: 'John Doe',
+      seat: '4A',
+      pnr: 'MET26JDOE8A',
+      price: '€45.00',
+      phone: '+30 694 123 4567',
+      invoice: 'INV-2026-00125',
+      id: 'B-1029',
+      email: 'john@example.com',
+    };
+
+    document.getElementById('ticket').innerHTML = `
+      <div style="max-width:420px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.12);border:1px solid #e5e7eb;">
+        <div style="background:linear-gradient(135deg,#0040df,#002a96);color:#fff;padding:20px 24px;">
+          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.85;">${booking.company}</div>
+          <h1 style="margin:8px 0 0;font-size:20px;">${booking.trip}</h1>
+          <p style="margin:8px 0 0;font-size:13px;opacity:.9;">${booking.date} · Αναχώρηση ${booking.time}</p>
+        </div>
+        <div style="height:16px;background:#fff;position:relative;">
+          <div style="position:absolute;left:0;right:0;top:50%;margin:0 24px;border-top:2px dashed #e5e7eb;"></div>
+        </div>
+        <div style="padding:20px 24px 24px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px 12px;margin-bottom:20px;">
+            <div><div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;">Επιβάτης</div><div style="font-weight:700;">${booking.passenger}</div></div>
+            <div><div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;">Θέση</div><div style="font-weight:700;font-size:22px;color:#0040df;">${booking.seat}</div></div>
+            <div><div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;">PNR</div><div style="font-family:monospace;font-weight:700;">${booking.pnr}</div></div>
+            <div><div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;">Τιμή</div><div style="font-weight:700;">${booking.price}</div></div>
+          </div>
+          <div style="text-align:center;border-top:1px solid #f3f4f6;padding-top:18px;">
+            <div id="qrcode" style="display:inline-block;padding:12px;border:2px dashed #e5e7eb;border-radius:12px;background:#fafafa;"></div>
+            <div style="font-family:monospace;font-weight:800;font-size:18px;letter-spacing:.15em;margin-top:12px;">${booking.pnr}</div>
+            <p style="font-size:10px;color:#9ca3af;margin-top:6px;">Σκανάρετε κατά την επιβίβαση</p>
+          </div>
+          <p style="font-size:10px;color:#6b7280;margin-top:16px;padding-top:12px;border-top:1px solid #f3f4f6;">
+            Κράτηση #${booking.id} · ${booking.email}
+          </p>
+        </div>
+      </div>
+    `;
+
+    new QRCode(document.getElementById('qrcode'), {
+      text: booking.pnr,
+      width: 180,
+      height: 180,
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+
+<html lang="el"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Voyage - Ταξίδια Εσωτερικού</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#303032",
+                        "surface-container-high": "#eae7ea",
+                        "on-surface": "#1b1b1d",
+                        "on-primary-fixed-variant": "#004b74",
+                        "secondary-fixed-dim": "#ffba27",
+                        "on-primary-fixed": "#001d32",
+                        "surface-container-low": "#f6f3f5",
+                        "secondary-container": "#ffb702",
+                        "outline-variant": "#bfc7d1",
+                        "error-container": "#ffdad6",
+                        "inverse-primary": "#94ccff",
+                        "on-tertiary-container": "#dfffeb",
+                        "secondary": "#7d5800",
+                        "on-secondary-container": "#6b4b00",
+                        "surface": "#fcf8fb",
+                        "primary-container": "#0077b6",
+                        "surface-tint": "#006399",
+                        "surface-container": "#f0edef",
+                        "on-error": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#fcf8fb",
+                        "on-surface-variant": "#404850",
+                        "on-secondary-fixed-variant": "#5e4100",
+                        "outline": "#707881",
+                        "on-primary-container": "#f3f7ff",
+                        "surface-variant": "#e4e2e4",
+                        "on-secondary": "#ffffff",
+                        "primary": "#005d90",
+                        "tertiary": "#266449",
+                        "surface-container-highest": "#e4e2e4",
+                        "on-primary": "#ffffff",
+                        "on-background": "#1b1b1d",
+                        "secondary-fixed": "#ffdea9",
+                        "tertiary-fixed": "#b1f0ce",
+                        "on-tertiary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed": "#002114",
+                        "on-tertiary-fixed-variant": "#0e5138",
+                        "tertiary-container": "#417d61",
+                        "primary-fixed-dim": "#94ccff",
+                        "surface-dim": "#dcd9dc",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed": "#271900",
+                        "tertiary-fixed-dim": "#95d4b3",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-bright": "#fcf8fb",
+                        "primary-fixed": "#cde5ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "80px",
+                        "md": "24px",
+                        "lg": "48px",
+                        "xs": "4px",
+                        "margin-desktop": "64px",
+                        "base": "8px",
+                        "margin-mobile": "16px",
+                        "sm": "12px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Montserrat"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "headline-md": ["Montserrat"],
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-xl": ["Montserrat"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "500" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-xl": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #fcf8fb; /* surface-bright */
+            color: #1b1b1d; /* on-surface */
+        }
+        .card-shadow {
+            box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05);
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            transition: transform 0.3s ease;
+        }
+        /* Hide scrollbar for horizontal scrolling */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="font-body-md text-body-md antialiased pb-24">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md bg-transparent transition-all duration-300 ease-in-out h-16 flex justify-between items-center px-margin-mobile">
+<button class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined">travel_explore</span>
+</button>
+<h1 class="font-headline-md-mobile text-headline-md-mobile font-bold text-primary dark:text-primary-fixed-dim">Voyage</h1>
+<button class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</header>
+<!-- Main Content -->
+<main class="pt-24 px-margin-mobile flex flex-col gap-8">
+<!-- Page Header -->
+<section>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-2">Ταξίδια Εσωτερικού</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Ανακαλύψτε μαγευτικούς προορισμούς στην Ελλάδα. Από βουνά μέχρι καταγάλανα νερά.</p>
+</section>
+<!-- Filters (Chips) -->
+<section class="flex gap-3 overflow-x-auto no-scrollbar py-2">
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md">Όλα</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-variant transition-colors">Δημοφιλή</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-variant transition-colors">Βουνό</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-variant transition-colors">Θάλασσα</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-tertiary/10 text-tertiary font-label-md text-label-md hover:bg-tertiary/20 transition-colors">Οικολογικά</button>
+</section>
+<!-- Destinations Grid -->
+<section class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+<!-- Card: Meteora -->
+<article class="bg-surface-container-lowest rounded-[16px] card-shadow card-hover overflow-hidden flex flex-col group">
+<div class="relative w-full h-48">
+<img alt="Meteora monasteries on rock formations" class="w-full h-full object-cover rounded-t-[16px] transition-transform duration-500 group-hover:scale-105" data-alt="A breathtaking view of the Meteora monasteries in Greece, perched precariously atop towering, smooth sandstone rock pillars. The scene is bathed in golden hour sunlight, casting warm orange and pink hues across the dramatic landscape. Mist softly clings to the valley floor below, adding an ethereal mood. The aesthetic is epic, serene, and perfectly captures the grandeur of Greek nature in a premium travel style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFvSfwCfeI0oBTQOpHE100qMBGP_nA8HnvwzgAQnu7ajqvLe6wo1KdwaK1gvA-xsBnpw8RFu23J9Csd4Gvg3z2b5M5iywT-lCfM5Xs_-GKj3xUfRSa8fGEDVZRa_mBRNMKaPoaKR9-YwmMoQMvHsN4evqNZ_c6wfiaRFPNzQ2SvikObTnj1MSSDYQ40y1Z_ls3NO5qKl9OKppy-yUdBI01prtBad-bVQW5rqlQ2jP9TpMkAmm4rl3OIaPC_fa-Dc99l9YMuR6Dxx1N"/>
+<div class="absolute top-4 left-4 bg-surface-container-lowest/90 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-secondary-container" style="font-size: 16px; font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">4.9</span>
+</div>
+</div>
+<div class="p-4 flex flex-col flex-grow">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Μετέωρα</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 flex-grow">Επιβλητικοί βράχοι και ιστορικά μοναστήρια σε ένα τοπίο που κόβει την ανάσα.</p>
+<div class="flex items-end justify-between mt-auto">
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Από</p>
+<p class="font-headline-md text-headline-md text-primary font-bold">120€<span class="font-body-md text-body-md text-on-surface-variant font-normal">/άτομο</span></p>
+</div>
+<button class="bg-secondary-container text-on-surface px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-secondary-fixed-dim transition-colors flex items-center gap-2">
+                            Δείτε περισσότερα
+                            <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Card: Chania -->
+<article class="bg-surface-container-lowest rounded-[16px] card-shadow card-hover overflow-hidden flex flex-col group">
+<div class="relative w-full h-48">
+<img alt="Chania old harbor" class="w-full h-full object-cover rounded-t-[16px] transition-transform duration-500 group-hover:scale-105" data-alt="A picturesque view of the Old Venetian Harbor in Chania, Crete, Greece. The calm waters reflect the colorful, historic buildings lining the promenade, featuring warm terracotta, faded yellow, and white facades. The iconic lighthouse stands proudly at the entrance to the harbor under a clear, bright blue sky. The lighting is sunny and vibrant, creating a cheerful, inviting, and premium Mediterranean vacation aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBswKqhVgKKz86kUhDfqgTyZzKwK3LCUSCUhpTAfcztltx5yz7lTVELCqCEmkOHLKPuJcPXg5vRBjrwOMRcFWmnGhhGPT9ulodLor2LZedcxQhA0H2uYsY3H64B6SaIUvWNRjeaT-4JAjd7T-6Oxb_gTbyReAkyRmsCR42BN_lGSyeEnO1uMttkxP18uZdLIkSed9yZ9Lbr6aU_VF0wuEfacF5Bux_6KSHskfVmrok8kD66F5yVR9VJMQk9O6OfbVthJ6B38xqJkeK6"/>
+<div class="absolute top-4 left-4 bg-surface-container-lowest/90 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-secondary-container" style="font-size: 16px; font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">4.8</span>
+</div>
+</div>
+<div class="p-4 flex flex-col flex-grow">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Χανιά</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 flex-grow">Περιπλανηθείτε στο παλιό ενετικό λιμάνι και απολαύστε την κρητική φιλοξενία.</p>
+<div class="flex items-end justify-between mt-auto">
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Από</p>
+<p class="font-headline-md text-headline-md text-primary font-bold">150€<span class="font-body-md text-body-md text-on-surface-variant font-normal">/άτομο</span></p>
+</div>
+<button class="bg-secondary-container text-on-surface px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-secondary-fixed-dim transition-colors flex items-center gap-2">
+                            Δείτε περισσότερα
+                            <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Card: Pelion -->
+<article class="bg-surface-container-lowest rounded-[16px] card-shadow card-hover overflow-hidden flex flex-col group">
+<div class="relative w-full h-48">
+<img alt="Pelion village view" class="w-full h-full object-cover rounded-t-[16px] transition-transform duration-500 group-hover:scale-105" data-alt="A lush, green mountainous landscape of Pelion, Greece, with traditional stone houses nestled among dense forests of oak and chestnut trees. The view looks down towards the deep blue Aegean sea in the distance. The lighting is bright and natural, highlighting the rich textures of the stone roofs and vibrant foliage. The mood is tranquil, authentic, and luxurious, fitting a high-end nature retreat aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAkMz7SZDBpVyJdDaZMAk2maZt1qvL9yo1Ll43X3s5PiYL2A_tfTu7iy8KHIsSsen5MpKs9z2gp3buu-7LxOZ4xzu7cWsJpZPljQ6gI7g0krdlRnYwB4V8j2nKfU92EAdw7-B8nVqokJYAzZhhcsk_oyQIF_UZytErKxP8htTBPewdcn_O48-aQjt0zAzePwh20aS8dcdVW4y3nRLL9rpml-ri_ege0QydFDQt7BAbE3_KeJrZHoKN1Rni4KPAg5pYoJ6QgwaDmmRTf"/>
+<div class="absolute top-4 left-4 bg-tertiary/10 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1 border border-tertiary/20">
+<span class="material-symbols-outlined text-tertiary" style="font-size: 16px;">eco</span>
+<span class="font-label-sm text-label-sm font-bold text-tertiary">Φύση</span>
+</div>
+</div>
+<div class="p-4 flex flex-col flex-grow">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Πήλιο</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 flex-grow">Ο τέλειος συνδυασμός βουνού και θάλασσας με παραδοσιακή αρχιτεκτονική.</p>
+<div class="flex items-end justify-between mt-auto">
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Από</p>
+<p class="font-headline-md text-headline-md text-primary font-bold">95€<span class="font-body-md text-body-md text-on-surface-variant font-normal">/άτομο</span></p>
+</div>
+<button class="bg-secondary-container text-on-surface px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-secondary-fixed-dim transition-colors flex items-center gap-2">
+                            Δείτε περισσότερα
+                            <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Card: Rhodes -->
+<article class="bg-surface-container-lowest rounded-[16px] card-shadow card-hover overflow-hidden flex flex-col group">
+<div class="relative w-full h-48">
+<img alt="Rhodes old town street" class="w-full h-full object-cover rounded-t-[16px] transition-transform duration-500 group-hover:scale-105" data-alt="A charming, narrow cobblestone street in the Old Town of Rhodes, Greece. Medieval stone walls rise on either side, adorned with vibrant magenta bougainvillea flowers cascading down. A softly lit lantern hangs above, adding a touch of romance to the scene. The lighting suggests early evening with warm, ambient tones contrasting with the cool stone. The aesthetic is historical, elegant, and perfectly suited for a premium travel discovery experience." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNuG8Y1hIQxh2QiuquK8fMr0VBZHLn2p0D9qEyWmSJVTnwU-AncxYhTnuBBNq9LypOKB4iMcaL2WFClRmLIm_GtUx6Roc1meRSvxZWKI5dotjkyJIJob17a3-MG17zdzbjyqvyHk-32miCz_VrgiOX95pq3uN-HcB7X7CCelnE9QRikHu9oYMc_EraXUaf-B2S5zgQm0ESEsokUOIHfkR_whAMfNzhXURsJZON3GqfKdWS_XJ51JomKl3-3RMji_MITOtS54D-zE5v"/>
+<div class="absolute top-4 left-4 bg-surface-container-lowest/90 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-secondary-container" style="font-size: 16px; font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">4.7</span>
+</div>
+</div>
+<div class="p-4 flex flex-col flex-grow">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Ρόδος</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 flex-grow">Εξερευνήστε τη μεσαιωνική πόλη και τις ατελείωτες χρυσαφένιες παραλίες.</p>
+<div class="flex items-end justify-between mt-auto">
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Από</p>
+<p class="font-headline-md text-headline-md text-primary font-bold">180€<span class="font-body-md text-body-md text-on-surface-variant font-normal">/άτομο</span></p>
+</div>
+<button class="bg-secondary-container text-on-surface px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-secondary-fixed-dim transition-colors flex items-center gap-2">
+                            Δείτε περισσότερα
+                            <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</article>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 shadow-[0px_-2px_10px_rgba(0,0,0,0.05)] bg-surface dark:bg-inverse-surface flex justify-around items-center px-4 py-2">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-label-md text-label-md text-[10px]">Αρχική</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary-container text-on-primary-container dark:text-on-primary-container rounded-full px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">search</span>
+<span class="font-label-md text-label-md text-[10px]">Αναζήτηση</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined mb-1">confirmation_number</span>
+<span class="font-label-md text-label-md text-[10px]">Κρατήσεις</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined mb-1">person</span>
+<span class="font-label-md text-label-md text-[10px]">Προφίλ</span>
+</a>
+</nav>
+</body></html>

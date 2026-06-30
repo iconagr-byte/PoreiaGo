@@ -1,0 +1,47 @@
+{
+  "deposit": {
+    "enabled": true,
+    "percent": 30
+  },
+  "methods": {
+    "card": {
+      "enabled": true,
+      "label": "Πιστωτική / Χρεωστική"
+    },
+    "paypal": {
+      "enabled": true,
+      "label": "PayPal"
+    },
+    "apple": {
+      "enabled": true,
+      "label": "Apple Pay"
+    },
+    "bank_transfer": {
+      "enabled": true,
+      "label": "Τραπεζική μεταφορά"
+    }
+  },
+  "bank_accounts": [
+    {
+      "id": "bank-default",
+      "label": "Eurobank EUR",
+      "bank_name": "Eurobank",
+      "beneficiary": "AeroStride Travel AE",
+      "iban": "GR1601101250000000012300695",
+      "bic": "ERBKGRAA",
+      "currency": "EUR",
+      "enabled": true,
+      "is_default": true,
+      "reference_template": "VOY-{pnr}",
+      "instructions": "Μετά την κατάθεση, στείλτε την απόδειξη στο email υποστήριξης. Η κράτηση επιβεβαιώνεται εντός 24 ωρών."
+    }
+  ],
+  "global_bank_instructions": "",
+  "security": {
+    "require_amount_on_confirm": true,
+    "require_reference_on_confirm": true,
+    "validate_iban_checksum": true,
+    "audit_payment_actions": true,
+    "mask_iban_public": false
+  }
+}

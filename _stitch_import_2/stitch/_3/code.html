@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Itinerary Details - Voyage</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary": "#7d5800",
+                    "primary-container": "#0077b6",
+                    "tertiary": "#266449",
+                    "inverse-on-surface": "#f3f0f2",
+                    "surface-container-high": "#eae7ea",
+                    "outline-variant": "#bfc7d1",
+                    "on-secondary-fixed": "#271900",
+                    "on-primary-container": "#f3f7ff",
+                    "surface-variant": "#e4e2e4",
+                    "inverse-surface": "#303032",
+                    "surface-dim": "#dcd9dc",
+                    "on-secondary": "#ffffff",
+                    "inverse-primary": "#94ccff",
+                    "surface-container-highest": "#e4e2e4",
+                    "on-secondary-fixed-variant": "#5e4100",
+                    "surface-container": "#f0edef",
+                    "secondary-fixed": "#ffdea9",
+                    "secondary-container": "#ffb702",
+                    "on-error": "#ffffff",
+                    "surface-tint": "#006399",
+                    "on-error-container": "#93000a",
+                    "on-tertiary-fixed-variant": "#0e5138",
+                    "primary-fixed-dim": "#94ccff",
+                    "error": "#ba1a1a",
+                    "outline": "#707881",
+                    "on-tertiary-fixed": "#002114",
+                    "secondary-fixed-dim": "#ffba27",
+                    "on-tertiary": "#ffffff",
+                    "on-surface": "#1b1b1d",
+                    "on-primary-fixed": "#001d32",
+                    "on-tertiary-container": "#dfffeb",
+                    "on-surface-variant": "#404850",
+                    "on-primary": "#ffffff",
+                    "on-background": "#1b1b1d",
+                    "primary": "#005d90",
+                    "surface-bright": "#fcf8fb",
+                    "surface-container-lowest": "#ffffff",
+                    "background": "#fcf8fb",
+                    "tertiary-fixed-dim": "#95d4b3",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed": "#b1f0ce",
+                    "surface-container-low": "#f6f3f5",
+                    "on-secondary-container": "#6b4b00",
+                    "on-primary-fixed-variant": "#004b74",
+                    "primary-fixed": "#cde5ff",
+                    "surface": "#fcf8fb",
+                    "tertiary-container": "#417d61"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "24px",
+                    "lg": "48px",
+                    "gutter": "24px",
+                    "base": "8px",
+                    "margin-desktop": "64px",
+                    "xs": "4px",
+                    "xl": "80px",
+                    "sm": "12px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Inter"],
+                    "headline-lg-mobile": ["Montserrat"],
+                    "label-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-lg": ["Montserrat"],
+                    "headline-xl": ["Montserrat"],
+                    "headline-md": ["Montserrat"]
+            },
+            "fontSize": {
+                    "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "headline-xl": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        /* Ambient shadows and smooth transitions */
+        .ambient-shadow {
+            box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05);
+        }
+        .lift-on-hover {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .lift-on-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0px 15px 45px rgba(0, 0, 0, 0.08);
+        }
+        /* Hide scrollbar for clean horizontal scrolls */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md antialiased pb-xl min-h-screen">
+<!-- Contextual Header (Overrides Shell for Task Focus) -->
+<header class="sticky top-0 z-50 bg-surface/90 backdrop-blur-md shadow-[0px_2px_10px_rgba(0,0,0,0.02)] px-margin-mobile md:px-margin-desktop h-16 flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<button class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-primary flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-on-surface">Paris Getaway</h1>
+</div>
+<button class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-primary flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">more_vert</span>
+</button>
+</header>
+<!-- Hero Image Section -->
+<section class="px-margin-mobile md:px-margin-desktop py-md">
+<div class="relative w-full h-48 md:h-64 rounded-xl overflow-hidden ambient-shadow">
+<img alt="Paris landscape" class="w-full h-full object-cover" data-alt="A stunning, wide-angle landscape photograph of the Eiffel Tower in Paris during golden hour, bathing the scene in warm, optimistic light. The composition is expansive and airy, aligning with a premium, frictionless travel aesthetic. The sky is a clear, vibrant blue that perfectly complements the brand's Travel Blue accents, while the foreground features lush green trees adding a touch of natural elegance. The overall mood is aspirational and professional, capturing the essence of a modern, high-end travel experience." data-location="Paris, France" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9kcGKy003blfyC2g7wIeGAoVXG0lIChoj_h8PYfZCqFJanwNrTyPEdPsdLrr7eN59yIRBxCtQOWaX92SfpMo3fsJcBbUSijE0hrK7iehufKdag8JZ6SSgXMP7drCJKPOT0p0eRn0t_4tzDUummtSSjvl7nSx16ipCFGRncz_wZB7NI_RAiJpmRRUi1g1R3d3JVxKsMEZddHk5UlyJknf6zyN8fsmX2Y4_c53qDYwsEcfqu-VPi_iEa89o7p0RWTVrYgZvSPbDVtOh"/>
+<div class="absolute bottom-4 left-4 bg-surface/90 backdrop-blur-sm px-4 py-2 rounded-lg ambient-shadow">
+<p class="font-label-md text-label-md text-primary">Oct 12 - Oct 18</p>
+<p class="font-body-sm text-on-surface-variant">6 Days, 5 Nights</p>
+</div>
+</div>
+</section>
+<!-- Quick Overview Bento Grid -->
+<section class="px-margin-mobile md:px-margin-desktop mb-lg">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-sm md:gap-md">
+<!-- Flight Status -->
+<div class="bg-surface rounded-xl p-md ambient-shadow lift-on-hover flex flex-col gap-sm">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">flight_takeoff</span>
+<span class="font-label-md text-label-md">Flight</span>
+</div>
+<div>
+<p class="font-body-md text-on-surface font-semibold">On Time</p>
+<p class="text-sm text-on-surface-variant">AF 1234 • Gate B2</p>
+</div>
+</div>
+<!-- Accommodation -->
+<div class="bg-surface rounded-xl p-md ambient-shadow lift-on-hover flex flex-col gap-sm">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">hotel</span>
+<span class="font-label-md text-label-md">Stay</span>
+</div>
+<div>
+<p class="font-body-md text-on-surface font-semibold">Le Meurice</p>
+<p class="text-sm text-on-surface-variant">Confirmed • 2 Guests</p>
+</div>
+</div>
+<!-- Weather -->
+<div class="bg-surface rounded-xl p-md ambient-shadow lift-on-hover flex flex-col gap-sm">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">partly_cloudy_day</span>
+<span class="font-label-md text-label-md">Weather</span>
+</div>
+<div>
+<p class="font-body-md text-on-surface font-semibold">18°C / 64°F</p>
+<p class="text-sm text-on-surface-variant">Mostly Sunny</p>
+</div>
+</div>
+<!-- Documents -->
+<div class="bg-surface rounded-xl p-md ambient-shadow lift-on-hover flex flex-col gap-sm">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
+<span class="font-label-md text-label-md">Docs</span>
+</div>
+<div>
+<p class="font-body-md text-on-surface font-semibold">Ready</p>
+<p class="text-sm text-primary underline cursor-pointer">View Passports</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Itinerary Timeline -->
+<section class="px-margin-mobile md:px-margin-desktop max-w-5xl mx-auto">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-md">Itinerary</h2>
+<!-- Day 1 -->
+<div class="mb-xl relative">
+<h3 class="font-headline-md text-headline-md text-primary mb-md sticky top-16 bg-background/90 backdrop-blur-sm py-2 z-20">Day 1 - Thursday, Oct 12</h3>
+<!-- Timeline vertical line for this day -->
+<div class="absolute left-[19px] top-16 bottom-0 w-[2px] bg-surface-container-high z-0"></div>
+<div class="flex flex-col gap-md">
+<!-- Event 1: Flight -->
+<div class="flex gap-md relative z-10 group">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0 mt-1 shadow-sm ring-4 ring-background">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">flight</span>
+</div>
+<div class="bg-surface rounded-xl p-md ambient-shadow lift-on-hover flex-1">
+<div class="flex flex-col md:flex-row md:items-center justify-between mb-sm">
+<span class="font-label-md text-label-md text-secondary bg-secondary-fixed px-2 py-1 rounded-full w-max mb-2 md:mb-0">08:00 AM - 11:30 AM</span>
+<span class="text-sm text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> 3h 30m</span>
+</div>
+<h4 class="font-body-lg text-body-lg font-semibold text-on-surface mb-1">Flight AF1234 to CDG</h4>
+<p class="font-body-md text-on-surface-variant mb-4">Air France • Economy • Terminal 4, Gate B2</p>
+<div class="bg-surface-container-low rounded-lg p-sm flex items-center justify-between">
+<div class="text-center">
+<p class="font-headline-md text-primary">JFK</p>
+<p class="text-xs text-on-surface-variant">New York</p>
+</div>
+<div class="flex-1 px-4 flex items-center">
+<div class="h-[1px] bg-outline-variant flex-1"></div>
+<span class="material-symbols-outlined text-outline-variant mx-2 rotate-90">flight</span>
+<div class="h-[1px] bg-outline-variant flex-1"></div>
+</div>
+<div class="text-center">
+<p class="font-headline-md text-primary">CDG</p>
+<p class="text-xs text-on-surface-variant">Paris</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Event 2: Hotel Check-in -->
+<div class="flex gap-md relative z-10 group">
+<div class="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center shrink-0 mt-1 shadow-sm ring-4 ring-background">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">hotel</span>
+</div>
+<div class="bg-surface rounded-xl p-md ambient-shadow lift-on-hover flex-1 flex flex-col md:flex-row gap-md">
+<div class="flex-1">
+<div class="mb-sm">
+<span class="font-label-md text-label-md text-tertiary bg-tertiary-fixed px-2 py-1 rounded-full">02:00 PM</span>
+</div>
+<h4 class="font-body-lg text-body-lg font-semibold text-on-surface mb-1">Check-in at Le Meurice</h4>
+<p class="font-body-md text-on-surface-variant mb-2">228 Rue de Rivoli, 75001 Paris, France</p>
+<p class="text-sm text-primary underline cursor-pointer inline-flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">map</span> View on Map
+                            </p>
+</div>
+<div class="w-full md:w-32 h-24 rounded-lg overflow-hidden shrink-0">
+<img alt="Hotel Room" class="w-full h-full object-cover" data-alt="A bright, elegantly appointed luxury hotel room interior showcasing crisp white linens and classic French architectural details. The room is flooded with natural light from large windows, emphasizing a clean, airy, and high-end aesthetic. Subtle gold and soft blue accents in the decor reflect the brand's premium color palette. The mood is welcoming, serene, and sophisticated, offering a frictionless retreat for the modern traveler." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdnqASGpc6_k3p0a_hdWvXs_mGeUL7WxTGBaord3LrbQKv6VYv4xu8bqqfOlRSvemhTQjmNv6QJnhowmd3PmVO3jCBOED__ZPLks3e9vZDR5R_a_Jj9moELYZJua6Dv5Tqc9iLagyzxZTf0RKCCRbFD0p98n89auDoSap1lfhR_Sf52JoqKJBHZgJq_661N8JpFGZ33T5-_zM4WxavfrSuLRqkkvfLryM_B2n0oI_TpQz3E1ifpPgCQt22aHIogrJeQ8Fxl8erPQ9Z"/>
+</div>
+</div>
+</div>
+<!-- Event 3: Dining -->
+<div class="flex gap-md relative z-10 group">
+<div class="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0 mt-1 shadow-sm ring-4 ring-background">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">restaurant</span>
+</div>
+<div class="bg-surface rounded-xl p-md ambient-shadow lift-on-hover flex-1 flex flex-col md:flex-row gap-md">
+<div class="flex-1">
+<div class="mb-sm">
+<span class="font-label-md text-label-md text-secondary bg-secondary-fixed px-2 py-1 rounded-full">07:30 PM</span>
+</div>
+<h4 class="font-body-lg text-body-lg font-semibold text-on-surface mb-1">Dinner at Le Jules Verne</h4>
+<p class="font-body-md text-on-surface-variant mb-2">Reservation confirmed for 2 on the Eiffel Tower.</p>
+<div class="flex gap-2 mt-2">
+<span class="text-xs bg-surface-container px-2 py-1 rounded text-on-surface-variant">Fine Dining</span>
+<span class="text-xs bg-surface-container px-2 py-1 rounded text-on-surface-variant">Smart Casual</span>
+</div>
+</div>
+<div class="w-full md:w-32 h-24 rounded-lg overflow-hidden shrink-0">
+<img alt="Restaurant table" class="w-full h-full object-cover" data-alt="An inviting, beautifully styled photograph of a table setting at a high-end Parisian restaurant with a view of the city skyline. The scene is bathed in soft, ambient natural light that highlights the crisp white linens and sparkling glassware, perfectly matching the UI's reliance on expansive white space and subtle tonal layering. Touches of warm gold in the decor subtlely echo the Sun Gold CTA color of the design system. The atmosphere is undeniably premium, promising a frictionless and memorable dining experience." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDn4ThyRQszxq4Aqi58DQWC8vY-bbEZz6zbtcEhE04oDWraBAcy5LTJDkhMmWmOfT5Qnezqm0a0eTrfspyEYu3x97JQObDdy_rBlPNjaDD2_WpvQA6USmo9pDTFrzx-K51_d59Zk2XMM0k5UAln765P7LaDi-gBAaJKlUm9CvB48qhVyU5PZgb-YvGe8y2ABCK3thjFDk4GqYtPZCuTq4SMebuR3ETx_GqHduHKrgvhg1iG6Y6BLlIUdkpcdneRFZuSVJtTuHT1EDqh"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</body></html>

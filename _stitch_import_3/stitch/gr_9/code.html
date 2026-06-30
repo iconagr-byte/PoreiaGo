@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+
+<html class="light" lang="el"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Αγαπημένοι Προορισμοί</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#7d5800",
+                        "primary-container": "#0077b6",
+                        "tertiary": "#266449",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7ea",
+                        "outline-variant": "#bfc7d1",
+                        "on-secondary-fixed": "#271900",
+                        "on-primary-container": "#f3f7ff",
+                        "surface-variant": "#e4e2e4",
+                        "inverse-surface": "#303032",
+                        "surface-dim": "#dcd9dc",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#94ccff",
+                        "surface-container-highest": "#e4e2e4",
+                        "on-secondary-fixed-variant": "#5e4100",
+                        "surface-container": "#f0edef",
+                        "secondary-fixed": "#ffdea9",
+                        "secondary-container": "#ffb702",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#006399",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#0e5138",
+                        "primary-fixed-dim": "#94ccff",
+                        "error": "#ba1a1a",
+                        "outline": "#707881",
+                        "on-tertiary-fixed": "#002114",
+                        "secondary-fixed-dim": "#ffba27",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#1b1b1d",
+                        "on-primary-fixed": "#001d32",
+                        "on-tertiary-container": "#dfffeb",
+                        "on-surface-variant": "#404850",
+                        "on-primary": "#ffffff",
+                        "on-background": "#1b1b1d",
+                        "primary": "#005d90",
+                        "surface-bright": "#fcf8fb",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#fcf8fb",
+                        "tertiary-fixed-dim": "#95d4b3",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#b1f0ce",
+                        "surface-container-low": "#f6f3f5",
+                        "on-secondary-container": "#6b4b00",
+                        "on-primary-fixed-variant": "#004b74",
+                        "primary-fixed": "#cde5ff",
+                        "surface": "#fcf8fb",
+                        "tertiary-container": "#417d61"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "lg": "48px",
+                        "gutter": "24px",
+                        "base": "8px",
+                        "margin-desktop": "64px",
+                        "xs": "4px",
+                        "xl": "80px",
+                        "sm": "12px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Montserrat"],
+                        "headline-xl": ["Montserrat"],
+                        "headline-md": ["Montserrat"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-xl": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-headline-md, .font-headline-lg-mobile { font-family: 'Montserrat', sans-serif; }
+        .ambient-shadow { box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col antialiased">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md bg-transparent flex justify-between items-center px-margin-mobile h-16 transition-all duration-300 ease-in-out md:hidden">
+<button class="text-primary dark:text-inverse-primary hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="travel_explore">travel_explore</span>
+</button>
+<div class="font-headline-md-mobile text-headline-md-mobile font-bold text-primary dark:text-primary-fixed-dim">
+            Voyage
+        </div>
+<button class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<!-- Desktop Navigation (Simplified placeholder for structural context, hidden on mobile) -->
+<header class="hidden md:flex fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-md border-b border-surface-variant h-20 items-center justify-between px-margin-desktop">
+<div class="font-headline-md text-headline-md font-bold text-primary">Voyage</div>
+<nav class="flex gap-8">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Αρχική</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Αναζήτηση</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Κρατήσεις</a>
+<a class="font-label-md text-label-md text-primary font-bold border-b-2 border-primary pb-1" href="#">Προφίλ</a>
+</nav>
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-24 pb-32 md:pt-32 md:pb-16 px-margin-mobile md:px-margin-desktop max-w-7xl mx-auto w-full">
+<!-- Header Section -->
+<div class="mb-8 md:mb-12">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-surface mb-2">Αγαπημένοι Προορισμοί</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Η επιλεγμένη σας λίστα για επερχόμενες περιπέτειες και ονειρεμένες αποδράσεις.</p>
+</div>
+<!-- Destinations Grid -->
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-gutter">
+<!-- Card 1 -->
+<article class="bg-surface rounded-[16px] ambient-shadow group cursor-pointer hover:-translate-y-1 transition-transform duration-300 flex flex-col overflow-hidden">
+<div class="relative aspect-[4/3] w-full overflow-hidden bg-surface-variant">
+<img alt="Destination Image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A sweeping, majestic wide-angle landscape photograph of a rugged canyon bathed in golden hour sunlight. The lighting is warm and dramatic, casting long deep shadows that emphasize the texture of the ancient rock formations. A vintage travel van is parked near the edge, overlooking the vast expanse. The mood is adventurous, aspirational, and deeply connected to nature, fitting perfectly within a premium modern travel aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBu-51Am-hP2T5TV86wdmPtht5cOQgDogNM_3HKvNztnG6DLrdSh8_M_8jYeShKuiK89L_C7hP8rqvVfQE19zCbgs4JkmqYKiPUswsancjbHu5tCwyNr6KMXEycXehGqL6zzzkv0g6pZNEFK3wSR_4XVrqDn6aJ1BxZnTUHQO5fgWuHe9FdOTaptQfpbe02fSZBn_KDAYPFhnkMJQMLeOgShKRVPD_FwESg8_EXktZiTJ26MV5jR0vAzPjDudL4yBs_AoubV9eOuLZp"/>
+<button class="absolute top-3 right-3 bg-surface/80 backdrop-blur-sm rounded-full p-1.5 text-error shadow-sm hover:scale-110 transition-transform">
+<span class="material-symbols-outlined" data-icon="favorite" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+</div>
+<div class="p-4 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-1">
+<h2 class="font-label-md text-label-md text-on-surface line-clamp-1">Grand Canyon</h2>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-label-sm">4.9</span>
+</div>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-3">Arizona, USA</p>
+<div class="mt-auto flex items-end justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Από</span>
+<span class="font-label-md text-label-md text-primary">$299<span class="font-label-sm text-label-sm text-on-surface-variant font-normal">/ταξίδι</span></span>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surface rounded-[16px] ambient-shadow group cursor-pointer hover:-translate-y-1 transition-transform duration-300 flex flex-col overflow-hidden">
+<div class="relative aspect-[4/3] w-full overflow-hidden bg-surface-variant">
+<img alt="Destination Image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A romantic, soft-focus view of Parisian architecture during twilight. The Eiffel tower sparkles faintly in the distant background against a gradient dusk sky of soft pinks and purples. In the foreground, warm light spills from an elegant corner brasserie onto a cobblestone street. The aesthetic is sophisticated, moody, and highly evocative of classic European travel experiences, reflecting a premium lifestyle brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVyB71P9YcwwQqiynKea5oYyHR0gG0hY1uLtkUC8X-PcVPi9u5wY4k6866VCNlRViGOll5AUEQR51bIrZtaQlkvqA6kD3ITBW1RghHFGSgAk7op9xZzm1FIW--79yW4_sjATOAzVa3RH87GlmiV9UtqlDl6f3RfLw9luHInNbQLAyNohvsLI1tz-lQV_wglQrH0coVroqlhCNua7_u0YGYyzwyG7G_mgJwp-8g_iIxlumFl8g2vsfx9cy4hUi7FGC6wlqVuPJLa3RV"/>
+<button class="absolute top-3 right-3 bg-surface/80 backdrop-blur-sm rounded-full p-1.5 text-error shadow-sm hover:scale-110 transition-transform">
+<span class="material-symbols-outlined" data-icon="favorite" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+</div>
+<div class="p-4 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-1">
+<h2 class="font-label-md text-label-md text-on-surface line-clamp-1">Paris Lights</h2>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-label-sm">4.8</span>
+</div>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-3">Ile-de-France, France</p>
+<div class="mt-auto flex items-end justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Από</span>
+<span class="font-label-md text-label-md text-primary">$850<span class="font-label-sm text-label-sm text-on-surface-variant font-normal">/πτήση</span></span>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 3 -->
+<article class="bg-surface rounded-[16px] ambient-shadow group cursor-pointer hover:-translate-y-1 transition-transform duration-300 flex flex-col overflow-hidden">
+<div class="relative aspect-[4/3] w-full overflow-hidden bg-surface-variant">
+<img alt="Destination Image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A serene, minimalist aerial photograph of a pristine white sand beach meeting crystal clear turquoise waters. Small gentle waves lap the shore, and a solitary wooden sunbed sits on the beach. The lighting is bright midday tropical sun, creating high contrast and a vivid, clean color palette of intense blues and bright whites. The image conveys ultimate relaxation and an upscale tropical getaway aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7cEQZIR5AUyxKRTz9w48pzL-yZDfSvY655NVnKHxL-l_LW9jfY1MOXDsYRlhYdLjNqqNx_ZlcrxYd7rZNHhEspGbZuWa5ZMwKw2g_JyWtCcGqOiBQsAlpA_a7wpBEdYzbK0S2GQoZhrNttSwG8eSpanPI-ac2BEbsSfW8GmNrQQzxrfN4lNFtapFGuv51f7or_iTzzpBuUN8wd40IbNF7MKQTKvKbf_OK-epUCTF96TmBbRMrLWLq9xJIC3QkSYE8Pod3XKD3y9wu"/>
+<button class="absolute top-3 right-3 bg-surface/80 backdrop-blur-sm rounded-full p-1.5 text-error shadow-sm hover:scale-110 transition-transform">
+<span class="material-symbols-outlined" data-icon="favorite" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+<!-- Tag overlay -->
+<div class="absolute bottom-3 left-3 bg-surface/90 backdrop-blur-md rounded-full px-2 py-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px] text-tertiary">eco</span>
+<span class="font-label-sm text-label-sm text-on-surface text-[10px]">Eco-Stay</span>
+</div>
+</div>
+<div class="p-4 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-1">
+<h2 class="font-label-md text-label-md text-on-surface line-clamp-1">Maldives Retreat</h2>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-label-sm">5.0</span>
+</div>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-3">Malé Atoll</p>
+<div class="mt-auto flex items-end justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Από</span>
+<span class="font-label-md text-label-md text-primary">$1,200<span class="font-label-sm text-label-sm text-on-surface-variant font-normal">/διανυκτέρευση</span></span>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 4 -->
+<article class="bg-surface rounded-[16px] ambient-shadow group cursor-pointer hover:-translate-y-1 transition-transform duration-300 flex flex-col overflow-hidden">
+<div class="relative aspect-[4/3] w-full overflow-hidden bg-surface-variant">
+<img alt="Destination Image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A vibrant, bustling street scene in a historic Italian city during a sunny afternoon. Old terracotta buildings with green shuttered windows frame a narrow cobblestone alley. A classic Vespa scooter is parked softly out of focus in the foreground. The lighting is warm and inviting, casting soft shadows that highlight the textures of the old masonry. The mood is culturally rich, authentic, and evocative of a premium European holiday." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCn53bbGkMZC2xrXWyDlWuZK3oCNQ-HEsPI5E2KYzD6-7bPxUuDbM3hUNXULCYeFaNlCVic8N7wpTrkvl3p5sxIavAiAWrExexsU9peUiUEjf0tgr4iNezrY93m2EfwIajZ3sSUIrgVVVMSoXYbgV1ZAaBKqbeseON1CTd8QvDUlZIXUxYQOJ9mDoqDPF9HKbqgqAzX2ScNrWmuSd9KPROzVPV2SGJWx8l8haa-T65wRN3ZWZRb0jO8xkK7HoTfgtf5JUGJkXaQCFht"/>
+<button class="absolute top-3 right-3 bg-surface/80 backdrop-blur-sm rounded-full p-1.5 text-error shadow-sm hover:scale-110 transition-transform">
+<span class="material-symbols-outlined" data-icon="favorite" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+</div>
+<div class="p-4 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-1">
+<h2 class="font-label-md text-label-md text-on-surface line-clamp-1">Tuscan Villa</h2>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-label-sm">4.7</span>
+</div>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-3">Florence, Italy</p>
+<div class="mt-auto flex items-end justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Από</span>
+<span class="font-label-md text-label-md text-primary">$450<span class="font-label-sm text-label-sm text-on-surface-variant font-normal">/διανυκτέρευση</span></span>
+</div>
+</div>
+</div>
+</article>
+</div>
+</main>
+<!-- BottomNavBar (Mobile only) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 shadow-[0px_-2px_10px_rgba(0,0,0,0.05)] bg-surface dark:bg-inverse-surface shadow-lg flex justify-around items-center px-4 py-2 w-full">
+<!-- Inactive: Home -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 duration-200 rounded-lg p-1" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm">Αρχική</span>
+</a>
+<!-- Inactive: Search -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 duration-200 rounded-lg p-1" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="search">search</span>
+<span class="font-label-sm text-label-sm">Αναζήτηση</span>
+</a>
+<!-- Inactive: Bookings -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 duration-200 rounded-lg p-1" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="confirmation_number">confirmation_number</span>
+<span class="font-label-sm text-label-sm">Κρατήσεις</span>
+</a>
+<!-- Active: Profile (acting as host for Saved items) -->
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary-container text-on-primary-container dark:text-on-primary-container rounded-full px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-label-sm text-label-sm">Προφίλ</span>
+</a>
+</nav>
+</body></html>

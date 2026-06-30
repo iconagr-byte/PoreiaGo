@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+
+<html lang="el"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Voyage - Ταξίδια Εξωτερικού</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-surface": "#303032",
+                    "surface-container-high": "#eae7ea",
+                    "on-surface": "#1b1b1d",
+                    "on-primary-fixed-variant": "#004b74",
+                    "secondary-fixed-dim": "#ffba27",
+                    "on-primary-fixed": "#001d32",
+                    "surface-container-low": "#f6f3f5",
+                    "secondary-container": "#ffb702",
+                    "outline-variant": "#bfc7d1",
+                    "error-container": "#ffdad6",
+                    "inverse-primary": "#94ccff",
+                    "on-tertiary-container": "#dfffeb",
+                    "secondary": "#7d5800",
+                    "on-secondary-container": "#6b4b00",
+                    "surface": "#fcf8fb",
+                    "primary-container": "#0077b6",
+                    "surface-tint": "#006399",
+                    "surface-container": "#f0edef",
+                    "on-error": "#ffffff",
+                    "surface-container-lowest": "#ffffff",
+                    "background": "#fcf8fb",
+                    "on-surface-variant": "#404850",
+                    "on-secondary-fixed-variant": "#5e4100",
+                    "outline": "#707881",
+                    "on-primary-container": "#f3f7ff",
+                    "surface-variant": "#e4e2e4",
+                    "on-secondary": "#ffffff",
+                    "primary": "#005d90",
+                    "tertiary": "#266449",
+                    "surface-container-highest": "#e4e2e4",
+                    "on-primary": "#ffffff",
+                    "on-background": "#1b1b1d",
+                    "secondary-fixed": "#ffdea9",
+                    "tertiary-fixed": "#b1f0ce",
+                    "on-tertiary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "on-tertiary-fixed": "#002114",
+                    "on-tertiary-fixed-variant": "#0e5138",
+                    "tertiary-container": "#417d61",
+                    "primary-fixed-dim": "#94ccff",
+                    "surface-dim": "#dcd9dc",
+                    "error": "#ba1a1a",
+                    "on-secondary-fixed": "#271900",
+                    "tertiary-fixed-dim": "#95d4b3",
+                    "inverse-on-surface": "#f3f0f2",
+                    "surface-bright": "#fcf8fb",
+                    "primary-fixed": "#cde5ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "80px",
+                    "md": "24px",
+                    "lg": "48px",
+                    "xs": "4px",
+                    "margin-desktop": "64px",
+                    "base": "8px",
+                    "margin-mobile": "16px",
+                    "sm": "12px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "headline-lg": [
+                            "Montserrat"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "headline-lg-mobile": [
+                            "Montserrat"
+                    ],
+                    "headline-md": [
+                            "Montserrat"
+                    ],
+                    "label-sm": [
+                            "Inter"
+                    ],
+                    "label-md": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ],
+                    "headline-xl": [
+                            "Montserrat"
+                    ]
+            },
+            "fontSize": {
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "1.3",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "1.6",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "28px",
+                            {
+                                    "lineHeight": "1.3",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "1.4",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "1.2",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "label-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "1.2",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "1.6",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-xl": [
+                            "48px",
+                            {
+                                    "lineHeight": "1.2",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background antialiased pb-24 font-body-md">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md bg-transparent flat no shadows flex justify-between items-center px-margin-mobile h-16 w-full">
+<button class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-all duration-300 ease-in-out">
+<span class="material-symbols-outlined" data-icon="travel_explore">travel_explore</span>
+</button>
+<div class="font-headline-md-mobile text-headline-md-mobile font-bold text-primary dark:text-primary-fixed-dim">
+            Voyage
+        </div>
+<button class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-all duration-300 ease-in-out">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<main class="pt-24 px-margin-mobile">
+<div class="mb-8">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background mb-2">Ταξίδια Εξωτερικού</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Ανακαλύψτε premium προορισμούς για αξέχαστες εμπειρίες.</p>
+</div>
+<div class="flex gap-2 overflow-x-auto pb-4 mb-6 -mx-margin-mobile px-margin-mobile scrollbar-hide">
+<button class="bg-primary text-on-primary font-label-md text-label-md px-4 py-2 rounded-full whitespace-nowrap shadow-sm">Όλοι</button>
+<button class="bg-surface-container text-on-surface font-label-md text-label-md px-4 py-2 rounded-full whitespace-nowrap hover:bg-surface-container-high transition-colors">Ευρώπη</button>
+<button class="bg-surface-container text-on-surface font-label-md text-label-md px-4 py-2 rounded-full whitespace-nowrap hover:bg-surface-container-high transition-colors">Αμερική</button>
+<button class="bg-surface-container text-on-surface font-label-md text-label-md px-4 py-2 rounded-full whitespace-nowrap hover:bg-surface-container-high transition-colors">Ασία</button>
+</div>
+<div class="grid grid-cols-1 gap-6">
+<!-- Paris Card -->
+<article class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_30px_rgba(0,0,0,0.05)] overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+<div class="h-48 w-full relative bg-surface-container-highest">
+<img alt="Paris" class="w-full h-full object-cover" data-alt="A breathtaking view of the Eiffel Tower in Paris during twilight. The sky is painted in soft pastel hues of pink and purple. The iron structure is illuminated with warm golden lights, standing tall against the sky. In the foreground, elegant Haussmann-style buildings frame the scene, creating a romantic and premium travel aesthetic consistent with a high-end corporate modern design." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCev_xmkp3N4URDrL46CFzt_DjwBaDXdvBbfL-1Gp91SOQOoscyUyxJNwsigUfzwU9GVCKt28nWnHBom1QRv488g7weZVQb-4zBjU1s7TaL9MX9FdORSGJmkIEdICM_WQ_YE25ZTxhYMITkJmO-KWgnM7h5E2iwo6PuscWX4EpSJcZ18MsxZPKvLDfRrj-J7ozSUxeMJF8DcrQVosqBJNGvC20H-3gF4iLXQ-bD2mdqCnVG--vvhuNDxLpGM3__gToddQvPprGzMhul"/>
+<div class="absolute top-4 left-4 bg-tertiary/10 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-tertiary text-sm" data-icon="stars" style="font-variation-settings: 'FILL' 1;">stars</span>
+<span class="font-label-sm text-label-sm text-tertiary font-medium">Top Choice</span>
+</div>
+<button class="absolute top-4 right-4 bg-surface-container-lowest/50 backdrop-blur-md p-2 rounded-full text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="favorite_border">favorite_border</span>
+</button>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h2 class="font-headline-md text-headline-md text-on-background">Παρίσι, Γαλλία</h2>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Από</span>
+<span class="font-headline-md text-headline-md text-primary font-bold">€850</span>
+</div>
+</div>
+<div class="flex items-center gap-4 mb-4">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="schedule">schedule</span>
+<span class="font-label-md text-label-md">5 Ημέρες</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="flight">flight</span>
+<span class="font-label-md text-label-md">Περιλαμβάνονται</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 line-clamp-2">Ρομαντικές βόλτες στον Σηκουάνα, επίσκεψη στο Λούβρο και δείπνο με θέα τον Πύργο του Άιφελ.</p>
+<button class="w-full py-3 bg-secondary-container text-on-secondary-container rounded-lg font-label-md text-label-md font-semibold hover:opacity-90 transition-opacity">
+                        Κράτηση
+                    </button>
+</div>
+</article>
+<!-- Rome Card -->
+<article class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_30px_rgba(0,0,0,0.05)] overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+<div class="h-48 w-full relative bg-surface-container-highest">
+<img alt="Rome" class="w-full h-full object-cover" data-alt="A sun-drenched view of the Colosseum in Rome. The ancient amphitheater glows warmly under clear blue skies. Lush green Mediterranean pines are visible in the surrounding area. The image conveys a sense of rich history and premium travel exploration, fitting a modern and professional lifestyle brand aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_rnjeBjqRfpONuaP3wYEoZtnwJKCCRKf_lLsLDcxonjMIB_UDNIjCwguBc0eZKo48Rgi033Ge_wU8OjsGEn8bCWQ2Ha2xui4UkESMU4-ciipAcXqfmRv607kj-kdNB_VHjHMbjjQVhJFRa5hAzl8u1Q8r3_Iixz88dumoJ-slsaSaUNftMnHrWopFZO_YiYNXHV-MBwTSqTlI88fTPEr2e-67L3FcX5mE1MrUPpRaO1Ts966NW0i1Ofuv81jv_-7FOVPeeMPoLyfz"/>
+<button class="absolute top-4 right-4 bg-surface-container-lowest/50 backdrop-blur-md p-2 rounded-full text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="favorite_border">favorite_border</span>
+</button>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h2 class="font-headline-md text-headline-md text-on-background">Ρώμη, Ιταλία</h2>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Από</span>
+<span class="font-headline-md text-headline-md text-primary font-bold">€620</span>
+</div>
+</div>
+<div class="flex items-center gap-4 mb-4">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="schedule">schedule</span>
+<span class="font-label-md text-label-md">4 Ημέρες</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="hotel">hotel</span>
+<span class="font-label-md text-label-md">4 Αστέρια</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 line-clamp-2">Ανακαλύψτε την Αιώνια Πόλη. Περιήγηση στο Κολοσσαίο, το Βατικανό και τις γραφικές πλατείες.</p>
+<button class="w-full py-3 bg-secondary-container text-on-secondary-container rounded-lg font-label-md text-label-md font-semibold hover:opacity-90 transition-opacity">
+                        Κράτηση
+                    </button>
+</div>
+</article>
+<!-- London Card -->
+<article class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_30px_rgba(0,0,0,0.05)] overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+<div class="h-48 w-full relative bg-surface-container-highest">
+<img alt="London" class="w-full h-full object-cover" data-alt="An iconic view of London featuring the Elizabeth Tower (Big Ben) and the red double-decker buses crossing Westminster Bridge. The scene is set during a bright, crisp morning. The architecture is detailed and stately, reflecting a premium, professional travel experience suitable for a modern lifestyle aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJRKjQFogxX5zZm4p00SgCxRSrLzhB1872hJOGjEQMpVB5YjC3JyqrywrTcJ7ddFxdIyPBALRA5QeSHIRbjZ2vjAb5WrfNFBvdL4V6h-R9wXLHCCJmnKoMmbFT35pMOr5NDjJIJv_wSDe0egdUUnBd-84iHqt19jVvyCt9GdPac_vUswz4QOg9wgHj7CCPMDP57zIQpQKBP6vtalP389I2cTe11YXKPchDbnjA1ylYYp8x-aLvGA831fpswO3feZ1i5g0ZD6EmS221"/>
+<button class="absolute top-4 right-4 bg-surface-container-lowest/50 backdrop-blur-md p-2 rounded-full text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="favorite_border">favorite_border</span>
+</button>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h2 class="font-headline-md text-headline-md text-on-background">Λονδίνο, ΗΒ</h2>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Από</span>
+<span class="font-headline-md text-headline-md text-primary font-bold">€790</span>
+</div>
+</div>
+<div class="flex items-center gap-4 mb-4">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="schedule">schedule</span>
+<span class="font-label-md text-label-md">5 Ημέρες</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="museum">museum</span>
+<span class="font-label-md text-label-md">Ξεναγήσεις</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 line-clamp-2">Ζήστε τον παλμό του Λονδίνου. Βρετανικό Μουσείο, West End και ψώνια στην Oxford Street.</p>
+<button class="w-full py-3 bg-secondary-container text-on-secondary-container rounded-lg font-label-md text-label-md font-semibold hover:opacity-90 transition-opacity">
+                        Κράτηση
+                    </button>
+</div>
+</article>
+<!-- New York Card -->
+<article class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_30px_rgba(0,0,0,0.05)] overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+<div class="h-48 w-full relative bg-surface-container-highest">
+<img alt="New York" class="w-full h-full object-cover" data-alt="A spectacular aerial view of the New York City skyline at sunset. Skyscrapers, including the Empire State Building, catch the golden hour light. The Hudson River reflects the warm tones. The image exudes a sense of vast discovery and premium aspiration, perfectly aligned with a high-end travel brand aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBs_C7MsXFrLb4y1gIJ6hjE-ZYC0kVLNys7xs0GKQwC8CH9TJJF_1hl4qx4WJRHgQKfMQ_okW8J_b2WWA-ypJO05mSV7yVe1hv2XJsVmsxvOHJ47K6YwId4DnZoFPh5sfm3oEEq5o21306OriRH_7Z1SqLCeC7AF1oDMNpPGysybkJl6mcrFAR4DAyEnvUh4KiwNCDc6Afazcal712bsZ3sWx40fbmyyHDcYVXwKas7uQPn8h9aMYIrFHmT2RnM0pUn-UnfuM3iEqF0"/>
+<div class="absolute top-4 left-4 bg-tertiary/10 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-tertiary text-sm" data-icon="trending_up" style="font-variation-settings: 'FILL' 1;">trending_up</span>
+<span class="font-label-sm text-label-sm text-tertiary font-medium">Trending</span>
+</div>
+<button class="absolute top-4 right-4 bg-surface-container-lowest/50 backdrop-blur-md p-2 rounded-full text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="favorite_border">favorite_border</span>
+</button>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h2 class="font-headline-md text-headline-md text-on-background">Νέα Υόρκη, ΗΠΑ</h2>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Από</span>
+<span class="font-headline-md text-headline-md text-primary font-bold">€1450</span>
+</div>
+</div>
+<div class="flex items-center gap-4 mb-4">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="schedule">schedule</span>
+<span class="font-label-md text-label-md">8 Ημέρες</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="local_activity">local_activity</span>
+<span class="font-label-md text-label-md">Broadway</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4 line-clamp-2">Η πόλη που δεν κοιμάται ποτέ. Central Park, Times Square και πανοραμική θέα από το Top of the Rock.</p>
+<button class="w-full py-3 bg-secondary-container text-on-secondary-container rounded-lg font-label-md text-label-md font-semibold hover:opacity-90 transition-opacity">
+                        Κράτηση
+                    </button>
+</div>
+</article>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 shadow-[0px_-2px_10px_rgba(0,0,0,0.05)] bg-surface dark:bg-inverse-surface shadow-lg md:hidden">
+<ul class="flex justify-around items-center px-4 py-2 w-full">
+<li class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="home">home</span>
+<span class="font-label-md text-label-md text-[10px]">Home</span>
+</li>
+<li class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary-container text-on-primary-container dark:text-on-primary-container rounded-full px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="search" style="font-variation-settings: 'FILL' 1;">search</span>
+<span class="font-label-md text-label-md text-[10px]">Search</span>
+</li>
+<li class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="confirmation_number">confirmation_number</span>
+<span class="font-label-md text-label-md text-[10px]">Bookings</span>
+</li>
+<li class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-label-md text-label-md text-[10px]">Profile</span>
+</li>
+</ul>
+</nav>
+</body></html>

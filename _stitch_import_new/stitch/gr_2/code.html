@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+
+<html lang="el"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Voyage - Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "inverse-surface": "#303032",
+                      "surface-container-high": "#eae7ea",
+                      "on-surface": "#1b1b1d",
+                      "on-primary-fixed-variant": "#004b74",
+                      "secondary-fixed-dim": "#ffba27",
+                      "on-primary-fixed": "#001d32",
+                      "surface-container-low": "#f6f3f5",
+                      "secondary-container": "#ffb702",
+                      "outline-variant": "#bfc7d1",
+                      "error-container": "#ffdad6",
+                      "inverse-primary": "#94ccff",
+                      "on-tertiary-container": "#dfffeb",
+                      "secondary": "#7d5800",
+                      "on-secondary-container": "#6b4b00",
+                      "surface": "#fcf8fb",
+                      "primary-container": "#0077b6",
+                      "surface-tint": "#006399",
+                      "surface-container": "#f0edef",
+                      "on-error": "#ffffff",
+                      "surface-container-lowest": "#ffffff",
+                      "background": "#fcf8fb",
+                      "on-surface-variant": "#404850",
+                      "on-secondary-fixed-variant": "#5e4100",
+                      "outline": "#707881",
+                      "on-primary-container": "#f3f7ff",
+                      "surface-variant": "#e4e2e4",
+                      "on-secondary": "#ffffff",
+                      "primary": "#005d90",
+                      "tertiary": "#266449",
+                      "surface-container-highest": "#e4e2e4",
+                      "on-primary": "#ffffff",
+                      "on-background": "#1b1b1d",
+                      "secondary-fixed": "#ffdea9",
+                      "tertiary-fixed": "#b1f0ce",
+                      "on-tertiary": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "on-tertiary-fixed": "#002114",
+                      "on-tertiary-fixed-variant": "#0e5138",
+                      "tertiary-container": "#417d61",
+                      "primary-fixed-dim": "#94ccff",
+                      "surface-dim": "#dcd9dc",
+                      "error": "#ba1a1a",
+                      "on-secondary-fixed": "#271900",
+                      "tertiary-fixed-dim": "#95d4b3",
+                      "inverse-on-surface": "#f3f0f2",
+                      "surface-bright": "#fcf8fb",
+                      "primary-fixed": "#cde5ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "xl": "80px",
+                      "md": "24px",
+                      "lg": "48px",
+                      "xs": "4px",
+                      "margin-desktop": "64px",
+                      "base": "8px",
+                      "margin-mobile": "16px",
+                      "sm": "12px",
+                      "gutter": "24px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Montserrat"],
+                      "body-lg": ["Inter"],
+                      "headline-lg-mobile": ["Montserrat"],
+                      "headline-md": ["Montserrat"],
+                      "label-sm": ["Inter"],
+                      "label-md": ["Inter"],
+                      "body-md": ["Inter"],
+                      "headline-xl": ["Montserrat"]
+              },
+              "fontSize": {
+                      "headline-lg": ["32px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                      "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "500"}],
+                      "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "headline-xl": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        .ambient-shadow { box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05); }
+        .hover-lift { transition: transform 0.3s ease; }
+        .hover-lift:hover { transform: translateY(-4px); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background antialiased pb-24 md:pb-0">
+<!-- Top App Bar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md bg-transparent flex justify-between items-center px-margin-mobile h-16 w-full">
+<button class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-all duration-300 ease-in-out">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">travel_explore</span>
+</button>
+<div class="font-headline-md-mobile text-headline-md-mobile font-bold text-primary dark:text-primary-fixed-dim">Voyage</div>
+<button class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest rounded-full p-2 transition-all duration-300 ease-in-out">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
+</button>
+</header>
+<main class="pt-20 px-margin-mobile md:hidden">
+<!-- Hero Search Section -->
+<section class="mt-4 mb-lg">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile mb-md text-on-surface">Ανακαλύψτε τον επόμενο προορισμό σας</h1>
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-4 top-1/2 transform -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-surface-container-low border border-surface-variant rounded-[16px] py-4 pl-12 pr-4 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all ambient-shadow" placeholder="Πού θέλετε να πάτε;" type="text"/>
+</div>
+</section>
+<!-- Categories -->
+<section class="mb-lg">
+<div class="flex space-x-4 overflow-x-auto pb-4 snap-x hide-scrollbar">
+<!-- Category 1 -->
+<div class="snap-start shrink-0 w-32 relative rounded-[16px] overflow-hidden aspect-square ambient-shadow hover-lift">
+<img alt="Greece" class="w-full h-full object-cover" data-alt="A bright, sunlit view of a classic Greek island with white-washed buildings and blue domed churches overlooking the Aegean Sea. The scene is vibrant, optimistic, and evokes a sense of travel and discovery, fitting a premium light-mode travel agency aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGZxxbeLhA9N_gh8UGg7ewTTylv2Su124E-VH8r6HohP2cMMVtBa-5BkG1_Q80DIDvjkWuTly_xIRCbNqbAPg5WDhGDC-jykHnz1SnlIxhOWp4_gOkTtumgh8X_vDPxLWUU5VxV2H452Z8ILTcdQM7INweXONhVznbfoJo680RqgqgIvVHlrfIZsZZQSWLEZFAlOsG3-O0jn7v1FOzIZGBNohKmNJyFjF0-sCzflVsA3r2AYLNebmkTzkGAAvysrhF_xmyT0vueX7w"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
+<span class="text-on-primary font-label-md text-label-md">Ελλάδα</span>
+</div>
+</div>
+<!-- Category 2 -->
+<div class="snap-start shrink-0 w-32 relative rounded-[16px] overflow-hidden aspect-square ambient-shadow hover-lift">
+<img alt="Europe" class="w-full h-full object-cover" data-alt="A picturesque view of a historic European city street with cobblestones, elegant architecture, and a lively, romantic atmosphere. The lighting is soft and natural, aligning with a sophisticated and premium light-mode travel design language." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDc3ihuWHU74MOiTWxC2Vts_g7BlWjNqbB2gTMzOOztjnbZyNOwTYTMrIJ6agaVxNWC1xvD14IbM4LR08IK-SKZC9LX7wtrBtcxRDVCWC71CnKcPyKSNJakrwtykd9zVnDUG3tQpC7UYnNUAVVssbk1ZfFhtAVsfT708hYJ2iwEBfExf-b87cRGoYD53wG3pvlk4x_Ui8XhRcDsh0eQyKkoSd744glJ3AVzE34_Y-tom4D8BR2MCyBcdWj4oXSsaFoapKAO9Q9mAQYM"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
+<span class="text-on-primary font-label-md text-label-md">Ευρώπη</span>
+</div>
+</div>
+<!-- Category 3 -->
+<div class="snap-start shrink-0 w-32 relative rounded-[16px] overflow-hidden aspect-square ambient-shadow hover-lift">
+<img alt="Exotic" class="w-full h-full object-cover" data-alt="A stunning tropical beach scene with clear turquoise water, pristine white sand, and palm trees swaying gently. The mood is tranquil and luxurious, emphasizing premium relaxation within a bright, airy light-mode UI context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBssMRmWhZq09YmBqeOwC4GEuZbyBEOku2J5MzlYym7Iu4jrWqodUSUlHFJbY7JikhKZHV-EHmXJXOMAovDcfZvLNEcuMbGfZ1gcFGhEcAMKyOan-hSpHHfd35nqaKmiqnLwLExwNm4_zevER5G9zSQ--ATY0aRBK-Q3ISR3Csaws8qKtT13Y7C4YNnnvf61tBbSbSWao6leKJIKULI8IRsqL5HJekdcGEfjcYyyJc-aGRpeFdEWzmPCED5zlCajnZ26n6_PqXreZgV"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
+<span class="text-on-primary font-label-md text-label-md">Εξωτικά</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Featured Destinations -->
+<section class="mb-xl">
+<div class="flex justify-between items-center mb-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Δημοφιλείς Προορισμοί</h2>
+<a class="font-label-md text-label-md text-primary" href="#">Όλοι</a>
+</div>
+<div class="flex flex-col gap-6">
+<!-- Card Santorini -->
+<article class="bg-surface rounded-[16px] overflow-hidden ambient-shadow hover-lift border border-surface-variant/50">
+<div class="h-48 relative">
+<img alt="Santorini" class="w-full h-full object-cover" data-alt="A wide, sweeping shot of Santorini's iconic caldera at golden hour, featuring the classic blue and white architecture cascading down the cliffside. The image conveys luxury, romance, and premium travel, suited for a high-end light-mode interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKTkXo5SSKQL43tI4XhW6nPgTDiAXKnM-Jw-jNs8HV8jhXHreQ6YK95T1McLp6KIUsnd-W4yMuhgo8ZfRx9I49XNSpNO-RfHfLJo55DRRA5fm0KPjZ9Sn0_zc59NWx9M6kfXsMIW7TrZVxYHV3zJUpWMpLv2BfVjXNNEdC_YIuUW024nr9X4CJALkVA8jCL9js1YmFCGeaYyMvwaDSTLWD5pVACPG9u0ukp6vNiqjTF5sAp7_6sZp3RjFrTpQqSidoTRHsS2KgXKU4"/>
+<div class="absolute top-4 left-4 bg-tertiary/10 text-tertiary px-3 py-1 rounded-full backdrop-blur-sm font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> Δημοφιλές
+                        </div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Σαντορίνη</h3>
+<div class="flex items-center text-outline font-body-md text-body-md">
+<span class="material-symbols-outlined text-[18px] mr-1">location_on</span> Ελλάδα
+                                </div>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-outline block">Από</span>
+<span class="font-headline-md text-headline-md text-primary">€450</span>
+</div>
+</div>
+</div>
+</article>
+<!-- Card Mykonos -->
+<article class="bg-surface rounded-[16px] overflow-hidden ambient-shadow hover-lift border border-surface-variant/50">
+<div class="h-48 relative">
+<img alt="Mykonos" class="w-full h-full object-cover" data-alt="A picturesque view of Mykonos windmills against a bright blue sky and sparkling Aegean sea. The vibrant colors and clean composition suggest an upscale, vibrant lifestyle travel experience, perfect for a modern light-mode app." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_RDipq3mHUkqjJpzIXzNES__uLjFgkm5UEOEnU-2Nvxu8bLG1b0WzuPsipO-yRnFsGMf5R2uSlZUetZ8IIR8_9B-ox0K-8_fBUMU9TMdeUecC0NMW2-pBa8Ufk5Ksu64KN4a4ac3UKm7WMsU4uK-9xsePXrZ_V-y5x35CJj1l7iNvY78XCdqCsXSi_zKZpi6BOD_Jz_cr1tHNgZyT9_0g0QJLlPo9R9JLdNV6E8BpXA3VBmDsDejHO1N9b6L3OKe8eNj_x0I4WRyG"/>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Μύκονος</h3>
+<div class="flex items-center text-outline font-body-md text-body-md">
+<span class="material-symbols-outlined text-[18px] mr-1">location_on</span> Ελλάδα
+                                </div>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-outline block">Από</span>
+<span class="font-headline-md text-headline-md text-primary">€520</span>
+</div>
+</div>
+</div>
+</article>
+</div>
+</section>
+</main>
+<!-- Bottom Nav Bar -->
+<nav class="fixed bottom-0 w-full z-50 shadow-[0px_-2px_10px_rgba(0,0,0,0.05)] bg-surface dark:bg-inverse-surface shadow-lg flex justify-around items-center px-4 py-2 w-full md:hidden">
+<!-- Home (Active) -->
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary-container text-on-primary-container dark:text-on-primary-container rounded-full px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-sm text-label-sm mt-1">Αρχική</span>
+</a>
+<!-- Search (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200 px-4 py-1 rounded-full" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">search</span>
+<span class="font-label-sm text-label-sm mt-1">Αναζήτηση</span>
+</a>
+<!-- Bookings (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200 px-4 py-1 rounded-full" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">confirmation_number</span>
+<span class="font-label-sm text-label-sm mt-1">Κρατήσεις</span>
+</a>
+<!-- Profile (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors scale-95 active:scale-90 transition-transform duration-200 px-4 py-1 rounded-full" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">person</span>
+<span class="font-label-sm text-label-sm mt-1">Προφίλ</span>
+</a>
+</nav>
+<style>
+        /* Utility for hiding scrollbar in horizontal scroll areas */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body></html>

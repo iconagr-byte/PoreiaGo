@@ -1,0 +1,140 @@
+# Project Travel SaaS — local / staging stack
+# Usage: make up   or   docker compose up -d
+
+name: project-travel-saas
+
+services:
+  traefik:
+    image: traefik:v3.2
+    restart: unless-stopped
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - saas_edge
+
+  db:
+    image: postgis/postgis:15-3.3
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aerostride_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepassword}
+      POSTGRES_DB: ${POSTGRES_DB:-aerostride_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aerostride_user} -d ${POSTGRES_DB:-aerostride_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - saas_internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - saas_internal
+
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aerostride_user}:${POSTGRES_PASSWORD:-securepassword}@db:5432/${POSTGRES_DB:-aerostride_db}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-change-me-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.saas-api.rule=Host(`${API_HOST:-api.localhost}`)
+      - traefik.http.routers.saas-api.entrypoints=web
+      - traefik.http.services.saas-api.loadbalancer.server.port=8000
+    networks:
+      - saas_edge
+      - saas_internal
+
+  aade-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "app.workers.aade_consumer"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aerostride_user}:${POSTGRES_PASSWORD:-securepassword}@db:5432/${POSTGRES_DB:-aerostride_db}
+      REDIS_URL: redis://redis:6379/0
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-change-me-in-production}
+    depends_on:
+      - redis
+      - db
+    networks:
+      - saas_internal
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["celery", "-A", "workers.celery_app", "worker", "--loglevel=info"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aerostride_user}:${POSTGRES_PASSWORD:-securepassword}@db:5432/${POSTGRES_DB:-aerostride_db}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-change-me-in-production}
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - saas_internal
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["celery", "-A", "workers.celery_app", "beat", "--loglevel=info"]
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - saas_internal
+
+volumes:
+  postgres_data:
+
+networks:
+  saas_edge:
+    driver: bridge
+  saas_internal:
+    driver: bridge

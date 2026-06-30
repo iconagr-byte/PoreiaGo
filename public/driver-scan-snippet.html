@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>PoreiaGo — Driver QR Scanner (snippet)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a; color: #fff; min-height: 100vh; }
+    header { padding: 1rem; border-bottom: 1px solid #334155; }
+    #video { width: 100%; max-width: 400px; display: block; margin: 1rem auto; border-radius: 1rem; }
+    #result { margin: 1rem; padding: 1.5rem; border-radius: 1rem; text-align: center; font-weight: 700; display: none; }
+    #result.success { display: block; background: #059669; }
+    #result.failure { display: block; background: #dc2626; }
+    .wrap { padding: 1rem; text-align: center; }
+    button { background: #2563eb; color: #fff; border: 0; padding: 0.75rem 1.5rem; border-radius: 999px; font-weight: 700; cursor: pointer; }
+    p.hint { font-size: 0.85rem; color: #94a3b8; max-width: 28rem; margin: 1rem auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Driver Scan</strong> — minimal camera + POST /api/admin/scan
+  </header>
+  <div class="wrap">
+    <p class="hint">Requires dev server (<code>npm run dev</code>) and a valid signed QR from the wallet. Set driver token below.</p>
+    <label style="font-size:0.8rem;display:block;margin-bottom:0.5rem">
+      Bearer token:
+      <input id="token" type="text" style="width:100%;max-width:320px;padding:0.5rem;border-radius:8px;border:1px solid #475569;background:#1e293b;color:#fff" placeholder="drv_..." />
+    </label>
+    <button type="button" id="start">Έναρξη κάμερας</button>
+    <video id="video" playsinline muted></video>
+    <canvas id="canvas" hidden></canvas>
+    <div id="result"></div>
+  </div>
+
+  <!-- jsQR: lightweight QR decoder (CDN for snippet only) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const resultEl = document.getElementById('result');
+    const tokenInput = document.getElementById('token');
+    let stream = null;
+    let scanning = false;
+
+    document.getElementById('start').onclick = async () => {
+      if (!tokenInput.value.trim()) {
+        alert('Set a driver Bearer token (login as admin/driver in the app first, copy from localStorage driverAuthToken)');
+        return;
+      }
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+      video.srcObject = stream;
+      await video.play();
+      scanning = true;
+      requestAnimationFrame(tick);
+    };
+
+    async function onQrDecoded(raw) {
+      scanning = false;
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+
+      const res = await fetch('/api/admin/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + tokenInput.value.trim(),
+        },
+        body: JSON.stringify({ qr: raw }),
+      });
+      const data = await res.json();
+      resultEl.className = data.result === 'SUCCESS' ? 'success' : 'failure';
+      resultEl.style.display = 'block';
+      resultEl.innerHTML =
+        '<div>' + (data.result === 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILURE') + '</div>' +
+        (data.passengerName ? '<div>' + data.passengerName + '</div>' : '') +
+        (data.seat ? '<div>Θέση: ' + data.seat + '</div>' : '') +
+        '<div style="font-size:0.9rem;margin-top:0.5rem">' + (data.message || '') + '</div>';
+    }
+
+    function tick() {
+      if (!scanning) return;
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        if (code?.data) {
+          onQrDecoded(code.data);
+          return;
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+  </script>
+</body>
+</html>

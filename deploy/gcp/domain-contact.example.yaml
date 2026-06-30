@@ -1,0 +1,17 @@
+# Registrant contact for: gcloud domains registrations register --contact-data-from-file=...
+# Copy to domain-contact.yaml and fill in — DO NOT commit real data to GitHub.
+
+allContacts:
+  email: CHANGE_ME@example.com
+  phoneNumber: +30.2100000000
+  postalAddress:
+    regionCode: GR
+    postalCode: "00000"
+    administrativeArea: Attica
+    locality: Athens
+    addressLines:
+      - "Street address"
+  organization: Your Company Name
+registrantContact:
+  postalAddress:
+    regionCode: GR

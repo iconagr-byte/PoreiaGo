@@ -1,0 +1,29 @@
+http:
+  middlewares:
+    security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        forceSTSHeader: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+    rate-limit-api:
+      rateLimit:
+        average: 100
+        burst: 200
+    cors-api:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "https://${WP_HOST}"
+          - "https://${APP_HOST}"
+        accessControlAllowHeaders:
+          - Authorization
+          - Content-Type
+          - X-Tenant-Id
+        accessControlMaxAge: 100
+        addVaryHeader: true
