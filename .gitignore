@@ -28,3 +28,6 @@ deploy/gcp/domain-contact.yaml
 *.njsproj
 *.sln
 *.sw?
+
+# Accidental nested clone — ignore
+Booking Travel/
