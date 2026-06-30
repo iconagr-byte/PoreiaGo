@@ -7,7 +7,7 @@ substitutions:
   _AR_REPO: poreiago
   _CLOUDSQL_INSTANCE: ''
   _VITE_API_BASE: https://api.poreiago.com
-  _DEPLOY_FRONTEND: 'true'
+  _DEPLOY_FRONTEND: 'false'
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -32,24 +32,29 @@ steps:
   - id: deploy-api
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     waitFor: [push-api]
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - run
-      - deploy
-      - ${_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:$SHORT_SHA
-      - --region=${_REGION}
-      - --platform=managed
-      - --allow-unauthenticated
-      - --port=8000
-      - --min-instances=0
-      - --max-instances=3
-      - --cpu=1
-      - --memory=512Mi
-      - --timeout=3600
-      - --session-affinity
-      - --add-cloudsql-instances=${_CLOUDSQL_INSTANCE}
-      - --set-env-vars=ENVIRONMENT=staging
+      - -c
+      - |
+        set -euo pipefail
+        EXTRA=()
+        if [ -n "${_CLOUDSQL_INSTANCE}" ]; then
+          EXTRA+=(--add-cloudsql-instances="${_CLOUDSQL_INSTANCE}")
+        fi
+        gcloud run deploy "${_SERVICE}" \
+          --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:$SHORT_SHA" \
+          --region="${_REGION}" \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8000 \
+          --min-instances=0 \
+          --max-instances=3 \
+          --cpu=1 \
+          --memory=512Mi \
+          --timeout=3600 \
+          --session-affinity \
+          "$${EXTRA[@]}" \
+          --set-env-vars=ENVIRONMENT=staging
 
   - id: build-frontend
     name: node:20
