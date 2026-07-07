@@ -4,7 +4,7 @@
 
 Το `vm-deploy-all.sh`:
 
-1. `git pull`
+1. `git fetch` + `reset --hard origin/main` (όχι `git pull` — αποφεύγει conflicts από παλιές χειροκίνητες αλλαγές στο VM)
 2. Ρυθμίζει `.env.prod` (domains, Redis/Celery, VAPID push keys)
 3. Διορθώνει Traefik (ACME email, απενεργοποίηση λάθος dynamic configs)
 4. `npm run build` frontend
@@ -37,10 +37,30 @@
 
 Αν το deploy job αποτυγχάνει σε **1 δευτερόλεπτο**, συνήθως λείπουν τα secrets ή το SSH key είναι λάθος.
 
+## Συμβόλαια & Stripe
+
+Βλ. **[deploy/STRIPE-SETUP.md](./STRIPE-SETUP.md)** — χωρίς Stripe keys το checkout δεν ανοίγει (διαθέσιμη δωρεάν δοκιμή 14 ημερών).
+
 ## Βήμα 2 — SSH στο VM (μία εντολή)
 
 ```bash
-cd /opt/poreiago && git pull && bash deploy/scripts/vm-deploy-all.sh
+cd /opt/poreiago && bash deploy/scripts/vm-deploy-all.sh
+```
+
+(Το script κάνει `git fetch` + `reset --hard origin/main` — **δεν** χρειάζεται ξεχωριστό `git pull`.)
+
+### Σφάλμα: «Please commit your changes or stash them before you merge»
+
+Στο VM υπάρχουν παλιές χειροκίνητες αλλαγές σε `deploy/docker-compose.prod.yml` ή `deploy/traefik/traefik.yml`.
+Τα domains/secrets είναι στο `deploy/.env.prod` (δεν χάνονται).
+
+```bash
+cd /opt/poreiago
+cp deploy/docker-compose.prod.yml /tmp/docker-compose.prod.yml.bak 2>/dev/null || true
+cp deploy/traefik/traefik.yml /tmp/traefik.yml.bak 2>/dev/null || true
+git fetch origin main
+git reset --hard origin/main
+bash deploy/scripts/vm-deploy-all.sh
 ```
 
 Πρώτη φορά με demo admin:

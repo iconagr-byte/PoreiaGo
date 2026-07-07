@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import stripe
@@ -31,6 +31,36 @@ SUSPEND_STATUSES = frozenset({
     SubscriptionStatus.UNPAID,
     SubscriptionStatus.CANCELED,
 })
+
+TRIAL_DAYS = 14
+
+
+def stripe_readiness() -> dict:
+    """Whether SaaS checkout can run (no secret values exposed)."""
+    settings = get_settings()
+    missing: list[str] = []
+    if not settings.stripe_secret_key:
+        missing.append("STRIPE_SECRET_KEY")
+    for env_name, value in (
+        ("STRIPE_PRICE_STARTER", settings.stripe_price_starter),
+        ("STRIPE_PRICE_PROFESSIONAL", settings.stripe_price_professional),
+        ("STRIPE_PRICE_STARTER_YEARLY", settings.stripe_price_starter_yearly),
+        ("STRIPE_PRICE_PROFESSIONAL_YEARLY", settings.stripe_price_professional_yearly),
+    ):
+        if not value:
+            missing.append(env_name)
+    checkout_ready = not missing
+    portal_ready = bool(settings.stripe_secret_key)
+    plans = ["starter", "professional"]
+    if settings.stripe_price_enterprise:
+        plans.append("enterprise")
+    return {
+        "checkout_ready": checkout_ready,
+        "portal_ready": portal_ready,
+        "missing_env": missing,
+        "plans": plans,
+        "trial_days": TRIAL_DAYS,
+    }
 
 
 def _stripe_client() -> stripe:
@@ -266,6 +296,36 @@ class BillingService:
             return_url=self._settings.billing_success_url,
         )
         return {"portal_url": portal.url}
+
+    async def start_local_trial(
+        self,
+        tenant: Tenant,
+        *,
+        plan: TenantPlan,
+        billing_interval: str = "month",
+    ) -> Subscription:
+        """14-day trial without Stripe — only when checkout is not configured."""
+        readiness = stripe_readiness()
+        if readiness["checkout_ready"]:
+            raise ValueError("Stripe checkout is configured — use checkout-session")
+        if plan == TenantPlan.ENTERPRISE:
+            raise ValueError("Enterprise requires sales contact")
+
+        sub = await self.get_or_create_subscription(tenant)
+        if sub.stripe_subscription_id and sub.status == SubscriptionStatus.ACTIVE:
+            raise ValueError("Paid subscription already active")
+
+        interval = billing_interval if billing_interval in ("month", "year") else "month"
+        now = datetime.now(timezone.utc)
+        sub.plan = plan
+        sub.status = SubscriptionStatus.TRIALING
+        sub.trial_ends_at = now + timedelta(days=TRIAL_DAYS)
+        sub.base_amount_cents = _plan_base_cents(plan, billing_interval=interval)
+        tenant.plan = plan
+        tenant.is_active = True
+        await self._session.flush()
+        logger.info("Local trial started: tenant=%s plan=%s", tenant.slug, plan.value)
+        return sub
 
     async def suspend_tenant(self, tenant_id: UUID, *, reason: str) -> None:
         result = await self._session.execute(

@@ -41,6 +41,10 @@ set_kv "DRIVER_APP_PUBLIC_URL" "https://${APP_HOST_DEFAULT}"
 set_kv "FRONTEND_PUBLIC_URL" "https://${APP_HOST_DEFAULT}"
 set_kv "CELERY_BROKER_URL" "redis://redis:6379/0"
 set_kv "CELERY_RESULT_BACKEND" "redis://redis:6379/1"
+set_kv "BILLING_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/admin?billing=success"
+set_kv "BILLING_CANCEL_URL" "https://${APP_HOST_DEFAULT}/admin?billing=cancel"
+set_kv "BILLING_SIGNUP_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup/success?billing=success"
+set_kv "BILLING_SIGNUP_CANCEL_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup?billing=cancel"
 
 if ! [[ -f "$DEPLOY_DIR/.vapid_private.pem" ]]; then
   echo "==> Generating Web Push VAPID keys"

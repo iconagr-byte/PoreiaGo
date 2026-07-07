@@ -162,8 +162,22 @@ class BillingSubscriptionResponse(BaseModel):
     stripe_customer_id: str | None = None
     stripe_subscription_id: str | None = None
     current_period_end: datetime | None = None
+    trial_ends_at: datetime | None = None
     cancel_at_period_end: bool = False
     base_amount_cents: int = 0
+
+
+class BillingConfigResponse(BaseModel):
+    checkout_ready: bool
+    portal_ready: bool
+    missing_env: list[str] = Field(default_factory=list)
+    plans: list[str] = Field(default_factory=list)
+    trial_days: int = 14
+
+
+class BillingTrialRequest(BaseModel):
+    plan: str = Field(default="professional", pattern="^(starter|professional)$")
+    billing_interval: str = Field(default="month", pattern="^(month|year)$")
 
 
 class BillingUsageReportResponse(BaseModel):

@@ -9,7 +9,9 @@ import {
 import {
   createBillingCheckout,
   createBillingPortal,
+  fetchBillingConfig,
   fetchBillingSubscription,
+  startBillingTrial,
 } from '../../services/billingApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
 
@@ -35,6 +37,7 @@ function formatDate(iso) {
 
 export default function ContractsPanel({ initialPlan, initialInterval = 'month' }) {
   const [sub, setSub] = useState(null);
+  const [billingConfig, setBillingConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [interval, setInterval] = useState(initialInterval);
@@ -48,7 +51,12 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     }
     setLoading(true);
     try {
-      setSub(await fetchBillingSubscription());
+      const [subscription, config] = await Promise.all([
+        fetchBillingSubscription(),
+        fetchBillingConfig().catch(() => null),
+      ]);
+      setSub(subscription);
+      setBillingConfig(config);
     } catch (e) {
       toast.error(e.message || 'Αποτυχία φόρτωσης συνδρομής');
       setSub(null);
@@ -84,6 +92,19 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     }
   };
 
+  const startTrial = async () => {
+    setWorking(true);
+    try {
+      const updated = await startBillingTrial(selectedPlan, interval);
+      setSub(updated);
+      toast.success(`Δωρεάν δοκιμή ${billingConfig?.trial_days || 14} ημερών ενεργοποιήθηκε`);
+    } catch (e) {
+      toast.error(e.message || 'Αποτυχία ενεργοποίησης δοκιμής');
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const openPortal = async () => {
     setWorking(true);
     try {
@@ -109,9 +130,22 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
 
   const catalogPlan = AGENCY_PLANS.find((p) => p.id === selectedPlan) || AGENCY_PLANS[1];
   const quote = displayPrice(catalogPlan, interval);
+  const checkoutReady = billingConfig?.checkout_ready === true;
+  const trialDays = billingConfig?.trial_days || 14;
+  const onTrial = sub?.status === 'trialing' && !sub?.stripe_subscription_id;
 
   return (
     <div className="space-y-6">
+      {billingConfig && !checkoutReady && (
+        <div className="bg-sky-50 border border-sky-200 rounded-[24px] p-4 text-sm text-sky-950">
+          <p className="font-bold">Stripe δεν είναι ακόμα πλήρως ρυθμισμένο στο server.</p>
+          <p className="mt-1">
+            Μπορείτε να ξεκινήσετε <strong>δωρεάν δοκιμή {trialDays} ημερών</strong> τώρα.
+            Για πληρωμή μέσω Stripe, ο διαχειριστής server προσθέτει τα κλειδιά (βλ.{' '}
+            <code className="text-xs bg-white/80 px-1 rounded">deploy/STRIPE-SETUP.md</code>).
+          </p>
+        </div>
+      )}
       <div className="bg-surface-container-lowest rounded-[24px] border border-black/[0.06] p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
@@ -147,7 +181,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                 </span>
               }
             />
-            <MiniStat label="Λήξη περιόδου" value={formatDate(sub.current_period_end)} />
+            <MiniStat label="Λήξη περιόδου" value={formatDate(sub.current_period_end || sub.trial_ends_at)} />
             <MiniStat
               label="Γραφείο ενεργό"
               value={sub.is_active ? 'Ναι' : 'Αναστολή'}
@@ -205,22 +239,37 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={working}
-              onClick={startCheckout}
-              className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold disabled:opacity-50"
-            >
-              Ενεργοποίηση / αναβάθμιση
-            </button>
-            <button
-              type="button"
-              disabled={working}
-              onClick={openPortal}
-              className="px-5 py-2.5 border border-primary/30 text-primary rounded-full text-sm font-bold"
-            >
-              Διαχείριση στο Stripe
-            </button>
+            {checkoutReady ? (
+              <button
+                type="button"
+                disabled={working}
+                onClick={startCheckout}
+                className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold disabled:opacity-50"
+              >
+                Ενεργοποίηση / αναβάθμιση
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={working || (onTrial && sub?.plan === selectedPlan)}
+                onClick={startTrial}
+                className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold disabled:opacity-50"
+              >
+                {onTrial && sub?.plan === selectedPlan
+                  ? `Δοκιμή ενεργή (${trialDays} ημέρες)`
+                  : `Ξεκινήστε δωρεάν δοκιμή ${trialDays} ημερών`}
+              </button>
+            )}
+            {checkoutReady && billingConfig?.portal_ready && (
+              <button
+                type="button"
+                disabled={working}
+                onClick={openPortal}
+                className="px-5 py-2.5 border border-primary/30 text-primary rounded-full text-sm font-bold"
+              >
+                Διαχείριση στο Stripe
+              </button>
+            )}
           </div>
         </div>
 

@@ -5,6 +5,24 @@ export async function fetchBillingSubscription() {
   return saasFetch('/api/v1/billing/subscription');
 }
 
+export async function fetchBillingConfig() {
+  const res = await fetch(`${API_BASE}/api/v1/billing/config`);
+  if (!res.ok) {
+    throw new Error('Billing config unavailable');
+  }
+  return res.json();
+}
+
+export async function startBillingTrial(plan, billingInterval = 'month') {
+  return saasFetch('/api/v1/billing/start-trial', {
+    method: 'POST',
+    body: JSON.stringify({
+      plan: plan || 'professional',
+      billing_interval: billingInterval,
+    }),
+  });
+}
+
 /** Public SaaS signup — no JWT; redirects to Stripe Checkout. */
 export async function createSignupCheckout({
   legalName,

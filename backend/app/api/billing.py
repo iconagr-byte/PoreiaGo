@@ -13,16 +13,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.schemas import (
     BillingCheckoutRequest,
     BillingCheckoutResponse,
+    BillingConfigResponse,
     BillingPortalResponse,
     BillingSignupCheckoutRequest,
     BillingSubscriptionResponse,
+    BillingTrialRequest,
     BillingUsageReportResponse,
 )
 from app.core.auth_deps import get_current_tenant_id, get_tenant_db, require_roles
 from app.core.database import AsyncSessionLocal
 from app.models.tenant import Tenant, TenantPlan
 from app.models.user import UserRole
-from app.services.billing_service import BillingService
+from app.services.billing_service import BillingService, stripe_readiness
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,13 @@ async def _load_tenant(session: AsyncSession, tenant_id: UUID) -> Tenant:
     if not tenant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     return tenant
+
+
+@router.get("/config", response_model=BillingConfigResponse)
+async def billing_config():
+    """Public — whether Stripe checkout is ready (no secrets)."""
+    data = stripe_readiness()
+    return BillingConfigResponse(**data)
 
 
 @router.get("/subscription", response_model=BillingSubscriptionResponse)
@@ -53,6 +62,7 @@ async def get_subscription(
         stripe_customer_id=tenant.stripe_customer_id,
         stripe_subscription_id=sub.stripe_subscription_id,
         current_period_end=sub.current_period_end,
+        trial_ends_at=sub.trial_ends_at,
         cancel_at_period_end=sub.cancel_at_period_end,
         base_amount_cents=sub.base_amount_cents,
     )
@@ -76,6 +86,43 @@ async def create_checkout(
     except ValueError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     return BillingCheckoutResponse(**result)
+
+
+@router.post("/start-trial", response_model=BillingSubscriptionResponse)
+async def start_trial(
+    body: BillingTrialRequest,
+    db: Annotated[AsyncSession, Depends(get_tenant_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
+):
+    """Activate 14-day trial when Stripe is not configured on the server."""
+    tenant = await _load_tenant(db, tenant_id)
+    try:
+        plan = TenantPlan(body.plan)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Invalid plan: {body.plan}") from exc
+    try:
+        sub = await BillingService(db).start_local_trial(
+            tenant,
+            plan=plan,
+            billing_interval=body.billing_interval,
+        )
+        await db.commit()
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return BillingSubscriptionResponse(
+        tenant_id=tenant.id,
+        plan=sub.plan.value,
+        status=sub.status.value,
+        is_active=tenant.is_active,
+        stripe_customer_id=tenant.stripe_customer_id,
+        stripe_subscription_id=sub.stripe_subscription_id,
+        current_period_end=sub.current_period_end,
+        trial_ends_at=sub.trial_ends_at,
+        cancel_at_period_end=sub.cancel_at_period_end,
+        base_amount_cents=sub.base_amount_cents,
+    )
 
 
 @router.post("/signup-checkout", response_model=BillingCheckoutResponse)

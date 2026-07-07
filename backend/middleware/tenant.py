@@ -62,6 +62,7 @@ PUBLIC_PATHS = {
     "/api/v1/billing/webhook",
     "/api/v1/payments/webhook",
     "/api/v1/billing/signup-checkout",
+    "/api/v1/billing/config",
     "/api/v1/telemetry/update",
     "/api/v1/bookings/guest",
     "/api/v1/bookings/lookup",

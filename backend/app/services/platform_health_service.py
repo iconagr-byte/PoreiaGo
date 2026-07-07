@@ -158,4 +158,16 @@ async def build_platform_health(
     }
     if fiscal is not None:
         payload["fiscal"] = fiscal
+
+    try:
+        from app.services.billing_service import stripe_readiness
+
+        billing = stripe_readiness()
+        payload["billing"] = {
+            "checkout_ready": billing["checkout_ready"],
+            "portal_ready": billing["portal_ready"],
+        }
+    except Exception:
+        pass
+
     return payload

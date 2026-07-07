@@ -32,6 +32,7 @@ PUBLIC_HOST_PATHS = (
     "/api/v1/billing/webhook",
     "/api/v1/payments/webhook",
     "/api/v1/billing/signup-checkout",
+    "/api/v1/billing/config",
     "/api/v1/aade/webhook",
     "/api/v1/auth/login",
     "/api/v1/auth/dev-login",
