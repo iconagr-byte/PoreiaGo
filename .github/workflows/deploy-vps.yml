@@ -1,7 +1,8 @@
 name: Deploy VPS (Hetzner — cheap)
 
-# Push main → SSH deploy to single VPS (~5€/month)
-# Secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY
+# Push main → SSH deploy to poreiago VM
+# REQUIRED repo secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY
+# Setup: deploy/VM-DEPLOY.md § GitHub Actions
 
 on:
   push:
@@ -29,22 +30,23 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Deploy to Hetzner VPS
+      - name: Deploy to VPS (/opt/poreiago)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 30m
           script: |
-            set -e
+            set -euo pipefail
+            if [ ! -d /opt/poreiago/.git ]; then
+              echo "ERROR: /opt/poreiago is not a git repo. Clone first on the VM:"
+              echo "  git clone https://github.com/iconagr-byte/PoreiaGo.git /opt/poreiago"
+              exit 1
+            fi
             cd /opt/poreiago
-            git pull origin main
-            npm ci
-            export VITE_API_BASE=https://api.poreiago.com
-            npm run build
-            docker compose --env-file deploy/.env.prod \
-              -f deploy/docker-compose.prod.yml \
-              --profile bundled-db \
-              up -d --build
-            sleep 10
-            curl -fsS https://api.poreiago.com/health || curl -fsS http://127.0.0.1:8000/health
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd -e deploy/.env.prod -e deploy/.vapid_private.pem
+            bash deploy/scripts/vm-deploy-all.sh

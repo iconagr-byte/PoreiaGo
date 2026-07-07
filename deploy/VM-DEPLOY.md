@@ -15,6 +15,28 @@
 
 Κάνε **Push** στο repo `PoreiaGo` (όλα τα νέα αρχεία).
 
+## Βήμα 1β — GitHub Actions (auto-deploy με SSH)
+
+Το push στο `main` **δεν** ενημερώνει μόνο του το site — χρειάζονται **3 secrets** στο repo:
+
+1. [github.com/iconagr-byte/PoreiaGo/settings/secrets/actions](https://github.com/iconagr-byte/PoreiaGo/settings/secrets/actions)
+2. **New repository secret** για καθένα:
+
+| Secret | Τιμή |
+|--------|------|
+| `SSH_HOST` | IP του server (π.χ. `95.x.x.x`) |
+| `SSH_USER` | `root` (ή ο user SSH σου) |
+| `SSH_PRIVATE_KEY` | Ολόκληρο το private key (`.pem`), συμπεριλαμβανομένων `-----BEGIN...` |
+
+3. Στο VM πρέπει να υπάρχει ήδη clone:
+   ```bash
+   git clone https://github.com/iconagr-byte/PoreiaGo.git /opt/poreiago
+   ```
+
+4. Έλεγχος: [Actions → Deploy VPS](https://github.com/iconagr-byte/PoreiaGo/actions/workflows/deploy-vps.yml) — πρέπει να είναι **πράσινο**.
+
+Αν το deploy job αποτυγχάνει σε **1 δευτερόλεπτο**, συνήθως λείπουν τα secrets ή το SSH key είναι λάθος.
+
 ## Βήμα 2 — SSH στο VM (μία εντολή)
 
 ```bash
