@@ -1,21 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 
-/** Hardcoded demo — no imports from bookingStore/tripStore (avoids circular load crashes). */
-const DEMO_BOOKING = {
-  id: 'B-1029',
-  customerName: 'John Doe',
-  tripTitle: 'Ημερήσια στα Μετέωρα',
-  date: '2026-06-15',
-  time: '08:00',
-  seat: '4A',
-  price: 45,
-  phone: '+30 694 123 4567',
-  email: 'john@example.com',
-  pnr: 'MET26JDOE8A',
-  invoiceNumber: 'INV-2026-00125',
-};
-
 function Field({ label, children }) {
   return (
     <div>
@@ -107,20 +92,16 @@ function TicketCard({ booking, tripTitle }) {
 
 export default function TicketPrintPage() {
   const { bookingId: rawId } = useParams();
-  const bookingId = decodeURIComponent(rawId || 'demo');
-  const isDemo = !bookingId || bookingId === 'demo';
+  const bookingId = decodeURIComponent(rawId || '').trim();
 
-  const [resolved, setResolved] = useState(() =>
-    isDemo ? { booking: DEMO_BOOKING, tripTitle: DEMO_BOOKING.tripTitle } : null,
-  );
+  if (!bookingId || bookingId === 'demo') {
+    return <Navigate to="/my-booking" replace />;
+  }
+
+  const [resolved, setResolved] = useState(null);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    if (isDemo) {
-      setResolved({ booking: DEMO_BOOKING, tripTitle: DEMO_BOOKING.tripTitle });
-      return;
-    }
-
     let cancelled = false;
     (async () => {
       try {
@@ -151,9 +132,9 @@ export default function TicketPrintPage() {
     return () => {
       cancelled = true;
     };
-  }, [bookingId, isDemo]);
+  }, [bookingId]);
 
-  if (!isDemo && !resolved && !loadError) {
+  if (!resolved && !loadError) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <p className="text-gray-500">Φόρτωση εισιτηρίου…</p>
@@ -166,8 +147,8 @@ export default function TicketPrintPage() {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-8 text-center">
         <div>
           <p className="text-red-600 font-bold">Η κράτηση «{bookingId}» δεν βρέθηκε.</p>
-          <Link to="/ticket/print/demo" className="text-[#0040df] font-bold text-sm mt-4 inline-block">
-            Demo εισιτήριο
+          <Link to="/my-booking" className="text-[#0040df] font-bold text-sm mt-4 inline-block">
+            Ανάκτηση κράτησης
           </Link>
         </div>
       </div>
@@ -178,9 +159,9 @@ export default function TicketPrintPage() {
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-8 text-center gap-4">
         <p className="text-red-600 font-bold">Σφάλμα φόρτωσης.</p>
-        <a href="/ticket-demo.html" className="text-[#0040df] font-bold">
-          Άνοιγμα στατικού demo (ticket-demo.html)
-        </a>
+        <Link to="/my-booking" className="text-[#0040df] font-bold">
+          Ανάκτηση κράτησης
+        </Link>
       </div>
     );
   }
@@ -212,10 +193,6 @@ export default function TicketPrintPage() {
           <Link to="/" className="text-[#0040df] font-bold hover:underline">
             Αρχική
           </Link>
-          {' · '}
-          <a href="/ticket-demo.html" className="text-[#0040df] font-bold hover:underline">
-            HTML backup
-          </a>
         </p>
       </div>
     </div>

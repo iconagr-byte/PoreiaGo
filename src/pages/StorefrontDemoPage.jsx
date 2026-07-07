@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { loadTrips } from '../lib/trips/tripStore.js';
 import { getTripMarket, MARKET_DOMESTIC, MARKET_INTERNATIONAL } from '../lib/trips/tripMarket.js';
 import {
@@ -26,12 +26,14 @@ import {
 } from '../lib/homepage/homepagePreview.js';
 import { fetchPublicFleet } from '../services/fleetPublicApi.js';
 import FleetShowcaseSection from '../components/FleetShowcaseSection.jsx';
-import StorefrontHeader, { getHeaderDemoOffset } from '../components/storefront/StorefrontHeader.jsx';
+import StorefrontHeader from '../components/storefront/StorefrontHeader.jsx';
 import StorefrontHero from '../components/storefront/StorefrontHero.jsx';
 import StorefrontFooter from '../components/storefront/StorefrontFooter.jsx';
 import TripsSection from '../components/storefront/TripsSection.jsx';
 export default function StorefrontDemoPage() {
   const navigate = useNavigate();
+  const isPreview = isStorefrontPreviewMode();
+
   const [trips] = useState(() => loadTrips());
   const domesticTrips = useMemo(
     () => trips.filter((t) => getTripMarket(t) === MARKET_DOMESTIC),
@@ -150,8 +152,6 @@ export default function StorefrontDemoPage() {
   };
 
   const headerTemplate = siteAppearance.header_template || 'glass_dark';
-  const demoBannerTop = getHeaderDemoOffset(headerTemplate);
-  const isPreview = isStorefrontPreviewMode();
   const themeVars = {
     '--sf-accent': siteAppearance.accent_color || '#0ea5e9',
     '--sf-secondary': siteAppearance.secondary_color || '#1e3a5f',
@@ -289,17 +289,13 @@ export default function StorefrontDemoPage() {
     </form>
   );
 
+  if (!isPreview) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="storefront-themed min-h-screen" style={themeVars}>
       <StorefrontHeader siteAppearance={siteAppearance} templateId={headerTemplate} />
-      {!isPreview && (
-      <div
-        className="fixed left-0 right-0 z-40 bg-amber-500/95 text-amber-950 text-center py-2 text-sm font-bold px-4"
-        style={{ top: demoBannerTop }}
-      >
-        Demo B2C storefront — έτσι βλέπουν οι επιβάτες το online κατάστημα του γραφείου σας
-      </div>
-      )}
       <main>
         <StorefrontHero
           siteAppearance={siteAppearance}

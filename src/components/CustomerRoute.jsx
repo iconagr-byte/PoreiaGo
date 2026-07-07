@@ -46,9 +46,6 @@ export default function CustomerRoute({ children, allowGuest = false }) {
         >
           Driver Portal
         </Link>
-        <Link to="/wallet/demo" className="text-primary text-sm font-bold hover:underline">
-          Προεπισκόπηση demo wallet
-        </Link>
       </div>
     );
   }
@@ -64,9 +61,6 @@ export default function CustomerRoute({ children, allowGuest = false }) {
         className="px-6 py-3 rounded-full bg-primary text-white font-bold text-sm hover:opacity-90"
       >
         Σύνδεση πελάτη
-      </Link>
-      <Link to="/wallet/demo" className="text-primary text-sm font-bold hover:underline">
-        Ή δείτε demo χωρίς σύνδεση
       </Link>
     </div>
   );

@@ -5,6 +5,11 @@ import 'leaflet/dist/leaflet.css';
 import { useAnimatedFleetVehicles } from '../../hooks/useAnimatedFleetVehicles.js';
 import FleetHeatmapLayer from './FleetHeatmapLayer.jsx';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
+import {
+  formatBoardingLabel,
+  formatPassengerNames,
+  formatSensorSummary,
+} from '../../lib/admin/fleetVehicleDetails.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
 import FleetMapFlyTo from './FleetMapFlyTo.jsx';
@@ -26,6 +31,12 @@ function LeafletAnimatedMarkers({ vehicles }) {
         <strong>{v.driver_name}</strong>
         <br />
         {v.bus_plate} · {Math.round(v.speed)} km/h
+        {formatBoardingLabel(v) ? (
+          <>
+            <br />
+            Επιβάτες: {formatBoardingLabel(v)}
+          </>
+        ) : null}
       </Tooltip>
       <Popup>
         <strong>{v.driver_name}</strong>
@@ -35,6 +46,24 @@ function LeafletAnimatedMarkers({ vehicles }) {
         Ταχύτητα: {Math.round(v.speed)} km/h
         <br />
         Δρομολόγιο #{v.trip_id ?? '—'}
+        {formatBoardingLabel(v) ? (
+          <>
+            <br />
+            Επιβιβασμένοι: {formatBoardingLabel(v)}
+          </>
+        ) : null}
+        {formatPassengerNames(v) ? (
+          <>
+            <br />
+            <span className="text-xs">{formatPassengerNames(v)}</span>
+          </>
+        ) : null}
+        {formatSensorSummary(v) ? (
+          <>
+            <br />
+            <span className="text-xs text-gray-500">{formatSensorSummary(v)}</span>
+          </>
+        ) : null}
         <div className="mt-2">
           <FleetDriverPlaybackButton vehicle={v} />
         </div>

@@ -382,6 +382,21 @@ class MasterQrIssueResponse(BaseModel):
     source: str = "local"
 
 
+class DriverShiftPushRequest(BaseModel):
+    trip_id: int = Field(..., gt=0)
+    driver_id: str | None = None
+    message: str | None = Field(default=None, max_length=240)
+    trip_title: str | None = Field(default=None, max_length=120)
+
+
+class DriverShiftPushResponse(BaseModel):
+    ok: bool
+    auth_url: str
+    expires_at: int
+    trip_id: int
+    push: dict = Field(default_factory=dict)
+
+
 class TripSyncItem(BaseModel):
     id: int = Field(..., gt=0)
     title: str = ""

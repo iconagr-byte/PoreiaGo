@@ -79,6 +79,7 @@ export async function fetchDriverManifest() {
     if (res.ok) {
       const data = await res.json();
       await cacheManifestForOffline(tripId, data);
+      window.dispatchEvent(new CustomEvent('driver-manifest-updated', { detail: { tripId } }));
       return data;
     }
   } catch {

@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   isGeolocationSupported,
-  positionToTelemetryPayload,
   startDriverGeolocationWatch,
 } from '../../lib/driver/driverGeolocation.js';
+import { buildDriverTelemetryPayload } from '../../lib/driver/driverTelemetryEnvelope.js';
+import {
+  requestMotionPermission,
+  startDeviceSensorWatch,
+} from '../../lib/driver/driverDeviceSensors.js';
 import { createDriverTelemetrySocket } from '../../lib/driver/driverTelemetryWs.js';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
+import { fetchDriverManifest } from '../../services/driverPortalApi.js';
 import { isWakeLockSupported, releaseWakeLock, requestWakeLock } from '../../lib/driver/wakeLock.js';
 import {
   formatRateLimitedMessage,
@@ -23,24 +28,51 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
   const [online, setOnline] = useState(false);
   const [lastPing, setLastPing] = useState(null);
   const [gpsError, setGpsError] = useState('');
+  const [manifestSummary, setManifestSummary] = useState(null);
   const iosEnv = getIosGpsEnvironment();
   const backgroundWarning = useIosBackgroundGpsWarning(online);
   const stopGeoRef = useRef(null);
   const wsRef = useRef(null);
   const wakeRef = useRef(null);
+  const stopSensorsRef = useRef(null);
+  const manifestRef = useRef(null);
+  const sensorsRef = useRef(null);
   const session = getDriverSession();
 
   useEffect(() => {
     return () => {
       stopGeoRef.current?.();
+      stopSensorsRef.current?.();
       wsRef.current?.close();
       releaseWakeLock(wakeRef.current);
     };
   }, []);
 
+  useEffect(() => {
+    if (!online) return undefined;
+    const refreshManifest = () => {
+      fetchDriverManifest()
+        .then((manifest) => {
+          manifestRef.current = manifest;
+          setManifestSummary(manifest);
+        })
+        .catch(() => {});
+    };
+    refreshManifest();
+    const manifestPollId = window.setInterval(refreshManifest, 10_000);
+    const onManifestUpdated = () => refreshManifest();
+    window.addEventListener('driver-manifest-updated', onManifestUpdated);
+    return () => {
+      window.clearInterval(manifestPollId);
+      window.removeEventListener('driver-manifest-updated', onManifestUpdated);
+    };
+  }, [online]);
+
   const goOffline = () => {
     stopGeoRef.current?.();
     stopGeoRef.current = null;
+    stopSensorsRef.current?.();
+    stopSensorsRef.current = null;
     wsRef.current?.close();
     wsRef.current = null;
     releaseWakeLock(wakeRef.current);
@@ -63,6 +95,7 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
       );
     }
     try {
+      await requestMotionPermission();
       const conn = createDriverTelemetrySocket({
         onOpen: () => toast.success('Σύνδεση telemetry OK'),
         onError: () => toast.error('Αποτυχία WebSocket'),
@@ -77,6 +110,9 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
         },
       });
       wsRef.current = conn;
+      stopSensorsRef.current = startDeviceSensorWatch((snapshot) => {
+        sensorsRef.current = snapshot;
+      });
       wakeRef.current = await requestWakeLock();
       if (!isWakeLockSupported()) {
         toast('Wake Lock μη διαθέσιμο — κρατήστε την οθόνη ενεργή', { icon: 'ℹ️' });
@@ -84,9 +120,11 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
 
       stopGeoRef.current = startDriverGeolocationWatch({
         onPosition: (pos) => {
-          const payload = positionToTelemetryPayload(pos, session, {
+          const payload = buildDriverTelemetryPayload(pos, session, {
             driverName,
             busPlate: session?.busPlate || `TRIP-${session?.tripId || '?'}`,
+            manifest: manifestRef.current,
+            sensors: sensorsRef.current,
           });
           conn.send(payload);
           setLastPing(new Date());
@@ -164,8 +202,18 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
             {isWakeLockSupported() ? 'Ναι' : 'Όχι'}
           </dd>
         </div>
+        <div className="driver-stat-tile">
+          <dt className="driver-card-label">Επιβιβασμένοι</dt>
+          <dd className="text-white text-sm mt-1 font-bold tabular-nums">
+            {manifestSummary?.progress_label ||
+              `${manifestSummary?.boarded_passengers?.length ?? 0}/${manifestSummary?.capacity ?? '—'}`}
+          </dd>
+        </div>
       </dl>
 
+      <p className="text-[11px] text-[var(--driver-muted)] leading-relaxed">
+        Στέλνονται live: θέση, ταχύτητα, επιβάτες μετά check-in, μπαταρία &amp; αισθητήρες κινητού.
+      </p>
       <p className="text-[11px] text-[var(--driver-muted)] leading-relaxed">
         {iosEnv.isIos
           ? 'iPhone: κρατήστε την εφαρμογή σε πρώτο πλάνο κατά τη βάρδια. Το GPS δεν λειτουργεί αξιόπιστα στο background.'

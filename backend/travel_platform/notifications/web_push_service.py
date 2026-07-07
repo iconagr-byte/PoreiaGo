@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,15 @@ def _vapid_public_key() -> str:
 
 
 def _vapid_private_key() -> str:
-    return os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()
+    key_file = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY_FILE", "").strip()
+    if key_file:
+        path = Path(key_file)
+        if path.is_file():
+            return path.read_text(encoding="utf-8").strip()
+    inline = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()
+    if "\\n" in inline:
+        return inline.replace("\\n", "\n")
+    return inline
 
 
 def _vapid_subject() -> str:

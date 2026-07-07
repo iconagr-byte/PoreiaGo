@@ -34,9 +34,6 @@ export default function FrontPage() {
             <a href="#pricing" className="hover:text-white transition-colors">
               Τιμές
             </a>
-            <Link to="/storefront" className="hover:text-white transition-colors">
-              Demo B2C
-            </Link>
             {role === 'admin' && (
               <Link to="/admin" className="hover:text-white transition-colors">
                 Panel
@@ -82,9 +79,6 @@ export default function FrontPage() {
           <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/55">
             <Link to="/grafeia" className="hover:text-white">
               Συμβόλαια
-            </Link>
-            <Link to="/storefront" className="hover:text-white">
-              Demo καταστήματος
             </Link>
             <Link to="/my-booking" className="hover:text-white">
               Ανάκτηση κράτησης

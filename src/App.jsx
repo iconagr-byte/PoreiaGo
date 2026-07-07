@@ -42,7 +42,6 @@ function App() {
           <Routes>
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
-            <Route path="/ticket/demo" element={<Navigate to="/ticket/print/demo" replace />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
             <Route path="/" element={<FrontPage />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />

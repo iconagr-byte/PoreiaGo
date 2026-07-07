@@ -43,6 +43,10 @@ function normalizeVehicle(msg, id, prev) {
     speed: msg.speed ?? msg.speed_kmh ?? 0,
     heading: msg.heading ?? msg.heading_deg,
     timestamp: msg.timestamp,
+    accuracy_m: msg.accuracy_m ?? null,
+    altitude_m: msg.altitude_m ?? null,
+    boarding: msg.boarding ?? null,
+    sensors: msg.sensors ?? null,
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
 }

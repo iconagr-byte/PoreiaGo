@@ -15,6 +15,57 @@ from travel_platform.telemetry.processor import process_telemetry_payload
 logger = logging.getLogger(__name__)
 
 
+def _boarding_snapshot(body: dict[str, Any]) -> dict[str, Any] | None:
+    boarding = body.get("boarding") or body.get("boarding_snapshot")
+    if not isinstance(boarding, dict):
+        return None
+    passengers = boarding.get("boarded_passengers")
+    if not isinstance(passengers, list):
+        passengers = []
+    compact = []
+    for p in passengers[:50]:
+        if not isinstance(p, dict):
+            continue
+        compact.append(
+            {
+                "booking_id": p.get("booking_id"),
+                "passenger_name": p.get("passenger_name") or p.get("customer_name"),
+                "seat_number": p.get("seat_number") or p.get("seat"),
+                "boarded_at": p.get("boarded_at"),
+            },
+        )
+    return {
+        "boarded_count": boarding.get("boarded_count", len(compact)),
+        "capacity": boarding.get("capacity"),
+        "progress_label": boarding.get("progress_label"),
+        "progress_percent": boarding.get("progress_percent"),
+        "boarded_passengers": compact,
+    }
+
+
+def _device_sensors(body: dict[str, Any]) -> dict[str, Any] | None:
+    sensors = body.get("sensors") or body.get("device_sensors")
+    if not isinstance(sensors, dict):
+        return None
+    out: dict[str, Any] = {}
+    if isinstance(sensors.get("battery"), dict):
+        out["battery"] = {
+            "level_pct": sensors["battery"].get("level_pct"),
+            "charging": sensors["battery"].get("charging"),
+        }
+    if isinstance(sensors.get("network"), dict):
+        out["network"] = {
+            "effective_type": sensors["network"].get("effective_type"),
+            "downlink_mbps": sensors["network"].get("downlink_mbps"),
+            "rtt_ms": sensors["network"].get("rtt_ms"),
+        }
+    if isinstance(sensors.get("orientation"), dict):
+        out["orientation"] = sensors["orientation"]
+    if isinstance(sensors.get("acceleration"), dict):
+        out["acceleration"] = sensors["acceleration"]
+    return out or None
+
+
 def driver_payload_to_telemetry(
     body: dict[str, Any],
     *,
@@ -36,6 +87,8 @@ def driver_payload_to_telemetry(
         or f"BUS-{trip_id or 'X'}",
     )
     driver_name = str(body.get("driver_name") or session.get("driver_name") or "Driver")
+    accuracy_m = body.get("accuracy_m")
+    altitude_m = body.get("altitude_m")
 
     if isinstance(ts, (int, float)):
         recorded_at = datetime.fromtimestamp(float(ts) / 1000 if ts > 1e12 else ts, tz=timezone.utc).isoformat()
@@ -58,6 +111,13 @@ def driver_payload_to_telemetry(
         "driver_name": driver_name,
         "bus_plate": vehicle_code,
         "source": "driver_pwa",
+        "accuracy_m": float(accuracy_m) if accuracy_m is not None else None,
+        "altitude_m": float(altitude_m) if altitude_m is not None else None,
+        "accel_x": body.get("accel_x"),
+        "accel_y": body.get("accel_y"),
+        "accel_z": body.get("accel_z"),
+        "boarding_snapshot": _boarding_snapshot(body),
+        "device_sensors": _device_sensors(body),
     }
 
 
@@ -119,6 +179,10 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         "speed": payload["speed_kmh"],
         "heading": payload.get("heading_deg"),
         "timestamp": payload["recorded_at"],
+        "accuracy_m": payload.get("accuracy_m"),
+        "altitude_m": payload.get("altitude_m"),
+        "boarding": payload.get("boarding_snapshot"),
+        "sensors": payload.get("device_sensors"),
     }
 
     await publish_fleet_location(tenant_id, egress)

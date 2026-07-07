@@ -47,7 +47,7 @@ async def seed() -> None:
             tenant = Tenant(
                 id=uuid4(),
                 slug=DEMO_TENANT_SLUG,
-                legal_name="Achillio Travel Demo",
+                legal_name="PoreiaGo",
                 vat_number="999999999",
                 subdomain="achillio",
                 plan=TenantPlan.PROFESSIONAL,

@@ -34,9 +34,6 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
           {siteAppearance.footer_terms_label}
         </a>
       )}
-      <Link to="/ticket/print/demo" className="hover:underline">
-        Demo εισιτήριο
-      </Link>
       <Link
         to="/admin/login"
         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white font-bold hover:bg-gray-800 transition-all"

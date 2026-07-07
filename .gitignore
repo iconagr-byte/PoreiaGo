@@ -17,6 +17,12 @@ dist-ssr
 .env.*
 !.env.example
 deploy/gcp/domain-contact.yaml
+deploy/.vapid_private.pem
+deploy/.vapid_public.key
+
+# Accidental nested workspace copies
+/Booking Travel/
+/PoreiaGo/
 
 # Editor directories and files
 .vscode/*
@@ -28,6 +34,3 @@ deploy/gcp/domain-contact.yaml
 *.njsproj
 *.sln
 *.sw?
-
-# Accidental nested clone — ignore
-Booking Travel/

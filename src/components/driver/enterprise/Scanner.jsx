@@ -28,6 +28,7 @@ export default function Scanner() {
         toast.error(response.message || 'Άκυρο εισιτήριο');
       }
       await fetchDriverManifest();
+      window.dispatchEvent(new CustomEvent('driver-manifest-updated'));
       setTimeout(() => setScanning(true), 1800);
       return response;
     },

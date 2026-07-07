@@ -49,33 +49,6 @@ export function HeroSection() {
         aria-hidden
       />
 
-      {/* Κάρτα demo — μόνο desktop, δεξιά */}
-      <div className="hidden lg:block absolute right-8 xl:right-14 top-1/2 -translate-y-1/2 z-10 w-[300px] xl:w-[320px] pointer-events-none">
-        <div className="rounded-[24px] overflow-hidden border border-white/20 shadow-2xl bg-slate-950/50 backdrop-blur-md">
-          <div className="relative h-32">
-            <img src={trip.image} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
-            <p className="absolute bottom-3 left-4 right-4 text-white text-sm font-bold leading-snug">
-              {trip.hook}
-            </p>
-          </div>
-          <div className="p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-sky-300/90">
-              Live storefront
-            </p>
-            <h3 className="text-base font-bold text-white mt-1">{trip.title}</h3>
-            <p className="text-xs text-white/60 mt-2 flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px]">calendar_today</span>
-              {trip.departureLabel}
-            </p>
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
-              <span className="text-xl font-bold text-white">€{trip.priceEur}</span>
-              <span className="text-xs font-bold text-emerald-300">{trip.availableSeats} θέσεις</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="relative z-10 w-full max-w-6xl mx-auto px-4 md:px-8 py-28 md:py-32">
         <div className="max-w-2xl">
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-bold uppercase tracking-wider text-sky-200 mb-6">
@@ -101,13 +74,6 @@ export function HeroSection() {
             >
               Ξεκινήστε δωρεάν δοκιμή
               <span className="material-symbols-outlined">arrow_forward</span>
-            </Link>
-            <Link
-              to="/storefront"
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-white/25 text-white hover:bg-white/10 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[20px]">storefront</span>
-              Demo καταστήματος B2C
             </Link>
           </div>
 
@@ -322,7 +288,7 @@ export function FinalCtaSection() {
           Έτοιμοι να δείτε το panel live;
         </h2>
         <p className="text-white/80 mb-8 max-w-lg mx-auto">
-          Συνδεθείτε στο demo ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
+          Συνδεθείτε στο panel του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link

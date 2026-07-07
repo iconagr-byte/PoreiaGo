@@ -8,6 +8,11 @@ import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import FleetGeofenceMapboxLayers from './FleetGeofenceMapboxLayers.jsx';
 import FleetSosPinsMapbox from './FleetSosPinsMapbox.jsx';
 import FleetMapFlyToMapbox from './FleetMapFlyToMapbox.jsx';
+import {
+  formatBoardingLabel,
+  formatPassengerNames,
+  formatSensorSummary,
+} from '../../lib/admin/fleetVehicleDetails.js';
 
 function HeatmapDots({ points = [], visible = true }) {
   if (!visible || !points.length) return null;
@@ -47,6 +52,24 @@ function BusMarker({ vehicle }) {
           <strong>{vehicle.driver_name}</strong>
           <br />
           {vehicle.bus_plate} · {Math.round(vehicle.speed)} km/h
+          {formatBoardingLabel(vehicle) ? (
+            <>
+              <br />
+              Επιβάτες: {formatBoardingLabel(vehicle)}
+            </>
+          ) : null}
+          {formatPassengerNames(vehicle) ? (
+            <>
+              <br />
+              <span className="opacity-80">{formatPassengerNames(vehicle)}</span>
+            </>
+          ) : null}
+          {formatSensorSummary(vehicle) ? (
+            <>
+              <br />
+              <span className="opacity-70">{formatSensorSummary(vehicle)}</span>
+            </>
+          ) : null}
         </div>
         <div className="pointer-events-auto absolute top-full left-1/2 z-50 mt-2 -translate-x-1/2 opacity-0 transition-opacity group-hover:opacity-100">
           <FleetDriverPlaybackButton vehicle={vehicle} className="shadow-lg" />

@@ -2,6 +2,11 @@ import { useFleetTelemetryEgress } from '../../context/FleetTelemetryContext.jsx
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import FleetPassengerTrackLinkButton from './FleetPassengerTrackLinkButton.jsx';
 import { navigateToDriverTodayPlayback } from '../../lib/admin/fleetPlaybackNav.js';
+import {
+  formatBoardingLabel,
+  formatPassengerNames,
+  formatSensorSummary,
+} from '../../lib/admin/fleetVehicleDetails.js';
 import { useNavigate } from 'react-router-dom';
 
 export default function ActiveDriversList() {
@@ -57,6 +62,21 @@ export default function ActiveDriversList() {
                 <dt className="text-[10px] uppercase text-gray-400 font-bold">Δρομολόγιο</dt>
                 <dd className="font-bold">{v.trip_id ?? '—'}</dd>
               </div>
+              {formatBoardingLabel(v) ? (
+                <div className="col-span-2">
+                  <dt className="text-[10px] uppercase text-gray-400 font-bold">Επιβιβασμένοι</dt>
+                  <dd className="font-bold text-emerald-700">{formatBoardingLabel(v)}</dd>
+                  {formatPassengerNames(v) ? (
+                    <p className="text-xs text-gray-500 mt-1">{formatPassengerNames(v)}</p>
+                  ) : null}
+                </div>
+              ) : null}
+              {formatSensorSummary(v) ? (
+                <div className="col-span-2">
+                  <dt className="text-[10px] uppercase text-gray-400 font-bold">Συσκευή</dt>
+                  <dd className="text-xs text-gray-600">{formatSensorSummary(v)}</dd>
+                </div>
+              ) : null}
               <div className="col-span-2">
                 <dt className="text-[10px] uppercase text-gray-400 font-bold">Τελευταία θέση</dt>
                 <dd className="font-mono text-xs text-gray-600">

@@ -8,7 +8,7 @@ export default function StorefrontBrand({ siteAppearance, variant = 'dark', clas
 
   return (
     <Link
-      to="/storefront"
+      to="/"
       className={`inline-flex items-center gap-2.5 shrink-0 hover:opacity-90 transition-opacity ${className}`}
     >
       {logoUrl ? (

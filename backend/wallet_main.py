@@ -43,6 +43,10 @@ try:
     from api.driver_portal import router as driver_portal_router
 except ImportError:
     driver_portal_router = None
+try:
+    from api.driver_push_router import router as driver_push_router
+except ImportError:
+    driver_push_router = None
 
 try:
     from api.driver_enterprise_router import router as driver_enterprise_router
@@ -131,6 +135,8 @@ if saas_router:
     app.include_router(saas_router)
 if driver_portal_router:
     app.include_router(driver_portal_router)
+if driver_push_router:
+    app.include_router(driver_push_router)
 if driver_enterprise_router:
     app.include_router(driver_enterprise_router)
 if expenses_upload_router:

@@ -24,7 +24,7 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: "${ACME_EMAIL}"
+      email: "${ACME_EMAIL:-ops@travel-agency.com}"
       storage: /acme/acme.json
       httpChallenge:
         entryPoint: web

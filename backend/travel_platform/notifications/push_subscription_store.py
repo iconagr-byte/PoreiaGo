@@ -62,6 +62,28 @@ def list_subscriptions_for_tenant(tenant_id: str, *, audience: str | None = "adm
     return rows
 
 
+def list_subscriptions_for_driver(
+    tenant_id: str,
+    driver_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Driver PWA push targets — optional filter by driver_id."""
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        return []
+    did = str(driver_id or "").strip() or None
+    rows: list[dict[str, Any]] = []
+    for row in _load().get("subscriptions", []):
+        if str(row.get("audience") or "") != "driver":
+            continue
+        if str(row.get("tenant_id") or "") != tid:
+            continue
+        row_driver = str(row.get("driver_id") or "").strip()
+        if did and row_driver and row_driver != did:
+            continue
+        rows.append(dict(row))
+    return rows
+
+
 def upsert_subscription(
     *,
     email: str,
@@ -70,6 +92,7 @@ def upsert_subscription(
     user_agent: str | None = None,
     tenant_id: str | None = None,
     audience: str = "customer",
+    driver_id: str | None = None,
 ) -> dict[str, Any]:
     normalized_email = _normalize_email(email)
     endpoint = str(endpoint or "").strip()
@@ -91,6 +114,8 @@ def upsert_subscription(
                 row["tenant_id"] = str(tenant_id)
             if audience:
                 row["audience"] = audience
+            if driver_id is not None:
+                row["driver_id"] = str(driver_id).strip() or None
             row["updated_at"] = now
             _save({"subscriptions": rows})
             return dict(row)
@@ -103,6 +128,7 @@ def upsert_subscription(
         "user_agent": user_agent or "",
         "tenant_id": str(tenant_id) if tenant_id else None,
         "audience": audience or "customer",
+        "driver_id": str(driver_id).strip() if driver_id else None,
         "created_at": now,
         "updated_at": now,
     }

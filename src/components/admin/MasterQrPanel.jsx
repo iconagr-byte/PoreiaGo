@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'react-qr-code';
 import toast from 'react-hot-toast';
 import { loadTrips, getTripById } from '../../lib/trips/tripStore.js';
-import { issueMasterQr, getMasterQrPngUrl, fetchFleetDrivers } from '../../services/platformApi.js';
+import { issueMasterQr, getMasterQrPngUrl, fetchFleetDrivers, notifyDriverShiftPush } from '../../services/platformApi.js';
 import { syncTripsToPostgres } from '../../services/tripsSyncApi.js';
 import BusPwaInstallGuide from './BusPwaInstallGuide.jsx';
 
@@ -15,6 +15,7 @@ export default function MasterQrPanel() {
   const [driverId, setDriverId] = useState('');
   const [issued, setIssued] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
   const [drivers, setDrivers] = useState([]);
   const [driversLoading, setDriversLoading] = useState(true);
 
@@ -75,6 +76,46 @@ export default function MasterQrPanel() {
     }
   }, [tripId, driverId, trips]);
 
+  const onNotifyDriverPush = useCallback(async () => {
+    const id = Number(tripId);
+    if (!Number.isFinite(id) || id <= 0) {
+      toast.error('Επιλέξτε εκδρομή');
+      return;
+    }
+    const trip = getTripById(id) || trips.find((t) => Number(t.id) === id);
+    setPushLoading(true);
+    try {
+      const result = await notifyDriverShiftPush({
+        tripId: id,
+        driverId: driverId.trim() || undefined,
+        tripTitle: trip?.title,
+        message: trip?.title ? `${trip.title} — πάτα για σύνδεση στη βάρδια` : undefined,
+      });
+      if (result.push?.reason === 'no_driver_subscriptions') {
+        toast.error(
+          'Ο οδηγός δεν έχει ενεργοποιήσει push στο /driver (Αρχική → Ενεργοποίηση push)',
+          { duration: 7000 },
+        );
+      } else if (result.ok) {
+        toast.success(`Push στάλθηκε · ${result.push?.sent || 0} συσκευή(ές)`);
+        setIssued({
+          trip_id: result.trip_id,
+          auth_url: result.auth_url,
+          expires_at: result.expires_at,
+          driver_id: driverId.trim() || undefined,
+        });
+      } else if (result.push?.reason === 'vapid_not_configured') {
+        toast.error('Ρυθμίστε WEB_PUSH_VAPID_* στο server');
+      } else {
+        toast.error('Αποτυχία αποστολής push');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία push');
+    } finally {
+      setPushLoading(false);
+    }
+  }, [tripId, driverId, trips]);
+
   const expiresLabel = issued?.expires_at
     ? new Date(issued.expires_at * 1000).toLocaleString('el-GR')
     : null;
@@ -106,7 +147,7 @@ export default function MasterQrPanel() {
           </div>
         </div>
 
-        <form onSubmit={onIssue} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end">
+        <form onSubmit={onIssue} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end">
           <label className="block">
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Εκδρομή</span>
             <select value={tripId} onChange={(e) => setTripId(e.target.value)} className={inputClass}>
@@ -155,6 +196,18 @@ export default function MasterQrPanel() {
             </span>
             {loading ? 'Έκδοση…' : 'Έκδοση QR'}
           </button>
+          <button
+            type="button"
+            disabled={pushLoading}
+            onClick={onNotifyDriverPush}
+            className="h-[46px] rounded-full bg-emerald-600 text-white font-bold text-sm px-5 hover:bg-emerald-700 disabled:opacity-60 transition-all flex items-center justify-center gap-2 md:col-span-1"
+            title="Αποστολή push στο κινητό οδηγού"
+          >
+            <span className="material-symbols-outlined text-[20px]">
+              {pushLoading ? 'hourglass_empty' : 'notifications_active'}
+            </span>
+            {pushLoading ? 'Push…' : 'Push οδηγού'}
+          </button>
         </form>
 
         <BusPwaInstallGuide />
@@ -180,6 +233,17 @@ export default function MasterQrPanel() {
                   <span className="material-symbols-outlined text-[16px]">download</span>
                   Λήψη PNG
                 </a>
+                <button
+                  type="button"
+                  disabled={pushLoading}
+                  onClick={onNotifyDriverPush}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {pushLoading ? 'hourglass_empty' : 'notifications_active'}
+                  </span>
+                  {pushLoading ? 'Αποστολή…' : 'Push «Άνοιξε βάρδια»'}
+                </button>
               </div>
               {issued.source && (
                 <span

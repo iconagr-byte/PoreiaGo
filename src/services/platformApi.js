@@ -571,6 +571,19 @@ export function getMasterQrPngUrl(tripId, { driverId } = {}) {
   return `${API_BASE}/api/admin/platform/operations/master-qr/${tripId}/png${qs ? `?${qs}` : ''}`;
 }
 
+export async function notifyDriverShiftPush({ tripId, driverId, message, tripTitle } = {}) {
+  const body = { trip_id: Number(tripId) };
+  if (driverId) body.driver_id = driverId;
+  if (message) body.message = message;
+  if (tripTitle) body.trip_title = tripTitle;
+  const res = await adminFetch('/api/admin/platform/operations/notify-driver-push', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function fetchFleetDepreciation(vehicleId) {
   const q = new URLSearchParams({ vehicle_id: vehicleId }).toString();
   try {

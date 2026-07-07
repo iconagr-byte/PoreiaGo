@@ -65,6 +65,35 @@ class DriverPayloadNormalizationTests(unittest.TestCase):
         self.assertEqual(out["driver_name"], "Maria")
         self.assertEqual(out["source"], "driver_pwa")
 
+    def test_maps_boarding_and_sensors(self):
+        session = {"tenant_id": DEMO_TENANT, "trip_id": 1, "sub": "drv-1"}
+        body = {
+            "lat": 38.0,
+            "lng": 23.0,
+            "speed": 40,
+            "accuracy_m": 12.5,
+            "boarding": {
+                "boarded_count": 2,
+                "capacity": 45,
+                "progress_label": "2/45",
+                "boarded_passengers": [
+                    {"booking_id": 1, "passenger_name": "Maria", "seat_number": "4A"},
+                ],
+            },
+            "sensors": {
+                "battery": {"level_pct": 88, "charging": False},
+                "network": {"effective_type": "4g"},
+            },
+            "accel_x": 0.1,
+            "accel_y": -0.2,
+            "accel_z": 9.7,
+        }
+        out = driver_payload_to_telemetry(body, session=session)
+        self.assertEqual(out["accuracy_m"], 12.5)
+        self.assertEqual(out["boarding_snapshot"]["boarded_count"], 2)
+        self.assertEqual(out["device_sensors"]["battery"]["level_pct"], 88)
+        self.assertEqual(out["accel_x"], 0.1)
+
 
 class IngestDriverLocationTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

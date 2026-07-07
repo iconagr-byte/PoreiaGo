@@ -57,6 +57,8 @@ from schemas.platform_admin import (
     PartnerDispatchResponse,
     MasterQrIssueRequest,
     MasterQrIssueResponse,
+    DriverShiftPushRequest,
+    DriverShiftPushResponse,
     TripSyncItem,
     TripsSyncRequest,
     TripsSyncResponse,
@@ -427,6 +429,38 @@ async def issue_master_qr(body: MasterQrIssueRequest):
         expires_at=result["expires_at"],
         manifest_url=result["manifest_url"],
         source=result.get("source", "local"),
+    )
+
+
+@router.post("/operations/notify-driver-push", response_model=DriverShiftPushResponse)
+async def notify_driver_shift_push(body: DriverShiftPushRequest):
+    """Έκδοση Master QR + Web Push «Άνοιξε βάρδια» στο κινητό οδηγού."""
+    from travel_platform.notifications.driver_push_service import send_driver_shift_invite_push
+    from travel_platform.operations.master_qr_bridge import issue_master_qr_hybrid
+    from travel_platform.operations.master_qr_normalize import build_driver_auth_url, driver_app_public_base
+
+    result = await issue_master_qr_hybrid(body.trip_id, driver_id=body.driver_id)
+    auth_url = result.get("auth_url") or result.get("qr_content")
+    qr_token = result.get("qr_token")
+    if qr_token:
+        auth_url = build_driver_auth_url(qr_token, base_url=driver_app_public_base())
+
+    push_result = await send_driver_shift_invite_push(
+        tenant_id=str(result["tenant_id"]),
+        trip_id=int(result["trip_id"]),
+        driver_id=body.driver_id,
+        message=body.message,
+        trip_title=body.trip_title,
+        auth_url=auth_url,
+        qr_token=qr_token,
+    )
+
+    return DriverShiftPushResponse(
+        ok=bool(push_result.get("ok")),
+        auth_url=auth_url or "",
+        expires_at=int(result["expires_at"]),
+        trip_id=int(result["trip_id"]),
+        push=push_result,
     )
 
 

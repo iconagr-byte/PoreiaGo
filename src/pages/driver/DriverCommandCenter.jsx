@@ -13,6 +13,7 @@ import SOSButton from '../../components/driver/enterprise/SOSButton.jsx';
 import TachographStrip from '../../components/driver/enterprise/TachographStrip.jsx';
 import DaySummary from '../../components/driver/DaySummary.jsx';
 import DriverShiftTelemetry from '../../components/driver/DriverShiftTelemetry.jsx';
+import DriverPushPanel from '../../components/driver/DriverPushPanel.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
 
 const TABS = [
@@ -226,7 +227,12 @@ export default function DriverCommandCenter() {
       </div>
 
       <main className="driver-shell driver-main">
-        {tab === 'home' && <DailyManifest />}
+        {tab === 'home' && (
+          <>
+            <DriverPushPanel />
+            <DailyManifest />
+          </>
+        )}
         {tab === 'gps' && (
           <DriverShiftTelemetry driverName={session?.driverName || 'Οδηγός'} />
         )}

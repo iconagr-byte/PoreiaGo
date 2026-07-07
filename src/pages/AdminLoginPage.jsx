@@ -180,9 +180,6 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <p className="text-xs text-center text-gray-500 mt-6">
-          Demo: {SAAS_ADMIN} / Admin123!
-        </p>
       </div>
 
       <div className="mt-8 text-center relative z-10 space-y-2">

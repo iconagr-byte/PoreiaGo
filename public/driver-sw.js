@@ -1,7 +1,7 @@
 /**
  * Driver Command Center — cache manifest, offline σελίδα, PWA assets.
  */
-const CACHE = 'aerostride-driver-v2';
+const CACHE = 'aerostride-driver-v3';
 const MANIFEST_PREFIX = '/driver-cache/manifest/';
 const OFFLINE_URL = '/driver-offline.html';
 
@@ -50,6 +50,60 @@ self.addEventListener('message', (event) => {
       );
     });
   }
+});
+
+self.addEventListener('push', (event) => {
+  let payload = {
+    title: 'PoreiaGo Οδηγός',
+    body: 'Νέα ενημέρωση βάρδιας',
+    url: '/driver',
+    tag: 'driver-pwa',
+    data: {},
+  };
+
+  if (event.data) {
+    try {
+      payload = { ...payload, ...event.data.json() };
+    } catch {
+      payload.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: payload.body,
+    tag: payload.tag || 'driver-pwa',
+    data: {
+      url: payload.url || '/driver',
+      ...(payload.data || {}),
+    },
+    icon: '/icons/driver-pwa-192.png',
+    badge: '/icons/driver-pwa-192.png',
+  };
+
+  event.waitUntil(self.registration.showNotification(payload.title || 'PoreiaGo Οδηγός', options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const data = event.notification?.data || {};
+  let target = data.url || data.auth_url || '/driver';
+  if (target.startsWith('/')) {
+    target = `${self.location.origin}${target}`;
+  }
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if ('focus' in client && client.url.includes('/driver')) {
+          client.navigate(target);
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(target);
+      }
+      return undefined;
+    }),
+  );
 });
 
 self.addEventListener('fetch', (event) => {
