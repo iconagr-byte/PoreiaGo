@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { fetchTenantBrandingSettings, updateTenantBrandingSettings } from '../../services/growthApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
 import { cacheBranding } from '../../lib/branding/applyBranding.js';
+import { DEFAULT_INGRESS_CNAME, getPlatformBaseDomain } from '../../lib/platform/domain.js';
 
 const EMPTY_DNS = {
   cname_host: '',
@@ -152,7 +153,7 @@ export default function BrandingPanel() {
           </div>
         </div>
         <p className="text-xs text-sky-900/80">
-          Wildcard SSL στο <strong>{form.platform_domain || 'olympus-saas.com'}</strong> — δεν χρειάζεται DNS
+          Wildcard SSL στο <strong>{form.platform_domain || getPlatformBaseDomain()}</strong> — δεν χρειάζεται DNS
           ρύθμιση.
         </p>
       </div>
@@ -203,7 +204,7 @@ export default function BrandingPanel() {
           <span className="font-bold text-gray-700">Checkout base URL</span>
           <input
             className="mt-1 w-full rounded-xl border px-3 py-2 font-mono text-sm"
-            placeholder={`https://${form.subdomain_fqdn || 'agency.olympus-saas.com'}`}
+            placeholder={`https://${form.subdomain_fqdn || `agency.${getPlatformBaseDomain()}`}`}
             value={form.checkout_base_url}
             onChange={(e) => setForm((p) => ({ ...p, checkout_base_url: e.target.value }))}
           />
@@ -233,13 +234,13 @@ export default function BrandingPanel() {
               <p>
                 <span className="text-emerald-800 font-bold">{dns.cname_host || form.custom_domain}</span>
                 {'  CNAME  '}
-                <span className="text-indigo-700 font-bold">{dns.cname_target || 'ingress.olympus-saas.com'}</span>
+                <span className="text-indigo-700 font-bold">{dns.cname_target || DEFAULT_INGRESS_CNAME}</span>
               </p>
               {dns.alternate_www_host && (
                 <p className="mt-2">
                   <span className="text-emerald-800 font-bold">{dns.alternate_www_host}</span>
                   {'  CNAME  '}
-                  <span className="text-indigo-700 font-bold">{dns.cname_target || 'ingress.olympus-saas.com'}</span>
+                  <span className="text-indigo-700 font-bold">{dns.cname_target || DEFAULT_INGRESS_CNAME}</span>
                 </p>
               )}
             </div>

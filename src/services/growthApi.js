@@ -1,11 +1,16 @@
 import { API_BASE } from '../config/api.js';
 import { adminFetch } from './adminApi.js';
 import { getSaasToken, saasFetch } from './saasApi.js';
+import {
+  DEFAULT_INGRESS_CNAME,
+  getPlatformBaseDomain,
+  tenantSubdomainFqdn,
+} from '../lib/platform/domain.js';
 
-const BASE_DOMAIN = import.meta.env.VITE_OLYMPUS_BASE_DOMAIN || 'olympus-saas.com';
+const BASE_DOMAIN = getPlatformBaseDomain();
 const DEFAULT_DNS = {
   cname_host: '',
-  cname_target: 'ingress.olympus-saas.com',
+  cname_target: DEFAULT_INGRESS_CNAME,
   notes: [],
 };
 
@@ -28,7 +33,7 @@ function normalizeBrandingResponse(data, source = 'postgres') {
     slug: data.slug || subdomain,
     subdomain,
     platform_domain: platformDomain,
-    subdomain_fqdn: data.subdomain_fqdn || `${subdomain}.${platformDomain}`,
+    subdomain_fqdn: data.subdomain_fqdn || tenantSubdomainFqdn(subdomain, platformDomain),
     custom_domain: data.custom_domain || '',
     primary_color: data.primary_color || '#0040df',
     logo_url: data.logo_url || '',

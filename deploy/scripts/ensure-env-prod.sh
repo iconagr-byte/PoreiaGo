@@ -46,6 +46,23 @@ set_kv "BILLING_CANCEL_URL" "https://${APP_HOST_DEFAULT}/admin?billing=cancel"
 set_kv "BILLING_SIGNUP_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup/success?billing=success"
 set_kv "BILLING_SIGNUP_CANCEL_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup?billing=cancel"
 
+PLATFORM_DOMAIN="${PLATFORM_DOMAIN:-poreiago.com}"
+if grep -q "^APP_HOST=" "$ENV_FILE" 2>/dev/null; then
+  _app_host="$(grep "^APP_HOST=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
+  _app_host="${_app_host#https://}"
+  _app_host="${_app_host#http://}"
+  _app_host="${_app_host%%/*}"
+  if [[ -n "$_app_host" ]]; then
+    PLATFORM_DOMAIN="${_app_host#www.}"
+    INGRESS_CNAME="${_app_host}"
+  fi
+fi
+INGRESS_CNAME="${INGRESS_CNAME:-www.poreiago.com}"
+replace_kv "OLYMPUS_BASE_DOMAIN" "$PLATFORM_DOMAIN"
+replace_kv "OLYMPUS_INGRESS_CNAME" "$INGRESS_CNAME"
+replace_kv "VITE_OLYMPUS_BASE_DOMAIN" "$PLATFORM_DOMAIN"
+replace_kv "VITE_OLYMPUS_INGRESS_CNAME" "$INGRESS_CNAME"
+
 if ! [[ -f "$DEPLOY_DIR/.vapid_private.pem" ]]; then
   echo "==> Generating Web Push VAPID keys"
   REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"

@@ -9,8 +9,9 @@ import {
   getPlanById,
 } from '../lib/billing/planCatalog.js';
 import { createSignupCheckout } from '../services/billingApi.js';
+import { getPlatformBaseDomain } from '../lib/platform/domain.js';
 
-const BASE_DOMAIN = import.meta.env.VITE_OLYMPUS_BASE_DOMAIN || 'olympus-saas.com';
+const BASE_DOMAIN = getPlatformBaseDomain();
 const SUBDOMAIN_PATTERN = /^[a-z0-9-]+$/;
 
 function normalizeSubdomain(value) {

@@ -45,7 +45,20 @@ echo "==> Frontend build"
 if [[ ! -d node_modules ]] || [[ package-lock.json -nt node_modules ]]; then
   npm ci
 fi
-VITE_API_BASE="$API_BASE" npm run build
+PLATFORM_DOMAIN="${PLATFORM_DOMAIN:-poreiago.com}"
+INGRESS_CNAME="${INGRESS_CNAME:-www.poreiago.com}"
+if [[ -f "$ENV_FILE" ]]; then
+  if grep -q "^OLYMPUS_BASE_DOMAIN=" "$ENV_FILE" 2>/dev/null; then
+    PLATFORM_DOMAIN="$(grep "^OLYMPUS_BASE_DOMAIN=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
+  fi
+  if grep -q "^OLYMPUS_INGRESS_CNAME=" "$ENV_FILE" 2>/dev/null; then
+    INGRESS_CNAME="$(grep "^OLYMPUS_INGRESS_CNAME=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
+  fi
+fi
+VITE_API_BASE="$API_BASE" \
+VITE_OLYMPUS_BASE_DOMAIN="$PLATFORM_DOMAIN" \
+VITE_OLYMPUS_INGRESS_CNAME="$INGRESS_CNAME" \
+npm run build
 
 echo "==> API Docker image"
 docker build -t "$API_IMAGE" "$REPO_ROOT/backend"
