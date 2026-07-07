@@ -10,6 +10,7 @@ import {
 } from '../lib/billing/planCatalog.js';
 import { createSignupCheckout } from '../services/billingApi.js';
 import { getPlatformBaseDomain } from '../lib/platform/domain.js';
+import PasswordField from '../components/PasswordField.jsx';
 
 const BASE_DOMAIN = getPlatformBaseDomain();
 const SUBDOMAIN_PATTERN = /^[a-z0-9-]+$/;
@@ -275,36 +276,20 @@ export default function AgencySignupPage() {
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold" htmlFor="password">
-                    Κωδικός
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    required
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold" htmlFor="confirm">
-                    Επιβεβαίωση κωδικού
-                  </label>
-                  <input
-                    id="confirm"
-                    type="password"
-                    required
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
-                    placeholder="••••••••"
-                  />
-                </div>
+                <PasswordField
+                  id="password"
+                  label="Κωδικός"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <PasswordField
+                  id="confirm"
+                  label="Επιβεβαίωση κωδικού"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
               </div>
 
               <button
