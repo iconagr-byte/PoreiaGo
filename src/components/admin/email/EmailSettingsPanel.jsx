@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   createEmailSettings,
@@ -8,7 +8,10 @@ import {
   testSavedEmailConnection,
   updateEmailSettings,
 } from '../../../services/emailSettingsApi.js';
-
+import {
+  downloadEmailSettingsTemplate,
+  parseEmailSettingsFile,
+} from '../../../lib/email/emailSettingsImport.js';
 const EMPTY = {
   label: '',
   email_address: '',
@@ -32,6 +35,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
   const [form, setForm] = useState({ ...EMPTY });
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   const load = async () => {
     try {
@@ -160,22 +165,99 @@ export default function EmailSettingsPanel({ onAccountChange }) {
     }
   };
 
+  const applyImportedAccount = (account) => {
+    setEditingId('new');
+    setForm({
+      ...EMPTY,
+      ...account,
+      mail_password: account.mail_password || '',
+    });
+  };
+
+  const handleImportFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const { accounts, errors } = parseEmailSettingsFile(text, file.name);
+
+      if (errors.length) {
+        errors.forEach((msg) => toast.error(msg, { duration: 5000 }));
+      }
+      if (!accounts.length) {
+        if (!errors.length) toast.error('Δεν βρέθηκαν έγκυροι λογαριασμοί στο αρχείο');
+        return;
+      }
+
+      if (accounts.length === 1) {
+        applyImportedAccount(accounts[0]);
+        toast.success('Οι ρυθμίσεις φορτώθηκαν — ελέγξτε και πατήστε Αποθήκευση');
+        return;
+      }
+
+      let created = 0;
+      for (const account of accounts) {
+        if (!account.mail_password) continue;
+        await createEmailSettings(account);
+        created += 1;
+      }
+      if (created) {
+        toast.success(`Εισήχθησαν ${created} λογαριασμοί`);
+        load();
+      } else {
+        toast.error('Κανένας λογαριασμός δεν αποθηκεύτηκε — λείπουν κωδικοί');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία εισαγωγής');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="font-headline-md text-headline-md text-on-surface">Ρυθμίσεις Email</h2>
           <p className="text-body-sm text-on-surface-variant mt-1">
-            Συνδέστε τον δικό σας λογαριασμό (π.χ. info@mydomain.gr) — IMAP/SMTP, όχι .env
+            Συνδέστε τον δικό σας λογαριασμό (π.χ. info@mydomain.gr) — IMAP/SMTP, όχι .env.
+            Εισαγωγή από <strong>JSON</strong> ή <strong>.env</strong> αρχείο.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={startNew}
-          className="px-4 py-2 rounded-lg bg-primary text-on-primary text-label-md"
-        >
-          + Νέος λογαριασμός
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,.env,.txt,application/json,text/plain"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="px-4 py-2 rounded-lg border border-outline-variant text-label-md font-bold"
+          >
+            {importing ? 'Εισαγωγή…' : 'Εισαγωγή από αρχείο'}
+          </button>
+          <button
+            type="button"
+            onClick={downloadEmailSettingsTemplate}
+            className="px-4 py-2 rounded-lg border border-outline-variant text-label-md"
+          >
+            Πρότυπο JSON
+          </button>
+          <button
+            type="button"
+            onClick={startNew}
+            className="px-4 py-2 rounded-lg bg-primary text-on-primary text-label-md"
+          >
+            + Νέος λογαριασμός
+          </button>
+        </div>
       </div>
 
       {accounts.length > 0 && (
