@@ -20,8 +20,16 @@ echo "=============================================="
 cd "$REPO_ROOT"
 
 if [[ -d .git ]]; then
-  echo "==> git pull"
-  git pull --ff-only || git pull
+  echo "==> git sync (origin/main)"
+  git fetch origin main
+  # VM may have old hand-edits in deploy/*.yml — reset to repo; secrets stay in .env.prod (gitignored)
+  git reset --hard origin/main
+  git clean -fd \
+    -e deploy/.env.prod \
+    -e 'deploy/.env.prod.*' \
+    -e deploy/.vapid_private.pem \
+    -e deploy/.vapid_public.key \
+    -e 'deploy/.vapid_*.pem' || true
 fi
 
 bash "$DEPLOY_DIR/scripts/ensure-env-prod.sh"
