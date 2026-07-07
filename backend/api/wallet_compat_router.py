@@ -17,8 +17,8 @@ _BRANDING_FILE = _DATA / "tenant_branding.json"
 _SETTINGS_FILE = Path(__file__).resolve().parents[1] / "platform" / "settings" / "platform_settings.json"
 
 _DEFAULT_BRANDING = {
-    "slug": "aerostride",
-    "display_name": "AeroStride Travel",
+    "slug": "poreiago",
+    "display_name": "PoreiaGo",
     "logo_url": "",
     "primary_color": "#0040df",
     "custom_domain": "",

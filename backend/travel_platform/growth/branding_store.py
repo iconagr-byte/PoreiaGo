@@ -12,8 +12,8 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 STORE_PATH = DATA_DIR / "tenant_branding.json"
 
 DEFAULT_BRANDING = {
-    "slug": "achillio",
-    "display_name": "Achillio Travel",
+    "slug": "poreiago",
+    "display_name": "PoreiaGo",
     "logo_url": "",
     "primary_color": "#0040df",
     "custom_domain": "",

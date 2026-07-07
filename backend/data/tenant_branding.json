@@ -1,26 +1,26 @@
 {
   "default": {
-    "slug": "aerostride",
-    "display_name": "Achillio Travel QA",
+    "slug": "poreiago",
+    "display_name": "PoreiaGo",
     "logo_url": "",
     "primary_color": "#005d90",
-    "custom_domain": "bookings-test.achillio-demo.gr",
+    "custom_domain": "",
     "css_injection_url": "",
     "css_injection_inline": "",
     "verified_domain": true,
-    "checkout_base_url": "http://localhost:5173",
-    "updated_at": "2026-06-21T13:28:33.431991+00:00"
+    "checkout_base_url": "https://www.poreiago.com",
+    "updated_at": "2026-07-07T20:04:00.000000+00:00"
   },
-  "achillio": {
-    "slug": "achillio",
-    "display_name": "Achillio Travel QA",
+  "poreiago": {
+    "slug": "poreiago",
+    "display_name": "PoreiaGo",
     "logo_url": "",
     "primary_color": "#005d90",
-    "custom_domain": "bookings-test.achillio-demo.gr",
+    "custom_domain": "",
     "css_injection_url": "",
     "css_injection_inline": "",
     "verified_domain": true,
-    "checkout_base_url": "http://localhost:5173",
-    "updated_at": "2026-06-21T13:28:33.446553+00:00"
+    "checkout_base_url": "https://www.poreiago.com",
+    "updated_at": "2026-07-07T20:04:00.000000+00:00"
   }
 }
