@@ -1,9 +1,24 @@
 import { saasFetch } from './saasApi.js';
 
 export const FISCAL_PROVIDERS = [
-  { id: 'native_aade', label: 'myDATA (Native AADE)' },
-  { id: 'prosvasis', label: 'Prosvasis GO' },
-  { id: 'epsilon', label: 'Epsilon Smart' },
+  {
+    id: 'native_aade',
+    label: 'myDATA (Native AADE)',
+    icon: 'verified_user',
+    description: 'Απευθείας έκδοση ΑΠΥ/τιμολογίων μέσω AADE myDATA',
+  },
+  {
+    id: 'prosvasis',
+    label: 'Prosvasis GO',
+    icon: 'cloud_sync',
+    description: 'Έκδοση μέσω S1 Cloud / Prosvasis integration',
+  },
+  {
+    id: 'epsilon',
+    label: 'Epsilon Smart',
+    icon: 'hub',
+    description: 'Έκδοση μέσω Epsilon Smart API',
+  },
 ];
 
 export const DEFAULT_FISCAL_SETTINGS = {
