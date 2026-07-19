@@ -3,7 +3,7 @@ import {
   AUDIENCE_HOOKS,
   FEATURES,
   HERO,
-  HERO_SHOWCASE_TRIP,
+  HERO_BACKGROUND_IMAGE,
   PLATFORM_TAGLINE,
   STATS,
   STEPS,
@@ -20,14 +20,11 @@ const FEATURE_ICON_STYLES = {
 };
 
 export function HeroSection() {
-  const trip = HERO_SHOWCASE_TRIP;
-
   return (
     <section className="relative min-h-[92vh] flex items-center overflow-hidden bg-slate-950">
-      {/* Πλήρες background — καλύπτει όλη την οθόνη */}
       <div className="absolute inset-0" aria-hidden>
         <img
-          src={trip.image}
+          src={HERO_BACKGROUND_IMAGE}
           alt=""
           className="absolute inset-0 h-full w-full object-cover object-center"
         />
@@ -74,6 +71,12 @@ export function HeroSection() {
             >
               Ξεκινήστε δωρεάν δοκιμή
               <span className="material-symbols-outlined">arrow_forward</span>
+            </Link>
+            <Link
+              to="/admin/login"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-white/25 text-white hover:bg-white/10 transition-colors"
+            >
+              Σύνδεση γραφείου
             </Link>
           </div>
 
@@ -285,7 +288,7 @@ export function FinalCtaSection() {
     <section className="py-20 px-4 md:px-8">
       <div className="max-w-4xl mx-auto text-center rounded-[32px] bg-gradient-to-br from-indigo-600 to-violet-700 p-10 md:p-14 text-white shadow-2xl">
         <h2 className="text-2xl md:text-3xl font-bold mb-4">
-          Έτοιμοι να δείτε το panel live;
+          Έτοιμοι να ξεκινήσετε;
         </h2>
         <p className="text-white/80 mb-8 max-w-lg mx-auto">
           Συνδεθείτε στο panel του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.

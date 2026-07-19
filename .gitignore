@@ -34,3 +34,5 @@ deploy/.vapid_public.key
 *.njsproj
 *.sln
 *.sw?
+.tmp.driveupload/
+backend/.env
