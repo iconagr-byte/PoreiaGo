@@ -182,7 +182,7 @@ export const ADMIN_NAV_ITEMS = {
   },
   drivers: {
     id: 'drivers',
-    label: 'Οδηγοί',
+    label: 'Οδηγοί / App',
     icon: 'badge',
     filled: true,
     type: 'tab',
