@@ -69,7 +69,7 @@ export function HeroSection() {
               to="/grafeia"
               className="inline-flex items-center gap-2 px-8 py-4 bg-white text-slate-900 rounded-full font-bold text-base hover:scale-[1.02] shadow-xl shadow-black/20 transition-transform"
             >
-              Ξεκινήστε δωρεάν δοκιμή
+              Δείτε τα συμβόλαια
               <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
             <Link

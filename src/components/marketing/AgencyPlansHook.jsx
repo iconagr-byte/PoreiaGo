@@ -36,15 +36,15 @@ export default function AgencyPlansHook({ variant = 'hero' }) {
             Ψηφιοποιήστε το γραφείο σας — κρατήσεις, στόλος, GPS, billing σε ένα panel
           </h2>
           <p className="text-white/75 text-sm md:text-base leading-relaxed mb-6 max-w-xl">
-            Επιλέξτε <strong className="text-white">μηνιαίο ή ετήσιο συμβόλαιο</strong>, ξεκινήστε δοκιμή
-            14 ημερών και στείλτε καμπάνιες με {CAMPAIGN_TEMPLATE_COUNT} έτοιμα email πρότυπα.
+            Επιλέξτε <strong className="text-white">μηνιαίο ή ετήσιο συμβόλαιο</strong> και στείλτε
+            καμπάνιες με {CAMPAIGN_TEMPLATE_COUNT} έτοιμα email πρότυπα.
           </p>
           <div className="flex flex-wrap gap-3">
             <Link
               to="/grafeia/signup"
               className="inline-flex items-center gap-2 px-6 py-3.5 bg-white text-indigo-950 rounded-full font-bold hover:scale-[1.02] transition-transform shadow-lg"
             >
-              Ξεκινήστε δωρεάν δοκιμή
+              Εγγραφή γραφείου
               <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
             </Link>
             <Link

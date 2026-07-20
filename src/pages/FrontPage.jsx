@@ -52,8 +52,8 @@ export default function FrontPage() {
               to="/grafeia"
               className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-white text-sm font-bold rounded-full shadow-lg shadow-sky-500/25 transition-colors"
             >
-              Δωρεάν δοκιμή
-              <span className="material-symbols-outlined text-[18px]">rocket_launch</span>
+              Συμβόλαια
+              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </Link>
           </div>
         </div>
