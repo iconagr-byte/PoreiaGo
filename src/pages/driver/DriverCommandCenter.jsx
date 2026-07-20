@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import '../../styles/driver-app.css';
 import { clearDriverSession, getDriverSession, isSessionValid } from '../../lib/driver/driverSession.js';
 import { flushOfflineScanQueue } from '../../services/ticketingApi.js';
+import { fetchDriverMe } from '../../services/driverPortalApi.js';
 import MasterQrGate from '../../components/driver/MasterQrGate.jsx';
 import DailyManifest from '../../components/driver/DailyManifest.jsx';
 import Scanner from '../../components/driver/enterprise/Scanner.jsx';
@@ -30,11 +31,83 @@ function safetyComplete(tripId) {
   return !!localStorage.getItem(`safety_done_${tripId}`);
 }
 
+function driverInitials(name) {
+  return (name || 'Ο')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
+function DriverHeader({ session, telemetryOnline, onLogout, kicker, title }) {
+  const name = session?.driverName || 'Οδηγός';
+  const plate = session?.vehiclePlate || session?.vehicleCode;
+  const photoUrl = session?.photoUrl;
+  const busUrl = session?.vehicleImageUrl;
+
+  return (
+    <header className="driver-header driver-shell flex justify-between items-center gap-3">
+      <div className="driver-brand min-w-0">
+        <div className="driver-header-avatars" aria-hidden={!photoUrl && !busUrl}>
+          {photoUrl ? (
+            <img src={photoUrl} alt="" className="driver-avatar" />
+          ) : (
+            <div className="driver-avatar driver-avatar--initials">{driverInitials(name)}</div>
+          )}
+          {busUrl ? (
+            <img src={busUrl} alt="" className="driver-bus-thumb" />
+          ) : (
+            <div className="driver-bus-thumb">
+              <span className="material-symbols-outlined">directions_bus</span>
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="driver-header-kicker truncate">{kicker || name}</p>
+          <p className="driver-header-title truncate">
+            {title || plate || (session?.tripId ? `Βάρδια #${session.tripId}` : 'Βάρδια')}
+          </p>
+        </div>
+      </div>
+      <div className="driver-header-actions">
+        <span
+          className={`driver-live-badge ${telemetryOnline ? 'is-live' : 'is-offline'}`}
+          title={telemetryOnline ? 'Ζωντανή μετάδοση GPS' : 'Εκτός σύνδεσης'}
+        >
+          {telemetryOnline ? 'LIVE' : 'Offline'}
+        </span>
+        <button type="button" onClick={onLogout} className="driver-header-btn shrink-0">
+          {kicker === 'Pre-trip' ? 'Έξοδος' : 'Τέλος'}
+        </button>
+      </div>
+    </header>
+  );
+}
+
+const toastOptions = {
+  duration: 3500,
+  style: {
+    background: '#ffffff',
+    color: '#0f172a',
+    fontSize: '0.9375rem',
+    fontWeight: 600,
+    border: '1px solid rgba(15,23,42,0.08)',
+    borderRadius: '12px',
+    boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
+  },
+  success: {
+    iconTheme: { primary: '#1d4ed8', secondary: '#ffffff' },
+  },
+};
+
 export default function DriverCommandCenter() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [authenticated, setAuthenticated] = useState(isSessionValid());
   const [safetyOk, setSafetyOk] = useState(false);
+  const [profileTick, setProfileTick] = useState(0);
   const tab = params.get('tab') || 'home';
 
   const [onBreak, setOnBreak] = useState(false);
@@ -72,12 +145,13 @@ export default function DriverCommandCenter() {
       link.href = '/driver-telemetry-manifest.webmanifest';
       document.head.appendChild(link);
     }
-    if (!document.querySelector('meta[name="theme-color"]')) {
-      const theme = document.createElement('meta');
+    let theme = document.querySelector('meta[name="theme-color"]');
+    if (!theme) {
+      theme = document.createElement('meta');
       theme.name = 'theme-color';
-      theme.content = '#facc15';
       document.head.appendChild(theme);
     }
+    theme.content = '#ffffff';
     if (!document.querySelector('link[rel="apple-touch-icon"]')) {
       const apple = document.createElement('link');
       apple.rel = 'apple-touch-icon';
@@ -86,7 +160,7 @@ export default function DriverCommandCenter() {
     }
     const iosMeta = [
       ['apple-mobile-web-app-capable', 'yes'],
-      ['apple-mobile-web-app-status-bar-style', 'black-translucent'],
+      ['apple-mobile-web-app-status-bar-style', 'default'],
       ['apple-mobile-web-app-title', 'GPS Οδηγού'],
       ['format-detection', 'telephone=no'],
     ];
@@ -108,7 +182,18 @@ export default function DriverCommandCenter() {
     return () => window.removeEventListener('driver-shift-online', onShift);
   }, []);
 
-  const session = getDriverSession();
+  useEffect(() => {
+    if (!authenticated) return undefined;
+    let cancelled = false;
+    fetchDriverMe().then(() => {
+      if (!cancelled) setProfileTick((n) => n + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated]);
+
+  const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
   const tripId = session?.tripId;
 
   useEffect(() => {
@@ -146,10 +231,11 @@ export default function DriverCommandCenter() {
         <MasterQrGate
           onAuthenticated={() => {
             setAuthenticated(true);
+            setProfileTick((n) => n + 1);
             toast.success('Σύνδεση για τη σημερινή βάρδια');
           }}
         />
-        <Toaster position="bottom-center" containerClassName="driver-toast" />
+        <Toaster position="bottom-center" containerClassName="driver-toast" toastOptions={toastOptions} />
       </>
     );
   }
@@ -157,44 +243,24 @@ export default function DriverCommandCenter() {
   if (!safetyOk) {
     return (
       <div className="driver-app">
-        <header className="driver-header driver-shell flex justify-between items-center gap-3">
-          <div className="driver-brand">
-            <div className="driver-brand-icon">
-              <span className="material-symbols-outlined text-[22px]">directions_bus</span>
-            </div>
-            <div className="min-w-0">
-              <p className="driver-header-kicker">Pre-trip</p>
-              <p className="driver-header-title">Έλεγχος ασφαλείας</p>
-            </div>
-          </div>
-          <button type="button" onClick={logout} className="driver-header-btn">
-            Έξοδος
-          </button>
-        </header>
+        <DriverHeader
+          session={session}
+          telemetryOnline={telemetryOnline}
+          onLogout={logout}
+          kicker="Pre-trip"
+          title="Έλεγχος ασφαλείας"
+        />
         <div className="driver-shell driver-main">
           <PreTripForm onComplete={handlePreTripComplete} />
         </div>
-        <Toaster position="bottom-center" containerClassName="driver-toast" />
+        <Toaster position="bottom-center" containerClassName="driver-toast" toastOptions={toastOptions} />
       </div>
     );
   }
 
   return (
     <div className="driver-app">
-      <header className="driver-header driver-shell flex justify-between items-center gap-3">
-        <div className="driver-brand min-w-0">
-          <div className="driver-brand-icon shrink-0">
-            <span className="material-symbols-outlined text-[22px]">directions_bus</span>
-          </div>
-          <div className="min-w-0">
-            <p className="driver-header-kicker">Command Center</p>
-            <p className="driver-header-title truncate">Βάρδια #{tripId}</p>
-          </div>
-        </div>
-        <button type="button" onClick={logout} className="driver-header-btn shrink-0">
-          Τέλος
-        </button>
-      </header>
+      <DriverHeader session={session} telemetryOnline={telemetryOnline} onLogout={logout} />
 
       <div className="driver-shell">
         <TachographStrip
@@ -216,8 +282,8 @@ export default function DriverCommandCenter() {
               }}
               className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
                 onBreak
-                  ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-950/30'
-                  : 'border-[var(--driver-yellow)]/50 text-[var(--driver-yellow)] bg-[var(--driver-yellow-soft)]'
+                  ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
+                  : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
               }`}
             >
               {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
@@ -266,21 +332,7 @@ export default function DriverCommandCenter() {
       <Toaster
         position="bottom-center"
         containerClassName="driver-toast"
-        toastOptions={{
-          duration: 3500,
-          style: {
-            background: '#1a1a1a',
-            color: '#fafafa',
-            fontSize: '0.9375rem',
-            fontWeight: 600,
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '12px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-          },
-          success: {
-            iconTheme: { primary: '#facc15', secondary: '#0a0a0a' },
-          },
-        }}
+        toastOptions={toastOptions}
       />
     </div>
   );

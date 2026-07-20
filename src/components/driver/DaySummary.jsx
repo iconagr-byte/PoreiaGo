@@ -38,14 +38,14 @@ export default function DaySummary() {
               t.tone === 'green' ? 'driver-card-accent' : ''
             }`}
           >
-            <div className="w-12 h-12 rounded-xl bg-black/40 border border-[var(--driver-border)] flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-[var(--driver-accent-soft)] border border-[var(--driver-border)] flex items-center justify-center shrink-0">
               <span
                 className={`material-symbols-outlined text-2xl ${
                   t.tone === 'gold'
-                    ? 'text-[var(--driver-yellow)]'
+                    ? 'text-[var(--driver-yellow-dim)]'
                     : t.tone === 'green'
                       ? 'text-[var(--driver-success)]'
-                      : 'text-white'
+                      : 'text-[var(--driver-accent)]'
                 }`}
               >
                 {t.icon}
@@ -56,10 +56,10 @@ export default function DaySummary() {
               <p
                 className={`text-3xl font-extrabold tabular-nums mt-0.5 ${
                   t.tone === 'gold'
-                    ? 'text-[var(--driver-yellow)]'
+                    ? 'text-[var(--driver-yellow-dim)]'
                     : t.tone === 'green'
                       ? 'text-[var(--driver-success)]'
-                      : 'text-white'
+                      : 'text-[var(--driver-text)]'
                 }`}
               >
                 {t.value}

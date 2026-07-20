@@ -23,15 +23,15 @@ export default function IosPwaGpsGuidance({ compact = false }) {
     <div
       className={`rounded-2xl border text-sm leading-relaxed ${
         critical
-          ? 'border-amber-500/50 bg-amber-950/40 text-amber-50'
-          : 'border-sky-500/30 bg-sky-950/30 text-sky-50'
+          ? 'border-amber-300 bg-amber-50 text-amber-950'
+          : 'border-sky-200 bg-sky-50 text-sky-950'
       }`}
       role="note"
       aria-label="Οδηγίες GPS για iPhone"
     >
       <div className="flex items-start justify-between gap-3 p-4">
         <div className="flex gap-3 min-w-0">
-          <span className="material-symbols-outlined text-2xl shrink-0 text-[#facc15]" aria-hidden>
+          <span className="material-symbols-outlined text-2xl shrink-0 text-[var(--driver-accent)]" aria-hidden>
             phone_iphone
           </span>
           <div className="min-w-0">
@@ -44,7 +44,7 @@ export default function IosPwaGpsGuidance({ compact = false }) {
                 : 'Το iOS περιορίζει GPS στο background — ακολουθήστε τα παρακάτω.'}
             </p>
             {env.isStandalone ? (
-              <p className="text-[11px] mt-2 text-emerald-300 font-semibold">✓ Ανοίχτηκε ως PWA (standalone)</p>
+              <p className="text-[11px] mt-2 text-emerald-700 font-semibold">✓ Ανοίχτηκε ως PWA (standalone)</p>
             ) : null}
           </div>
         </div>
@@ -53,7 +53,7 @@ export default function IosPwaGpsGuidance({ compact = false }) {
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="text-[11px] px-2 py-1 rounded-lg bg-black/30 font-bold"
+              className="text-[11px] px-2 py-1 rounded-lg bg-white/80 border border-black/5 font-bold"
             >
               {expanded ? 'Λιγότερα' : 'Λεπτομέρειες'}
             </button>
@@ -65,7 +65,7 @@ export default function IosPwaGpsGuidance({ compact = false }) {
                 dismissGuidance();
                 setDismissed(true);
               }}
-              className="text-[11px] px-2 py-1 rounded-lg bg-black/30"
+              className="text-[11px] px-2 py-1 rounded-lg bg-white/80 border border-black/5"
             >
               Κλείσιμο
             </button>
@@ -76,8 +76,8 @@ export default function IosPwaGpsGuidance({ compact = false }) {
       {(expanded || compact || critical) && (
         <ol className="px-4 pb-4 space-y-3 list-none">
           {steps.map((step, index) => (
-            <li key={step.id} className="flex gap-3 rounded-xl bg-black/25 p-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#facc15] text-neutral-900 text-xs font-black">
+            <li key={step.id} className="flex gap-3 rounded-xl bg-white/70 border border-black/5 p-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--driver-accent)] text-white text-xs font-black">
                 {index + 1}
               </span>
               <div className="min-w-0">

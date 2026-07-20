@@ -163,7 +163,7 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
         </div>
         <span
           className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-            online ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-[var(--driver-muted)]'
+            online ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-[var(--driver-muted)]'
           }`}
         >
           {online ? 'Online' : 'Offline'}
@@ -184,7 +184,7 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
 
       {gpsError ? <p className="text-sm text-rose-400">{gpsError}</p> : null}
       {backgroundWarning ? (
-        <p className="text-sm text-amber-300 bg-amber-950/50 border border-amber-600/40 rounded-xl p-3">
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">
           {backgroundWarning}
         </p>
       ) : null}
@@ -192,19 +192,19 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
       <dl className="driver-stat-grid text-sm">
         <div className="driver-stat-tile">
           <dt className="driver-card-label">Τελευταία αποστολή</dt>
-          <dd className="text-white font-mono text-sm mt-1 tabular-nums">
+          <dd className="text-[var(--driver-text)] font-mono text-sm mt-1 tabular-nums">
             {lastPing ? lastPing.toLocaleTimeString('el-GR') : '—'}
           </dd>
         </div>
         <div className="driver-stat-tile">
           <dt className="driver-card-label">Οθόνη ενεργή</dt>
-          <dd className="text-white text-sm mt-1 font-bold">
+          <dd className="text-[var(--driver-text)] text-sm mt-1 font-bold">
             {isWakeLockSupported() ? 'Ναι' : 'Όχι'}
           </dd>
         </div>
         <div className="driver-stat-tile">
           <dt className="driver-card-label">Επιβιβασμένοι</dt>
-          <dd className="text-white text-sm mt-1 font-bold tabular-nums">
+          <dd className="text-[var(--driver-text)] text-sm mt-1 font-bold tabular-nums">
             {manifestSummary?.progress_label ||
               `${manifestSummary?.boarded_passengers?.length ?? 0}/${manifestSummary?.capacity ?? '—'}`}
           </dd>

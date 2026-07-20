@@ -49,6 +49,8 @@ const emptyForm = {
   salary_per_trip: 25,
   hiring_date: new Date().toISOString().slice(0, 10),
   license_expires_at: '',
+  photo_url: '',
+  password: '',
 };
 
 const inputClass =
@@ -107,6 +109,8 @@ export default function DriversManagementPanel() {
       salary_per_trip: d.salary_per_trip,
       hiring_date: d.hiring_date?.slice?.(0, 10) || d.hiring_date,
       license_expires_at: d.license_expires_at?.slice?.(0, 10) || d.license_expires_at || '',
+      photo_url: d.photo_url || '',
+      password: '',
     });
     setModal('edit');
   };
@@ -118,9 +122,13 @@ export default function DriversManagementPanel() {
       vehicle_code: form.vehicle_code || null,
       license_plate: form.license_plate || null,
       license_expires_at: form.license_expires_at || null,
+      photo_url: form.photo_url?.trim() || null,
       salary_per_km: Number(form.salary_per_km),
       salary_per_trip: Number(form.salary_per_trip),
     };
+    if (!body.password) {
+      delete body.password;
+    }
     try {
       if (modal === 'create') {
         await createFleetDriver(body);
@@ -283,9 +291,17 @@ export default function DriversManagementPanel() {
                   >
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/15 to-indigo-100 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0 group-hover:from-primary/25 transition-colors">
-                          {driverInitials(d.name)}
-                        </div>
+                        {d.photo_url ? (
+                          <img
+                            src={d.photo_url}
+                            alt=""
+                            className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-black/5"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/15 to-indigo-100 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0 group-hover:from-primary/25 transition-colors">
+                            {driverInitials(d.name)}
+                          </div>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -391,6 +407,29 @@ export default function DriversManagementPanel() {
                 />
               </label>
             ))}
+            <label className="block text-sm">
+              <span className="font-bold text-gray-600">Φωτογραφία (URL)</span>
+              <input
+                type="url"
+                placeholder="https://…"
+                value={form.photo_url}
+                onChange={(e) => setForm((p) => ({ ...p, photo_url: e.target.value }))}
+                className={inputClass}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-bold text-gray-600">
+                Κωδικός PWA {modal === 'edit' ? '(κενό = χωρίς αλλαγή)' : ''}
+              </span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                placeholder={modal === 'create' ? 'Προεπιλογή: driver123' : 'Νέος κωδικός'}
+                value={form.password}
+                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                className={inputClass}
+              />
+            </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm">
                 <span className="font-bold text-gray-600">Κατάσταση</span>

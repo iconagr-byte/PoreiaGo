@@ -62,7 +62,7 @@ export default function ExpenseUpload() {
           inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="driver-touch w-full mt-2 bg-black/30 border border-[var(--driver-border)] rounded-xl px-4 text-white text-2xl min-h-[3.5rem]"
+          className="driver-touch w-full mt-2 bg-[#f8fafc] border border-[var(--driver-border)] rounded-xl px-4 text-[var(--driver-text)] text-2xl min-h-[3.5rem]"
         />
       </label>
 
@@ -74,8 +74,8 @@ export default function ExpenseUpload() {
             onClick={() => setCategory(c.id)}
             className={`driver-touch rounded-xl border min-h-[3.25rem] text-sm font-bold ${
               category === c.id
-                ? 'border-[var(--driver-yellow)] bg-[var(--driver-yellow-soft)] text-[var(--driver-yellow)]'
-                : 'border-[var(--driver-border)] bg-black/25 text-[var(--driver-muted)]'
+                ? 'border-[var(--driver-accent)] bg-[var(--driver-accent-soft)] text-[var(--driver-accent)]'
+                : 'border-[var(--driver-border)] bg-[var(--driver-surface)] text-[var(--driver-muted)]'
             }`}
           >
             {c.label}
@@ -88,11 +88,11 @@ export default function ExpenseUpload() {
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Σχόλια..."
         rows={2}
-        className="w-full bg-black/30 border border-[var(--driver-border)] rounded-xl p-4 text-white text-base min-h-[5rem]"
+        className="w-full bg-[#f8fafc] border border-[var(--driver-border)] rounded-xl p-4 text-[var(--driver-text)] text-base min-h-[5rem]"
       />
 
       <label className="driver-touch driver-card flex items-center justify-center gap-3 cursor-pointer min-h-[72px]">
-        <span className="material-symbols-outlined text-4xl text-[#facc15]">photo_camera</span>
+        <span className="material-symbols-outlined text-4xl text-[var(--driver-accent)]">photo_camera</span>
         <span className="font-bold text-lg">
           {receiptFile ? receiptFile.name : 'Φωτογραφία απόδειξης'}
         </span>

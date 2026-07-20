@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from decimal import Decimal
 from typing import Literal
 from uuid import uuid4
 
+from ticketing.password_utils import hash_password, verify_password
+
 DriverStatus = Literal["active", "inactive", "on_leave", "suspended"]
+
+DEFAULT_DRIVER_PASSWORD = "driver123"
 
 
 @dataclass
@@ -30,6 +33,8 @@ class FleetDriver:
     total_km: float = 0.0
     license_expires_at: date | None = None
     avg_rating: float | None = None
+    password_hash: str | None = None
+    photo_url: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -42,6 +47,7 @@ def _seed() -> dict[str, FleetDriver]:
         ("Ανδρέας Ανδρέου", "XAH-4022", "XAH-4022", "AB456789", "+30 694 444 0004", "andreas.driver@aerostride.com", 42000, 89, 97),
     ]
     drivers: dict[str, FleetDriver] = {}
+    pwd_hash = hash_password(DEFAULT_DRIVER_PASSWORD)
     for name, vcode, plate, lic, phone, email, km, trips, safety in seeds:
         did = str(uuid4())
         drivers[did] = FleetDriver(
@@ -62,6 +68,8 @@ def _seed() -> dict[str, FleetDriver]:
             total_km=float(km),
             license_expires_at=date(today.year + 1, 6, 30),
             avg_rating=4.2 + (safety % 5) * 0.1,
+            password_hash=pwd_hash,
+            photo_url=None,
         )
     return drivers
 
@@ -87,8 +95,42 @@ def get_driver(driver_id: str) -> FleetDriver | None:
     return _ensure().get(driver_id)
 
 
+def find_driver_by_username(username: str) -> FleetDriver | None:
+    """Match email, license number, or vehicle/driver code (case-insensitive)."""
+    needle = (username or "").strip().lower()
+    if not needle:
+        return None
+    for d in _ensure().values():
+        if d.email.lower() == needle:
+            return d
+        if d.license_no.lower() == needle:
+            return d
+        if d.vehicle_code and d.vehicle_code.lower() == needle:
+            return d
+        if d.license_plate and d.license_plate.lower() == needle:
+            return d
+    return None
+
+
+def authenticate_driver(username: str, password: str) -> FleetDriver | None:
+    driver = find_driver_by_username(username)
+    if not driver or driver.status not in ("active", "on_leave"):
+        return None
+    stored = driver.password_hash
+    if not stored:
+        # Legacy rows without hash — accept default seed password once, then persist hash
+        if password != DEFAULT_DRIVER_PASSWORD:
+            return None
+        driver.password_hash = hash_password(password)
+        return driver
+    if not verify_password(password, stored):
+        return None
+    return driver
+
+
 def create_driver(data: dict) -> FleetDriver:
     did = str(uuid4())
+    pwd = data.get("password") or DEFAULT_DRIVER_PASSWORD
     driver = FleetDriver(
         id=did,
         name=data["name"].strip(),
@@ -104,7 +146,11 @@ def create_driver(data: dict) -> FleetDriver:
         current_balance=0.0,
         safety_score=100,
         license_expires_at=data.get("license_expires_at"),
+        password_hash=hash_password(str(pwd)),
+        photo_url=(data.get("photo_url") or None),
     )
+    if driver.photo_url is not None:
+        driver.photo_url = str(driver.photo_url).strip() or None
     _ensure()[did] = driver
     return driver
 
@@ -116,15 +162,20 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
     for key in (
         "name", "license_no", "phone", "email", "status",
         "vehicle_code", "license_plate", "hiring_date", "license_expires_at",
+        "photo_url",
     ):
         if key in patch and patch[key] is not None:
             setattr(d, key, patch[key])
+    if "photo_url" in patch and patch["photo_url"] is not None:
+        d.photo_url = str(patch["photo_url"]).strip() or None
     if patch.get("email"):
         d.email = str(patch["email"]).lower()
     if patch.get("salary_per_km") is not None:
         d.salary_per_km = float(patch["salary_per_km"])
     if patch.get("salary_per_trip") is not None:
         d.salary_per_trip = float(patch["salary_per_trip"])
+    if patch.get("password"):
+        d.password_hash = hash_password(str(patch["password"]))
     return d
 
 
@@ -155,6 +206,8 @@ def drivers_for_export() -> list[dict]:
             "total_km": d.total_km,
             "license_expires_at": d.license_expires_at.isoformat() if d.license_expires_at else None,
             "avg_rating": d.avg_rating,
+            "password_hash": d.password_hash,
+            "photo_url": d.photo_url,
             "created_at": d.created_at.isoformat(),
         })
     return out
@@ -165,6 +218,9 @@ def replace_drivers_from_backup(rows: list[dict]) -> int:
     _drivers = {}
     for row in rows:
         did = row.get("id") or str(uuid4())
+        pwd_hash = row.get("password_hash")
+        if not pwd_hash and row.get("password"):
+            pwd_hash = hash_password(str(row["password"]))
         _drivers[did] = FleetDriver(
             id=did,
             name=row["name"],
@@ -187,6 +243,8 @@ def replace_drivers_from_backup(rows: list[dict]) -> int:
             if row.get("license_expires_at")
             else None,
             avg_rating=row.get("avg_rating"),
+            password_hash=pwd_hash or hash_password(DEFAULT_DRIVER_PASSWORD),
+            photo_url=row.get("photo_url") or None,
             created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
             if row.get("created_at")
             else datetime.now(timezone.utc),

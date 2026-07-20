@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { exchangeMasterQr } from '../../services/driverPortalApi.js';
+import { exchangeMasterQr, loginDriver } from '../../services/driverPortalApi.js';
 import BusQrScanner from '../BusQrScanner.jsx';
 import '../../styles/driver-app.css';
 
 export default function MasterQrGate({ onAuthenticated }) {
+  const [mode, setMode] = useState('password'); // password | qr
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,14 +29,28 @@ export default function MasterQrGate({ onAuthenticated }) {
     };
   }, []);
 
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const session = await loginDriver(username.trim(), password);
+      onAuthenticated(session);
+    } catch (err) {
+      setError(err.message || 'Αποτυχία σύνδεσης');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRaw = async (raw) => {
     setError('');
     setLoading(true);
     try {
       const session = await exchangeMasterQr(raw);
       onAuthenticated(session);
-    } catch (e) {
-      setError(e.message || 'Αποτυχία σύνδεσης');
+    } catch (err) {
+      setError(err.message || 'Αποτυχία σύνδεσης');
     } finally {
       setLoading(false);
     }
@@ -51,42 +68,117 @@ export default function MasterQrGate({ onAuthenticated }) {
               className="material-symbols-outlined text-[36px]"
               style={{ fontVariationSettings: "'FILL' 1" }}
             >
-              qr_code_scanner
+              {mode === 'password' ? 'badge' : 'qr_code_scanner'}
             </span>
           </div>
-          <p className="driver-header-kicker mb-1">PoreiaGo · Οδηγός</p>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white">Σύνδεση βάρδιας</h1>
-          <p className="text-sm text-[var(--driver-muted)] mt-2 leading-relaxed max-w-xs mx-auto">
-            Σκανάρετε το <span className="font-bold text-[var(--driver-yellow)]">Master QR</span> στο
-            ταμπλό του λεωφορείου
+          <p className="driver-header-kicker mb-1" style={{ color: 'var(--driver-muted)' }}>
+            PoreiaGo · Οδηγός
+          </p>
+          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--driver-text)' }}>
+            {mode === 'password' ? 'Είσοδος βάρδιας' : 'Master QR'}
+          </h1>
+          <p
+            className="text-sm mt-2 leading-relaxed max-w-xs mx-auto"
+            style={{ color: 'var(--driver-muted)' }}
+          >
+            {mode === 'password' ? (
+              <>Συνδεθείτε με όνομα χρήστη και κωδικό</>
+            ) : (
+              <>
+                Σκανάρετε το <span className="font-bold" style={{ color: 'var(--driver-accent)' }}>Master QR</span>{' '}
+                στο ταμπλό του λεωφορείου
+              </>
+            )}
           </p>
         </div>
 
         <div className="driver-gate-card space-y-4">
-          <BusQrScanner
-            variant="dark"
-            compact
-            paused={loading}
-            quietCamera
-            onScan={handleRaw}
-          />
+          {mode === 'password' ? (
+            <form onSubmit={handleLogin} className="space-y-3">
+              <label className="block">
+                <span className="driver-gate-label">Όνομα χρήστη</span>
+                <input
+                  className="driver-gate-input"
+                  type="text"
+                  autoComplete="username"
+                  inputMode="email"
+                  placeholder="email ή κωδικός άδειας"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </label>
+              <label className="block">
+                <span className="driver-gate-label">Κωδικός</span>
+                <input
+                  className="driver-gate-input"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </label>
+              <button type="submit" className="driver-gate-submit" disabled={loading || !username || !password}>
+                {loading ? 'Σύνδεση…' : 'Είσοδος'}
+              </button>
+              <button
+                type="button"
+                className="driver-gate-secondary"
+                disabled={loading}
+                onClick={() => {
+                  setError('');
+                  setMode('qr');
+                }}
+              >
+                Γρήγορη είσοδος με QR
+              </button>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <BusQrScanner
+                variant="light"
+                compact
+                paused={loading}
+                quietCamera
+                onScan={handleRaw}
+              />
+              <button
+                type="button"
+                className="driver-gate-secondary"
+                disabled={loading}
+                onClick={() => {
+                  setError('');
+                  setMode('password');
+                }}
+              >
+                Επιστροφή σε όνομα / κωδικό
+              </button>
+            </div>
+          )}
 
-          {loading && (
-            <p className="text-center text-sm font-bold text-[var(--driver-yellow)] flex items-center justify-center gap-2">
+          {loading && mode === 'qr' && (
+            <p
+              className="text-center text-sm font-bold flex items-center justify-center gap-2"
+              style={{ color: 'var(--driver-accent)' }}
+            >
               <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
               Σύνδεση στη βάρδια…
             </p>
           )}
 
           {error && (
-            <p className="text-sm text-red-300 bg-red-950/50 border border-red-500/30 rounded-xl px-4 py-3 text-center font-medium">
+            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-center font-medium">
               {error}
             </p>
           )}
         </div>
 
-        <p className="text-center text-xs text-[var(--driver-muted)] mt-6">
-          <Link to="/admin/login" className="text-[var(--driver-yellow)] font-bold hover:underline">
+        <p className="text-center text-xs mt-6" style={{ color: 'var(--driver-muted)' }}>
+          <Link to="/admin/login" className="font-bold hover:underline" style={{ color: 'var(--driver-accent)' }}>
             Επιστροφή στη σύνδεση
           </Link>
         </p>

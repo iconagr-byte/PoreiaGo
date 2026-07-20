@@ -111,6 +111,8 @@ def _driver_response(d) -> FleetDriverResponse:
         license_expires_at=d.license_expires_at,
         avg_rating=d.avg_rating,
         days_until_license_expiry=days,
+        photo_url=getattr(d, "photo_url", None),
+        has_password=bool(getattr(d, "password_hash", None)),
     )
 
 

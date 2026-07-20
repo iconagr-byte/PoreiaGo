@@ -109,7 +109,7 @@ export default function SOSButton() {
       )}
 
       <label className="driver-touch driver-card flex items-center justify-center gap-3 cursor-pointer min-h-[64px]">
-        <span className="material-symbols-outlined text-3xl text-[#facc15]">add_a_photo</span>
+        <span className="material-symbols-outlined text-3xl text-[var(--driver-accent)]">add_a_photo</span>
         <span className="font-bold">{photoFile ? photoFile.name : 'Φωτογραφία συμβάντος (προαιρ.)'}</span>
         <input
           type="file"
@@ -123,7 +123,7 @@ export default function SOSButton() {
       <button
         type="button"
         onClick={() => setShowIssues(!showIssues)}
-        className="driver-touch w-full bg-[var(--driver-surface-raised)] border border-[var(--driver-border)] text-white rounded-2xl min-h-[3.5rem] font-bold"
+        className="driver-touch w-full bg-[var(--driver-surface-raised)] border border-[var(--driver-border)] text-[var(--driver-text)] rounded-2xl min-h-[3.5rem] font-bold"
       >
         <span className="material-symbols-outlined align-middle mr-2">report</span>
         Αναφορά προβλήματος
@@ -138,7 +138,7 @@ export default function SOSButton() {
               onClick={() => report(t.id)}
               className="driver-touch driver-card flex items-center gap-4 text-left w-full min-h-[64px]"
             >
-              <span className="material-symbols-outlined text-4xl text-[#facc15]">{t.icon}</span>
+              <span className="material-symbols-outlined text-4xl text-[var(--driver-accent)]">{t.icon}</span>
               <span className="text-xl font-bold">{t.label}</span>
             </button>
           ))}
