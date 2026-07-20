@@ -1,4 +1,4 @@
-import QRCode from 'react-qr-code';
+import { QRCode } from 'react-qr-code';
 import { getMasterQrPngUrl } from '../../services/platformApi.js';
 
 export default function MasterQrIssuedModal({ open, issued, driverId, tripTitle, onClose }) {

@@ -1,4 +1,4 @@
-import QRCode from 'react-qr-code';
+import { QRCode } from 'react-qr-code';
 import { useEffect, useState } from 'react';
 import { issueSignedQrToken } from '../lib/ticketing/qrToken.js';
 import { isBookingPaid } from '../lib/ticketing/bookingStore.js';

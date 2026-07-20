@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import QRCode from 'react-qr-code';
+import { QRCode } from 'react-qr-code';
 import toast from 'react-hot-toast';
 import { getDriverPwaStartUrl } from '../../lib/driver/driverPwaUrl.js';
 
