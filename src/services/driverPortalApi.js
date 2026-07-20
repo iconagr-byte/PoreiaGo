@@ -16,6 +16,68 @@ const DEV_SCHEDULE = [
   { time: '18:00', stop: 'Επιστροφή', status: 'upcoming' },
 ];
 
+function mapSessionPayload(data) {
+  return {
+    accessToken: data.access_token,
+    tripId: data.trip_id,
+    tenantId: data.tenant_id,
+    driverId: data.driver_id,
+    expiresAt: data.expires_at,
+    schedule: data.schedule || [],
+    driverName: data.driver_name || null,
+    photoUrl: data.photo_url || null,
+    vehiclePlate: data.vehicle_plate || null,
+    vehicleCode: data.vehicle_code || null,
+    vehicleImageUrl: data.vehicle_image_url || null,
+  };
+}
+
+function saveMappedSession(data) {
+  const session = mapSessionPayload(data);
+  saveDriverSession(session);
+  return session;
+}
+
+const DEV_SESSION = {
+  accessToken: 'dev-driver-session',
+  tripId: 1,
+  tenantId: '00000000-0000-0000-0000-000000000001',
+  driverId: 'dev-driver',
+  expiresAt: Math.floor(Date.now() / 1000) + 86400,
+  schedule: DEV_SCHEDULE,
+  driverName: 'Οδηγός Demo',
+  photoUrl: null,
+  vehiclePlate: 'XAH-4021',
+  vehicleCode: 'XAH-4021',
+  vehicleImageUrl: '/images/hero-bus-achillio.png',
+};
+
+export async function loginDriver(username, password) {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/driver/session/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+  } catch {
+    if (import.meta.env.DEV) {
+      saveDriverSession(DEV_SESSION);
+      await cacheManifestForOffline(1);
+      return DEV_SESSION;
+    }
+    throw new Error('Δεν υπάρχει σύνδεση με τον server');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Λάθος όνομα χρήστη ή κωδικός');
+  }
+  const session = saveMappedSession(data);
+  await cacheManifestForOffline(data.trip_id);
+  return session;
+}
+
 export async function exchangeMasterQr(qrRaw) {
   let res;
   try {
@@ -26,48 +88,51 @@ export async function exchangeMasterQr(qrRaw) {
     });
   } catch {
     if (import.meta.env.DEV) {
-      const session = {
-        accessToken: 'dev-driver-session',
-        tripId: 1,
-        tenantId: '00000000-0000-0000-0000-000000000001',
-        driverId: 'dev-driver',
-        expiresAt: Math.floor(Date.now() / 1000) + 86400,
-        schedule: DEV_SCHEDULE,
-      };
-      saveDriverSession(session);
+      saveDriverSession(DEV_SESSION);
       await cacheManifestForOffline(1);
-      return session;
+      return DEV_SESSION;
     }
     throw new Error('Δεν υπάρχει σύνδεση με τον server');
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (import.meta.env.DEV && qrRaw.trim().length > 4) {
-      const session = {
-        accessToken: 'dev-driver-session',
-        tripId: 1,
-        tenantId: '00000000-0000-0000-0000-000000000001',
-        driverId: 'dev-driver',
-        expiresAt: Math.floor(Date.now() / 1000) + 86400,
-        schedule: DEV_SCHEDULE,
-      };
-      saveDriverSession(session);
+      saveDriverSession(DEV_SESSION);
       await cacheManifestForOffline(1);
-      return session;
+      return DEV_SESSION;
     }
     throw new Error(data.detail || 'Master QR invalid');
   }
-  const session = {
-    accessToken: data.access_token,
-    tripId: data.trip_id,
-    tenantId: data.tenant_id,
-    driverId: data.driver_id,
-    expiresAt: data.expires_at,
-    schedule: data.schedule || [],
-  };
-  saveDriverSession(session);
+  const session = saveMappedSession(data);
   await cacheManifestForOffline(data.trip_id);
   return session;
+}
+
+export async function fetchDriverMe() {
+  try {
+    const res = await fetch(`${API_BASE}/api/driver/me`, {
+      headers: driverSessionHeaders(),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const session = getDriverSession();
+    if (session) {
+      const merged = {
+        ...session,
+        driverId: data.driver_id || session.driverId,
+        driverName: data.driver_name || session.driverName,
+        photoUrl: data.photo_url || session.photoUrl,
+        vehiclePlate: data.vehicle_plate || session.vehiclePlate,
+        vehicleCode: data.vehicle_code || session.vehicleCode,
+        vehicleImageUrl: data.vehicle_image_url || session.vehicleImageUrl,
+      };
+      saveDriverSession(merged);
+      return merged;
+    }
+    return data;
+  } catch {
+    return getDriverSession();
+  }
 }
 
 export async function fetchDriverManifest() {

@@ -56,8 +56,8 @@ export default function PreTripForm({ onComplete }) {
           onClick={() => toggle(item.key)}
           className={`driver-touch w-full flex items-center gap-4 p-4 rounded-2xl border text-left min-h-[72px] transition-colors ${
             checked[item.key]
-              ? 'border-[var(--driver-success)]/60 bg-green-950/25'
-              : 'border-[var(--driver-border)] bg-black/25'
+              ? 'border-[var(--driver-success)]/60 bg-green-50'
+              : 'border-[var(--driver-border)] bg-[var(--driver-surface)]'
           }`}
         >
           <span className="material-symbols-outlined text-4xl">

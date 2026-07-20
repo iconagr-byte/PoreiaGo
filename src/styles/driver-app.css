@@ -1,4 +1,6 @@
-/* PoreiaGo Driver PWA — mobile-first, glove-friendly, gold on obsidian */
+/* PoreiaGo Driver PWA — light, mobile-first, glove-friendly */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
 html.driver-route,
 html.driver-route body {
@@ -13,18 +15,20 @@ html.driver-route body {
 
 .driver-app {
   --driver-max-w: 28rem;
-  --driver-bg: #050505;
-  --driver-surface: #121212;
-  --driver-surface-raised: #1a1a1a;
-  --driver-yellow: #facc15;
-  --driver-yellow-soft: rgba(250, 204, 21, 0.14);
-  --driver-yellow-glow: rgba(250, 204, 21, 0.35);
+  --driver-bg: #f8fafc;
+  --driver-surface: #ffffff;
+  --driver-surface-raised: #ffffff;
+  --driver-yellow: #eab308;
+  --driver-yellow-soft: rgba(234, 179, 8, 0.12);
+  --driver-yellow-glow: rgba(234, 179, 8, 0.28);
   --driver-yellow-dim: #ca8a04;
-  --driver-text: #fafafa;
-  --driver-muted: #9ca3af;
-  --driver-border: rgba(255, 255, 255, 0.08);
+  --driver-accent: #1d4ed8;
+  --driver-accent-soft: rgba(29, 78, 216, 0.1);
+  --driver-text: #0f172a;
+  --driver-muted: #64748b;
+  --driver-border: rgba(15, 23, 42, 0.08);
   --driver-danger: #ef4444;
-  --driver-success: #22c55e;
+  --driver-success: #16a34a;
   --driver-nav-h: 4.25rem;
   --driver-pad-x: max(1rem, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
 
@@ -34,15 +38,14 @@ html.driver-route body {
   max-width: 100vw;
   margin: 0 auto;
   background:
-    radial-gradient(ellipse 90% 55% at 50% -15%, rgba(250, 204, 21, 0.11), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 100% 80%, rgba(250, 204, 21, 0.05), transparent 50%),
-    var(--driver-bg);
+    radial-gradient(ellipse 90% 50% at 50% -12%, rgba(29, 78, 216, 0.08), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 100% 85%, rgba(234, 179, 8, 0.08), transparent 50%),
+    linear-gradient(180deg, #ffffff 0%, var(--driver-bg) 40%, #f1f5f9 100%);
   color: var(--driver-text);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   padding-bottom: calc(var(--driver-nav-h) + env(safe-area-inset-bottom, 0px) + 0.5rem);
 }
 
-/* Centered phone column on tablets / desktop preview */
 .driver-shell {
   width: 100%;
   max-width: var(--driver-max-w);
@@ -69,13 +72,13 @@ html.driver-route body {
 }
 
 .driver-btn-primary {
-  background: linear-gradient(180deg, #fde047 0%, var(--driver-yellow) 45%, var(--driver-yellow-dim) 100%);
-  color: #0a0a0a;
-  box-shadow: 0 4px 20px var(--driver-yellow-glow);
+  background: linear-gradient(180deg, #3b82f6 0%, var(--driver-accent) 55%, #1e3a8a 100%);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(29, 78, 216, 0.28);
 }
 
 .driver-btn-primary:active {
-  box-shadow: 0 2px 10px rgba(250, 204, 21, 0.25);
+  box-shadow: 0 2px 10px rgba(29, 78, 216, 0.2);
 }
 
 .driver-btn-danger {
@@ -90,10 +93,10 @@ html.driver-route body {
   z-index: 40;
   padding-top: max(0.625rem, env(safe-area-inset-top, 0px));
   padding-bottom: 0.75rem;
-  background: rgba(5, 5, 5, 0.94);
-  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--driver-border);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
 }
 
 .driver-header::after {
@@ -103,8 +106,8 @@ html.driver-route body {
   right: 0;
   bottom: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--driver-yellow), transparent);
-  opacity: 0.85;
+  background: linear-gradient(90deg, transparent, var(--driver-accent), var(--driver-yellow), transparent);
+  opacity: 0.55;
 }
 
 .driver-brand {
@@ -118,13 +121,57 @@ html.driver-route body {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 0.75rem;
-  background: var(--driver-yellow-soft);
-  border: 1px solid rgba(250, 204, 21, 0.35);
+  background: var(--driver-accent-soft);
+  border: 1px solid rgba(29, 78, 216, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--driver-yellow);
+  color: var(--driver-accent);
   flex-shrink: 0;
+}
+
+.driver-header-avatars {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.driver-avatar,
+.driver-bus-thumb {
+  width: 2.75rem;
+  height: 2.75rem;
+  object-fit: cover;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  background: #e2e8f0;
+}
+
+.driver-avatar {
+  border-radius: 9999px;
+  z-index: 1;
+}
+
+.driver-avatar--initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--driver-accent);
+  background: linear-gradient(145deg, #dbeafe, #eff6ff);
+}
+
+.driver-bus-thumb {
+  border-radius: 0.85rem;
+  margin-left: -0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--driver-muted);
+}
+
+.driver-bus-thumb .material-symbols-outlined {
+  font-size: 1.25rem;
 }
 
 .driver-header-kicker {
@@ -143,6 +190,13 @@ html.driver-route body {
   line-height: 1.2;
 }
 
+.driver-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .driver-header-btn {
   font-size: 0.6875rem;
   font-weight: 700;
@@ -153,15 +207,67 @@ html.driver-route body {
   border: 1px solid var(--driver-border);
   color: var(--driver-muted);
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.driver-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.65rem;
+  border-radius: 9999px;
+  min-height: 2.25rem;
+  border: 1px solid transparent;
+}
+
+.driver-live-badge::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.driver-live-badge.is-live {
+  color: #15803d;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.driver-live-badge.is-live::before {
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55);
+  animation: driver-live-pulse 1.6s ease-out infinite;
+}
+
+.driver-live-badge.is-offline {
+  color: #64748b;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+@keyframes driver-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 0.55rem rgba(22, 163, 74, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+  }
 }
 
 /* —— Cards —— */
 .driver-card {
-  background: linear-gradient(160deg, #181818 0%, #101010 100%);
+  background: var(--driver-surface);
   border: 1px solid var(--driver-border);
   border-radius: 1.25rem;
   padding: 1rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
 }
 
 @media (min-width: 380px) {
@@ -171,10 +277,10 @@ html.driver-route body {
 }
 
 .driver-card-accent {
-  border-color: rgba(250, 204, 21, 0.35);
+  border-color: rgba(29, 78, 216, 0.22);
   box-shadow:
-    0 0 0 1px rgba(250, 204, 21, 0.08),
-    0 12px 40px rgba(250, 204, 21, 0.06);
+    0 0 0 1px rgba(29, 78, 216, 0.05),
+    0 12px 32px rgba(29, 78, 216, 0.06);
 }
 
 .driver-card-label {
@@ -192,7 +298,7 @@ html.driver-route body {
 }
 
 .driver-stat-tile {
-  background: rgba(0, 0, 0, 0.35);
+  background: #f8fafc;
   border: 1px solid var(--driver-border);
   border-radius: 1rem;
   padding: 0.75rem 0.5rem;
@@ -211,7 +317,7 @@ html.driver-route body {
 }
 
 .driver-stat-tile .value-gold {
-  color: var(--driver-yellow);
+  color: var(--driver-yellow-dim);
 }
 
 .driver-stat-tile .value-green {
@@ -222,14 +328,14 @@ html.driver-route body {
   margin-top: 0.875rem;
   height: 0.5rem;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: #e2e8f0;
   overflow: hidden;
 }
 
 .driver-boarding-fill {
   height: 100%;
   border-radius: 9999px;
-  background: linear-gradient(90deg, var(--driver-yellow-dim), var(--driver-yellow));
+  background: linear-gradient(90deg, var(--driver-accent), #60a5fa);
   transition: width 0.4s ease;
 }
 
@@ -254,7 +360,7 @@ html.driver-route body {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #2a2a2a;
+  background: #e2e8f0;
 }
 
 .driver-timeline-item:last-child::before {
@@ -269,8 +375,8 @@ html.driver-route body {
   width: 0.8rem;
   height: 0.8rem;
   border-radius: 50%;
-  background: #2a2a2a;
-  border: 2px solid #404040;
+  background: #fff;
+  border: 2px solid #cbd5e1;
   z-index: 1;
 }
 
@@ -280,27 +386,27 @@ html.driver-route body {
 }
 
 .driver-timeline-item.current {
-  background: var(--driver-yellow-soft);
+  background: var(--driver-accent-soft);
   border-radius: 0 1rem 1rem 0;
   margin-right: -0.125rem;
   padding-right: 0.375rem;
 }
 
 .driver-timeline-item.current::before {
-  background: linear-gradient(to bottom, var(--driver-yellow), #2a2a2a);
+  background: linear-gradient(to bottom, var(--driver-accent), #e2e8f0);
 }
 
 .driver-timeline-item.current::after {
-  background: var(--driver-yellow);
-  border-color: #0a0a0a;
-  box-shadow: 0 0 12px var(--driver-yellow-glow);
+  background: var(--driver-accent);
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.2);
 }
 
 .driver-timeline-time {
   font-family: ui-monospace, monospace;
   font-size: 0.875rem;
   font-weight: 800;
-  color: var(--driver-yellow);
+  color: var(--driver-accent);
   padding-top: 0.125rem;
 }
 
@@ -319,7 +425,7 @@ html.driver-route body {
 }
 
 .driver-timeline-item.current .driver-timeline-status {
-  color: var(--driver-yellow);
+  color: var(--driver-accent);
 }
 
 /* —— Tachograph —— */
@@ -334,11 +440,12 @@ html.driver-route body {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
 .driver-tacho--alert {
-  border-color: rgba(239, 68, 68, 0.5);
-  background: linear-gradient(135deg, rgba(127, 29, 29, 0.35), #121212);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(135deg, #fef2f2, #ffffff);
 }
 
 .driver-tacho-progress {
@@ -346,14 +453,14 @@ html.driver-route body {
   max-width: 5rem;
   height: 0.375rem;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: #e2e8f0;
   overflow: hidden;
 }
 
 .driver-tacho-progress-fill {
   height: 100%;
   border-radius: 9999px;
-  background: var(--driver-yellow);
+  background: var(--driver-accent);
 }
 
 .driver-tacho--alert .driver-tacho-progress-fill {
@@ -385,12 +492,13 @@ html.driver-route body {
   z-index: 50;
   min-height: var(--driver-nav-h);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: rgba(5, 5, 5, 0.97);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(16px);
   border-top: 1px solid var(--driver-border);
   display: flex;
   justify-content: stretch;
   max-width: 100vw;
+  box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.06);
 }
 
 .driver-nav-inner {
@@ -411,7 +519,7 @@ html.driver-route body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(250, 204, 21, 0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(29, 78, 216, 0.35), transparent);
   pointer-events: none;
 }
 
@@ -436,8 +544,8 @@ html.driver-route body {
 }
 
 .driver-nav button.active {
-  color: var(--driver-yellow);
-  background: var(--driver-yellow-soft);
+  color: var(--driver-accent);
+  background: var(--driver-accent-soft);
 }
 
 .driver-nav button.active::after {
@@ -449,7 +557,7 @@ html.driver-route body {
   width: 1.25rem;
   height: 2px;
   border-radius: 0 0 4px 4px;
-  background: var(--driver-yellow);
+  background: var(--driver-accent);
 }
 
 .driver-nav .material-symbols-outlined {
@@ -469,7 +577,6 @@ html.driver-route body {
   padding: 0 1px;
 }
 
-/* Very narrow phones: icons only */
 @media (max-width: 359px) {
   .driver-nav-label {
     display: none;
@@ -490,8 +597,19 @@ html.driver-route body {
   }
 }
 
-/* —— Gate —— */
+/* —— Gate / login —— */
 .driver-gate {
+  --driver-max-w: 28rem;
+  --driver-bg: #f8fafc;
+  --driver-surface: #ffffff;
+  --driver-yellow: #eab308;
+  --driver-accent: #1d4ed8;
+  --driver-accent-soft: rgba(29, 78, 216, 0.1);
+  --driver-text: #0f172a;
+  --driver-muted: #64748b;
+  --driver-border: rgba(15, 23, 42, 0.08);
+  --driver-pad-x: max(1rem, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+
   min-height: 100dvh;
   min-height: -webkit-fill-available;
   display: flex;
@@ -503,9 +621,12 @@ html.driver-route body {
   position: relative;
   overflow-x: hidden;
   overflow-y: auto;
+  color: var(--driver-text);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   background:
-    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(250, 204, 21, 0.12), transparent 60%),
-    var(--driver-bg);
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(29, 78, 216, 0.1), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 0% 100%, rgba(234, 179, 8, 0.08), transparent 55%),
+    linear-gradient(180deg, #ffffff, #f8fafc 55%, #f1f5f9);
 }
 
 .driver-gate-glow {
@@ -520,7 +641,7 @@ html.driver-route body {
   right: -8%;
   width: 22rem;
   height: 22rem;
-  background: rgba(250, 204, 21, 0.1);
+  background: rgba(29, 78, 216, 0.12);
 }
 
 .driver-gate-glow--bl {
@@ -528,7 +649,7 @@ html.driver-route body {
   left: -12%;
   width: 18rem;
   height: 18rem;
-  background: rgba(250, 204, 21, 0.05);
+  background: rgba(234, 179, 8, 0.1);
 }
 
 .driver-gate-panel {
@@ -540,11 +661,11 @@ html.driver-route body {
 }
 
 .driver-gate-card {
-  background: linear-gradient(165deg, #161616 0%, #0d0d0d 100%);
-  border: 1px solid rgba(250, 204, 21, 0.2);
+  background: #ffffff;
+  border: 1px solid var(--driver-border);
   border-radius: 1.5rem;
   padding: 1rem;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
 }
 
 @media (min-width: 380px) {
@@ -552,6 +673,60 @@ html.driver-route body {
     padding: 1.25rem 1.5rem;
     border-radius: 1.75rem;
   }
+}
+
+.driver-gate-input {
+  width: 100%;
+  min-height: 3rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--driver-border);
+  background: #f8fafc;
+  padding: 0.75rem 0.9rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--driver-text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.driver-gate-input:focus {
+  background: #fff;
+  border-color: rgba(29, 78, 216, 0.45);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12);
+}
+
+.driver-gate-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--driver-muted);
+  margin-bottom: 0.35rem;
+}
+
+.driver-gate-submit {
+  width: 100%;
+  min-height: 3.25rem;
+  border-radius: 1rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(180deg, #3b82f6 0%, var(--driver-accent) 55%, #1e3a8a 100%);
+  box-shadow: 0 8px 22px rgba(29, 78, 216, 0.28);
+}
+
+.driver-gate-submit:disabled {
+  opacity: 0.65;
+}
+
+.driver-gate-secondary {
+  width: 100%;
+  min-height: 2.85rem;
+  border-radius: 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--driver-accent);
+  background: var(--driver-accent-soft);
+  border: 1px solid rgba(29, 78, 216, 0.15);
 }
 
 .driver-sos {
@@ -565,12 +740,12 @@ html.driver-route body {
   padding: 1rem var(--driver-pad-x) 1.5rem;
 }
 
-/* GPS / telemetry panel */
 .driver-telemetry-card {
-  background: linear-gradient(160deg, #181818 0%, #101010 100%);
+  background: var(--driver-surface);
   border: 1px solid var(--driver-border);
   border-radius: 1.25rem;
   padding: 1rem;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
 }
 
 .driver-telemetry-card .driver-shift-btn {
@@ -584,12 +759,10 @@ html.driver-route body {
   touch-action: manipulation;
 }
 
-/* Toasts above nav */
 .driver-toast {
   bottom: calc(var(--driver-nav-h) + env(safe-area-inset-bottom, 0px) + 0.75rem) !important;
 }
 
-/* Passenger track page mobile */
 .passenger-track-app {
   min-height: 100dvh;
   min-height: -webkit-fill-available;

@@ -1,21 +1,23 @@
 """
-Driver portal API — public Master QR exchange + session-scoped manifest.
-No admin login; trip_id is bound to the signed Master QR token.
+Driver portal API — username/password login + Master QR exchange + session-scoped manifest.
 """
 
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timezone
 from uuid import UUID
 
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import AsyncSessionLocal
 from ticketing.boarding_service import get_boarding_manifest
+from travel_platform.operations.master_qr_local import DEFAULT_TENANT, _secret as local_secret
+from travel_platform.settings.drivers_store import authenticate_driver, get_driver
 from travel_platform.telemetry.live_fleet import LiveFleetService
 from travel_platform.telemetry.processor import get_idling, get_live_fleet
 
@@ -29,6 +31,11 @@ class MasterQrExchangeBody(BaseModel):
     qr_raw: str
 
 
+class DriverLoginBody(BaseModel):
+    username: str = Field(..., min_length=2)
+    password: str = Field(..., min_length=1)
+
+
 class DriverSessionResponse(BaseModel):
     access_token: str
     trip_id: int
@@ -36,11 +43,32 @@ class DriverSessionResponse(BaseModel):
     driver_id: str | None
     expires_at: int
     schedule: list[dict]
+    driver_name: str | None = None
+    photo_url: str | None = None
+    vehicle_plate: str | None = None
+    vehicle_code: str | None = None
+    vehicle_image_url: str | None = None
+
+
+class DriverMeResponse(BaseModel):
+    driver_id: str | None
+    driver_name: str | None = None
+    photo_url: str | None = None
+    email: str | None = None
+    vehicle_plate: str | None = None
+    vehicle_code: str | None = None
+    vehicle_image_url: str | None = None
+    trip_id: int | None = None
+    tenant_id: str | None = None
 
 
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
+
+
+def _jwt_secret() -> str:
+    return JWT_SECRET or local_secret()
 
 
 def _decode_master_qr(raw: str) -> dict:
@@ -50,7 +78,7 @@ def _decode_master_qr(raw: str) -> dict:
     if token.startswith("mq1."):
         token = token[4:]
     try:
-        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return jwt.decode(token, _jwt_secret(), algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError as e:
         raise HTTPException(status_code=401, detail="Invalid Master QR") from e
 
@@ -60,7 +88,7 @@ async def require_driver_session(authorization: str | None = Header(default=None
         raise HTTPException(status_code=401, detail="Driver session required")
     token = authorization[7:].strip()
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, _jwt_secret(), algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError as e:
         raise HTTPException(status_code=401, detail="Session expired") from e
     if "driver" not in (payload.get("roles") or []):
@@ -68,28 +96,151 @@ async def require_driver_session(authorization: str | None = Header(default=None
     return payload
 
 
+def _normalize_plate(value: str | None) -> str:
+    return (value or "").strip().upper().replace(" ", "")
+
+
+def _vehicle_profile_for_driver(driver) -> dict:
+    if not driver:
+        return {
+            "vehicle_plate": None,
+            "vehicle_code": None,
+            "vehicle_image_url": None,
+        }
+    plate = driver.license_plate or driver.vehicle_code
+    code = driver.vehicle_code
+    image = "/images/hero-bus-achillio.png"
+    try:
+        from travel_platform.fleet.service_service import service_service
+
+        needle = _normalize_plate(plate) or _normalize_plate(code)
+        for v in service_service.list_vehicles():
+            if _normalize_plate(v.get("plate_number")) == needle:
+                image = v.get("public_image_url") or image
+                plate = v.get("plate_number") or plate
+                break
+    except Exception:
+        pass
+    return {
+        "vehicle_plate": plate,
+        "vehicle_code": code,
+        "vehicle_image_url": image,
+    }
+
+
+def _profile_fields(driver_id: str | None) -> dict:
+    driver = get_driver(driver_id) if driver_id else None
+    vehicle = _vehicle_profile_for_driver(driver)
+    return {
+        "driver_name": driver.name if driver else None,
+        "photo_url": getattr(driver, "photo_url", None) if driver else None,
+        **vehicle,
+    }
+
+
+def _issue_driver_session(
+    *,
+    driver_id: str | None,
+    tenant_id: str,
+    trip_id: int,
+    expires_at: int | None = None,
+) -> DriverSessionResponse:
+    exp = expires_at or int(time.time()) + 24 * 3600
+    tid = tenant_id or DEFAULT_TENANT
+    driver_jwt = jwt.encode(
+        {
+            "sub": driver_id or "master-qr-driver",
+            "tenant_id": tid,
+            "trip_id": trip_id,
+            "roles": ["driver"],
+            "scope": "manifest:read driver:scan",
+            "exp": exp,
+        },
+        _jwt_secret(),
+        algorithm=JWT_ALGORITHM,
+    )
+    profile = _profile_fields(driver_id)
+    return DriverSessionResponse(
+        access_token=driver_jwt,
+        trip_id=trip_id,
+        tenant_id=tid,
+        driver_id=driver_id,
+        expires_at=exp,
+        schedule=_build_daily_schedule(trip_id),
+        **profile,
+    )
+
+
+def _resolve_trip_for_driver(driver_id: str | None) -> int:
+    """Prefer live fleet assignment; otherwise default demo trip."""
+    if not driver_id:
+        return 1
+    try:
+        live: LiveFleetService = get_live_fleet()
+        tenant_id = UUID(DEFAULT_TENANT)
+        for v in live.list_active(tenant_id):
+            raw = getattr(v, "__dict__", {}) or {}
+            if str(raw.get("driver_id") or "") == str(driver_id) and v.trip_id:
+                return int(v.trip_id)
+    except Exception:
+        pass
+    return 1
+
+
+@router.post("/session/login", response_model=DriverSessionResponse)
+async def login_with_password(body: DriverLoginBody):
+    """Primary PWA login — username (email / license / plate) + password."""
+    driver = authenticate_driver(body.username, body.password)
+    if not driver:
+        raise HTTPException(status_code=401, detail="Λάθος όνομα χρήστη ή κωδικός")
+    trip_id = _resolve_trip_for_driver(driver.id)
+    return _issue_driver_session(
+        driver_id=driver.id,
+        tenant_id=DEFAULT_TENANT,
+        trip_id=trip_id,
+    )
+
+
 @router.post("/session/master-qr", response_model=DriverSessionResponse)
 async def exchange_master_qr(body: MasterQrExchangeBody):
-    """Scan bus dashboard QR → day session (no username/password)."""
+    """Scan bus dashboard QR → day session (secondary login path)."""
     from travel_platform.operations.master_qr_bridge import exchange_master_qr_hybrid, preview_master_qr_payload
 
     hybrid = await exchange_master_qr_hybrid(body.qr_raw)
     if hybrid:
         trip_id = int(hybrid["trip_id"])
-        schedule = _build_daily_schedule(trip_id)
+        driver_id = hybrid.get("driver_id")
+        profile = _profile_fields(driver_id)
         return DriverSessionResponse(
             access_token=hybrid["access_token"],
             trip_id=trip_id,
             tenant_id=str(hybrid["tenant_id"]),
-            driver_id=hybrid.get("driver_id"),
+            driver_id=driver_id,
             expires_at=int(hybrid["expires_at"]),
-            schedule=schedule,
+            schedule=_build_daily_schedule(trip_id),
+            **profile,
         )
 
     preview = preview_master_qr_payload(body.qr_raw)
     if not preview or preview.get("typ") != "master_qr":
         raise HTTPException(status_code=400, detail="Not a Master QR code")
     raise HTTPException(status_code=401, detail="Invalid or expired Master QR")
+
+
+@router.get("/me", response_model=DriverMeResponse)
+async def driver_me(session_payload: dict = Depends(require_driver_session)):
+    driver_id = session_payload.get("sub") or session_payload.get("driver_id")
+    if driver_id in (None, "master-qr-driver"):
+        driver_id = session_payload.get("driver_id")
+    profile = _profile_fields(driver_id if driver_id and driver_id != "master-qr-driver" else None)
+    driver = get_driver(driver_id) if driver_id and driver_id != "master-qr-driver" else None
+    return DriverMeResponse(
+        driver_id=driver_id if driver_id != "master-qr-driver" else None,
+        email=driver.email if driver else None,
+        trip_id=int(session_payload.get("trip_id") or 0) or None,
+        tenant_id=str(session_payload.get("tenant_id") or ""),
+        **profile,
+    )
 
 
 @router.get("/manifest")

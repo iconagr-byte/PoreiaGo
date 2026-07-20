@@ -114,6 +114,8 @@ class FleetDriverResponse(BaseModel):
     license_expires_at: date | None = None
     avg_rating: float | None = None
     days_until_license_expiry: int | None = None
+    photo_url: str | None = None
+    has_password: bool = False
 
 
 class FleetDriverCreate(BaseModel):
@@ -128,6 +130,8 @@ class FleetDriverCreate(BaseModel):
     salary_per_km: float = Field(0.45, ge=0)
     salary_per_trip: float = Field(25.0, ge=0)
     license_expires_at: date | None = None
+    photo_url: str | None = None
+    password: str | None = Field(None, min_length=4)
 
 
 class FleetDriverUpdate(BaseModel):
@@ -142,7 +146,8 @@ class FleetDriverUpdate(BaseModel):
     salary_per_km: float | None = Field(None, ge=0)
     salary_per_trip: float | None = Field(None, ge=0)
     license_expires_at: date | None = None
-
+    photo_url: str | None = None
+    password: str | None = Field(None, min_length=4)
 
 class VehicleProfileResponse(BaseModel):
     id: str
