@@ -67,6 +67,29 @@ export default function SettingsTabPanels({
   if (tab === 'drivers') {
     return (
       <div className="space-y-6">
+        <div className="rounded-[24px] border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-5 md:p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-wider text-sky-700 mb-1">
+                Εφαρμογή λεωφορείου
+              </p>
+              <h3 className="font-bold text-lg text-gray-900">Λογαριασμοί οδηγών για το /driver</h3>
+              <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                Δημιουργήστε λογαριασμούς με email και κωδικό για κάθε οδηγό. Μετά μπαίνουν στην
+                εφαρμογή στο λεωφορείο χωρίς Master QR (το QR παραμένει ως εναλλακτική).
+              </p>
+            </div>
+            <a
+              href="/driver"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-sky-600 text-white text-sm font-bold px-4 py-2.5 hover:bg-sky-700 shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">smartphone</span>
+              Άνοιγμα εφαρμογής
+            </a>
+          </div>
+        </div>
         <MasterQrPanel />
         <DriversManagementPanel />
       </div>
