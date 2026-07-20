@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import QRCode from 'react-qr-code';
+import { QRCode } from 'react-qr-code';
 import toast from 'react-hot-toast';
 import { loadTrips, getTripById } from '../../lib/trips/tripStore.js';
 import { issueMasterQr, getMasterQrPngUrl, fetchFleetDrivers, notifyDriverShiftPush } from '../../services/platformApi.js';
