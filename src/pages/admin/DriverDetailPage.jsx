@@ -148,21 +148,31 @@ export default function DriverDetailPage() {
   }, [driver]);
 
   const header = (
-    <div className="flex items-center gap-4 w-full">
+    <div className="flex items-center gap-3 w-full">
       <button
         type="button"
         onClick={() =>
           navigate('/admin', { state: { activeTab: 'drivers' } })
         }
-        className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center hover:bg-surface-container-high transition-colors"
+        className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center hover:bg-surface-container-high transition-colors shrink-0"
         aria-label="Επιστροφή"
       >
         <span className="material-symbols-outlined">arrow_back</span>
       </button>
-      <h1 className="font-headline-md font-bold flex items-center gap-2">
+      <h1 className="font-headline-md font-bold flex items-center gap-2 min-w-0 flex-1">
         <span className="material-symbols-outlined text-primary">badge</span>
-        Προφίλ Οδηγού
+        <span className="truncate">Προφίλ Οδηγού</span>
       </h1>
+      {driverId && (
+        <button
+          type="button"
+          onClick={() => navigate(`/admin/drivers/${driverId}/edit`)}
+          className="shrink-0 px-4 py-2 rounded-full bg-primary text-white text-sm font-bold inline-flex items-center gap-1.5 hover:opacity-90"
+        >
+          <span className="material-symbols-outlined text-[18px]">edit</span>
+          Επεξεργασία
+        </button>
+      )}
     </div>
   );
 

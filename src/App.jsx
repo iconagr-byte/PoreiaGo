@@ -17,6 +17,7 @@ import DriverAuthPage from './pages/driver/DriverAuthPage.jsx';
 import FleetVehicleDetail from './pages/FleetVehicleDetail';
 import TripEditorPage from './pages/admin/TripEditorPage';
 import DriverDetailPage from './pages/admin/DriverDetailPage';
+import DriverFormPage from './pages/admin/DriverFormPage.jsx';
 import PlatformAdminRedirect from './pages/admin/PlatformAdminRedirect';
 import AgencyPlansPage from './pages/AgencyPlansPage';
 import AgencySignupPage from './pages/AgencySignupPage';
@@ -58,6 +59,8 @@ function App() {
             <Route path="/admin/platform" element={<PlatformAdminRedirect />} />
             <Route path="/admin/fleet/:vehicleId" element={<FleetVehicleDetail />} />
             <Route path="/admin/trips/:tripId" element={<TripEditorPage />} />
+            <Route path="/admin/drivers/new" element={<DriverFormPage />} />
+            <Route path="/admin/drivers/:driverId/edit" element={<DriverFormPage />} />
             <Route path="/admin/drivers/:driverId" element={<DriverDetailPage />} />
             <Route path="/driver/auth" element={<DriverAuthPage />} />
             <Route path="/driver/dashboard" element={<Navigate to="/driver" replace />} />
