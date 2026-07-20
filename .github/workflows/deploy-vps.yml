@@ -45,6 +45,7 @@ jobs:
               echo "  git clone https://github.com/iconagr-byte/PoreiaGo.git /opt/poreiago"
               exit 1
             fi
+            git config --global --add safe.directory /opt/poreiago || true
             cd /opt/poreiago
             git fetch origin main
             git reset --hard origin/main
