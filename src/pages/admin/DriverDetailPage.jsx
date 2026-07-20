@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { mockFleet } from '../../data/mockData.js';
 import AdminLayout from '../../components/AdminLayout.jsx';
 import { loadTrips } from '../../lib/trips/tripStore.js';
-import { fetchFleetDriver } from '../../services/platformApi.js';
+import { fetchFleetDriver, updateFleetDriver } from '../../services/platformApi.js';
 
 const STATUS_LABELS = {
   active: 'Ενεργός',
@@ -62,6 +63,17 @@ export default function DriverDetailPage() {
   const navigate = useNavigate();
   const [driver, setDriver] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [appPassword, setAppPassword] = useState('');
+  const [appPasswordConfirm, setAppPasswordConfirm] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [savingAccount, setSavingAccount] = useState(false);
+
+  const reloadDriver = async () => {
+    const d = await fetchFleetDriver(driverId);
+    setDriver(d);
+    setPhotoUrl(d?.photo_url || '');
+    return d;
+  };
 
   useEffect(() => {
     const role = localStorage.getItem('userRole');
@@ -75,6 +87,7 @@ export default function DriverDetailPage() {
       const d = await fetchFleetDriver(driverId);
       if (!cancelled) {
         setDriver(d);
+        setPhotoUrl(d?.photo_url || '');
         setLoading(false);
       }
     })();
@@ -82,6 +95,38 @@ export default function DriverDetailPage() {
       cancelled = true;
     };
   }, [driverId, navigate]);
+
+  const saveAppAccount = async (e) => {
+    e.preventDefault();
+    if (!appPassword && photoUrl === (driver?.photo_url || '')) {
+      toast.error('Δεν υπάρχουν αλλαγές');
+      return;
+    }
+    if (appPassword) {
+      if (appPassword.length < 4) {
+        toast.error('Ο κωδικός πρέπει να έχει τουλάχιστον 4 χαρακτήρες');
+        return;
+      }
+      if (appPassword !== appPasswordConfirm) {
+        toast.error('Οι κωδικοί δεν ταιριάζουν');
+        return;
+      }
+    }
+    setSavingAccount(true);
+    try {
+      const patch = { photo_url: photoUrl.trim() || null };
+      if (appPassword) patch.password = appPassword;
+      await updateFleetDriver(driverId, patch);
+      await reloadDriver();
+      setAppPassword('');
+      setAppPasswordConfirm('');
+      toast.success('Ο λογαριασμός εφαρμογής ενημερώθηκε');
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία αποθήκευσης');
+    } finally {
+      setSavingAccount(false);
+    }
+  };
 
   const assignedTrips = useMemo(() => {
     if (!driver) return [];
@@ -157,9 +202,17 @@ export default function DriverDetailPage() {
         <div className="bg-surface-container-lowest rounded-[32px] border border-black/[0.05] shadow-sm p-6 md:p-8">
           <div className="flex flex-col md:flex-row gap-6 md:gap-8">
             <div className="flex flex-col items-center md:items-start shrink-0">
-              <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-primary/5 text-primary flex items-center justify-center shadow-inner border border-primary/10">
-                <span className="material-symbols-outlined text-[48px]">person</span>
-              </div>
+              {driver.photo_url ? (
+                <img
+                  src={driver.photo_url}
+                  alt=""
+                  className="w-24 h-24 rounded-3xl object-cover shadow-inner border border-primary/10"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-primary/5 text-primary flex items-center justify-center shadow-inner border border-primary/10">
+                  <span className="material-symbols-outlined text-[48px]">person</span>
+                </div>
+              )}
               <div className="mt-4 relative w-20 h-20 mx-auto md:mx-0">
                 <svg className="w-20 h-20 -rotate-90" viewBox="0 0 36 36">
                   <path
@@ -275,6 +328,95 @@ export default function DriverDetailPage() {
             sub={driver.vehicle_code && driver.vehicle_code !== driver.license_plate ? driver.vehicle_code : undefined}
           />
         </div>
+
+        <section className="bg-surface-container-lowest rounded-[28px] border border-black/[0.05] shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
+            <h3 className="font-bold text-lg flex items-center gap-2 text-on-surface">
+              <span className="material-symbols-outlined text-primary">smartphone</span>
+              Λογαριασμός εφαρμογής λεωφορείου
+            </h3>
+            <span
+              className={`text-xs font-bold px-3 py-1 rounded-full ${
+                driver.has_password
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-amber-50 text-amber-800'
+              }`}
+            >
+              {driver.has_password ? 'Έχει κωδικό' : 'Χωρίς κωδικό'}
+            </span>
+          </div>
+          <form onSubmit={saveAppAccount} className="p-6 space-y-4">
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              Ο οδηγός μπαίνει στην εφαρμογή στο{' '}
+              <a href="/driver" target="_blank" rel="noreferrer" className="text-primary font-bold underline">
+                /driver
+              </a>{' '}
+              με email, αριθμό άδειας ή πινακίδα και τον κωδικό που ορίζετε εδώ.
+            </p>
+            <div className="rounded-2xl bg-sky-50 border border-sky-100 px-4 py-3 text-sm">
+              <div className="text-xs font-bold uppercase tracking-wide text-sky-700 mb-1">
+                Όνομα χρήστη
+              </div>
+              <div className="font-mono font-bold text-sky-950 break-all">{driver.email}</div>
+              <div className="text-xs text-sky-800/80 mt-1">
+                Εναλλακτικά: {driver.license_no}
+                {driver.license_plate ? ` · ${driver.license_plate}` : ''}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="block text-sm">
+                <span className="font-bold text-on-surface">Νέος κωδικός</span>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={appPassword}
+                  onChange={(e) => setAppPassword(e.target.value)}
+                  placeholder={driver.has_password ? 'Αφήστε κενό για να μείνει ίδιος' : 'Ορίστε κωδικό'}
+                  className="mt-1 w-full rounded-xl border border-black/[0.08] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/15"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-bold text-on-surface">Επιβεβαίωση</span>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={appPasswordConfirm}
+                  onChange={(e) => setAppPasswordConfirm(e.target.value)}
+                  placeholder="Επαναλάβετε τον κωδικό"
+                  className="mt-1 w-full rounded-xl border border-black/[0.08] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/15"
+                />
+              </label>
+            </div>
+            <label className="block text-sm">
+              <span className="font-bold text-on-surface">Φωτογραφία (URL)</span>
+              <input
+                type="url"
+                value={photoUrl}
+                onChange={(e) => setPhotoUrl(e.target.value)}
+                placeholder="https://…"
+                className="mt-1 w-full rounded-xl border border-black/[0.08] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/15"
+              />
+            </label>
+            <div className="flex flex-wrap gap-3 pt-1">
+              <button
+                type="submit"
+                disabled={savingAccount}
+                className="px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold hover:opacity-90 disabled:opacity-60"
+              >
+                {savingAccount ? 'Αποθήκευση…' : 'Αποθήκευση λογαριασμού'}
+              </button>
+              <a
+                href="/driver"
+                target="_blank"
+                rel="noreferrer"
+                className="px-5 py-2.5 rounded-full border border-black/[0.08] text-sm font-bold text-on-surface hover:bg-surface-container-low inline-flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                Δοκιμή εφαρμογής
+              </a>
+            </div>
+          </form>
+        </section>
 
         {fleetVehicle && (
           <div className="bg-primary/5 border border-primary/10 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
