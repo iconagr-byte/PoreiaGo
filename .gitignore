@@ -36,3 +36,5 @@ deploy/.vapid_public.key
 *.sw?
 .tmp.driveupload/
 backend/.env
+backend/data/
+deploy/runtime-data/

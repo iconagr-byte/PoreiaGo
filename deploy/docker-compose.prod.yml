@@ -25,11 +25,14 @@ services:
     env_file: .env.prod
     volumes:
       - ./.vapid_private.pem:/run/secrets/vapid_private.pem:ro
+      - api_data:/app/data
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379/0
       TICKET_JWT_SECRET: ${TICKET_JWT_SECRET}
       DRIVER_API_KEYS: ${DRIVER_API_KEYS}
+      POREIAGO_DATA_DIR: /app/data
+      FLEET_DRIVERS_STORE: /app/data/fleet_drivers.json
     depends_on:
       redis:
         condition: service_healthy
@@ -60,9 +63,13 @@ services:
     restart: unless-stopped
     profiles: ["bluegreen"]
     env_file: .env.prod
+    volumes:
+      - api_data:/app/data
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379/0
+      POREIAGO_DATA_DIR: /app/data
+      FLEET_DRIVERS_STORE: /app/data/fleet_drivers.json
     depends_on:
       redis:
         condition: service_healthy
@@ -168,6 +175,7 @@ volumes:
   redis_data:
   postgres_data:
   wp_data:
+  api_data:
 
 networks:
   edge:
