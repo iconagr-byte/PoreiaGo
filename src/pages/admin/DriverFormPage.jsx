@@ -294,7 +294,8 @@ export default function DriverFormPage() {
                 <a href="/driver" target="_blank" rel="noreferrer" className="font-bold underline">
                   /driver
                 </a>
-                . Όνομα χρήστη: email, αρ. άδειας ή πινακίδα.
+                . Όνομα χρήστη: το email (ή αρ. άδειας / πινακίδα). Η κατάσταση πρέπει να είναι
+                «Ενεργός».
               </p>
               {isEdit && (
                 <p className="text-xs font-bold mt-2 text-sky-800">
