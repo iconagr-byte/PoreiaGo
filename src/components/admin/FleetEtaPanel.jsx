@@ -2,24 +2,27 @@ import { useEffect, useMemo, useState } from 'react';
 import { fetchFleetEtas } from '../../services/telemetryApi.js';
 import FleetPassengerTrackLinkButton from './FleetPassengerTrackLinkButton.jsx';
 
-const TRAFFIC_TONES = {
-  light: 'bg-emerald-100 text-emerald-800',
-  moderate: 'bg-sky-100 text-sky-800',
-  heavy: 'bg-amber-100 text-amber-800',
-  severe: 'bg-red-100 text-red-800',
+const TRAFFIC_LABELS = {
+  light: { label: 'Ελαφριά κίνηση', tone: 'text-emerald-700 bg-emerald-50' },
+  moderate: { label: 'Κανονική', tone: 'text-sky-700 bg-sky-50' },
+  heavy: { label: 'Αυξημένη', tone: 'text-amber-800 bg-amber-50' },
+  severe: { label: 'Έντονη', tone: 'text-rose-700 bg-rose-50' },
 };
 
 function formatDistance(m) {
   if (m == null) return '—';
   if (m >= 1000) return `${(m / 1000).toFixed(1)} km`;
-  return `${m} m`;
+  return `${Math.round(m)} m`;
 }
 
 function formatCountdown(seconds) {
   if (seconds == null) return '—';
-  if (seconds < 60) return `${seconds} δευτ.`;
+  if (seconds < 60) return `${seconds}δ`;
   const mins = Math.max(1, Math.round(seconds / 60));
-  return `${mins} λεπτά`;
+  if (mins < 60) return `${mins}΄`;
+  const h = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem ? `${h}ω ${rem}΄` : `${h}ω`;
 }
 
 function EtaRow({ item }) {
@@ -37,43 +40,71 @@ function EtaRow({ item }) {
     return () => clearInterval(id);
   }, [item.eta_seconds, item.computed_at]);
 
-  const trafficClass = TRAFFIC_TONES[item.traffic_level] || TRAFFIC_TONES.moderate;
+  const traffic = TRAFFIC_LABELS[item.traffic_level] || TRAFFIC_LABELS.moderate;
 
   return (
-    <article className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
+    <article className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="absolute inset-y-0 left-0 w-1 bg-[var(--color-primary,#0040df)]" aria-hidden />
+      <div className="flex items-start justify-between gap-3 pl-2">
         <div className="min-w-0">
-          <h3 className="font-bold truncate">{item.driver_name || '—'}</h3>
-          <p className="text-xs text-gray-500 font-mono truncate">{item.bus_plate || item.vehicle_code}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            {item.bus_plate || item.vehicle_code || '—'}
+          </p>
+          <h3 className="mt-0.5 truncate text-[15px] font-bold text-slate-900">
+            {item.driver_name || 'Οδηγός'}
+          </h3>
         </div>
-        <span className="text-[10px] font-bold text-gray-400">#{item.trip_id}</span>
+        <div className="text-right shrink-0">
+          <p className="text-[28px] leading-none font-black tabular-nums tracking-tight text-[var(--color-primary,#0040df)]">
+            {formatCountdown(remaining)}
+          </p>
+          <p className="mt-1 text-[10px] font-medium text-slate-400">έως στάση</p>
+        </div>
       </div>
 
-      <p className="mt-3 text-2xl font-black text-primary tabular-nums">{formatCountdown(remaining)}</p>
-      <p className="text-xs text-gray-600 mt-1">
-        → <strong>{item.next_stop_name}</strong>
+      <p className="mt-3 pl-2 text-sm text-slate-600">
+        Επόμενη: <span className="font-semibold text-slate-900">{item.next_stop_name || '—'}</span>
       </p>
 
-      <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        <div>
-          <dt className="text-[10px] uppercase text-gray-400 font-bold">Απόσταση</dt>
-          <dd className="font-bold">{formatDistance(item.distance_m)}</dd>
-        </div>
-        <div>
-          <dt className="text-[10px] uppercase text-gray-400 font-bold">Ταχύτητα</dt>
-          <dd className="font-bold">{Math.round(item.speed_kmh ?? 0)} km/h</dd>
-        </div>
-      </dl>
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${trafficClass}`}>
-          {item.traffic_label || item.traffic_level}
+      <div className="mt-3 flex flex-wrap items-center gap-2 pl-2">
+        <span className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600">
+          {formatDistance(item.distance_m)}
         </span>
-        <div className="flex items-center gap-2">
+        <span className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600">
+          {Math.round(item.speed_kmh ?? 0)} km/h
+        </span>
+        <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${traffic.tone}`}>
+          {item.traffic_label || traffic.label}
+        </span>
+        <div className="ml-auto">
           <FleetPassengerTrackLinkButton tripId={item.trip_id} compact />
-          <span className="text-[10px] text-gray-400">
-            {item.computed_at ? new Date(item.computed_at).toLocaleTimeString('el-GR') : '—'}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function LiveVehicleFallbackRow({ vehicle }) {
+  return (
+    <article className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-slate-900">
+            {vehicle.driver_name || 'Οδηγός'}
+          </p>
+          <p className="truncate font-mono text-[11px] text-slate-500">
+            {vehicle.bus_plate || vehicle.vehicle_code || '—'}
+            {vehicle.trip_id != null ? ` · #${vehicle.trip_id}` : ''}
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+            Live
           </span>
+          <p className="mt-1 text-[11px] font-semibold tabular-nums text-slate-600">
+            {Math.round(vehicle.speed ?? vehicle.speed_kmh ?? 0)} km/h
+          </p>
         </div>
       </div>
     </article>
@@ -81,7 +112,11 @@ function EtaRow({ item }) {
 }
 
 /** Πλευρικό panel ETA — επόμενες στάσεις ενεργών οδηγών. */
-export default function FleetEtaPanel({ activeTripCount = 0 }) {
+export default function FleetEtaPanel({
+  vehicles = [],
+  connected = false,
+  transport = 'connecting',
+}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -99,7 +134,10 @@ export default function FleetEtaPanel({ activeTripCount = 0 }) {
           }
         })
         .catch((err) => {
-          if (!cancelled) setError(err.message || 'Αποτυχία φόρτωσης ETA');
+          if (!cancelled) {
+            setError(err.message || 'Αποτυχία φόρτωσης ETA');
+            // Keep last good payload if we have one.
+          }
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -111,42 +149,116 @@ export default function FleetEtaPanel({ activeTripCount = 0 }) {
       cancelled = true;
       clearInterval(id);
     };
-  }, [pollMs, activeTripCount]);
+  }, [pollMs, vehicles.length]);
 
   const items = data?.items || [];
+  const etaTripIds = useMemo(
+    () => new Set(items.map((item) => Number(item.trip_id)).filter((n) => Number.isFinite(n))),
+    [items],
+  );
+  const onlineWithoutEta = useMemo(
+    () =>
+      vehicles.filter((v) => {
+        const tid = v.trip_id != null ? Number(v.trip_id) : null;
+        return tid == null || !etaTripIds.has(tid);
+      }),
+    [vehicles, etaTripIds],
+  );
+
+  const trafficMode = !data
+    ? null
+    : data.google_maps_configured
+      ? 'Google Traffic'
+      : 'Εκτίμηση απόστασης';
+
+  const statusTone = connected
+    ? vehicles.length
+      ? 'bg-emerald-50 text-emerald-800'
+      : 'bg-amber-50 text-amber-900'
+    : 'bg-slate-100 text-slate-600';
+
+  const statusLabel = !connected
+    ? 'Σύνδεση…'
+    : vehicles.length
+      ? `${vehicles.length} online`
+      : 'Χωρίς online οδηγούς';
 
   return (
-    <aside className="rounded-[24px] border border-black/[0.08] bg-gradient-to-b from-slate-50 to-white p-4 h-full min-h-[280px] xl:max-h-[min(72vh,620px)] overflow-y-auto">
-      <div className="flex items-center justify-between gap-2 mb-4 sticky top-0 bg-gradient-to-b from-slate-50 to-slate-50/95 pb-2 z-10">
-        <div>
-          <h3 className="font-bold flex items-center gap-1">
-            <span className="material-symbols-outlined text-[18px] text-primary">schedule</span>
-            Live ETA
-          </h3>
-          <p className="text-[10px] text-gray-500">
-            refresh {data?.push_seconds || 30}s
-            {data?.google_maps_configured ? ' · Google Traffic' : ' · mock ETA'}
-          </p>
+    <aside className="flex h-full min-h-[320px] flex-col overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)] xl:max-h-[min(72vh,620px)]">
+      <header className="border-b border-slate-100 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] px-4 py-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="flex items-center gap-1.5 text-[15px] font-bold text-slate-900">
+              <span className="material-symbols-outlined text-[20px] text-[var(--color-primary,#0040df)]">
+                schedule
+              </span>
+              Live ETA
+            </h3>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Ανανέωση {data?.push_seconds || 30}δ
+              {trafficMode ? ` · ${trafficMode}` : ''}
+              {transport === 'poll' ? ' · poll' : transport === 'ws' ? ' · live feed' : ''}
+            </p>
+          </div>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusTone}`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                connected && vehicles.length ? 'bg-emerald-500 animate-pulse' : 'bg-current opacity-50'
+              }`}
+              aria-hidden
+            />
+            {statusLabel}
+          </span>
         </div>
-        {loading ? <span className="text-[10px] text-gray-400">…</span> : null}
-      </div>
+      </header>
 
-      {error ? (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-3">
-          {error}
-        </p>
-      ) : null}
+      <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
+        {loading && !items.length ? (
+          <div className="space-y-3 py-2">
+            {[0, 1].map((i) => (
+              <div key={i} className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+            ))}
+          </div>
+        ) : null}
 
-      {!items.length && !loading ? (
-        <p className="text-sm text-gray-500 text-center py-8">
-          Δεν υπάρχουν ενεργά δρομολόγια με ETA. Οι οδηγοί πρέπει να είναι online στον χάρτη.
-        </p>
-      ) : null}
+        {error && !items.length ? (
+          <div className="rounded-2xl border border-amber-100 bg-amber-50/80 px-3.5 py-3 text-[13px] text-amber-950">
+            <p className="font-semibold">Δεν φορτώθηκε το ETA</p>
+            <p className="mt-1 text-amber-800/90">{error}</p>
+            {vehicles.length ? (
+              <p className="mt-2 text-amber-800/80">
+                Εμφανίζονται οι online οδηγοί από τον χάρτη μέχρι να επανέλθει η σύνδεση.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
-      <div className="space-y-3">
         {items.map((item) => (
           <EtaRow key={`${item.trip_id}-${item.vehicle_id}`} item={item} />
         ))}
+
+        {!items.length && !loading && onlineWithoutEta.length > 0
+          ? onlineWithoutEta.map((v) => (
+              <LiveVehicleFallbackRow
+                key={v.id || v.vehicle_id || `${v.bus_plate}-${v.trip_id}`}
+                vehicle={v}
+              />
+            ))
+          : null}
+
+        {!items.length && !vehicles.length && !loading ? (
+          <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400">
+              <span className="material-symbols-outlined text-[28px]">near_me_disabled</span>
+            </div>
+            <p className="text-sm font-semibold text-slate-800">Κανένας οδηγός online</p>
+            <p className="mt-1.5 max-w-[220px] text-[12px] leading-relaxed text-slate-500">
+              Όταν ο οδηγός πατήσει «Έναρξη βάρδιας» στο PWA, εμφανίζεται εδώ το ETA επόμενης στάσης.
+            </p>
+          </div>
+        ) : null}
       </div>
     </aside>
   );

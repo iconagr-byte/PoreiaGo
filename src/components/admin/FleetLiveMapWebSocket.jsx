@@ -13,7 +13,7 @@ import FleetEtaPanel from './FleetEtaPanel.jsx';
 export default function FleetLiveMapWebSocket() {
   const { connected, vehicles, tenantId, transport } = useFleetTelemetryEgress();
   const mapbox = isMapboxEnabled();
-  const [showHeat, setShowHeat] = useState(true);
+  const [showHeat, setShowHeat] = useState(false);
   const [heatDays, setHeatDays] = useState(7);
   const [slowOnly, setSlowOnly] = useState(false);
   const [heatmap, setHeatmap] = useState([]);
@@ -65,104 +65,129 @@ export default function FleetLiveMapWebSocket() {
     return [38.5, 23.0];
   }, [vehicles]);
 
+  const feedLabel =
+    transport === 'poll' ? 'HTTP poll' : transport === 'ws' ? 'WebSocket' : 'σύνδεση…';
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-headline-md font-bold">Ζωντανός Χάρτης Στόλου</h2>
-          <p className="text-sm text-on-surface-variant">
-            {vehicles.length} ενεργά οχήματα ·{' '}
-            {transport === 'poll'
-              ? 'HTTP poll'
-              : transport === 'ws'
-                ? 'WebSocket'
-                : 'σύνδεση…'}{' '}
-            {connected ? 'ενεργό' : 'εκτός'}
+          <h2 className="font-headline-md text-2xl font-bold tracking-tight text-slate-900">
+            Ζωντανός Χάρτης
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {vehicles.length} ενεργά οχήματα · {feedLabel}
+            {connected ? ' ενεργό' : ''}
             {' · '}
-            {mapbox ? 'Mapbox GL' : 'Leaflet (χωρίς token)'}
-            {showHeat && heatmap.length ? (
-              <span className="text-[10px] text-orange-600 ml-2">
-                heatmap {heatmap.length} κελιά ({heatDays}ημ.)
-              </span>
-            ) : null}
-            {tenantId ? (
-              <span className="text-[10px] text-gray-400 ml-2 font-mono">tenant {tenantId.slice(0, 8)}…</span>
-            ) : null}
+            {mapbox ? 'Mapbox' : 'Leaflet'}
           </p>
         </div>
-        <span
-          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
-            connected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[14px]">sensors</span>
-          {connected ? (transport === 'poll' ? 'LIVE (poll)' : 'ΖΩΝΤΑΝΑ') : '…'}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {tenantId ? (
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 font-mono text-[10px] text-slate-500">
+              {tenantId.slice(0, 8)}…
+            </span>
+          ) : null}
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
+              connected
+                ? vehicles.length
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-900'
+                : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                connected && vehicles.length ? 'bg-emerald-500 animate-pulse' : 'bg-current opacity-40'
+              }`}
+              aria-hidden
+            />
+            {connected ? (transport === 'poll' ? 'LIVE · poll' : 'LIVE') : 'Σύνδεση…'}
+          </span>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-black/[0.06] bg-white px-4 py-3 text-sm">
-        <label className="flex items-center gap-2 font-bold cursor-pointer">
-          <input type="checkbox" checked={showHeat} onChange={(e) => setShowHeat(e.target.checked)} />
-          Heatmap GPS
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+        <label className="flex cursor-pointer items-center gap-2 font-semibold text-slate-700">
+          <input
+            type="checkbox"
+            className="rounded border-slate-300"
+            checked={showHeat}
+            onChange={(e) => setShowHeat(e.target.checked)}
+          />
+          Heatmap
         </label>
         {showHeat ? (
           <>
-            <label className="flex items-center gap-2">
-              <span className="text-[10px] uppercase font-bold text-gray-400">Περίοδος</span>
+            <label className="flex items-center gap-2 text-slate-600">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Περίοδος</span>
               <select
                 value={heatDays}
                 onChange={(e) => setHeatDays(Number(e.target.value))}
-                className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
               >
                 <option value={7}>7 ημέρες</option>
                 <option value={30}>30 ημέρες</option>
                 <option value={90}>90 ημέρες</option>
               </select>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={slowOnly} onChange={(e) => setSlowOnly(e.target.checked)} />
+            <label className="flex cursor-pointer items-center gap-2 text-slate-600">
+              <input
+                type="checkbox"
+                className="rounded border-slate-300"
+                checked={slowOnly}
+                onChange={(e) => setSlowOnly(e.target.checked)}
+              />
               Μόνο στάσεις (&lt;8 km/h)
             </label>
           </>
         ) : null}
-        <label className="flex items-center gap-2 font-bold cursor-pointer">
-          <input type="checkbox" checked={showSosPins} onChange={(e) => setShowSosPins(e.target.checked)} />
-          <span className="text-red-700">SOS pins</span>
+        <label className="flex cursor-pointer items-center gap-2 font-semibold text-slate-700">
+          <input
+            type="checkbox"
+            className="rounded border-slate-300"
+            checked={showSosPins}
+            onChange={(e) => setShowSosPins(e.target.checked)}
+          />
+          <span className="text-rose-700">SOS</span>
+          {showSosPins && sosAlerts.length ? (
+            <span className="text-[10px] font-bold text-rose-600">{sosAlerts.length}</span>
+          ) : null}
         </label>
-        {showSosPins && sosAlerts.length ? (
-          <span className="text-[10px] font-bold text-red-600 animate-pulse">
-            {sosAlerts.length} SOS στον χάρτη
-          </span>
-        ) : null}
-        <label className="flex items-center gap-2 font-bold cursor-pointer ml-auto xl:ml-0">
-          <input type="checkbox" checked={showGeofence} onChange={(e) => setShowGeofence(e.target.checked)} />
-          Geofence & alerts
+        <label className="flex cursor-pointer items-center gap-2 font-semibold text-slate-700">
+          <input
+            type="checkbox"
+            className="rounded border-slate-300"
+            checked={showGeofence}
+            onChange={(e) => setShowGeofence(e.target.checked)}
+          />
+          Geofence
+          {showGeofence && mapAlerts.length ? (
+            <span className="text-[10px] font-bold text-rose-600">
+              {mapAlerts.length}
+              {alertsWs ? ' · live' : ''}
+            </span>
+          ) : null}
         </label>
-        {showGeofence ? (
-          <span className="text-[10px] text-rose-600 font-bold">
-            {mapAlerts.length} στον χάρτη
-            {alertsWs ? ' · live' : ''}
-          </span>
-        ) : null}
       </div>
-
-      {!mapbox ? (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2">
-          Ορίστε <code className="font-mono">VITE_MAPBOX_TOKEN</code> στο <code className="font-mono">.env.local</code>{' '}
-          για Mapbox GL. Προσωρινά χρησιμοποιείται Leaflet / CARTO.
-        </p>
-      ) : null}
 
       <AdminFleetPushPanel />
 
       {!vehicles.length && connected ? (
-        <p className="text-sm text-gray-500 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
-          Δεν υπάρχουν ενεργοί οδηγοί στον χάρτη. Ζητήστε από έναν οδηγό να πατήσει «Έναρξη Βάρδιας» στην εφαρμογή PWA.
-        </p>
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <span className="material-symbols-outlined text-slate-400">share_location</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-800">Δεν υπάρχουν ενεργοί οδηγοί στον χάρτη</p>
+            <p className="text-[12px] text-slate-500">
+              Ζητήστε από τον οδηγό να πατήσει «Έναρξη βάρδιας» στην εφαρμογή και να μείνει online.
+            </p>
+          </div>
+        </div>
       ) : null}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-4">
-        <div className="h-[min(72vh,620px)] rounded-[24px] overflow-hidden border border-black/[0.08] shadow-level-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="relative h-[min(72vh,640px)] overflow-hidden rounded-[24px] border border-slate-200/90 shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
           {mapbox ? (
             <FleetLiveMapMapbox
               vehicles={vehicles}
@@ -189,8 +214,13 @@ export default function FleetLiveMapWebSocket() {
               focusSosAlert={showSosPins ? focusSosAlert : null}
             />
           )}
+          {!mapbox ? (
+            <p className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-medium text-slate-500 shadow-sm backdrop-blur">
+              Leaflet · ορίστε VITE_MAPBOX_TOKEN για Mapbox
+            </p>
+          ) : null}
         </div>
-        <FleetEtaPanel activeTripCount={vehicles.length} />
+        <FleetEtaPanel vehicles={vehicles} connected={connected} transport={transport} />
       </div>
     </div>
   );

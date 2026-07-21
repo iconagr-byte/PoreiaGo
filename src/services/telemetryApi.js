@@ -1,5 +1,5 @@
 import { API_BASE } from '../config/api.js';
-import { adminAuthHeaders } from './adminApi.js';
+import { adminAuthHeaders, adminBearerHeaders } from './adminApi.js';
 import { driverSessionHeaders } from '../lib/driver/driverSession.js';
 
 const DEVICE_KEY = import.meta.env.VITE_TELEMETRY_DEVICE_KEY || 'dev-gps-key';
@@ -100,13 +100,32 @@ export async function fetchFleetKpis({ days = 30, from, to } = {}, authHeaders =
   return data;
 }
 
-export async function fetchFleetEtas(authHeaders = adminAuthHeaders()) {
-  const res = await fetch(`${API_BASE}/api/admin/telemetry/etas`, { headers: authHeaders });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.detail || 'Αποτυχία φόρτωσης fleet ETA');
+export async function fetchFleetEtas(authHeaders = adminBearerHeaders()) {
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/telemetry/etas`, {
+      headers: authHeaders,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = data.detail;
+      const message =
+        typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d) => d.msg || d).join(', ')
+            : 'Αποτυχία φόρτωσης fleet ETA';
+      throw new Error(message);
+    }
+    return data;
+  } catch (err) {
+    // Network / CORS / unreachable API — don't surface raw "Failed to fetch".
+    if (err?.message && /failed to fetch|networkerror|load failed/i.test(err.message)) {
+      const soft = new Error('Αδυναμία σύνδεσης με το API ETA');
+      soft.code = 'NETWORK';
+      throw soft;
+    }
+    throw err;
   }
-  return data;
 }
 
 /** Signed public passenger track link — POST /api/admin/telemetry/trips/{id}/track-link */
