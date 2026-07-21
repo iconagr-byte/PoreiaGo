@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import AdminLayout from '../../components/AdminLayout.jsx';
@@ -45,6 +45,7 @@ export default function DriverFormPage() {
   const { driverId } = useParams();
   const isEdit = Boolean(driverId);
   const navigate = useNavigate();
+  const formRef = useRef(null);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -93,22 +94,41 @@ export default function DriverFormPage() {
 
   const setField = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    if (!isEdit && !form.password) {
-      toast.error('Ορίστε κωδικό για την εφαρμογή λεωφορείου');
-      return;
+  const validate = () => {
+    if (!form.name.trim()) {
+      toast.error('Συμπληρώστε το ονοματεπώνυμο');
+      return false;
+    }
+    if (!form.email.trim()) {
+      toast.error('Συμπληρώστε το email (όνομα χρήστη)');
+      return false;
+    }
+    if (!form.license_no.trim() || form.license_no.trim().length < 4) {
+      toast.error('Ο αριθμός άδειας πρέπει να έχει τουλάχιστον 4 χαρακτήρες');
+      return false;
+    }
+    if (!isEdit) {
+      if (!form.password) {
+        toast.error('Ορίστε κωδικό για την εφαρμογή λεωφορείου');
+        return false;
+      }
     }
     if (form.password || form.password_confirm) {
       if (form.password.length < 4) {
         toast.error('Ο κωδικός πρέπει να έχει τουλάχιστον 4 χαρακτήρες');
-        return;
+        return false;
       }
       if (form.password !== form.password_confirm) {
         toast.error('Οι κωδικοί δεν ταιριάζουν');
-        return;
+        return false;
       }
     }
+    return true;
+  };
+
+  const save = async () => {
+    if (saving) return;
+    if (!validate()) return;
 
     const body = {
       name: form.name.trim(),
@@ -146,6 +166,11 @@ export default function DriverFormPage() {
     }
   };
 
+  const onSubmit = (e) => {
+    e.preventDefault();
+    save();
+  };
+
   const header = (
     <div className="flex items-center gap-3 w-full min-w-0">
       <button
@@ -180,8 +205,8 @@ export default function DriverFormPage() {
   const actions = (
     <div className="flex gap-3">
       <button
-        type="submit"
-        form="driver-account-form"
+        type="button"
+        onClick={save}
         disabled={saving}
         className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-primary text-white font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 disabled:opacity-60"
       >
@@ -199,8 +224,13 @@ export default function DriverFormPage() {
 
   return (
     <AdminLayout activeTab="drivers" title={header} footer={actions}>
-      <form id="driver-account-form" onSubmit={onSubmit} className="max-w-3xl mx-auto space-y-5">
-        {/* Credentials first — must be above the fold on mobile */}
+      <form
+        ref={formRef}
+        id="driver-account-form"
+        onSubmit={onSubmit}
+        noValidate
+        className="max-w-3xl mx-auto space-y-5"
+      >
         <section className="bg-sky-50 rounded-[24px] border border-sky-100 p-5 sm:p-6 space-y-4">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
@@ -228,15 +258,24 @@ export default function DriverFormPage() {
           </div>
 
           <label className="block text-sm">
+            <span className="font-bold text-gray-800">Ονοματεπώνυμο *</span>
+            <input value={form.name} onChange={setField('name')} className={inputClass} />
+          </label>
+
+          <label className="block text-sm">
             <span className="font-bold text-gray-800">Email (όνομα χρήστη) *</span>
             <input
-              required
               type="email"
               autoComplete="username"
               value={form.email}
               onChange={setField('email')}
               className={inputClass}
             />
+          </label>
+
+          <label className="block text-sm">
+            <span className="font-bold text-gray-800">Αρ. άδειας *</span>
+            <input value={form.license_no} onChange={setField('license_no')} className={inputClass} />
           </label>
 
           <div className="grid grid-cols-1 gap-4">
@@ -247,7 +286,6 @@ export default function DriverFormPage() {
               <input
                 type="password"
                 autoComplete="new-password"
-                required={!isEdit}
                 minLength={4}
                 placeholder="τουλάχιστον 4 χαρακτήρες"
                 value={form.password}
@@ -260,7 +298,6 @@ export default function DriverFormPage() {
               <input
                 type="password"
                 autoComplete="new-password"
-                required={!isEdit || Boolean(form.password)}
                 minLength={4}
                 placeholder="Επαναλάβετε τον κωδικό"
                 value={form.password_confirm}
@@ -273,27 +310,24 @@ export default function DriverFormPage() {
 
         <section className="bg-white rounded-[24px] border border-black/[0.06] shadow-sm p-5 sm:p-6 space-y-4">
           <div>
-            <h2 className="font-bold text-base sm:text-lg text-gray-900">Στοιχεία οδηγού</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Προσωπικά στοιχεία και όχημα.</p>
+            <h2 className="font-bold text-base sm:text-lg text-gray-900">Στοιχεία οχήματος</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Προαιρετικά — πινακίδα, αμοιβές, φωτογραφία.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="block text-sm sm:col-span-2">
-              <span className="font-bold text-gray-700">Ονοματεπώνυμο *</span>
-              <input required value={form.name} onChange={setField('name')} className={inputClass} />
-            </label>
-            <label className="block text-sm">
-              <span className="font-bold text-gray-700">Αρ. άδειας *</span>
-              <input
-                required
-                value={form.license_no}
-                onChange={setField('license_no')}
-                className={inputClass}
-              />
-            </label>
             <label className="block text-sm">
               <span className="font-bold text-gray-700">Τηλέφωνο</span>
               <input value={form.phone} onChange={setField('phone')} className={inputClass} />
+            </label>
+            <label className="block text-sm">
+              <span className="font-bold text-gray-700">Κατάσταση</span>
+              <select value={form.status} onChange={setField('status')} className={inputClass}>
+                {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block text-sm">
               <span className="font-bold text-gray-700">Κωδικός οχήματος</span>
@@ -312,21 +346,20 @@ export default function DriverFormPage() {
               />
             </label>
             <label className="block text-sm">
-              <span className="font-bold text-gray-700">Κατάσταση</span>
-              <select value={form.status} onChange={setField('status')} className={inputClass}>
-                {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
               <span className="font-bold text-gray-700">Έναρξη</span>
               <input
                 type="date"
                 value={form.hiring_date}
                 onChange={setField('hiring_date')}
+                className={inputClass}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-bold text-gray-700">Λήξη άδειας</span>
+              <input
+                type="date"
+                value={form.license_expires_at}
+                onChange={setField('license_expires_at')}
                 className={inputClass}
               />
             </label>
@@ -350,16 +383,7 @@ export default function DriverFormPage() {
                 className={inputClass}
               />
             </label>
-            <label className="block text-sm sm:col-span-2">
-              <span className="font-bold text-gray-700">Λήξη άδειας</span>
-              <input
-                type="date"
-                value={form.license_expires_at}
-                onChange={setField('license_expires_at')}
-                className={inputClass}
-              />
-            </label>
-            <label className="block text-sm sm:col-span-2">
+            <div className="sm:col-span-2">
               <ImageDropField
                 label="Φωτογραφία οδηγού"
                 hint="Σύρετε φωτογραφία εδώ ή πατήστε για επιλογή"
@@ -368,7 +392,7 @@ export default function DriverFormPage() {
                 onUpload={uploadDriverPhoto}
                 disabled={saving}
               />
-            </label>
+            </div>
           </div>
         </section>
       </form>

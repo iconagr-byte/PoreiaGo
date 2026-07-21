@@ -94,6 +94,7 @@ FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/settings",
     "/api/admin/platform/branding",
     "/api/admin/platform/seat-pricing",
+    "/api/admin/platform/drivers",  # fleet_drivers.json — bus PWA accounts
 )
 
 
