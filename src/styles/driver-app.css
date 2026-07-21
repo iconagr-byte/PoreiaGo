@@ -278,7 +278,7 @@ html.driver-route body {
   border: 1px solid var(--driver-border);
   border-radius: 1.25rem;
   padding: 1rem;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(15, 23, 42, 0.05);
 }
 
 @media (min-width: 380px) {
