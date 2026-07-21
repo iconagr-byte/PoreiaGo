@@ -150,17 +150,25 @@ class FleetTelemetryWebSocketTests(unittest.TestCase):
     def setUpClass(cls):
         import api.ws_telemetry as ws_mod
 
-        ws_mod.JWT_SECRET = TEST_JWT_SECRET
+        cls._orig_secrets = ws_mod._jwt_secrets
+        ws_mod._jwt_secrets = lambda: [TEST_JWT_SECRET]
+        cls.ws_mod = ws_mod
         cls.app = FastAPI()
         cls.app.include_router(ws_mod.router)
         cls.client = TestClient(cls.app)
         cls.tenant_uuid = DEMO_TENANT
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.ws_mod._jwt_secrets = cls._orig_secrets
+
     def test_ingress_rejects_invalid_token(self):
-        with self.assertRaises(WebSocketDisconnect) as ctx:
-            with self.client.websocket_connect("/ws/telemetry/ingress?token=not-a-jwt"):
-                pass
-        self.assertEqual(ctx.exception.code, 4401)
+        with self.client.websocket_connect("/ws/telemetry/ingress?token=not-a-jwt") as ws:
+            msg = ws.receive_json()
+            self.assertEqual(msg.get("type"), "error")
+            with self.assertRaises(WebSocketDisconnect) as ctx:
+                ws.receive_json()
+            self.assertEqual(ctx.exception.code, 4401)
 
     def test_ingress_ack_and_egress_location(self):
         token = _driver_session_token()

@@ -54,19 +54,35 @@ except ImportError:
 
 try:
     from api.admin_platform import router as admin_platform_router
+except ImportError:
+    admin_platform_router = None
+
+try:
     from api.admin_telemetry import router as admin_telemetry_router
+except ImportError:
+    admin_telemetry_router = None
+
+try:
     from api.telemetry_router import ingest_router as telemetry_ingest_router
+except ImportError:
+    telemetry_ingest_router = None
+
+try:
     from api.passenger_portal import router as passenger_portal_router
+except ImportError:
+    passenger_portal_router = None
+
+# WebSocket GPS must load independently — do not bundle with unrelated imports.
+try:
     from api.ws_telemetry import router as ws_telemetry_router
+except ImportError:
+    ws_telemetry_router = None
+
+try:
     from travel_platform.telemetry.eta_intelligence import start_eta_refresh_loop
     from travel_platform.telemetry.processor import get_live_fleet, process_telemetry_payload
     from travel_platform.telemetry.queue import start_consumer
 except ImportError:
-    telemetry_ingest_router = None
-    passenger_portal_router = None
-    ws_telemetry_router = None
-    admin_platform_router = None
-    admin_telemetry_router = None
     start_eta_refresh_loop = None
     get_live_fleet = None
     start_consumer = None

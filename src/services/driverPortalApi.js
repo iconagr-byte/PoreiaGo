@@ -135,6 +135,21 @@ export async function fetchDriverMe() {
   }
 }
 
+/** HTTP fallback for live GPS when WebSocket upgrade is blocked. */
+export async function postDriverTelemetryLocation(payload) {
+  const res = await fetch(`${API_BASE}/api/driver/telemetry/location`, {
+    method: 'POST',
+    headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Αποτυχία αποστολής θέσης');
+  }
+  return data;
+}
+
 export async function fetchDriverManifest() {
   const tripId = getActiveTripId();
   try {
