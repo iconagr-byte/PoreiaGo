@@ -158,10 +158,7 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         from travel_platform.telemetry.processor import get_live_fleet
 
         fleet = get_live_fleet()
-        for vid, meta in fleet._vehicles.items():
-            if meta.get("tenant_id") == tenant_id and meta.get("vehicle_code") == payload["vehicle_code"]:
-                vehicle_id = vid
-                break
+        vehicle_id = fleet.find_vehicle_id(tenant_id, payload["vehicle_code"])
     except Exception:
         pass
 

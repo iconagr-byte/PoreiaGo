@@ -120,15 +120,19 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
 
       stopGeoRef.current = startDriverGeolocationWatch({
         onPosition: (pos) => {
+          const plate =
+            session?.vehiclePlate ||
+            session?.vehicleCode ||
+            session?.busPlate ||
+            `TRIP-${session?.tripId || '?'}`;
           const payload = buildDriverTelemetryPayload(pos, session, {
-            driverName,
-            busPlate: session?.busPlate || `TRIP-${session?.tripId || '?'}`,
+            driverName: session?.driverName || driverName,
+            busPlate: plate,
             manifest: manifestRef.current,
             sensors: sensorsRef.current,
           });
-          conn.send(payload);
-          setLastPing(new Date());
-          setGpsError('');
+          const sent = conn.send(payload);
+          if (sent) setGpsError('');
         },
         onError: (err) => {
           setGpsError(geolocationErrorToGreek(err, { isIos: iosEnv.isIos }));
@@ -137,6 +141,10 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
       setOnline(true);
       localStorage.setItem('driver_shift_online', '1');
       window.dispatchEvent(new CustomEvent('driver-shift-online', { detail: { online: true } }));
+      toast('Η θέση σας θα εμφανιστεί στον live χάρτη του γραφείου', {
+        icon: '🗺️',
+        duration: 4000,
+      });
     } catch (err) {
       toast.error(err.message || 'Αποτυχία σύνδεσης');
     }

@@ -49,6 +49,12 @@ export function startDriverGeolocationWatch({ onPosition, onError, intervalMs = 
 
 export function positionToTelemetryPayload(position, session, extras = {}) {
   const { latitude, longitude, speed, heading } = position.coords;
+  const busPlate =
+    extras.busPlate ||
+    session?.busPlate ||
+    session?.vehiclePlate ||
+    session?.vehicleCode ||
+    null;
   return {
     lat: latitude,
     lng: longitude,
@@ -59,6 +65,7 @@ export function positionToTelemetryPayload(position, session, extras = {}) {
     trip_id: session?.tripId || null,
     timestamp: Date.now(),
     driver_name: extras.driverName || session?.driverName || null,
-    bus_plate: extras.busPlate || session?.busPlate || null,
+    bus_plate: busPlate,
+    vehicle_code: busPlate,
   };
 }
