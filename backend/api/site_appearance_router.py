@@ -298,6 +298,23 @@ async def get_site_asset(kind: str):
     return FileResponse(path, media_type=media_type)
 
 
+@router.get("/api/site/driver-photos/{filename}")
+async def get_driver_photo(filename: str):
+    """Public driver headshot for admin + driver PWA headers."""
+    import os
+    import re
+
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", filename) or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    data_root = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data")
+    path = (data_root / "uploads" / "driver_photos" / filename).resolve()
+    allowed_root = (data_root / "uploads" / "driver_photos").resolve()
+    if not str(path).startswith(str(allowed_root)) or not path.is_file():
+        raise HTTPException(status_code=404, detail="Photo not found")
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media_type)
+
+
 @router.get("/api/admin/platform/site-appearance", response_model=SiteAppearanceResponse)
 async def get_admin_site_appearance():
     return await get_public_site_appearance()

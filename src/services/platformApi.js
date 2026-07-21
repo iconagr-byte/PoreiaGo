@@ -316,6 +316,19 @@ export async function deleteFleetDriver(driverId) {
   if (!res.ok && res.status !== 204) await parseError(res);
 }
 
+/** Upload driver headshot — returns relative `/api/site/driver-photos/...` URL. */
+export async function uploadDriverPhoto(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/api/admin/platform/drivers/photo-upload`, {
+    method: 'POST',
+    headers: adminBearerHeaders(),
+    body: form,
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function fetchFleetPlateAvailability(plate) {
   if (!plate) return { available: true };
   try {

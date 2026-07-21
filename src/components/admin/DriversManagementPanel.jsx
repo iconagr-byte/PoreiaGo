@@ -5,6 +5,7 @@ import {
   deleteFleetDriver,
   fetchFleetDrivers,
 } from '../../services/platformApi.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 const STATUS_LABELS = {
   active: 'Ενεργός',
@@ -259,7 +260,7 @@ export default function DriversManagementPanel() {
                         <div className="flex items-center gap-3">
                           {d.photo_url ? (
                             <img
-                              src={d.photo_url}
+                              src={resolveSiteAssetUrl(d.photo_url)}
                               alt=""
                               className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-black/5"
                             />
