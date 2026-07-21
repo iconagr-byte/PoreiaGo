@@ -14,8 +14,9 @@ import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
 import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
 import AdminFleetPushPanel from './AdminFleetPushPanel.jsx';
 import FleetEtaPanel from './FleetEtaPanel.jsx';
+import '../../styles/fleet-live-map.css';
 
-/** Ζωντανός χάρτης στόλου — Mapbox αν υπάρχει token, αλλιώς Leaflet. */
+/** Ζωντανός χάρτης στόλου — Apple-like UI, πόλεις & περιφέρειες Ελλάδας. */
 export default function FleetLiveMapWebSocket() {
   const { connected, vehicles, tenantId, transport, pollError, lastPollAt } = useFleetTelemetryEgress();
   const mapbox = isMapboxEnabled();
@@ -25,6 +26,7 @@ export default function FleetLiveMapWebSocket() {
   const [heatmap, setHeatmap] = useState([]);
   const [showGeofence, setShowGeofence] = useState(false);
   const [showSosPins, setShowSosPins] = useState(true);
+  const [showPlaces, setShowPlaces] = useState(true);
   const [geofenceLayers, setGeofenceLayers] = useState(null);
   const [fitNonce, setFitNonce] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
@@ -70,7 +72,7 @@ export default function FleetLiveMapWebSocket() {
 
   const center = useMemo(() => {
     if (vehicles.length) return [vehicles[0].lat, vehicles[0].lng];
-    return [38.5, 23.0];
+    return [38.3, 23.5];
   }, [vehicles]);
 
   const selected = useMemo(
@@ -78,121 +80,97 @@ export default function FleetLiveMapWebSocket() {
     [vehicles, selectedId],
   );
 
+  const transportLabel =
+    transport === 'poll' ? 'HTTP' : transport === 'ws' ? 'Live' : 'σύνδεση…';
+
   return (
-    <div className="space-y-4">
+    <div className="fleet-apple-shell space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-headline-md font-bold">Ζωντανός Χάρτης Στόλου</h2>
-          <p className="text-sm text-on-surface-variant">
-            {vehicles.length} ενεργά οχήματα ·{' '}
-            {transport === 'poll'
-              ? 'HTTP poll'
-              : transport === 'ws'
-                ? 'WebSocket'
-                : 'σύνδεση…'}{' '}
-            {connected ? 'ενεργό' : 'εκτός'}
-            {' · '}
-            {mapbox ? 'Mapbox GL' : 'Leaflet'}
-            {showHeat && heatmap.length ? (
-              <span className="text-[10px] text-orange-600 ml-2">
-                heatmap {heatmap.length} κελιά ({heatDays}ημ.)
-              </span>
-            ) : null}
-            {tenantId ? (
-              <span className="text-[10px] text-gray-400 ml-2 font-mono">tenant {tenantId.slice(0, 8)}…</span>
-            ) : null}
+          <h2 className="fleet-apple-title">Ζωντανός χάρτης στόλου</h2>
+          <p className="fleet-apple-subtitle">
+            {vehicles.length} ενεργά οχήματα · {transportLabel} {connected ? 'ενεργό' : 'εκτός'}
+            {showHeat && heatmap.length ? ` · heatmap ${heatmap.length}` : ''}
+            {tenantId ? ` · ${tenantId.slice(0, 8)}…` : ''}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setFitNonce((n) => n + 1)}
-            className="inline-flex items-center gap-1 rounded-xl border border-black/[0.08] bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50"
-          >
+          <button type="button" onClick={() => setFitNonce((n) => n + 1)} className="fleet-apple-chip">
             <span className="material-symbols-outlined text-[16px]">center_focus_strong</span>
             Κέντρο στόλου
           </button>
-          <span
-            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
-              connected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-            }`}
-          >
+          <span className={`fleet-apple-chip ${connected ? 'is-live' : 'is-warn'}`}>
             <span className="material-symbols-outlined text-[14px]">sensors</span>
-            {connected ? (transport === 'poll' ? 'LIVE (poll)' : 'ΖΩΝΤΑΝΑ') : '…'}
+            {connected ? 'Ζωντανά' : '…'}
           </span>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-black/[0.06] bg-white px-4 py-3 text-sm">
-        <label className="flex items-center gap-2 font-bold cursor-pointer">
+      <div className="fleet-apple-toolbar">
+        <label>
+          <input type="checkbox" checked={showPlaces} onChange={(e) => setShowPlaces(e.target.checked)} />
+          Πόλεις &amp; περιφέρειες
+        </label>
+        <label>
           <input type="checkbox" checked={showHeat} onChange={(e) => setShowHeat(e.target.checked)} />
           Heatmap GPS
         </label>
         {showHeat ? (
           <>
-            <label className="flex items-center gap-2">
-              <span className="text-[10px] uppercase font-bold text-gray-400">Περίοδος</span>
-              <select
-                value={heatDays}
-                onChange={(e) => setHeatDays(Number(e.target.value))}
-                className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
-              >
+            <label>
+              <span className="text-[10px] uppercase tracking-wide text-[var(--fleet-secondary)]">Περίοδος</span>
+              <select value={heatDays} onChange={(e) => setHeatDays(Number(e.target.value))}>
                 <option value={7}>7 ημέρες</option>
                 <option value={30}>30 ημέρες</option>
                 <option value={90}>90 ημέρες</option>
               </select>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label>
               <input type="checkbox" checked={slowOnly} onChange={(e) => setSlowOnly(e.target.checked)} />
               Μόνο στάσεις (&lt;8 km/h)
             </label>
           </>
         ) : null}
-        <label className="flex items-center gap-2 font-bold cursor-pointer">
+        <label>
           <input type="checkbox" checked={showSosPins} onChange={(e) => setShowSosPins(e.target.checked)} />
-          <span className="text-red-700">SOS pins</span>
+          <span style={{ color: 'var(--fleet-danger)' }}>SOS</span>
         </label>
         {showSosPins && sosAlerts.length ? (
-          <span className="text-[10px] font-bold text-red-600 animate-pulse">
-            {sosAlerts.length} SOS στον χάρτη
+          <span className="text-[11px] font-semibold" style={{ color: 'var(--fleet-danger)' }}>
+            {sosAlerts.length} στον χάρτη
           </span>
         ) : null}
-        <label className="flex items-center gap-2 font-bold cursor-pointer ml-auto xl:ml-0">
+        <label className="ml-auto xl:ml-0">
           <input type="checkbox" checked={showGeofence} onChange={(e) => setShowGeofence(e.target.checked)} />
-          Geofence & alerts
+          Geofence
         </label>
         {showGeofence ? (
-          <span className="text-[10px] text-rose-600 font-bold">
-            {mapAlerts.length} στον χάρτη
-            {alertsWs ? ' · live' : ''}
+          <span className="text-[11px] font-semibold text-[var(--fleet-secondary)]">
+            {mapAlerts.length} alerts{alertsWs ? ' · live' : ''}
           </span>
         ) : null}
       </div>
 
       {!mapbox ? (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2">
-          Ορίστε <code className="font-mono">VITE_MAPBOX_TOKEN</code> στο <code className="font-mono">.env.local</code>{' '}
-          για Mapbox GL. Προσωρινά χρησιμοποιείται Leaflet / CARTO.
+        <p className="fleet-apple-banner">
+          Mapbox token προαιρετικό — χρησιμοποιείται μαλακό CARTO basemap με ελληνικές ετικέτες πόλεων &amp;
+          περιφερειών.
         </p>
       ) : null}
 
       <AdminFleetPushPanel />
 
-      {pollError ? (
-        <p className="text-sm text-rose-800 rounded-xl bg-rose-50 border border-rose-100 px-4 py-3">
-          {pollError}
-        </p>
-      ) : null}
+      {pollError ? <p className="fleet-apple-banner is-error">{pollError}</p> : null}
 
       {!vehicles.length && connected ? (
-        <p className="text-sm text-gray-500 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
-          Δεν υπάρχουν ενεργοί οδηγοί στον χάρτη. Ζητήστε από έναν οδηγό να πατήσει «Έναρξη Βάρδιας» στην εφαρμογή PWA
-          και να επιτρέψει την τοποθεσία.
+        <p className="fleet-apple-banner">
+          Δεν υπάρχουν ενεργοί οδηγοί. Ζητήστε «Έναρξη βάρδιας» στην PWA με άδεια τοποθεσίας. Με «Τέλος βάρδιας»
+          το pin αφαιρείται αμέσως.
         </p>
       ) : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4">
-        <div className="h-[min(72vh,640px)] rounded-[24px] overflow-hidden border border-black/[0.08] shadow-level-2 relative">
+        <div className="fleet-apple-map-frame">
           {mapbox ? (
             <FleetLiveMapMapbox
               vehicles={vehicles}
@@ -203,6 +181,7 @@ export default function FleetLiveMapWebSocket() {
               sosAlerts={sosAlerts}
               showGeofence={showGeofence}
               showSosPins={showSosPins}
+              showPlaces={showPlaces}
               focusSosAlert={showSosPins ? focusSosAlert : null}
               fitNonce={fitNonce}
             />
@@ -217,6 +196,7 @@ export default function FleetLiveMapWebSocket() {
               sosAlerts={sosAlerts}
               showGeofence={showGeofence}
               showSosPins={showSosPins}
+              showPlaces={showPlaces}
               focusSosAlert={showSosPins ? focusSosAlert : null}
               fitNonce={fitNonce}
             />
@@ -224,17 +204,17 @@ export default function FleetLiveMapWebSocket() {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-[24px] border border-black/[0.06] bg-white p-4 shadow-sm">
+          <div className="fleet-apple-side-card">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-slate-900">Ενεργά οχήματα</h3>
+              <h3 className="text-sm font-bold tracking-tight">Ενεργά οχήματα</h3>
               {lastPollAt ? (
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-[var(--fleet-secondary)]">
                   {lastPollAt.toLocaleTimeString('el-GR')}
                 </span>
               ) : null}
             </div>
             {vehicles.length ? (
-              <ul className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+              <ul className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
                 {vehicles.map((v) => {
                   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(v));
                   const active = (selected?.id || selectedId) === v.id;
@@ -246,26 +226,24 @@ export default function FleetLiveMapWebSocket() {
                           setSelectedId(v.id);
                           setFitNonce((n) => n + 1);
                         }}
-                        className={`w-full rounded-2xl border px-3 py-2.5 text-left transition ${
-                          active
-                            ? 'border-emerald-300 bg-emerald-50'
-                            : 'border-black/[0.06] bg-slate-50/80 hover:bg-white'
-                        }`}
+                        className={`fleet-apple-vehicle-btn ${active ? 'is-active' : ''}`}
                       >
                         <div className="flex items-center gap-3">
                           <img
                             src={img}
                             alt=""
-                            className="h-12 w-12 rounded-xl object-cover ring-2 ring-white shadow"
+                            className="h-12 w-12 rounded-[14px] object-cover shadow-sm ring-2 ring-white"
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-bold text-slate-900">{v.driver_name}</div>
-                            <div className="truncate text-xs text-slate-500">
-                              {v.bus_plate} · δρομολόγιο #{v.trip_id ?? '—'}
+                            <div className="truncate text-sm font-bold tracking-tight">{v.driver_name}</div>
+                            <div className="truncate text-xs text-[var(--fleet-secondary)]">
+                              {v.bus_plate} · #{v.trip_id ?? '—'}
                             </div>
-                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-slate-600">
+                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-[var(--fleet-secondary)]">
                               <span>{Math.round(v.speed || 0)} km/h</span>
-                              <span>{Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}</span>
+                              <span>
+                                {Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}
+                              </span>
                               <span>{formatUpdatedAgo(v.timestamp) || '—'}</span>
                               {formatBoardingLabel(v) ? <span>{formatBoardingLabel(v)}</span> : null}
                             </div>
@@ -277,7 +255,7 @@ export default function FleetLiveMapWebSocket() {
                 })}
               </ul>
             ) : (
-              <p className="text-xs text-slate-500">Κανένα ενεργό όχημα αυτή τη στιγμή.</p>
+              <p className="text-xs text-[var(--fleet-secondary)]">Κανένα ενεργό όχημα αυτή τη στιγμή.</p>
             )}
           </div>
           <FleetEtaPanel activeTripCount={vehicles.length} />
