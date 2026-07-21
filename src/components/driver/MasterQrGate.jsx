@@ -74,14 +74,14 @@ export default function MasterQrGate({ onAuthenticated }) {
             PoreiaGo · Οδηγός
           </p>
           <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--driver-text)' }}>
-            {mode === 'password' ? 'Είσοδος βάρδιας' : 'Master QR'}
+            {mode === 'password' ? 'Καλωσήρθατε' : 'Σάρωση QR'}
           </h1>
           <p
             className="text-sm mt-2 leading-relaxed max-w-xs mx-auto"
             style={{ color: 'var(--driver-muted)' }}
           >
             {mode === 'password' ? (
-              <>Συνδεθείτε με όνομα χρήστη και κωδικό</>
+              <>Συνδεθείτε για να ξεκινήσετε τη βάρδια σας</>
             ) : (
               <>
                 Σκανάρετε το <span className="font-bold" style={{ color: 'var(--driver-accent)' }}>Master QR</span>{' '}
