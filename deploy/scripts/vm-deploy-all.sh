@@ -75,6 +75,19 @@ echo "  API_HOST=${API_HOST_VAL:-<unset>}"
 echo "  APP_HOST=$(grep -E '^APP_HOST=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
 
 $COMPOSE --profile bundled-db up -d postgres redis
+# Parallel GitHub deploys can leave rename-orphan containers that block recreate.
+echo "==> Clearing stale api-blue rename orphans (if any)"
+docker ps -a --format '{{.ID}} {{.Names}}' | awk '/aerostride-prod-api-blue/ {print $1}' | while read -r cid; do
+  # Keep the currently compose-managed container; remove rename leftovers (*_aerostride-prod-api-blue-1).
+  name="$(docker inspect -f '{{.Name}}' "$cid" 2>/dev/null | sed "s#^/##")"
+  case "$name" in
+    aerostride-prod-api-blue-1) ;;
+    *aerostride-prod-api-blue*)
+      echo "  removing orphan $name"
+      docker rm -f "$cid" >/dev/null 2>&1 || true
+      ;;
+  esac
+done
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps api-blue
 # Ensure API is on the edge network Traefik uses (recreate can drop attachments).
 API_CID="$($COMPOSE ps -q api-blue)"
