@@ -15,17 +15,25 @@ async def _handle_stale_session(session: dict) -> None:
     from travel_platform.telemetry.driver_shift_notifications import notify_driver_shift
     from travel_platform.telemetry.fleet_metrics import record_stale_offline
     from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
+    from travel_platform.telemetry.processor import get_live_fleet
 
     tenant_id = str(session.get("tenant_id") or "")
     record_stale_offline(tenant_id)
     driver_id = str(session.get("sub") or session.get("driver_id") or "driver")
     trip_id = session.get("trip_id")
+    removed: list[str] = []
+    if driver_id:
+        try:
+            removed = await get_live_fleet().remove_driver_vehicles(tenant_id, driver_id)
+        except Exception:
+            removed = []
     payload = {
         "type": "fleet_driver_offline",
         "tenant_id": tenant_id,
         "driver_id": driver_id,
         "trip_id": trip_id,
         "reason": "stale_gps",
+        "removed_vehicle_ids": removed,
     }
     if tenant_id:
         await get_fleet_egress_hub().broadcast(tenant_id, payload)

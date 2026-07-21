@@ -250,26 +250,50 @@ class LiveFleetService:
         return remote or local
 
     async def remove_driver_vehicles(self, tenant_id: str, driver_id: str) -> list[str]:
-        """Drop live vehicles for a driver (end shift). Returns removed vehicle ids."""
-        from travel_platform.telemetry.live_fleet_redis import delete_live_vehicle
+        """Drop live vehicles for a driver (end shift). Returns removed vehicle ids.
 
-        tid = str(tenant_id or "")
+        Hydrates from Redis first so HTTP-poll GPS written by another worker is
+        cleared immediately — not only the in-memory cache of this process.
+        Also scans the legacy demo tenant used by older driver sessions.
+        """
+        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+        from travel_platform.telemetry.live_fleet_redis import delete_live_vehicle, load_live_vehicles
+
         did = str(driver_id or "")
         removed: list[str] = []
-        if not tid or not did:
+        if not did:
             return removed
 
-        for vid, meta in list(self._vehicles.items()):
-            if str(meta.get("tenant_id") or "") != tid:
-                continue
-            if str(meta.get("driver_id") or "") != did:
-                continue
-            code = meta.get("vehicle_code")
-            self._vehicles.pop(vid, None)
-            if code:
-                self._code_index.pop(f"{tid}:{code}", None)
-            await delete_live_vehicle(tid, vid)
-            removed.append(vid)
+        tenant_ids: list[str] = []
+        tid = str(tenant_id or "").strip()
+        if tid:
+            tenant_ids.append(tid)
+        demo = str(DEFAULT_TENANT)
+        if demo not in tenant_ids:
+            tenant_ids.append(demo)
+
+        for scan_tid in tenant_ids:
+            for meta in await load_live_vehicles(scan_tid):
+                vid = str(meta.get("vehicle_id") or "")
+                if not vid:
+                    continue
+                self._vehicles[vid] = {**self._vehicles.get(vid, {}), **meta}
+                code = meta.get("vehicle_code")
+                if code:
+                    self._code_index[f"{scan_tid}:{code}"] = vid
+
+            for vid, meta in list(self._vehicles.items()):
+                if str(meta.get("tenant_id") or "") != scan_tid:
+                    continue
+                if str(meta.get("driver_id") or "") != did:
+                    continue
+                code = meta.get("vehicle_code")
+                self._vehicles.pop(vid, None)
+                if code:
+                    self._code_index.pop(f"{scan_tid}:{code}", None)
+                await delete_live_vehicle(scan_tid, vid)
+                if vid not in removed:
+                    removed.append(vid)
         return removed
 
     def heatmap_grid(self, tenant_id: UUID, cell_size: float = 0.01) -> list[dict]:

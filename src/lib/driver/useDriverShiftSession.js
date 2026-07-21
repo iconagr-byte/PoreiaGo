@@ -76,16 +76,22 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   }, []);
 
   const goOffline = useCallback(
-    ({ silent = false } = {}) => {
+    async ({ silent = false } = {}) => {
       stopRuntime();
       setOnline(false);
       setGpsError('');
       setStarting(false);
       setShiftFlag(false);
-      // Fire-and-forget: notify admin platform + clear live map pin.
-      endDriverShift().catch(() => {});
-      if (!silent) {
-        toast('Η βάρδια τερματίστηκε', { icon: '🛑', duration: 2500 });
+      // Await so logout can keep the JWT until the platform + map are notified.
+      try {
+        await endDriverShift();
+        if (!silent) {
+          toast('Η βάρδια τερματίστηκε — ενημερώθηκε ο χάρτης', { icon: '🛑', duration: 2800 });
+        }
+      } catch (err) {
+        if (!silent) {
+          toast.error(err?.message || 'Η βάρδια σταμάτησε τοπικά — ο χάρτης μπορεί να καθυστερήσει');
+        }
       }
     },
     [stopRuntime],
@@ -296,12 +302,12 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     };
   }, [online, enabled]);
 
-  const toggle = useCallback(() => {
+  const toggle = useCallback(async () => {
     if (online || starting || runningRef.current || isDriverShiftOnline()) {
-      goOffline();
-    } else {
-      void goOnline({ resume: false });
+      await goOffline();
+      return;
     }
+    await goOnline({ resume: false });
   }, [online, starting, goOffline, goOnline]);
 
   return {
