@@ -86,6 +86,21 @@ class DriverSessionLoginApiTests(unittest.TestCase):
         self.assertIn("vehicle_plate", data)
         self.assertTrue(data.get("expires_at"))
 
+    def test_login_uses_resolved_platform_tenant(self):
+        from unittest.mock import AsyncMock
+
+        platform = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        with patch(
+            "api.driver_portal.resolve_platform_tenant_id",
+            new=AsyncMock(return_value=platform),
+        ):
+            res = self.client.post(
+                "/api/driver/session/login",
+                json={"username": self.driver.email, "password": "driver123"},
+            )
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(res.json().get("tenant_id"), platform)
+
     def test_login_rejects_bad_password(self):
         res = self.client.post(
             "/api/driver/session/login",
