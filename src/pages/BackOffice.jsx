@@ -123,10 +123,6 @@ export default function BackOffice() {
     if (location.state?.activeTab) {
       setActiveTab(location.state.activeTab);
     }
-    if (location.state?.settingsSubTab === 'drivers' || location.state?.platformTab === 'drivers') {
-      setActiveTab('drivers');
-      return;
-    }
     if (location.state?.settingsSubTab || location.state?.platformTab) {
       setSettingsSubTab(
         sanitizeSettingsSubTab(

@@ -56,7 +56,7 @@ function migrateNavLayout(layout, isSuperAdmin) {
   let main = [...(layout.main || [])];
   let settings = [...(layout.settings || [])];
 
-  settings = settings.filter((id) => id !== 'settings_drivers');
+  // Keep settings_drivers when present in defaults (Ρυθμίσεις → Οδηγοί).
   main = main.filter((id) => id !== 'drivers' && id !== 'email_templates' && id !== 'fleet_kpis' && id !== 'fleet_live_map' && id !== 'fleet_active_drivers' && id !== 'fleet_route_playback');
 
   const fleetIdx = main.indexOf('fleet');
