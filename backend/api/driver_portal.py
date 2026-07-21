@@ -318,3 +318,44 @@ async def driver_trip_telemetry(session_payload: dict = Depends(require_driver_s
         "estimated_fuel_saved_liters": saved,
         "is_currently_idling": idle_seconds > 0 and vehicle and vehicle.speed_kmh < 3,
     }
+
+
+@router.post("/telemetry/location")
+async def driver_telemetry_location(
+    body: dict,
+    session_payload: dict = Depends(require_driver_session),
+):
+    """
+    HTTP fallback for driver PWA GPS when WebSocket upgrade is blocked by a proxy.
+    Same ingest path as /ws/telemetry/ingress.
+    """
+    from travel_platform.telemetry.driver_shift_notifications import notify_driver_shift
+    from travel_platform.telemetry.driver_shift_tracker import on_driver_connected
+    from travel_platform.telemetry.fleet_ingress import ingest_driver_location
+
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    # Mark shift online on first successful HTTP ping (idempotent per driver/trip).
+    connection_id = hash(f"http:{session_payload.get('sub')}:{session_payload.get('trip_id')}")
+    if on_driver_connected(session_payload, connection_id):
+        try:
+            import asyncio
+
+            asyncio.create_task(notify_driver_shift("online", session_payload))
+        except Exception:
+            pass
+
+    try:
+        result = await ingest_driver_location(body, session=session_payload)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)[:200]) from exc
+
+    if result.get("rate_limited"):
+        return {
+            "type": "rate_limited",
+            "ok": False,
+            "retry_after_sec": result.get("retry_after_sec"),
+            "tenant_id": result.get("tenant_id"),
+        }
+    return {"type": "ack", "ok": True, **result}

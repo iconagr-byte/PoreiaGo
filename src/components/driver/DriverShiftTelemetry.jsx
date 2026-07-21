@@ -9,7 +9,7 @@ import {
   requestMotionPermission,
   startDeviceSensorWatch,
 } from '../../lib/driver/driverDeviceSensors.js';
-import { createDriverTelemetrySocket } from '../../lib/driver/driverTelemetryWs.js';
+import { createDriverTelemetryTransport } from '../../lib/driver/driverTelemetryTransport.js';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
 import { fetchDriverManifest } from '../../services/driverPortalApi.js';
 import { isWakeLockSupported, releaseWakeLock, requestWakeLock } from '../../lib/driver/wakeLock.js';
@@ -22,7 +22,7 @@ import IosPwaGpsGuidance from './IosPwaGpsGuidance.jsx';
 import { useIosBackgroundGpsWarning } from '../../lib/driver/useIosBackgroundGpsWarning.js';
 
 /**
- * Mobile-first shift telemetry — Go Online toggle, GPS → WebSocket ingress.
+ * Mobile-first shift telemetry — Go Online toggle, GPS → WebSocket (HTTP fallback).
  */
 export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
   const [online, setOnline] = useState(false);
@@ -32,18 +32,19 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
   const iosEnv = getIosGpsEnvironment();
   const backgroundWarning = useIosBackgroundGpsWarning(online);
   const stopGeoRef = useRef(null);
-  const wsRef = useRef(null);
+  const transportRef = useRef(null);
   const wakeRef = useRef(null);
   const stopSensorsRef = useRef(null);
   const manifestRef = useRef(null);
   const sensorsRef = useRef(null);
+  const linkedOnlineRef = useRef(false);
   const session = getDriverSession();
 
   useEffect(() => {
     return () => {
       stopGeoRef.current?.();
       stopSensorsRef.current?.();
-      wsRef.current?.close();
+      transportRef.current?.close();
       releaseWakeLock(wakeRef.current);
     };
   }, []);
@@ -73,14 +74,27 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
     stopGeoRef.current = null;
     stopSensorsRef.current?.();
     stopSensorsRef.current = null;
-    wsRef.current?.close();
-    wsRef.current = null;
+    transportRef.current?.close();
+    transportRef.current = null;
     releaseWakeLock(wakeRef.current);
     wakeRef.current = null;
+    linkedOnlineRef.current = false;
     setOnline(false);
     setGpsError('');
     localStorage.setItem('driver_shift_online', '0');
     window.dispatchEvent(new CustomEvent('driver-shift-online', { detail: { online: false } }));
+  };
+
+  const markOnline = () => {
+    if (linkedOnlineRef.current) return;
+    linkedOnlineRef.current = true;
+    setOnline(true);
+    localStorage.setItem('driver_shift_online', '1');
+    window.dispatchEvent(new CustomEvent('driver-shift-online', { detail: { online: true } }));
+    toast('Η θέση σας θα εμφανιστεί στον live χάρτη του γραφείου', {
+      icon: '🗺️',
+      duration: 4000,
+    });
   };
 
   const goOnline = async () => {
@@ -96,20 +110,37 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
     }
     try {
       await requestMotionPermission();
-      const conn = createDriverTelemetrySocket({
-        onOpen: () => toast.success('Σύνδεση telemetry OK'),
-        onError: () => toast.error('Αποτυχία WebSocket'),
+      let httpFallbackNotified = false;
+      const conn = createDriverTelemetryTransport({
+        onOpen: ({ transport } = {}) => {
+          markOnline();
+          if (transport === 'ws') {
+            toast.success('Σύνδεση telemetry OK');
+          } else if (transport === 'http' && !httpFallbackNotified) {
+            httpFallbackNotified = true;
+            toast.success('Σύνδεση θέσης OK');
+          }
+        },
+        onError: () => {
+          // WS errors are handled by HTTP fallback — only surface if HTTP also fails.
+        },
         onClose: () => {
-          if (online) toast('Η σύνδεση telemetry διακόπηκε');
+          if (linkedOnlineRef.current && transportRef.current?.mode === 'ws') {
+            toast('Η σύνδεση telemetry διακόπηκε — συνέχεια μέσω HTTP');
+          }
         },
         onMessage: (msg) => {
           if (msg.type === 'ack' && msg.ok !== false) setLastPing(new Date());
           if (msg.type === 'rate_limited') {
             toast(formatRateLimitedMessage(msg.retry_after_sec), { icon: '⏳' });
           }
+          if (msg.type === 'error' && msg.detail === 'invalid_token') {
+            toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά');
+            goOffline();
+          }
         },
       });
-      wsRef.current = conn;
+      transportRef.current = conn;
       stopSensorsRef.current = startDeviceSensorWatch((snapshot) => {
         sensorsRef.current = snapshot;
       });
@@ -138,15 +169,9 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
           setGpsError(geolocationErrorToGreek(err, { isIos: iosEnv.isIos }));
         },
       });
-      setOnline(true);
-      localStorage.setItem('driver_shift_online', '1');
-      window.dispatchEvent(new CustomEvent('driver-shift-online', { detail: { online: true } }));
-      toast('Η θέση σας θα εμφανιστεί στον live χάρτη του γραφείου', {
-        icon: '🗺️',
-        duration: 4000,
-      });
     } catch (err) {
       toast.error(err.message || 'Αποτυχία σύνδεσης');
+      goOffline();
     }
   };
 

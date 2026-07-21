@@ -60,12 +60,17 @@ class FleetTelemetryE2ETests(unittest.TestCase):
     def setUpClass(cls):
         import api.ws_telemetry as ws_mod
 
-        ws_mod.JWT_SECRET = TEST_JWT_SECRET
+        cls._orig_secrets = ws_mod._jwt_secrets
+        ws_mod._jwt_secrets = lambda: [TEST_JWT_SECRET]
+        cls.ws_mod = ws_mod
         cls.ws_app = FastAPI()
         cls.ws_app.include_router(ws_mod.router)
         cls.ws_client = TestClient(cls.ws_app)
         cls.admin_client = TestClient(_tenant_app())
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.ws_mod._jwt_secrets = cls._orig_secrets
     def test_ws_ingress_to_egress_roundtrip(self):
         token = _driver_token()
         with self.ws_client.websocket_connect(f"/ws/telemetry/ingress?token={token}") as ingress:

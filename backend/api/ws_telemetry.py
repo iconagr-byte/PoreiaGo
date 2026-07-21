@@ -13,6 +13,7 @@ from uuid import UUID
 import jwt
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
+from travel_platform.operations.master_qr_local import _secret as local_secret
 from travel_platform.telemetry.eta_resolve import DEMO_TENANT, resolve_eta_snapshot
 from travel_platform.telemetry.eta_serializers import snapshot_to_payload
 from travel_platform.telemetry.fleet_ingress import ingest_driver_location
@@ -23,12 +24,39 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["telemetry-ws"])
 
-JWT_SECRET = os.getenv("MASTER_QR_SECRET") or os.getenv("TICKET_JWT_SECRET") or os.getenv("AUTH_JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 
 
+def _jwt_secrets() -> list[str]:
+    """Match driver_portal._jwt_secret() — env secrets first, then local fallback."""
+    ordered = [
+        os.getenv("MASTER_QR_SECRET"),
+        os.getenv("TICKET_JWT_SECRET"),
+        os.getenv("AUTH_JWT_SECRET"),
+        local_secret(),
+    ]
+    seen: set[str] = set()
+    out: list[str] = []
+    for secret in ordered:
+        if not secret or secret in seen:
+            continue
+        seen.add(secret)
+        out.append(secret)
+    return out
+
+
 def _decode_driver_token(token: str) -> dict:
-    payload = jwt.decode(token.strip(), JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    raw = token.strip()
+    last_error: Exception | None = None
+    for secret in _jwt_secrets():
+        try:
+            payload = jwt.decode(raw, secret, algorithms=[JWT_ALGORITHM])
+            break
+        except jwt.PyJWTError as exc:
+            last_error = exc
+            payload = None
+    else:
+        raise last_error or jwt.InvalidTokenError("Invalid driver token")
     if "driver" not in (payload.get("roles") or []):
         raise jwt.InvalidTokenError("Not a driver session")
     return payload
@@ -104,14 +132,17 @@ async def driver_telemetry_ingress_ws(
             online_notified = True
             asyncio.create_task(notify_driver_shift("online", sess))
 
+    # Accept first so proxies/browsers complete the Upgrade; then auth.
+    await websocket.accept()
+
     if token:
         try:
             session = _decode_driver_token(token)
         except jwt.PyJWTError:
+            await websocket.send_text(json.dumps({"type": "error", "detail": "invalid_token"}))
             await websocket.close(code=4401)
             return
 
-    await websocket.accept()
     if session:
         await websocket.send_text(json.dumps({"type": "ready", "trip_id": session.get("trip_id")}))
         await _maybe_notify_online(session)
