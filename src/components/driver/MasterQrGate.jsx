@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { exchangeMasterQr, loginDriver } from '../../services/driverPortalApi.js';
 import BusQrScanner from '../BusQrScanner.jsx';
 import '../../styles/driver-app.css';
@@ -176,12 +175,6 @@ export default function MasterQrGate({ onAuthenticated }) {
             </p>
           )}
         </div>
-
-        <p className="text-center text-xs mt-6" style={{ color: 'var(--driver-muted)' }}>
-          <Link to="/admin/login" className="font-bold hover:underline" style={{ color: 'var(--driver-accent)' }}>
-            Επιστροφή στη σύνδεση
-          </Link>
-        </p>
       </div>
     </div>
   );
