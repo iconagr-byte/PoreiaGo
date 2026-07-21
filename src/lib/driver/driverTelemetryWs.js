@@ -13,8 +13,19 @@ export function createDriverTelemetrySocket({ onMessage, onOpen, onClose, onErro
 
   const url = `${buildWsUrl('/ws/telemetry/ingress')}?token=${encodeURIComponent(token)}`;
   const ws = new WebSocket(url);
+  const pending = [];
 
-  ws.onopen = () => onOpen?.();
+  ws.onopen = () => {
+    while (pending.length) {
+      const payload = pending.shift();
+      try {
+        ws.send(JSON.stringify(payload));
+      } catch {
+        /* drop */
+      }
+    }
+    onOpen?.();
+  };
   ws.onclose = (ev) => onClose?.(ev);
   ws.onerror = (ev) => onError?.(ev);
   ws.onmessage = (ev) => {
@@ -30,15 +41,26 @@ export function createDriverTelemetrySocket({ onMessage, onOpen, onClose, onErro
     send(payload) {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(payload));
+        return true;
       }
+      if (ws.readyState === WebSocket.CONNECTING) {
+        pending.push(payload);
+        if (pending.length > 20) pending.shift();
+        return false;
+      }
+      return false;
     },
     close() {
+      pending.length = 0;
       ws.close();
     },
     ping() {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send('ping');
       }
+    },
+    get readyState() {
+      return ws.readyState;
     },
   };
 }
