@@ -6,7 +6,9 @@ import {
   createFleetDriver,
   fetchFleetDriver,
   updateFleetDriver,
+  uploadDriverPhoto,
 } from '../../services/platformApi.js';
+import ImageDropField from '../../components/admin/ImageDropField.jsx';
 
 const STATUS_LABELS = {
   active: 'Ενεργός',
@@ -358,13 +360,13 @@ export default function DriverFormPage() {
               />
             </label>
             <label className="block text-sm sm:col-span-2">
-              <span className="font-bold text-gray-700">Φωτογραφία οδηγού (URL)</span>
-              <input
-                type="url"
-                placeholder="https://… (εμφανίζεται στο header της εφαρμογής)"
+              <ImageDropField
+                label="Φωτογραφία οδηγού"
+                hint="Σύρετε φωτογραφία εδώ ή πατήστε για επιλογή"
                 value={form.photo_url}
-                onChange={setField('photo_url')}
-                className={inputClass}
+                onChange={(url) => setForm((p) => ({ ...p, photo_url: url }))}
+                onUpload={uploadDriverPhoto}
+                disabled={saving}
               />
             </label>
           </div>

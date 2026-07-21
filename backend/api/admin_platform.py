@@ -7,6 +7,9 @@ Admin platform API — ρυθμίσεις πλατφόρμας, χρήστες, 
 
 from __future__ import annotations
 
+import os
+import re
+import uuid
 from datetime import date, datetime
 from pathlib import Path
 
@@ -188,6 +191,40 @@ async def remove_user(user_id: str):
 @router.get("/drivers", response_model=list[FleetDriverResponse])
 async def get_drivers(status: str | None = None):
     return [_driver_response(d) for d in list_drivers(status)]
+
+
+_DRIVER_PHOTO_DIR = Path(
+    os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data"
+) / "uploads" / "driver_photos"
+_MAX_DRIVER_PHOTO_BYTES = 4 * 1024 * 1024
+_ALLOWED_PHOTO_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+
+@router.post("/drivers/photo-upload")
+async def upload_driver_photo(file: UploadFile = File(...)):
+    """Admin upload — returns a public URL for photo_url on create/update."""
+    import mimetypes
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    if len(content) > _MAX_DRIVER_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 4 MB)")
+
+    ext = Path(file.filename or "photo.jpg").suffix.lower()
+    if ext not in _ALLOWED_PHOTO_EXT:
+        guessed = mimetypes.guess_extension(file.content_type or "") or ".jpg"
+        ext = guessed if guessed in _ALLOWED_PHOTO_EXT else ".jpg"
+    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "photo").stem)[:40] or "photo"
+    filename = f"{safe_stem}-{uuid.uuid4().hex[:10]}{ext}"
+
+    _DRIVER_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _DRIVER_PHOTO_DIR / filename
+    out_path.write_bytes(content)
+    url = f"/api/site/driver-photos/{filename}"
+    return {"ok": True, "url": url, "filename": filename}
 
 
 @router.post("/drivers", response_model=FleetDriverResponse, status_code=201)

@@ -6,6 +6,7 @@ import { clearDriverSession, getDriverSession, isSessionValid } from '../../lib/
 import { flushOfflineScanQueue } from '../../services/ticketingApi.js';
 import { fetchDriverMe } from '../../services/driverPortalApi.js';
 import MasterQrGate from '../../components/driver/MasterQrGate.jsx';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import DailyManifest from '../../components/driver/DailyManifest.jsx';
 import Scanner from '../../components/driver/enterprise/Scanner.jsx';
 import ExpenseUpload from '../../components/driver/enterprise/ExpenseUpload.jsx';
@@ -44,8 +45,8 @@ function driverInitials(name) {
 function DriverHeader({ session, telemetryOnline, onLogout, kicker, title }) {
   const name = session?.driverName || 'Οδηγός';
   const plate = session?.vehiclePlate || session?.vehicleCode;
-  const photoUrl = session?.photoUrl;
-  const busUrl = session?.vehicleImageUrl;
+  const photoUrl = session?.photoUrl ? resolveSiteAssetUrl(session.photoUrl) : '';
+  const busUrl = session?.vehicleImageUrl ? resolveSiteAssetUrl(session.vehicleImageUrl) : '';
 
   return (
     <header className="driver-header driver-shell flex justify-between items-center gap-3">

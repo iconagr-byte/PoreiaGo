@@ -4,7 +4,9 @@ import toast from 'react-hot-toast';
 import { mockFleet } from '../../data/mockData.js';
 import AdminLayout from '../../components/AdminLayout.jsx';
 import { loadTrips } from '../../lib/trips/tripStore.js';
-import { fetchFleetDriver, updateFleetDriver } from '../../services/platformApi.js';
+import { fetchFleetDriver, updateFleetDriver, uploadDriverPhoto } from '../../services/platformApi.js';
+import ImageDropField from '../../components/admin/ImageDropField.jsx';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 const STATUS_LABELS = {
   active: 'Ενεργός',
@@ -214,7 +216,7 @@ export default function DriverDetailPage() {
             <div className="flex flex-col items-center md:items-start shrink-0">
               {driver.photo_url ? (
                 <img
-                  src={driver.photo_url}
+                  src={resolveSiteAssetUrl(driver.photo_url)}
                   alt=""
                   className="w-24 h-24 rounded-3xl object-cover shadow-inner border border-primary/10"
                 />
@@ -397,16 +399,14 @@ export default function DriverDetailPage() {
                 />
               </label>
             </div>
-            <label className="block text-sm">
-              <span className="font-bold text-on-surface">Φωτογραφία (URL)</span>
-              <input
-                type="url"
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-                placeholder="https://…"
-                className="mt-1 w-full rounded-xl border border-black/[0.08] bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/15"
-              />
-            </label>
+            <ImageDropField
+              label="Φωτογραφία οδηγού"
+              hint="Σύρετε φωτογραφία εδώ ή πατήστε για επιλογή"
+              value={photoUrl}
+              onChange={setPhotoUrl}
+              onUpload={uploadDriverPhoto}
+              disabled={savingAccount}
+            />
             <div className="flex flex-wrap gap-3 pt-1">
               <button
                 type="submit"
