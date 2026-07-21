@@ -55,7 +55,8 @@ if [[ -f "$ENV_FILE" ]]; then
     INGRESS_CNAME="$(grep "^OLYMPUS_INGRESS_CNAME=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
   fi
 fi
-VITE_API_BASE="$API_BASE" \
+# Empty VITE_API_BASE → browser uses same-origin www + nginx /api proxy (avoids flaky api.* Traefik).
+VITE_API_BASE="${VITE_API_BASE:-}" \
 VITE_OLYMPUS_BASE_DOMAIN="$PLATFORM_DOMAIN" \
 VITE_OLYMPUS_INGRESS_CNAME="$INGRESS_CNAME" \
 npm run build
@@ -84,18 +85,21 @@ if [[ -n "$API_CID" ]]; then
 fi
 # Recreate Traefik so docker provider reloads API router labels cleanly.
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps traefik
-$COMPOSE --profile bundled-db up -d frontend
+# Recreate frontend so nginx picks up same-origin /api + /ws proxy config.
+$COMPOSE --profile bundled-db up -d --force-recreate --no-deps frontend
 
 echo "==> Waiting for API health"
 api_ok=0
+APP_ORIGIN_HEALTH="${APP_ORIGIN:-https://www.poreiago.com}"
 for i in $(seq 1 40); do
-  if curl -sf "$API_BASE/health" >/dev/null 2>&1; then
+  # Prefer same-origin www /health (nginx → api-blue). Fall back to api.* host.
+  if curl -sf "$APP_ORIGIN_HEALTH/health" >/dev/null 2>&1 || curl -sf "$API_BASE/health" >/dev/null 2>&1; then
     echo "  API healthy (public)"
     api_ok=1
     break
   fi
   if $COMPOSE exec -T api-blue python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" >/dev/null 2>&1; then
-    echo "  API process up (Traefik catching up… try $i)"
+    echo "  API process up (Traefik/nginx catching up… try $i)"
   else
     echo "  waiting for api-blue… try $i"
   fi
@@ -103,7 +107,7 @@ for i in $(seq 1 40); do
 done
 
 if [[ "$api_ok" -ne 1 ]]; then
-  echo "ERROR: Public API health failed for $API_BASE"
+  echo "ERROR: Public API health failed for $APP_ORIGIN_HEALTH/health and $API_BASE/health"
   echo "==> api-blue labels"
   docker inspect "$($COMPOSE ps -q api-blue)" --format '{{json .Config.Labels}}' 2>/dev/null | python3 -m json.tool || true
   echo "==> compose ps"
@@ -112,6 +116,8 @@ if [[ "$api_ok" -ne 1 ]]; then
   $COMPOSE logs api-blue --tail 80 || true
   echo "==> traefik logs"
   $COMPOSE logs traefik --tail 80 || true
+  echo "==> frontend logs"
+  $COMPOSE logs frontend --tail 40 || true
   exit 1
 fi
 
