@@ -294,8 +294,12 @@ export async function fetchFleetDriver(driverId) {
 export async function createFleetDriver(body) {
   const res = await adminFetch('/api/admin/platform/drivers', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά');
+  }
   if (!res.ok) await parseError(res);
   return res.json();
 }
@@ -303,8 +307,12 @@ export async function createFleetDriver(body) {
 export async function updateFleetDriver(driverId, body) {
   const res = await adminFetch(`/api/admin/platform/drivers/${driverId}`, {
     method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά');
+  }
   if (!res.ok) await parseError(res);
   return res.json();
 }
