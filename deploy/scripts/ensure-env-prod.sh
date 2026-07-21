@@ -66,16 +66,21 @@ replace_kv "VITE_OLYMPUS_INGRESS_CNAME" "$INGRESS_CNAME"
 if ! [[ -f "$DEPLOY_DIR/.vapid_private.pem" ]]; then
   echo "==> Generating Web Push VAPID keys"
   REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
+  # Docker may have created a directory here if the compose bind-mount was missing a file.
+  if [[ -d "$DEPLOY_DIR/.vapid_private.pem" ]]; then
+    echo "  removing ghost directory deploy/.vapid_private.pem"
+    rm -rf "$DEPLOY_DIR/.vapid_private.pem"
+  fi
   if ! python3 -c "from cryptography.hazmat.primitives.asymmetric import ec" 2>/dev/null; then
     pip3 install --user cryptography >/dev/null 2>&1 || true
   fi
   python3 "$REPO_ROOT/deploy/scripts/generate_vapid_keys.py" || {
-    echo "WARN: VAPID generation failed — pip3 install cryptography"
+    echo "WARN: host VAPID generation failed — API will auto-generate into /app/data on startup"
   }
 fi
 
 if [[ -f "$DEPLOY_DIR/.vapid_private.pem" ]]; then
-  set_kv "WEB_PUSH_VAPID_PRIVATE_KEY_FILE" "/run/secrets/vapid_private.pem"
+  set_kv "WEB_PUSH_VAPID_PRIVATE_KEY_FILE" "/app/data/vapid_private.pem"
   if [[ -f "$DEPLOY_DIR/.vapid_public.key" ]]; then
     pub="$(tr -d '\n' < "$DEPLOY_DIR/.vapid_public.key")"
     replace_kv "WEB_PUSH_VAPID_PUBLIC_KEY" "$pub"
