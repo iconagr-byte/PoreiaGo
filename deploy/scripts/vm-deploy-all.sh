@@ -75,6 +75,13 @@ echo "  APP_HOST=$(grep -E '^APP_HOST=' "$ENV_FILE" 2>/dev/null | head -1 | cut 
 
 $COMPOSE --profile bundled-db up -d postgres redis
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps api-blue
+# Ensure API is on the edge network Traefik uses (recreate can drop attachments).
+API_CID="$($COMPOSE ps -q api-blue)"
+if [[ -n "$API_CID" ]]; then
+  docker network connect aerostride-prod_edge "$API_CID" 2>/dev/null || true
+  echo "  api-blue networks:"
+  docker inspect "$API_CID" --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+fi
 # Recreate Traefik so docker provider reloads API router labels cleanly.
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps traefik
 $COMPOSE --profile bundled-db up -d frontend
