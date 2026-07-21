@@ -15,6 +15,8 @@ assert.equal(sanitizeSettingsSubTab('tenants', true), 'tenants');
 
 const tenantTabs = settingsTabsForRole(false);
 assert.ok(tenantTabs.some((t) => t.id === 'homepage'));
+assert.ok(tenantTabs.some((t) => t.id === 'drivers'));
+assert.equal(sanitizeSettingsSubTab('drivers', false), 'drivers');
 assert.ok(!tenantTabs.some((t) => PLATFORM_ONLY_TAB_IDS.has(t.id) && t.id === 'tenants'));
 assert.equal(tenantTabs.length, TENANT_SETTINGS_TABS.length);
 
