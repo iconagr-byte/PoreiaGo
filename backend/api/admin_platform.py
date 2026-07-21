@@ -196,6 +196,8 @@ async def post_driver(body: FleetDriverCreate):
         d = create_driver(body.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
     return _driver_response(d)
 
 
@@ -213,6 +215,10 @@ async def patch_driver(driver_id: str, body: FleetDriverUpdate):
         d = update_driver(driver_id, body.model_dump(exclude_unset=True))
     except KeyError:
         raise HTTPException(status_code=404, detail="Driver not found") from None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
     return _driver_response(d)
 
 
