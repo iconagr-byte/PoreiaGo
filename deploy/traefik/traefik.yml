@@ -16,7 +16,8 @@ providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
-    network: aerostride-prod_edge
+    # Do not pin a single network name — after recreate Traefik must still
+    # discover api-blue on whatever edge network Compose attached.
   file:
     directory: /etc/traefik/dynamic
     watch: true

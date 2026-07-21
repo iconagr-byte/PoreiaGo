@@ -270,12 +270,17 @@ export async function downloadBackupFile(backupId, filename) {
 }
 
 export async function fetchFleetDrivers(status) {
+  const q = status ? `?status=${status}` : '';
   try {
-    const q = status ? `?status=${status}` : '';
     const res = await adminFetch(`/api/admin/platform/drivers${q}`);
     if (res.ok) return res.json();
-  } catch {
-    /* offline */
+    // Authenticated failures must not swap in demo mocks (hides real drivers e.g. Achilleas).
+    if (getSaasToken()) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Αποτυχία φόρτωσης οδηγών (${res.status})`);
+    }
+  } catch (err) {
+    if (getSaasToken()) throw err;
   }
   return getMockDrivers();
 }
@@ -285,8 +290,12 @@ export async function fetchFleetDriver(driverId) {
     const res = await adminFetch(`/api/admin/platform/drivers/${driverId}`);
     if (res.ok) return res.json();
     if (res.status === 404) return null;
-  } catch {
-    /* offline */
+    if (getSaasToken()) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Αποτυχία φόρτωσης οδηγού (${res.status})`);
+    }
+  } catch (err) {
+    if (getSaasToken()) throw err;
   }
   return getMockDrivers().find((d) => d.id === driverId) || null;
 }

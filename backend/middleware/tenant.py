@@ -89,12 +89,13 @@ ADMIN_PUBLIC_GET_PREFIXES = (
 )
 
 # JSON file-store admin routes — no Postgres tenant gate (local dev / single-tenant file)
+# NOTE: /drivers intentionally NOT listed here — still file-backed, but requires admin JWT
+# so the list is never publicly readable and the UI never falls back to demos without Achilleas.
 FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/site-appearance",
     "/api/admin/platform/settings",
     "/api/admin/platform/branding",
     "/api/admin/platform/seat-pricing",
-    "/api/admin/platform/drivers",  # fleet_drivers.json — bus PWA accounts
 )
 
 

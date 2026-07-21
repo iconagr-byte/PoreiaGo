@@ -17,6 +17,7 @@ import DaySummary from '../../components/driver/DaySummary.jsx';
 import DriverShiftTelemetry from '../../components/driver/DriverShiftTelemetry.jsx';
 import DriverPushPanel from '../../components/driver/DriverPushPanel.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
+import { useDriverShiftSession } from '../../lib/driver/useDriverShiftSession.js';
 
 const TABS = [
   { id: 'home', icon: 'home', label: 'Αρχική', short: 'Αρχ.' },
@@ -113,15 +114,26 @@ export default function DriverCommandCenter() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [authenticated, setAuthenticated] = useState(isSessionValid());
-  const [safetyOk, setSafetyOk] = useState(false);
   const [profileTick, setProfileTick] = useState(0);
   const tab = params.get('tab') || 'home';
+  const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
+  const tripId = session?.tripId;
+  const [safetyOk, setSafetyOk] = useState(() => {
+    const s = getDriverSession();
+    return s?.tripId ? safetyComplete(s.tripId) : false;
+  });
 
   const [onBreak, setOnBreak] = useState(false);
-  const [telemetryOnline, setTelemetryOnline] = useState(
-    () => localStorage.getItem('driver_shift_online') === '1',
-  );
-  const tachograph = useTachograph({ online: telemetryOnline, onBreak });
+  const shift = useDriverShiftSession({
+    driverName: session?.driverName || 'Οδηγός',
+    enabled: authenticated && safetyOk,
+  });
+  const telemetryOnline = shift.online;
+  // Duty clock starts after login + pre-trip — not only on GPS «Έναρξη βάρδιας».
+  const tachograph = useTachograph({
+    active: authenticated && safetyOk,
+    onBreak,
+  });
 
   useEffect(() => {
     document.documentElement.classList.add('driver-route');
@@ -184,12 +196,6 @@ export default function DriverCommandCenter() {
   }, []);
 
   useEffect(() => {
-    const onShift = (e) => setTelemetryOnline(!!e.detail?.online);
-    window.addEventListener('driver-shift-online', onShift);
-    return () => window.removeEventListener('driver-shift-online', onShift);
-  }, []);
-
-  useEffect(() => {
     if (!authenticated) return undefined;
     let cancelled = false;
     fetchDriverMe().then(() => {
@@ -200,9 +206,6 @@ export default function DriverCommandCenter() {
     };
   }, [authenticated]);
 
-  const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
-  const tripId = session?.tripId;
-
   useEffect(() => {
     if (authenticated && tripId) {
       setSafetyOk(safetyComplete(tripId));
@@ -210,10 +213,10 @@ export default function DriverCommandCenter() {
   }, [authenticated, tripId]);
 
   useEffect(() => {
-    if (tachograph.limitReached && telemetryOnline) {
+    if (tachograph.limitReached && authenticated && safetyOk) {
       toast('Required Rest Stop in 15 minutes', { icon: '⏱️', duration: 8000 });
     }
-  }, [tachograph.limitReached, telemetryOnline]);
+  }, [tachograph.limitReached, authenticated, safetyOk]);
 
   const setTab = (id) => {
     setParams({ tab: id });
@@ -227,6 +230,7 @@ export default function DriverCommandCenter() {
 
   const logout = () => {
     toast.dismiss();
+    shift.goOffline({ silent: true });
     clearDriverSession();
     setAuthenticated(false);
     setSafetyOk(false);
@@ -274,30 +278,31 @@ export default function DriverCommandCenter() {
           <TachographStrip
             drivingLabel={tachograph.drivingLabel}
             limitReached={tachograph.limitReached}
+            progressPct={tachograph.progressPct}
+            isCounting={tachograph.isCounting}
+            onBreak={onBreak}
           />
 
-          {telemetryOnline && (
-            <div className="driver-break-bar">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onBreak) {
-                    setOnBreak(false);
-                    tachograph.resetBreak();
-                  } else {
-                    setOnBreak(true);
-                  }
-                }}
-                className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
-                  onBreak
-                    ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
-                    : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
-                }`}
-              >
-                {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
-              </button>
-            </div>
-          )}
+          <div className="driver-break-bar">
+            <button
+              type="button"
+              onClick={() => {
+                if (onBreak) {
+                  setOnBreak(false);
+                  tachograph.resetBreak();
+                } else {
+                  setOnBreak(true);
+                }
+              }}
+              className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
+                onBreak
+                  ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
+                  : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
+              }`}
+            >
+              {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
+            </button>
+          </div>
         </div>
 
         <main className="driver-shell driver-main">
@@ -307,9 +312,10 @@ export default function DriverCommandCenter() {
               <DailyManifest />
             </>
           )}
-          {tab === 'gps' && (
-            <DriverShiftTelemetry driverName={session?.driverName || 'Οδηγός'} />
-          )}
+          {/* Keep GPS panel mounted so tab switches never remount shift UI. */}
+          <div hidden={tab !== 'gps'} aria-hidden={tab !== 'gps'}>
+            <DriverShiftTelemetry shift={shift} />
+          </div>
           {tab === 'scan' && <Scanner />}
           {tab === 'logs' && <ExpenseUpload />}
           {tab === 'sos' && <SOSButton />}
