@@ -17,6 +17,7 @@ import DaySummary from '../../components/driver/DaySummary.jsx';
 import DriverShiftTelemetry from '../../components/driver/DriverShiftTelemetry.jsx';
 import DriverPushPanel from '../../components/driver/DriverPushPanel.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
+import { useDriverShiftSession } from '../../lib/driver/useDriverShiftSession.js';
 
 const TABS = [
   { id: 'home', icon: 'home', label: 'Αρχική', short: 'Αρχ.' },
@@ -113,14 +114,21 @@ export default function DriverCommandCenter() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [authenticated, setAuthenticated] = useState(isSessionValid());
-  const [safetyOk, setSafetyOk] = useState(false);
   const [profileTick, setProfileTick] = useState(0);
   const tab = params.get('tab') || 'home';
+  const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
+  const tripId = session?.tripId;
+  const [safetyOk, setSafetyOk] = useState(() => {
+    const s = getDriverSession();
+    return s?.tripId ? safetyComplete(s.tripId) : false;
+  });
 
   const [onBreak, setOnBreak] = useState(false);
-  const [telemetryOnline, setTelemetryOnline] = useState(
-    () => localStorage.getItem('driver_shift_online') === '1',
-  );
+  const shift = useDriverShiftSession({
+    driverName: session?.driverName || 'Οδηγός',
+    enabled: authenticated && safetyOk,
+  });
+  const telemetryOnline = shift.online;
   const tachograph = useTachograph({ online: telemetryOnline, onBreak });
 
   useEffect(() => {
@@ -184,12 +192,6 @@ export default function DriverCommandCenter() {
   }, []);
 
   useEffect(() => {
-    const onShift = (e) => setTelemetryOnline(!!e.detail?.online);
-    window.addEventListener('driver-shift-online', onShift);
-    return () => window.removeEventListener('driver-shift-online', onShift);
-  }, []);
-
-  useEffect(() => {
     if (!authenticated) return undefined;
     let cancelled = false;
     fetchDriverMe().then(() => {
@@ -199,9 +201,6 @@ export default function DriverCommandCenter() {
       cancelled = true;
     };
   }, [authenticated]);
-
-  const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
-  const tripId = session?.tripId;
 
   useEffect(() => {
     if (authenticated && tripId) {
@@ -227,6 +226,7 @@ export default function DriverCommandCenter() {
 
   const logout = () => {
     toast.dismiss();
+    shift.goOffline({ silent: true });
     clearDriverSession();
     setAuthenticated(false);
     setSafetyOk(false);
@@ -307,9 +307,7 @@ export default function DriverCommandCenter() {
               <DailyManifest />
             </>
           )}
-          {tab === 'gps' && (
-            <DriverShiftTelemetry driverName={session?.driverName || 'Οδηγός'} />
-          )}
+          {tab === 'gps' && <DriverShiftTelemetry shift={shift} />}
           {tab === 'scan' && <Scanner />}
           {tab === 'logs' && <ExpenseUpload />}
           {tab === 'sos' && <SOSButton />}
