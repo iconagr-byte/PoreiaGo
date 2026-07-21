@@ -21,15 +21,17 @@ export async function postTelemetryUpdate(payload) {
 }
 
 export async function fetchLiveFleet(authHeaders = adminAuthHeaders()) {
-  try {
-    const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
-      headers: authHeaders,
-    });
-    if (res.ok) return res.json();
-    // Do not fall back to mock when authenticated — empty list is honest.
-    if (authHeaders?.Authorization) return [];
-  } catch {
-    if (authHeaders?.Authorization) return [];
+  const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
+    headers: authHeaders,
+  });
+  if (res.ok) {
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  }
+  // Authenticated failures must not fall back to mock fleet (hides real LIVE drivers).
+  if (authHeaders?.Authorization) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Αποτυχία live στόλου (${res.status})`);
   }
   return getMockFleet();
 }

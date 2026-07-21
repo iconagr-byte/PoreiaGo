@@ -27,8 +27,8 @@ function normalizeVehicle(msg, id, prev) {
   const targetLat = Number(msg.lat ?? msg.latitude);
   const targetLng = Number(msg.lng ?? msg.longitude);
   if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng)) return null;
-  const prevLat = prev?.lat ?? targetLat;
-  const prevLng = prev?.lng ?? targetLng;
+  const prevLat = Number.isFinite(prev?.lat) ? prev.lat : targetLat;
+  const prevLng = Number.isFinite(prev?.lng) ? prev.lng : targetLng;
   return {
     id,
     vehicle_id: msg.vehicle_id || id,
@@ -74,170 +74,150 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
       window.removeEventListener('saas-session-changed', syncTenant);
     };
   }, [tenantIdProp]);
+
   const [vehicles, setVehicles] = useState({});
   const [connected, setConnected] = useState(false);
   const [transport, setTransport] = useState('connecting'); // ws | poll | connecting
+  const [pollError, setPollError] = useState('');
+  const [lastPollAt, setLastPollAt] = useState(null);
   const wsRef = useRef(null);
 
-  // Prefer WebSocket; fall back to REST poll when WS is blocked (prod Traefik/proxy 404).
+  // HTTP poll is primary in production — Traefik often 404s WebSocket upgrades.
   useEffect(() => {
     let closed = false;
     let pollTimer = null;
-    let fallbackTimer = null;
-    let mode = 'connecting';
+    let ws = null;
+    let mode = 'poll';
 
-    const applyRows = (rows) => {
+    const applyRows = (rows, { replace = true } = {}) => {
       if (!Array.isArray(rows)) return;
       setVehicles((prev) => {
-        // When WS is also feeding, merge poll rows without wiping fresher WS points.
-        const map = mode === 'ws' ? { ...prev } : {};
+        const map = replace ? {} : { ...prev };
         rows.forEach((row) => {
           const id = vehicleIdFromRow(row);
-          const normalized = normalizeVehicle(row, id, map[id]);
+          const normalized = normalizeVehicle(row, id, map[id] || prev[id]);
           if (normalized) map[id] = normalized;
         });
         return map;
       });
     };
 
-    const startPoll = (reason, { asPrimary = true } = {}) => {
-      if (closed) return;
-      if (asPrimary) {
-        mode = 'poll';
-        setTransport('poll');
-        setConnected(true);
-      }
-      if (pollTimer) {
-        if (import.meta.env.DEV) {
-          console.info('[fleet] HTTP poll already running', reason);
-        }
+    const tick = () => {
+      const headers = adminAuthHeaders();
+      if (!headers.Authorization && !getSaasToken()) {
+        setPollError('Απαιτείται σύνδεση admin για τον live χάρτη');
+        setConnected(false);
         return;
       }
-      const tick = () => {
-        fetchLiveFleet(adminAuthHeaders())
-          .then((rows) => {
-            if (!closed) applyRows(rows);
-          })
-          .catch(() => {});
-      };
-      tick();
-      pollTimer = window.setInterval(tick, 4000);
-      if (import.meta.env.DEV) {
-        console.info('[fleet] HTTP poll', reason);
-      }
+      fetchLiveFleet(headers)
+        .then((rows) => {
+          if (closed) return;
+          if (!Array.isArray(rows)) {
+            setPollError('Μη έγκυρη απάντηση live fleet');
+            return;
+          }
+          applyRows(rows, { replace: true });
+          setPollError('');
+          setLastPollAt(new Date());
+          setConnected(true);
+          if (mode !== 'ws') {
+            mode = 'poll';
+            setTransport('poll');
+          }
+        })
+        .catch((err) => {
+          if (closed) return;
+          setPollError(err?.message || 'Αποτυχία φόρτωσης live στόλου');
+        });
     };
 
+    // Start poll immediately — do not wait for WebSocket.
+    setTransport('poll');
+    tick();
+    pollTimer = window.setInterval(tick, 3000);
+
     const url = buildWsUrl(`/ws/telemetry/egress/${tenantId}`);
-    let ws;
     try {
       ws = new WebSocket(url);
       wsRef.current = ws;
-    } catch (err) {
-      startPoll(err?.message || 'ws_unavailable');
-      return () => {
-        closed = true;
+    } catch {
+      ws = null;
+    }
+
+    if (ws) {
+      ws.onopen = () => {
+        if (closed) return;
+        mode = 'ws';
+        setTransport('ws');
+        setConnected(true);
+      };
+      ws.onclose = () => {
+        if (closed) return;
+        if (mode === 'ws') {
+          mode = 'poll';
+          setTransport('poll');
+        }
+      };
+      ws.onerror = () => {
+        /* poll already running */
+      };
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === 'fleet_snapshot' && Array.isArray(msg.vehicles)) {
+            // Never wipe HTTP poll data with an empty WS snapshot.
+            if (!msg.vehicles.length) return;
+            applyRows(msg.vehicles, { replace: true });
+            return;
+          }
+          if (msg.type === 'fleet_location') {
+            const id = vehicleIdFromRow(msg);
+            setVehicles((prev) => {
+              const normalized = normalizeVehicle(msg, id, prev[id]);
+              if (!normalized) return prev;
+              return { ...prev, [id]: normalized };
+            });
+            return;
+          }
+          if (msg.type === 'fleet_driver_offline') {
+            const id = vehicleIdFromRow(msg);
+            setVehicles((prev) => {
+              if (!prev[id]) {
+                const matchKey = Object.keys(prev).find(
+                  (k) =>
+                    prev[k].driver_id === msg.driver_id &&
+                    String(prev[k].trip_id) === String(msg.trip_id),
+                );
+                if (!matchKey) return prev;
+                const next = { ...prev };
+                delete next[matchKey];
+                return next;
+              }
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            });
+          }
+        } catch {
+          // ignore malformed frames
+        }
       };
     }
 
-    ws.onopen = () => {
-      if (closed) return;
-      if (fallbackTimer) {
-        window.clearTimeout(fallbackTimer);
-        fallbackTimer = null;
-      }
-      mode = 'ws';
-      setTransport('ws');
-      setConnected(true);
-      // Always seed/refresh from REST — WS upgrades are often blocked in prod,
-      // and even when open the in-memory snapshot can be empty on this worker.
-      startPoll('ws_open_seed', { asPrimary: false });
-    };
-    ws.onclose = () => {
-      if (closed) return;
-      setConnected(false);
-      if (mode === 'ws' || mode === 'connecting') {
-        startPoll('ws_closed');
-      }
-    };
-    ws.onerror = () => {
-      if (closed) return;
-      setConnected(false);
-      startPoll('ws_error');
-    };
-
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data);
-        if (msg.type === 'fleet_snapshot' && Array.isArray(msg.vehicles)) {
-          const map = {};
-          msg.vehicles.forEach((v) => {
-            const id = vehicleIdFromRow(v);
-            const normalized = normalizeVehicle(v, id);
-            if (normalized) map[id] = normalized;
-          });
-          setVehicles(map);
-          return;
-        }
-        if (msg.type === 'fleet_location') {
-          const id = vehicleIdFromRow(msg);
-          setVehicles((prev) => {
-            const previous = prev[id];
-            const normalized = normalizeVehicle(msg, id, previous);
-            if (!normalized) return prev;
-            return {
-              ...prev,
-              [id]: normalized,
-            };
-          });
-          return;
-        }
-        if (msg.type === 'fleet_driver_offline') {
-          const id = vehicleIdFromRow(msg);
-          setVehicles((prev) => {
-            if (!prev[id]) {
-              const matchKey = Object.keys(prev).find(
-                (k) => prev[k].driver_id === msg.driver_id && String(prev[k].trip_id) === String(msg.trip_id),
-              );
-              if (!matchKey) return prev;
-              const next = { ...prev };
-              delete next[matchKey];
-              return next;
-            }
-            const next = { ...prev };
-            delete next[id];
-            return next;
-          });
-        }
-      } catch {
-        // ignore malformed frames
-      }
-    };
-
-    fallbackTimer = window.setTimeout(() => {
-      if (!closed && mode === 'connecting') {
-        try {
-          ws.close();
-        } catch {
-          /* ignore */
-        }
-        startPoll('ws_timeout');
-      }
-    }, 2500);
-
-    const ping = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.send('ping');
+    const ping = window.setInterval(() => {
+      if (ws?.readyState === WebSocket.OPEN) ws.send('ping');
     }, 25000);
 
     return () => {
       closed = true;
-      if (fallbackTimer) window.clearTimeout(fallbackTimer);
       if (pollTimer) window.clearInterval(pollTimer);
-      clearInterval(ping);
+      window.clearInterval(ping);
       try {
-        ws.close();
+        ws?.close();
       } catch {
         /* ignore */
       }
+      wsRef.current = null;
     };
   }, [tenantId]);
 
@@ -248,8 +228,10 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
       vehicles: Object.values(vehicles),
       vehicleMap: vehicles,
       tenantId,
+      pollError,
+      lastPollAt,
     }),
-    [connected, transport, vehicles, tenantId],
+    [connected, transport, vehicles, tenantId, pollError, lastPollAt],
   );
 
   return <FleetTelemetryContext.Provider value={value}>{children}</FleetTelemetryContext.Provider>;
