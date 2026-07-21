@@ -76,6 +76,15 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
     idle_sec = _idling.trip_idle_seconds(vehicle_id)
     _live.apply_update(vehicle_id, update, idle_seconds=idle_sec)
 
+    try:
+        from travel_platform.telemetry.live_fleet_redis import save_live_vehicle
+
+        meta = _live._vehicles.get(str(vehicle_id), {})
+        if meta:
+            await save_live_vehicle(meta)
+    except Exception:
+        logger.debug("live fleet Redis save skipped", exc_info=True)
+
     return NormalizedTelemetry(
         update=update,
         vehicle_id=vehicle_id,

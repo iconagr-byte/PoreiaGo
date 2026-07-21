@@ -53,6 +53,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   const sensorsRef = useRef(null);
   const linkedOnlineRef = useRef(false);
   const runningRef = useRef(false);
+  const gotGpsFixRef = useRef(false);
   const driverNameRef = useRef(driverName);
   const enabledRef = useRef(enabled);
   const startingRef = useRef(false);
@@ -70,6 +71,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     wakeRef.current = null;
     runningRef.current = false;
     linkedOnlineRef.current = false;
+    gotGpsFixRef.current = false;
     startingRef.current = false;
   }, []);
 
@@ -187,12 +189,24 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
               sensors: sensorsRef.current,
             });
             const sent = conn.send(payload);
-            if (sent) setGpsError('');
+            if (sent) {
+              gotGpsFixRef.current = true;
+              setGpsError('');
+              setLastPing(new Date());
+            }
           },
           onError: (err) => {
             setGpsError(geolocationErrorToGreek(err, { isIos: iosEnv.isIos }));
           },
         });
+
+        // Warn if the phone never grants a GPS fix (map stays empty).
+        window.setTimeout(() => {
+          if (!linkedOnlineRef.current || gotGpsFixRef.current) return;
+          setGpsError(
+            'Δεν ελήφθη ακόμα θέση GPS — ελέγξτε άδεια τοποθεσίας και ότι το GPS του κινητού είναι ανοιχτό',
+          );
+        }, 12000);
 
         markOnline();
         if (!resume) {
