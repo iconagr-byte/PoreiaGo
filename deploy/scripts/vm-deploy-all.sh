@@ -66,27 +66,47 @@ docker build -t "$API_IMAGE" "$REPO_ROOT/backend"
 echo "==> Pull Traefik (Docker 29 compat)"
 docker pull traefik:v3.6.6
 
-echo "==> Docker Compose up (force recreate API so new image is used)"
+echo "==> Docker Compose up (recreate API + bounce Traefik routing)"
 cd "$DEPLOY_DIR"
+# Show the host Traefik will match — empty API_HOST previously broke public routing.
+API_HOST_VAL="$(grep -E '^API_HOST=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+echo "  API_HOST=${API_HOST_VAL:-<unset>}"
+echo "  APP_HOST=$(grep -E '^APP_HOST=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+
+$COMPOSE --profile bundled-db up -d postgres redis
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps api-blue
-$COMPOSE --profile bundled-db up -d traefik frontend postgres redis
+# Recreate Traefik so docker provider reloads API router labels cleanly.
+$COMPOSE --profile bundled-db up -d --force-recreate --no-deps traefik
+$COMPOSE --profile bundled-db up -d frontend
 
 echo "==> Waiting for API health"
+api_ok=0
 for i in $(seq 1 40); do
   if curl -sf "$API_BASE/health" >/dev/null 2>&1; then
     echo "  API healthy (public)"
+    api_ok=1
     break
   fi
   if $COMPOSE exec -T api-blue python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" >/dev/null 2>&1; then
     echo "  API process up (Traefik catching up… try $i)"
+  else
+    echo "  waiting for api-blue… try $i"
   fi
   sleep 3
-  if [[ "$i" -eq 40 ]]; then
-    echo "WARN: API health check timeout — see: $COMPOSE logs api-blue --tail 80"
-    $COMPOSE logs api-blue --tail 80 || true
-    $COMPOSE ps || true
-  fi
 done
+
+if [[ "$api_ok" -ne 1 ]]; then
+  echo "ERROR: Public API health failed for $API_BASE"
+  echo "==> api-blue labels"
+  docker inspect "$($COMPOSE ps -q api-blue)" --format '{{json .Config.Labels}}' 2>/dev/null | python3 -m json.tool || true
+  echo "==> compose ps"
+  $COMPOSE ps || true
+  echo "==> api-blue logs"
+  $COMPOSE logs api-blue --tail 80 || true
+  echo "==> traefik logs"
+  $COMPOSE logs traefik --tail 80 || true
+  exit 1
+fi
 
 if [[ "${RUN_SEED:-0}" == "1" ]]; then
   echo "==> Seeding demo admin (RUN_SEED=1)"
