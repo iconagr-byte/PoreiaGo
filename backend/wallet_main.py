@@ -1,5 +1,6 @@
 """Lightweight API — My Wallet (auth + bookings). Includes SaaS admin auth on /api/v1."""
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -38,6 +39,20 @@ try:
     from app.api.router import saas_router
 except ImportError:
     saas_router = None
+
+_DEFAULT_CORS_ORIGINS = (
+    "https://www.poreiago.com,"
+    "https://poreiago.com,"
+    "http://localhost:5173,"
+    "http://localhost:3000,"
+    "http://127.0.0.1:5173,"
+    "http://127.0.0.1:3000"
+)
+
+
+def _cors_origins() -> list[str]:
+    raw = (os.getenv("CORS_ORIGINS") or _DEFAULT_CORS_ORIGINS).strip()
+    return [o.strip() for o in raw.split(",") if o.strip()]
 
 try:
     from api.driver_portal import router as driver_portal_router
@@ -103,15 +118,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS outermost so preflight/401 responses get Access-Control-* headers.
+app.add_middleware(TenantContextMiddleware)
+app.add_middleware(DomainTenantMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(TenantContextMiddleware)
-app.add_middleware(DomainTenantMiddleware)
 
 app.include_router(wallet_compat_router)
 app.include_router(admin_bookings_router)

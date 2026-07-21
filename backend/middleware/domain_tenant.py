@@ -62,6 +62,9 @@ class DomainTenantMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path
+        # Let CORSMiddleware answer preflight without domain/tenant lookup.
+        if request.method == "OPTIONS":
+            return await call_next(request)
         if any(path.startswith(p) for p in PUBLIC_HOST_PATHS):
             return await call_next(request)
         if any(path.startswith(p) for p in JWT_SCOPED_PREFIXES):
