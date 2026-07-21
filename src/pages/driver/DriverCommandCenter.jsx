@@ -65,7 +65,7 @@ function DriverHeader({ session, telemetryOnline, onLogout, kicker, title }) {
             </div>
           )}
         </div>
-        <div className="min-w-0">
+        <div className="driver-header-copy min-w-0">
           <p className="driver-header-kicker truncate">{kicker || name}</p>
           <p className="driver-header-title truncate">
             {title || plate || (session?.tripId ? `Βάρδια #${session.tripId}` : 'Βάρδια')}
