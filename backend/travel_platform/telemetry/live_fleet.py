@@ -145,6 +145,36 @@ class LiveFleetService:
             )
         return out
 
+    def list_active_for_admin(self, tenant_id: UUID) -> list[LiveVehicleState]:
+        """
+        Active vehicles for the admin map.
+
+        Also includes GPS still keyed under the legacy demo tenant
+        (…0001) from older driver password-login sessions, so LIVE
+        drivers like Achilleas appear before they re-login.
+        """
+        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
+        primary = self.list_active(tenant_id)
+        demo = UUID(DEFAULT_TENANT)
+        if str(tenant_id) == str(demo):
+            return primary
+
+        legacy = self.list_active(demo)
+        if not legacy:
+            return primary
+
+        seen_ids = {v.vehicle_id for v in primary if v.vehicle_id}
+        seen_codes = {v.vehicle_code for v in primary if v.vehicle_code}
+        merged = list(primary)
+        for v in legacy:
+            if v.vehicle_id and v.vehicle_id in seen_ids:
+                continue
+            if v.vehicle_code and v.vehicle_code in seen_codes:
+                continue
+            merged.append(v)
+        return merged
+
     def vehicle_meta(self, tenant_id: UUID, vehicle_id: str) -> dict:
         meta = self._vehicles.get(vehicle_id, {})
         if meta.get("tenant_id") != str(tenant_id):
