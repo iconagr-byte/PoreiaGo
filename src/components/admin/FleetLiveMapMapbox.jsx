@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Map, { Marker, Popup, useMap } from 'react-map-gl/mapbox';
+import Map, { Marker, Popup, NavigationControl, useMap } from 'react-map-gl/mapbox';
 import { LngLatBounds } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import '../../styles/fleet-live-map.css';
 import { MAPBOX_STYLE, MAPBOX_TOKEN } from '../../lib/maps/mapboxConfig.js';
 import { useAnimatedFleetVehicles } from '../../hooks/useAnimatedFleetVehicles.js';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import FleetGeofenceMapboxLayers from './FleetGeofenceMapboxLayers.jsx';
 import FleetSosPinsMapbox from './FleetSosPinsMapbox.jsx';
 import FleetMapFlyToMapbox from './FleetMapFlyToMapbox.jsx';
+import GreecePlacesMapboxLayer from './GreecePlacesMapboxLayer.jsx';
 import {
   formatBoardingLabel,
   formatPassengerNames,
@@ -24,7 +26,7 @@ function HeatmapDots({ points = [], visible = true }) {
     return (
       <Marker key={`heat-${p.lat}-${p.lng}-${i}`} longitude={p.lng} latitude={p.lat} anchor="center">
         <div
-          className="rounded-full border border-orange-500 bg-red-500/40"
+          className="rounded-full border border-orange-400/60 bg-red-400/35"
           style={{
             width: `${16 * scale}px`,
             height: `${16 * scale}px`,
@@ -41,21 +43,19 @@ function BusMarker({ vehicle }) {
   const img = resolveFleetMarkerImage(vehicle);
   return (
     <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={() => setOpen(true)}>
-      <button type="button" className="relative cursor-pointer border-0 bg-transparent p-0" onClick={() => setOpen(true)}>
-        <div className="relative h-[52px] w-[52px] drop-shadow-[0_8px_18px_rgba(15,23,42,0.28)]">
-          <div className="h-full w-full overflow-hidden rounded-full border-[3px] border-slate-50 bg-slate-900 ring-2 ring-slate-900">
-            <img src={img} alt="" className="h-full w-full object-cover" />
+      <button type="button" className="fleet-apple-bus-pin border-0 bg-transparent p-0" onClick={() => setOpen(true)}>
+        <div className="fleet-apple-bus-pin__ring">
+          <div className="fleet-apple-bus-pin__avatar">
+            <img src={img} alt="" />
           </div>
-          <div className="pointer-events-none absolute inset-[-4px] rounded-full border-2 border-amber-300" />
           <div
-            className="pointer-events-none absolute left-1/2 top-[-2px] h-0 w-0 -translate-x-1/2 border-x-[5px] border-b-[8px] border-x-transparent border-b-amber-300"
+            className="fleet-apple-bus-pin__heading"
             style={{
               transform: `translateX(-50%) rotate(${vehicle.heading ?? 0}deg)`,
-              transformOrigin: '50% 30px',
             }}
           />
         </div>
-        <div className="absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-bold text-white shadow">
+        <div className="fleet-apple-bus-pill">
           {vehicle.driver_name} · {Math.round(vehicle.speed || 0)} km/h
         </div>
       </button>
@@ -64,16 +64,16 @@ function BusMarker({ vehicle }) {
           longitude={vehicle.lng}
           latitude={vehicle.lat}
           anchor="top"
-          offset={28}
+          offset={34}
           onClose={() => setOpen(false)}
           closeOnClick={false}
         >
-          <div className="min-w-[180px] text-sm">
+          <div className="fleet-apple-popup p-3 text-sm">
             <div className="mb-2 flex items-center gap-2.5">
-              <img src={img} alt="" className="h-12 w-12 rounded-xl object-cover" />
+              <img src={img} alt="" className="h-12 w-12 rounded-[14px] object-cover" />
               <div>
-                <div className="font-bold">{vehicle.driver_name}</div>
-                <div className="text-xs text-slate-500">{vehicle.bus_plate}</div>
+                <div className="fleet-apple-popup__title">{vehicle.driver_name}</div>
+                <div className="fleet-apple-popup__meta">{vehicle.bus_plate}</div>
               </div>
             </div>
             <div>Ταχύτητα: {Math.round(vehicle.speed || 0)} km/h</div>
@@ -143,13 +143,13 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
       }
     });
     if (bounds.isEmpty()) return;
-    mapInstance.fitBounds(bounds, { padding: 64, maxZoom: 14, duration: force ? 600 : 0 });
+    mapInstance.fitBounds(bounds, { padding: 72, maxZoom: 13, duration: force ? 700 : 0 });
   }, [vehicles, map, fitNonce]);
 
   return null;
 }
 
-/** Mapbox GL — react-map-gl με ομαλή κίνηση δεικτών. */
+/** Mapbox GL — light Apple aesthetic + ελληνικές ετικέτες. */
 export default function FleetLiveMapMapbox({
   vehicles,
   heatmap = [],
@@ -159,17 +159,18 @@ export default function FleetLiveMapMapbox({
   sosAlerts = [],
   showGeofence = false,
   showSosPins = true,
+  showPlaces = true,
   focusSosAlert = null,
   fitNonce = 0,
 }) {
   const initialViewState = useMemo(() => {
     if (vehicles.length) {
-      return { longitude: vehicles[0].lng, latitude: vehicles[0].lat, zoom: 10 };
+      return { longitude: vehicles[0].lng, latitude: vehicles[0].lat, zoom: 9.5 };
     }
     if (sosAlerts.length) {
-      return { longitude: sosAlerts[0].lng, latitude: sosAlerts[0].lat, zoom: 12 };
+      return { longitude: sosAlerts[0].lng, latitude: sosAlerts[0].lat, zoom: 11 };
     }
-    return { longitude: 23.0, latitude: 38.5, zoom: 7 };
+    return { longitude: 23.5, latitude: 38.3, zoom: 6.2 };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initial only
 
   const fitVehicles = useMemo(() => {
@@ -184,7 +185,10 @@ export default function FleetLiveMapMapbox({
       mapStyle={MAPBOX_STYLE}
       style={{ width: '100%', height: '100%' }}
       attributionControl
+      logoPosition="bottom-right"
     >
+      <NavigationControl position="top-right" showCompass visualizePitch={false} />
+      <GreecePlacesMapboxLayer visible={showPlaces} />
       <FitBounds vehicles={fitVehicles} fitNonce={fitNonce} />
       {focusSosAlert ? <FleetMapFlyToMapbox alert={focusSosAlert} /> : null}
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
