@@ -1,14 +1,11 @@
 /**
- * Driver PWA — HTML5 geolocation watchPosition (high accuracy, ~4s interval).
+ * Driver PWA — HTML5 geolocation watchPosition (high accuracy, every 5s).
  */
 
 import { detectIosDevice, iosGeolocationOptions } from './iosPwaGps.js';
 
-const DEFAULT_INTERVAL_MS = 4000;
-
-export function isGeolocationSupported() {
-  return typeof navigator !== 'undefined' && 'geolocation' in navigator;
-}
+/** How often the driver app pushes GPS to the platform. */
+export const DRIVER_GPS_INTERVAL_MS = 5000;
 
 /**
  * @param {object} options
@@ -17,26 +14,51 @@ export function isGeolocationSupported() {
  * @param {number} [options.intervalMs]
  * @returns {() => void} stop function
  */
-export function startDriverGeolocationWatch({ onPosition, onError, intervalMs = DEFAULT_INTERVAL_MS }) {
+export function startDriverGeolocationWatch({
+  onPosition,
+  onError,
+  intervalMs = DRIVER_GPS_INTERVAL_MS,
+} = {}) {
   if (!isGeolocationSupported()) {
     onError?.({ code: 0, message: 'Geolocation not supported' });
     return () => {};
   }
 
   const isIos = detectIosDevice();
-  const geoOptions = iosGeolocationOptions(isIos);
+  const geoOptions = {
+    ...iosGeolocationOptions(isIos),
+    // Prefer a fresh fix at least as often as we publish.
+    maximumAge: Math.min(intervalMs, isIos ? 5000 : 4000),
+  };
+
+  let lastEmitAt = 0;
+  let lastPos = null;
+
+  const emit = (pos, { force = false } = {}) => {
+    if (!pos) return;
+    lastPos = pos;
+    const now = Date.now();
+    if (!force && lastEmitAt && now - lastEmitAt < intervalMs) {
+      return;
+    }
+    lastEmitAt = now;
+    onPosition(pos);
+  };
 
   const watchId = navigator.geolocation.watchPosition(
-    (pos) => onPosition(pos),
+    (pos) => emit(pos),
     (err) => onError?.(err),
     geoOptions,
   );
 
-  // Some browsers throttle watchPosition — poll as backup every intervalMs
+  // Guarantee a platform update every intervalMs even if watchPosition is quiet.
   const pollId = window.setInterval(() => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => onPosition(pos),
-      () => {},
+      (pos) => emit(pos, { force: true }),
+      () => {
+        // If getCurrentPosition fails, re-send last known fix so the map stays alive.
+        if (lastPos) emit(lastPos, { force: true });
+      },
       { ...geoOptions, maximumAge: intervalMs, timeout: isIos ? 18000 : 12000 },
     );
   }, intervalMs);
@@ -45,6 +67,10 @@ export function startDriverGeolocationWatch({ onPosition, onError, intervalMs = 
     navigator.geolocation.clearWatch(watchId);
     window.clearInterval(pollId);
   };
+}
+
+export function isGeolocationSupported() {
+  return typeof navigator !== 'undefined' && 'geolocation' in navigator;
 }
 
 export function positionToTelemetryPayload(position, session, extras = {}) {
