@@ -49,6 +49,7 @@ services:
       - traefik.http.routers.api.tls.certresolver=letsencrypt
       - traefik.http.services.api.loadbalancer.server.port=8000
       - traefik.http.services.api.loadbalancer.sticky.cookie=true
+      - traefik.http.services.api.loadbalancer.responseforwarding.flushinterval=1ms
     networks:
       - edge
       - internal

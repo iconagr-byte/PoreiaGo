@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { buildWsUrl } from '../lib/wsUrl.js';
 import { getSaasTenantId, getSaasToken } from '../services/saasApi.js';
 import { decodeJwtPayload, getImpersonationTarget } from '../lib/saasJwt.js';
+import { fetchLiveFleet } from '../services/telemetryApi.js';
+import { adminAuthHeaders } from '../services/adminApi.js';
 
 export const DEMO_TENANT = import.meta.env.VITE_DEMO_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 
@@ -22,8 +24,9 @@ export function resolveFleetTenantId() {
 const FleetTelemetryContext = createContext(null);
 
 function normalizeVehicle(msg, id, prev) {
-  const targetLat = Number(msg.lat);
-  const targetLng = Number(msg.lng);
+  const targetLat = Number(msg.lat ?? msg.latitude);
+  const targetLng = Number(msg.lng ?? msg.longitude);
+  if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng)) return null;
   const prevLat = prev?.lat ?? targetLat;
   const prevLng = prev?.lng ?? targetLng;
   return {
@@ -42,13 +45,17 @@ function normalizeVehicle(msg, id, prev) {
     prevLng,
     speed: msg.speed ?? msg.speed_kmh ?? 0,
     heading: msg.heading ?? msg.heading_deg,
-    timestamp: msg.timestamp,
+    timestamp: msg.timestamp || msg.updated_at,
     accuracy_m: msg.accuracy_m ?? null,
     altitude_m: msg.altitude_m ?? null,
     boarding: msg.boarding ?? null,
     sensors: msg.sensors ?? null,
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
+}
+
+function vehicleIdFromRow(v) {
+  return v.vehicle_id || v.driver_id || `${v.bus_plate || v.vehicle_code || 'bus'}-${v.trip_id || '0'}`;
 }
 
 export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
@@ -69,16 +76,82 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
   }, [tenantIdProp]);
   const [vehicles, setVehicles] = useState({});
   const [connected, setConnected] = useState(false);
+  const [transport, setTransport] = useState('connecting'); // ws | poll | connecting
   const wsRef = useRef(null);
 
+  // Prefer WebSocket; fall back to REST poll when WS is blocked (prod Traefik/proxy 404).
   useEffect(() => {
-    const url = buildWsUrl(`/ws/telemetry/egress/${tenantId}`);
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
+    let closed = false;
+    let pollTimer = null;
+    let fallbackTimer = null;
+    let mode = 'connecting';
 
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
+    const applyRows = (rows) => {
+      if (!Array.isArray(rows)) return;
+      setVehicles(() => {
+        const map = {};
+        rows.forEach((row) => {
+          const id = vehicleIdFromRow(row);
+          const normalized = normalizeVehicle(row, id);
+          if (normalized) map[id] = normalized;
+        });
+        return map;
+      });
+    };
+
+    const startPoll = (reason) => {
+      if (closed || mode === 'poll') return;
+      mode = 'poll';
+      setTransport('poll');
+      setConnected(true);
+      const tick = () => {
+        fetchLiveFleet(adminAuthHeaders())
+          .then((rows) => {
+            if (!closed) applyRows(rows);
+          })
+          .catch(() => {});
+      };
+      tick();
+      pollTimer = window.setInterval(tick, 4000);
+      if (import.meta.env.DEV) {
+        console.info('[fleet] HTTP poll fallback', reason);
+      }
+    };
+
+    const url = buildWsUrl(`/ws/telemetry/egress/${tenantId}`);
+    let ws;
+    try {
+      ws = new WebSocket(url);
+      wsRef.current = ws;
+    } catch (err) {
+      startPoll(err?.message || 'ws_unavailable');
+      return () => {
+        closed = true;
+      };
+    }
+
+    ws.onopen = () => {
+      if (closed) return;
+      if (fallbackTimer) {
+        window.clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
+      mode = 'ws';
+      setTransport('ws');
+      setConnected(true);
+    };
+    ws.onclose = () => {
+      if (closed) return;
+      setConnected(false);
+      if (mode === 'ws' || mode === 'connecting') {
+        startPoll('ws_closed');
+      }
+    };
+    ws.onerror = () => {
+      if (closed) return;
+      setConnected(false);
+      startPoll('ws_error');
+    };
 
     ws.onmessage = (ev) => {
       try {
@@ -86,25 +159,28 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
         if (msg.type === 'fleet_snapshot' && Array.isArray(msg.vehicles)) {
           const map = {};
           msg.vehicles.forEach((v) => {
-            const id = v.vehicle_id || `${v.bus_plate}-${v.trip_id}`;
-            map[id] = normalizeVehicle(v, id);
+            const id = vehicleIdFromRow(v);
+            const normalized = normalizeVehicle(v, id);
+            if (normalized) map[id] = normalized;
           });
           setVehicles(map);
           return;
         }
         if (msg.type === 'fleet_location') {
-          const id = msg.vehicle_id || msg.driver_id || `${msg.bus_plate}-${msg.trip_id}`;
+          const id = vehicleIdFromRow(msg);
           setVehicles((prev) => {
             const previous = prev[id];
+            const normalized = normalizeVehicle(msg, id, previous);
+            if (!normalized) return prev;
             return {
               ...prev,
-              [id]: normalizeVehicle(msg, id, previous),
+              [id]: normalized,
             };
           });
           return;
         }
         if (msg.type === 'fleet_driver_offline') {
-          const id = msg.vehicle_id || msg.driver_id || `${msg.bus_plate || 'bus'}-${msg.trip_id}`;
+          const id = vehicleIdFromRow(msg);
           setVehicles((prev) => {
             if (!prev[id]) {
               const matchKey = Object.keys(prev).find(
@@ -125,24 +201,43 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
       }
     };
 
+    fallbackTimer = window.setTimeout(() => {
+      if (!closed && mode === 'connecting') {
+        try {
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+        startPoll('ws_timeout');
+      }
+    }, 2500);
+
     const ping = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) ws.send('ping');
     }, 25000);
 
     return () => {
+      closed = true;
+      if (fallbackTimer) window.clearTimeout(fallbackTimer);
+      if (pollTimer) window.clearInterval(pollTimer);
       clearInterval(ping);
-      ws.close();
+      try {
+        ws.close();
+      } catch {
+        /* ignore */
+      }
     };
   }, [tenantId]);
 
   const value = useMemo(
     () => ({
       connected,
+      transport,
       vehicles: Object.values(vehicles),
       vehicleMap: vehicles,
       tenantId,
     }),
-    [connected, vehicles, tenantId],
+    [connected, transport, vehicles, tenantId],
   );
 
   return <FleetTelemetryContext.Provider value={value}>{children}</FleetTelemetryContext.Provider>;

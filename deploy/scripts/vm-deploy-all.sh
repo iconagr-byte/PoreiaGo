@@ -66,9 +66,10 @@ docker build -t "$API_IMAGE" "$REPO_ROOT/backend"
 echo "==> Pull Traefik (Docker 29 compat)"
 docker pull traefik:v3.6.6
 
-echo "==> Docker Compose up"
+echo "==> Docker Compose up (force recreate API so new image is used)"
 cd "$DEPLOY_DIR"
-$COMPOSE --profile bundled-db up -d traefik api-blue frontend postgres redis
+$COMPOSE --profile bundled-db up -d --force-recreate --no-deps api-blue
+$COMPOSE --profile bundled-db up -d traefik frontend postgres redis
 
 echo "==> Waiting for API health"
 for i in $(seq 1 30); do

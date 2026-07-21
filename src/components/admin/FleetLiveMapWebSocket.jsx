@@ -11,7 +11,7 @@ import FleetEtaPanel from './FleetEtaPanel.jsx';
 
 /** Ζωντανός χάρτης στόλου — Mapbox αν υπάρχει token, αλλιώς Leaflet. */
 export default function FleetLiveMapWebSocket() {
-  const { connected, vehicles, tenantId } = useFleetTelemetryEgress();
+  const { connected, vehicles, tenantId, transport } = useFleetTelemetryEgress();
   const mapbox = isMapboxEnabled();
   const [showHeat, setShowHeat] = useState(true);
   const [heatDays, setHeatDays] = useState(7);
@@ -71,8 +71,13 @@ export default function FleetLiveMapWebSocket() {
         <div>
           <h2 className="font-headline-md font-bold">Ζωντανός Χάρτης Στόλου</h2>
           <p className="text-sm text-on-surface-variant">
-            {vehicles.length} ενεργά οχήματα · WebSocket{' '}
-            {connected ? 'συνδεδεμένο' : 'σύνδεση…'}
+            {vehicles.length} ενεργά οχήματα ·{' '}
+            {transport === 'poll'
+              ? 'HTTP poll'
+              : transport === 'ws'
+                ? 'WebSocket'
+                : 'σύνδεση…'}{' '}
+            {connected ? 'ενεργό' : 'εκτός'}
             {' · '}
             {mapbox ? 'Mapbox GL' : 'Leaflet (χωρίς token)'}
             {showHeat && heatmap.length ? (
@@ -91,7 +96,7 @@ export default function FleetLiveMapWebSocket() {
           }`}
         >
           <span className="material-symbols-outlined text-[14px]">sensors</span>
-          {connected ? 'ΖΩΝΤΑΝΑ' : '…'}
+          {connected ? (transport === 'poll' ? 'LIVE (poll)' : 'ΖΩΝΤΑΝΑ') : '…'}
         </span>
       </div>
 
