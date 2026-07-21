@@ -35,6 +35,62 @@ def default_tenant_id() -> str:
     )
 
 
+_PLATFORM_TENANT_CACHE: tuple[float, str] | None = None
+_PLATFORM_TENANT_CACHE_TTL_SEC = 60
+
+
+async def resolve_platform_tenant_id() -> str:
+    """
+    Tenant UUID that admin JWT / live map use for the default agency.
+
+    Env wins when set; otherwise look up DEFAULT_TENANT_SLUG (achillio) in Postgres.
+    Falls back to the local demo UUID only when DB is unavailable.
+    """
+    global _PLATFORM_TENANT_CACHE
+    now = time.time()
+    if _PLATFORM_TENANT_CACHE and now - _PLATFORM_TENANT_CACHE[0] < _PLATFORM_TENANT_CACHE_TTL_SEC:
+        return _PLATFORM_TENANT_CACHE[1]
+
+    env = (
+        os.getenv("SAAS_DEFAULT_TENANT_ID")
+        or os.getenv("DEFAULT_TENANT_ID")
+        or ""
+    ).strip()
+    if env:
+        _PLATFORM_TENANT_CACHE = (now, env)
+        return env
+
+    tid = DEFAULT_TENANT
+    slug = (os.getenv("DEFAULT_TENANT_SLUG") or "achillio").strip().lower()
+    try:
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Tenant).where(Tenant.slug == slug).limit(1))
+            tenant = result.scalar_one_or_none()
+            if tenant:
+                tid = str(tenant.id)
+    except Exception as exc:
+        logger.debug("resolve_platform_tenant_id DB lookup failed: %s", exc)
+
+    _PLATFORM_TENANT_CACHE = (now, tid)
+    return tid
+
+
+def coerce_driver_tenant_id(raw: str | None, *, platform_tenant_id: str) -> str:
+    """
+    Map legacy demo-tenant driver sessions onto the real SaaS tenant so GPS
+    appears on the admin live map (password login used to hardcode …0001).
+    """
+    tid = (raw or "").strip()
+    if not tid or tid == DEFAULT_TENANT:
+        return platform_tenant_id or DEFAULT_TENANT
+    return tid
+
+
 async def saas_db_available() -> bool:
     """True when Postgres is reachable and platform schema (master_qr_tokens) exists."""
     global _DB_CACHE
