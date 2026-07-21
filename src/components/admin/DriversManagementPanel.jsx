@@ -14,17 +14,17 @@ const STATUS_LABELS = {
   suspended: 'Αναστολή',
 };
 
-const STATUS_STYLES = {
-  active: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-  inactive: 'bg-gray-100 text-gray-600 ring-gray-200',
-  on_leave: 'bg-amber-50 text-amber-800 ring-amber-100',
-  suspended: 'bg-rose-50 text-rose-700 ring-rose-100',
+const STATUS_DOT = {
+  active: 'bg-emerald-500',
+  inactive: 'bg-zinc-300',
+  on_leave: 'bg-amber-400',
+  suspended: 'bg-rose-500',
 };
 
-function safetyMeta(score) {
-  if (score >= 90) return { text: 'text-emerald-600', bar: 'bg-emerald-500', bg: 'bg-emerald-50' };
-  if (score >= 75) return { text: 'text-amber-600', bar: 'bg-amber-500', bg: 'bg-amber-50' };
-  return { text: 'text-rose-600', bar: 'bg-rose-500', bg: 'bg-rose-50' };
+function safetyTone(score) {
+  if (score >= 90) return 'text-emerald-600';
+  if (score >= 75) return 'text-amber-600';
+  return 'text-rose-600';
 }
 
 function driverInitials(name) {
@@ -41,16 +41,19 @@ export default function DriversManagementPanel() {
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [query, setQuery] = useState('');
 
-  const stats = useMemo(() => {
-    const active = drivers.filter((d) => d.status === 'active').length;
-    const withApp = drivers.filter((d) => d.has_password).length;
-    const avgSafety =
-      drivers.length > 0
-        ? Math.round(drivers.reduce((s, d) => s + (d.safety_score || 0), 0) / drivers.length)
-        : null;
-    return { total: drivers.length, active, withApp, avgSafety };
-  }, [drivers]);
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return drivers;
+    return drivers.filter((d) => {
+      const hay = [d.name, d.email, d.license_no, d.license_plate, d.vehicle_code]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [drivers, query]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,7 +67,7 @@ export default function DriversManagementPanel() {
   }, [load]);
 
   const onDelete = async (d) => {
-    if (!window.confirm(`Διαγραφή οδηγού ${d.name}; Θα χαθεί και ο λογαριασμός εφαρμογής.`)) return;
+    if (!window.confirm(`Διαγραφή οδηγού ${d.name};`)) return;
     try {
       await deleteFleetDriver(d.id);
       toast.success('Διαγράφηκε');
@@ -74,271 +77,198 @@ export default function DriversManagementPanel() {
     }
   };
 
-  const renderVehicle = (d) => {
-    const plate = d.license_plate?.trim();
-    const code = d.vehicle_code?.trim();
-    if (!plate && !code) return <span className="text-gray-300">—</span>;
-    const showCode = code && code !== plate;
-    return (
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500">
-          <span className="material-symbols-outlined text-[18px]">directions_bus</span>
-        </span>
-        <div>
-          <div className="font-mono font-bold text-gray-800 text-sm tracking-wide">
-            {plate || code}
-          </div>
-          {showCode && <div className="text-xs text-gray-400">{code}</div>}
-        </div>
-      </div>
-    );
-  };
-
-  const renderAppAccount = (d) => {
-    if (d.has_password) {
-      return (
-        <div className="min-w-0">
-          <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-            <span className="material-symbols-outlined text-[14px]">smartphone</span>
-            Έτοιμος
-          </span>
-          <div className="text-[11px] text-gray-400 mt-1 truncate font-mono" title={d.email}>
-            {d.email}
-          </div>
-        </div>
-      );
-    }
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          navigate(`/admin/drivers/${d.id}/edit`);
-        }}
-        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-100 hover:bg-amber-100 transition-colors"
-        title="Ορισμός κωδικού εφαρμογής"
-      >
-        <span className="material-symbols-outlined text-[14px]">key</span>
-        Χωρίς κωδικό
-      </button>
-    );
-  };
-
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap justify-between items-start gap-4">
+    <section className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h3 className="font-bold text-gray-900 text-lg tracking-tight">Οδηγοί & λογαριασμοί εφαρμογής</h3>
-          <p className="text-sm text-gray-500 mt-0.5 max-w-2xl">
-            Καταχωρήστε οδηγούς σε πλήρη σελίδα και ορίστε όνομα χρήστη / κωδικό για την εφαρμογή
-            λεωφορείου (<span className="font-mono text-gray-700">/driver</span>).
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            Εφαρμογή
+          </p>
+          <h3 className="mt-1 text-[22px] font-semibold tracking-tight text-zinc-900">
+            Λογαριασμοί οδηγών
+          </h3>
+          <p className="mt-1 text-[14px] text-zinc-500 tracking-tight max-w-lg">
+            Email και κωδικός για είσοδο στο /driver.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href="/driver"
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm hover:bg-gray-50 inline-flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-            Άνοιγμα εφαρμογής
-          </a>
+        <button
+          type="button"
+          onClick={() => navigate('/admin/drivers/new')}
+          className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-[12px] bg-zinc-900 text-white text-[14px] font-semibold hover:bg-zinc-800 transition-colors shrink-0"
+        >
+          <span className="material-symbols-outlined text-[18px]">person_add</span>
+          Νέος λογαριασμός
+        </button>
+      </div>
+
+      <div className="rounded-[22px] bg-white/80 backdrop-blur-xl border border-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)] overflow-hidden">
+        <div className="flex flex-col sm:flex-row gap-3 p-4 border-b border-zinc-100/80">
+          <div className="relative flex-1">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-[18px]">
+              search
+            </span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Αναζήτηση ονόματος, email, πινακίδας…"
+              className="w-full h-11 rounded-[12px] bg-zinc-50 border border-zinc-200/70 pl-10 pr-3 text-[14px] text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
+            />
+          </div>
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/15"
+            className="h-11 rounded-[12px] bg-zinc-50 border border-zinc-200/70 px-3.5 text-[14px] font-medium text-zinc-700 focus:outline-none focus:bg-white"
           >
             <option value="">Όλοι</option>
             <option value="active">Ενεργοί</option>
             <option value="on_leave">Άδεια</option>
             <option value="inactive">Ανενεργοί</option>
           </select>
-          <button
-            type="button"
-            onClick={() => navigate('/admin/drivers/new')}
-            className="px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold flex items-center gap-2 shadow-md shadow-primary/20 hover:bg-primary/90 hover:shadow-lg transition-all"
+          <a
+            href="/driver"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-[12px] bg-zinc-100 text-zinc-800 text-[13px] font-semibold hover:bg-zinc-200/80 transition-colors"
           >
-            <span className="material-symbols-outlined text-[18px]">person_add</span>
-            Νέος λογαριασμός
-          </button>
+            <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+            /driver
+          </a>
         </div>
-      </div>
 
-      {!loading && drivers.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Σύνολο', value: stats.total, icon: 'groups', color: 'text-primary bg-primary/10' },
-            { label: 'Ενεργοί', value: stats.active, icon: 'check_circle', color: 'text-emerald-600 bg-emerald-50' },
-            {
-              label: 'Με λογαριασμό app',
-              value: stats.withApp,
-              icon: 'smartphone',
-              color: 'text-sky-600 bg-sky-50',
-            },
-            {
-              label: 'Μέσο Safety',
-              value: stats.avgSafety != null ? `${stats.avgSafety}/100` : '—',
-              icon: 'shield',
-              color: 'text-indigo-600 bg-indigo-50',
-            },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="flex items-center gap-3 rounded-2xl border border-black/[0.05] bg-white px-4 py-3 shadow-sm"
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.color}`}>
-                <span className="material-symbols-outlined text-[20px]">{s.icon}</span>
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 font-medium">{s.label}</div>
-                <div className="font-bold text-gray-900 text-lg leading-tight">{s.value}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="bg-white rounded-[24px] border border-black/[0.06] overflow-hidden shadow-sm">
         {loading ? (
-          <div className="p-10 space-y-4">
+          <div className="p-6 space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-4 animate-pulse">
-                <div className="w-10 h-10 rounded-full bg-gray-100" />
+              <div key={i} className="flex items-center gap-3 animate-pulse">
+                <div className="w-11 h-11 rounded-full bg-zinc-100" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-100 rounded-lg w-40" />
-                  <div className="h-3 bg-gray-50 rounded-lg w-24" />
+                  <div className="h-3.5 bg-zinc-100 rounded-md w-36" />
+                  <div className="h-3 bg-zinc-50 rounded-md w-24" />
                 </div>
               </div>
             ))}
           </div>
-        ) : drivers.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
-              <span className="material-symbols-outlined text-gray-300 text-[32px]">badge</span>
+        ) : visible.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <div className="w-14 h-14 rounded-[16px] bg-zinc-50 flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-zinc-300 text-[28px]">badge</span>
             </div>
-            <p className="font-bold text-gray-700">Δεν βρέθηκαν οδηγοί</p>
-            <p className="text-sm text-gray-400 mt-1">
-              Δημιουργήστε τον πρώτο λογαριασμό σε κανονική σελίδα.
+            <p className="text-[16px] font-semibold text-zinc-800 tracking-tight">
+              {drivers.length === 0 ? 'Κανένας λογαριασμός ακόμα' : 'Κανένα αποτέλεσμα'}
             </p>
-            <button
-              type="button"
-              onClick={() => navigate('/admin/drivers/new')}
-              className="mt-5 px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold inline-flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined text-[18px]">person_add</span>
-              Νέος λογαριασμός
-            </button>
+            <p className="text-[14px] text-zinc-500 mt-1">
+              {drivers.length === 0
+                ? 'Δημιουργήστε τον πρώτο οδηγό για την εφαρμογή.'
+                : 'Δοκιμάστε άλλο φίλτρο ή αναζήτηση.'}
+            </p>
+            {drivers.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => navigate('/admin/drivers/new')}
+                className="mt-5 inline-flex items-center gap-2 h-11 px-5 rounded-[12px] bg-zinc-900 text-white text-[14px] font-semibold"
+              >
+                <span className="material-symbols-outlined text-[18px]">person_add</span>
+                Νέος λογαριασμός
+              </button>
+            ) : null}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/80">
-                  {['Οδηγός', 'Όχημα', 'Εφαρμογή', 'Safety', 'Κατάσταση', ''].map((h, i) => (
-                    <th
-                      key={h || 'actions'}
-                      className={`px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-gray-400 ${
-                        i === 5 ? 'text-right' : 'text-left'
-                      }`}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {drivers.map((d) => {
-                  const safety = safetyMeta(d.safety_score);
-                  return (
-                    <tr
-                      key={d.id}
-                      onClick={() => navigate(`/admin/drivers/${d.id}`)}
-                      className="cursor-pointer hover:bg-primary/[0.03] transition-colors group"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          {d.photo_url ? (
-                            <img
-                              src={resolveSiteAssetUrl(d.photo_url)}
-                              alt=""
-                              className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-black/5"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/15 to-indigo-100 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
-                              {driverInitials(d.name)}
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="font-bold text-gray-900 group-hover:text-primary transition-colors truncate">
-                              {d.name}
-                            </div>
-                            <div className="text-xs text-gray-400 font-mono mt-0.5">{d.license_no}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">{renderVehicle(d)}</td>
-                      <td className="px-5 py-4">{renderAppAccount(d)}</td>
-                      <td className="px-5 py-4">
-                        <div className={`inline-flex flex-col gap-1.5 min-w-[88px] rounded-xl px-3 py-2 ${safety.bg}`}>
-                          <span className={`font-bold text-sm ${safety.text}`}>{d.safety_score}/100</span>
-                          <div className="h-1.5 rounded-full bg-white/70 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${safety.bar}`}
-                              style={{ width: `${Math.min(100, d.safety_score)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex text-xs font-bold px-2.5 py-1 rounded-full ring-1 ${
-                            STATUS_STYLES[d.status] || STATUS_STYLES.inactive
-                          }`}
-                        >
-                          {STATUS_LABELS[d.status] || d.status}
+          <ul className="divide-y divide-zinc-100/90">
+            {visible.map((d) => {
+              const plate = d.license_plate || d.vehicle_code;
+              return (
+                <li key={d.id}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/admin/drivers/${d.id}`)}
+                    className="w-full text-left px-4 sm:px-5 py-3.5 flex items-center gap-3 sm:gap-4 hover:bg-zinc-50/80 transition-colors group"
+                  >
+                    {d.photo_url ? (
+                      <img
+                        src={resolveSiteAssetUrl(d.photo_url)}
+                        alt=""
+                        className="w-11 h-11 rounded-full object-cover shrink-0 ring-1 ring-black/5"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full bg-zinc-100 text-zinc-600 font-semibold text-[13px] flex items-center justify-center shrink-0">
+                        {driverInitials(d.name)}
+                      </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-semibold text-[15px] text-zinc-900 tracking-tight truncate">
+                          {d.name}
                         </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/admin/drivers/${d.id}/edit`);
-                            }}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center text-primary hover:bg-primary/10"
-                            title="Επεξεργασία σε σελίδα"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDelete(d);
-                            }}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-50"
-                            title="Διαγραφή"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {!loading && drivers.length > 0 && (
-          <p className="text-xs text-gray-400 px-5 py-3.5 border-t border-gray-50 bg-gray-50/50 flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-            Νέος λογαριασμός / Επεξεργασία ανοίγουν σε κανονική σελίδα — όλα τα πεδία ορατά.
-          </p>
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            STATUS_DOT[d.status] || STATUS_DOT.inactive
+                          }`}
+                          title={STATUS_LABELS[d.status] || d.status}
+                        />
+                      </div>
+                      <div className="mt-0.5 text-[13px] text-zinc-500 truncate tracking-tight">
+                        {d.email}
+                        {plate ? ` · ${plate}` : ''}
+                      </div>
+                    </div>
+
+                    <div className="hidden sm:flex flex-col items-end gap-0.5 shrink-0">
+                      <span className={`text-[13px] font-semibold tabular-nums ${safetyTone(d.safety_score)}`}>
+                        {d.safety_score}
+                      </span>
+                      <span className="text-[11px] text-zinc-400">
+                        {d.has_password ? 'App έτοιμο' : 'Χωρίς κωδικό'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-0.5 shrink-0 opacity-60 group-hover:opacity-100">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/drivers/${d.id}/edit`);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.stopPropagation();
+                            navigate(`/admin/drivers/${d.id}/edit`);
+                          }
+                        }}
+                        className="w-9 h-9 rounded-[10px] flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+                        title="Επεξεργασία"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(d);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.stopPropagation();
+                            onDelete(d);
+                          }
+                        }}
+                        className="w-9 h-9 rounded-[10px] flex items-center justify-center text-zinc-400 hover:bg-rose-50 hover:text-rose-600"
+                        title="Διαγραφή"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </span>
+                      <span className="material-symbols-outlined text-zinc-300 text-[20px] hidden sm:inline">
+                        chevron_right
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
-    </div>
+    </section>
   );
 }
