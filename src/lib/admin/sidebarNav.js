@@ -24,7 +24,6 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'email',
   'email_templates',
   'bookings',
-  'driver_scan',
 ];
 
 export const LEGACY_NAV_IDS = new Set(['settings', 'payments']);
