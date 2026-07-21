@@ -127,7 +127,12 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
         })
         .catch((err) => {
           if (closed) return;
-          setPollError(err?.message || 'Αποτυχία φόρτωσης live στόλου');
+          const raw = String(err?.message || '');
+          const msg =
+            raw === 'Failed to fetch' || /network|load failed|fetch/i.test(raw)
+              ? 'Δεν συνδέει με το API (Failed to fetch). Ανανέωσε τη σελίδα· αν συνεχίζει, το api host είναι εκτός.'
+              : raw || 'Αποτυχία φόρτωσης live στόλου';
+          setPollError(msg);
         });
     };
 

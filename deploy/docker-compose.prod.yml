@@ -50,7 +50,7 @@ services:
       - traefik.http.routers.api.tls.certresolver=letsencrypt
       - traefik.http.routers.api.service=api
       - traefik.http.services.api.loadbalancer.server.port=8000
-      - traefik.http.services.api.loadbalancer.sticky.cookie=true
+      # Sticky cookies pin clients to dead backends after recreate → timeouts / Failed to fetch.
       - traefik.docker.network=aerostride-prod_edge
     networks:
       - edge
