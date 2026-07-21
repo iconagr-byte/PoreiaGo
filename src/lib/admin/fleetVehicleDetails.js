@@ -1,5 +1,29 @@
 /** Shared labels for live fleet vehicle popups / cards. */
 
+export const DEFAULT_FLEET_BUS_IMAGE = '/images/hero-bus-achillio.png';
+
+export function resolveFleetMarkerImage(vehicle) {
+  return (
+    vehicle?.vehicle_image_url ||
+    vehicle?.vehicleImageUrl ||
+    vehicle?.photo_url ||
+    vehicle?.photoUrl ||
+    DEFAULT_FLEET_BUS_IMAGE
+  );
+}
+
+export function formatUpdatedAgo(timestamp) {
+  if (!timestamp) return null;
+  const t = new Date(timestamp).getTime();
+  if (!Number.isFinite(t)) return null;
+  const sec = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (sec < 5) return 'τώρα';
+  if (sec < 60) return `πριν ${sec}δ`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `πριν ${min}λ`;
+  return new Date(t).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
+}
+
 export function formatBoardingLabel(vehicle) {
   const boarding = vehicle?.boarding;
   if (!boarding) return null;

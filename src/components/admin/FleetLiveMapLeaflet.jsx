@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -9,72 +9,134 @@ import {
   formatBoardingLabel,
   formatPassengerNames,
   formatSensorSummary,
+  formatUpdatedAgo,
+  resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
 import FleetMapFlyTo from './FleetMapFlyTo.jsx';
 
-const busIcon = (heading) =>
-  L.divIcon({
+function escapeAttr(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+const busIcon = (vehicle) => {
+  const heading = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
+  const img = escapeAttr(resolveFleetMarkerImage(vehicle));
+  return L.divIcon({
     className: 'fleet-bus-marker-ws',
-    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-8px)">
-      <div style="transform:rotate(${heading ?? 0}deg);background:#0040df;color:#fff;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #facc15;font-size:18px;box-shadow:0 6px 16px rgba(0,0,0,.25)">🚌</div>
+    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-10px);filter:drop-shadow(0 8px 18px rgba(15,23,42,.28))">
+      <div style="position:relative;width:52px;height:52px">
+        <div style="width:52px;height:52px;border-radius:50%;overflow:hidden;border:3px solid #f8fafc;background:#0f172a;box-shadow:0 0 0 2px #0f172a">
+          <img src="${img}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" />
+        </div>
+        <div style="position:absolute;inset:-4px;border-radius:50%;border:2px solid #facc15;pointer-events:none"></div>
+        <div style="position:absolute;left:50%;top:-2px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #facc15;transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 30px"></div>
+      </div>
     </div>`,
-    iconSize: [44, 56],
-    iconAnchor: [22, 22],
+    iconSize: [52, 64],
+    iconAnchor: [26, 26],
   });
+};
 
 function LeafletAnimatedMarkers({ vehicles }) {
   const display = useAnimatedFleetVehicles(vehicles);
 
   return display.map((v) => (
-    <Marker key={v.id} position={[v.lat, v.lng]} icon={busIcon(v.heading)}>
-      <Tooltip direction="top" offset={[0, -22]} opacity={0.95} permanent>
+    <Marker key={v.id} position={[v.lat, v.lng]} icon={busIcon(v)}>
+      <Tooltip direction="top" offset={[0, -28]} opacity={0.96} permanent>
         <strong>{v.driver_name}</strong>
         <br />
         {v.bus_plate} · {Math.round(v.speed)} km/h
       </Tooltip>
       <Popup>
-        <strong>{v.driver_name}</strong>
-        <br />
-        Πινακίδα: {v.bus_plate}
-        <br />
-        Ταχύτητα: {Math.round(v.speed)} km/h
-        <br />
-        Δρομολόγιο #{v.trip_id ?? '—'}
-        {formatBoardingLabel(v) ? (
-          <>
-            <br />
-            Επιβιβασμένοι: {formatBoardingLabel(v)}
-          </>
-        ) : null}
-        {formatPassengerNames(v) ? (
-          <>
-            <br />
-            <span className="text-xs">{formatPassengerNames(v)}</span>
-          </>
-        ) : null}
-        {formatSensorSummary(v) ? (
-          <>
-            <br />
-            <span className="text-xs text-gray-500">{formatSensorSummary(v)}</span>
-          </>
-        ) : null}
-        <div className="mt-2">
-          <FleetDriverPlaybackButton vehicle={v} />
+        <div style={{ minWidth: 180 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+            <img
+              src={resolveFleetMarkerImage(v)}
+              alt=""
+              style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover' }}
+            />
+            <div>
+              <strong>{v.driver_name}</strong>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{v.bus_plate}</div>
+            </div>
+          </div>
+          Ταχύτητα: {Math.round(v.speed)} km/h
+          <br />
+          Δρομολόγιο #{v.trip_id ?? '—'}
+          <br />
+          Ενημέρωση: {formatUpdatedAgo(v.timestamp) || '—'}
+          {formatBoardingLabel(v) ? (
+            <>
+              <br />
+              Επιβιβασμένοι: {formatBoardingLabel(v)}
+            </>
+          ) : null}
+          {formatPassengerNames(v) ? (
+            <>
+              <br />
+              <span className="text-xs">{formatPassengerNames(v)}</span>
+            </>
+          ) : null}
+          {formatSensorSummary(v) ? (
+            <>
+              <br />
+              <span className="text-xs text-gray-500">{formatSensorSummary(v)}</span>
+            </>
+          ) : null}
+          <div className="mt-2">
+            <FleetDriverPlaybackButton vehicle={v} />
+          </div>
         </div>
       </Popup>
     </Marker>
   ));
 }
 
-function FitBounds({ vehicles }) {
+/** Fit only when the vehicle *set* changes or when parent requests recenter — never on GPS ticks. */
+function FitBounds({ vehicles, fitNonce = 0 }) {
   const map = useMap();
+  const fittedIdsRef = useRef('');
+  const userMovedRef = useRef(false);
+  const lastNonceRef = useRef(fitNonce);
+
+  useEffect(() => {
+    const markMoved = () => {
+      userMovedRef.current = true;
+    };
+    map.on('dragstart', markMoved);
+    map.on('zoomstart', markMoved);
+    return () => {
+      map.off('dragstart', markMoved);
+      map.off('zoomstart', markMoved);
+    };
+  }, [map]);
+
   useEffect(() => {
     if (!vehicles?.length) return;
+    const ids = vehicles
+      .map((v) => v.id || v.vehicle_id || `${v.lat},${v.lng}`)
+      .sort()
+      .join('|');
+    const force = fitNonce !== lastNonceRef.current;
+    if (force) {
+      userMovedRef.current = false;
+      lastNonceRef.current = fitNonce;
+    } else if (userMovedRef.current) {
+      return;
+    } else if (ids === fittedIdsRef.current) {
+      return;
+    }
+    fittedIdsRef.current = ids;
     const bounds = L.latLngBounds(vehicles.map((v) => [v.lat, v.lng]));
-    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 12 });
-  }, [vehicles, map]);
+    map.fitBounds(bounds, { padding: [56, 56], maxZoom: 14 });
+  }, [vehicles, map, fitNonce]);
+
   return null;
 }
 
@@ -90,10 +152,11 @@ export default function FleetLiveMapLeaflet({
   showGeofence = false,
   showSosPins = true,
   focusSosAlert = null,
+  fitNonce = 0,
 }) {
   const fitPoints = useMemo(() => {
-    const pts = vehicles.map((v) => [v.lat, v.lng]);
-    sosAlerts.forEach((a) => pts.push([a.lat, a.lng]));
+    const pts = vehicles.map((v) => ({ ...v, id: v.id || v.vehicle_id }));
+    sosAlerts.forEach((a, i) => pts.push({ id: `sos-${a.id || i}`, lat: a.lat, lng: a.lng }));
     return pts;
   }, [vehicles, sosAlerts]);
 
@@ -103,7 +166,7 @@ export default function FleetLiveMapLeaflet({
         attribution="© OpenStreetMap · © CARTO"
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       />
-      <FitBounds vehicles={fitPoints.length ? fitPoints.map(([lat, lng]) => ({ lat, lng })) : vehicles} />
+      <FitBounds vehicles={fitPoints} fitNonce={fitNonce} />
       {focusSosAlert ? <FleetMapFlyTo alert={focusSosAlert} /> : null}
       <FleetGeofenceLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetSosPins alerts={sosAlerts} visible={showSosPins} />

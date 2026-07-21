@@ -168,6 +168,25 @@ async def load_live_vehicle(tenant_id: str, vehicle_id: str) -> dict[str, Any]:
     return meta if isinstance(meta, dict) else {}
 
 
+async def delete_live_vehicle(tenant_id: str, vehicle_id: str) -> bool:
+    tid = str(tenant_id or "").strip()
+    vid = str(vehicle_id or "").strip()
+    if not tid or not vid:
+        return False
+    r = await _get_redis()
+    if not r:
+        return False
+    try:
+        pipe = r.pipeline()
+        pipe.delete(_vehicle_key(tid, vid))
+        pipe.srem(_tenant_index_key(tid), vid)
+        await pipe.execute()
+        return True
+    except Exception as exc:
+        logger.warning("Failed to delete live vehicle from Redis: %s", exc)
+        return False
+
+
 def parse_updated_at(value: Any) -> datetime | None:
     if value is None:
         return None

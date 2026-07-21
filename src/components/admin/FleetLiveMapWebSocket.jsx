@@ -4,6 +4,12 @@ import { isMapboxEnabled } from '../../lib/maps/mapboxConfig.js';
 import { fetchHeatmap, fetchGeofenceMapLayers } from '../../services/telemetryApi.js';
 import { useTelemetryAlerts } from '../../hooks/useTelemetryAlerts.js';
 import { mapSosAlertsWithCoords, mapTelemetryAlertsWithCoords } from '../../lib/admin/fleetMapAlerts.js';
+import {
+  formatBoardingLabel,
+  formatUpdatedAgo,
+  resolveFleetMarkerImage,
+} from '../../lib/admin/fleetVehicleDetails.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
 import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
 import AdminFleetPushPanel from './AdminFleetPushPanel.jsx';
@@ -20,6 +26,8 @@ export default function FleetLiveMapWebSocket() {
   const [showGeofence, setShowGeofence] = useState(false);
   const [showSosPins, setShowSosPins] = useState(true);
   const [geofenceLayers, setGeofenceLayers] = useState(null);
+  const [fitNonce, setFitNonce] = useState(0);
+  const [selectedId, setSelectedId] = useState(null);
 
   const { alerts, wsConnected: alertsWs } = useTelemetryAlerts({ tenantId, limit: 80, enabled: true });
   const sosAlerts = useMemo(() => mapSosAlertsWithCoords(alerts), [alerts]);
@@ -65,6 +73,11 @@ export default function FleetLiveMapWebSocket() {
     return [38.5, 23.0];
   }, [vehicles]);
 
+  const selected = useMemo(
+    () => vehicles.find((v) => v.id === selectedId) || vehicles[0] || null,
+    [vehicles, selectedId],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -79,7 +92,7 @@ export default function FleetLiveMapWebSocket() {
                 : 'σύνδεση…'}{' '}
             {connected ? 'ενεργό' : 'εκτός'}
             {' · '}
-            {mapbox ? 'Mapbox GL' : 'Leaflet (χωρίς token)'}
+            {mapbox ? 'Mapbox GL' : 'Leaflet'}
             {showHeat && heatmap.length ? (
               <span className="text-[10px] text-orange-600 ml-2">
                 heatmap {heatmap.length} κελιά ({heatDays}ημ.)
@@ -90,14 +103,24 @@ export default function FleetLiveMapWebSocket() {
             ) : null}
           </p>
         </div>
-        <span
-          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
-            connected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[14px]">sensors</span>
-          {connected ? (transport === 'poll' ? 'LIVE (poll)' : 'ΖΩΝΤΑΝΑ') : '…'}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFitNonce((n) => n + 1)}
+            className="inline-flex items-center gap-1 rounded-xl border border-black/[0.08] bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50"
+          >
+            <span className="material-symbols-outlined text-[16px]">center_focus_strong</span>
+            Κέντρο στόλου
+          </button>
+          <span
+            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
+              connected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[14px]">sensors</span>
+            {connected ? (transport === 'poll' ? 'LIVE (poll)' : 'ΖΩΝΤΑΝΑ') : '…'}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-black/[0.06] bg-white px-4 py-3 text-sm">
@@ -161,28 +184,6 @@ export default function FleetLiveMapWebSocket() {
         </p>
       ) : null}
 
-      {vehicles.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {vehicles.map((v) => (
-            <div
-              key={v.id}
-              className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm"
-            >
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-bold text-emerald-950">{v.driver_name}</span>
-              <span className="text-emerald-800/80">
-                {v.bus_plate} · {Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}
-              </span>
-            </div>
-          ))}
-          {lastPollAt ? (
-            <span className="self-center text-[11px] text-gray-400">
-              ενημέρωση {lastPollAt.toLocaleTimeString('el-GR')}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-
       {!vehicles.length && connected ? (
         <p className="text-sm text-gray-500 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
           Δεν υπάρχουν ενεργοί οδηγοί στον χάρτη. Ζητήστε από έναν οδηγό να πατήσει «Έναρξη Βάρδιας» στην εφαρμογή PWA
@@ -190,8 +191,8 @@ export default function FleetLiveMapWebSocket() {
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-4">
-        <div className="h-[min(72vh,620px)] rounded-[24px] overflow-hidden border border-black/[0.08] shadow-level-2">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4">
+        <div className="h-[min(72vh,640px)] rounded-[24px] overflow-hidden border border-black/[0.08] shadow-level-2 relative">
           {mapbox ? (
             <FleetLiveMapMapbox
               vehicles={vehicles}
@@ -203,6 +204,7 @@ export default function FleetLiveMapWebSocket() {
               showGeofence={showGeofence}
               showSosPins={showSosPins}
               focusSosAlert={showSosPins ? focusSosAlert : null}
+              fitNonce={fitNonce}
             />
           ) : (
             <FleetLiveMapLeaflet
@@ -216,10 +218,70 @@ export default function FleetLiveMapWebSocket() {
               showGeofence={showGeofence}
               showSosPins={showSosPins}
               focusSosAlert={showSosPins ? focusSosAlert : null}
+              fitNonce={fitNonce}
             />
           )}
         </div>
-        <FleetEtaPanel activeTripCount={vehicles.length} />
+
+        <div className="space-y-4">
+          <div className="rounded-[24px] border border-black/[0.06] bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-slate-900">Ενεργά οχήματα</h3>
+              {lastPollAt ? (
+                <span className="text-[11px] text-slate-400">
+                  {lastPollAt.toLocaleTimeString('el-GR')}
+                </span>
+              ) : null}
+            </div>
+            {vehicles.length ? (
+              <ul className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+                {vehicles.map((v) => {
+                  const img = resolveSiteAssetUrl(resolveFleetMarkerImage(v));
+                  const active = (selected?.id || selectedId) === v.id;
+                  return (
+                    <li key={v.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedId(v.id);
+                          setFitNonce((n) => n + 1);
+                        }}
+                        className={`w-full rounded-2xl border px-3 py-2.5 text-left transition ${
+                          active
+                            ? 'border-emerald-300 bg-emerald-50'
+                            : 'border-black/[0.06] bg-slate-50/80 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={img}
+                            alt=""
+                            className="h-12 w-12 rounded-xl object-cover ring-2 ring-white shadow"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-bold text-slate-900">{v.driver_name}</div>
+                            <div className="truncate text-xs text-slate-500">
+                              {v.bus_plate} · δρομολόγιο #{v.trip_id ?? '—'}
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-slate-600">
+                              <span>{Math.round(v.speed || 0)} km/h</span>
+                              <span>{Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}</span>
+                              <span>{formatUpdatedAgo(v.timestamp) || '—'}</span>
+                              {formatBoardingLabel(v) ? <span>{formatBoardingLabel(v)}</span> : null}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-xs text-slate-500">Κανένα ενεργό όχημα αυτή τη στιγμή.</p>
+            )}
+          </div>
+          <FleetEtaPanel activeTripCount={vehicles.length} />
+        </div>
       </div>
     </div>
   );

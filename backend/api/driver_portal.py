@@ -362,3 +362,62 @@ async def driver_telemetry_location(
             "tenant_id": result.get("tenant_id"),
         }
     return {"type": "ack", "ok": True, **result}
+
+
+@router.post("/telemetry/shift/end")
+async def driver_shift_end(session_payload: dict = Depends(require_driver_session)):
+    """
+    Explicit end-of-shift from the driver PWA.
+
+    Notifies the admin platform (alert + Web Push) and removes the driver from
+    the live fleet map immediately — even when GPS was sent over HTTP only.
+    """
+    from travel_platform.telemetry.driver_shift_notifications import notify_driver_shift
+    from travel_platform.telemetry.driver_shift_tracker import force_driver_offline
+    from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
+    from travel_platform.telemetry.processor import get_live_fleet
+
+    was_online = force_driver_offline(session_payload)
+    tenant_id = str(session_payload.get("tenant_id") or "")
+    driver_id = str(session_payload.get("sub") or session_payload.get("driver_id") or "")
+    trip_id = session_payload.get("trip_id")
+
+    removed: list[str] = []
+    if tenant_id and driver_id:
+        try:
+            removed = await get_live_fleet().remove_driver_vehicles(tenant_id, driver_id)
+        except Exception:
+            removed = []
+
+    if tenant_id:
+        try:
+            await get_fleet_egress_hub().broadcast(
+                tenant_id,
+                {
+                    "type": "fleet_driver_offline",
+                    "tenant_id": tenant_id,
+                    "driver_id": driver_id,
+                    "trip_id": trip_id,
+                    "reason": "shift_end",
+                    "removed_vehicle_ids": removed,
+                },
+            )
+        except Exception:
+            pass
+
+    notify_result: dict = {"skipped": True}
+    try:
+        notify_result = await notify_driver_shift(
+            "offline",
+            session_payload,
+            body={"reason": "shift_end"},
+        )
+    except Exception as exc:
+        notify_result = {"skipped": True, "reason": str(exc)[:120]}
+
+    return {
+        "ok": True,
+        "was_online": was_online,
+        "removed_vehicles": removed,
+        "notify": notify_result,
+    }

@@ -66,11 +66,11 @@ replace_kv "VITE_OLYMPUS_INGRESS_CNAME" "$INGRESS_CNAME"
 if ! [[ -f "$DEPLOY_DIR/.vapid_private.pem" ]]; then
   echo "==> Generating Web Push VAPID keys"
   REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
-  if ! python3 -c "import py_vapid" 2>/dev/null; then
-    pip3 install --user py-vapid cryptography >/dev/null 2>&1 || true
+  if ! python3 -c "from cryptography.hazmat.primitives.asymmetric import ec" 2>/dev/null; then
+    pip3 install --user cryptography >/dev/null 2>&1 || true
   fi
   python3 "$REPO_ROOT/deploy/scripts/generate_vapid_keys.py" || {
-    echo "WARN: VAPID generation failed — pip3 install py-vapid cryptography"
+    echo "WARN: VAPID generation failed — pip3 install cryptography"
   }
 fi
 

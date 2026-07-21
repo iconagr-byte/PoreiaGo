@@ -82,12 +82,19 @@ admin_router = APIRouter(prefix="/telemetry", tags=["telemetry-admin"])
 async def fleet_live(
     tenant_id: Annotated[UUID, Depends(get_tenant_id)],
 ):
+    from travel_platform.telemetry.live_fleet_media import enrich_live_vehicle_media
+
     live: LiveFleetService = get_live_fleet()
     rows = []
     for v in await live.list_active_for_admin_async(tenant_id):
         meta = await live.vehicle_meta_async(tenant_id, v.vehicle_id)
         if not meta:
             meta = live._vehicles.get(v.vehicle_id, {})
+        media = enrich_live_vehicle_media(
+            driver_id=meta.get("driver_id"),
+            bus_plate=meta.get("bus_plate", v.vehicle_code),
+            vehicle_code=v.vehicle_code,
+        )
         rows.append(
             LiveVehicleResponse(
                 vehicle_id=v.vehicle_id,
@@ -101,9 +108,11 @@ async def fleet_live(
                 idle_seconds_trip=v.idle_seconds_trip,
                 updated_at=v.updated_at,
                 driver_name=meta.get("driver_name"),
-                bus_plate=meta.get("bus_plate", v.vehicle_code),
+                bus_plate=media.get("bus_plate") or meta.get("bus_plate", v.vehicle_code),
                 heading_deg=meta.get("heading_deg"),
                 driver_id=meta.get("driver_id"),
+                photo_url=media.get("photo_url"),
+                vehicle_image_url=media.get("vehicle_image_url"),
             ),
         )
     return rows

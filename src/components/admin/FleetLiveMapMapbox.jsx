@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react';
-import Map, { Marker, useMap } from 'react-map-gl/mapbox';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Map, { Marker, Popup, useMap } from 'react-map-gl/mapbox';
 import { LngLatBounds } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MAPBOX_STYLE, MAPBOX_TOKEN } from '../../lib/maps/mapboxConfig.js';
@@ -12,6 +12,8 @@ import {
   formatBoardingLabel,
   formatPassengerNames,
   formatSensorSummary,
+  formatUpdatedAgo,
+  resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
 
 function HeatmapDots({ points = [], visible = true }) {
@@ -35,20 +37,59 @@ function HeatmapDots({ points = [], visible = true }) {
 }
 
 function BusMarker({ vehicle }) {
+  const [open, setOpen] = useState(false);
+  const img = resolveFleetMarkerImage(vehicle);
   return (
-    <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center">
-      <div className="relative cursor-pointer">
-        <div
-          className="flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#facc15] bg-[#0040df] text-lg text-white shadow-lg"
-          style={{ transform: `rotate(${vehicle.heading ?? 0}deg)` }}
-          aria-label={`${vehicle.driver_name}, ${vehicle.bus_plate}`}
+    <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={() => setOpen(true)}>
+      <button type="button" className="relative cursor-pointer border-0 bg-transparent p-0" onClick={() => setOpen(true)}>
+        <div className="relative h-[52px] w-[52px] drop-shadow-[0_8px_18px_rgba(15,23,42,0.28)]">
+          <div className="h-full w-full overflow-hidden rounded-full border-[3px] border-slate-50 bg-slate-900 ring-2 ring-slate-900">
+            <img src={img} alt="" className="h-full w-full object-cover" />
+          </div>
+          <div className="pointer-events-none absolute inset-[-4px] rounded-full border-2 border-amber-300" />
+          <div
+            className="pointer-events-none absolute left-1/2 top-[-2px] h-0 w-0 -translate-x-1/2 border-x-[5px] border-b-[8px] border-x-transparent border-b-amber-300"
+            style={{
+              transform: `translateX(-50%) rotate(${vehicle.heading ?? 0}deg)`,
+              transformOrigin: '50% 30px',
+            }}
+          />
+        </div>
+        <div className="absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-bold text-white shadow">
+          {vehicle.driver_name} · {Math.round(vehicle.speed || 0)} km/h
+        </div>
+      </button>
+      {open ? (
+        <Popup
+          longitude={vehicle.lng}
+          latitude={vehicle.lat}
+          anchor="top"
+          offset={28}
+          onClose={() => setOpen(false)}
+          closeOnClick={false}
         >
-          🚌
-        </div>
-        <div className="absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-bold text-white shadow">
-          {vehicle.driver_name}
-        </div>
-      </div>
+          <div className="min-w-[180px] text-sm">
+            <div className="mb-2 flex items-center gap-2.5">
+              <img src={img} alt="" className="h-12 w-12 rounded-xl object-cover" />
+              <div>
+                <div className="font-bold">{vehicle.driver_name}</div>
+                <div className="text-xs text-slate-500">{vehicle.bus_plate}</div>
+              </div>
+            </div>
+            <div>Ταχύτητα: {Math.round(vehicle.speed || 0)} km/h</div>
+            <div>Δρομολόγιο #{vehicle.trip_id ?? '—'}</div>
+            <div>Ενημέρωση: {formatUpdatedAgo(vehicle.timestamp) || '—'}</div>
+            {formatBoardingLabel(vehicle) ? <div>Επιβιβασμένοι: {formatBoardingLabel(vehicle)}</div> : null}
+            {formatPassengerNames(vehicle) ? <div className="text-xs">{formatPassengerNames(vehicle)}</div> : null}
+            {formatSensorSummary(vehicle) ? (
+              <div className="text-xs text-slate-500">{formatSensorSummary(vehicle)}</div>
+            ) : null}
+            <div className="mt-2">
+              <FleetDriverPlaybackButton vehicle={vehicle} />
+            </div>
+          </div>
+        </Popup>
+      ) : null}
     </Marker>
   );
 }
@@ -58,12 +99,43 @@ function MapboxAnimatedMarkers({ vehicles }) {
   return display.map((v) => <BusMarker key={v.id} vehicle={v} />);
 }
 
-function FitBounds({ vehicles }) {
+function FitBounds({ vehicles, fitNonce = 0 }) {
   const map = useMap();
+  const fittedIdsRef = useRef('');
+  const userMovedRef = useRef(false);
+  const lastNonceRef = useRef(fitNonce);
+
+  useEffect(() => {
+    const mapInstance = map?.getMap?.() || map;
+    if (!mapInstance?.on) return undefined;
+    const markMoved = () => {
+      userMovedRef.current = true;
+    };
+    mapInstance.on('dragstart', markMoved);
+    mapInstance.on('zoomstart', markMoved);
+    return () => {
+      mapInstance.off('dragstart', markMoved);
+      mapInstance.off('zoomstart', markMoved);
+    };
+  }, [map]);
 
   useEffect(() => {
     const mapInstance = map?.getMap?.() || map;
     if (!mapInstance || !vehicles?.length) return;
+    const ids = vehicles
+      .map((v) => v.id || v.vehicle_id || `${v.lat},${v.lng}`)
+      .sort()
+      .join('|');
+    const force = fitNonce !== lastNonceRef.current;
+    if (force) {
+      userMovedRef.current = false;
+      lastNonceRef.current = fitNonce;
+    } else if (userMovedRef.current) {
+      return;
+    } else if (ids === fittedIdsRef.current) {
+      return;
+    }
+    fittedIdsRef.current = ids;
     const bounds = new LngLatBounds();
     vehicles.forEach((v) => {
       if (Number.isFinite(v.lng) && Number.isFinite(v.lat)) {
@@ -71,8 +143,8 @@ function FitBounds({ vehicles }) {
       }
     });
     if (bounds.isEmpty()) return;
-    mapInstance.fitBounds(bounds, { padding: 64, maxZoom: 13, duration: 800 });
-  }, [vehicles, map]);
+    mapInstance.fitBounds(bounds, { padding: 64, maxZoom: 14, duration: force ? 600 : 0 });
+  }, [vehicles, map, fitNonce]);
 
   return null;
 }
@@ -88,6 +160,7 @@ export default function FleetLiveMapMapbox({
   showGeofence = false,
   showSosPins = true,
   focusSosAlert = null,
+  fitNonce = 0,
 }) {
   const initialViewState = useMemo(() => {
     if (vehicles.length) {
@@ -97,10 +170,10 @@ export default function FleetLiveMapMapbox({
       return { longitude: sosAlerts[0].lng, latitude: sosAlerts[0].lat, zoom: 12 };
     }
     return { longitude: 23.0, latitude: 38.5, zoom: 7 };
-  }, [vehicles, sosAlerts]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initial only
 
   const fitVehicles = useMemo(() => {
-    const extra = sosAlerts.map((a) => ({ lat: a.lat, lng: a.lng }));
+    const extra = sosAlerts.map((a, i) => ({ id: `sos-${a.id || i}`, lat: a.lat, lng: a.lng }));
     return [...vehicles, ...extra];
   }, [vehicles, sosAlerts]);
 
@@ -112,7 +185,7 @@ export default function FleetLiveMapMapbox({
       style={{ width: '100%', height: '100%' }}
       attributionControl
     >
-      <FitBounds vehicles={fitVehicles} />
+      <FitBounds vehicles={fitVehicles} fitNonce={fitNonce} />
       {focusSosAlert ? <FleetMapFlyToMapbox alert={focusSosAlert} /> : null}
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} />
