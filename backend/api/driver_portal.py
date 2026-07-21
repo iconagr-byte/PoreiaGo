@@ -372,36 +372,44 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
     Notifies the admin platform (alert + Web Push) and removes the driver from
     the live fleet map immediately — even when GPS was sent over HTTP only.
     """
+    from travel_platform.operations.master_qr_bridge import (
+        coerce_driver_tenant_id,
+        resolve_platform_tenant_id,
+    )
     from travel_platform.telemetry.driver_shift_notifications import notify_driver_shift
     from travel_platform.telemetry.driver_shift_tracker import force_driver_offline
     from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
     from travel_platform.telemetry.processor import get_live_fleet
 
-    was_online = force_driver_offline(session_payload)
-    tenant_id = str(session_payload.get("tenant_id") or "")
+    platform_tid = await resolve_platform_tenant_id()
+    tenant_id = coerce_driver_tenant_id(
+        str(session_payload.get("tenant_id") or ""),
+        platform_tenant_id=platform_tid,
+    )
+    session_payload = {**session_payload, "tenant_id": tenant_id}
     driver_id = str(session_payload.get("sub") or session_payload.get("driver_id") or "")
     trip_id = session_payload.get("trip_id")
 
+    was_online = force_driver_offline(session_payload)
+
     removed: list[str] = []
-    if tenant_id and driver_id:
+    if driver_id:
         try:
             removed = await get_live_fleet().remove_driver_vehicles(tenant_id, driver_id)
         except Exception:
             removed = []
 
+    offline_msg = {
+        "type": "fleet_driver_offline",
+        "tenant_id": tenant_id,
+        "driver_id": driver_id,
+        "trip_id": trip_id,
+        "reason": "shift_end",
+        "removed_vehicle_ids": removed,
+    }
     if tenant_id:
         try:
-            await get_fleet_egress_hub().broadcast(
-                tenant_id,
-                {
-                    "type": "fleet_driver_offline",
-                    "tenant_id": tenant_id,
-                    "driver_id": driver_id,
-                    "trip_id": trip_id,
-                    "reason": "shift_end",
-                    "removed_vehicle_ids": removed,
-                },
-            )
+            await get_fleet_egress_hub().broadcast(tenant_id, offline_msg)
         except Exception:
             pass
 

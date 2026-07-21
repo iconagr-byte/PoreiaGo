@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
 import IosPwaGpsGuidance from './IosPwaGpsGuidance.jsx';
 
@@ -16,6 +17,21 @@ export default function DriverShiftTelemetry({ shift }) {
     toggle,
     wakeLockSupported,
   } = shift;
+  const [ending, setEnding] = useState(false);
+
+  const onToggle = async () => {
+    if (ending) return;
+    if (online) {
+      setEnding(true);
+      try {
+        await Promise.resolve(toggle());
+      } finally {
+        setEnding(false);
+      }
+      return;
+    }
+    toggle();
+  };
 
   return (
     <section className="driver-telemetry-card space-y-4">
@@ -36,20 +52,21 @@ export default function DriverShiftTelemetry({ shift }) {
             online ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-[var(--driver-muted)]'
           }`}
         >
-          {online ? 'Online' : 'Offline'}
+          {ending ? 'Τερματισμός…' : online ? 'Online' : 'Offline'}
         </span>
       </div>
 
       <button
         type="button"
-        onClick={toggle}
+        onClick={onToggle}
+        disabled={ending}
         className={`driver-shift-btn transition-transform active:scale-[0.98] ${
           online
             ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40'
             : 'driver-btn-primary'
-        }`}
+        } ${ending ? 'opacity-70' : ''}`}
       >
-        {online ? 'ΤΕΛΟΣ ΒΑΡΔΙΑΣ' : 'ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ'}
+        {ending ? 'ΕΝΗΜΕΡΩΣΗ ΧΑΡΤΗ…' : online ? 'ΤΕΛΟΣ ΒΑΡΔΙΑΣ' : 'ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ'}
       </button>
 
       {gpsError ? <p className="text-sm text-rose-400">{gpsError}</p> : null}
@@ -82,7 +99,8 @@ export default function DriverShiftTelemetry({ shift }) {
       </dl>
 
       <p className="text-[11px] text-[var(--driver-muted)] leading-relaxed">
-        Η βάρδια μένει ενεργή όταν αλλάζετε καρτέλες. Σταματά μόνο με «ΤΕΛΟΣ ΒΑΡΔΙΑΣ».
+        Η βάρδια μένει ενεργή όταν αλλάζετε καρτέλες. Σταματά μόνο με «ΤΕΛΟΣ ΒΑΡΔΙΑΣ» — τότε
+        ενημερώνονται η πλατφόρμα και ο ζωντανός χάρτης του γραφείου.
       </p>
       <p className="text-[11px] text-[var(--driver-muted)] leading-relaxed">
         Στέλνονται live: θέση, ταχύτητα, επιβάτες μετά check-in, μπαταρία &amp; αισθητήρες κινητού.

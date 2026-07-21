@@ -187,23 +187,44 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
             return;
           }
           if (msg.type === 'fleet_driver_offline') {
-            const id = vehicleIdFromRow(msg);
+            // End-shift / stale: drop pins by removed ids or driver_id (not trip match).
             setVehicles((prev) => {
-              if (!prev[id]) {
-                const matchKey = Object.keys(prev).find(
-                  (k) =>
-                    prev[k].driver_id === msg.driver_id &&
-                    String(prev[k].trip_id) === String(msg.trip_id),
-                );
-                if (!matchKey) return prev;
-                const next = { ...prev };
-                delete next[matchKey];
-                return next;
-              }
               const next = { ...prev };
-              delete next[id];
-              return next;
+              let changed = false;
+              const removedIds = Array.isArray(msg.removed_vehicle_ids)
+                ? msg.removed_vehicle_ids.map(String)
+                : [];
+              for (const rid of removedIds) {
+                if (next[rid]) {
+                  delete next[rid];
+                  changed = true;
+                }
+              }
+              const did = msg.driver_id != null ? String(msg.driver_id) : '';
+              if (did) {
+                for (const [key, row] of Object.entries(next)) {
+                  if (String(row.driver_id || '') === did) {
+                    delete next[key];
+                    changed = true;
+                  }
+                }
+              }
+              if (!changed) {
+                const id = vehicleIdFromRow(msg);
+                if (next[id]) {
+                  delete next[id];
+                  changed = true;
+                }
+              }
+              return changed ? next : prev;
             });
+            // Force a poll refresh so HTTP mode clears Redis-backed pins quickly.
+            fetchLiveFleet(adminAuthHeaders())
+              .then((rows) => {
+                if (closed || !Array.isArray(rows)) return;
+                applyRows(rows, { replace: true });
+              })
+              .catch(() => {});
           }
         } catch {
           // ignore malformed frames

@@ -228,9 +228,14 @@ export default function DriverCommandCenter() {
     toast('Ενεργοποιήστε το GPS για ζωντανή θέση στο χάρτη', { icon: '📍', duration: 5000 });
   };
 
-  const logout = () => {
+  const logout = async () => {
     toast.dismiss();
-    shift.goOffline({ silent: true });
+    // End shift on the server before clearing the JWT (map + admin notify).
+    try {
+      await shift.goOffline({ silent: true });
+    } catch {
+      /* local offline still applied inside goOffline */
+    }
     clearDriverSession();
     setAuthenticated(false);
     setSafetyOk(false);
