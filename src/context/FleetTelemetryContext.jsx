@@ -50,6 +50,8 @@ function normalizeVehicle(msg, id, prev) {
     altitude_m: msg.altitude_m ?? null,
     boarding: msg.boarding ?? null,
     sensors: msg.sensors ?? null,
+    photo_url: msg.photo_url ?? prev?.photo_url ?? null,
+    vehicle_image_url: msg.vehicle_image_url ?? prev?.vehicle_image_url ?? null,
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
 }

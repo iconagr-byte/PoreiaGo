@@ -39,6 +39,14 @@ def on_driver_disconnected(session: dict, connection_id: int) -> bool:
         return True
 
 
+def force_driver_offline(session: dict) -> bool:
+    """Clear all tracked connections for this driver/trip. True if they were online."""
+    key = driver_connection_key(session)
+    with _lock:
+        bucket = _connections.pop(key, None)
+        return bool(bucket)
+
+
 def active_connection_count() -> int:
     with _lock:
         return sum(len(bucket) for bucket in _connections.values())

@@ -150,6 +150,20 @@ export async function postDriverTelemetryLocation(payload) {
   return data;
 }
 
+/** Explicit end-of-shift — notifies admin platform + clears live map pin. */
+export async function endDriverShift() {
+  const res = await fetch(`${API_BASE}/api/driver/telemetry/shift/end`, {
+    method: 'POST',
+    headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Αποτυχία τερματισμού βάρδιας');
+  }
+  return data;
+}
+
 export async function fetchDriverManifest() {
   const tripId = getActiveTripId();
   try {

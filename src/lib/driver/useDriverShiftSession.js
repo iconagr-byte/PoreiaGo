@@ -15,7 +15,7 @@ import {
 } from './driverDeviceSensors.js';
 import { createDriverTelemetryTransport } from './driverTelemetryTransport.js';
 import { getDriverSession } from './driverSession.js';
-import { fetchDriverManifest } from '../../services/driverPortalApi.js';
+import { endDriverShift, fetchDriverManifest } from '../../services/driverPortalApi.js';
 import { isWakeLockSupported, releaseWakeLock, requestWakeLock } from './wakeLock.js';
 import {
   formatRateLimitedMessage,
@@ -82,6 +82,8 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       setGpsError('');
       setStarting(false);
       setShiftFlag(false);
+      // Fire-and-forget: notify admin platform + clear live map pin.
+      endDriverShift().catch(() => {});
       if (!silent) {
         toast('Η βάρδια τερματίστηκε', { icon: '🛑', duration: 2500 });
       }

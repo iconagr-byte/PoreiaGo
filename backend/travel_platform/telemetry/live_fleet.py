@@ -249,6 +249,29 @@ class LiveFleetService:
             self._vehicles[vehicle_id] = {**self._vehicles.get(vehicle_id, {}), **remote}
         return remote or local
 
+    async def remove_driver_vehicles(self, tenant_id: str, driver_id: str) -> list[str]:
+        """Drop live vehicles for a driver (end shift). Returns removed vehicle ids."""
+        from travel_platform.telemetry.live_fleet_redis import delete_live_vehicle
+
+        tid = str(tenant_id or "")
+        did = str(driver_id or "")
+        removed: list[str] = []
+        if not tid or not did:
+            return removed
+
+        for vid, meta in list(self._vehicles.items()):
+            if str(meta.get("tenant_id") or "") != tid:
+                continue
+            if str(meta.get("driver_id") or "") != did:
+                continue
+            code = meta.get("vehicle_code")
+            self._vehicles.pop(vid, None)
+            if code:
+                self._code_index.pop(f"{tid}:{code}", None)
+            await delete_live_vehicle(tid, vid)
+            removed.append(vid)
+        return removed
+
     def heatmap_grid(self, tenant_id: UUID, cell_size: float = 0.01) -> list[dict]:
         """Aggregate frequent stopping points for heatmap layer."""
         points = self._heat_points.get(str(tenant_id), [])
