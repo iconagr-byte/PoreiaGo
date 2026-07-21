@@ -91,12 +91,13 @@ html.driver-route body {
   position: sticky;
   top: 0;
   z-index: 40;
-  padding-top: max(0.625rem, env(safe-area-inset-top, 0px));
-  padding-bottom: 0.75rem;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--driver-border);
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+  padding-top: max(0.85rem, env(safe-area-inset-top, 0px));
+  padding-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 8px 28px rgba(15, 23, 42, 0.05);
 }
 
 .driver-header::after {
@@ -113,14 +114,14 @@ html.driver-route body {
 .driver-brand {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.85rem;
   min-width: 0;
 }
 
 .driver-brand-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.75rem;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.9rem;
   background: var(--driver-accent-soft);
   border: 1px solid rgba(29, 78, 216, 0.18);
   display: flex;
@@ -138,12 +139,14 @@ html.driver-route body {
 
 .driver-avatar,
 .driver-bus-thumb {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3.5rem;
+  height: 3.5rem;
   object-fit: cover;
-  border: 2px solid #fff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
-  background: #e2e8f0;
+  border: 2.5px solid #fff;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 6px 16px rgba(15, 23, 42, 0.1);
+  background: #eef2f7;
 }
 
 .driver-avatar {
@@ -155,15 +158,16 @@ html.driver-route body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: var(--driver-accent);
-  background: linear-gradient(145deg, #dbeafe, #eff6ff);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1e40af;
+  background: linear-gradient(160deg, #e8f0fe 0%, #dbeafe 55%, #eff6ff 100%);
 }
 
 .driver-bus-thumb {
-  border-radius: 0.85rem;
-  margin-left: -0.55rem;
+  border-radius: 1.05rem;
+  margin-left: -0.7rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -171,56 +175,63 @@ html.driver-route body {
 }
 
 .driver-bus-thumb .material-symbols-outlined {
-  font-size: 1.25rem;
+  font-size: 1.45rem;
 }
 
 .driver-header-kicker {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--driver-muted);
+  color: #86868b;
+  line-height: 1.25;
 }
 
 .driver-header-title {
-  font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--driver-text);
-  line-height: 1.2;
+  margin-top: 0.1rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #1d1d1f;
+  line-height: 1.15;
 }
 
 .driver-header-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   flex-shrink: 0;
 }
 
 .driver-header-btn {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  padding: 0.625rem 0.875rem;
-  min-height: 2.75rem;
-  border-radius: 9999px;
-  background: var(--driver-surface-raised);
-  border: 1px solid var(--driver-border);
-  color: var(--driver-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.7rem 1rem;
+  min-height: 2.85rem;
+  border-radius: 0.95rem;
+  background: rgba(15, 23, 42, 0.05);
+  border: 1px solid transparent;
+  color: #424245;
   white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.driver-header-btn:active {
+  background: rgba(15, 23, 42, 0.1);
 }
 
 .driver-live-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.625rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 0.45rem 0.65rem;
-  border-radius: 9999px;
-  min-height: 2.25rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.85rem;
+  min-height: 2.5rem;
   border: 1px solid transparent;
 }
 
