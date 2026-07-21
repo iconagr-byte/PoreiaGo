@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import AsyncSessionLocal
 from ticketing.boarding_service import get_boarding_manifest
 from travel_platform.operations.master_qr_local import DEFAULT_TENANT, _secret as local_secret
+from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
 from travel_platform.settings.drivers_store import authenticate_driver, get_driver
 from travel_platform.telemetry.live_fleet import LiveFleetService
 from travel_platform.telemetry.processor import get_idling, get_live_fleet
@@ -171,14 +172,14 @@ def _issue_driver_session(
     )
 
 
-def _resolve_trip_for_driver(driver_id: str | None) -> int:
+def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None) -> int:
     """Prefer live fleet assignment; otherwise default demo trip."""
     if not driver_id:
         return 1
     try:
         live: LiveFleetService = get_live_fleet()
-        tenant_id = UUID(DEFAULT_TENANT)
-        for v in live.list_active(tenant_id):
+        tid = UUID(tenant_id or DEFAULT_TENANT)
+        for v in live.list_active(tid):
             raw = getattr(v, "__dict__", {}) or {}
             if str(raw.get("driver_id") or "") == str(driver_id) and v.trip_id:
                 return int(v.trip_id)
@@ -193,10 +194,12 @@ async def login_with_password(body: DriverLoginBody):
     driver = authenticate_driver(body.username, body.password)
     if not driver:
         raise HTTPException(status_code=401, detail="Λάθος όνομα χρήστη ή κωδικός")
-    trip_id = _resolve_trip_for_driver(driver.id)
+    # Must match the SaaS tenant the admin live map filters by (not the local demo UUID).
+    tenant_id = await resolve_platform_tenant_id()
+    trip_id = _resolve_trip_for_driver(driver.id, tenant_id)
     return _issue_driver_session(
         driver_id=driver.id,
-        tenant_id=DEFAULT_TENANT,
+        tenant_id=tenant_id,
         trip_id=trip_id,
     )
 

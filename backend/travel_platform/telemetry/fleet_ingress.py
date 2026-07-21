@@ -77,7 +77,8 @@ def driver_payload_to_telemetry(
     speed = float(body.get("speed") or body.get("speed_kmh") or 0)
     heading = body.get("heading") or body.get("heading_deg")
     ts = body.get("timestamp") or body.get("recorded_at")
-    tenant_id = str(body.get("tenant_id") or session.get("tenant_id"))
+    # Prefer JWT session tenant — body.tenant_id is client-supplied and often the legacy demo UUID.
+    tenant_id = str(session.get("tenant_id") or body.get("tenant_id") or "")
     driver_id = str(body.get("driver_id") or session.get("driver_id") or session.get("sub") or "driver")
     trip_id = body.get("trip_id") or session.get("trip_id")
     vehicle_code = str(
@@ -122,10 +123,23 @@ def driver_payload_to_telemetry(
 
 
 async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any]) -> dict[str, Any]:
-    tenant_id = str(body.get("tenant_id") or session.get("tenant_id") or "")
-
+    from travel_platform.operations.master_qr_bridge import (
+        coerce_driver_tenant_id,
+        resolve_platform_tenant_id,
+    )
     from travel_platform.telemetry.ingress_rate_limit import check_driver_gps_rate_limit
     from travel_platform.telemetry.settings_store import get_telemetry_settings
+
+    platform_tid = await resolve_platform_tenant_id()
+    # Trust session first; remap legacy …0001 demo sessions onto the real SaaS tenant.
+    tenant_id = coerce_driver_tenant_id(
+        str(session.get("tenant_id") or body.get("tenant_id") or ""),
+        platform_tenant_id=platform_tid,
+    )
+    # Ensure downstream payload builders see the coerced tenant (even for old JWTs).
+    session = {**session, "tenant_id": tenant_id}
+    if isinstance(body, dict):
+        body = {**body, "tenant_id": tenant_id}
 
     settings = get_telemetry_settings(tenant_id or None)
     rate = check_driver_gps_rate_limit(
