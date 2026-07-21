@@ -307,7 +307,10 @@ export default function DriverCommandCenter() {
               <DailyManifest />
             </>
           )}
-          {tab === 'gps' && <DriverShiftTelemetry shift={shift} />}
+          {/* Keep GPS panel mounted so tab switches never remount shift UI. */}
+          <div hidden={tab !== 'gps'} aria-hidden={tab !== 'gps'}>
+            <DriverShiftTelemetry shift={shift} />
+          </div>
           {tab === 'scan' && <Scanner />}
           {tab === 'logs' && <ExpenseUpload />}
           {tab === 'sos' && <SOSButton />}
