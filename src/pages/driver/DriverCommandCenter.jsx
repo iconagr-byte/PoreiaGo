@@ -51,16 +51,21 @@ function DriverHeader({ session, telemetryOnline, onLogout, kicker, title }) {
   return (
     <header className="driver-header driver-shell flex justify-between items-center gap-3">
       <div className="driver-brand min-w-0">
-        <div className="driver-header-avatars" aria-hidden={!photoUrl && !busUrl}>
+        <div
+          className="driver-header-avatars"
+          aria-label={`${name}${plate ? ` · ${plate}` : ''}`}
+        >
           {photoUrl ? (
             <img src={photoUrl} alt="" className="driver-avatar" />
           ) : (
-            <div className="driver-avatar driver-avatar--initials">{driverInitials(name)}</div>
+            <div className="driver-avatar driver-avatar--initials" aria-hidden>
+              {driverInitials(name)}
+            </div>
           )}
           {busUrl ? (
             <img src={busUrl} alt="" className="driver-bus-thumb" />
           ) : (
-            <div className="driver-bus-thumb">
+            <div className="driver-bus-thumb" aria-hidden>
               <span className="material-symbols-outlined">directions_bus</span>
             </div>
           )}
@@ -76,6 +81,7 @@ function DriverHeader({ session, telemetryOnline, onLogout, kicker, title }) {
         <span
           className={`driver-live-badge ${telemetryOnline ? 'is-live' : 'is-offline'}`}
           title={telemetryOnline ? 'Ζωντανή μετάδοση GPS' : 'Εκτός σύνδεσης'}
+          aria-live="polite"
         >
           {telemetryOnline ? 'LIVE' : 'Offline'}
         </span>
