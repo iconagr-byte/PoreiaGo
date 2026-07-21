@@ -17,9 +17,11 @@ import FleetMapFlyTo from './FleetMapFlyTo.jsx';
 const busIcon = (heading) =>
   L.divIcon({
     className: 'fleet-bus-marker-ws',
-    html: `<div style="transform:rotate(${heading ?? 0}deg);background:#0040df;color:#fff;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #facc15;font-size:18px">🚌</div>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
+    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-8px)">
+      <div style="transform:rotate(${heading ?? 0}deg);background:#0040df;color:#fff;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #facc15;font-size:18px;box-shadow:0 6px 16px rgba(0,0,0,.25)">🚌</div>
+    </div>`,
+    iconSize: [44, 56],
+    iconAnchor: [22, 22],
   });
 
 function LeafletAnimatedMarkers({ vehicles }) {
@@ -27,16 +29,10 @@ function LeafletAnimatedMarkers({ vehicles }) {
 
   return display.map((v) => (
     <Marker key={v.id} position={[v.lat, v.lng]} icon={busIcon(v.heading)}>
-      <Tooltip direction="top" offset={[0, -18]} opacity={0.95} permanent={false}>
+      <Tooltip direction="top" offset={[0, -22]} opacity={0.95} permanent>
         <strong>{v.driver_name}</strong>
         <br />
         {v.bus_plate} · {Math.round(v.speed)} km/h
-        {formatBoardingLabel(v) ? (
-          <>
-            <br />
-            Επιβάτες: {formatBoardingLabel(v)}
-          </>
-        ) : null}
       </Tooltip>
       <Popup>
         <strong>{v.driver_name}</strong>

@@ -11,13 +11,13 @@ import FleetEtaPanel from './FleetEtaPanel.jsx';
 
 /** Ζωντανός χάρτης στόλου — Mapbox αν υπάρχει token, αλλιώς Leaflet. */
 export default function FleetLiveMapWebSocket() {
-  const { connected, vehicles, tenantId, transport } = useFleetTelemetryEgress();
+  const { connected, vehicles, tenantId, transport, pollError, lastPollAt } = useFleetTelemetryEgress();
   const mapbox = isMapboxEnabled();
-  const [showHeat, setShowHeat] = useState(true);
+  const [showHeat, setShowHeat] = useState(false);
   const [heatDays, setHeatDays] = useState(7);
   const [slowOnly, setSlowOnly] = useState(false);
   const [heatmap, setHeatmap] = useState([]);
-  const [showGeofence, setShowGeofence] = useState(true);
+  const [showGeofence, setShowGeofence] = useState(false);
   const [showSosPins, setShowSosPins] = useState(true);
   const [geofenceLayers, setGeofenceLayers] = useState(null);
 
@@ -155,9 +155,38 @@ export default function FleetLiveMapWebSocket() {
 
       <AdminFleetPushPanel />
 
+      {pollError ? (
+        <p className="text-sm text-rose-800 rounded-xl bg-rose-50 border border-rose-100 px-4 py-3">
+          {pollError}
+        </p>
+      ) : null}
+
+      {vehicles.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {vehicles.map((v) => (
+            <div
+              key={v.id}
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm"
+            >
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-bold text-emerald-950">{v.driver_name}</span>
+              <span className="text-emerald-800/80">
+                {v.bus_plate} · {Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}
+              </span>
+            </div>
+          ))}
+          {lastPollAt ? (
+            <span className="self-center text-[11px] text-gray-400">
+              ενημέρωση {lastPollAt.toLocaleTimeString('el-GR')}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {!vehicles.length && connected ? (
         <p className="text-sm text-gray-500 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
-          Δεν υπάρχουν ενεργοί οδηγοί στον χάρτη. Ζητήστε από έναν οδηγό να πατήσει «Έναρξη Βάρδιας» στην εφαρμογή PWA.
+          Δεν υπάρχουν ενεργοί οδηγοί στον χάρτη. Ζητήστε από έναν οδηγό να πατήσει «Έναρξη Βάρδιας» στην εφαρμογή PWA
+          και να επιτρέψει την τοποθεσία.
         </p>
       ) : null}
 

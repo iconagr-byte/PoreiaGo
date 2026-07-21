@@ -37,42 +37,16 @@ function HeatmapDots({ points = [], visible = true }) {
 function BusMarker({ vehicle }) {
   return (
     <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center">
-      <div className="relative group cursor-pointer">
+      <div className="relative cursor-pointer">
         <div
-          className="flex h-10 w-10 items-center justify-center rounded-full border-[3px] border-[#facc15] bg-[#0040df] text-lg text-white shadow-lg"
+          className="flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#facc15] bg-[#0040df] text-lg text-white shadow-lg"
           style={{ transform: `rotate(${vehicle.heading ?? 0}deg)` }}
           aria-label={`${vehicle.driver_name}, ${vehicle.bus_plate}`}
         >
           🚌
         </div>
-        <div
-          className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900/95 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
-          role="tooltip"
-        >
-          <strong>{vehicle.driver_name}</strong>
-          <br />
-          {vehicle.bus_plate} · {Math.round(vehicle.speed)} km/h
-          {formatBoardingLabel(vehicle) ? (
-            <>
-              <br />
-              Επιβάτες: {formatBoardingLabel(vehicle)}
-            </>
-          ) : null}
-          {formatPassengerNames(vehicle) ? (
-            <>
-              <br />
-              <span className="opacity-80">{formatPassengerNames(vehicle)}</span>
-            </>
-          ) : null}
-          {formatSensorSummary(vehicle) ? (
-            <>
-              <br />
-              <span className="opacity-70">{formatSensorSummary(vehicle)}</span>
-            </>
-          ) : null}
-        </div>
-        <div className="pointer-events-auto absolute top-full left-1/2 z-50 mt-2 -translate-x-1/2 opacity-0 transition-opacity group-hover:opacity-100">
-          <FleetDriverPlaybackButton vehicle={vehicle} className="shadow-lg" />
+        <div className="absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-bold text-white shadow">
+          {vehicle.driver_name}
         </div>
       </div>
     </Marker>
@@ -85,15 +59,20 @@ function MapboxAnimatedMarkers({ vehicles }) {
 }
 
 function FitBounds({ vehicles }) {
-  const { current: mapRef } = useMap();
+  const map = useMap();
 
   useEffect(() => {
-    const map = mapRef?.getMap?.();
-    if (!map || !vehicles?.length) return;
+    const mapInstance = map?.getMap?.() || map;
+    if (!mapInstance || !vehicles?.length) return;
     const bounds = new LngLatBounds();
-    vehicles.forEach((v) => bounds.extend([v.lng, v.lat]));
-    map.fitBounds(bounds, { padding: 48, maxZoom: 12 });
-  }, [vehicles, mapRef]);
+    vehicles.forEach((v) => {
+      if (Number.isFinite(v.lng) && Number.isFinite(v.lat)) {
+        bounds.extend([v.lng, v.lat]);
+      }
+    });
+    if (bounds.isEmpty()) return;
+    mapInstance.fitBounds(bounds, { padding: 64, maxZoom: 13, duration: 800 });
+  }, [vehicles, map]);
 
   return null;
 }
