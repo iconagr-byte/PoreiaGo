@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from typing import List
 
@@ -16,6 +17,22 @@ from middleware.tenant import TenantContextMiddleware
 from ticketing.db import init_ticketing_db, close_ticketing_db
 from ticketing.seed import seed_if_empty
 from ticketing.customer_bookings import seed_customer_bookings_if_empty
+
+
+# Explicit origins required when allow_credentials=True (browsers reject "*").
+_DEFAULT_CORS_ORIGINS = (
+    "https://www.poreiago.com,"
+    "https://poreiago.com,"
+    "http://localhost:5173,"
+    "http://localhost:3000,"
+    "http://127.0.0.1:5173,"
+    "http://127.0.0.1:3000"
+)
+
+
+def _cors_origins() -> list[str]:
+    raw = (os.getenv("CORS_ORIGINS") or _DEFAULT_CORS_ORIGINS).strip()
+    return [o.strip() for o in raw.split(",") if o.strip()]
 
 try:
     from api.bookings import router as bookings_router
@@ -148,15 +165,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Inner → outer: tenant/domain auth first, CORS last so it is outermost.
+# Starlette runs the last-added middleware first; CORS must wrap 401s and
+# answer OPTIONS preflight before TenantContextMiddleware requires JWT.
+app.add_middleware(TenantContextMiddleware)
+app.add_middleware(DomainTenantMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(TenantContextMiddleware)
-app.add_middleware(DomainTenantMiddleware)
 
 app.include_router(ticketing_router)
 app.include_router(abandoned_public_router)

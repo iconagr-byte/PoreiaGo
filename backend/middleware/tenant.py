@@ -178,6 +178,10 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path
+        # CORS preflight never carries Authorization; must not 401 here.
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         jwt_secret, jwt_algorithm, admin_auth_disabled = _jwt_settings()
 
         if path in PUBLIC_PATHS:
