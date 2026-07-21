@@ -131,7 +131,7 @@ class FleetDriverCreate(BaseModel):
     salary_per_trip: float = Field(25.0, ge=0)
     license_expires_at: date | None = None
     photo_url: str | None = None
-    password: str | None = Field(None, min_length=4)
+    password: str = Field(..., min_length=4, max_length=128)
 
 
 class FleetDriverUpdate(BaseModel):

@@ -157,17 +157,27 @@ def _seed() -> dict[str, FleetDriver]:
     return drivers
 
 
-def _load_from_disk() -> dict[str, FleetDriver] | None:
+def _normalize_username(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _load_from_disk() -> tuple[dict[str, FleetDriver], float] | None:
+    """
+    Load store from disk.
+    Returns (drivers, mtime). Empty list is a valid store (do NOT re-seed).
+    Missing / corrupt file → None (caller may seed).
+    """
     if not STORE_PATH.exists():
         return None
     try:
+        mtime = STORE_PATH.stat().st_mtime
         raw = json.loads(STORE_PATH.read_text(encoding="utf-8"))
         rows = raw.get("drivers") if isinstance(raw, dict) else raw
-        if not isinstance(rows, list) or not rows:
+        if not isinstance(rows, list):
             return None
-        drivers = {row["id"]: _driver_from_row(row) for row in rows if row.get("id")}
+        drivers = {row["id"]: _driver_from_row(row) for row in rows if isinstance(row, dict) and row.get("id")}
         logger.info("Loaded %s fleet drivers from %s", len(drivers), STORE_PATH)
-        return drivers
+        return drivers, mtime
     except Exception as exc:
         logger.warning("Failed to load fleet drivers from %s: %s", STORE_PATH, exc)
         return None
@@ -182,23 +192,71 @@ def _persist() -> None:
         tmp = STORE_PATH.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(STORE_PATH)
+        global _store_mtime
+        _store_mtime = STORE_PATH.stat().st_mtime
     except Exception as exc:
         logger.error("Failed to persist fleet drivers to %s: %s", STORE_PATH, exc)
+        raise RuntimeError(f"Αποτυχία αποθήκευσης οδηγών: {exc}") from exc
 
 
 _drivers: dict[str, FleetDriver] | None = None
+_store_mtime: float | None = None
+
+
+def reset_drivers_cache() -> None:
+    """Test helper — drop in-memory cache so next access reloads from disk."""
+    global _drivers, _store_mtime
+    _drivers = None
+    _store_mtime = None
 
 
 def _ensure() -> dict[str, FleetDriver]:
-    global _drivers
+    global _drivers, _store_mtime
+    # Reload when another process (or blue/green peer) wrote a newer store file.
+    if _drivers is not None and STORE_PATH.exists():
+        try:
+            disk_mtime = STORE_PATH.stat().st_mtime
+            if _store_mtime is not None and disk_mtime > _store_mtime:
+                loaded = _load_from_disk()
+                if loaded is not None:
+                    _drivers, _store_mtime = loaded
+                    return _drivers
+        except OSError:
+            pass
+
     if _drivers is None:
         loaded = _load_from_disk()
         if loaded is not None:
-            _drivers = loaded
+            _drivers, _store_mtime = loaded
         else:
             _drivers = _seed()
             _persist()
     return _drivers
+
+
+def _assert_unique(
+    *,
+    email: str,
+    license_no: str,
+    vehicle_code: str | None,
+    license_plate: str | None,
+    exclude_id: str | None = None,
+) -> None:
+    email_n = _normalize_username(email)
+    license_n = _normalize_username(license_no)
+    code_n = _normalize_username(vehicle_code)
+    plate_n = _normalize_username(license_plate)
+    for d in _ensure().values():
+        if exclude_id and d.id == exclude_id:
+            continue
+        if email_n and d.email.lower() == email_n:
+            raise ValueError("Το email χρησιμοποιείται ήδη από άλλον οδηγό")
+        if license_n and d.license_no.lower() == license_n:
+            raise ValueError("Ο αριθμός άδειας χρησιμοποιείται ήδη")
+        if code_n and d.vehicle_code and d.vehicle_code.lower() == code_n:
+            raise ValueError("Ο κωδικός οχήματος χρησιμοποιείται ήδη")
+        if plate_n and d.license_plate and d.license_plate.lower() == plate_n:
+            raise ValueError("Η πινακίδα χρησιμοποιείται ήδη")
 
 
 def list_drivers(status: str | None = None) -> list[FleetDriver]:
@@ -214,7 +272,7 @@ def get_driver(driver_id: str) -> FleetDriver | None:
 
 def find_driver_by_username(username: str) -> FleetDriver | None:
     """Match email, license number, or vehicle/driver code (case-insensitive)."""
-    needle = (username or "").strip().lower()
+    needle = _normalize_username(username)
     if not needle:
         return None
     for d in _ensure().values():
@@ -246,19 +304,40 @@ def authenticate_driver(username: str, password: str) -> FleetDriver | None:
 
 
 def create_driver(data: dict) -> FleetDriver:
+    pwd = data.get("password")
+    if not pwd or not str(pwd).strip():
+        raise ValueError("Απαιτείται κωδικός για την εφαρμογή λεωφορείου")
+    if len(str(pwd)) < 4:
+        raise ValueError("Ο κωδικός πρέπει να έχει τουλάχιστον 4 χαρακτήρες")
+
+    email = data["email"].strip().lower()
+    license_no = data["license_no"].strip()
+    vehicle_code = (data.get("vehicle_code") or None)
+    if isinstance(vehicle_code, str):
+        vehicle_code = vehicle_code.strip() or None
+    license_plate = (data.get("license_plate") or None)
+    if isinstance(license_plate, str):
+        license_plate = license_plate.strip() or None
+
+    _assert_unique(
+        email=email,
+        license_no=license_no,
+        vehicle_code=vehicle_code,
+        license_plate=license_plate,
+    )
+
     did = str(uuid4())
-    pwd = data.get("password") or DEFAULT_DRIVER_PASSWORD
     hiring = _parse_date(data.get("hiring_date")) or date.today()
     driver = FleetDriver(
         id=did,
         name=data["name"].strip(),
-        license_no=data["license_no"].strip(),
+        license_no=license_no,
         phone=(data.get("phone") or "").strip(),
-        email=data["email"].strip().lower(),
+        email=email,
         hiring_date=hiring,
         status=data.get("status", "active"),
-        vehicle_code=data.get("vehicle_code"),
-        license_plate=data.get("license_plate"),
+        vehicle_code=vehicle_code,
+        license_plate=license_plate,
         salary_per_km=float(data.get("salary_per_km", 0.45)),
         salary_per_trip=float(data.get("salary_per_trip", 25)),
         current_balance=0.0,
@@ -276,6 +355,26 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
     d = _ensure().get(driver_id)
     if not d:
         raise KeyError("Driver not found")
+
+    next_email = str(patch["email"]).strip().lower() if patch.get("email") else d.email
+    next_license = str(patch["license_no"]).strip() if patch.get("license_no") is not None else d.license_no
+    next_code = d.vehicle_code
+    if "vehicle_code" in patch:
+        raw = patch["vehicle_code"]
+        next_code = (str(raw).strip() or None) if raw is not None else None
+    next_plate = d.license_plate
+    if "license_plate" in patch:
+        raw = patch["license_plate"]
+        next_plate = (str(raw).strip() or None) if raw is not None else None
+
+    _assert_unique(
+        email=next_email,
+        license_no=next_license,
+        vehicle_code=next_code,
+        license_plate=next_plate,
+        exclude_id=driver_id,
+    )
+
     for key in (
         "name", "license_no", "phone", "email", "status",
         "vehicle_code", "license_plate",
@@ -291,12 +390,19 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         d.photo_url = (str(raw).strip() or None) if raw is not None else None
     if patch.get("email"):
         d.email = str(patch["email"]).lower()
+    if "vehicle_code" in patch:
+        d.vehicle_code = next_code
+    if "license_plate" in patch:
+        d.license_plate = next_plate
     if patch.get("salary_per_km") is not None:
         d.salary_per_km = float(patch["salary_per_km"])
     if patch.get("salary_per_trip") is not None:
         d.salary_per_trip = float(patch["salary_per_trip"])
     if patch.get("password"):
-        d.password_hash = hash_password(str(patch["password"]))
+        pwd = str(patch["password"])
+        if len(pwd) < 4:
+            raise ValueError("Ο κωδικός πρέπει να έχει τουλάχιστον 4 χαρακτήρες")
+        d.password_hash = hash_password(pwd)
     _persist()
     return d
 
