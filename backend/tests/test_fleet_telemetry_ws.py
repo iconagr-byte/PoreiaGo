@@ -127,6 +127,10 @@ class IngestDriverLocationTests(unittest.IsolatedAsyncioTestCase):
             patch("travel_platform.telemetry.fleet_ingress.process_telemetry_payload", process),
             patch("travel_platform.telemetry.fleet_ingress.publish_fleet_location", publish),
             patch.object(hub, "broadcast", broadcast),
+            patch(
+                "travel_platform.operations.master_qr_bridge.resolve_platform_tenant_id",
+                new=AsyncMock(return_value=DEMO_TENANT),
+            ),
         ):
             result = await ingest_driver_location(body, session=session)
 
@@ -143,6 +147,39 @@ class IngestDriverLocationTests(unittest.IsolatedAsyncioTestCase):
         batch = drain_batch(10)
         self.assertEqual(len(batch), 1)
         self.assertEqual(batch[0].lat, 37.98)
+
+    async def test_remaps_legacy_demo_tenant_to_platform(self):
+        platform = "11111111-2222-3333-4444-555555555555"
+        session = {
+            "tenant_id": DEMO_TENANT,
+            "trip_id": 1,
+            "sub": "drv-remap",
+            "vehicle_code": "REM-001",
+        }
+        body = {
+            "lat": 38.0,
+            "lng": 23.0,
+            "speed": 10,
+            "bus_plate": "REM-001",
+            "tenant_id": DEMO_TENANT,
+            "timestamp": int(time.time() * 1000),
+        }
+        process = AsyncMock()
+        with (
+            patch("travel_platform.telemetry.fleet_ingress.process_telemetry_payload", process),
+            patch("travel_platform.telemetry.fleet_ingress.publish_fleet_location", AsyncMock()),
+            patch.object(get_fleet_egress_hub(), "broadcast", AsyncMock()),
+            patch(
+                "travel_platform.operations.master_qr_bridge.resolve_platform_tenant_id",
+                new=AsyncMock(return_value=platform),
+            ),
+        ):
+            result = await ingest_driver_location(body, session=session)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["tenant_id"], platform)
+        payload = process.await_args.args[0]
+        self.assertEqual(payload["tenant_id"], platform)
 
 
 class FleetTelemetryWebSocketTests(unittest.TestCase):
