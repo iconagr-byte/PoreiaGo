@@ -72,14 +72,19 @@ $COMPOSE --profile bundled-db up -d --force-recreate --no-deps api-blue
 $COMPOSE --profile bundled-db up -d traefik frontend postgres redis
 
 echo "==> Waiting for API health"
-for i in $(seq 1 30); do
+for i in $(seq 1 40); do
   if curl -sf "$API_BASE/health" >/dev/null 2>&1; then
-    echo "  API healthy"
+    echo "  API healthy (public)"
     break
   fi
-  sleep 2
-  if [[ "$i" -eq 30 ]]; then
-    echo "WARN: API health check timeout — see: $COMPOSE logs api-blue --tail 40"
+  if $COMPOSE exec -T api-blue python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" >/dev/null 2>&1; then
+    echo "  API process up (Traefik catching up… try $i)"
+  fi
+  sleep 3
+  if [[ "$i" -eq 40 ]]; then
+    echo "WARN: API health check timeout — see: $COMPOSE logs api-blue --tail 80"
+    $COMPOSE logs api-blue --tail 80 || true
+    $COMPOSE ps || true
   fi
 done
 
