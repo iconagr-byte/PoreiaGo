@@ -1,184 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
-import toast from 'react-hot-toast';
-import {
-  isGeolocationSupported,
-  startDriverGeolocationWatch,
-} from '../../lib/driver/driverGeolocation.js';
-import { buildDriverTelemetryPayload } from '../../lib/driver/driverTelemetryEnvelope.js';
-import {
-  requestMotionPermission,
-  startDeviceSensorWatch,
-} from '../../lib/driver/driverDeviceSensors.js';
-import { createDriverTelemetryTransport } from '../../lib/driver/driverTelemetryTransport.js';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
-import { fetchDriverManifest } from '../../services/driverPortalApi.js';
-import { isWakeLockSupported, releaseWakeLock, requestWakeLock } from '../../lib/driver/wakeLock.js';
-import {
-  formatRateLimitedMessage,
-  geolocationErrorToGreek,
-  getIosGpsEnvironment,
-} from '../../lib/driver/iosPwaGps.js';
 import IosPwaGpsGuidance from './IosPwaGpsGuidance.jsx';
-import { useIosBackgroundGpsWarning } from '../../lib/driver/useIosBackgroundGpsWarning.js';
 
 /**
- * Mobile-first shift telemetry — Go Online toggle, GPS → WebSocket (HTTP fallback).
+ * GPS tab UI for an already-running shift session (session lives in parent).
  */
-export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
-  const [online, setOnline] = useState(false);
-  const [lastPing, setLastPing] = useState(null);
-  const [gpsError, setGpsError] = useState('');
-  const [manifestSummary, setManifestSummary] = useState(null);
-  const iosEnv = getIosGpsEnvironment();
-  const backgroundWarning = useIosBackgroundGpsWarning(online);
-  const stopGeoRef = useRef(null);
-  const transportRef = useRef(null);
-  const wakeRef = useRef(null);
-  const stopSensorsRef = useRef(null);
-  const manifestRef = useRef(null);
-  const sensorsRef = useRef(null);
-  const linkedOnlineRef = useRef(false);
+export default function DriverShiftTelemetry({ shift }) {
   const session = getDriverSession();
-
-  useEffect(() => {
-    return () => {
-      stopGeoRef.current?.();
-      stopSensorsRef.current?.();
-      transportRef.current?.close();
-      releaseWakeLock(wakeRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!online) return undefined;
-    const refreshManifest = () => {
-      fetchDriverManifest()
-        .then((manifest) => {
-          manifestRef.current = manifest;
-          setManifestSummary(manifest);
-        })
-        .catch(() => {});
-    };
-    refreshManifest();
-    const manifestPollId = window.setInterval(refreshManifest, 10_000);
-    const onManifestUpdated = () => refreshManifest();
-    window.addEventListener('driver-manifest-updated', onManifestUpdated);
-    return () => {
-      window.clearInterval(manifestPollId);
-      window.removeEventListener('driver-manifest-updated', onManifestUpdated);
-    };
-  }, [online]);
-
-  const goOffline = () => {
-    stopGeoRef.current?.();
-    stopGeoRef.current = null;
-    stopSensorsRef.current?.();
-    stopSensorsRef.current = null;
-    transportRef.current?.close();
-    transportRef.current = null;
-    releaseWakeLock(wakeRef.current);
-    wakeRef.current = null;
-    linkedOnlineRef.current = false;
-    setOnline(false);
-    setGpsError('');
-    localStorage.setItem('driver_shift_online', '0');
-    window.dispatchEvent(new CustomEvent('driver-shift-online', { detail: { online: false } }));
-  };
-
-  const markOnline = () => {
-    if (linkedOnlineRef.current) return;
-    linkedOnlineRef.current = true;
-    setOnline(true);
-    localStorage.setItem('driver_shift_online', '1');
-    window.dispatchEvent(new CustomEvent('driver-shift-online', { detail: { online: true } }));
-    toast('Η θέση σας θα εμφανιστεί στον live χάρτη του γραφείου', {
-      icon: '🗺️',
-      duration: 4000,
-    });
-  };
-
-  const goOnline = async () => {
-    if (!isGeolocationSupported()) {
-      toast.error('Το GPS δεν υποστηρίζεται σε αυτή τη συσκευή');
-      return;
-    }
-    if (iosEnv.needsInstallGuidance) {
-      toast(
-        'Στο iPhone προσθέστε την εφαρμογή στην Αρχική (βλ. οδηγίες παρακάτω) για αξιόπιστο GPS.',
-        { icon: '📱', duration: 6000 },
-      );
-    }
-    try {
-      await requestMotionPermission();
-      let httpFallbackNotified = false;
-      const conn = createDriverTelemetryTransport({
-        onOpen: ({ transport } = {}) => {
-          markOnline();
-          if (transport === 'ws') {
-            toast.success('Σύνδεση telemetry OK');
-          } else if (transport === 'http' && !httpFallbackNotified) {
-            httpFallbackNotified = true;
-            toast.success('Σύνδεση θέσης OK');
-          }
-        },
-        onError: () => {
-          // WS errors are handled by HTTP fallback — only surface if HTTP also fails.
-        },
-        onClose: () => {
-          if (linkedOnlineRef.current && transportRef.current?.mode === 'ws') {
-            toast('Η σύνδεση telemetry διακόπηκε — συνέχεια μέσω HTTP');
-          }
-        },
-        onMessage: (msg) => {
-          if (msg.type === 'ack' && msg.ok !== false) setLastPing(new Date());
-          if (msg.type === 'rate_limited') {
-            toast(formatRateLimitedMessage(msg.retry_after_sec), { icon: '⏳' });
-          }
-          if (msg.type === 'error' && msg.detail === 'invalid_token') {
-            toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά');
-            goOffline();
-          }
-        },
-      });
-      transportRef.current = conn;
-      stopSensorsRef.current = startDeviceSensorWatch((snapshot) => {
-        sensorsRef.current = snapshot;
-      });
-      wakeRef.current = await requestWakeLock();
-      if (!isWakeLockSupported()) {
-        toast('Wake Lock μη διαθέσιμο — κρατήστε την οθόνη ενεργή', { icon: 'ℹ️' });
-      }
-
-      stopGeoRef.current = startDriverGeolocationWatch({
-        onPosition: (pos) => {
-          const plate =
-            session?.vehiclePlate ||
-            session?.vehicleCode ||
-            session?.busPlate ||
-            `TRIP-${session?.tripId || '?'}`;
-          const payload = buildDriverTelemetryPayload(pos, session, {
-            driverName: session?.driverName || driverName,
-            busPlate: plate,
-            manifest: manifestRef.current,
-            sensors: sensorsRef.current,
-          });
-          const sent = conn.send(payload);
-          if (sent) setGpsError('');
-        },
-        onError: (err) => {
-          setGpsError(geolocationErrorToGreek(err, { isIos: iosEnv.isIos }));
-        },
-      });
-    } catch (err) {
-      toast.error(err.message || 'Αποτυχία σύνδεσης');
-      goOffline();
-    }
-  };
-
-  const toggle = () => {
-    if (online) goOffline();
-    else goOnline();
-  };
+  const {
+    online,
+    lastPing,
+    gpsError,
+    manifestSummary,
+    backgroundWarning,
+    iosEnv,
+    toggle,
+    wakeLockSupported,
+  } = shift;
 
   return (
     <section className="driver-telemetry-card space-y-4">
@@ -232,7 +69,7 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
         <div className="driver-stat-tile">
           <dt className="driver-card-label">Οθόνη ενεργή</dt>
           <dd className="text-[var(--driver-text)] text-sm mt-1 font-bold">
-            {isWakeLockSupported() ? 'Ναι' : 'Όχι'}
+            {wakeLockSupported ? 'Ναι' : 'Όχι'}
           </dd>
         </div>
         <div className="driver-stat-tile">
@@ -244,6 +81,9 @@ export default function DriverShiftTelemetry({ driverName = 'Οδηγός' }) {
         </div>
       </dl>
 
+      <p className="text-[11px] text-[var(--driver-muted)] leading-relaxed">
+        Η βάρδια μένει ενεργή όταν αλλάζετε καρτέλες. Σταματά μόνο με «ΤΕΛΟΣ ΒΑΡΔΙΑΣ».
+      </p>
       <p className="text-[11px] text-[var(--driver-muted)] leading-relaxed">
         Στέλνονται live: θέση, ταχύτητα, επιβάτες μετά check-in, μπαταρία &amp; αισθητήρες κινητού.
       </p>
