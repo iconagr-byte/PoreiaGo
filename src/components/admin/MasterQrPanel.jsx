@@ -6,10 +6,10 @@ import { issueMasterQr, getMasterQrPngUrl, fetchFleetDrivers, notifyDriverShiftP
 import { syncTripsToPostgres } from '../../services/tripsSyncApi.js';
 import BusPwaInstallGuide from './BusPwaInstallGuide.jsx';
 
-const inputClass =
-  'mt-1.5 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-sm font-medium transition-colors focus:bg-white focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/15';
+const fieldClass =
+  'mt-1.5 w-full rounded-[12px] border border-zinc-200/80 bg-zinc-50 px-3.5 py-2.5 text-[14px] font-medium text-zinc-900 transition-colors focus:bg-white focus:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900/5';
 
-export default function MasterQrPanel() {
+export default function MasterQrPanel({ compact = false }) {
   const [trips, setTrips] = useState([]);
   const [tripId, setTripId] = useState('');
   const [driverId, setDriverId] = useState('');
@@ -43,38 +43,37 @@ export default function MasterQrPanel() {
     };
   }, []);
 
-  const onIssue = useCallback(async (e) => {
-    e.preventDefault();
-    const id = Number(tripId);
-    if (!Number.isFinite(id) || id <= 0) {
-      toast.error('Επιλέξτε εκδρομή');
-      return;
-    }
-    setLoading(true);
-    try {
-      const trip = getTripById(id) || trips.find((t) => Number(t.id) === id);
-      if (trip) {
-        const sync = await syncTripsToPostgres([trip]);
-        if (!sync.postgres_available) {
-          toast('Postgres offline — Master QR θα είναι τοπικό JSON', { icon: 'ℹ️' });
-        }
+  const onIssue = useCallback(
+    async (e) => {
+      e.preventDefault();
+      const id = Number(tripId);
+      if (!Number.isFinite(id) || id <= 0) {
+        toast.error('Επιλέξτε εκδρομή');
+        return;
       }
-      const result = await issueMasterQr({
-        tripId: id,
-        driverId: driverId.trim() || undefined,
-      });
-      setIssued(result);
-      toast.success(
-        result.source === 'postgres'
-          ? 'Master QR εκδόθηκε (SaaS / Postgres)'
-          : 'Master QR εκδόθηκε (τοπικό demo)',
-      );
-    } catch (err) {
-      toast.error(err.message || 'Αποτυχία έκδοσης');
-    } finally {
-      setLoading(false);
-    }
-  }, [tripId, driverId, trips]);
+      setLoading(true);
+      try {
+        const trip = getTripById(id) || trips.find((t) => Number(t.id) === id);
+        if (trip) {
+          const sync = await syncTripsToPostgres([trip]);
+          if (!sync.postgres_available) {
+            toast('Postgres offline — τοπικό QR', { icon: 'ℹ️' });
+          }
+        }
+        const result = await issueMasterQr({
+          tripId: id,
+          driverId: driverId.trim() || undefined,
+        });
+        setIssued(result);
+        toast.success('Το Master QR εκδόθηκε');
+      } catch (err) {
+        toast.error(err.message || 'Αποτυχία έκδοσης');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [tripId, driverId, trips],
+  );
 
   const onNotifyDriverPush = useCallback(async () => {
     const id = Number(tripId);
@@ -92,12 +91,9 @@ export default function MasterQrPanel() {
         message: trip?.title ? `${trip.title} — πάτα για σύνδεση στη βάρδια` : undefined,
       });
       if (result.push?.reason === 'no_driver_subscriptions') {
-        toast.error(
-          'Ο οδηγός δεν έχει ενεργοποιήσει push στο /driver (Αρχική → Ενεργοποίηση push)',
-          { duration: 7000 },
-        );
+        toast.error('Ο οδηγός δεν έχει ενεργοποιήσει push στο /driver', { duration: 7000 });
       } else if (result.ok) {
-        toast.success(`Push στάλθηκε · ${result.push?.sent || 0} συσκευή(ές)`);
+        toast.success(`Push στάλθηκε · ${result.push?.sent || 0}`);
         setIssued({
           trip_id: result.trip_id,
           auth_url: result.auth_url,
@@ -121,78 +117,56 @@ export default function MasterQrPanel() {
     : null;
 
   return (
-    <div className="relative overflow-hidden bg-white rounded-[24px] border border-black/[0.06] shadow-sm">
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-primary/70 to-indigo-400" />
+    <div className="h-full rounded-[22px] bg-white/80 backdrop-blur-xl border border-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)] p-6 sm:p-7 flex flex-col gap-5">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          Ταμπλό
+        </p>
+        <h3 className="mt-1 text-[19px] font-semibold tracking-tight text-zinc-900">Master QR</h3>
+        <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-500 tracking-tight">
+          Εναλλακτική είσοδος χωρίς κωδικό — σάρωση στο{' '}
+          <span className="font-medium text-zinc-700">/driver</span>.
+        </p>
+      </div>
 
-      <div className="p-6 sm:p-7 space-y-6">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <span className="material-symbols-outlined text-primary text-[26px]">qr_code_2</span>
-          </div>
-          <div className="min-w-0">
-            <h4 className="font-bold text-gray-900 text-lg tracking-tight">
-              Master QR (ταμπλό λεωφορείου)
-            </h4>
-            <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-              Ο οδηγός σκανάρει στο{' '}
-              <code className="bg-primary/8 text-primary px-1.5 py-0.5 rounded-md text-xs font-mono font-semibold">
-                /driver
-              </code>{' '}
-              ή ανοίγει magic link{' '}
-              <code className="bg-primary/8 text-primary px-1.5 py-0.5 rounded-md text-xs font-mono font-semibold">
-                /driver/auth
-              </code>{' '}
-              — χωρίς username/password.
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={onIssue} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end">
-          <label className="block">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Εκδρομή</span>
-            <select value={tripId} onChange={(e) => setTripId(e.target.value)} className={inputClass}>
-              {trips.map((t) => (
-                <option key={t.id} value={t.id}>
-                  #{t.id} — {t.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Οδηγός (προαιρ.)
-            </span>
-            <select
-              value={driverId}
-              onChange={(e) => setDriverId(e.target.value)}
-              className={inputClass}
-              disabled={driversLoading}
-            >
-              <option value="">— Χωρίς συγκεκριμένο οδηγό —</option>
-              {drivers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                  {d.license_plate || d.vehicle_code
-                    ? ` · ${d.license_plate || d.vehicle_code}`
-                    : ''}
-                </option>
-              ))}
-            </select>
-            {driversLoading ? (
-              <p className="text-[10px] text-gray-400 mt-1">Φόρτωση οδηγών…</p>
-            ) : drivers.length === 0 ? (
-              <p className="text-[10px] text-amber-600 mt-1">
-                Δεν βρέθηκαν ενεργοί οδηγοί — προσθέστε από Διαχείριση Οδηγών
-              </p>
-            ) : null}
-          </label>
+      <form onSubmit={onIssue} className="space-y-3">
+        <label className="block">
+          <span className="text-[12px] font-medium text-zinc-500">Εκδρομή</span>
+          <select value={tripId} onChange={(e) => setTripId(e.target.value)} className={fieldClass}>
+            {trips.map((t) => (
+              <option key={t.id} value={t.id}>
+                #{t.id} — {t.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-[12px] font-medium text-zinc-500">Οδηγός (προαιρετικά)</span>
+          <select
+            value={driverId}
+            onChange={(e) => setDriverId(e.target.value)}
+            className={fieldClass}
+            disabled={driversLoading}
+          >
+            <option value="">Χωρίς συγκεκριμένο οδηγό</option>
+            {drivers.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+                {d.license_plate || d.vehicle_code
+                  ? ` · ${d.license_plate || d.vehicle_code}`
+                  : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex flex-wrap gap-2 pt-1">
           <button
             type="submit"
             disabled={loading}
-            className="h-[46px] rounded-full bg-primary text-white font-bold text-sm px-7 hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+            className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-[12px] bg-zinc-900 text-white text-[14px] font-semibold hover:bg-zinc-800 disabled:opacity-50 transition-colors"
           >
-            <span className="material-symbols-outlined text-[20px]">
-              {loading ? 'hourglass_empty' : 'qr_code_scanner'}
+            <span className="material-symbols-outlined text-[18px]">
+              {loading ? 'progress_activity' : 'qr_code_2'}
             </span>
             {loading ? 'Έκδοση…' : 'Έκδοση QR'}
           </button>
@@ -200,91 +174,56 @@ export default function MasterQrPanel() {
             type="button"
             disabled={pushLoading}
             onClick={onNotifyDriverPush}
-            className="h-[46px] rounded-full bg-emerald-600 text-white font-bold text-sm px-5 hover:bg-emerald-700 disabled:opacity-60 transition-all flex items-center justify-center gap-2 md:col-span-1"
-            title="Αποστολή push στο κινητό οδηγού"
+            className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-[12px] bg-zinc-100 text-zinc-800 text-[14px] font-semibold hover:bg-zinc-200/80 disabled:opacity-50 transition-colors"
           >
-            <span className="material-symbols-outlined text-[20px]">
-              {pushLoading ? 'hourglass_empty' : 'notifications_active'}
+            <span className="material-symbols-outlined text-[18px]">
+              {pushLoading ? 'progress_activity' : 'notifications'}
             </span>
-            {pushLoading ? 'Push…' : 'Push οδηγού'}
+            Push
           </button>
-        </form>
+        </div>
+      </form>
 
-        <BusPwaInstallGuide />
+      {!compact ? <BusPwaInstallGuide /> : null}
 
-        {issued && (
-          <div className="flex flex-col md:flex-row gap-6 items-center md:items-start pt-6 border-t border-gray-100">
-            <div className="relative bg-white p-5 rounded-2xl border-2 border-dashed border-primary/25 shadow-inner">
-              <div className="absolute -top-2.5 left-4 px-2 bg-white text-[10px] font-bold uppercase tracking-wider text-primary">
-                Σκανάρισμα
-              </div>
-              <QRCode value={issued.auth_url || issued.qr_content} size={180} />
+      {issued ? (
+        <div className="pt-4 border-t border-zinc-100 flex flex-col sm:flex-row gap-5 items-center sm:items-start">
+          <div className="rounded-[18px] bg-zinc-50 p-4 border border-zinc-100 shrink-0">
+            <QRCode value={issued.auth_url || issued.qr_content} size={148} bgColor="transparent" />
+          </div>
+          <div className="flex-1 w-full min-w-0 space-y-3 text-[13px]">
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={getMasterQrPngUrl(issued.trip_id, {
+                  driverId: issued.driver_id || driverId.trim() || undefined,
+                })}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[11px] bg-zinc-900 text-white text-[13px] font-semibold hover:bg-zinc-800"
+              >
+                <span className="material-symbols-outlined text-[16px]">download</span>
+                Λήψη PNG
+              </a>
             </div>
-            <div className="flex-1 space-y-3 text-sm w-full">
-              <div className="flex flex-wrap gap-2">
-                <a
-                  href={getMasterQrPngUrl(issued.trip_id, {
-                    driverId: issued.driver_id || driverId.trim() || undefined,
-                  })}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full bg-primary text-white hover:bg-primary/90"
-                >
-                  <span className="material-symbols-outlined text-[16px]">download</span>
-                  Λήψη PNG
-                </a>
-                <button
-                  type="button"
-                  disabled={pushLoading}
-                  onClick={onNotifyDriverPush}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  <span className="material-symbols-outlined text-[16px]">
-                    {pushLoading ? 'hourglass_empty' : 'notifications_active'}
-                  </span>
-                  {pushLoading ? 'Αποστολή…' : 'Push «Άνοιξε βάρδια»'}
-                </button>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-[12px] bg-zinc-50 px-3 py-2.5 border border-zinc-100">
+                <div className="text-[11px] text-zinc-400">Trip</div>
+                <div className="font-semibold text-zinc-900 mt-0.5">#{issued.trip_id}</div>
               </div>
-              {issued.source && (
-                <span
-                  className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${
-                    issued.source === 'postgres'
-                      ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[14px]">
-                    {issued.source === 'postgres' ? 'cloud_done' : 'storage'}
-                  </span>
-                  {issued.source === 'postgres' ? 'Postgres (SaaS)' : 'Τοπικό JSON'}
-                </span>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="rounded-xl bg-gray-50 px-4 py-3">
-                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">Trip</div>
-                  <div className="font-bold text-gray-900 mt-0.5">#{issued.trip_id}</div>
-                </div>
-                <div className="rounded-xl bg-gray-50 px-4 py-3">
-                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">Λήξη</div>
-                  <div className="font-bold text-gray-900 mt-0.5">{expiresLabel}</div>
-                </div>
+              <div className="rounded-[12px] bg-zinc-50 px-3 py-2.5 border border-zinc-100">
+                <div className="text-[11px] text-zinc-400">Λήξη</div>
+                <div className="font-semibold text-zinc-900 mt-0.5 truncate">{expiresLabel}</div>
               </div>
-              <div className="rounded-xl bg-gray-50 px-4 py-3">
-                <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Magic link</div>
-                <code className="text-xs bg-white px-2 py-1 rounded-lg border border-gray-100 break-all">
-                  {issued.auth_url || issued.qr_content}
-                </code>
-              </div>
-              <div className="rounded-xl bg-gray-50 px-4 py-3">
-                <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Manifest URL</div>
-                <code className="text-xs bg-white px-2 py-1 rounded-lg border border-gray-100 break-all">
-                  {issued.manifest_url}
-                </code>
-              </div>
+            </div>
+            <div className="rounded-[12px] bg-zinc-50 px-3 py-2.5 border border-zinc-100">
+              <div className="text-[11px] text-zinc-400 mb-1">Magic link</div>
+              <code className="text-[11px] break-all text-zinc-600">
+                {issued.auth_url || issued.qr_content}
+              </code>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

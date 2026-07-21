@@ -54,8 +54,7 @@ import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
-import DriversManagementPanel from '../components/admin/DriversManagementPanel.jsx';
-import MasterQrPanel from '../components/admin/MasterQrPanel.jsx';
+import DriversHub from '../components/admin/DriversHub.jsx';
 import SortableSidebarNav from '../components/admin/SortableSidebarNav.jsx';
 import DashboardKpiCard from '../components/admin/DashboardKpiCard.jsx';
 import TemplateSearch from '../components/admin/TemplateSearch.jsx';
@@ -904,18 +903,7 @@ export default function BackOffice() {
     );
   };
 
-  const renderDrivers = () => (
-    <div className="space-y-stack-lg pb-stack-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">Οδηγοί</h2>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-          Προσωπικό, safety score και ανάθεση σε εκδρομές — αμέσως μετά τον στόλο.
-        </p>
-      </div>
-      <MasterQrPanel />
-      <DriversManagementPanel />
-    </div>
-  );
+  const renderDrivers = () => <DriversHub />;
 
   const renderFleet = () => {
     const rows = fleetVehicles.length

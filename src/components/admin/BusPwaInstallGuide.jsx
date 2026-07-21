@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { getDriverPwaStartUrl } from '../../lib/driver/driverPwaUrl.js';
 
 /**
- * Οδηγίες για το κινητό του λεωφορείου — εγκατάσταση PWA στο /driver (όχι /admin).
+ * Οδηγίες για το κινητό του λεωφορείου — εγκατάσταση PWA στο /driver.
  */
 export default function BusPwaInstallGuide() {
   const driverUrl = useMemo(() => getDriverPwaStartUrl('gps'), []);
@@ -12,7 +12,7 @@ export default function BusPwaInstallGuide() {
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(driverUrl);
-      toast.success('Ο σύνδεσμος PWA αντιγράφηκε');
+      toast.success('Ο σύνδεσμος αντιγράφηκε');
     } catch {
       toast.error('Αποτυχία αντιγραφής');
     }
@@ -28,34 +28,27 @@ export default function BusPwaInstallGuide() {
       <!DOCTYPE html><html lang="el"><head><meta charset="utf-8"/>
       <title>Οδηγός PWA — κινητό λεωφορείου</title>
       <style>
-        body { font-family: system-ui, sans-serif; padding: 24px; max-width: 640px; margin: 0 auto; }
-        h1 { font-size: 1.25rem; }
-        ol { line-height: 1.6; }
-        .url { font-family: monospace; font-size: 12px; word-break: break-all; background: #f3f4f6; padding: 8px; border-radius: 8px; }
-        .note { font-size: 13px; color: #b45309; margin-top: 16px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 32px; max-width: 640px; margin: 0 auto; color: #1d1d1f; }
+        h1 { font-size: 1.35rem; letter-spacing: -0.02em; }
+        h2 { font-size: 1rem; margin-top: 1.5rem; letter-spacing: -0.01em; }
+        ol { line-height: 1.65; color: #424245; }
+        .url { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; background: #f5f5f7; padding: 12px; border-radius: 12px; }
+        .note { font-size: 13px; color: #86868b; margin-top: 20px; }
       </style></head><body>
-      <h1>PoreiaGo Driver — κινητό λεωφορείου</h1>
-      <p><strong>ΜΗΝ</strong> ανοίξετε το BackOffice (/admin). Μόνο η εφαρμογή οδηγού:</p>
+      <h1>PoreiaGo Driver</h1>
+      <p>Ανοίξτε μόνο την εφαρμογή οδηγού (όχι BackOffice):</p>
       <p class="url">${driverUrl}</p>
-      <h2>Android (Chrome)</h2>
+      <h2>Android</h2>
       <ol>
-        <li>Ανοίξτε τον σύνδεσμο παραπάνω στο κινητό του λεωφορείου.</li>
-        <li>Μενού ⋮ → <strong>Προσθήκη στην αρχική οθόνη</strong> / Install app.</li>
-        <li>Εικονίδιο «GPS Οδηγού» στην αρχική — ανοίγτε πάντα από εκεί.</li>
+        <li>Ανοίξτε τον σύνδεσμο στο Chrome.</li>
+        <li>Μενού → Προσθήκη στην αρχική οθόνη.</li>
       </ol>
-      <h2>iPhone (Safari)</h2>
+      <h2>iPhone</h2>
       <ol>
-        <li>Ανοίξτε τον σύνδεσμο στο Safari (όχι in-app browser).</li>
-        <li>Κουμπί <strong>Κοινοποίηση</strong> → <strong>Προσθήκη στην Αρχική</strong>.</li>
-        <li>Κατά τη βάρδια κρατήστε την εφαρμογή σε πρώτο πλάνο για GPS.</li>
+        <li>Ανοίξτε τον σύνδεσμο στο Safari.</li>
+        <li>Κοινοποίηση → Προσθήκη στην Αρχική.</li>
       </ol>
-      <h2>Κάθε βάρδια</h2>
-      <ol>
-        <li>Ανοίξτε το PWA από την αρχική.</li>
-        <li>Σκανάρστε το Master QR στο ταμπλό (ή magic link).</li>
-        <li>Ολοκληρώστε Pre-Trip → ξεκινήστε GPS / scan.</li>
-      </ol>
-      <p class="note">Το γραφείο εκδίδει QR από BackOffice. Ο οδηγός δεν χρειάζεται login admin.</p>
+      <p class="note">Κατά τη βάρδια κρατήστε την εφαρμογή ανοιχτή για GPS.</p>
       </body></html>`);
     w.document.close();
     w.focus();
@@ -63,54 +56,65 @@ export default function BusPwaInstallGuide() {
   };
 
   return (
-    <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-white p-5 sm:p-6 space-y-4">
-      <div className="flex items-start gap-3">
-        <span className="material-symbols-outlined text-indigo-600 text-[28px]">phone_android</span>
-        <div>
-          <h4 className="font-bold text-gray-900">Κινητό λεωφορείου — εγκατάσταση PWA</h4>
-          <p className="text-sm text-gray-600 mt-1">
-            Στείλτε ή σκανάρστε αυτό το QR στο <strong>κινητό του λεωφορείου</strong>. Ανοίγει{' '}
-            <code className="text-xs bg-white px-1 rounded">/driver</code> — όχι BackOffice.
-          </p>
-        </div>
+    <div className="h-full rounded-[22px] bg-white/80 backdrop-blur-xl border border-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)] p-6 sm:p-7 flex flex-col gap-5">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          Εγκατάσταση
+        </p>
+        <h3 className="mt-1 text-[19px] font-semibold tracking-tight text-zinc-900">
+          Κινητό λεωφορείου
+        </h3>
+        <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-500 tracking-tight">
+          Σκανάρετε το QR στο τηλέφωνο του λεωφορείου. Ανοίγει μόνο το{' '}
+          <span className="font-medium text-zinc-700">/driver</span>.
+        </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-        <div className="bg-white p-4 rounded-xl border-2 border-dashed border-indigo-200 shrink-0">
-          <QRCode value={driverUrl} size={140} />
+      <div className="flex flex-col sm:flex-row gap-5 items-center sm:items-start flex-1">
+        <div className="rounded-[18px] bg-zinc-50 p-4 border border-zinc-100 shrink-0">
+          <QRCode value={driverUrl} size={132} bgColor="transparent" />
         </div>
-        <div className="flex-1 space-y-3 text-sm w-full min-w-0">
-          <div className="rounded-xl bg-white border border-gray-100 px-3 py-2">
-            <p className="text-[10px] font-bold uppercase text-gray-400 mb-1">Σύνδεσμος PWA</p>
-            <code className="text-xs break-all text-indigo-800">{driverUrl}</code>
+        <div className="flex-1 w-full min-w-0 space-y-3">
+          <div className="rounded-[14px] bg-zinc-50 px-3.5 py-3 border border-zinc-100">
+            <p className="text-[11px] font-medium text-zinc-400 mb-1">Σύνδεσμος</p>
+            <code className="text-[12px] break-all text-zinc-700 leading-snug">{driverUrl}</code>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={copyLink}
-              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700"
+              className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2.5 rounded-[12px] bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
             >
               <span className="material-symbols-outlined text-[16px]">content_copy</span>
-              Αντιγραφή link
+              Αντιγραφή
             </button>
             <button
               type="button"
               onClick={printSheet}
-              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full border border-indigo-200 text-indigo-800 hover:bg-indigo-50"
+              className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2.5 rounded-[12px] bg-zinc-100 text-zinc-800 hover:bg-zinc-200/80 transition-colors"
             >
               <span className="material-symbols-outlined text-[16px]">print</span>
-              Εκτύπωση οδηγιών
+              Εκτύπωση
             </button>
           </div>
-          <ul className="text-xs text-gray-600 space-y-1.5 list-disc list-inside">
-            <li>
-              <strong>Android:</strong> Chrome → Προσθήκη στην αρχική / Install app
-            </li>
-            <li>
-              <strong>iPhone:</strong> Safari → Κοινοποίηση → Προσθήκη στην Αρχική
-            </li>
-            <li>Κάθε πρωί: άνοιγμα PWA → σάρωση Master QR στο ταμπλό</li>
-          </ul>
+          <details className="group text-[13px] text-zinc-500">
+            <summary className="cursor-pointer font-medium text-zinc-600 hover:text-zinc-900 list-none flex items-center gap-1">
+              Οδηγίες εγκατάστασης
+              <span className="material-symbols-outlined text-[16px] group-open:rotate-180 transition-transform">
+                expand_more
+              </span>
+            </summary>
+            <ul className="mt-2 space-y-1.5 pl-0.5">
+              <li>
+                <span className="font-medium text-zinc-700">Android:</span> Chrome → Προσθήκη στην
+                αρχική
+              </li>
+              <li>
+                <span className="font-medium text-zinc-700">iPhone:</span> Safari → Κοινοποίηση →
+                Προσθήκη στην Αρχική
+              </li>
+            </ul>
+          </details>
         </div>
       </div>
     </div>
