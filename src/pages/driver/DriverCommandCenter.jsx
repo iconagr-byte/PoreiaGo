@@ -129,7 +129,11 @@ export default function DriverCommandCenter() {
     enabled: authenticated && safetyOk,
   });
   const telemetryOnline = shift.online;
-  const tachograph = useTachograph({ online: telemetryOnline, onBreak });
+  // Duty clock starts after login + pre-trip — not only on GPS «Έναρξη βάρδιας».
+  const tachograph = useTachograph({
+    active: authenticated && safetyOk,
+    onBreak,
+  });
 
   useEffect(() => {
     document.documentElement.classList.add('driver-route');
@@ -209,10 +213,10 @@ export default function DriverCommandCenter() {
   }, [authenticated, tripId]);
 
   useEffect(() => {
-    if (tachograph.limitReached && telemetryOnline) {
+    if (tachograph.limitReached && authenticated && safetyOk) {
       toast('Required Rest Stop in 15 minutes', { icon: '⏱️', duration: 8000 });
     }
-  }, [tachograph.limitReached, telemetryOnline]);
+  }, [tachograph.limitReached, authenticated, safetyOk]);
 
   const setTab = (id) => {
     setParams({ tab: id });
@@ -274,30 +278,31 @@ export default function DriverCommandCenter() {
           <TachographStrip
             drivingLabel={tachograph.drivingLabel}
             limitReached={tachograph.limitReached}
+            progressPct={tachograph.progressPct}
+            isCounting={tachograph.isCounting}
+            onBreak={onBreak}
           />
 
-          {telemetryOnline && (
-            <div className="driver-break-bar">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onBreak) {
-                    setOnBreak(false);
-                    tachograph.resetBreak();
-                  } else {
-                    setOnBreak(true);
-                  }
-                }}
-                className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
-                  onBreak
-                    ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
-                    : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
-                }`}
-              >
-                {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
-              </button>
-            </div>
-          )}
+          <div className="driver-break-bar">
+            <button
+              type="button"
+              onClick={() => {
+                if (onBreak) {
+                  setOnBreak(false);
+                  tachograph.resetBreak();
+                } else {
+                  setOnBreak(true);
+                }
+              }}
+              className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
+                onBreak
+                  ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
+                  : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
+              }`}
+            >
+              {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
+            </button>
+          </div>
         </div>
 
         <main className="driver-shell driver-main">

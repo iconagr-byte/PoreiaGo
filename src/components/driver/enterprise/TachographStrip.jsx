@@ -1,6 +1,19 @@
 /** Compact tachograph display for driver header. */
-export default function TachographStrip({ drivingLabel, limitReached }) {
-  const pct = limitReached ? 100 : 35;
+export default function TachographStrip({
+  drivingLabel,
+  limitReached,
+  progressPct = 0,
+  isCounting = false,
+  onBreak = false,
+}) {
+  const pct = limitReached ? 100 : Math.max(0, Math.min(100, progressPct));
+  const status = limitReached
+    ? 'Υποχρ. στάση!'
+    : onBreak
+      ? 'Διάλειμμα'
+      : isCounting
+        ? 'Όριο 4ω 15λ'
+        : 'Σε αναμονή';
 
   return (
     <div className={`driver-tacho ${limitReached ? 'driver-tacho--alert' : ''}`}>
@@ -21,8 +34,12 @@ export default function TachographStrip({ drivingLabel, limitReached }) {
         <div className="driver-tacho-progress">
           <div className="driver-tacho-progress-fill" style={{ width: `${pct}%` }} />
         </div>
-        <span className={`text-[10px] font-bold uppercase tracking-wide ${limitReached ? 'text-red-400' : 'text-[var(--driver-muted)]'}`}>
-          {limitReached ? 'Υποχρ. στάση!' : 'Όριο 4ω 15λ'}
+        <span
+          className={`text-[10px] font-bold uppercase tracking-wide ${
+            limitReached ? 'text-red-400' : 'text-[var(--driver-muted)]'
+          }`}
+        >
+          {status}
         </span>
       </div>
     </div>
