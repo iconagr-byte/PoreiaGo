@@ -772,6 +772,12 @@ html.driver-route body {
 
 .driver-toast {
   bottom: calc(var(--driver-nav-h) + env(safe-area-inset-bottom, 0px) + 0.75rem) !important;
+  z-index: 9999 !important;
+  pointer-events: none;
+}
+
+.driver-toast > div {
+  pointer-events: auto;
 }
 
 .passenger-track-app {

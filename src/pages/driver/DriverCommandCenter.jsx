@@ -220,29 +220,32 @@ export default function DriverCommandCenter() {
   };
 
   const logout = () => {
+    toast.dismiss();
     clearDriverSession();
     setAuthenticated(false);
     setSafetyOk(false);
     navigate('/driver');
   };
 
+  let body = null;
   if (!authenticated) {
-    return (
-      <>
-        <MasterQrGate
-          onAuthenticated={() => {
-            setAuthenticated(true);
-            setProfileTick((n) => n + 1);
-            toast.success('Σύνδεση για τη σημερινή βάρδια');
-          }}
-        />
-        <Toaster position="bottom-center" containerClassName="driver-toast" toastOptions={toastOptions} />
-      </>
+    body = (
+      <MasterQrGate
+        onAuthenticated={() => {
+          toast.dismiss();
+          setAuthenticated(true);
+          setProfileTick((n) => n + 1);
+          window.setTimeout(() => {
+            toast.success('Σύνδεση για τη σημερινή βάρδια', {
+              id: 'driver-shift-login',
+              duration: 2800,
+            });
+          }, 80);
+        }}
+      />
     );
-  }
-
-  if (!safetyOk) {
-    return (
+  } else if (!safetyOk) {
+    body = (
       <div className="driver-app">
         <DriverHeader
           session={session}
@@ -254,87 +257,91 @@ export default function DriverCommandCenter() {
         <div className="driver-shell driver-main">
           <PreTripForm onComplete={handlePreTripComplete} />
         </div>
-        <Toaster position="bottom-center" containerClassName="driver-toast" toastOptions={toastOptions} />
+      </div>
+    );
+  } else {
+    body = (
+      <div className="driver-app">
+        <DriverHeader session={session} telemetryOnline={telemetryOnline} onLogout={logout} />
+
+        <div className="driver-shell">
+          <TachographStrip
+            drivingLabel={tachograph.drivingLabel}
+            limitReached={tachograph.limitReached}
+          />
+
+          {telemetryOnline && (
+            <div className="driver-break-bar">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onBreak) {
+                    setOnBreak(false);
+                    tachograph.resetBreak();
+                  } else {
+                    setOnBreak(true);
+                  }
+                }}
+                className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
+                  onBreak
+                    ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
+                    : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
+                }`}
+              >
+                {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <main className="driver-shell driver-main">
+          {tab === 'home' && (
+            <>
+              <DriverPushPanel />
+              <DailyManifest />
+            </>
+          )}
+          {tab === 'gps' && (
+            <DriverShiftTelemetry driverName={session?.driverName || 'Οδηγός'} />
+          )}
+          {tab === 'scan' && <Scanner />}
+          {tab === 'logs' && <ExpenseUpload />}
+          {tab === 'sos' && <SOSButton />}
+          {tab === 'summary' && <DaySummary />}
+        </main>
+
+        <nav className="driver-nav" aria-label="Driver navigation">
+          <div className="driver-nav-inner">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={tab === t.id ? 'active' : ''}
+                onClick={() => setTab(t.id)}
+                aria-label={t.label}
+                aria-current={tab === t.id ? 'page' : undefined}
+              >
+                <span className="material-symbols-outlined">{t.icon}</span>
+                <span className="driver-nav-label">
+                  <span className="hidden min-[360px]:inline">{t.label}</span>
+                  <span className="min-[360px]:hidden">{t.short}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </nav>
       </div>
     );
   }
 
   return (
-    <div className="driver-app">
-      <DriverHeader session={session} telemetryOnline={telemetryOnline} onLogout={logout} />
-
-      <div className="driver-shell">
-        <TachographStrip
-          drivingLabel={tachograph.drivingLabel}
-          limitReached={tachograph.limitReached}
-        />
-
-        {telemetryOnline && (
-          <div className="driver-break-bar">
-            <button
-              type="button"
-              onClick={() => {
-                if (onBreak) {
-                  setOnBreak(false);
-                  tachograph.resetBreak();
-                } else {
-                  setOnBreak(true);
-                }
-              }}
-              className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
-                onBreak
-                  ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
-                  : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
-              }`}
-            >
-              {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
-            </button>
-          </div>
-        )}
-      </div>
-
-      <main className="driver-shell driver-main">
-        {tab === 'home' && (
-          <>
-            <DriverPushPanel />
-            <DailyManifest />
-          </>
-        )}
-        {tab === 'gps' && (
-          <DriverShiftTelemetry driverName={session?.driverName || 'Οδηγός'} />
-        )}
-        {tab === 'scan' && <Scanner />}
-        {tab === 'logs' && <ExpenseUpload />}
-        {tab === 'sos' && <SOSButton />}
-        {tab === 'summary' && <DaySummary />}
-      </main>
-
-      <nav className="driver-nav" aria-label="Driver navigation">
-        <div className="driver-nav-inner">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={tab === t.id ? 'active' : ''}
-              onClick={() => setTab(t.id)}
-              aria-label={t.label}
-              aria-current={tab === t.id ? 'page' : undefined}
-            >
-              <span className="material-symbols-outlined">{t.icon}</span>
-              <span className="driver-nav-label">
-                <span className="hidden min-[360px]:inline">{t.label}</span>
-                <span className="min-[360px]:hidden">{t.short}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </nav>
-
+    <>
+      {body}
       <Toaster
         position="bottom-center"
         containerClassName="driver-toast"
         toastOptions={toastOptions}
       />
-    </div>
+    </>
   );
 }

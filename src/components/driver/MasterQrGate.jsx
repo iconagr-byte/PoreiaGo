@@ -160,7 +160,7 @@ export default function MasterQrGate({ onAuthenticated }) {
             </div>
           )}
 
-          {loading && mode === 'qr' && (
+          {loading && (
             <p
               className="text-center text-sm font-bold flex items-center justify-center gap-2"
               style={{ color: 'var(--driver-accent)' }}
