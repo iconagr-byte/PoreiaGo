@@ -214,8 +214,10 @@ async def admin_fleet_egress_ws(
 
     live = get_live_fleet()
     snapshot = []
-    for vehicle in live.list_active(tenant_id):
-        meta = live._vehicles.get(vehicle.vehicle_id, {})
+    for vehicle in await live.list_active_for_admin_async(tenant_id):
+        meta = await live.vehicle_meta_async(tenant_id, vehicle.vehicle_id)
+        if not meta:
+            meta = live._vehicles.get(vehicle.vehicle_id, {})
         snapshot.append(
             {
                 "type": "fleet_snapshot",

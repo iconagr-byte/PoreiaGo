@@ -84,8 +84,10 @@ async def fleet_live(
 ):
     live: LiveFleetService = get_live_fleet()
     rows = []
-    for v in live.list_active_for_admin(tenant_id):
-        meta = live._vehicles.get(v.vehicle_id, {})
+    for v in await live.list_active_for_admin_async(tenant_id):
+        meta = await live.vehicle_meta_async(tenant_id, v.vehicle_id)
+        if not meta:
+            meta = live._vehicles.get(v.vehicle_id, {})
         rows.append(
             LiveVehicleResponse(
                 vehicle_id=v.vehicle_id,

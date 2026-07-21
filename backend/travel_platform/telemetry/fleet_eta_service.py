@@ -16,7 +16,7 @@ async def fetch_fleet_etas(tenant_id: UUID) -> dict[str, Any]:
     """Επιστρέφει ETA ανά ενεργό δρομολόγιο στον στόλο."""
     live = get_live_fleet()
     settings = get_telemetry_settings(str(tenant_id))
-    vehicles = live.list_active_for_admin(tenant_id)
+    vehicles = await live.list_active_for_admin_async(tenant_id)
     seen_trips: set[int] = set()
     items: list[dict[str, Any]] = []
 
@@ -30,7 +30,9 @@ async def fetch_fleet_etas(tenant_id: UUID) -> dict[str, Any]:
         if not snap:
             continue
 
-        meta = live._vehicles.get(vehicle.vehicle_id, {}) or {}
+        meta = await live.vehicle_meta_async(tenant_id, vehicle.vehicle_id)
+        if not meta:
+            meta = live._vehicles.get(vehicle.vehicle_id, {}) or {}
         payload = snapshot_to_payload(
             snap,
             sync_interval_sec=settings.eta_ws_push_seconds,

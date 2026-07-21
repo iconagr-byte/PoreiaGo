@@ -88,22 +88,31 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
 
     const applyRows = (rows) => {
       if (!Array.isArray(rows)) return;
-      setVehicles(() => {
-        const map = {};
+      setVehicles((prev) => {
+        // When WS is also feeding, merge poll rows without wiping fresher WS points.
+        const map = mode === 'ws' ? { ...prev } : {};
         rows.forEach((row) => {
           const id = vehicleIdFromRow(row);
-          const normalized = normalizeVehicle(row, id);
+          const normalized = normalizeVehicle(row, id, map[id]);
           if (normalized) map[id] = normalized;
         });
         return map;
       });
     };
 
-    const startPoll = (reason) => {
-      if (closed || mode === 'poll') return;
-      mode = 'poll';
-      setTransport('poll');
-      setConnected(true);
+    const startPoll = (reason, { asPrimary = true } = {}) => {
+      if (closed) return;
+      if (asPrimary) {
+        mode = 'poll';
+        setTransport('poll');
+        setConnected(true);
+      }
+      if (pollTimer) {
+        if (import.meta.env.DEV) {
+          console.info('[fleet] HTTP poll already running', reason);
+        }
+        return;
+      }
       const tick = () => {
         fetchLiveFleet(adminAuthHeaders())
           .then((rows) => {
@@ -114,7 +123,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
       tick();
       pollTimer = window.setInterval(tick, 4000);
       if (import.meta.env.DEV) {
-        console.info('[fleet] HTTP poll fallback', reason);
+        console.info('[fleet] HTTP poll', reason);
       }
     };
 
@@ -139,6 +148,9 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
       mode = 'ws';
       setTransport('ws');
       setConnected(true);
+      // Always seed/refresh from REST — WS upgrades are often blocked in prod,
+      // and even when open the in-memory snapshot can be empty on this worker.
+      startPoll('ws_open_seed', { asPrimary: false });
     };
     ws.onclose = () => {
       if (closed) return;
