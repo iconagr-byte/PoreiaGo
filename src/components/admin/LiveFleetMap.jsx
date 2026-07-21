@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 're
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchHeatmap, fetchLiveFleet } from '../../services/telemetryApi.js';
+import { adminAuthHeaders } from '../../services/adminApi.js';
 
 const busIcon = L.divIcon({
   className: 'fleet-bus-marker',
@@ -25,15 +26,16 @@ function FitBounds({ vehicles }) {
  * Live fleet map — Leaflet (works without Mapbox token).
  * Set VITE_MAPBOX_TOKEN and swap TileLayer URL for Mapbox GL in production.
  */
-export default function LiveFleetMap({ authHeaders = {}, pollMs = 5000 }) {
+export default function LiveFleetMap({ authHeaders = adminAuthHeaders(), pollMs = 5000 }) {
   const [vehicles, setVehicles] = useState([]);
   const [heatmap, setHeatmap] = useState([]);
   const [showHeat, setShowHeat] = useState(true);
 
   useEffect(() => {
+    const headers = authHeaders || adminAuthHeaders();
     const load = () => {
-      fetchLiveFleet(authHeaders).then(setVehicles);
-      fetchHeatmap(authHeaders).then(setHeatmap);
+      fetchLiveFleet(headers).then(setVehicles);
+      fetchHeatmap({ days: 7 }, headers).then(setHeatmap);
     };
     load();
     const id = setInterval(load, pollMs);

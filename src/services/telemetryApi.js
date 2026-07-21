@@ -20,14 +20,16 @@ export async function postTelemetryUpdate(payload) {
   return res.json();
 }
 
-export async function fetchLiveFleet(authHeaders = {}) {
+export async function fetchLiveFleet(authHeaders = adminAuthHeaders()) {
   try {
     const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
       headers: authHeaders,
     });
     if (res.ok) return res.json();
+    // Do not fall back to mock when authenticated — empty list is honest.
+    if (authHeaders?.Authorization) return [];
   } catch {
-    /* offline */
+    if (authHeaders?.Authorization) return [];
   }
   return getMockFleet();
 }

@@ -75,7 +75,13 @@ except ImportError:
 # WebSocket GPS must load independently — do not bundle with unrelated imports.
 try:
     from api.ws_telemetry import router as ws_telemetry_router
-except ImportError:
+except ImportError as exc:
+    import logging as _logging
+
+    _logging.getLogger(__name__).exception(
+        "ws_telemetry router failed to import — live map WebSockets disabled: %s",
+        exc,
+    )
     ws_telemetry_router = None
 
 try:
@@ -237,6 +243,14 @@ async def health_check(include_fiscal: bool = True):
 
         async with AsyncSessionLocal() as session:
             payload = await build_platform_health(session, include_fiscal=include_fiscal)
+        ws_paths = sorted(
+            {
+                getattr(route, "path", "")
+                for route in app.routes
+                if "WebSocket" in type(route).__name__ and getattr(route, "path", "")
+            }
+        )
+        payload["websockets"] = {"route_count": len(ws_paths), "routes": ws_paths}
         status_code = 200 if payload.get("status") != "unhealthy" else 503
         return JSONResponse(content=payload, status_code=status_code)
     except Exception:

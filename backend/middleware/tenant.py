@@ -167,6 +167,13 @@ def _suspended_tenant_allowed(path: str, roles: list[str] | None = None) -> bool
 
 
 class TenantContextMiddleware(BaseHTTPMiddleware):
+    async def __call__(self, scope, receive, send):
+        # WebSocket upgrades must not go through BaseHTTPMiddleware request wrapping.
+        if scope["type"] == "websocket":
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path
         jwt_secret, jwt_algorithm, admin_auth_disabled = _jwt_settings()
