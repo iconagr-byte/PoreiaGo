@@ -117,6 +117,18 @@ async def lifespan(app: FastAPI):
     await init_ticketing_db()
     await seed_if_empty()
     await seed_customer_bookings_if_empty()
+    try:
+        from travel_platform.notifications.web_push_service import ensure_web_push_keys
+
+        if ensure_web_push_keys():
+            logger = __import__("logging").getLogger("poreiago.startup")
+            logger.info("Web Push VAPID configured")
+        else:
+            logger = __import__("logging").getLogger("poreiago.startup")
+            logger.warning("Web Push VAPID not configured — admin/driver push disabled")
+    except Exception as exc:
+        logger = __import__("logging").getLogger("poreiago.startup")
+        logger.warning("Web Push VAPID bootstrap failed: %s", exc)
     if start_consumer and process_telemetry_payload:
         await start_consumer(process_telemetry_payload)
     try:
@@ -197,6 +209,12 @@ except ImportError:
     admin_push_router = None
 if admin_push_router:
     app.include_router(admin_push_router)
+try:
+    from api.driver_push_router import router as driver_push_router
+except ImportError:
+    driver_push_router = None
+if driver_push_router:
+    app.include_router(driver_push_router)
 if bookings_router:
     app.include_router(bookings_router)
 if platform_router:

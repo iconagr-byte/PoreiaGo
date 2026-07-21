@@ -62,7 +62,7 @@ def main() -> int:
 
     if ENV_FILE.exists():
         _set_env_kv("WEB_PUSH_VAPID_PUBLIC_KEY", public_key)
-        _set_env_kv("WEB_PUSH_VAPID_PRIVATE_KEY_FILE", "/run/secrets/vapid_private.pem")
+        _set_env_kv("WEB_PUSH_VAPID_PRIVATE_KEY_FILE", "/app/data/vapid_private.pem")
         _set_env_kv("WEB_PUSH_VAPID_SUBJECT", SUBJECT)
 
     print(f"Created {PUBLIC_FILE.name} and {PRIVATE_FILE.name}")

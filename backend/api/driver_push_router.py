@@ -11,7 +11,11 @@ from travel_platform.notifications.push_subscription_store import (
     list_subscriptions_for_driver,
     upsert_subscription,
 )
-from travel_platform.notifications.web_push_service import get_public_vapid_key, web_push_configured
+from travel_platform.notifications.web_push_service import (
+    ensure_web_push_keys,
+    get_public_vapid_key,
+    web_push_configured,
+)
 
 router = APIRouter(prefix="/api/driver/push", tags=["Driver Push"])
 
@@ -34,6 +38,7 @@ def _driver_email(session: dict) -> str:
 
 @router.get("/config")
 async def driver_push_config():
+    ensure_web_push_keys()
     return {
         "enabled": web_push_configured(),
         "public_key": get_public_vapid_key(),

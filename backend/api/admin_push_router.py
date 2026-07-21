@@ -13,7 +13,11 @@ from travel_platform.notifications.push_subscription_store import (
     list_subscriptions_for_tenant,
     upsert_subscription,
 )
-from travel_platform.notifications.web_push_service import get_public_vapid_key, web_push_configured
+from travel_platform.notifications.web_push_service import (
+    ensure_web_push_keys,
+    get_public_vapid_key,
+    web_push_configured,
+)
 
 try:
     from app.core.auth_deps import get_current_tenant_id, get_token_payload
@@ -52,6 +56,7 @@ async def _require_admin(payload: Annotated[dict, Depends(get_token_payload)]) -
 
 @router.get("/config")
 async def push_config(_: Annotated[dict, Depends(_require_admin)]):
+    ensure_web_push_keys()
     return {
         "enabled": web_push_configured(),
         "public_key": get_public_vapid_key(),
@@ -63,6 +68,7 @@ async def push_status(
     tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
     _: Annotated[dict, Depends(_require_admin)],
 ):
+    ensure_web_push_keys()
     subs = list_subscriptions_for_tenant(str(tenant_id), audience="admin")
     return {
         "enabled": web_push_configured(),
