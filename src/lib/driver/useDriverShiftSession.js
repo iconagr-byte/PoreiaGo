@@ -54,8 +54,10 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   const linkedOnlineRef = useRef(false);
   const runningRef = useRef(false);
   const driverNameRef = useRef(driverName);
-  const resumeAttemptedRef = useRef(false);
+  const enabledRef = useRef(enabled);
+  const startingRef = useRef(false);
   driverNameRef.current = driverName;
+  enabledRef.current = enabled;
 
   const stopRuntime = useCallback(() => {
     stopGeoRef.current?.();
@@ -68,6 +70,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     wakeRef.current = null;
     runningRef.current = false;
     linkedOnlineRef.current = false;
+    startingRef.current = false;
   }, []);
 
   const goOffline = useCallback(
@@ -86,126 +89,167 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
 
   const markOnline = useCallback(() => {
     linkedOnlineRef.current = true;
+    startingRef.current = false;
     setOnline(true);
     setStarting(false);
     setShiftFlag(true);
   }, []);
 
-  const goOnline = useCallback(async () => {
-    if (!enabled) return;
-    if (runningRef.current) return;
-    if (!isGeolocationSupported()) {
-      toast.error('Το GPS δεν υποστηρίζεται σε αυτή τη συσκευή');
-      return;
-    }
-
-    const session = getDriverSession();
-    if (!session?.accessToken) {
-      toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά');
-      setShiftFlag(false);
-      setOnline(false);
-      return;
-    }
-
-    if (iosEnv.needsInstallGuidance) {
-      toast(
-        'Στο iPhone προσθέστε την εφαρμογή στην Αρχική (βλ. οδηγίες παρακάτω) για αξιόπιστο GPS.',
-        { icon: '📱', duration: 6000 },
-      );
-    }
-
-    setStarting(true);
-    runningRef.current = true;
-
-    try {
-      await requestMotionPermission();
-      let httpFallbackNotified = false;
-      const conn = createDriverTelemetryTransport({
-        onOpen: ({ transport } = {}) => {
-          markOnline();
-          if (transport === 'ws') {
-            toast.success('Σύνδεση telemetry OK');
-          } else if (transport === 'http' && !httpFallbackNotified) {
-            httpFallbackNotified = true;
-            toast.success('Σύνδεση θέσης OK');
-          }
-        },
-        onError: () => {},
-        onClose: () => {
-          if (linkedOnlineRef.current && transportRef.current?.mode === 'ws') {
-            toast('Η σύνδεση telemetry διακόπηκε — συνέχεια μέσω HTTP');
-          }
-        },
-        onMessage: (msg) => {
-          if (msg.type === 'ack' && msg.ok !== false) setLastPing(new Date());
-          if (msg.type === 'rate_limited') {
-            toast(formatRateLimitedMessage(msg.retry_after_sec), { icon: '⏳' });
-          }
-          if (msg.type === 'error' && msg.detail === 'invalid_token') {
-            toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά');
-            goOffline({ silent: true });
-          }
-        },
-      });
-      transportRef.current = conn;
-      stopSensorsRef.current = startDeviceSensorWatch((snapshot) => {
-        sensorsRef.current = snapshot;
-      });
-      wakeRef.current = await requestWakeLock();
-      if (!isWakeLockSupported()) {
-        toast('Wake Lock μη διαθέσιμο — κρατήστε την οθόνη ενεργή', { icon: 'ℹ️' });
+  /**
+   * @param {{ resume?: boolean }} [opts]
+   * resume=true: keep the shift flag even if GPS fails to restart (tab remount / brief gate).
+   */
+  const goOnline = useCallback(
+    async ({ resume = false } = {}) => {
+      if (!enabledRef.current) return;
+      if (runningRef.current || startingRef.current) return;
+      if (!isGeolocationSupported()) {
+        if (!resume) toast.error('Το GPS δεν υποστηρίζεται σε αυτή τη συσκευή');
+        return;
       }
 
-      stopGeoRef.current = startDriverGeolocationWatch({
-        onPosition: (pos) => {
-          const liveSession = getDriverSession();
-          const plate =
-            liveSession?.vehiclePlate ||
-            liveSession?.vehicleCode ||
-            liveSession?.busPlate ||
-            `TRIP-${liveSession?.tripId || '?'}`;
-          const payload = buildDriverTelemetryPayload(pos, liveSession, {
-            driverName: liveSession?.driverName || driverNameRef.current,
-            busPlate: plate,
-            manifest: manifestRef.current,
-            sensors: sensorsRef.current,
+      const session = getDriverSession();
+      if (!session?.accessToken) {
+        if (!resume) {
+          toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά');
+          setShiftFlag(false);
+          setOnline(false);
+        }
+        return;
+      }
+
+      if (!resume && iosEnv.needsInstallGuidance) {
+        toast(
+          'Στο iPhone προσθέστε την εφαρμογή στην Αρχική (βλ. οδηγίες παρακάτω) για αξιόπιστο GPS.',
+          { icon: '📱', duration: 6000 },
+        );
+      }
+
+      startingRef.current = true;
+      setStarting(true);
+      // Optimistic UI — keep «ΤΕΛΟΣ ΒΑΡΔΙΑΣ» while connecting / across tabs.
+      setOnline(true);
+      setShiftFlag(true);
+      runningRef.current = true;
+
+      try {
+        await requestMotionPermission();
+        let httpFallbackNotified = false;
+        const conn = createDriverTelemetryTransport({
+          onOpen: ({ transport } = {}) => {
+            markOnline();
+            if (resume) return;
+            if (transport === 'ws') {
+              toast.success('Σύνδεση telemetry OK');
+            } else if (transport === 'http' && !httpFallbackNotified) {
+              httpFallbackNotified = true;
+              toast.success('Σύνδεση θέσης OK');
+            }
+          },
+          onError: () => {},
+          onClose: () => {
+            if (linkedOnlineRef.current && transportRef.current?.mode === 'ws') {
+              toast('Η σύνδεση telemetry διακόπηκε — συνέχεια μέσω HTTP');
+            }
+          },
+          onMessage: (msg) => {
+            if (msg.type === 'ack' && msg.ok !== false) setLastPing(new Date());
+            if (msg.type === 'rate_limited') {
+              toast(formatRateLimitedMessage(msg.retry_after_sec), { icon: '⏳' });
+            }
+            if (msg.type === 'error' && msg.detail === 'invalid_token') {
+              toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά');
+              goOffline({ silent: true });
+            }
+          },
+        });
+        transportRef.current = conn;
+        stopSensorsRef.current = startDeviceSensorWatch((snapshot) => {
+          sensorsRef.current = snapshot;
+        });
+        wakeRef.current = await requestWakeLock();
+        if (!resume && !isWakeLockSupported()) {
+          toast('Wake Lock μη διαθέσιμο — κρατήστε την οθόνη ενεργή', { icon: 'ℹ️' });
+        }
+
+        stopGeoRef.current = startDriverGeolocationWatch({
+          onPosition: (pos) => {
+            const liveSession = getDriverSession();
+            const plate =
+              liveSession?.vehiclePlate ||
+              liveSession?.vehicleCode ||
+              liveSession?.busPlate ||
+              `TRIP-${liveSession?.tripId || '?'}`;
+            const payload = buildDriverTelemetryPayload(pos, liveSession, {
+              driverName: liveSession?.driverName || driverNameRef.current,
+              busPlate: plate,
+              manifest: manifestRef.current,
+              sensors: sensorsRef.current,
+            });
+            const sent = conn.send(payload);
+            if (sent) setGpsError('');
+          },
+          onError: (err) => {
+            setGpsError(geolocationErrorToGreek(err, { isIos: iosEnv.isIos }));
+          },
+        });
+
+        markOnline();
+        if (!resume) {
+          toast('Η θέση σας θα εμφανιστεί στον live χάρτη του γραφείου', {
+            icon: '🗺️',
+            duration: 4000,
+            id: 'driver-shift-map-hint',
           });
-          const sent = conn.send(payload);
-          if (sent) setGpsError('');
-        },
-        onError: (err) => {
-          setGpsError(geolocationErrorToGreek(err, { isIos: iosEnv.isIos }));
-        },
-      });
+        }
+      } catch (err) {
+        // Never clear an in-progress shift on resume/reconnect failure —
+        // tab changes must keep «ΤΕΛΟΣ ΒΑΡΔΙΑΣ». User ends only via toggle/logout.
+        stopRuntime();
+        setStarting(false);
+        if (resume || isDriverShiftOnline()) {
+          setOnline(true);
+          setShiftFlag(true);
+          setGpsError(err.message || 'Αποτυχία επανασύνδεσης GPS — δοκιμάστε ξανά');
+          return;
+        }
+        toast.error(err.message || 'Αποτυχία σύνδεσης');
+        goOffline({ silent: true });
+      }
+    },
+    [goOffline, iosEnv.isIos, iosEnv.needsInstallGuidance, markOnline, stopRuntime],
+  );
 
-      // Keep UI on «ΤΕΛΟΣ ΒΑΡΔΙΑΣ» across tab switches before first ack.
-      markOnline();
-      toast('Η θέση σας θα εμφανιστεί στον live χάρτη του γραφείου', {
-        icon: '🗺️',
-        duration: 4000,
-        id: 'driver-shift-map-hint',
-      });
-    } catch (err) {
-      toast.error(err.message || 'Αποτυχία σύνδεσης');
-      goOffline({ silent: true });
-    }
-  }, [enabled, goOffline, iosEnv.isIos, iosEnv.needsInstallGuidance, markOnline]);
-
-  // Pause GPS while gated (login / pre-trip) but keep the shift flag so
-  // tab changes and returning from the safety gate do not end the shift.
-  // Explicit end is only goOffline() (Τέλος βάρδιας / logout).
+  // Keep GPS running while the driver shell is active. Tab changes must not end the shift.
   useEffect(() => {
     if (!enabled) {
-      resumeAttemptedRef.current = false;
+      // Pause runtime only (login / pre-trip). Keep the localStorage flag.
       stopRuntime();
       setStarting(false);
       return undefined;
     }
-    if (!resumeAttemptedRef.current && isDriverShiftOnline() && !runningRef.current) {
-      resumeAttemptedRef.current = true;
-      void goOnline();
-    }
-    return undefined;
+
+    const ensureRunning = () => {
+      if (!isDriverShiftOnline()) return;
+      setOnline(true);
+      if (!runningRef.current && !startingRef.current) {
+        void goOnline({ resume: true });
+      }
+    };
+
+    ensureRunning();
+    const retryId = window.setInterval(ensureRunning, 8000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') ensureRunning();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', ensureRunning);
+
+    return () => {
+      window.clearInterval(retryId);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', ensureRunning);
+    };
   }, [enabled, goOnline, stopRuntime]);
 
   // Tear down GPS runtime on full unmount; do not clear the shift flag
@@ -237,12 +281,15 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   }, [online, enabled]);
 
   const toggle = useCallback(() => {
-    if (online || starting || runningRef.current) goOffline();
-    else goOnline();
+    if (online || starting || runningRef.current || isDriverShiftOnline()) {
+      goOffline();
+    } else {
+      void goOnline({ resume: false });
+    }
   }, [online, starting, goOffline, goOnline]);
 
   return {
-    online: online || starting,
+    online: online || starting || isDriverShiftOnline(),
     starting,
     lastPing,
     gpsError,
