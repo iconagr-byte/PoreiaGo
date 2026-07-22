@@ -6,20 +6,37 @@ import {
   normalizeTrip,
 } from './tripMarket.js';
 import { syncTripToPostgres } from '../../services/tripsSyncApi.js';
+import {
+  isAuthenticatedOfficeSession,
+  officeStorageKey,
+} from '../admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'aerostride_trips_v1';
+const STORAGE_KEY_BASE = 'aerostride_trips_v1';
+
+function storageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
 
 export function loadTrips() {
   let base;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length) base = parsed.map(normalizeTrip);
+      if (Array.isArray(parsed) && parsed.length === 0 && isAuthenticatedOfficeSession()) {
+        return [];
+      }
     }
   } catch {
     /* ignore */
   }
+
+  // Authenticated office: never inject platform demo trips.
+  if (isAuthenticatedOfficeSession()) {
+    return Array.isArray(base) ? base.map(normalizeTrip) : [];
+  }
+
   if (!base) return mockTrips.map(normalizeTrip);
 
   const ids = new Set(base.map((t) => t.id));
@@ -31,7 +48,7 @@ export function loadTrips() {
 }
 
 export function saveTrips(trips) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
+  localStorage.setItem(storageKey(), JSON.stringify(trips));
 }
 
 export function getTripById(tripId) {

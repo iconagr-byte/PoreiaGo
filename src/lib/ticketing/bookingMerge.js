@@ -78,11 +78,16 @@ function mergeByKey(local, remote) {
 
 /** Postgres admin API → cache; fallback SQLite / SaaS JWT / localStorage. */
 export async function loadMergedBookings() {
+  const authenticated = Boolean(getSaasToken());
+
   try {
     const pg = await fetchAdminBookings();
-    if (Array.isArray(pg) && pg.length) {
-      mergeBookingsIntoStore(pg);
-      return pg;
+    if (Array.isArray(pg)) {
+      // Authenticated office with empty PG must stay empty (no mock seed).
+      if (authenticated || pg.length) {
+        mergeBookingsIntoStore(pg);
+        return pg;
+      }
     }
   } catch (err) {
     console.warn('[bookings] Postgres admin load failed', err);
@@ -90,7 +95,7 @@ export async function loadMergedBookings() {
 
   await loadAllBookingsAsync();
   const local = loadBookings();
-  if (!getSaasToken()) return local;
+  if (!authenticated) return local;
   try {
     const saas = await fetchSaasBookings();
     if (!Array.isArray(saas) || !saas.length) return local;

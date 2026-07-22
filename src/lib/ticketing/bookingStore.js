@@ -34,8 +34,16 @@ import {
   roundMoney,
 } from '../payments/depositPayment.js';
 import { PAYMENT_METHOD_BANK } from '../payments/bankTransfer.js';
+import {
+  isAuthenticatedOfficeSession,
+  officeStorageKey,
+} from '../admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'aerostride_bookings_v1';
+const STORAGE_KEY_BASE = 'aerostride_bookings_v1';
+
+function storageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
 
 /**
  * @typedef {typeof mockBookings[0] & {
@@ -141,13 +149,20 @@ async function pushBookingToServer(booking) {
 
 export function loadBookings() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch {
-    /* use seed */
+    /* fall through */
   }
+
+  // Authenticated office: never inject platform demo bookings.
+  if (isAuthenticatedOfficeSession()) {
+    return [];
+  }
+
   const seeded = seedTripIds(mockBookings);
   saveBookings(seeded);
   return seeded;
@@ -155,7 +170,7 @@ export function loadBookings() {
 
 /** @param {BookingRecord[]} bookings */
 export function saveBookings(bookings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+  localStorage.setItem(storageKey(), JSON.stringify(bookings));
 }
 
 /** @param {string} bookingId */

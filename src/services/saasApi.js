@@ -39,12 +39,19 @@ export function getSaasTenantId() {
 }
 
 export function setSaasSession({ accessToken, tenantId, email }) {
+  const previousTenantId = localStorage.getItem(TENANT_KEY) || '';
   if (accessToken) {
     localStorage.setItem(TOKEN_KEY, accessToken);
     storeSaasRolesFromToken(accessToken);
   }
   if (tenantId) localStorage.setItem(TENANT_KEY, tenantId);
   if (email) localStorage.setItem(EMAIL_KEY, email);
+  if (tenantId && previousTenantId !== tenantId) {
+    // Dynamic import avoids circular dependency with officeTenantStore.
+    import('../lib/admin/officeTenantStore.js')
+      .then((m) => m.resetOfficeLocalCachesForTenant(previousTenantId, tenantId))
+      .catch(() => {});
+  }
   notifySaasSessionChanged();
 }
 

@@ -27,6 +27,7 @@ from travel_platform.settings.backup_service import (
 )
 from travel_platform.settings.platform_store import get_platform_config, update_platform_config
 from travel_platform.settings.drivers_store import (
+    DEMO_TENANT_ID,
     create_driver,
     delete_driver,
     get_driver,
@@ -120,6 +121,21 @@ def _driver_response(d) -> FleetDriverResponse:
     )
 
 
+def _request_tenant_id(request: Request) -> str:
+    tid = getattr(request.state, "tenant_id", None)
+    return str(tid) if tid else DEMO_TENANT_ID
+
+
+def _driver_for_tenant(driver_id: str, tenant_id: str):
+    d = get_driver(driver_id)
+    if not d:
+        return None
+    driver_tid = getattr(d, "tenant_id", None) or DEMO_TENANT_ID
+    if str(driver_tid) != str(tenant_id):
+        return None
+    return d
+
+
 def _user_response(u) -> PlatformUserResponse:
     return PlatformUserResponse(
         id=u.id,
@@ -190,8 +206,9 @@ async def remove_user(user_id: str):
 
 
 @router.get("/drivers", response_model=list[FleetDriverResponse])
-async def get_drivers(status: str | None = None):
-    return [_driver_response(d) for d in list_drivers(status)]
+async def get_drivers(request: Request, status: str | None = None):
+    tenant_id = _request_tenant_id(request)
+    return [_driver_response(d) for d in list_drivers(status, tenant_id=tenant_id)]
 
 
 _DRIVER_PHOTO_DIR = Path(
@@ -229,9 +246,11 @@ async def upload_driver_photo(file: UploadFile = File(...)):
 
 
 @router.post("/drivers", response_model=FleetDriverResponse, status_code=201)
-async def post_driver(body: FleetDriverCreate):
+async def post_driver(request: Request, body: FleetDriverCreate):
+    data = body.model_dump()
+    data["tenant_id"] = _request_tenant_id(request)
     try:
-        d = create_driver(body.model_dump())
+        d = create_driver(data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -240,15 +259,17 @@ async def post_driver(body: FleetDriverCreate):
 
 
 @router.get("/drivers/{driver_id}", response_model=FleetDriverResponse)
-async def get_driver_api(driver_id: str):
-    d = get_driver(driver_id)
+async def get_driver_api(request: Request, driver_id: str):
+    d = _driver_for_tenant(driver_id, _request_tenant_id(request))
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
     return _driver_response(d)
 
 
 @router.patch("/drivers/{driver_id}", response_model=FleetDriverResponse)
-async def patch_driver(driver_id: str, body: FleetDriverUpdate):
+async def patch_driver(request: Request, driver_id: str, body: FleetDriverUpdate):
+    if not _driver_for_tenant(driver_id, _request_tenant_id(request)):
+        raise HTTPException(status_code=404, detail="Driver not found")
     try:
         d = update_driver(driver_id, body.model_dump(exclude_unset=True))
     except KeyError:
@@ -261,7 +282,9 @@ async def patch_driver(driver_id: str, body: FleetDriverUpdate):
 
 
 @router.delete("/drivers/{driver_id}", status_code=204)
-async def remove_driver(driver_id: str):
+async def remove_driver(request: Request, driver_id: str):
+    if not _driver_for_tenant(driver_id, _request_tenant_id(request)):
+        raise HTTPException(status_code=404, detail="Driver not found")
     try:
         delete_driver(driver_id)
     except KeyError:
