@@ -97,9 +97,14 @@ elif [[ -f "$DEPLOY_DIR/.vapid_public.key" ]]; then
   set_kv "WEB_PUSH_VAPID_PUBLIC_KEY" "$pub"
 fi
 
-if grep -q 'email: "\${ACME_EMAIL}"' "$DEPLOY_DIR/traefik/traefik.yml" 2>/dev/null; then
-  echo "==> Fixing Traefik ACME email"
-  sed -i.bak "s|email: \"\${ACME_EMAIL}\"|email: \"${ACME_EMAIL_DEFAULT}\"|" \
+# Traefik static YAML does not expand ${ACME_EMAIL:-...} — bake a real address.
+ACME_EMAIL_VALUE="$ACME_EMAIL_DEFAULT"
+if grep -q "^ACME_EMAIL=" "$ENV_FILE" 2>/dev/null; then
+  ACME_EMAIL_VALUE="$(grep "^ACME_EMAIL=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
+fi
+if [[ -f "$DEPLOY_DIR/traefik/traefik.yml" ]]; then
+  echo "==> Baking ACME email into Traefik config ($ACME_EMAIL_VALUE)"
+  sed -i.bak -E "s|email: \".*\"|email: \"${ACME_EMAIL_VALUE}\"|" \
     "$DEPLOY_DIR/traefik/traefik.yml"
 fi
 
