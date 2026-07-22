@@ -392,6 +392,26 @@ export async function fetchFleetVehicles() {
   return getMockVehicles();
 }
 
+export async function createFleetVehicle(body) {
+  const res = await adminFetch('/api/admin/platform/fleet/vehicles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    const message =
+      typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d) => d.msg || d).join(', ')
+          : data.message || 'Αποτυχία εισαγωγής οχήματος';
+    throw new Error(message);
+  }
+  return data;
+}
+
 export async function deleteFleetVehicle(vehicleId) {
   const res = await adminFetch(
     `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}`,

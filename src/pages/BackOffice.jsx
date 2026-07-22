@@ -37,6 +37,7 @@ import {
   MARKET_LABELS,
 } from '../lib/trips/tripMarket.js';
 import {
+  createFleetVehicle,
   createMaintenanceEvent,
   fetchFleetAlerts,
   fetchFleetCostReport,
@@ -53,6 +54,7 @@ import { DEFAULT_TENANT_SETTINGS_TAB, DEFAULT_PLATFORM_TAB, sanitizeSettingsSubT
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
 import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
+import FleetVehicleCreateModal, { fleetVehicleIcon } from '../components/admin/FleetVehicleCreateModal.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
@@ -307,6 +309,8 @@ export default function BackOffice() {
   };
 
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
+  const [savingFleetVehicle, setSavingFleetVehicle] = useState(false);
   const [serviceForm, setServiceForm] = useState({
     vehicle_id: '',
     mileage: '',
@@ -336,6 +340,18 @@ export default function BackOffice() {
     setSelectedFleetVehicleId(pickId);
     if (pickId) {
       setServiceForm((prev) => ({ ...prev, vehicle_id: pickId }));
+    }
+  };
+
+  const handleCreateFleetVehicle = async (payload) => {
+    setSavingFleetVehicle(true);
+    try {
+      const created = await createFleetVehicle(payload);
+      toast.success(`Το όχημα ${created.plate_number || payload.plate_number} προστέθηκε`);
+      setVehicleModalOpen(false);
+      await reloadFleetData(created.id);
+    } finally {
+      setSavingFleetVehicle(false);
     }
   };
 
@@ -920,8 +936,9 @@ export default function BackOffice() {
           id: v.id,
           name: `${v.make} ${v.model}`,
           licensePlate: v.plate_number,
-          type: v.model,
-          seats: '-',
+          type: v.category || v.model,
+          seats: v.seat_count ?? '—',
+          icon: fleetVehicleIcon(v.category),
           status:
             v.service_status === 'Urgent'
               ? 'Σε Service'
@@ -940,7 +957,7 @@ export default function BackOffice() {
           service_status: v.service_status,
           km_to_service: v.km_to_service,
         }))
-      : mockFleet;
+      : mockFleet.map((f) => ({ ...f, icon: fleetVehicleIcon(f.type) }));
     const totalFleet = rows.length;
     const activeFleet = rows.filter((f) => f.status === 'Ενεργό').length;
     const totalRevenue = rows.reduce((sum, f) => sum + Number(f.financials?.revenue || 0), 0);
@@ -957,7 +974,15 @@ export default function BackOffice() {
               Παρακολούθηση οχημάτων, κατάσταση συντήρησης και οικονομικά στοιχεία.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setVehicleModalOpen(true)}
+              className="px-6 py-2 bg-primary text-white font-label-md text-label-md rounded-full hover:scale-105 transition-transform flex items-center gap-2 shadow-md"
+            >
+              <span className="material-symbols-outlined text-sm">add</span>
+              Εισαγωγή οχήματος
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -967,7 +992,7 @@ export default function BackOffice() {
                   vehicle_id: selectedFleetVehicleId || fleetVehicles[0]?.id || '',
                 }));
               }}
-              className="px-6 py-2 bg-primary text-white font-label-md text-label-md rounded-full hover:scale-105 transition-transform flex items-center gap-2 shadow-md"
+              className="px-6 py-2 bg-white text-primary border border-primary/30 font-label-md text-label-md rounded-full hover:bg-primary/5 transition-colors flex items-center gap-2 shadow-sm"
             >
               <span className="material-symbols-outlined text-sm">build</span> Καταχώριση Service
             </button>
@@ -1099,7 +1124,9 @@ export default function BackOffice() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-2xl bg-surface-container-low text-primary flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                            <span className="material-symbols-outlined text-[24px]">directions_bus</span>
+                            <span className="material-symbols-outlined text-[24px]">
+                              {bus.icon || 'directions_bus'}
+                            </span>
                           </div>
                           <div>
                             <div className="font-bold text-gray-900">{bus.name} <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full ml-2">{bus.type} • {bus.seats} Θέσεις</span></div>
@@ -1270,6 +1297,13 @@ export default function BackOffice() {
             </form>
           </div>
         )}
+
+        <FleetVehicleCreateModal
+          open={vehicleModalOpen}
+          onClose={() => setVehicleModalOpen(false)}
+          onSubmit={handleCreateFleetVehicle}
+          saving={savingFleetVehicle}
+        />
       </div>
     );
   };

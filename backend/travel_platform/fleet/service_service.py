@@ -42,12 +42,25 @@ DEFAULT_AMENITIES: dict[str, list[str]] = {
         "Θέρμανση",
         "Μεγάλοι αποθηκευτικοί χώροι",
     ],
+    "Van": [
+        "Κλιματισμός",
+        "USB θύρες",
+        "Χώρος αποσκευών",
+    ],
+    "VIP Minibus": [
+        "Wi-Fi onboard",
+        "USB θύρες",
+        "Κλιματισμός",
+        "Ανακλινόμενα καθίσματα",
+    ],
 }
 
 DEFAULT_SEATS: dict[str, int] = {
     "Luxury Coach": 50,
     "Premium Express": 32,
     "Standard": 55,
+    "Van": 9,
+    "VIP Minibus": 16,
 }
 
 
