@@ -39,6 +39,18 @@ export async function fetchAdminPushStatus() {
   return data;
 }
 
+/** True only if THIS browser has an active PushManager subscription. */
+export async function isThisBrowserAdminPushSubscribed() {
+  if (!isAdminPushSupported()) return false;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    return Boolean(subscription?.endpoint);
+  } catch {
+    return false;
+  }
+}
+
 async function registerServiceWorker() {
   const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
   await navigator.serviceWorker.ready;

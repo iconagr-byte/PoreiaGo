@@ -62,6 +62,17 @@ def list_subscriptions_for_tenant(tenant_id: str, *, audience: str | None = "adm
     return rows
 
 
+def list_all_subscriptions(*, audience: str | None = "admin") -> list[dict[str, Any]]:
+    """All push subscriptions for an audience (fallback when tenant ids diverge)."""
+    rows: list[dict[str, Any]] = []
+    for row in _load().get("subscriptions", []):
+        row_audience = str(row.get("audience") or "customer")
+        if audience and row_audience != audience:
+            continue
+        rows.append(dict(row))
+    return rows
+
+
 def list_subscriptions_for_driver(
     tenant_id: str,
     driver_id: str | None = None,
