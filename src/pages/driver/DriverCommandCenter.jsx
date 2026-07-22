@@ -16,11 +16,13 @@ import TachographStrip from '../../components/driver/enterprise/TachographStrip.
 import DaySummary from '../../components/driver/DaySummary.jsx';
 import DriverShiftTelemetry from '../../components/driver/DriverShiftTelemetry.jsx';
 import DriverPushPanel from '../../components/driver/DriverPushPanel.jsx';
+import DriverOfficeChat from '../../components/driver/DriverOfficeChat.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
 import { useDriverShiftSession } from '../../lib/driver/useDriverShiftSession.js';
 
 const TABS = [
   { id: 'home', icon: 'home', label: 'Αρχική', short: 'Αρχ.' },
+  { id: 'chat', icon: 'chat', label: 'Chat', short: 'Chat' },
   { id: 'gps', icon: 'share_location', label: 'Θέση', short: 'GPS' },
   { id: 'scan', icon: 'qr_code_scanner', label: 'Scan', short: 'Scan' },
   { id: 'logs', icon: 'receipt_long', label: 'Έξοδα', short: 'Έξ.' },
@@ -315,6 +317,9 @@ export default function DriverCommandCenter() {
           {/* Keep GPS panel mounted so tab switches never remount shift UI. */}
           <div hidden={tab !== 'gps'} aria-hidden={tab !== 'gps'}>
             <DriverShiftTelemetry shift={shift} />
+          </div>
+          <div hidden={tab !== 'chat'} aria-hidden={tab !== 'chat'}>
+            <DriverOfficeChat />
           </div>
           {tab === 'scan' && <Scanner />}
           {tab === 'logs' && <ExpenseUpload />}

@@ -14,6 +14,7 @@ import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
 import AdminFleetPushPanel from './AdminFleetPushPanel.jsx';
 import FleetEtaPanel from './FleetEtaPanel.jsx';
 import FleetVehicleHistoryModal from './FleetVehicleHistoryModal.jsx';
+import DriverOfficeChatPanel from './DriverOfficeChatPanel.jsx';
 
 /** Ζωντανός χάρτης στόλου — μεγάλος χάρτης, χωρίς βαριά toolbar. */
 export default function FleetLiveMapWebSocket() {
@@ -177,6 +178,12 @@ export default function FleetLiveMapWebSocket() {
             )}
           </div>
           <AdminFleetPushPanel />
+          <DriverOfficeChatPanel
+            compact
+            driverId={selected?.driver_id || selected?.driverId || null}
+            driverName={selected?.driver_name || selected?.driverName}
+            tripId={selected?.trip_id ?? selected?.tripId ?? null}
+          />
           <FleetEtaPanel activeTripCount={vehicles.length} />
         </div>
       </div>

@@ -90,6 +90,16 @@ export default function ActiveDriversList() {
             >
               <FleetDriverPlaybackButton vehicle={v} />
               <FleetPassengerTrackLinkButton tripId={v.trip_id} compact />
+              {v.driver_id ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin', { state: { activeTab: 'driver_chat', driverId: v.driver_id } })}
+                  className="inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chat</span>
+                  Chat
+                </button>
+              ) : null}
             </div>
           </article>
         ))}

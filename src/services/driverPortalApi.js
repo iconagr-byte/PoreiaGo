@@ -467,3 +467,38 @@ export function getDaySummaryStats(manifest) {
     tripId: session?.tripId,
   };
 }
+
+/** Driver ↔ office chat */
+export async function fetchDriverChatMessages({ after } = {}) {
+  const q = after ? `?after=${encodeURIComponent(after)}` : '';
+  const res = await fetch(`${API_BASE}/api/driver/chat/messages${q}`, {
+    headers: driverSessionHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Αποτυχία φόρτωσης chat');
+  }
+  return res.json();
+}
+
+export async function sendDriverChatMessage(body) {
+  const res = await fetch(`${API_BASE}/api/driver/chat/messages`, {
+    method: 'POST',
+    headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Αποτυχία αποστολής');
+  }
+  return res.json();
+}
+
+export async function markDriverChatRead() {
+  const res = await fetch(`${API_BASE}/api/driver/chat/read`, {
+    method: 'POST',
+    headers: driverSessionHeaders(),
+  });
+  if (!res.ok) return { ok: false };
+  return res.json();
+}

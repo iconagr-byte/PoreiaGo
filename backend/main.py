@@ -70,6 +70,11 @@ except ImportError:
     driver_sos_router = None
 
 try:
+    from api.driver_chat_router import router as driver_chat_router
+except ImportError:
+    driver_chat_router = None
+
+try:
     from api.admin_platform import router as admin_platform_router
 except ImportError:
     admin_platform_router = None
@@ -229,6 +234,8 @@ if expenses_upload_router:
     app.include_router(expenses_upload_router)
 if driver_sos_router:
     app.include_router(driver_sos_router)
+if driver_chat_router:
+    app.include_router(driver_chat_router)
 if telemetry_ingest_router:
     app.include_router(telemetry_ingest_router)
 if passenger_portal_router:

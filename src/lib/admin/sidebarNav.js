@@ -34,7 +34,13 @@ const OFFICE_SETTINGS_IDS = TENANT_SETTINGS_TABS.map((t) => `settings_${t.id}`);
 export function getDefaultNavLayout(isSuperAdmin) {
   return {
     main: [...DEFAULT_MAIN_NAV_ORDER],
-    fleet_ops: ['fleet_kpis', 'fleet_live_map', 'fleet_active_drivers', 'fleet_route_playback'],
+    fleet_ops: [
+      'fleet_kpis',
+      'fleet_live_map',
+      'fleet_active_drivers',
+      'driver_chat',
+      'fleet_route_playback',
+    ],
     platform: isSuperAdmin ? [...PLATFORM_IDS] : [],
     settings: [...OFFICE_SETTINGS_IDS],
   };
@@ -57,7 +63,7 @@ function migrateNavLayout(layout, isSuperAdmin) {
   let settings = [...(layout.settings || [])];
 
   // Keep settings_drivers when present in defaults (Ρυθμίσεις → Οδηγοί).
-  main = main.filter((id) => id !== 'drivers' && id !== 'email_templates' && id !== 'fleet_kpis' && id !== 'fleet_live_map' && id !== 'fleet_active_drivers' && id !== 'fleet_route_playback');
+  main = main.filter((id) => id !== 'drivers' && id !== 'email_templates' && id !== 'fleet_kpis' && id !== 'fleet_live_map' && id !== 'fleet_active_drivers' && id !== 'fleet_route_playback' && id !== 'driver_chat');
 
   const fleetIdx = main.indexOf('fleet');
   const driversInsertAt = fleetIdx >= 0 ? fleetIdx + 1 : main.length;
@@ -228,6 +234,16 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'fleet_active_drivers',
     navGroup: 'fleet_ops',
     accent: 'teal',
+  },
+  driver_chat: {
+    id: 'driver_chat',
+    label: 'Chat Οδηγών',
+    icon: 'forum',
+    filled: true,
+    type: 'tab',
+    tab: 'driver_chat',
+    navGroup: 'fleet_ops',
+    accent: 'sky',
   },
   fleet_route_playback: {
     id: 'fleet_route_playback',

@@ -79,6 +79,11 @@ except ImportError:
     driver_sos_router = None
 
 try:
+    from api.driver_chat_router import router as driver_chat_router
+except ImportError:
+    driver_chat_router = None
+
+try:
     from api.ws_telemetry import router as ws_telemetry_router
 except ImportError:
     ws_telemetry_router = None
@@ -159,6 +164,8 @@ if expenses_upload_router:
     app.include_router(expenses_upload_router)
 if driver_sos_router:
     app.include_router(driver_sos_router)
+if driver_chat_router:
+    app.include_router(driver_chat_router)
 if ws_telemetry_router:
     app.include_router(ws_telemetry_router)
 if admin_platform_router:
