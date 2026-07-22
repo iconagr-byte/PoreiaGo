@@ -86,8 +86,12 @@ export default function BackOffice() {
     return fromQuery || location.state?.activeTab || 'dashboard';
   });
   const [settingsSubTab, setSettingsSubTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('sub') || params.get('settingsSubTab');
     const fromState = location.state?.settingsSubTab || location.state?.platformTab;
-    if (fromState) return sanitizeSettingsSubTab(fromState, isSaasSuperAdmin());
+    if (fromQuery || fromState) {
+      return sanitizeSettingsSubTab(fromQuery || fromState, isSaasSuperAdmin());
+    }
     return isSaasSuperAdmin() ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
   });
   const [trips, setTrips] = useState(() => loadTrips());
@@ -103,6 +107,13 @@ export default function BackOffice() {
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
     if (tab) setActiveTab(tab);
+    const sub =
+      new URLSearchParams(location.search).get('sub') ||
+      new URLSearchParams(location.search).get('settingsSubTab');
+    if (sub) {
+      setActiveTab('settings');
+      setSettingsSubTab(sanitizeSettingsSubTab(sub, isSaasSuperAdmin()));
+    }
   }, [location.search]);
 
   useEffect(() => {

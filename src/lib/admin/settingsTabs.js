@@ -13,7 +13,7 @@ export const TENANT_SETTINGS_TABS = [
 ];
 
 export const PLATFORM_OPERATOR_TABS = [
-  { id: 'tenants', label: 'Tenants & MRR', icon: 'domain', section: 'platform' },
+  { id: 'tenants', label: 'Γραφεία', icon: 'domain', section: 'platform' },
   { id: 'saas_infra', label: 'SaaS Infra', icon: 'dns', section: 'platform' },
   { id: 'backup', label: 'Backup', icon: 'backup', section: 'platform' },
   { id: 'growth', label: 'Growth', icon: 'hub', section: 'platform' },
