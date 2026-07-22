@@ -79,10 +79,12 @@ class DomainResolver:
         if subdomain:
             stmt = stmt.where(Tenant.subdomain == subdomain)
         else:
+            apex = normalized.removeprefix("www.")
             stmt = stmt.where(
                 or_(
                     Tenant.custom_domain == normalized,
-                    Tenant.custom_domain == f"www.{normalized}",
+                    Tenant.custom_domain == apex,
+                    Tenant.custom_domain == f"www.{apex}",
                 ),
             )
 
