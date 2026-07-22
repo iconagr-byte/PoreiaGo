@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Map, { Marker, Popup, useMap } from 'react-map-gl/mapbox';
 import { LngLatBounds } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import '../../styles/fleet-live-map.css';
 import { MAPBOX_STYLE, MAPBOX_TOKEN } from '../../lib/maps/mapboxConfig.js';
 import { useAnimatedFleetVehicles } from '../../hooks/useAnimatedFleetVehicles.js';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
@@ -48,31 +49,23 @@ function BusMarker({ vehicle, onVehicleHistory }) {
     <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={() => setOpen(true)}>
       <button
         type="button"
-        className="relative cursor-pointer border-0 bg-transparent p-0"
+        className="fleet-apple-bus-pin border-0 bg-transparent p-0"
         onClick={() => setOpen(true)}
         onDoubleClick={openHistory}
       >
-        <div className="relative h-[52px] w-[52px] drop-shadow-[0_8px_18px_rgba(15,23,42,0.28)]">
-          <div className="h-full w-full overflow-hidden rounded-full border-[3px] border-slate-50 bg-slate-900 ring-2 ring-slate-900">
-            <img src={img} alt="" className="h-full w-full object-cover" />
+        <div className="fleet-apple-bus-pin__ring">
+          <div className="fleet-apple-bus-pin__avatar">
+            <img src={img} alt="" />
           </div>
-          <div className="pointer-events-none absolute inset-[-4px] rounded-full border-2 border-amber-300" />
           <div
-            className="pointer-events-none absolute left-1/2 top-[-2px] h-0 w-0 -translate-x-1/2 border-x-[5px] border-b-[8px] border-x-transparent border-b-amber-300"
+            className="fleet-apple-bus-pin__heading"
             style={{
               transform: `translateX(-50%) rotate(${vehicle.heading ?? 0}deg)`,
-              transformOrigin: '50% 30px',
             }}
           />
         </div>
-        <div
-          className="absolute left-1/2 bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-xl bg-white px-2.5 py-1.5 text-left shadow-lg border border-black/[0.06]"
-          onDoubleClick={openHistory}
-        >
-          <div className="text-[11px] font-bold text-slate-900 leading-tight">{vehicle.driver_name}</div>
-          <div className="text-[10px] text-slate-500">
-            {vehicle.bus_plate} · {Math.round(vehicle.speed || 0)} km/h
-          </div>
+        <div className="fleet-apple-bus-pill" onDoubleClick={openHistory}>
+          {vehicle.driver_name} · {Math.round(vehicle.speed || 0)} km/h
         </div>
       </button>
       {open ? (
@@ -80,16 +73,16 @@ function BusMarker({ vehicle, onVehicleHistory }) {
           longitude={vehicle.lng}
           latitude={vehicle.lat}
           anchor="top"
-          offset={28}
+          offset={34}
           onClose={() => setOpen(false)}
           closeOnClick={false}
         >
-          <div className="min-w-[180px] text-sm">
+          <div className="fleet-apple-popup p-3 text-sm">
             <div className="mb-2 flex items-center gap-2.5">
-              <img src={img} alt="" className="h-12 w-12 rounded-xl object-cover" />
+              <img src={img} alt="" className="h-12 w-12 rounded-[14px] object-cover" />
               <div>
-                <div className="font-bold">{vehicle.driver_name}</div>
-                <div className="text-xs text-slate-500">{vehicle.bus_plate}</div>
+                <div className="fleet-apple-popup__title">{vehicle.driver_name}</div>
+                <div className="fleet-apple-popup__meta">{vehicle.bus_plate}</div>
               </div>
             </div>
             <div>Ταχύτητα: {Math.round(vehicle.speed || 0)} km/h</div>
