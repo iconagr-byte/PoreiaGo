@@ -31,6 +31,10 @@ export default function SortableSidebarNav({
   const [dragState, setDragState] = useState({ section: null, overIndex: null, draggingId: null });
 
   useEffect(() => {
+    setLayout(loadNavLayout(superAdmin));
+  }, [superAdmin]);
+
+  useEffect(() => {
     if (activeTab === 'settings') setSettingsOpen(true);
   }, [activeTab, settingsSubTab]);
 

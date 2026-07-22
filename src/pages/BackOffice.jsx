@@ -124,6 +124,18 @@ export default function BackOffice() {
     ensureDriverSession();
   }, [navigate]);
 
+  // Tenant offices must not stay on platform-operator / debug tabs.
+  useEffect(() => {
+    if (!isSaasSuperAdmin() && activeTab === 'live_tracking') {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (isSaasSuperAdmin()) return;
+    setSettingsSubTab((prev) => sanitizeSettingsSubTab(prev, false));
+  }, []);
+
   useEffect(() => {
     if (location.state?.activeTab) {
       setActiveTab(location.state.activeTab);

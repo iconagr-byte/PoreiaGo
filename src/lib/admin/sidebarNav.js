@@ -6,10 +6,22 @@ import {
 } from './settingsTabs.js';
 import { settingsTabToNavItem } from './settingsSidebar.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v2';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v3';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
+
+/** Ids that belong only under «Λειτουργίες Στόλου» — never also in main. */
+export const FLEET_OPS_ONLY_IDS = [
+  'fleet_kpis',
+  'fleet_live_map',
+  'fleet_active_drivers',
+  'driver_chat',
+  'fleet_route_playback',
+];
+
+/** Debug / platform-operator tools — not for normal office admins. */
+export const SUPER_ONLY_MAIN_IDS = ['live_tracking'];
 
 export const DEFAULT_MAIN_NAV_ORDER = [
   'dashboard',
@@ -17,9 +29,6 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'customers',
   'fleet',
   'drivers',
-  'live_tracking',
-  'fleet_live_map',
-  'fleet_active_drivers',
   'lost_found',
   'email',
   'email_templates',
@@ -33,14 +42,10 @@ const OFFICE_SETTINGS_IDS = TENANT_SETTINGS_TABS.map((t) => `settings_${t.id}`);
 
 export function getDefaultNavLayout(isSuperAdmin) {
   return {
-    main: [...DEFAULT_MAIN_NAV_ORDER],
-    fleet_ops: [
-      'fleet_kpis',
-      'fleet_live_map',
-      'fleet_active_drivers',
-      'driver_chat',
-      'fleet_route_playback',
-    ],
+    main: isSuperAdmin
+      ? [...DEFAULT_MAIN_NAV_ORDER.slice(0, 5), 'live_tracking', ...DEFAULT_MAIN_NAV_ORDER.slice(5)]
+      : [...DEFAULT_MAIN_NAV_ORDER],
+    fleet_ops: [...FLEET_OPS_ONLY_IDS],
     platform: isSuperAdmin ? [...PLATFORM_IDS] : [],
     settings: [...OFFICE_SETTINGS_IDS],
   };
@@ -59,11 +64,17 @@ function mergeSectionOrder(saved, defaults) {
 
 function migrateNavLayout(layout, isSuperAdmin) {
   const defaults = getDefaultNavLayout(isSuperAdmin);
-  let main = [...(layout.main || [])];
-  let settings = [...(layout.settings || [])];
+  const fleetOpsSet = new Set(FLEET_OPS_ONLY_IDS);
+  const superOnlyMain = new Set(SUPER_ONLY_MAIN_IDS);
 
-  // Keep settings_drivers when present in defaults (Ρυθμίσεις → Οδηγοί).
-  main = main.filter((id) => id !== 'drivers' && id !== 'email_templates' && id !== 'fleet_kpis' && id !== 'fleet_live_map' && id !== 'fleet_active_drivers' && id !== 'fleet_route_playback' && id !== 'driver_chat');
+  let main = [...(layout.main || [])].filter(
+    (id) =>
+      id !== 'drivers' &&
+      id !== 'email_templates' &&
+      !fleetOpsSet.has(id) &&
+      (isSuperAdmin || !superOnlyMain.has(id)),
+  );
+  let settings = [...(layout.settings || [])].filter((id) => OFFICE_SETTINGS_IDS.includes(id));
 
   const fleetIdx = main.indexOf('fleet');
   const driversInsertAt = fleetIdx >= 0 ? fleetIdx + 1 : main.length;
@@ -73,12 +84,21 @@ function migrateNavLayout(layout, isSuperAdmin) {
 
   const emailIdx = main.indexOf('email');
   const templatesInsertAt = emailIdx >= 0 ? emailIdx + 1 : main.length;
-  main.splice(templatesInsertAt, 0, 'email_templates');
+  if (!main.includes('email_templates')) {
+    main.splice(templatesInsertAt, 0, 'email_templates');
+  }
+
+  // Re-merge against defaults, then force-dedupe fleet ops out of main again.
+  main = mergeSectionOrder(main, defaults.main).filter(
+    (id) => !fleetOpsSet.has(id) && (isSuperAdmin || !superOnlyMain.has(id)),
+  );
 
   return {
-    main: mergeSectionOrder(main, defaults.main),
+    main,
     fleet_ops: mergeSectionOrder(layout.fleet_ops || defaults.fleet_ops || [], defaults.fleet_ops || []),
-    platform: mergeSectionOrder(layout.platform || [], defaults.platform),
+    platform: isSuperAdmin
+      ? mergeSectionOrder(layout.platform || [], defaults.platform)
+      : [],
     settings: mergeSectionOrder(settings, defaults.settings),
   };
 }
@@ -204,6 +224,7 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'live_tracking',
     navGroup: 'main',
     accent: 'cyan',
+    superOnly: true,
   },
   fleet_live_map: {
     id: 'fleet_live_map',
@@ -309,19 +330,33 @@ export const ADMIN_NAV_ITEMS = {
 };
 
 export function resolveNavItem(id, isSuperAdmin) {
-  if (ADMIN_NAV_ITEMS[id]) return ADMIN_NAV_ITEMS[id];
+  if (ADMIN_NAV_ITEMS[id]) {
+    const item = ADMIN_NAV_ITEMS[id];
+    if (item.superOnly && !isSuperAdmin) return null;
+    return item;
+  }
   if (!id.startsWith('settings_')) return null;
 
   const tabId = id.slice('settings_'.length);
   const platformTab = PLATFORM_OPERATOR_TABS.find((t) => t.id === tabId);
-  if (platformTab) return settingsTabToNavItem(platformTab);
+  if (platformTab) {
+    return isSuperAdmin ? settingsTabToNavItem(platformTab) : null;
+  }
 
   const officeTab = TENANT_SETTINGS_TABS.find((t) => t.id === tabId);
   return officeTab ? settingsTabToNavItem(officeTab) : null;
 }
 
 export function navItemsFromIds(ids, isSuperAdmin) {
-  return ids.map((id) => resolveNavItem(id, isSuperAdmin)).filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  for (const id of ids || []) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const item = resolveNavItem(id, isSuperAdmin);
+    if (item) out.push(item);
+  }
+  return out;
 }
 
 export function reorderNav(order, fromId, toIndex) {
