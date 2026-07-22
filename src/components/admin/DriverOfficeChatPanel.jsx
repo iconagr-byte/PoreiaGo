@@ -122,8 +122,15 @@ export default function DriverOfficeChatPanel({
 
   if (!driverId) {
     return (
-      <div className="office-chat office-chat-shell rounded-[1.35rem] p-5 text-sm text-slate-500 font-semibold">
-        Επιλέξτε όχημα / οδηγό για chat.
+      <div className="office-chat messages-inbox-empty-hint">
+        <span
+          className="material-symbols-outlined text-[42px] text-[#007aff] mb-2 block mx-auto"
+          style={{ fontVariationSettings: "'FILL' 1" }}
+        >
+          forum
+        </span>
+        Επιλέξτε συνομιλία
+        <strong>Διαλέξτε όχημα / οδηγό για chat.</strong>
       </div>
     );
   }
