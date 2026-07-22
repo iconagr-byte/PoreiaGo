@@ -7,6 +7,7 @@ import BrandingPanel from './BrandingPanel.jsx';
 import HomepageSettingsPanel from './HomepageSettingsPanel.jsx';
 import PartnerWebhooksPanel from './PartnerWebhooksPanel.jsx';
 import GdprCompliancePanel from './GdprCompliancePanel.jsx';
+import LoginAuditPanel from './LoginAuditPanel.jsx';
 import ContractsPanel from './ContractsPanel.jsx';
 import SuperAdminPanel from './SuperAdminPanel.jsx';
 import SaasConnectionPanel from './SaasConnectionPanel.jsx';
@@ -64,6 +65,7 @@ export default function SettingsTabPanels({
     );
   }
   if (tab === 'compliance') return <GdprCompliancePanel />;
+  if (tab === 'logins') return <LoginAuditPanel />;
   if (tab === 'homepage') return <HomepageSettingsPanel />;
   // Domain της προσωπικής σελίδας γραφείου — όχι κάτω από platform Growth.
   if (tab === 'domain') return <BrandingPanel />;
