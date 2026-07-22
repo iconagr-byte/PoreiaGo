@@ -129,9 +129,9 @@ export default function DriverCommandCenter() {
     enabled: authenticated && safetyOk,
   });
   const telemetryOnline = shift.online;
-  // Duty clock starts after login + pre-trip — not only on GPS «Έναρξη βάρδιας».
+  // Duty clock starts only on GPS «Έναρξη βάρδιας», not on login / pre-trip.
   const tachograph = useTachograph({
-    active: authenticated && safetyOk,
+    active: telemetryOnline,
     onBreak,
   });
 

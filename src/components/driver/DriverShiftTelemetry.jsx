@@ -12,7 +12,6 @@ export default function DriverShiftTelemetry({ shift }) {
     gpsError,
     manifestSummary,
     backgroundWarning,
-    iosEnv,
     toggle,
     wakeLockSupported,
   } = shift;
@@ -80,18 +79,6 @@ export default function DriverShiftTelemetry({ shift }) {
           </dd>
         </div>
       </dl>
-
-      <p className="text-[11px] text-[var(--driver-muted)] leading-relaxed">
-        Η βάρδια μένει ενεργή όταν αλλάζετε καρτέλες. Σταματά μόνο με «ΤΕΛΟΣ ΒΑΡΔΙΑΣ».
-      </p>
-      <p className="text-[11px] text-[var(--driver-muted)] leading-relaxed">
-        Στέλνονται live: θέση, ταχύτητα, επιβάτες μετά check-in, μπαταρία &amp; αισθητήρες κινητού.
-      </p>
-      <p className="text-[11px] text-[var(--driver-muted)] leading-relaxed">
-        {iosEnv.isIos
-          ? 'iPhone: κρατήστε την εφαρμογή σε πρώτο πλάνο κατά τη βάρδια. Το GPS δεν λειτουργεί αξιόπιστα στο background.'
-          : 'Κρατήστε την εφαρμογή ανοιχτή. Εγκαταστήστε από το μενού του browser «Προσθήκη στην αρχική» για PWA.'}
-      </p>
     </section>
   );
 }
