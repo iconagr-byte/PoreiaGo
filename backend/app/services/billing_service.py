@@ -51,12 +51,15 @@ def stripe_readiness() -> dict:
             missing.append(env_name)
     checkout_ready = not missing
     portal_ready = bool(settings.stripe_secret_key)
+    # Demo signup/trial without real charge: explicit flag OR Stripe not configured.
+    demo_mode = bool(getattr(settings, "billing_demo_mode", False)) or not checkout_ready
     plans = ["starter", "professional"]
     if settings.stripe_price_enterprise:
         plans.append("enterprise")
     return {
         "checkout_ready": checkout_ready,
         "portal_ready": portal_ready,
+        "demo_mode": demo_mode,
         "missing_env": missing,
         "plans": plans,
         "trial_days": TRIAL_DAYS,
@@ -288,6 +291,88 @@ class BillingService:
         await self._session.flush()
         return {"checkout_url": session.url, "session_id": session.id}
 
+    async def create_signup_demo_session(
+        self,
+        *,
+        legal_name: str,
+        admin_email: str,
+        subdomain: str,
+        password: str,
+        plan: TenantPlan = TenantPlan.STARTER,
+        billing_interval: str = "month",
+    ) -> dict:
+        """Provision a new office without Stripe charge (demo / trial signup)."""
+        readiness = stripe_readiness()
+        if not readiness.get("demo_mode"):
+            raise ValueError("Demo signup is disabled — use Stripe checkout")
+        if plan == TenantPlan.ENTERPRISE:
+            raise ValueError("Enterprise requires sales contact")
+
+        subdomain_norm = subdomain.strip().lower()
+        taken = await self._session.execute(
+            select(Tenant.id).where(
+                or_(Tenant.slug == subdomain_norm, Tenant.subdomain == subdomain_norm),
+            ).limit(1),
+        )
+        if taken.scalar_one_or_none():
+            raise ValueError("Subdomain already taken")
+
+        interval = billing_interval if billing_interval in ("month", "year") else "month"
+        isolation = (
+            "database"
+            if plan == TenantPlan.ENTERPRISE
+            else "schema"
+            if plan == TenantPlan.PROFESSIONAL
+            else "shared_rls"
+        )
+        password_hash = hash_password(password)
+        job = TenantProvisioningJob(
+            id=uuid4(),
+            status=ProvisioningJobStatus.PENDING.value,
+            isolation_strategy=isolation,
+            payload={
+                "legal_name": legal_name.strip(),
+                "admin_email": admin_email.lower().strip(),
+                "subdomain": subdomain_norm,
+                "plan": plan.value,
+                "billing_interval": interval,
+                "admin_password_hash": password_hash,
+                "demo": True,
+            },
+        )
+        self._session.add(job)
+        await self._session.flush()
+
+        demo_customer_id = f"demo_cus_{job.id.hex[:16]}"
+        demo_sub_id = f"demo_sub_{job.id.hex[:16]}"
+        provisioning = TenantProvisioningServiceFacade(self._session)
+        tenant = await provisioning.provision_from_stripe_checkout(
+            stripe_customer_id=demo_customer_id,
+            stripe_subscription_id=demo_sub_id,
+            plan=plan,
+            legal_name=legal_name.strip(),
+            admin_email=admin_email.lower().strip(),
+            admin_password_hash=password_hash,
+            subdomain_hint=subdomain_norm,
+        )
+
+        job.tenant_id = tenant.id
+        job.status = ProvisioningJobStatus.COMPLETED.value
+        job.completed_at = datetime.now(timezone.utc)
+        job.stripe_checkout_session_id = f"demo_cs_{job.id.hex[:16]}"
+        await self._session.flush()
+
+        success = self._settings.billing_signup_success_url
+        sep = "&" if "?" in success else "?"
+        checkout_url = f"{success}{sep}demo=1&tenant={tenant.slug}&billing=success"
+        logger.info("Demo signup provisioned: tenant=%s job=%s", tenant.slug, job.id)
+        return {
+            "checkout_url": checkout_url,
+            "session_id": job.stripe_checkout_session_id,
+            "demo": True,
+            "tenant_slug": tenant.slug,
+        }
+
     async def create_portal_session(self, tenant: Tenant) -> dict:
         customer_id = await self.ensure_stripe_customer(tenant)
         _stripe_client()
@@ -304,9 +389,9 @@ class BillingService:
         plan: TenantPlan,
         billing_interval: str = "month",
     ) -> Subscription:
-        """14-day trial without Stripe — only when checkout is not configured."""
+        """14-day trial without Stripe — when demo mode is on or Stripe is not configured."""
         readiness = stripe_readiness()
-        if readiness["checkout_ready"]:
+        if readiness.get("checkout_ready") and not readiness.get("demo_mode"):
             raise ValueError("Stripe checkout is configured — use checkout-session")
         if plan == TenantPlan.ENTERPRISE:
             raise ValueError("Enterprise requires sales contact")

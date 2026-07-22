@@ -148,6 +148,8 @@ class BillingSignupCheckoutRequest(BaseModel):
 class BillingCheckoutResponse(BaseModel):
     checkout_url: str
     session_id: str
+    demo: bool = False
+    tenant_slug: str | None = None
 
 
 class BillingPortalResponse(BaseModel):
@@ -170,6 +172,7 @@ class BillingSubscriptionResponse(BaseModel):
 class BillingConfigResponse(BaseModel):
     checkout_ready: bool
     portal_ready: bool
+    demo_mode: bool = False
     missing_env: list[str] = Field(default_factory=list)
     plans: list[str] = Field(default_factory=list)
     trial_days: int = 14

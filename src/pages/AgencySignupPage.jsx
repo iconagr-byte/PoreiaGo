@@ -8,7 +8,7 @@ import {
   displayPrice,
   getPlanById,
 } from '../lib/billing/planCatalog.js';
-import { createSignupCheckout } from '../services/billingApi.js';
+import { createSignupCheckout, fetchBillingConfig } from '../services/billingApi.js';
 import { getPlatformBaseDomain } from '../lib/platform/domain.js';
 import PasswordField from '../components/PasswordField.jsx';
 
@@ -40,10 +40,27 @@ export default function AgencySignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+  const [billingConfig, setBillingConfig] = useState(null);
 
   const plan = useMemo(() => getPlanById(planId), [planId]);
   const price = useMemo(() => displayPrice(plan, interval), [plan, interval]);
   const subdomainPreview = normalizeSubdomain(subdomain) || 'your-agency';
+  const demoMode = billingConfig?.demo_mode === true;
+  const trialDays = billingConfig?.trial_days || 14;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchBillingConfig()
+      .then((cfg) => {
+        if (!cancelled) setBillingConfig(cfg);
+      })
+      .catch(() => {
+        if (!cancelled) setBillingConfig({ demo_mode: true, trial_days: 14 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (searchParams.get('billing') === 'cancel') {
@@ -84,7 +101,7 @@ export default function AgencySignupPage() {
 
     setWorking(true);
     try {
-      const { checkout_url: url } = await createSignupCheckout({
+      const result = await createSignupCheckout({
         legalName: legalName.trim(),
         adminEmail: adminEmail.trim().toLowerCase(),
         subdomain,
@@ -92,8 +109,11 @@ export default function AgencySignupPage() {
         plan: planId,
         billingInterval: interval,
       });
-      if (url) {
-        window.location.href = url;
+      if (result?.checkout_url) {
+        if (result.demo) {
+          toast.success(`Demo γραφείο έτοιμο — δοκιμή ${trialDays} ημερών`);
+        }
+        window.location.href = result.checkout_url;
         return;
       }
       setError('Δεν επιστράφηκε checkout URL από τον server');
@@ -132,11 +152,20 @@ export default function AgencySignupPage() {
                 Νέο γραφείο
               </span>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-4">
-                Ξεκινήστε με Stripe Checkout
+                {demoMode
+                  ? `Demo πληρωμή — ${trialDays} ημέρες δωρεάν`
+                  : 'Ξεκινήστε με Stripe Checkout'}
               </h1>
               <p className="text-sm text-on-surface-variant mt-2 leading-relaxed">
-                Μετά την πληρωμή δημιουργείται αυτόματα ο tenant, ο admin λογαριασμός και η συνδρομή σας.
+                {demoMode
+                  ? 'Χωρίς πραγματική χρέωση: δημιουργείται αμέσως ο tenant, ο admin λογαριασμός και trial συνδρομή για δοκιμή.'
+                  : 'Μετά την πληρωμή δημιουργείται αυτόματα ο tenant, ο admin λογαριασμός και η συνδρομή σας.'}
               </p>
+              {demoMode ? (
+                <p className="mt-3 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2">
+                  Demo mode ενεργό — ιδανικό για δοκιμή νέου γραφείου.
+                </p>
+              ) : null}
             </div>
 
             <div className="rounded-[24px] border border-black/[0.06] bg-surface-container-low p-5 space-y-4">
@@ -300,18 +329,24 @@ export default function AgencySignupPage() {
                 {working ? (
                   <>
                     <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
-                    Μετάβαση στο Stripe…
+                    {demoMode ? 'Δημιουργία demo γραφείου…' : 'Μετάβαση στο Stripe…'}
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-[20px]">lock</span>
-                    Συνέχεια στην πληρωμή
+                    <span className="material-symbols-outlined text-[20px]">
+                      {demoMode ? 'science' : 'lock'}
+                    </span>
+                    {demoMode
+                      ? `Ενεργοποίηση demo (${trialDays} ημέρες)`
+                      : 'Συνέχεια στην πληρωμή'}
                   </>
                 )}
               </button>
 
               <p className="text-xs text-center text-gray-500">
-                Με την εγγραφή αποδέχεστε τους όρους SaaS · η χρέωση ξεκινά μετά την ολοκλήρωση του Checkout
+                {demoMode
+                  ? 'Demo πληρωμή — χωρίς χρέωση κάρτας. Μπορείτε αργότερα να ενεργοποιήσετε πραγματικό Stripe.'
+                  : 'Με την εγγραφή αποδέχεστε τους όρους SaaS · η χρέωση ξεκινά μετά την ολοκλήρωση του Checkout'}
               </p>
             </form>
           </section>

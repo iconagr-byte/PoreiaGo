@@ -131,12 +131,30 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
   const catalogPlan = AGENCY_PLANS.find((p) => p.id === selectedPlan) || AGENCY_PLANS[1];
   const quote = displayPrice(catalogPlan, interval);
   const checkoutReady = billingConfig?.checkout_ready === true;
+  const demoMode = billingConfig?.demo_mode === true;
   const trialDays = billingConfig?.trial_days || 14;
-  const onTrial = sub?.status === 'trialing' && !sub?.stripe_subscription_id;
+  const onTrial = sub?.status === 'trialing' && !String(sub?.stripe_subscription_id || '').startsWith('demo_');
 
   return (
     <div className="space-y-6">
-      {billingConfig && !checkoutReady && (
+      {billingConfig && demoMode && (
+        <div className="bg-amber-50 border border-amber-200 rounded-[24px] p-4 text-sm text-amber-950">
+          <p className="font-bold">Demo πληρωμή ενεργή</p>
+          <p className="mt-1">
+            Μπορείτε να ξεκινήσετε <strong>δωρεάν δοκιμή {trialDays} ημερών</strong> χωρίς πραγματική χρέωση.
+            {!checkoutReady ? (
+              <>
+                {' '}
+                Για live Stripe δείτε{' '}
+                <code className="text-xs bg-white/80 px-1 rounded">deploy/STRIPE-SETUP.md</code>.
+              </>
+            ) : (
+              <> Για απενεργοποίηση demo: <code className="text-xs bg-white/80 px-1 rounded">BILLING_DEMO_MODE=0</code>.</>
+            )}
+          </p>
+        </div>
+      )}
+      {billingConfig && !checkoutReady && !demoMode && (
         <div className="bg-sky-50 border border-sky-200 rounded-[24px] p-4 text-sm text-sky-950">
           <p className="font-bold">Stripe δεν είναι ακόμα πλήρως ρυθμισμένο στο server.</p>
           <p className="mt-1">
@@ -239,7 +257,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {checkoutReady ? (
+            {checkoutReady && !demoMode ? (
               <button
                 type="button"
                 disabled={working}
