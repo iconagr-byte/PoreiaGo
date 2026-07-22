@@ -21,19 +21,35 @@ export async function postTelemetryUpdate(payload) {
 }
 
 export async function fetchLiveFleet(authHeaders = adminAuthHeaders()) {
-  const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
-    headers: authHeaders,
-  });
-  if (res.ok) {
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+  const run = async () => {
+    const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
+      headers: authHeaders,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+    // Authenticated failures must not fall back to mock fleet (hides real LIVE drivers).
+    if (authHeaders?.Authorization) {
+      const err = await res.json().catch(() => ({}));
+      const error = new Error(err.detail || `Αποτυχία live στόλου (${res.status})`);
+      error.status = res.status;
+      throw error;
+    }
+    return getMockFleet();
+  };
+
+  try {
+    return await run();
+  } catch (err) {
+    // One quick retry on gateway blips during api-blue recreate.
+    const status = err?.status;
+    if (status === 502 || status === 503 || status === 504) {
+      await new Promise((r) => setTimeout(r, 600));
+      return run();
+    }
+    throw err;
   }
-  // Authenticated failures must not fall back to mock fleet (hides real LIVE drivers).
-  if (authHeaders?.Authorization) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Αποτυχία live στόλου (${res.status})`);
-  }
-  return getMockFleet();
 }
 
 export async function fetchHeatmap(

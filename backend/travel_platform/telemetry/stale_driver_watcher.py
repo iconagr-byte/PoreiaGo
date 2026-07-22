@@ -42,7 +42,7 @@ async def _stale_driver_loop() -> None:
         try:
             await asyncio.sleep(SWEEP_INTERVAL_SEC)
             settings = get_telemetry_settings()
-            stale_seconds = int(getattr(settings, "driver_stale_seconds", 90))
+            stale_seconds = int(getattr(settings, "driver_stale_seconds", 360))
             for session in collect_stale_sessions(stale_seconds=stale_seconds):
                 if session:
                     await _handle_stale_session(session)

@@ -87,9 +87,10 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
   // HTTP poll is primary in production — Traefik often 404s WebSocket upgrades.
   useEffect(() => {
     let closed = false;
-    let pollTimer = null;
     let ws = null;
     let mode = 'poll';
+    let pollMs = 3000;
+    let pollTimer = null;
 
     const applyRows = (rows, { replace = true } = {}) => {
       if (!Array.isArray(rows)) return;
@@ -104,11 +105,19 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
       });
     };
 
+    const scheduleNext = () => {
+      if (closed) return;
+      pollTimer = window.setTimeout(() => {
+        tick();
+      }, pollMs);
+    };
+
     const tick = () => {
       const headers = adminAuthHeaders();
       if (!headers.Authorization && !getSaasToken()) {
         setPollError('Απαιτείται σύνδεση admin για τον live χάρτη');
         setConnected(false);
+        scheduleNext();
         return;
       }
       fetchLiveFleet(headers)
@@ -116,12 +125,14 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           if (closed) return;
           if (!Array.isArray(rows)) {
             setPollError('Μη έγκυρη απάντηση live fleet');
+            pollMs = 2000;
             return;
           }
           applyRows(rows, { replace: true });
           setPollError('');
           setLastPollAt(new Date());
           setConnected(true);
+          pollMs = 3000;
           if (mode !== 'ws') {
             mode = 'poll';
             setTransport('poll');
@@ -130,18 +141,25 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
         .catch((err) => {
           if (closed) return;
           const raw = String(err?.message || '');
+          const isGateway = /\b(502|503|504)\b/.test(raw) || err?.status === 502;
           const msg =
             raw === 'Failed to fetch' || /network|load failed|fetch/i.test(raw)
               ? 'Δεν συνδέει με το API (Failed to fetch). Ανανέωσε τη σελίδα· αν συνεχίζει, το api host είναι εκτός.'
-              : raw || 'Αποτυχία φόρτωσης live στόλου';
+              : isGateway
+                ? 'Προσωρινή αποτυχία σύνδεσης με το API (502). Κρατάμε το τελευταίο στίγμα — επανασύνδεση…'
+                : raw || 'Αποτυχία φόρτωσης live στόλου';
           setPollError(msg);
+          // Keep last-known pins on gateway errors — do not blank the map.
+          pollMs = isGateway || /Failed to fetch/i.test(raw) ? 1500 : 3000;
+        })
+        .finally(() => {
+          scheduleNext();
         });
     };
 
     // Start poll immediately — do not wait for WebSocket.
     setTransport('poll');
     tick();
-    pollTimer = window.setInterval(tick, 3000);
 
     const url = buildWsUrl(`/ws/telemetry/egress/${tenantId}`);
     try {
@@ -217,7 +235,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
 
     return () => {
       closed = true;
-      if (pollTimer) window.clearInterval(pollTimer);
+      if (pollTimer) window.clearTimeout(pollTimer);
       window.clearInterval(ping);
       try {
         ws?.close();
