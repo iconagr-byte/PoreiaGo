@@ -155,6 +155,12 @@ class TenantBrandingService:
 
         await self._session.flush()
         await self._sync_file_branding(tenant.slug, tenant, branding, theme)
+        try:
+            from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
+
+            await sync_traefik_custom_domains_from_db(self._session)
+        except Exception:
+            logger.debug("Traefik custom-domain sync skipped", exc_info=True)
         await self._audit.record(
             tenant_id=tenant_id,
             actor_id=None,

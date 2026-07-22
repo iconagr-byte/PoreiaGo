@@ -110,4 +110,7 @@ for f in olympus-on-demand-tls.yml tenants.example.yml; do
   fi
 done
 
+# Keep custom-domains.yml active (tenant Host → frontend + Let's Encrypt).
+replace_kv "TRAEFIK_DYNAMIC_DIR" "/etc/traefik/dynamic"
+
 echo "==> .env.prod ready"

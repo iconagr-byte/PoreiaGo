@@ -134,6 +134,20 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger = __import__("logging").getLogger("poreiago.startup")
         logger.warning("Web Push VAPID bootstrap failed: %s", exc)
+    try:
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
+
+        async with AsyncSessionLocal() as session:
+            synced = await sync_traefik_custom_domains_from_db(session)
+            if synced:
+                __import__("logging").getLogger("poreiago.startup").info(
+                    "Traefik custom domains synced: %s", ", ".join(synced)
+                )
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Traefik custom-domain sync skipped: %s", exc
+        )
     if start_consumer and process_telemetry_payload:
         await start_consumer(process_telemetry_payload)
     try:

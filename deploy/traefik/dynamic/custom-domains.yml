@@ -1,0 +1,25 @@
+# AUTO-GENERATED — tenant custom domains for Traefik + Let's Encrypt
+# Regenerated on Domain save / API startup when TRAEFIK_DYNAMIC_DIR is set.
+
+http:
+  routers:
+    tenant-domain-achilliotravel-com:
+      rule: Host(`achilliotravel.com`) || Host(`www.achilliotravel.com`)
+      entryPoints:
+        - websecure
+      service: tenant-custom-frontend
+      priority: 40
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "achilliotravel.com"
+            sans:
+              - "www.achilliotravel.com"
+      middlewares:
+        - security-headers@file
+
+  services:
+    tenant-custom-frontend:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:80"
