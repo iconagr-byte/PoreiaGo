@@ -43,7 +43,10 @@ export default function SortableSidebarNav({
     return visible.map((section) => ({
       ...section,
       order: layout[section.id] || [],
-      items: navItemsFromIds(layout[section.id] || [], superAdmin),
+      // Belt-and-suspenders: never render platform-only items for tenant offices.
+      items: navItemsFromIds(layout[section.id] || [], superAdmin).filter(
+        (item) => superAdmin || item.settingsSection !== 'platform',
+      ),
     }));
   }, [layout, superAdmin]);
 
