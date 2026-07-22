@@ -267,13 +267,19 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     const onVisible = () => {
       if (document.visibilityState === 'visible') ensureRunning();
     };
+    const onKeepalive = () => {
+      // SOS / incidents must never end the shift — just ensure GPS runtime is up.
+      ensureRunning();
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', ensureRunning);
+    window.addEventListener('driver-gps-keepalive', onKeepalive);
 
     return () => {
       window.clearInterval(retryId);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', ensureRunning);
+      window.removeEventListener('driver-gps-keepalive', onKeepalive);
     };
   }, [enabled, goOnline, stopRuntime]);
 

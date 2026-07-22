@@ -1,8 +1,15 @@
 /**
  * Module 4 — SOS button with long-press, GPS capture, optional incident photo.
+ *
+ * Important: never open a competing high-accuracy getCurrentPosition while the
+ * shift GPS watch is running — that can stall telemetry and look like a disconnect.
  */
 import { useCallback, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+import {
+  requestDriverGpsKeepalive,
+  resolveCoordsForSos,
+} from '../../../lib/driver/driverGeolocation.js';
 import { reportDriverIssue, triggerSosAlert } from '../../../services/driverPortalApi.js';
 
 const LONG_PRESS_MS = 1200;
@@ -12,25 +19,6 @@ const ISSUE_TYPES = [
   { id: 'accident', label: 'Ατύχημα', icon: 'car_crash' },
   { id: 'delay', label: 'Καθυστέρηση', icon: 'schedule' },
 ];
-
-function getCurrentPosition() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('GPS μη διαθέσιμο'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        resolve({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy_m: pos.coords.accuracy,
-        }),
-      (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 },
-    );
-  });
-}
 
 export default function SOSButton() {
   const [sosSent, setSosSent] = useState(false);
@@ -44,17 +32,32 @@ export default function SOSButton() {
     if (firedRef.current) return;
     firedRef.current = true;
     try {
-      const coords = await getCurrentPosition();
-      const res = await triggerSosAlert({ ...coords, photoFile });
+      const coords = await resolveCoordsForSos();
+      const res = await triggerSosAlert({
+        lat: coords.lat,
+        lng: coords.lng,
+        accuracy_m: coords.accuracy_m,
+        photoFile,
+      });
       setSosSent(true);
       toast.success(res.message || 'SOS εστάλη');
+      // Keep live GPS / map pin alive — SOS must never end the shift.
+      requestDriverGpsKeepalive();
+      window.setTimeout(() => requestDriverGpsKeepalive(), 1500);
     } catch (err) {
       firedRef.current = false;
       toast.error(err.message || 'Αποτυχία αποστολής SOS');
+      requestDriverGpsKeepalive();
     }
   }, [photoFile]);
 
-  const onPressStart = () => {
+  const onPressStart = (e) => {
+    // Prevent scroll / text-select / accidental sibling taps during long-press.
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
     firedRef.current = false;
     setHolding(true);
     timerRef.current = window.setTimeout(() => {
@@ -63,8 +66,13 @@ export default function SOSButton() {
     }, LONG_PRESS_MS);
   };
 
-  const onPressEnd = () => {
+  const onPressEnd = (e) => {
     setHolding(false);
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
     if (timerRef.current) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -76,22 +84,33 @@ export default function SOSButton() {
 
   const report = async (type) => {
     try {
-      const coords = await getCurrentPosition();
-      const res = await reportDriverIssue({ type, ...coords, photoFile });
+      const coords = await resolveCoordsForSos();
+      const res = await reportDriverIssue({
+        type,
+        lat: coords.lat,
+        lng: coords.lng,
+        accuracy_m: coords.accuracy_m,
+        photoFile,
+      });
       toast.success(`Αναφορά #${res.ticketId || res.alert_id}`);
       setShowIssues(false);
+      requestDriverGpsKeepalive();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αναφοράς');
+      requestDriverGpsKeepalive();
     }
   };
 
   return (
     <div className="driver-stack relative">
+      <p className="text-xs text-[var(--driver-muted)] text-center -mt-1 mb-1">
+        Το SOS ειδοποιεί το γραφείο χωρίς να διακόπτει τη βάρδια / GPS.
+      </p>
       <button
         type="button"
         onPointerDown={onPressStart}
         onPointerUp={onPressEnd}
-        onPointerLeave={onPressEnd}
+        onPointerCancel={onPressEnd}
         onContextMenu={(e) => e.preventDefault()}
         className={`driver-touch driver-btn-danger driver-sos w-full rounded-2xl min-h-[80px] text-2xl font-black select-none touch-manipulation ${
           holding ? 'scale-95 ring-4 ring-red-300' : ''
@@ -104,7 +123,7 @@ export default function SOSButton() {
 
       {sosSent && (
         <p className="text-center text-red-400 text-sm font-bold">
-          Σήμα εστάλη — περιμένετε επικοινωνία από το κεντρικό
+          Σήμα εστάλη — περιμένετε επικοινωνία από το κεντρικό. Η βάρδια παραμένει ενεργή.
         </p>
       )}
 

@@ -75,6 +75,34 @@ class SosServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["ok"])
         self.assertTrue(result["alert_id"])
 
+    async def test_publish_sos_does_not_force_offline_or_remove_vehicles(self) -> None:
+        """Regression: SOS must never cut the driver live connection / map pin."""
+        from travel_platform.driver.sos_service import publish_driver_sos
+
+        with (
+            patch(
+                "travel_platform.driver.sos_service.publish_fleet_alert",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.telemetry.driver_shift_tracker.force_driver_offline",
+            ) as offline,
+            patch(
+                "travel_platform.telemetry.processor.get_live_fleet",
+            ) as live,
+        ):
+            result = await publish_driver_sos(
+                tenant_id="00000000-0000-0000-0000-000000000001",
+                trip_id=7,
+                driver_id="drv-1",
+                lat=37.98,
+                lng=23.73,
+            )
+        self.assertTrue(result["ok"])
+        offline.assert_not_called()
+        live.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
