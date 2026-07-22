@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   deleteFleetDriver,
@@ -38,7 +38,12 @@ function driverInitials(name) {
 
 export default function DriversManagementPanel() {
   const navigate = useNavigate();
-  const [drivers, setDrivers] = useState([]);
+  const location = useLocation();
+  const pendingCreatedRef = useRef(location.state?.createdDriver || null);
+  const [drivers, setDrivers] = useState(() => {
+    const seeded = pendingCreatedRef.current;
+    return seeded?.id ? [seeded] : [];
+  });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('');
@@ -56,18 +61,28 @@ export default function DriversManagementPanel() {
     });
   }, [drivers, query]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ soft = false } = {}) => {
+    if (!soft) setLoading(true);
     setLoadError('');
     try {
       const rows = await fetchFleetDrivers(filter || undefined);
-      setDrivers(Array.isArray(rows) ? rows : []);
+      const list = Array.isArray(rows) ? rows : [];
+      const pending = pendingCreatedRef.current;
+      if (pending?.id && !list.some((d) => d.id === pending.id)) {
+        setDrivers([pending, ...list]);
+      } else {
+        setDrivers(list);
+        if (pending?.id) pendingCreatedRef.current = null;
+      }
     } catch (err) {
-      setDrivers([]);
+      if (!soft) {
+        const pending = pendingCreatedRef.current;
+        setDrivers(pending?.id ? [pending] : []);
+      }
       setLoadError(err.message || 'Αποτυχία φόρτωσης οδηγών');
       toast.error(err.message || 'Αποτυχία φόρτωσης οδηγών');
     } finally {
-      setLoading(false);
+      if (!soft) setLoading(false);
     }
   }, [filter]);
 
@@ -75,13 +90,32 @@ export default function DriversManagementPanel() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    const created = location.state?.createdDriver;
+    if (!created?.id) return undefined;
+    pendingCreatedRef.current = created;
+    setDrivers((prev) => {
+      if (prev.some((d) => d.id === created.id)) return prev;
+      return [created, ...prev];
+    });
+    navigate(`${location.pathname}${location.search}`, {
+      replace: true,
+      state: { activeTab: 'drivers' },
+    });
+    return undefined;
+  }, [location.state, location.pathname, location.search, navigate]);
+
   const onDelete = async (d) => {
     if (!window.confirm(`Διαγραφή οδηγού ${d.name};`)) return;
+    const prev = drivers;
+    // Optimistic: remove instantly — no skeleton flash while DELETE + refetch run.
+    setDrivers((rows) => rows.filter((row) => row.id !== d.id));
     try {
       await deleteFleetDriver(d.id);
       toast.success('Διαγράφηκε');
-      load();
+      load({ soft: true });
     } catch (err) {
+      setDrivers(prev);
       toast.error(err.message);
     }
   };

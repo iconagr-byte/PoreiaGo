@@ -8,6 +8,8 @@ import {
   updateFleetDriver,
   uploadDriverPhoto,
 } from '../../services/platformApi.js';
+import { getSaasToken, clearSaasSession } from '../../services/saasApi.js';
+import { isSaasTokenExpired } from '../../lib/saasJwt.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
 
 const STATUS_LABELS = {
@@ -53,39 +55,54 @@ export default function DriverFormPage() {
 
   useEffect(() => {
     const role = localStorage.getItem('userRole');
-    if (role !== 'admin') {
+    const token = getSaasToken();
+    if (role !== 'admin' || !token) {
       navigate('/admin/login');
+      return;
+    }
+    if (isSaasTokenExpired(token)) {
+      clearSaasSession();
+      localStorage.removeItem('userRole');
+      navigate('/admin/login', { replace: true, state: { reason: 'session_expired' } });
       return;
     }
     if (!isEdit) return undefined;
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const d = await fetchFleetDriver(driverId);
-      if (cancelled) return;
-      if (!d) {
-        toast.error('Δεν βρέθηκε ο οδηγός');
-        navigate('/admin', { state: { activeTab: 'drivers' } });
-        return;
+      try {
+        const d = await fetchFleetDriver(driverId);
+        if (cancelled) return;
+        if (!d) {
+          toast.error('Δεν βρέθηκε ο οδηγός');
+          navigate('/admin?tab=drivers', { state: { activeTab: 'drivers' } });
+          return;
+        }
+        setHasPassword(Boolean(d.has_password));
+        setForm({
+          name: d.name || '',
+          license_no: d.license_no || '',
+          phone: d.phone || '',
+          email: d.email || '',
+          status: d.status || 'active',
+          vehicle_code: d.vehicle_code || '',
+          license_plate: d.license_plate || '',
+          salary_per_km: d.salary_per_km ?? 0.45,
+          salary_per_trip: d.salary_per_trip ?? 25,
+          hiring_date: d.hiring_date?.slice?.(0, 10) || d.hiring_date || '',
+          license_expires_at: d.license_expires_at?.slice?.(0, 10) || d.license_expires_at || '',
+          photo_url: d.photo_url || '',
+          password: '',
+          password_confirm: '',
+        });
+      } catch (err) {
+        if (!cancelled) {
+          toast.error(err.message || 'Αποτυχία φόρτωσης');
+          navigate('/admin?tab=drivers', { state: { activeTab: 'drivers' } });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setHasPassword(Boolean(d.has_password));
-      setForm({
-        name: d.name || '',
-        license_no: d.license_no || '',
-        phone: d.phone || '',
-        email: d.email || '',
-        status: d.status || 'active',
-        vehicle_code: d.vehicle_code || '',
-        license_plate: d.license_plate || '',
-        salary_per_km: d.salary_per_km ?? 0.45,
-        salary_per_trip: d.salary_per_trip ?? 25,
-        hiring_date: d.hiring_date?.slice?.(0, 10) || d.hiring_date || '',
-        license_expires_at: d.license_expires_at?.slice?.(0, 10) || d.license_expires_at || '',
-        photo_url: d.photo_url || '',
-        password: '',
-        password_confirm: '',
-      });
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -95,12 +112,12 @@ export default function DriverFormPage() {
   const setField = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
 
   const validate = () => {
-    if (!form.name.trim()) {
-      toast.error('Συμπληρώστε το ονοματεπώνυμο');
+    if (!form.name.trim() || form.name.trim().length < 2) {
+      toast.error('Το ονοματεπώνυμο πρέπει να έχει τουλάχιστον 2 χαρακτήρες');
       return false;
     }
-    if (!form.email.trim()) {
-      toast.error('Συμπληρώστε το email (όνομα χρήστη)');
+    if (!form.email.trim() || !form.email.includes('@')) {
+      toast.error('Συμπληρώστε έγκυρο email (όνομα χρήστη)');
       return false;
     }
     if (!form.license_no.trim() || form.license_no.trim().length < 4) {
@@ -130,19 +147,21 @@ export default function DriverFormPage() {
     if (saving) return;
     if (!validate()) return;
 
+    const salaryKm = Number(form.salary_per_km);
+    const salaryTrip = Number(form.salary_per_trip);
     const body = {
       name: form.name.trim(),
       license_no: form.license_no.trim(),
       phone: form.phone.trim(),
-      email: form.email.trim(),
+      email: form.email.trim().toLowerCase(),
       status: form.status,
       vehicle_code: form.vehicle_code.trim() || null,
       license_plate: form.license_plate.trim() || null,
-      license_expires_at: form.license_expires_at || null,
+      license_expires_at: form.license_expires_at.trim() || null,
       photo_url: form.photo_url.trim() || null,
-      salary_per_km: Number(form.salary_per_km),
-      salary_per_trip: Number(form.salary_per_trip),
-      hiring_date: form.hiring_date || null,
+      salary_per_km: Number.isFinite(salaryKm) ? salaryKm : 0.45,
+      salary_per_trip: Number.isFinite(salaryTrip) ? salaryTrip : 25,
+      hiring_date: form.hiring_date.trim() || null,
     };
     if (form.password) body.password = form.password;
 
@@ -154,9 +173,13 @@ export default function DriverFormPage() {
         navigate(`/admin/drivers/${driverId}`);
       } else {
         const created = await createFleetDriver(body);
-        toast.success('Ο λογαριασμός δημιουργήθηκε');
-        navigate(created?.id ? `/admin/drivers/${created.id}` : '/admin', {
-          state: { activeTab: 'drivers' },
+        if (!created?.id) {
+          throw new Error('Η αποθήκευση δεν επέστρεψε id οδηγού');
+        }
+        toast.success('Ο λογαριασμός αποθηκεύτηκε');
+        // Seed the list with the created row so it is visible immediately.
+        navigate('/admin?tab=drivers', {
+          state: { activeTab: 'drivers', createdDriver: created },
         });
       }
     } catch (err) {

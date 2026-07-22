@@ -271,33 +271,27 @@ export async function downloadBackupFile(backupId, filename) {
 
 export async function fetchFleetDrivers(status) {
   const q = status ? `?status=${status}` : '';
-  try {
-    const res = await adminFetch(`/api/admin/platform/drivers${q}`);
-    if (res.ok) return res.json();
-    // Authenticated failures must not swap in demo mocks (hides real drivers e.g. Achilleas).
-    if (getSaasToken()) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Αποτυχία φόρτωσης οδηγών (${res.status})`);
-    }
-  } catch (err) {
-    if (getSaasToken()) throw err;
+  const res = await adminFetch(`/api/admin/platform/drivers${q}`);
+  if (res.ok) return res.json();
+  // Never fall back to demo mocks — they hide real saved drivers.
+  const err = await res.json().catch(() => ({}));
+  let detail = err.detail || `Αποτυχία φόρτωσης οδηγών (${res.status})`;
+  if (Array.isArray(detail)) {
+    detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
   }
-  return getMockDrivers();
+  throw new Error(String(detail));
 }
 
 export async function fetchFleetDriver(driverId) {
-  try {
-    const res = await adminFetch(`/api/admin/platform/drivers/${driverId}`);
-    if (res.ok) return res.json();
-    if (res.status === 404) return null;
-    if (getSaasToken()) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Αποτυχία φόρτωσης οδηγού (${res.status})`);
-    }
-  } catch (err) {
-    if (getSaasToken()) throw err;
+  const res = await adminFetch(`/api/admin/platform/drivers/${driverId}`);
+  if (res.ok) return res.json();
+  if (res.status === 404) return null;
+  const err = await res.json().catch(() => ({}));
+  let detail = err.detail || `Αποτυχία φόρτωσης οδηγού (${res.status})`;
+  if (Array.isArray(detail)) {
+    detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
   }
-  return getMockDrivers().find((d) => d.id === driverId) || null;
+  throw new Error(String(detail));
 }
 
 export async function createFleetDriver(body) {
@@ -310,7 +304,11 @@ export async function createFleetDriver(body) {
     throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά');
   }
   if (!res.ok) await parseError(res);
-  return res.json();
+  const data = await res.json();
+  if (!data?.id) {
+    throw new Error('Η αποθήκευση ολοπέτυχε — δοκιμάστε ξανά');
+  }
+  return data;
 }
 
 export async function updateFleetDriver(driverId, body) {
