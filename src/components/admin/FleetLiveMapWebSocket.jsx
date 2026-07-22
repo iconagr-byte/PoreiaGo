@@ -14,6 +14,7 @@ import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
 import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
 import AdminFleetPushPanel from './AdminFleetPushPanel.jsx';
 import FleetEtaPanel from './FleetEtaPanel.jsx';
+import FleetVehicleHistoryModal from './FleetVehicleHistoryModal.jsx';
 
 /** Ζωντανός χάρτης στόλου — Mapbox αν υπάρχει token, αλλιώς Leaflet. */
 export default function FleetLiveMapWebSocket() {
@@ -28,6 +29,7 @@ export default function FleetLiveMapWebSocket() {
   const [geofenceLayers, setGeofenceLayers] = useState(null);
   const [fitNonce, setFitNonce] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
+  const [historyVehicle, setHistoryVehicle] = useState(null);
 
   const { alerts, wsConnected: alertsWs } = useTelemetryAlerts({ tenantId, limit: 80, enabled: true });
   const sosAlerts = useMemo(() => mapSosAlertsWithCoords(alerts), [alerts]);
@@ -205,6 +207,7 @@ export default function FleetLiveMapWebSocket() {
               showSosPins={showSosPins}
               focusSosAlert={showSosPins ? focusSosAlert : null}
               fitNonce={fitNonce}
+              onVehicleHistory={setHistoryVehicle}
             />
           ) : (
             <FleetLiveMapLeaflet
@@ -219,6 +222,7 @@ export default function FleetLiveMapWebSocket() {
               showSosPins={showSosPins}
               focusSosAlert={showSosPins ? focusSosAlert : null}
               fitNonce={fitNonce}
+              onVehicleHistory={setHistoryVehicle}
             />
           )}
         </div>
@@ -233,6 +237,7 @@ export default function FleetLiveMapWebSocket() {
                 </span>
               ) : null}
             </div>
+            <p className="mb-2 text-[11px] text-slate-400">Διπλό κλικ σε κάρτα για ιστορικό διαδρομής &amp; check-in</p>
             {vehicles.length ? (
               <ul className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
                 {vehicles.map((v) => {
@@ -246,6 +251,8 @@ export default function FleetLiveMapWebSocket() {
                           setSelectedId(v.id);
                           setFitNonce((n) => n + 1);
                         }}
+                        onDoubleClick={() => setHistoryVehicle(v)}
+                        title="Διπλό κλικ: ιστορικό διαδρομής"
                         className={`w-full rounded-2xl border px-3 py-2.5 text-left transition ${
                           active
                             ? 'border-emerald-300 bg-emerald-50'
@@ -265,7 +272,9 @@ export default function FleetLiveMapWebSocket() {
                             </div>
                             <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-slate-600">
                               <span>{Math.round(v.speed || 0)} km/h</span>
-                              <span>{Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}</span>
+                              <span>
+                                {Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}
+                              </span>
                               <span>{formatUpdatedAgo(v.timestamp) || '—'}</span>
                               {formatBoardingLabel(v) ? <span>{formatBoardingLabel(v)}</span> : null}
                             </div>
@@ -283,6 +292,12 @@ export default function FleetLiveMapWebSocket() {
           <FleetEtaPanel activeTripCount={vehicles.length} />
         </div>
       </div>
+
+      <FleetVehicleHistoryModal
+        open={Boolean(historyVehicle)}
+        vehicle={historyVehicle}
+        onClose={() => setHistoryVehicle(null)}
+      />
     </div>
   );
 }
