@@ -134,6 +134,11 @@ if [[ "$api_ok" -ne 1 ]]; then
   exit 1
 fi
 
+echo "==> Custom domain / ACME check"
+$COMPOSE logs traefik --tail 120 2>/dev/null | grep -iE 'acme|achillio|error|certificate' || true
+curl -skI -H 'Host: www.achilliotravel.com' https://127.0.0.1/ 2>/dev/null | head -8 || true
+docker inspect "$($COMPOSE ps -q frontend)" --format '{{index .Config.Labels "traefik.http.routers.app.rule"}}' 2>/dev/null || true
+
 if [[ "${RUN_SEED:-0}" == "1" ]]; then
   echo "==> Seeding demo admin (RUN_SEED=1)"
   $COMPOSE exec -T api-blue python -m scripts.seed_saas_dev || true
