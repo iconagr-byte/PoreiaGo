@@ -514,13 +514,14 @@ html.driver-route body {
 
 .driver-nav-inner {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.125rem;
+  /* home · chat · gps · scan · logs · sos · summary */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.05rem;
   width: 100%;
   max-width: var(--driver-max-w);
   margin: 0 auto;
-  padding: 0.25rem max(0.25rem, env(safe-area-inset-left, 0px))
-    0.375rem max(0.25rem, env(safe-area-inset-right, 0px));
+  padding: 0.25rem max(0.15rem, env(safe-area-inset-left, 0px))
+    0.375rem max(0.15rem, env(safe-area-inset-right, 0px));
 }
 
 .driver-nav::before {

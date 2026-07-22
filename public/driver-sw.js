@@ -1,7 +1,7 @@
 /**
  * Driver Command Center — cache manifest, offline σελίδα, PWA assets.
  */
-const CACHE = 'aerostride-driver-v3';
+const CACHE = 'aerostride-driver-v4';
 const MANIFEST_PREFIX = '/driver-cache/manifest/';
 const OFFLINE_URL = '/driver-offline.html';
 
@@ -39,6 +39,10 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
   if (event.data?.type === 'CACHE_MANIFEST' && event.data.tripId) {
     const key = `${MANIFEST_PREFIX}${event.data.tripId}`;
     caches.open(CACHE).then((cache) => {
