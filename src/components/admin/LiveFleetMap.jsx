@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchHeatmap, fetchLiveFleet } from '../../services/telemetryApi.js';
 import { adminAuthHeaders } from '../../services/adminApi.js';
+import { clampFleetLivePollMs } from '../../lib/admin/fleetLivePoll.js';
 
 const busIcon = L.divIcon({
   className: 'fleet-bus-marker',
@@ -30,6 +31,7 @@ export default function LiveFleetMap({ authHeaders = adminAuthHeaders(), pollMs 
   const [vehicles, setVehicles] = useState([]);
   const [heatmap, setHeatmap] = useState([]);
   const [showHeat, setShowHeat] = useState(true);
+  const refreshMs = clampFleetLivePollMs(pollMs);
 
   useEffect(() => {
     const headers = authHeaders || adminAuthHeaders();
@@ -38,9 +40,9 @@ export default function LiveFleetMap({ authHeaders = adminAuthHeaders(), pollMs 
       fetchHeatmap({ days: 7 }, headers).then(setHeatmap);
     };
     load();
-    const id = setInterval(load, pollMs);
+    const id = setInterval(load, refreshMs);
     return () => clearInterval(id);
-  }, [authHeaders, pollMs]);
+  }, [authHeaders, refreshMs]);
 
   const center = useMemo(() => {
     if (vehicles.length) return [vehicles[0].lat, vehicles[0].lng];
@@ -55,7 +57,7 @@ export default function LiveFleetMap({ authHeaders = adminAuthHeaders(), pollMs 
         <div>
           <h2 className="font-headline-md font-bold">Live Fleet Tracking</h2>
           <p className="text-sm text-on-surface-variant">
-            {vehicles.length} ενεργά οχήματα · refresh {pollMs / 1000}s
+            {vehicles.length} ενεργά οχήματα · refresh {refreshMs / 1000}s
           </p>
         </div>
         <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">

@@ -25,10 +25,11 @@ export function startDriverGeolocationWatch({
   }
 
   const isIos = detectIosDevice();
+  const publishEveryMs = Math.max(DRIVER_GPS_INTERVAL_MS, Number(intervalMs) || DRIVER_GPS_INTERVAL_MS);
   const geoOptions = {
     ...iosGeolocationOptions(isIos),
     // Prefer a fresh fix at least as often as we publish.
-    maximumAge: Math.min(intervalMs, isIos ? 5000 : 4000),
+    maximumAge: Math.min(publishEveryMs, isIos ? 5000 : 4000),
   };
 
   let lastEmitAt = 0;
@@ -59,9 +60,9 @@ export function startDriverGeolocationWatch({
         // If getCurrentPosition fails, re-send last known fix so the map stays alive.
         if (lastPos) emit(lastPos, { force: true });
       },
-      { ...geoOptions, maximumAge: intervalMs, timeout: isIos ? 18000 : 12000 },
+      { ...geoOptions, maximumAge: publishEveryMs, timeout: isIos ? 18000 : 12000 },
     );
-  }, intervalMs);
+  }, publishEveryMs);
 
   return () => {
     navigator.geolocation.clearWatch(watchId);
