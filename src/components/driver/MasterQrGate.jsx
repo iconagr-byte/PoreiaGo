@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { exchangeMasterQr, loginDriver } from '../../services/driverPortalApi.js';
 import BusQrScanner from '../BusQrScanner.jsx';
 import '../../styles/driver-app.css';
 
 export default function MasterQrGate({ onAuthenticated }) {
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState('password'); // password | qr
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => searchParams.get('user') || '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fromQuery = searchParams.get('user');
+    if (fromQuery) setUsername(fromQuery);
+  }, [searchParams]);
 
   useEffect(() => {
     document.documentElement.classList.add('driver-route');
