@@ -14,6 +14,7 @@ import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
 import AdminFleetPushPanel from './AdminFleetPushPanel.jsx';
 import FleetEtaPanel from './FleetEtaPanel.jsx';
 import FleetVehicleHistoryModal from './FleetVehicleHistoryModal.jsx';
+import { FLEET_LIVE_POLL_MS } from '../../services/telemetryApi.js';
 
 /** Ζωντανός χάρτης στόλου — μεγάλος χάρτης, χωρίς βαριά toolbar. */
 export default function FleetLiveMapWebSocket() {
@@ -45,7 +46,7 @@ export default function FleetLiveMapWebSocket() {
           <h2 className="text-lg font-bold tracking-tight text-slate-900">Ζωντανός χάρτης</h2>
           <p className="text-xs text-slate-500">
             {vehicles.length} ενεργά · {connected ? 'ζωντανά' : 'εκτός'}
-            {transport === 'poll' ? ' (poll)' : ''}
+            {transport === 'poll' ? ' (poll)' : ''} · refresh {FLEET_LIVE_POLL_MS / 1000}s
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
