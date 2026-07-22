@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 DriverStatus = Literal["active", "inactive", "on_leave", "suspended"]
 
 DEFAULT_DRIVER_PASSWORD = "driver123"
+# Platform demo office — seed drivers belong only here.
+DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000001"
 
 # Prefer persistent volume in production (docker mount /app/data).
 _DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[2] / "data")
@@ -45,7 +47,17 @@ class FleetDriver:
     avg_rating: float | None = None
     password_hash: str | None = None
     photo_url: str | None = None
+    tenant_id: str = DEMO_TENANT_ID
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def _normalize_tenant_id(value: str | None) -> str:
+    tid = (value or "").strip()
+    return tid or DEMO_TENANT_ID
+
+
+def _driver_tenant_id(d: FleetDriver) -> str:
+    return _normalize_tenant_id(getattr(d, "tenant_id", None))
 
 
 def _parse_date(value) -> date | None:
@@ -92,6 +104,8 @@ def _driver_from_row(row: dict) -> FleetDriver:
         avg_rating=row.get("avg_rating"),
         password_hash=pwd_hash or hash_password(DEFAULT_DRIVER_PASSWORD),
         photo_url=(str(row["photo_url"]).strip() or None) if row.get("photo_url") else None,
+        # Legacy rows without tenant_id belong to the demo office only.
+        tenant_id=_normalize_tenant_id(row.get("tenant_id")),
         created_at=_parse_datetime(row.get("created_at")),
     )
 
@@ -117,6 +131,7 @@ def _driver_to_row(d: FleetDriver) -> dict:
         "avg_rating": d.avg_rating,
         "password_hash": d.password_hash,
         "photo_url": d.photo_url,
+        "tenant_id": _driver_tenant_id(d),
         "created_at": d.created_at.isoformat(),
     }
 
@@ -153,6 +168,7 @@ def _seed() -> dict[str, FleetDriver]:
             avg_rating=4.2 + (safety % 5) * 0.1,
             password_hash=pwd_hash,
             photo_url=None,
+            tenant_id=DEMO_TENANT_ID,
         )
     return drivers
 
@@ -240,14 +256,18 @@ def _assert_unique(
     license_no: str,
     vehicle_code: str | None,
     license_plate: str | None,
+    tenant_id: str | None = None,
     exclude_id: str | None = None,
 ) -> None:
     email_n = _normalize_username(email)
     license_n = _normalize_username(license_no)
     code_n = _normalize_username(vehicle_code)
     plate_n = _normalize_username(license_plate)
+    tid = _normalize_tenant_id(tenant_id)
     for d in _ensure().values():
         if exclude_id and d.id == exclude_id:
+            continue
+        if _driver_tenant_id(d) != tid:
             continue
         if email_n and d.email.lower() == email_n:
             raise ValueError("Το email χρησιμοποιείται ήδη από άλλον οδηγό")
@@ -259,8 +279,11 @@ def _assert_unique(
             raise ValueError("Η πινακίδα χρησιμοποιείται ήδη")
 
 
-def list_drivers(status: str | None = None) -> list[FleetDriver]:
+def list_drivers(status: str | None = None, tenant_id: str | None = None) -> list[FleetDriver]:
     items = list(_ensure().values())
+    if tenant_id is not None:
+        tid = _normalize_tenant_id(tenant_id)
+        items = [d for d in items if _driver_tenant_id(d) == tid]
     if status:
         items = [d for d in items if d.status == status]
     return sorted(items, key=lambda d: d.name)
@@ -319,11 +342,13 @@ def create_driver(data: dict) -> FleetDriver:
     if isinstance(license_plate, str):
         license_plate = license_plate.strip() or None
 
+    tenant_id = _normalize_tenant_id(data.get("tenant_id"))
     _assert_unique(
         email=email,
         license_no=license_no,
         vehicle_code=vehicle_code,
         license_plate=license_plate,
+        tenant_id=tenant_id,
     )
 
     did = str(uuid4())
@@ -345,6 +370,7 @@ def create_driver(data: dict) -> FleetDriver:
         license_expires_at=_parse_date(data.get("license_expires_at")),
         password_hash=hash_password(str(pwd)),
         photo_url=(str(data["photo_url"]).strip() or None) if data.get("photo_url") else None,
+        tenant_id=tenant_id,
     )
     _ensure()[did] = driver
     _persist()
@@ -372,6 +398,7 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         license_no=next_license,
         vehicle_code=next_code,
         license_plate=next_plate,
+        tenant_id=_driver_tenant_id(d),
         exclude_id=driver_id,
     )
 

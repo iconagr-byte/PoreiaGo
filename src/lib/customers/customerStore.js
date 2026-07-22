@@ -1,6 +1,14 @@
 import { mockCustomers } from '../../data/mockData.js';
+import {
+  isAuthenticatedOfficeSession,
+  officeStorageKey,
+} from '../admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'aerostride_customers_v1';
+const STORAGE_KEY_BASE = 'aerostride_customers_v1';
+
+function storageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -19,21 +27,25 @@ function nextCustomerId(existing) {
 
 function loadStoredCustomers() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (raw) return JSON.parse(raw);
   } catch {
-    /* seed from mock */
+    /* empty */
   }
   return [];
 }
 
 function saveStoredCustomers(list) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  localStorage.setItem(storageKey(), JSON.stringify(list));
 }
 
-/** mock + registered (stored wins on same email) */
+/** Authenticated office: only that tenant's stored customers (never mock seed). */
 export function loadAllCustomers() {
   const stored = loadStoredCustomers();
+  if (isAuthenticatedOfficeSession()) {
+    return [...stored].sort((a, b) => a.name.localeCompare(b.name, 'el'));
+  }
+
   const byEmail = new Map();
   for (const c of mockCustomers) {
     byEmail.set(c.email.toLowerCase(), { ...c });
@@ -63,12 +75,16 @@ export function upsertCustomer(input) {
   if (!email) return null;
 
   const stored = loadStoredCustomers();
-  const mock = mockCustomers.find((c) => c.email.toLowerCase() === email);
+  const useMocks = !isAuthenticatedOfficeSession();
+  const mock = useMocks
+    ? mockCustomers.find((c) => c.email.toLowerCase() === email)
+    : null;
   const idx = stored.findIndex((c) => c.email.toLowerCase() === email);
   const existing = idx >= 0 ? stored[idx] : mock || null;
+  const idPool = useMocks ? [...mockCustomers, ...stored] : stored;
 
   const record = {
-    id: input.id || existing?.id || nextCustomerId([...mockCustomers, ...stored]),
+    id: input.id || existing?.id || nextCustomerId(idPool),
     name: input.name?.trim() || existing?.name || email.split('@')[0],
     email,
     phone: input.phone?.trim() || existing?.phone || '',
@@ -91,12 +107,7 @@ export function upsertCustomer(input) {
   return record;
 }
 
-/** Για κράτηση checkout — σύνδεση booking.customerId με καρτέλα πελάτη */
-export function ensureCustomerForPassenger(passenger) {
-  return upsertCustomer({
-    email: passenger.email,
-    name: passenger.name,
-    phone: passenger.phone,
-    authProvider: 'checkout',
-  });
+export function ensureCustomerForPassenger({ name, email, phone }) {
+  if (!email) return null;
+  return upsertCustomer({ name, email, phone });
 }

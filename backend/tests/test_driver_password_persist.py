@@ -146,6 +146,32 @@ class DriverPasswordPersistTests(unittest.TestCase):
         authed = self.store.authenticate_driver(driver.email, "ExternPass2")
         self.assertIsNotNone(authed)
 
+    def test_list_drivers_scoped_by_tenant(self):
+        demo = self._create(password="DemoPass1", tenant_id=self.store.DEMO_TENANT_ID)
+        other_tid = "11111111-1111-4111-8111-111111111111"
+        other = self._create(
+            password="OtherPass1",
+            tenant_id=other_tid,
+            email="other.office@example.com",
+            license_no="LICOTHER1",
+            vehicle_code="OTH-1",
+            license_plate="OTH-1",
+        )
+        demo_list = self.store.list_drivers(tenant_id=self.store.DEMO_TENANT_ID)
+        other_list = self.store.list_drivers(tenant_id=other_tid)
+        self.assertEqual([d.id for d in demo_list], [demo.id])
+        self.assertEqual([d.id for d in other_list], [other.id])
+
+    def test_seed_drivers_belong_to_demo_tenant_only(self):
+        if self.store_path.exists():
+            self.store_path.unlink()
+        self.store.reset_drivers_cache()
+        demo = self.store.list_drivers(tenant_id=self.store.DEMO_TENANT_ID)
+        other = self.store.list_drivers(tenant_id="22222222-2222-4222-8222-222222222222")
+        self.assertGreaterEqual(len(demo), 1)
+        self.assertEqual(other, [])
+        self.assertTrue(all(d.tenant_id == self.store.DEMO_TENANT_ID for d in demo))
+
 
 if __name__ == "__main__":
     unittest.main()
