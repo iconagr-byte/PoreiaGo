@@ -232,6 +232,8 @@ async def admin_fleet_egress_ws(
                 "speed": vehicle.speed_kmh,
                 "heading": meta.get("heading_deg"),
                 "timestamp": vehicle.updated_at.isoformat(),
+                "boarding": meta.get("boarding"),
+                "sensors": meta.get("sensors"),
             },
         )
     await websocket.send_text(json.dumps({"type": "fleet_snapshot", "vehicles": snapshot}))

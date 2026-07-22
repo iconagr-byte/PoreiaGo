@@ -113,6 +113,8 @@ async def fleet_live(
                 driver_id=meta.get("driver_id"),
                 photo_url=media.get("photo_url"),
                 vehicle_image_url=media.get("vehicle_image_url"),
+                boarding=meta.get("boarding"),
+                sensors=meta.get("sensors"),
             ),
         )
     return rows

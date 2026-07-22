@@ -149,16 +149,26 @@ export default function BackOffice() {
   useEffect(() => {
     if (activeTab !== 'bookings' && activeTab !== 'dashboard') return;
     let cancelled = false;
-    setBookingsLoading(true);
-    loadMergedBookings()
-      .then((merged) => {
-        if (!cancelled) setBookings(merged);
-      })
-      .finally(() => {
-        if (!cancelled) setBookingsLoading(false);
-      });
+    const refresh = ({ silent = false } = {}) => {
+      if (!silent) setBookingsLoading(true);
+      return loadMergedBookings()
+        .then((merged) => {
+          if (!cancelled) setBookings(merged);
+        })
+        .finally(() => {
+          if (!cancelled && !silent) setBookingsLoading(false);
+        });
+    };
+    refresh();
+    // Driver bus check-ins update SaaS immediately — keep office list live.
+    const pollMs = activeTab === 'bookings' ? 4000 : 15000;
+    const pollTimer = window.setInterval(() => refresh({ silent: true }), pollMs);
+    const onBoarded = () => refresh({ silent: true });
+    window.addEventListener('office-boarding-updated', onBoarded);
     return () => {
       cancelled = true;
+      window.clearInterval(pollTimer);
+      window.removeEventListener('office-boarding-updated', onBoarded);
     };
   }, [activeTab, location.key]);
 

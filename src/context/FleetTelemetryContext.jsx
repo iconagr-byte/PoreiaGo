@@ -26,30 +26,35 @@ const FleetTelemetryContext = createContext(null);
 function normalizeVehicle(msg, id, prev) {
   const targetLat = Number(msg.lat ?? msg.latitude);
   const targetLng = Number(msg.lng ?? msg.longitude);
-  if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng)) return null;
-  const prevLat = Number.isFinite(prev?.lat) ? prev.lat : targetLat;
-  const prevLng = Number.isFinite(prev?.lng) ? prev.lng : targetLng;
+  // boarding_update may arrive without coordinates — keep previous position.
+  const hasCoords = Number.isFinite(targetLat) && Number.isFinite(targetLng);
+  if (!hasCoords && !prev) return null;
+  const resolvedLat = hasCoords ? targetLat : Number(prev.lat);
+  const resolvedLng = hasCoords ? targetLng : Number(prev.lng);
+  if (!Number.isFinite(resolvedLat) || !Number.isFinite(resolvedLng)) return null;
+  const prevLat = Number.isFinite(prev?.lat) ? prev.lat : resolvedLat;
+  const prevLng = Number.isFinite(prev?.lng) ? prev.lng : resolvedLng;
   return {
     id,
     vehicle_id: msg.vehicle_id || id,
-    vehicle_code: msg.vehicle_code || msg.bus_plate || id,
-    bus_plate: msg.bus_plate || msg.vehicle_code || '—',
-    driver_name: msg.driver_name || '—',
-    driver_id: msg.driver_id,
-    trip_id: msg.trip_id,
+    vehicle_code: msg.vehicle_code || msg.bus_plate || prev?.vehicle_code || id,
+    bus_plate: msg.bus_plate || msg.vehicle_code || prev?.bus_plate || '—',
+    driver_name: msg.driver_name || prev?.driver_name || '—',
+    driver_id: msg.driver_id ?? prev?.driver_id,
+    trip_id: msg.trip_id ?? prev?.trip_id,
     lat: prevLat,
     lng: prevLng,
-    targetLat,
-    targetLng,
+    targetLat: resolvedLat,
+    targetLng: resolvedLng,
     prevLat,
     prevLng,
-    speed: msg.speed ?? msg.speed_kmh ?? 0,
-    heading: msg.heading ?? msg.heading_deg,
-    timestamp: msg.timestamp || msg.updated_at,
-    accuracy_m: msg.accuracy_m ?? null,
-    altitude_m: msg.altitude_m ?? null,
-    boarding: msg.boarding ?? null,
-    sensors: msg.sensors ?? null,
+    speed: msg.speed ?? msg.speed_kmh ?? prev?.speed ?? 0,
+    heading: msg.heading ?? msg.heading_deg ?? prev?.heading,
+    timestamp: msg.timestamp || msg.updated_at || prev?.timestamp,
+    accuracy_m: msg.accuracy_m ?? prev?.accuracy_m ?? null,
+    altitude_m: msg.altitude_m ?? prev?.altitude_m ?? null,
+    boarding: msg.boarding ?? prev?.boarding ?? null,
+    sensors: msg.sensors ?? prev?.sensors ?? null,
     photo_url: msg.photo_url ?? prev?.photo_url ?? null,
     vehicle_image_url: msg.vehicle_image_url ?? prev?.vehicle_image_url ?? null,
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
@@ -97,8 +102,14 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
         const map = replace ? {} : { ...prev };
         rows.forEach((row) => {
           const id = vehicleIdFromRow(row);
-          const normalized = normalizeVehicle(row, id, map[id] || prev[id]);
-          if (normalized) map[id] = normalized;
+          const prior = map[id] || prev[id];
+          const normalized = normalizeVehicle(row, id, prior);
+          if (!normalized) return;
+          // HTTP poll historically omitted boarding — keep last known snapshot.
+          if (!normalized.boarding && prior?.boarding) {
+            normalized.boarding = prior.boarding;
+          }
+          map[id] = normalized;
         });
         return map;
       });
@@ -184,6 +195,44 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
               if (!normalized) return prev;
               return { ...prev, [id]: normalized };
             });
+            return;
+          }
+          if (msg.type === 'boarding_update') {
+            setVehicles((prev) => {
+              const next = { ...prev };
+              let changed = false;
+              const tripKey = msg.trip_id != null ? String(msg.trip_id) : null;
+              Object.keys(next).forEach((id) => {
+                const v = next[id];
+                const sameTrip = tripKey && String(v.trip_id) === tripKey;
+                const listed =
+                  Array.isArray(msg.vehicle_ids) &&
+                  msg.vehicle_ids.some((vid) => String(vid) === String(v.vehicle_id || id));
+                if (!sameTrip && !listed) return;
+                next[id] = {
+                  ...v,
+                  boarding: msg.boarding ?? v.boarding,
+                  timestamp: msg.timestamp || v.timestamp,
+                };
+                changed = true;
+              });
+              return changed ? next : prev;
+            });
+            try {
+              window.dispatchEvent(
+                new CustomEvent('office-boarding-updated', {
+                  detail: {
+                    tripId: msg.trip_id,
+                    bookingId: msg.booking_id,
+                    saasBookingId: msg.saas_booking_id,
+                    passengerName: msg.passenger_name,
+                    boarding: msg.boarding,
+                  },
+                }),
+              );
+            } catch {
+              /* ignore */
+            }
             return;
           }
           if (msg.type === 'fleet_driver_offline') {
