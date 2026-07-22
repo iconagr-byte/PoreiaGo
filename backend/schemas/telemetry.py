@@ -330,7 +330,7 @@ class TelemetrySettingsResponse(BaseModel):
     prefer_tracker_events: bool = True
     eta_refresh_seconds: int = Field(300, ge=60, le=900)
     eta_ws_push_seconds: int = Field(30, ge=10, le=120)
-    driver_stale_seconds: int = Field(90, ge=30, le=600)
+    driver_stale_seconds: int = Field(360, ge=30, le=3600)
     gps_retention_days: int = Field(90, ge=0, le=3650)
     driver_gps_max_per_minute: int = Field(60, ge=0, le=600)
     fleet_webhook_enabled: bool = True
@@ -353,7 +353,7 @@ class TelemetrySettingsUpdate(BaseModel):
     prefer_tracker_events: bool | None = None
     eta_refresh_seconds: int | None = Field(None, ge=60, le=900)
     eta_ws_push_seconds: int | None = Field(None, ge=10, le=120)
-    driver_stale_seconds: int | None = Field(None, ge=30, le=600)
+    driver_stale_seconds: int | None = Field(None, ge=30, le=3600)
     gps_retention_days: int | None = Field(None, ge=0, le=3650)
     driver_gps_max_per_minute: int | None = Field(None, ge=0, le=600)
     fleet_webhook_enabled: bool | None = None

@@ -39,7 +39,7 @@ class PlatformSettings(BaseSettings):
     corridor_buffer_m: int = 75
     gforce_spike_threshold_g: float = 0.45
     eta_refresh_seconds: int = 300
-    driver_stale_seconds: int = 90
+    driver_stale_seconds: int = 360
     gps_retention_days: int = 90
     driver_gps_max_per_minute: int = 60
     fleet_webhook_enabled: bool = True
