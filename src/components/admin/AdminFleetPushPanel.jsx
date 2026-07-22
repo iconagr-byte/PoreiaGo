@@ -4,6 +4,7 @@ import {
   fetchAdminPushStatus,
   isAdminPushSupported,
   isThisBrowserAdminPushSubscribed,
+  sendAdminPushTest,
   subscribeAdminFleetPush,
   unsubscribeAdminFleetPush,
 } from '../../services/adminPushNotificationApi.js';
@@ -105,6 +106,25 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
     }
   };
 
+  const onTest = async () => {
+    setBusy(true);
+    try {
+      // Re-register first so durable store + current VAPID key are in sync.
+      await subscribeAdminFleetPush();
+      setSubscribed(true);
+      const result = await sendAdminPushTest();
+      if (result.sent > 0) {
+        toast.success(`Δοκιμή push OK (${result.sent} συσκευή)`);
+      } else {
+        toast.error('Δοκιμή: καμία συσκευή δεν έλαβε — ελέγξτε άδεια ειδοποιήσεων');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία δοκιμής push');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!supported) return null;
 
   return (
@@ -118,24 +138,38 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
       </div>
       {!enabled ? (
         <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">VAPID μη ρυθμισμένο</span>
-      ) : subscribed ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onUnsubscribe}
-          className="text-xs font-bold px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
-        >
-          Απενεργοποίηση
-        </button>
       ) : (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onSubscribe}
-          className="text-xs font-bold px-3 py-2 rounded-xl bg-primary text-white hover:opacity-90"
-        >
-          {busy ? '…' : 'Ενεργοποίηση push'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {subscribed ? (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onTest}
+                className="text-xs font-bold px-3 py-2 rounded-xl bg-primary text-white hover:opacity-90"
+              >
+                {busy ? '…' : 'Δοκιμή push'}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onUnsubscribe}
+                className="text-xs font-bold px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
+              >
+                Απενεργοποίηση
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onSubscribe}
+              className="text-xs font-bold px-3 py-2 rounded-xl bg-primary text-white hover:opacity-90"
+            >
+              {busy ? '…' : 'Ενεργοποίηση push'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

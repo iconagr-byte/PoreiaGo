@@ -208,16 +208,20 @@ async def _send_driver_shift_push(*, event: str, meta: dict[str, Any], message: 
 
     admin_email = _admin_email()
     if admin_email:
-        for sub in list_subscriptions_for_email(admin_email):
+        # Prefer admin-audience devices for this email (ignore customer wallet subs).
+        for sub in list_subscriptions_for_email(admin_email, audience="admin"):
             await _try_sub(sub)
+        if sent == 0:
+            for sub in list_subscriptions_for_email(admin_email):
+                await _try_sub(sub)
         if sent == 0:
             email_result = await send_push_to_email(admin_email, payload)
             if email_result.get("sent"):
                 sent += int(email_result.get("sent") or 0)
             attempted += int(email_result.get("attempted") or 0)
 
-    # Last resort: any admin-audience device (covers tenant-id drift after login).
-    if attempted == 0:
+    # Last resort: any admin device (tenant-id drift / wiped-but-re-subscribed elsewhere).
+    if sent == 0:
         for sub in list_all_subscriptions(audience="admin"):
             await _try_sub(sub)
 
