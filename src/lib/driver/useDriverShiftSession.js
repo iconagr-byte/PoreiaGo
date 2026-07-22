@@ -15,7 +15,7 @@ import {
 } from './driverDeviceSensors.js';
 import { createDriverTelemetryTransport } from './driverTelemetryTransport.js';
 import { getDriverSession } from './driverSession.js';
-import { endDriverShift, fetchDriverManifest } from '../../services/driverPortalApi.js';
+import { endDriverShift, fetchDriverManifest, startDriverShift } from '../../services/driverPortalApi.js';
 import { isWakeLockSupported, releaseWakeLock, requestWakeLock } from './wakeLock.js';
 import {
   formatRateLimitedMessage,
@@ -135,6 +135,15 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       setOnline(true);
       setShiftFlag(true);
       runningRef.current = true;
+
+      // Explicit start → notify office immediately (before GPS/WS).
+      if (!resume) {
+        try {
+          await startDriverShift();
+        } catch {
+          /* GPS still proceeds; office push may retry on first ping */
+        }
+      }
 
       try {
         await requestMotionPermission();

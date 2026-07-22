@@ -29,6 +29,17 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
           requireInteraction: true,
         });
       }
+    } else if (type === 'DRIVER_ONLINE') {
+      toast.success(row.message || 'Οδηγός ξεκίνησε βάρδια', {
+        duration: 5000,
+        id: `driver-online-${row.id}`,
+      });
+    } else if (type === 'DRIVER_OFFLINE') {
+      toast(row.message || 'Οδηγός έκλεισε βάρδια', {
+        duration: 5000,
+        icon: '🛑',
+        id: `driver-offline-${row.id}`,
+      });
     }
   }, [limit]);
 
