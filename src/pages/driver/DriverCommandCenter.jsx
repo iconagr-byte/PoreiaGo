@@ -87,7 +87,7 @@ function DriverHeader({ session, telemetryOnline, onLogout, kicker, title }) {
           {telemetryOnline ? 'LIVE' : 'Offline'}
         </span>
         <button type="button" onClick={onLogout} className="driver-header-btn shrink-0">
-          {kicker === 'Pre-trip' ? 'Έξοδος' : 'Τέλος'}
+          Έξοδος
         </button>
       </div>
     </header>
@@ -318,7 +318,10 @@ export default function DriverCommandCenter() {
           </div>
           {tab === 'scan' && <Scanner />}
           {tab === 'logs' && <ExpenseUpload />}
-          {tab === 'sos' && <SOSButton />}
+          {/* Keep SOS mounted so remount never races with GPS keepalive. */}
+          <div hidden={tab !== 'sos'} aria-hidden={tab !== 'sos'}>
+            <SOSButton />
+          </div>
           {tab === 'summary' && <DaySummary />}
         </main>
 
