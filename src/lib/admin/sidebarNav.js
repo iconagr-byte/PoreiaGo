@@ -6,7 +6,7 @@ import {
 } from './settingsTabs.js';
 import { settingsTabToNavItem } from './settingsSidebar.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v3';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v4';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
@@ -23,6 +23,9 @@ export const FLEET_OPS_ONLY_IDS = [
 /** Debug / platform-operator tools — not for normal office admins. */
 export const SUPER_ONLY_MAIN_IDS = ['live_tracking'];
 
+/** Platform SaaS tabs (Tenants, SaaS Infra, Backup, Growth) — superadmin only. */
+export const PLATFORM_NAV_IDS = PLATFORM_OPERATOR_TABS.map((t) => `settings_${t.id}`);
+
 export const DEFAULT_MAIN_NAV_ORDER = [
   'dashboard',
   'routes',
@@ -37,9 +40,13 @@ export const DEFAULT_MAIN_NAV_ORDER = [
 
 export const LEGACY_NAV_IDS = new Set(['settings', 'payments']);
 
-const PLATFORM_IDS = PLATFORM_OPERATOR_TABS.map((t) => `settings_${t.id}`);
+const PLATFORM_IDS = PLATFORM_NAV_IDS;
 const OFFICE_SETTINGS_IDS = TENANT_SETTINGS_TABS.map((t) => `settings_${t.id}`);
+const PLATFORM_ID_SET = new Set(PLATFORM_IDS);
 
+function stripPlatformIds(ids) {
+  return (ids || []).filter((id) => !PLATFORM_ID_SET.has(id));
+}
 export function getDefaultNavLayout(isSuperAdmin) {
   return {
     main: isSuperAdmin
@@ -72,9 +79,13 @@ function migrateNavLayout(layout, isSuperAdmin) {
       id !== 'drivers' &&
       id !== 'email_templates' &&
       !fleetOpsSet.has(id) &&
+      !PLATFORM_ID_SET.has(id) &&
       (isSuperAdmin || !superOnlyMain.has(id)),
   );
-  let settings = [...(layout.settings || [])].filter((id) => OFFICE_SETTINGS_IDS.includes(id));
+  // Never keep Growth / Tenants / etc. under office settings for tenant admins.
+  let settings = stripPlatformIds([...(layout.settings || [])]).filter((id) =>
+    OFFICE_SETTINGS_IDS.includes(id),
+  );
 
   const fleetIdx = main.indexOf('fleet');
   const driversInsertAt = fleetIdx >= 0 ? fleetIdx + 1 : main.length;
@@ -90,12 +101,17 @@ function migrateNavLayout(layout, isSuperAdmin) {
 
   // Re-merge against defaults, then force-dedupe fleet ops out of main again.
   main = mergeSectionOrder(main, defaults.main).filter(
-    (id) => !fleetOpsSet.has(id) && (isSuperAdmin || !superOnlyMain.has(id)),
+    (id) =>
+      !fleetOpsSet.has(id) &&
+      !PLATFORM_ID_SET.has(id) &&
+      (isSuperAdmin || !superOnlyMain.has(id)),
   );
 
   return {
     main,
-    fleet_ops: mergeSectionOrder(layout.fleet_ops || defaults.fleet_ops || [], defaults.fleet_ops || []),
+    fleet_ops: stripPlatformIds(
+      mergeSectionOrder(layout.fleet_ops || defaults.fleet_ops || [], defaults.fleet_ops || []),
+    ),
     platform: isSuperAdmin
       ? mergeSectionOrder(layout.platform || [], defaults.platform)
       : [],
@@ -161,7 +177,8 @@ export function loadNavLayout(isSuperAdmin) {
 }
 
 export function saveNavLayout(isSuperAdmin, layout) {
-  localStorage.setItem(layoutStorageKey(isSuperAdmin), JSON.stringify(layout));
+  const safe = migrateNavLayout(layout || getDefaultNavLayout(isSuperAdmin), isSuperAdmin);
+  localStorage.setItem(layoutStorageKey(isSuperAdmin), JSON.stringify(safe));
 }
 
 export const ADMIN_NAV_ITEMS = {
