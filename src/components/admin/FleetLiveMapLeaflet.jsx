@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import '../../styles/fleet-live-map.css';
 import { useAnimatedFleetVehicles } from '../../hooks/useAnimatedFleetVehicles.js';
 import FleetHeatmapLayer from './FleetHeatmapLayer.jsx';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
@@ -27,18 +28,18 @@ function escapeAttr(value) {
 const busIcon = (vehicle) => {
   const heading = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
   const img = escapeAttr(resolveFleetMarkerImage(vehicle));
+  const name = escapeAttr(vehicle?.driver_name || 'Οδηγός');
+  const speed = Math.round(vehicle?.speed || 0);
   return L.divIcon({
     className: 'fleet-bus-marker-ws',
-    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-10px);filter:drop-shadow(0 8px 18px rgba(15,23,42,.28))">
-      <div style="position:relative;width:52px;height:52px">
-        <div style="width:52px;height:52px;border-radius:50%;overflow:hidden;border:3px solid #f8fafc;background:#0f172a;box-shadow:0 0 0 2px #0f172a">
-          <img src="${img}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" />
-        </div>
-        <div style="position:absolute;inset:-4px;border-radius:50%;border:2px solid #facc15;pointer-events:none"></div>
-        <div style="position:absolute;left:50%;top:-2px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #facc15;transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 30px"></div>
+    html: `<div class="fleet-apple-bus-pin">
+      <div class="fleet-apple-bus-pin__ring">
+        <div class="fleet-apple-bus-pin__avatar"><img src="${img}" alt="" /></div>
+        <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
+      <div class="fleet-apple-bus-pill">${name} · ${speed} km/h</div>
     </div>`,
-    iconSize: [52, 64],
+    iconSize: [52, 72],
     iconAnchor: [26, 26],
   });
 };
@@ -59,22 +60,22 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
         },
       }}
     >
-      <Tooltip direction="top" offset={[0, -28]} opacity={0.96} permanent>
+      <Tooltip className="fleet-apple-tooltip" direction="top" offset={[0, -34]} opacity={1} permanent={false}>
         <strong>{v.driver_name}</strong>
         <br />
         {v.bus_plate} · {Math.round(v.speed)} km/h
       </Tooltip>
       <Popup>
-        <div style={{ minWidth: 180 }}>
+        <div className="fleet-apple-popup" style={{ minWidth: 180 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
             <img
               src={resolveFleetMarkerImage(v)}
               alt=""
-              style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover' }}
+              style={{ width: 48, height: 48, borderRadius: 14, objectFit: 'cover' }}
             />
             <div>
-              <strong>{v.driver_name}</strong>
-              <div style={{ fontSize: 12, color: '#64748b' }}>{v.bus_plate}</div>
+              <div className="fleet-apple-popup__title">{v.driver_name}</div>
+              <div className="fleet-apple-popup__meta">{v.bus_plate}</div>
             </div>
           </div>
           Ταχύτητα: {Math.round(v.speed)} km/h

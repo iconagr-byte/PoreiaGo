@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 
-const DEFAULT_ANIM_MS = 3500;
+const DEFAULT_ANIM_MS = 5000;
 
 /**
  * Ομαλή μετάβαση δεικτών στόλου (ease-out quad) μεταξύ GPS pings.

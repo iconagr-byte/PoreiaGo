@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MapContainer, TileLayer, Polyline, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import '../../styles/fleet-live-map.css';
 import { fetchTripRoute, downloadTripRouteExport } from '../../services/telemetryApi.js';
 import {
   parsePlaybackFilters,
@@ -17,6 +19,23 @@ function FitRoute({ positions }) {
     map.fitBounds(positions, { padding: [40, 40] });
   }, [positions, map]);
   return null;
+}
+
+function playbackBusIcon(point) {
+  const heading = Number.isFinite(point?.heading) ? point.heading : 0;
+  const speed = Math.round(point?.speed_kmh || 0);
+  return L.divIcon({
+    className: 'fleet-bus-marker-ws',
+    html: `<div class="fleet-apple-bus-pin">
+      <div class="fleet-apple-bus-pin__ring">
+        <div class="fleet-apple-bus-pin__avatar" style="display:flex;align-items:center;justify-content:center;background:#0040df;font-size:22px;border-color:#fff;box-shadow:0 0 0 3px rgba(250,204,21,.55)">🚌</div>
+        <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg);border-bottom-color:#facc15"></div>
+      </div>
+      <div class="fleet-apple-bus-pill">${speed} km/h</div>
+    </div>`,
+    iconSize: [52, 72],
+    iconAnchor: [26, 26],
+  });
 }
 
 function useRoutePlayback(points, { playing, speed }) {
@@ -392,17 +411,16 @@ export default function FleetRoutePlayback() {
                 <Polyline positions={positions} pathOptions={{ color: '#0040df', weight: 5, opacity: 0.85 }} />
               ) : null}
               {position ? (
-                <CircleMarker
-                  center={[position.lat, position.lng]}
-                  radius={12}
-                  pathOptions={{ color: '#facc15', fillColor: '#0040df', fillOpacity: 1, weight: 3 }}
+                <Marker
+                  position={[position.lat, position.lng]}
+                  icon={playbackBusIcon(position)}
                 >
                   <Popup>
                     {Math.round(position.speed_kmh)} km/h
                     <br />
                     {new Date(position.recorded_at).toLocaleString('el-GR')}
                   </Popup>
-                </CircleMarker>
+                </Marker>
               ) : null}
             </MapContainer>
           </div>

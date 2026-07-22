@@ -1,0 +1,97 @@
+/* Live fleet bus pin (στίγμα) — photo avatar + heading */
+
+.fleet-apple-bus-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-8px);
+  filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.22));
+  cursor: pointer;
+}
+
+.fleet-apple-bus-pin__ring {
+  position: relative;
+  width: 52px;
+  height: 52px;
+}
+
+.fleet-apple-bus-pin__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #fff;
+  background: #1d1d1f;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.28);
+}
+
+.fleet-apple-bus-pin__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fleet-apple-bus-pin__heading {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 8px solid #0071e3;
+  transform-origin: 50% 30px;
+}
+
+.fleet-apple-bus-pill {
+  margin-top: 4px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.fleet-apple-popup {
+  min-width: 200px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  color: #1d1d1f;
+}
+
+.fleet-apple-popup__title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.fleet-apple-popup__meta {
+  font-size: 12px;
+  color: #6e6e73;
+}
+
+.leaflet-tooltip.fleet-apple-tooltip {
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #1d1d1f !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  font-size: 11px !important;
+  font-weight: 600;
+  padding: 4px 10px !important;
+}
+
+.fleet-bus-marker-ws {
+  background: transparent !important;
+  border: 0 !important;
+}
