@@ -45,6 +45,8 @@ set_kv "BILLING_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/admin?billing=success"
 set_kv "BILLING_CANCEL_URL" "https://${APP_HOST_DEFAULT}/admin?billing=cancel"
 set_kv "BILLING_SIGNUP_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup/success?billing=success"
 set_kv "BILLING_SIGNUP_CANCEL_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup?billing=cancel"
+# Demo office signup without real Stripe charge (set to 0 when going live with Stripe).
+set_kv "BILLING_DEMO_MODE" "true"
 
 PLATFORM_DOMAIN="${PLATFORM_DOMAIN:-poreiago.com}"
 if grep -q "^APP_HOST=" "$ENV_FILE" 2>/dev/null; then
