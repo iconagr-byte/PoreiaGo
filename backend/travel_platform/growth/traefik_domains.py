@@ -38,8 +38,12 @@ def _router_id(domain: str) -> str:
     return f"tenant-domain-{slug}"[:63]
 
 
-def render_custom_domains_yaml(domains: list[str]) -> str:
-    """Build Traefik dynamic YAML for apex + www of each custom domain."""
+def render_custom_domains_yaml(domains: list[str], *, include_apex: bool = False) -> str:
+    """Build Traefik dynamic YAML for custom domains.
+
+    By default only ``www.{domain}`` is certified/routed. Apex is included only
+    when ``include_apex=True`` (requires apex DNS to point at the platform).
+    """
     unique: list[str] = []
     seen: set[str] = set()
     for raw in domains:
@@ -55,6 +59,7 @@ def render_custom_domains_yaml(domains: list[str]) -> str:
     lines = [
         "# AUTO-GENERATED — tenant custom domains for Traefik + Let's Encrypt",
         "# Do not edit by hand; regenerated when Domain settings are saved.",
+        "# Default: www only (apex often still points at old hosting).",
         "",
         "http:",
         "  routers:",
@@ -75,11 +80,16 @@ def render_custom_domains_yaml(domains: list[str]) -> str:
         return "\n".join(lines)
 
     for domain in unique:
-        rid = _router_id(domain)
+        hosts = [f"www.{domain}"]
+        if include_apex:
+            hosts.insert(0, domain)
+        rid = _router_id("www-" + domain if not include_apex else domain)
+        rule = " || ".join(f"Host(`{h}`)" for h in hosts)
+        main = hosts[0]
         lines.extend(
             [
                 f"    {rid}:",
-                f"      rule: Host(`{domain}`) || Host(`www.{domain}`)",
+                f"      rule: {rule}",
                 "      entryPoints:",
                 "        - websecure",
                 "      service: tenant-custom-frontend",
@@ -87,9 +97,15 @@ def render_custom_domains_yaml(domains: list[str]) -> str:
                 "      tls:",
                 "        certResolver: letsencrypt",
                 "        domains:",
-                f'          - main: "{domain}"',
-                "            sans:",
-                f'              - "www.{domain}"',
+                f'          - main: "{main}"',
+            ]
+        )
+        if len(hosts) > 1:
+            lines.append("            sans:")
+            for h in hosts[1:]:
+                lines.append(f'              - "{h}"')
+        lines.extend(
+            [
                 "      middlewares:",
                 "        - security-headers@file",
                 "",
