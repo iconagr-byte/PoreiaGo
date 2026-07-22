@@ -4,6 +4,8 @@ import { driverSessionHeaders } from '../lib/driver/driverSession.js';
 
 const DEVICE_KEY = import.meta.env.VITE_TELEMETRY_DEVICE_KEY || 'dev-gps-key';
 
+/** Admin live map HTTP poll cadence — matches driver GPS send interval (5s). */
+export const FLEET_LIVE_POLL_MS = 5000;
 export async function postTelemetryUpdate(payload) {
   const res = await fetch(`${API_BASE}/telemetry/update`, {
     method: 'POST',

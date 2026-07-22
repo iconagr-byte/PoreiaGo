@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { fetchHeatmap, fetchLiveFleet } from '../../services/telemetryApi.js';
+import { fetchHeatmap, fetchLiveFleet, FLEET_LIVE_POLL_MS } from '../../services/telemetryApi.js';
 import { adminAuthHeaders } from '../../services/adminApi.js';
 
 const busIcon = L.divIcon({
@@ -26,7 +26,7 @@ function FitBounds({ vehicles }) {
  * Live fleet map — Leaflet (works without Mapbox token).
  * Set VITE_MAPBOX_TOKEN and swap TileLayer URL for Mapbox GL in production.
  */
-export default function LiveFleetMap({ authHeaders = adminAuthHeaders(), pollMs = 5000 }) {
+export default function LiveFleetMap({ authHeaders = adminAuthHeaders(), pollMs = FLEET_LIVE_POLL_MS }) {
   const [vehicles, setVehicles] = useState([]);
   const [heatmap, setHeatmap] = useState([]);
   const [showHeat, setShowHeat] = useState(true);
