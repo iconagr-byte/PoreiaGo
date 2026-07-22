@@ -1,7 +1,7 @@
 /**
  * Module 5 — Tachograph-Lite fatigue tracker.
- * Counts continuous duty time after the driver is in the app (post safety gate),
- * independent of GPS «Έναρξη βάρδιας». Pauses on break; warns at 4h15m.
+ * Counts continuous duty time only while GPS shift is online («Έναρξη βάρδιας»).
+ * Pauses on break / end-shift; warns at 4h15m.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -53,7 +53,7 @@ export function useTachograph({ active = false, onBreak = false } = {}) {
   const [warned, setWarned] = useState(initial.warned);
   const intervalRef = useRef(null);
 
-  // Counting runs whenever the driver is on duty in the app, not only with GPS online.
+  // Counting runs only while the GPS shift is active («Έναρξη βάρδιας»).
   const isCounting = active && !onBreak;
 
   useEffect(() => {
