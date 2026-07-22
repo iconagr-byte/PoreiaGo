@@ -80,10 +80,17 @@ async def notify_driver_shift(
         return {"skipped": True, "reason": "no_tenant"}
 
     alert_type = "DRIVER_ONLINE" if event == "online" else "DRIVER_OFFLINE"
+    reason = str((body or {}).get("reason") or "")
     if event == "online":
-        message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) είναι online"
+        if reason == "shift_start":
+            message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) ξεκίνησε τη βάρδια"
+        else:
+            message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) είναι online"
     else:
-        message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) έκλεισε τη βάρδια"
+        if reason == "shift_end":
+            message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) έκλεισε τη βάρδια"
+        else:
+            message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) είναι offline"
 
     alert = TelemetryAlertBus.push_driver_shift(
         alert_type=alert_type,
@@ -113,11 +120,11 @@ async def _send_driver_shift_push(*, event: str, meta: dict[str, Any], message: 
     if not web_push_configured():
         return {"skipped": True, "reason": "vapid_not_configured"}
 
-    title = "Οδηγός online" if event == "online" else "Οδηγός offline"
+    title = "Έναρξη βάρδιας" if event == "online" else "Τέλος βάρδιας"
     payload = {
         "title": title,
         "body": message,
-        "tag": f"driver-shift-{meta['tenant_id']}-{meta['driver_id']}",
+        "tag": f"driver-shift-{meta['tenant_id']}-{meta['driver_id']}-{event}",
         "url": "/admin",
         "data": {
             "type": "driver_shift",
@@ -127,6 +134,7 @@ async def _send_driver_shift_push(*, event: str, meta: dict[str, Any], message: 
             "driver_id": meta.get("driver_id"),
             "tab": "fleet_live_map",
         },
+        "requireInteraction": event == "online",
     }
 
     tenant_id = meta["tenant_id"]

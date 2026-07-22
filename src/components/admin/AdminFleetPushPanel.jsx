@@ -59,7 +59,7 @@ export default function AdminFleetPushPanel() {
       <div className="min-w-0">
         <p className="text-sm font-bold text-gray-900">Ειδοποιήσεις οδηγών</p>
         <p className="text-xs text-gray-500 mt-0.5">
-          Push όταν οδηγός ξεκινά ή τελειώνει βάρδια (GPS PWA)
+          Push όταν οδηγός πατάει Έναρξη ή Τέλος βάρδιας
         </p>
       </div>
       {!enabled ? (

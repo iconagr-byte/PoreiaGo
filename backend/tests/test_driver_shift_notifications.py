@@ -54,12 +54,17 @@ class DriverShiftNotificationTests(unittest.IsolatedAsyncioTestCase):
             new_callable=AsyncMock,
             return_value={"sent": 0},
         ):
-            result = await notify_driver_shift("online", session)
+            result = await notify_driver_shift(
+                "online",
+                session,
+                body={"reason": "shift_start"},
+            )
 
         self.assertIn("alert_id", result)
         alerts = TelemetryAlertBus.list_recent(session["tenant_id"], limit=5)
         self.assertEqual(alerts[0]["alert_type"], "DRIVER_ONLINE")
         self.assertIn("Nikos", alerts[0]["message"])
+        self.assertIn("ξεκίνησε τη βάρδια", alerts[0]["message"])
 
     async def test_notify_offline_skipped_when_disabled(self):
         from travel_platform.telemetry.driver_shift_notifications import notify_driver_shift
