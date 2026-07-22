@@ -169,6 +169,8 @@ export async function endDriverShift() {
   const res = await fetch(`${API_BASE}/api/driver/telemetry/shift/end`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    // Survive tab close / navigation so office still gets the push.
+    keepalive: true,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

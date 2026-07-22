@@ -76,14 +76,31 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   }, []);
 
   const goOffline = useCallback(
-    ({ silent = false } = {}) => {
+    async ({ silent = false } = {}) => {
+      // Notify office FIRST (while session is still valid), then tear down GPS/WS.
+      // Fire-and-forget previously aborted the request when the UI moved on → no push.
+      try {
+        const ended = await endDriverShift();
+        const push = ended?.notify?.push;
+        if (push?.sent > 0) {
+          console.info('[shift] end push sent', push.sent);
+        } else if (push) {
+          console.warn('[shift] end push result', push);
+        }
+      } catch (err) {
+        console.warn('[shift] end notify failed, retrying', err);
+        try {
+          await endDriverShift();
+        } catch (err2) {
+          console.warn('[shift] end notify retry failed', err2);
+        }
+      }
+
       stopRuntime();
       setOnline(false);
       setGpsError('');
       setStarting(false);
       setShiftFlag(false);
-      // Fire-and-forget: notify admin platform + clear live map pin.
-      endDriverShift().catch(() => {});
       if (!silent) {
         toast('Η βάρδια τερματίστηκε', { icon: '🛑', duration: 2500 });
       }
@@ -314,7 +331,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
 
   const toggle = useCallback(() => {
     if (online || starting || runningRef.current || isDriverShiftOnline()) {
-      goOffline();
+      void goOffline();
     } else {
       void goOnline({ resume: false });
     }
