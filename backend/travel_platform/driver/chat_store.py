@@ -90,6 +90,9 @@ def append_message(
         "sender_user_id": (sender_user_id or "").strip() or None,
         "body": text,
         "created_at": _now_iso(),
+        # Own side already has the message; peer delivery/read start empty.
+        "delivered_to_driver_at": _now_iso() if sender == "driver" else None,
+        "delivered_to_office_at": _now_iso() if sender == "office" else None,
         "read_by_driver_at": _now_iso() if sender == "driver" else None,
         "read_by_office_at": _now_iso() if sender == "office" else None,
     }
@@ -97,7 +100,35 @@ def append_message(
         data = _load()
         data["messages"].append(row)
         _save(data)
-    return dict(row)
+    # Sender-facing receipt starts as "sent" (peer not yet delivered/read).
+    return enrich_message(row, sender)
+
+
+def receipt_status_for_viewer(row: dict[str, Any], viewer: Sender) -> str | None:
+    """iMessage-style status for the sender's own bubble: sent | delivered | read."""
+    if not row or row.get("sender") != viewer:
+        return None
+    if viewer == "driver":
+        if row.get("read_by_office_at"):
+            return "read"
+        if row.get("delivered_to_office_at"):
+            return "delivered"
+        return "sent"
+    if row.get("read_by_driver_at"):
+        return "read"
+    if row.get("delivered_to_driver_at"):
+        return "delivered"
+    return "sent"
+
+
+def enrich_message(row: dict[str, Any], viewer: Sender | None = None) -> dict[str, Any]:
+    out = dict(row)
+    # Always expose both perspectives; ``receipt`` is viewer-specific.
+    out["receipt_driver"] = receipt_status_for_viewer(out, "driver")
+    out["receipt_office"] = receipt_status_for_viewer(out, "office")
+    if viewer in ("driver", "office"):
+        out["receipt"] = receipt_status_for_viewer(out, viewer)
+    return out
 
 
 def list_messages(
@@ -106,11 +137,14 @@ def list_messages(
     driver_id: str,
     after_id: str | None = None,
     limit: int = 100,
+    viewer: Sender | None = None,
 ) -> list[dict[str, Any]]:
     tid = str(tenant_id or "").strip()
     did = str(driver_id or "").strip()
     if not tid or not did:
         return []
+    if viewer in ("driver", "office"):
+        mark_thread_delivered(tenant_id=tid, driver_id=did, recipient=viewer)
     cap = max(1, min(int(limit), 500))
     with _lock:
         rows = [
@@ -124,27 +158,26 @@ def list_messages(
         if idx is not None:
             rows = rows[idx + 1 :]
         else:
-            # unknown cursor — return recent window only
             rows = rows[-cap:]
 
     if len(rows) > cap:
         rows = rows[-cap:]
-    return rows
+    return [enrich_message(m, viewer) for m in rows]
 
 
-def mark_thread_read(
+def mark_thread_delivered(
     *,
     tenant_id: str,
     driver_id: str,
-    reader: Sender,
+    recipient: Sender,
 ) -> int:
-    """Mark all peer messages in the thread as read."""
+    """Peer fetched the thread → mark undelivered messages as delivered (iMessage style)."""
     tid = str(tenant_id or "").strip()
     did = str(driver_id or "").strip()
-    if not tid or not did or reader not in ("driver", "office"):
+    if not tid or not did or recipient not in ("driver", "office"):
         return 0
-    field = "read_by_driver_at" if reader == "driver" else "read_by_office_at"
-    peer = "office" if reader == "driver" else "driver"
+    field = "delivered_to_driver_at" if recipient == "driver" else "delivered_to_office_at"
+    peer = "office" if recipient == "driver" else "driver"
     now = _now_iso()
     changed = 0
     with _lock:
@@ -157,6 +190,40 @@ def mark_thread_read(
             if row.get(field):
                 continue
             row[field] = now
+            changed += 1
+        if changed:
+            _save(data)
+    return changed
+
+
+def mark_thread_read(
+    *,
+    tenant_id: str,
+    driver_id: str,
+    reader: Sender,
+) -> int:
+    """Mark all peer messages in the thread as read (also implies delivered)."""
+    tid = str(tenant_id or "").strip()
+    did = str(driver_id or "").strip()
+    if not tid or not did or reader not in ("driver", "office"):
+        return 0
+    read_field = "read_by_driver_at" if reader == "driver" else "read_by_office_at"
+    delivered_field = "delivered_to_driver_at" if reader == "driver" else "delivered_to_office_at"
+    peer = "office" if reader == "driver" else "driver"
+    now = _now_iso()
+    changed = 0
+    with _lock:
+        data = _load()
+        for row in data.get("messages") or []:
+            if str(row.get("tenant_id") or "") != tid or str(row.get("driver_id") or "") != did:
+                continue
+            if row.get("sender") != peer:
+                continue
+            if not row.get(delivered_field):
+                row[delivered_field] = now
+            if row.get(read_field):
+                continue
+            row[read_field] = now
             changed += 1
         if changed:
             _save(data)

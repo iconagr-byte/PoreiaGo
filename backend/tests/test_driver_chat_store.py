@@ -1,4 +1,4 @@
-"""Tests for driver ↔ office chat store."""
+"""Tests for driver ↔ office chat store (delivery + read receipts)."""
 
 from __future__ import annotations
 
@@ -47,6 +47,56 @@ class DriverChatStoreTests(unittest.TestCase):
         threads = store.list_threads(tenant_id="t1")
         self.assertEqual(len(threads), 1)
         self.assertEqual(threads[0]["last_sender"], "office")
+
+    def test_imessage_delivery_and_read_receipts(self):
+        sent = store.append_message(
+            tenant_id="t1",
+            driver_id="d1",
+            sender="driver",
+            body="SOS μικρό",
+        )
+        self.assertEqual(sent["receipt_driver"], "sent")
+        self.assertEqual(sent["receipt"], "sent")
+        self.assertIsNone(sent.get("delivered_to_office_at"))
+
+        # Office opens thread → delivered
+        office_view = store.list_messages(
+            tenant_id="t1",
+            driver_id="d1",
+            viewer="office",
+        )
+        self.assertEqual(office_view[0]["delivered_to_office_at"] is not None, True)
+        # Driver polls again → sees Παραδόθηκε
+        driver_view = store.list_messages(
+            tenant_id="t1",
+            driver_id="d1",
+            viewer="driver",
+        )
+        self.assertEqual(driver_view[0]["receipt"], "delivered")
+
+        store.mark_thread_read(tenant_id="t1", driver_id="d1", reader="office")
+        driver_view = store.list_messages(
+            tenant_id="t1",
+            driver_id="d1",
+            viewer="driver",
+        )
+        self.assertEqual(driver_view[0]["receipt"], "read")
+
+        # Office → driver direction
+        office_msg = store.append_message(
+            tenant_id="t1",
+            driver_id="d1",
+            sender="office",
+            body="Είσαι ΟΚ;",
+        )
+        self.assertEqual(office_msg["receipt_office"], "sent")
+        store.list_messages(tenant_id="t1", driver_id="d1", viewer="driver")
+        office_view = store.list_messages(tenant_id="t1", driver_id="d1", viewer="office")
+        last = office_view[-1]
+        self.assertEqual(last["receipt"], "delivered")
+        store.mark_thread_read(tenant_id="t1", driver_id="d1", reader="driver")
+        office_view = store.list_messages(tenant_id="t1", driver_id="d1", viewer="office")
+        self.assertEqual(office_view[-1]["receipt"], "read")
 
 
 if __name__ == "__main__":

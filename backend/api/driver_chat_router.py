@@ -48,6 +48,7 @@ async def driver_list_messages(
         driver_id=driver_id,
         after_id=after,
         limit=limit,
+        viewer="driver",
     )
     counts = unread_counts(tenant_id=tenant_id, driver_id=driver_id)
     return {
