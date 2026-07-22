@@ -1,10 +1,11 @@
 /**
- * Office chat inbox — threads list + conversation (dashboard / nav tab).
+ * Office chat inbox — Apple Messages-style threads + conversation.
  */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { fetchDriverChatThreads, fetchFleetDrivers } from '../../services/platformApi.js';
 import DriverOfficeChatPanel from './DriverOfficeChatPanel.jsx';
+import '../../styles/office-chat.css';
 
 const POLL_MS = 5000;
 
@@ -18,6 +19,16 @@ function formatWhen(iso) {
   } catch {
     return '';
   }
+}
+
+function initials(name) {
+  return (name || 'Ο')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
 }
 
 export default function DriverChatInbox({ initialDriverId = null, onOpenLiveMap } = {}) {
@@ -63,104 +74,115 @@ export default function DriverChatInbox({ initialDriverId = null, onOpenLiveMap 
 
   const totalUnread = threads.reduce((s, t) => s + Number(t.unread_office || 0), 0);
 
-  // Drivers without a thread yet — still chatable
   const idleDrivers = drivers.filter(
     (d) => d.status === 'active' && !threads.some((t) => t.driver_id === d.id),
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="messages-inbox">
+      <div className="messages-inbox-top">
         <div>
-          <h2 className="text-xl font-bold text-on-surface flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">forum</span>
-            Chat οδηγών
-          </h2>
-          <p className="text-sm text-on-surface-variant">
+          <p className="messages-inbox-kicker">Messages</p>
+          <h2 className="messages-inbox-title">Chat οδηγών</h2>
+          <p className="messages-inbox-subtitle">
             Συνομιλία γραφείου με οδηγούς εφαρμογής
             {totalUnread > 0 ? ` · ${totalUnread} μη αναγνωσμένα` : ''}
           </p>
         </div>
         {typeof onOpenLiveMap === 'function' ? (
-          <button
-            type="button"
-            onClick={onOpenLiveMap}
-            className="px-4 py-2 rounded-full border border-black/[0.08] text-sm font-bold hover:bg-surface-container-low inline-flex items-center gap-1.5"
-          >
+          <button type="button" onClick={onOpenLiveMap} className="messages-inbox-map-btn">
             <span className="material-symbols-outlined text-[18px]">map</span>
             Ζωντανός χάρτης
           </button>
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-4">
-        <div className="rounded-[24px] border border-black/[0.06] bg-white shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-black/[0.05] text-xs font-bold uppercase text-on-surface-variant">
-            Συνομιλίες
-          </div>
+      <div className="messages-inbox-shell">
+        <aside className="messages-inbox-list" aria-label="Λίστα συνομιλιών">
+          <div className="messages-inbox-list-head">Συνομιλίες</div>
           {loading ? (
-            <p className="text-sm text-on-surface-variant text-center py-10">Φόρτωση…</p>
+            <p className="messages-inbox-empty-hint">Φόρτωση…</p>
           ) : (
-            <ul className="max-h-[480px] overflow-y-auto divide-y divide-black/[0.04]">
-              {threads.map((t) => (
-                <li key={t.driver_id}>
+            <div className="messages-inbox-scroll">
+              {threads.map((t) => {
+                const name = t.driver_name || 'Οδηγός';
+                const active = selectedId === t.driver_id;
+                return (
                   <button
+                    key={t.driver_id}
                     type="button"
                     onClick={() => setSelectedId(t.driver_id)}
-                    className={`w-full text-left px-4 py-3 hover:bg-surface-container-low transition-colors ${
-                      selectedId === t.driver_id ? 'bg-primary/5' : ''
-                    }`}
+                    className={`messages-inbox-item ${active ? 'is-active' : ''}`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-bold text-sm text-on-surface truncate">
-                          {t.driver_name || 'Οδηγός'}
-                        </div>
-                        <div className="text-xs text-on-surface-variant truncate mt-0.5">
-                          {t.last_message}
-                        </div>
-                        <div className="text-[10px] text-on-surface-variant/70 mt-1">
-                          {formatWhen(t.last_at)}
-                          {t.vehicle_plate ? ` · ${t.vehicle_plate}` : ''}
-                        </div>
-                      </div>
-                      {t.unread_office > 0 ? (
-                        <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">
-                          {t.unread_office}
-                        </span>
+                    <span className="messages-inbox-item-avatar" aria-hidden>
+                      {initials(name)}
+                    </span>
+                    <span className="messages-inbox-item-body">
+                      <span className="messages-inbox-item-row">
+                        <span className="messages-inbox-item-name">{name}</span>
+                        <span className="messages-inbox-item-time">{formatWhen(t.last_at)}</span>
+                      </span>
+                      <span className="messages-inbox-item-preview">{t.last_message || '—'}</span>
+                      {t.vehicle_plate ? (
+                        <span className="messages-inbox-item-meta">{t.vehicle_plate}</span>
                       ) : null}
-                    </div>
+                      {t.unread_office > 0 ? (
+                        <span className="messages-inbox-badge">{t.unread_office}</span>
+                      ) : null}
+                    </span>
                   </button>
-                </li>
-              ))}
-              {idleDrivers.slice(0, 12).map((d) => (
-                <li key={`idle-${d.id}`}>
+                );
+              })}
+
+              {idleDrivers.slice(0, 12).map((d) => {
+                const active = selectedId === d.id;
+                return (
                   <button
+                    key={`idle-${d.id}`}
                     type="button"
                     onClick={() => setSelectedId(d.id)}
-                    className={`w-full text-left px-4 py-3 hover:bg-surface-container-low transition-colors ${
-                      selectedId === d.id ? 'bg-primary/5' : ''
-                    }`}
+                    className={`messages-inbox-item ${active ? 'is-active' : ''}`}
                   >
-                    <div className="font-bold text-sm text-on-surface truncate">{d.name}</div>
-                    <div className="text-xs text-on-surface-variant mt-0.5">Νέα συνομιλία</div>
+                    <span className="messages-inbox-item-avatar" aria-hidden>
+                      {initials(d.name)}
+                    </span>
+                    <span className="messages-inbox-item-body">
+                      <span className="messages-inbox-item-name">{d.name}</span>
+                      <span className="messages-inbox-item-preview">Νέα συνομιλία</span>
+                    </span>
                   </button>
-                </li>
-              ))}
-              {!threads.length && !idleDrivers.length ? (
-                <li className="text-sm text-on-surface-variant text-center py-10 px-4">
-                  Δεν υπάρχουν οδηγοί / μηνύματα ακόμα.
-                </li>
-              ) : null}
-            </ul>
-          )}
-        </div>
+                );
+              })}
 
-        <DriverOfficeChatPanel
-          driverId={selectedId}
-          driverName={selectedName}
-          tripId={selected?.trip_id}
-        />
+              {!threads.length && !idleDrivers.length ? (
+                <p className="messages-inbox-empty-hint">
+                  Δεν υπάρχουν οδηγοί / μηνύματα ακόμα.
+                </p>
+              ) : null}
+            </div>
+          )}
+        </aside>
+
+        <section className="messages-inbox-pane" aria-label="Συνομιλία">
+          {selectedId ? (
+            <DriverOfficeChatPanel
+              driverId={selectedId}
+              driverName={selectedName}
+              tripId={selected?.trip_id}
+            />
+          ) : (
+            <div className="messages-inbox-empty-hint">
+              <span
+                className="material-symbols-outlined text-[42px] text-[#007aff] mb-2 block"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                chat_bubble
+              </span>
+              Επιλέξτε συνομιλία
+              <strong>Διαλέξτε οδηγό από τα αριστερά για να ξεκινήσετε.</strong>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
