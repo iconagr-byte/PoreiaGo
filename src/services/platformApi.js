@@ -614,6 +614,53 @@ export async function notifyDriverShiftPush({ tripId, driverId, message, tripTit
   return res.json();
 }
 
+/** Driver ↔ office chat (admin) */
+export async function fetchDriverChatThreads() {
+  const res = await adminFetch('/api/admin/platform/driver-chat/threads');
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+export async function fetchDriverChatUnread() {
+  const res = await adminFetch('/api/admin/platform/driver-chat/unread');
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+export async function fetchAdminDriverChatMessages(driverId, { after } = {}) {
+  const q = after ? `?after=${encodeURIComponent(after)}` : '';
+  const res = await adminFetch(
+    `/api/admin/platform/driver-chat/${encodeURIComponent(driverId)}/messages${q}`,
+  );
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+export async function sendAdminDriverChatMessage(driverId, body, { tripId, senderName } = {}) {
+  const payload = { body };
+  if (tripId != null) payload.trip_id = Number(tripId);
+  if (senderName) payload.sender_name = senderName;
+  const res = await adminFetch(
+    `/api/admin/platform/driver-chat/${encodeURIComponent(driverId)}/messages`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+export async function markAdminDriverChatRead(driverId) {
+  const res = await adminFetch(
+    `/api/admin/platform/driver-chat/${encodeURIComponent(driverId)}/read`,
+    { method: 'POST' },
+  );
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function fetchFleetDepreciation(vehicleId) {
   const q = new URLSearchParams({ vehicle_id: vehicleId }).toString();
   try {

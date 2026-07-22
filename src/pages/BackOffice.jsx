@@ -18,6 +18,8 @@ import FleetLiveMapWebSocket from '../components/admin/FleetLiveMapWebSocket.jsx
 import FleetRouteHistory from '../components/admin/FleetRouteHistory.jsx';
 import FleetKpisDashboard from '../components/admin/FleetKpisDashboard.jsx';
 import ActiveDriversList from '../components/admin/ActiveDriversList.jsx';
+import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
+import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
 import { FleetTelemetryProvider } from '../context/FleetTelemetryContext.jsx';
 import TelemetryAlertsPanel from '../components/admin/TelemetryAlertsPanel.jsx';
 import ImpersonationBanner from '../components/admin/ImpersonationBanner.jsx';
@@ -97,6 +99,9 @@ export default function BackOffice() {
   const [bookings, setBookings] = useState(() => loadBookings());
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [scanFlash, setScanFlash] = useState(null);
+  const [chatFocusDriverId, setChatFocusDriverId] = useState(
+    () => location.state?.driverId || null,
+  );
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
@@ -122,6 +127,9 @@ export default function BackOffice() {
   useEffect(() => {
     if (location.state?.activeTab) {
       setActiveTab(location.state.activeTab);
+    }
+    if (location.state?.driverId) {
+      setChatFocusDriverId(location.state.driverId);
     }
     if (location.state?.settingsSubTab || location.state?.platformTab) {
       setSettingsSubTab(
@@ -449,6 +457,11 @@ export default function BackOffice() {
           tone="amber"
         />
       </div>
+
+      <DriverChatDashboardWidget
+        onOpenInbox={() => setActiveTab('driver_chat')}
+        onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+      />
 
       <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-sky-100/60 flex flex-col min-w-0 overflow-hidden">
           <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
@@ -1804,6 +1817,14 @@ export default function BackOffice() {
             {activeTab === 'fleet_active_drivers' && (
               <div className="pb-stack-lg animate-in fade-in duration-300">
                 <ActiveDriversList />
+              </div>
+            )}
+            {activeTab === 'driver_chat' && (
+              <div className="pb-stack-lg animate-in fade-in duration-300">
+                <DriverChatInbox
+                  initialDriverId={chatFocusDriverId}
+                  onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+                />
               </div>
             )}
             {activeTab === 'fleet_route_playback' && (
