@@ -76,6 +76,11 @@ class Settings(BaseSettings):
         default="http://localhost:5173/grafeia/signup?billing=cancel",
         alias="BILLING_SIGNUP_CANCEL_URL",
     )
+    billing_demo_mode: bool = Field(
+        default=True,
+        alias="BILLING_DEMO_MODE",
+        description="Allow office signup / trial without real Stripe charge (demo payment). Set false for live Stripe only.",
+    )
 
     usage_metering_enabled: bool = Field(default=True, alias="USAGE_METERING_ENABLED")
     usage_metering_cron_hour: int = Field(default=2, alias="USAGE_METERING_CRON_HOUR")

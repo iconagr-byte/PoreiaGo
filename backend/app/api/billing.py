@@ -127,22 +127,36 @@ async def start_trial(
 
 @router.post("/signup-checkout", response_model=BillingCheckoutResponse)
 async def signup_checkout(body: BillingSignupCheckoutRequest):
-    """Public SaaS signup — Stripe Checkout then webhook provisions tenant."""
+    """Public SaaS signup — Stripe Checkout, or demo provision when demo_mode is on."""
     try:
         plan = TenantPlan(body.plan)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Invalid plan: {body.plan}") from exc
 
+    readiness = stripe_readiness()
+    use_demo = bool(readiness.get("demo_mode"))
+
     async with AsyncSessionLocal() as db:
         try:
-            result = await BillingService(db).create_signup_checkout_session(
-                legal_name=body.legal_name,
-                admin_email=str(body.admin_email),
-                subdomain=body.subdomain,
-                password=body.password,
-                plan=plan,
-                billing_interval=body.billing_interval,
-            )
+            billing = BillingService(db)
+            if use_demo:
+                result = await billing.create_signup_demo_session(
+                    legal_name=body.legal_name,
+                    admin_email=str(body.admin_email),
+                    subdomain=body.subdomain,
+                    password=body.password,
+                    plan=plan,
+                    billing_interval=body.billing_interval,
+                )
+            else:
+                result = await billing.create_signup_checkout_session(
+                    legal_name=body.legal_name,
+                    admin_email=str(body.admin_email),
+                    subdomain=body.subdomain,
+                    password=body.password,
+                    plan=plan,
+                    billing_interval=body.billing_interval,
+                )
             await db.commit()
         except ValueError as exc:
             await db.rollback()
