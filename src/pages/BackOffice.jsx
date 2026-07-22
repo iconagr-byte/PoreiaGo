@@ -1792,7 +1792,7 @@ export default function BackOffice() {
               </div>
             )}
             {activeTab === 'fleet_live_map' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300 space-y-6">
+              <div className="animate-in fade-in duration-300 -mt-1">
                 <FleetLiveMapWebSocket />
               </div>
             )}
