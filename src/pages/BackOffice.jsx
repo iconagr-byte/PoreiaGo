@@ -1788,7 +1788,7 @@ export default function BackOffice() {
                     </pre>
                   </div>
                 </div>
-                <LiveFleetMap pollMs={5000} />
+                <LiveFleetMap />
               </div>
             )}
             {activeTab === 'fleet_live_map' && (
