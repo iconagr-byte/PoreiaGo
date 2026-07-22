@@ -9,7 +9,7 @@ export const TENANT_SETTINGS_TABS = [
   { id: 'homepage', label: 'Αρχική σελίδα', icon: 'home', section: 'office' },
   { id: 'growth', label: 'Growth', icon: 'hub', section: 'office' },
   { id: 'users', label: 'Χρήστες', icon: 'group', section: 'office' },
-  { id: 'drivers', label: 'Οδηγοί', icon: 'badge', section: 'office' },
+  { id: 'drivers', label: 'Ρυθμίσεις οδηγών', icon: 'badge', section: 'office' },
   { id: 'telematics', label: 'Telematics', icon: 'tune', section: 'office' },
 ];
 

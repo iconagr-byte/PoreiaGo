@@ -6,27 +6,42 @@ import {
 } from './settingsTabs.js';
 import { settingsTabToNavItem } from './settingsSidebar.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v2';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v3';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 
+/** Κύριο μενού — χωρίς διπλότυπα στόλου (αυτά είναι στο fleet_ops). */
 export const DEFAULT_MAIN_NAV_ORDER = [
   'dashboard',
   'routes',
   'customers',
   'fleet',
   'drivers',
-  'live_tracking',
-  'fleet_live_map',
-  'fleet_active_drivers',
   'lost_found',
   'email',
   'email_templates',
   'bookings',
 ];
 
-export const LEGACY_NAV_IDS = new Set(['settings', 'payments']);
+/** Λειτουργίες στόλου — ένας ζωντανός χάρτης, χωρίς legacy Live GPS. */
+export const DEFAULT_FLEET_OPS_ORDER = [
+  'fleet_live_map',
+  'fleet_active_drivers',
+  'fleet_route_playback',
+  'fleet_kpis',
+];
+
+/** IDs που ανήκουν μόνο στο fleet_ops (ή είναι legacy). */
+const FLEET_ONLY_IDS = new Set([
+  'fleet_kpis',
+  'fleet_live_map',
+  'fleet_active_drivers',
+  'fleet_route_playback',
+  'live_tracking',
+]);
+
+export const LEGACY_NAV_IDS = new Set(['settings', 'payments', 'live_tracking']);
 
 const PLATFORM_IDS = PLATFORM_OPERATOR_TABS.map((t) => `settings_${t.id}`);
 const OFFICE_SETTINGS_IDS = TENANT_SETTINGS_TABS.map((t) => `settings_${t.id}`);
@@ -34,7 +49,7 @@ const OFFICE_SETTINGS_IDS = TENANT_SETTINGS_TABS.map((t) => `settings_${t.id}`);
 export function getDefaultNavLayout(isSuperAdmin) {
   return {
     main: [...DEFAULT_MAIN_NAV_ORDER],
-    fleet_ops: ['fleet_kpis', 'fleet_live_map', 'fleet_active_drivers', 'fleet_route_playback'],
+    fleet_ops: [...DEFAULT_FLEET_OPS_ORDER],
     platform: isSuperAdmin ? [...PLATFORM_IDS] : [],
     settings: [...OFFICE_SETTINGS_IDS],
   };
@@ -54,10 +69,16 @@ function mergeSectionOrder(saved, defaults) {
 function migrateNavLayout(layout, isSuperAdmin) {
   const defaults = getDefaultNavLayout(isSuperAdmin);
   let main = [...(layout.main || [])];
+  let fleetOps = [...(layout.fleet_ops || defaults.fleet_ops || [])];
   let settings = [...(layout.settings || [])];
 
-  // Keep settings_drivers when present in defaults (Ρυθμίσεις → Οδηγοί).
-  main = main.filter((id) => id !== 'drivers' && id !== 'email_templates' && id !== 'fleet_kpis' && id !== 'fleet_live_map' && id !== 'fleet_active_drivers' && id !== 'fleet_route_playback');
+  // Deduplicate: fleet tools live only under «Λειτουργίες Στόλου».
+  // Legacy «Live GPS (poll)» maps to «Ζωντανός Χάρτης».
+  main = main.filter((id) => !FLEET_ONLY_IDS.has(id) && id !== 'email_templates');
+  fleetOps = fleetOps.filter((id) => id !== 'live_tracking');
+  if (!fleetOps.includes('fleet_live_map')) {
+    fleetOps.unshift('fleet_live_map');
+  }
 
   const fleetIdx = main.indexOf('fleet');
   const driversInsertAt = fleetIdx >= 0 ? fleetIdx + 1 : main.length;
@@ -67,11 +88,13 @@ function migrateNavLayout(layout, isSuperAdmin) {
 
   const emailIdx = main.indexOf('email');
   const templatesInsertAt = emailIdx >= 0 ? emailIdx + 1 : main.length;
-  main.splice(templatesInsertAt, 0, 'email_templates');
+  if (!main.includes('email_templates')) {
+    main.splice(templatesInsertAt, 0, 'email_templates');
+  }
 
   return {
     main: mergeSectionOrder(main, defaults.main),
-    fleet_ops: mergeSectionOrder(layout.fleet_ops || defaults.fleet_ops || [], defaults.fleet_ops || []),
+    fleet_ops: mergeSectionOrder(fleetOps, defaults.fleet_ops || []),
     platform: mergeSectionOrder(layout.platform || [], defaults.platform),
     settings: mergeSectionOrder(settings, defaults.settings),
   };
@@ -82,9 +105,19 @@ function splitLegacyFlatOrder(flat, isSuperAdmin) {
   const main = [];
   const platform = [];
   const settings = [];
+  const fleetOps = [];
 
   for (const id of flat) {
-    if (LEGACY_NAV_IDS.has(id)) continue;
+    if (LEGACY_NAV_IDS.has(id)) {
+      if (id === 'live_tracking' && !fleetOps.includes('fleet_live_map')) {
+        fleetOps.push('fleet_live_map');
+      }
+      continue;
+    }
+    if (FLEET_ONLY_IDS.has(id)) {
+      if (id !== 'live_tracking') fleetOps.push(id);
+      continue;
+    }
     if (layout.main.includes(id) || ADMIN_NAV_ITEMS[id]) main.push(id);
     else if (PLATFORM_IDS.includes(id)) platform.push(id);
     else if (OFFICE_SETTINGS_IDS.includes(id)) settings.push(id);
@@ -92,6 +125,7 @@ function splitLegacyFlatOrder(flat, isSuperAdmin) {
 
   return {
     main: mergeSectionOrder(main, layout.main),
+    fleet_ops: mergeSectionOrder(fleetOps, layout.fleet_ops),
     platform: mergeSectionOrder(platform, layout.platform),
     settings: mergeSectionOrder(settings, layout.settings),
   };
@@ -101,30 +135,54 @@ export function loadNavLayout(isSuperAdmin) {
   const defaults = getDefaultNavLayout(isSuperAdmin);
   const storageKey = layoutStorageKey(isSuperAdmin);
 
+  const finish = (layout) => {
+    const cleaned = migrateNavLayout(layout, isSuperAdmin);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(cleaned));
+    } catch {
+      /* ignore quota */
+    }
+    return cleaned;
+  };
+
   try {
     const raw = localStorage.getItem(storageKey);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.main)) {
-        return migrateNavLayout(
-          {
-            main: mergeSectionOrder(parsed.main, defaults.main),
-            fleet_ops: mergeSectionOrder(parsed.fleet_ops || [], defaults.fleet_ops || []),
-            platform: mergeSectionOrder(parsed.platform || [], defaults.platform),
-            settings: mergeSectionOrder(parsed.settings || [], defaults.settings),
-          },
-          isSuperAdmin,
-        );
+        return finish({
+          main: parsed.main || [],
+          fleet_ops: parsed.fleet_ops || [],
+          platform: parsed.platform || [],
+          settings: parsed.settings || [],
+        });
       }
     }
 
-    const legacyRaw =
-      localStorage.getItem(isSuperAdmin ? `${NAV_ORDER_STORAGE_KEY}_super` : NAV_ORDER_STORAGE_KEY) ||
-      localStorage.getItem(NAV_ORDER_STORAGE_KEY);
-    if (legacyRaw) {
-      const flat = JSON.parse(legacyRaw);
-      if (Array.isArray(flat)) {
-        return migrateNavLayout(splitLegacyFlatOrder(flat, isSuperAdmin), isSuperAdmin);
+    // Migrate from v2 / flat order keys.
+    for (const key of [
+      isSuperAdmin ? 'aerostride_admin_nav_layout_v2_super' : 'aerostride_admin_nav_layout_v2',
+      'aerostride_admin_nav_layout_v2',
+      isSuperAdmin ? `${NAV_ORDER_STORAGE_KEY}_super` : NAV_ORDER_STORAGE_KEY,
+      NAV_ORDER_STORAGE_KEY,
+    ]) {
+      const legacyRaw = localStorage.getItem(key);
+      if (!legacyRaw) continue;
+      try {
+        const parsed = JSON.parse(legacyRaw);
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.main)) {
+          return finish({
+            main: parsed.main || [],
+            fleet_ops: parsed.fleet_ops || [],
+            platform: parsed.platform || [],
+            settings: parsed.settings || [],
+          });
+        }
+        if (Array.isArray(parsed)) {
+          return finish(splitLegacyFlatOrder(parsed, isSuperAdmin));
+        }
+      } catch {
+        /* try next key */
       }
     }
   } catch {
@@ -189,16 +247,6 @@ export const ADMIN_NAV_ITEMS = {
     navGroup: 'main',
     accent: 'indigo',
   },
-  live_tracking: {
-    id: 'live_tracking',
-    label: 'Live GPS (poll)',
-    icon: 'share_location',
-    filled: true,
-    type: 'tab',
-    tab: 'live_tracking',
-    navGroup: 'main',
-    accent: 'cyan',
-  },
   fleet_live_map: {
     id: 'fleet_live_map',
     label: 'Ζωντανός Χάρτης',
@@ -232,7 +280,7 @@ export const ADMIN_NAV_ITEMS = {
   fleet_route_playback: {
     id: 'fleet_route_playback',
     label: 'Ιστορικό Διαδρομής',
-    icon: 'route',
+    icon: 'history',
     filled: true,
     type: 'tab',
     tab: 'fleet_route_playback',
@@ -294,6 +342,8 @@ export const ADMIN_NAV_ITEMS = {
 
 export function resolveNavItem(id, isSuperAdmin) {
   if (ADMIN_NAV_ITEMS[id]) return ADMIN_NAV_ITEMS[id];
+  // Legacy alias — old bookmarks / layouts.
+  if (id === 'live_tracking') return ADMIN_NAV_ITEMS.fleet_live_map;
   if (!id.startsWith('settings_')) return null;
 
   const tabId = id.slice('settings_'.length);
