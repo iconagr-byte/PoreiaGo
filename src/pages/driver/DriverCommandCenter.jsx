@@ -213,10 +213,10 @@ export default function DriverCommandCenter() {
   }, [authenticated, tripId]);
 
   useEffect(() => {
-    if (tachograph.limitReached && authenticated && safetyOk) {
+    if (tachograph.limitReached && telemetryOnline) {
       toast('Required Rest Stop in 15 minutes', { icon: '⏱️', duration: 8000 });
     }
-  }, [tachograph.limitReached, authenticated, safetyOk]);
+  }, [tachograph.limitReached, telemetryOnline]);
 
   const setTab = (id) => {
     setParams({ tab: id });
