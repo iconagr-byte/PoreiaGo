@@ -31,19 +31,15 @@ export function storeSaasRoles(roles) {
   return list;
 }
 
+/** Always prefer roles from the current JWT — never trust a stale saas_roles cache alone. */
 export function getSaasRoles() {
   const token = getSaasToken();
   if (!token) {
     clearSaasRoles();
     return [];
   }
-  try {
-    const cached = localStorage.getItem(ROLES_KEY);
-    if (cached) return JSON.parse(cached);
-  } catch {
-    /* fall through */
-  }
-  return storeSaasRolesFromToken(token);
+  const fromToken = storeSaasRolesFromToken(token);
+  return Array.isArray(fromToken) ? fromToken : [];
 }
 
 export function clearSaasRoles() {
@@ -60,17 +56,26 @@ export function hasSaasRole(role) {
   return getSaasRoles().includes(role);
 }
 
-export function isSaasSuperAdmin() {
-  return hasSaasRole('superadmin');
-}
-
-export function isSaasTenantAdmin() {
-  return hasSaasRole('tenant_admin') || isSaasSuperAdmin();
-}
-
 export function isImpersonating(token = getSaasToken()) {
   const payload = decodeJwtPayload(token);
   return Boolean(payload?.impersonating);
+}
+
+/**
+ * True platform operator UI (Tenants/MRR, SaaS Infra, Backup, debug Live GPS).
+ * Hidden while impersonating a tenant office so the view matches that office.
+ */
+export function canAccessPlatformOperatorUi(token = getSaasToken()) {
+  if (isImpersonating(token)) return false;
+  return hasSaasRole('superadmin');
+}
+
+export function isSaasSuperAdmin() {
+  return canAccessPlatformOperatorUi();
+}
+
+export function isSaasTenantAdmin() {
+  return hasSaasRole('tenant_admin') || hasSaasRole('superadmin');
 }
 
 export function getImpersonationTarget(token = getSaasToken()) {

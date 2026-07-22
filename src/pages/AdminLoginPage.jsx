@@ -113,7 +113,8 @@ export default function AdminLoginPage() {
                 name="email"
                 type="email"
                 autoComplete="username"
-                defaultValue={SAAS_ADMIN}
+                defaultValue=""
+                placeholder="email@γραφείο.gr"
                 className="w-full pl-12 pr-4 py-4 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container text-body-md font-body-md transition-shadow"
                 required
               />
@@ -133,7 +134,7 @@ export default function AdminLoginPage() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                defaultValue="Admin123!"
+                defaultValue=""
                 className="w-full pl-12 pr-4 py-4 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container text-body-md font-body-md transition-shadow"
                 placeholder="••••••••"
                 required

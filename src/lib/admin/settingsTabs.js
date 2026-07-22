@@ -1,13 +1,12 @@
 /** Settings tabs — tenant office vs platform operator (super admin). */
 
 export const TENANT_SETTINGS_TABS = [
-  { id: 'platform', label: 'Πλατφόρμα', icon: 'admin_panel_settings', section: 'office' },
+  { id: 'platform', label: 'Γραφείο', icon: 'storefront', section: 'office' },
   { id: 'payments', label: 'Πληρωμές', icon: 'account_balance', section: 'office' },
   { id: 'fiscal', label: 'Φορολογία', icon: 'receipt_long', section: 'office' },
   { id: 'contracts', label: 'Συμβόλαιο', icon: 'description', section: 'office' },
   { id: 'compliance', label: 'GDPR & Audit', icon: 'shield', section: 'office' },
   { id: 'homepage', label: 'Αρχική σελίδα', icon: 'home', section: 'office' },
-  { id: 'growth', label: 'Growth', icon: 'hub', section: 'office' },
   { id: 'users', label: 'Χρήστες', icon: 'group', section: 'office' },
   { id: 'drivers', label: 'Οδηγοί', icon: 'badge', section: 'office' },
   { id: 'telematics', label: 'Telematics', icon: 'tune', section: 'office' },
@@ -17,6 +16,7 @@ export const PLATFORM_OPERATOR_TABS = [
   { id: 'tenants', label: 'Tenants & MRR', icon: 'domain', section: 'platform' },
   { id: 'saas_infra', label: 'SaaS Infra', icon: 'dns', section: 'platform' },
   { id: 'backup', label: 'Backup', icon: 'backup', section: 'platform' },
+  { id: 'growth', label: 'Growth', icon: 'hub', section: 'platform' },
 ];
 
 /** Όλες οι καρτέλες ρυθμίσεων για super admin στο Back Office. */
@@ -38,7 +38,7 @@ export const PLATFORM_NAV_SECTIONS = [
   { id: 'office', label: 'Ρυθμίσεις γραφείου' },
 ];
 
-/** Tenant admin — μόνο ρυθμίσεις γραφείου (όχι Tenants/MRR, SaaS Infra, Backup). */
+/** Tenant admin — μόνο ρυθμίσεις γραφείου (όχι Tenants/MRR, SaaS Infra, Backup, Growth). */
 export function settingsTabsForRole(isSuperAdmin) {
   return isSuperAdmin ? SUPER_ADMIN_SETTINGS_TABS : TENANT_SETTINGS_TABS;
 }
@@ -48,6 +48,6 @@ export function sanitizeSettingsSubTab(tab, isSuperAdmin) {
   const fallback = isSuperAdmin ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
   if (!tab) return fallback;
   if (PLATFORM_ONLY_TAB_IDS.has(tab) && !isSuperAdmin) return DEFAULT_TENANT_SETTINGS_TAB;
-  const allowed = settingsTabsForRole(isSuperAdmin).map((t) => t.id);
-  return allowed.includes(tab) ? tab : fallback;
+  const allowed = new Set(settingsTabsForRole(isSuperAdmin).map((t) => t.id));
+  return allowed.has(tab) ? tab : fallback;
 }
