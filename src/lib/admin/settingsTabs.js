@@ -4,7 +4,7 @@ export const TENANT_SETTINGS_TABS = [
   { id: 'platform', label: 'Πλατφόρμα', icon: 'admin_panel_settings', section: 'office' },
   { id: 'payments', label: 'Πληρωμές', icon: 'account_balance', section: 'office' },
   { id: 'fiscal', label: 'Φορολογία', icon: 'receipt_long', section: 'office' },
-  { id: 'contracts', label: 'Συμβόλαιο', icon: 'description', section: 'office' },
+  { id: 'contracts', label: 'Συμβόλαια', icon: 'handshake', section: 'office' },
   { id: 'compliance', label: 'GDPR & Audit', icon: 'shield', section: 'office' },
   { id: 'homepage', label: 'Αρχική σελίδα', icon: 'home', section: 'office' },
   { id: 'growth', label: 'Growth', icon: 'hub', section: 'office' },

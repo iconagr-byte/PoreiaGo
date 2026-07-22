@@ -159,7 +159,7 @@ export default function AgencyPlansPage() {
             <li>Πρόσβαση στο Control Panel για το γραφείο σας (όχι platform console)</li>
             <li>Email Hub με {CAMPAIGN_TEMPLATE_COUNT}+ έτοιμα πρότυπα καμπάνιας (προσφορές, εκδρομές, lifecycle)</li>
             <li>Metered χρέωση για ενεργά λεωφορεία & εκδρομές μετά τη βασική συνδρομή</li>
-            <li>GDPR εργαλεία για τους πελάτες σας · διαχείριση από Ρυθμίσεις → Συμβόλαιο</li>
+            <li>GDPR εργαλεία για τους πελάτες σας · διαχείριση από Ρυθμίσεις → Συμβόλαια</li>
             <li>Η πλατφόρμα (super admin, backups, SaaS infra) είναι μόνο για τον διαχειριστή συστήματος</li>
           </ul>
         </div>
