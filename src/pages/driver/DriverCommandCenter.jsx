@@ -157,8 +157,42 @@ export default function DriverCommandCenter() {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/driver-sw.js').catch(() => {});
+      let refreshing = false;
+      const onControllerChange = () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+
+      navigator.serviceWorker
+        .register('/driver-sw.js', { updateViaCache: 'none' })
+        .then((reg) => {
+          reg.update().catch(() => {});
+          const askWaitingToActivate = () => {
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+          };
+          askWaitingToActivate();
+          reg.addEventListener('updatefound', () => {
+            const installing = reg.installing;
+            if (!installing) return;
+            installing.addEventListener('statechange', () => {
+              if (installing.state === 'installed') askWaitingToActivate();
+            });
+          });
+        })
+        .catch(() => {});
+
+      return () => {
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      };
     }
+    return undefined;
+  }, []);
+
+  useEffect(() => {
     const manifest = document.querySelector('link[rel="manifest"][href*="driver-telemetry"]');
     if (!manifest) {
       const link = document.createElement('link');
@@ -310,6 +344,21 @@ export default function DriverCommandCenter() {
         <main className="driver-shell driver-main">
           {tab === 'home' && (
             <>
+              <button
+                type="button"
+                onClick={() => setTab('chat')}
+                className="driver-card flex items-center gap-3 text-left w-full !py-3.5"
+                aria-label="Άνοιγμα chat με το γραφείο"
+              >
+                <span className="material-symbols-outlined text-[28px] text-[#007aff]">forum</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-extrabold text-base text-slate-900">Chat γραφείου</span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    Μηνύματα με το γραφείο · παράδοση &amp; ανάγνωση
+                  </span>
+                </span>
+                <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+              </button>
               <DriverPushPanel />
               <DailyManifest />
             </>
