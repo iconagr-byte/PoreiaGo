@@ -36,12 +36,22 @@ function HeatmapDots({ points = [], visible = true }) {
   });
 }
 
-function BusMarker({ vehicle }) {
+function BusMarker({ vehicle, onVehicleHistory }) {
   const [open, setOpen] = useState(false);
   const img = resolveFleetMarkerImage(vehicle);
+  const openHistory = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    onVehicleHistory?.(vehicle);
+  };
   return (
     <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={() => setOpen(true)}>
-      <button type="button" className="relative cursor-pointer border-0 bg-transparent p-0" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="relative cursor-pointer border-0 bg-transparent p-0"
+        onClick={() => setOpen(true)}
+        onDoubleClick={openHistory}
+      >
         <div className="relative h-[52px] w-[52px] drop-shadow-[0_8px_18px_rgba(15,23,42,0.28)]">
           <div className="h-full w-full overflow-hidden rounded-full border-[3px] border-slate-50 bg-slate-900 ring-2 ring-slate-900">
             <img src={img} alt="" className="h-full w-full object-cover" />
@@ -55,8 +65,14 @@ function BusMarker({ vehicle }) {
             }}
           />
         </div>
-        <div className="absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-bold text-white shadow">
-          {vehicle.driver_name} · {Math.round(vehicle.speed || 0)} km/h
+        <div
+          className="absolute left-1/2 bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-xl bg-white px-2.5 py-1.5 text-left shadow-lg border border-black/[0.06]"
+          onDoubleClick={openHistory}
+        >
+          <div className="text-[11px] font-bold text-slate-900 leading-tight">{vehicle.driver_name}</div>
+          <div className="text-[10px] text-slate-500">
+            {vehicle.bus_plate} · {Math.round(vehicle.speed || 0)} km/h
+          </div>
         </div>
       </button>
       {open ? (
@@ -84,9 +100,17 @@ function BusMarker({ vehicle }) {
             {formatSensorSummary(vehicle) ? (
               <div className="text-xs text-slate-500">{formatSensorSummary(vehicle)}</div>
             ) : null}
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               <FleetDriverPlaybackButton vehicle={vehicle} />
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
+                onClick={openHistory}
+              >
+                Ιστορικό
+              </button>
             </div>
+            <p className="mt-2 text-[11px] text-slate-400">Διπλό κλικ στην κάρτα για ιστορικό</p>
           </div>
         </Popup>
       ) : null}
@@ -94,9 +118,11 @@ function BusMarker({ vehicle }) {
   );
 }
 
-function MapboxAnimatedMarkers({ vehicles }) {
+function MapboxAnimatedMarkers({ vehicles, onVehicleHistory }) {
   const display = useAnimatedFleetVehicles(vehicles);
-  return display.map((v) => <BusMarker key={v.id} vehicle={v} />);
+  return display.map((v) => (
+    <BusMarker key={v.id} vehicle={v} onVehicleHistory={onVehicleHistory} />
+  ));
 }
 
 function FitBounds({ vehicles, fitNonce = 0 }) {
@@ -161,6 +187,7 @@ export default function FleetLiveMapMapbox({
   showSosPins = true,
   focusSosAlert = null,
   fitNonce = 0,
+  onVehicleHistory,
 }) {
   const initialViewState = useMemo(() => {
     if (vehicles.length) {
@@ -190,7 +217,7 @@ export default function FleetLiveMapMapbox({
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} />
       <HeatmapDots points={heatmap} visible={showHeat} />
-      <MapboxAnimatedMarkers vehicles={vehicles} />
+      <MapboxAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
     </Map>
   );
 }

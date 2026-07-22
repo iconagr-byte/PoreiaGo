@@ -43,11 +43,22 @@ const busIcon = (vehicle) => {
   });
 };
 
-function LeafletAnimatedMarkers({ vehicles }) {
+function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
   const display = useAnimatedFleetVehicles(vehicles);
 
   return display.map((v) => (
-    <Marker key={v.id} position={[v.lat, v.lng]} icon={busIcon(v)}>
+    <Marker
+      key={v.id}
+      position={[v.lat, v.lng]}
+      icon={busIcon(v)}
+      eventHandlers={{
+        dblclick: (e) => {
+          e.originalEvent?.preventDefault?.();
+          e.originalEvent?.stopPropagation?.();
+          onVehicleHistory?.(v);
+        },
+      }}
+    >
       <Tooltip direction="top" offset={[0, -28]} opacity={0.96} permanent>
         <strong>{v.driver_name}</strong>
         <br />
@@ -89,9 +100,17 @@ function LeafletAnimatedMarkers({ vehicles }) {
               <span className="text-xs text-gray-500">{formatSensorSummary(v)}</span>
             </>
           ) : null}
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <FleetDriverPlaybackButton vehicle={v} />
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
+              onClick={() => onVehicleHistory?.(v)}
+            >
+              Ιστορικό
+            </button>
           </div>
+          <p style={{ marginTop: 8, fontSize: 11, color: '#94a3b8' }}>Διπλό κλικ στο pin για ιστορικό</p>
         </div>
       </Popup>
     </Marker>
@@ -153,6 +172,7 @@ export default function FleetLiveMapLeaflet({
   showSosPins = true,
   focusSosAlert = null,
   fitNonce = 0,
+  onVehicleHistory,
 }) {
   const fitPoints = useMemo(() => {
     const pts = vehicles.map((v) => ({ ...v, id: v.id || v.vehicle_id }));
@@ -171,7 +191,7 @@ export default function FleetLiveMapLeaflet({
       <FleetGeofenceLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetSosPins alerts={sosAlerts} visible={showSosPins} />
       <FleetHeatmapLayer points={heatmap} visible={showHeat} />
-      <LeafletAnimatedMarkers vehicles={vehicles} />
+      <LeafletAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
     </MapContainer>
   );
 }
