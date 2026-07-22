@@ -9,6 +9,7 @@ import HomepageSettingsPanel from './HomepageSettingsPanel.jsx';
 import PartnerWebhooksPanel from './PartnerWebhooksPanel.jsx';
 import DriversHub from './DriversHub.jsx';
 import GdprCompliancePanel from './GdprCompliancePanel.jsx';
+import LoginAuditPanel from './LoginAuditPanel.jsx';
 import ContractsPanel from './ContractsPanel.jsx';
 import SuperAdminPanel from './SuperAdminPanel.jsx';
 import SaasConnectionPanel from './SaasConnectionPanel.jsx';
@@ -54,6 +55,7 @@ export default function SettingsTabPanels({
     );
   }
   if (tab === 'compliance') return <GdprCompliancePanel />;
+  if (tab === 'logins') return <LoginAuditPanel />;
   if (tab === 'homepage') return <HomepageSettingsPanel />;
   if (tab === 'growth') {
     return (

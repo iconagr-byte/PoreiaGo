@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from ticketing.boarding_service import get_boarding_manifest
 from travel_platform.operations.master_qr_local import DEFAULT_TENANT, _secret as local_secret
 from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
 from travel_platform.settings.drivers_store import authenticate_driver, get_driver
+from travel_platform.settings.login_audit_store import record_login_from_request
 from travel_platform.telemetry.live_fleet import LiveFleetService
 from travel_platform.telemetry.processor import get_idling, get_live_fleet
 
@@ -189,14 +190,34 @@ def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None
 
 
 @router.post("/session/login", response_model=DriverSessionResponse)
-async def login_with_password(body: DriverLoginBody):
+async def login_with_password(request: Request, body: DriverLoginBody):
     """Primary PWA login — username (email / license / plate) + password."""
+    username = (body.username or "").strip()
     driver = authenticate_driver(body.username, body.password)
     if not driver:
+        record_login_from_request(
+            request,
+            actor_type="driver",
+            identity=username,
+            success=False,
+            method="password",
+            detail="Λάθος όνομα χρήστη ή κωδικός",
+        )
         raise HTTPException(status_code=401, detail="Λάθος όνομα χρήστη ή κωδικός")
     # Must match the SaaS tenant the admin live map filters by (not the local demo UUID).
     tenant_id = await resolve_platform_tenant_id()
     trip_id = _resolve_trip_for_driver(driver.id, tenant_id)
+    record_login_from_request(
+        request,
+        actor_type="driver",
+        identity=driver.email or driver.license_no or username,
+        success=True,
+        actor_id=driver.id,
+        actor_name=driver.name,
+        method="password",
+        tenant_id=str(tenant_id) if tenant_id else None,
+        detail=driver.license_plate or driver.vehicle_code,
+    )
     return _issue_driver_session(
         driver_id=driver.id,
         tenant_id=tenant_id,
