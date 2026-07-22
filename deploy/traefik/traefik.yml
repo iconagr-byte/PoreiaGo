@@ -25,7 +25,7 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: "${ACME_EMAIL:-ops@travel-agency.com}"
+      email: "iconagr@gmail.com"
       storage: /acme/acme.json
       # TLS-ALPN-01 — works even with :80 → :443 redirect (HTTP-01 can fail).
       tlsChallenge: {}
