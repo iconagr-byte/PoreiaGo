@@ -9,7 +9,6 @@ import MasterQrGate from '../../components/driver/MasterQrGate.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import DailyManifest from '../../components/driver/DailyManifest.jsx';
 import Scanner from '../../components/driver/enterprise/Scanner.jsx';
-import ExpenseUpload from '../../components/driver/enterprise/ExpenseUpload.jsx';
 import PreTripForm from '../../components/driver/enterprise/PreTripForm.jsx';
 import SOSButton from '../../components/driver/enterprise/SOSButton.jsx';
 import TachographStrip from '../../components/driver/enterprise/TachographStrip.jsx';
@@ -25,7 +24,6 @@ const TABS = [
   { id: 'chat', icon: 'chat', label: 'Chat', short: 'Chat' },
   { id: 'gps', icon: 'share_location', label: 'Θέση', short: 'GPS' },
   { id: 'scan', icon: 'qr_code_scanner', label: 'Scan', short: 'Scan' },
-  { id: 'logs', icon: 'receipt_long', label: 'Έξοδα', short: 'Έξ.' },
   { id: 'sos', icon: 'emergency', label: 'SOS', short: 'SOS' },
   { id: 'summary', icon: 'summarize', label: 'Σύνοψη', short: 'Σύν.' },
 ];
@@ -258,6 +256,10 @@ export default function DriverCommandCenter() {
     setParams({ tab: id });
   };
 
+  useEffect(() => {
+    if (tab === 'logs') setParams({ tab: 'home' }, { replace: true });
+  }, [tab, setParams]);
+
   const handlePreTripComplete = () => {
     setSafetyOk(true);
     setParams({ tab: 'gps' });
@@ -371,7 +373,6 @@ export default function DriverCommandCenter() {
             <DriverOfficeChat />
           </div>
           {tab === 'scan' && <Scanner />}
-          {tab === 'logs' && <ExpenseUpload />}
           {tab === 'sos' && <SOSButton />}
           {tab === 'summary' && <DaySummary />}
         </main>

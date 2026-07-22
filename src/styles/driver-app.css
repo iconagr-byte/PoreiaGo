@@ -514,8 +514,8 @@ html.driver-route body {
 
 .driver-nav-inner {
   display: grid;
-  /* home · chat · gps · scan · logs · sos · summary */
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* home · chat · gps · scan · sos · summary */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.05rem;
   width: 100%;
   max-width: var(--driver-max-w);
