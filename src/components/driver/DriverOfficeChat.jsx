@@ -93,7 +93,7 @@ export default function DriverOfficeChat() {
   return (
     <div className="driver-stack">
       <div className="driver-card !p-0 overflow-hidden flex flex-col min-h-[60vh]">
-        <div className="px-4 py-3 border-b border-[var(--driver-border)] flex items-center justify-between gap-2 bg-[#f2f2f7]/
+        <div className="px-4 py-3 border-b border-[var(--driver-border)] flex items-center justify-between gap-2 bg-[#f2f2f7]">
           <div>
             <h2 className="font-extrabold text-lg flex items-center gap-2 text-slate-900">
               <span className="material-symbols-outlined text-[#007aff]">chat</span>
