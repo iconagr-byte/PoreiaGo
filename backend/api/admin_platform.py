@@ -246,6 +246,44 @@ async def get_driver_api(driver_id: str):
     return _driver_response(d)
 
 
+@router.get("/drivers/{driver_id}/history")
+async def get_driver_history_api(driver_id: str, limit: int = Query(100, ge=1, le=500)):
+    """Πλήρες ιστορικό οδηγού: logins, βάρδιες, χιλιόμετρα (GPS + καταγραφές)."""
+    from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
+    from travel_platform.telemetry.driver_history_service import build_driver_history
+
+    if not get_driver(driver_id):
+        raise HTTPException(status_code=404, detail="Driver not found")
+
+    tenant_id = None
+    try:
+        tenant_id = await resolve_platform_tenant_id()
+    except Exception:
+        tenant_id = None
+
+    try:
+        from database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as db:
+            payload = await build_driver_history(
+                db,
+                driver_id=driver_id,
+                tenant_id=tenant_id,
+                limit=limit,
+            )
+    except Exception:
+        payload = await build_driver_history(
+            None,
+            driver_id=driver_id,
+            tenant_id=tenant_id,
+            limit=limit,
+        )
+
+    if not payload:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    return payload
+
+
 @router.patch("/drivers/{driver_id}", response_model=FleetDriverResponse)
 async def patch_driver(driver_id: str, body: FleetDriverUpdate):
     try:
