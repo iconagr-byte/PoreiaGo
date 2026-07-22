@@ -18,6 +18,20 @@ export async function fetchPlatformTenants({ offset = 0, limit = 50, q, isActive
   return saasFetch(`/api/v1/platform/tenants?${params}`);
 }
 
+export async function createPlatformTenant(body) {
+  return saasFetch('/api/v1/platform/tenants', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updatePlatformTenant(tenantId, body) {
+  return saasFetch(`/api/v1/platform/tenants/${tenantId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
 export async function suspendPlatformTenant(tenantId) {
   return saasFetch(`/api/v1/platform/tenants/${tenantId}/suspend`, { method: 'POST' });
 }
