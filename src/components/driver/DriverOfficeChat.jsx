@@ -1,5 +1,5 @@
 /**
- * Driver PWA — chat with office (iMessage-style receipts).
+ * Driver PWA — chat with office.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -13,8 +13,19 @@ import {
   markDriverChatRead,
   sendDriverChatMessage,
 } from '../../services/driverPortalApi.js';
+import '../../styles/office-chat.css';
 
 const POLL_MS = 4000;
+
+function initials(name) {
+  return (name || 'Γ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
 
 export default function DriverOfficeChat() {
   const [messages, setMessages] = useState([]);
@@ -91,60 +102,51 @@ export default function DriverOfficeChat() {
   const lastMineId = [...messages].reverse().find((m) => m.sender === 'driver')?.id;
 
   return (
-    <div className="driver-stack">
-      <div className="driver-card !p-0 overflow-hidden flex flex-col min-h-[60vh]">
-        <div className="px-4 py-3 border-b border-[var(--driver-border)] flex items-center justify-between gap-2 bg-[#f2f2f7]">
-          <div>
-            <h2 className="font-extrabold text-lg flex items-center gap-2 text-slate-900">
-              <span className="material-symbols-outlined text-[#007aff]">chat</span>
-              Γραφείο
-            </h2>
-            <p className="text-xs text-slate-500">Παράδοση &amp; ανάγνωση όπως στο iMessage</p>
-          </div>
-          {unread > 0 ? (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
-              {unread} νέα
+    <div className="driver-stack office-chat">
+      <div className="office-chat-shell rounded-[1.35rem] min-h-[60vh]">
+        <div className="office-chat-header">
+          <div className="office-chat-header-main">
+            <span className="office-chat-avatar" aria-hidden>
+              {initials('Γραφείο')}
             </span>
-          ) : null}
+            <div className="min-w-0">
+              <h2 className="office-chat-title">Γραφείο</h2>
+              <p className="office-chat-subtitle">Παραδόθηκε · Διαβάστηκε</p>
+            </div>
+          </div>
+          {unread > 0 ? <span className="office-chat-unread">{unread}</span> : null}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 bg-[#e5e5ea] min-h-[40vh] max-h-[55vh]">
+        <div className="office-chat-thread min-h-[40vh] max-h-[55vh]">
           {loading ? (
-            <p className="text-center text-sm text-slate-500 py-8">Φόρτωση…</p>
+            <p className="office-chat-loading">Φόρτωση…</p>
           ) : messages.length === 0 ? (
-            <p className="text-center text-sm text-slate-500 py-8">
+            <div className="office-chat-empty">
+              <div className="office-chat-empty-icon">
+                <span className="material-symbols-outlined">forum</span>
+              </div>
               Δεν υπάρχουν μηνύματα ακόμα. Γράψτε στο γραφείο παρακάτω.
-            </p>
+            </div>
           ) : (
-            messages.map((m) => {
+            messages.map((m, idx) => {
               const mine = m.sender === 'driver';
               const receipt = resolveChatReceipt(m, 'driver');
               const showReceipt = mine && m.id === lastMineId;
               return (
-                <div key={m.id} className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-                  <div
-                    className={`max-w-[85%] px-3.5 py-2 text-[15px] leading-snug shadow-sm ${
-                      mine
-                        ? 'bg-[#007aff] text-white rounded-[18px] rounded-br-[6px]'
-                        : 'bg-white text-slate-900 rounded-[18px] rounded-bl-[6px]'
-                    }`}
-                  >
+                <div
+                  key={m.id}
+                  className={`office-chat-row ${mine ? 'is-mine' : 'is-theirs'}`}
+                  style={{ animationDelay: `${Math.min(idx, 8) * 28}ms` }}
+                >
+                  <div className="office-chat-bubble">
                     {!mine ? (
-                      <div className="text-[10px] font-bold uppercase text-slate-400 mb-0.5">
-                        {m.sender_name || 'Γραφείο'}
-                      </div>
+                      <div className="office-chat-sender">{m.sender_name || 'Γραφείο'}</div>
                     ) : null}
-                    <div className="whitespace-pre-wrap break-words">{m.body}</div>
-                    <div
-                      className={`mt-1 flex items-center justify-end gap-1.5 ${
-                        mine ? 'text-white/80' : 'text-slate-400'
-                      }`}
-                    >
-                      <span className="text-[10px] tabular-nums">{formatChatTime(m.created_at)}</span>
-                    </div>
+                    <div className="office-chat-body">{m.body}</div>
+                    <div className="office-chat-meta">{formatChatTime(m.created_at)}</div>
                   </div>
                   {showReceipt ? (
-                    <div className="mt-0.5 px-1">
+                    <div className="office-chat-receipt">
                       <ChatReceiptStatus status={receipt} tone="light" />
                     </div>
                   ) : null}
@@ -155,22 +157,23 @@ export default function DriverOfficeChat() {
           <div ref={bottomRef} />
         </div>
 
-        <form onSubmit={send} className="p-3 border-t border-black/5 flex gap-2 bg-[#f2f2f7]">
+        <form onSubmit={send} className="office-chat-composer">
           <input
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="iMessage"
+            placeholder="Γράψτε μήνυμα…"
+            aria-label="Μήνυμα προς το γραφείο"
             maxLength={2000}
-            className="flex-1 rounded-full border border-black/10 bg-white px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#007aff]/30"
+            className="office-chat-input"
           />
           <button
             type="submit"
             disabled={sending || !text.trim()}
-            className="w-11 h-11 rounded-full bg-[#007aff] text-white font-bold disabled:opacity-40 inline-flex items-center justify-center shrink-0"
+            className="office-chat-send"
             aria-label="Αποστολή"
           >
-            <span className="material-symbols-outlined text-[22px]">arrow_upward</span>
+            <span className="material-symbols-outlined">arrow_upward</span>
           </button>
         </form>
       </div>

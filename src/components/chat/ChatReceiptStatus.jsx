@@ -1,5 +1,5 @@
 /**
- * iMessage-style receipt: Εστάλη → Παραδόθηκε → Διαβάστηκε
+ * Receipt status: Εστάλη → Παραδόθηκε → Διαβάστηκε
  */
 
 const LABELS = {

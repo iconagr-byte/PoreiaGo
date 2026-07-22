@@ -1,5 +1,5 @@
 /**
- * Office chat panel — iMessage-style receipts for selected driver.
+ * Office chat panel for a selected driver.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -13,8 +13,19 @@ import {
   markAdminDriverChatRead,
   sendAdminDriverChatMessage,
 } from '../../services/platformApi.js';
+import '../../styles/office-chat.css';
 
 const POLL_MS = 4000;
+
+function initials(name) {
+  return (name || 'Ο')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
 
 export default function DriverOfficeChatPanel({
   driverId,
@@ -111,77 +122,69 @@ export default function DriverOfficeChatPanel({
 
   if (!driverId) {
     return (
-      <div className="rounded-[24px] border border-black/[0.06] bg-white p-4 shadow-sm text-sm text-slate-500">
+      <div className="office-chat office-chat-shell rounded-[1.35rem] p-5 text-sm text-slate-500 font-semibold">
         Επιλέξτε όχημα / οδηγό για chat.
       </div>
     );
   }
 
   const lastMineId = [...messages].reverse().find((m) => m.sender === 'office')?.id;
+  const title = driverName || 'Οδηγός';
 
   return (
     <div
-      className={`rounded-[24px] border border-black/[0.06] bg-white shadow-sm overflow-hidden flex flex-col ${
-        compact ? 'min-h-[300px]' : 'min-h-[380px]'
+      className={`office-chat office-chat-shell rounded-[1.35rem] ${
+        compact ? 'min-h-[300px]' : 'min-h-[400px]'
       }`}
     >
-      <div className="px-4 py-3 border-b border-black/[0.05] flex items-center justify-between gap-2 bg-[#f2f2f7]">
-        <div className="min-w-0">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 truncate">
-            <span className="material-symbols-outlined text-[#007aff] text-[18px]">chat</span>
-            {driverName || 'Οδηγός'}
-          </h3>
-          <p className="text-[11px] text-slate-400 truncate">
-            {tripId != null ? `Δρομολόγιο #${tripId} · ` : ''}
-            Παραδόθηκε / Διαβάστηκε
-          </p>
-        </div>
-        {unread > 0 ? (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
-            {unread}
+      <div className="office-chat-header">
+        <div className="office-chat-header-main">
+          <span className="office-chat-avatar" aria-hidden>
+            {initials(title)}
           </span>
-        ) : null}
+          <div className="min-w-0">
+            <h3 className="office-chat-title">{title}</h3>
+            <p className="office-chat-subtitle">
+              {tripId != null ? `Δρομολόγιο #${tripId} · ` : ''}
+              Παραδόθηκε · Διαβάστηκε
+            </p>
+          </div>
+        </div>
+        {unread > 0 ? <span className="office-chat-unread">{unread}</span> : null}
       </div>
 
       <div
-        className={`flex-1 overflow-y-auto px-3 py-3 space-y-1.5 bg-[#e5e5ea] ${
-          compact ? 'max-h-[240px]' : 'max-h-[300px]'
-        }`}
+        className={`office-chat-thread ${compact ? 'max-h-[240px] min-h-[200px]' : 'max-h-[320px] min-h-[260px]'}`}
       >
         {loading ? (
-          <p className="text-center text-xs text-slate-400 py-6">Φόρτωση…</p>
+          <p className="office-chat-loading">Φόρτωση…</p>
         ) : messages.length === 0 ? (
-          <p className="text-center text-xs text-slate-400 py-6">
+          <div className="office-chat-empty">
+            <div className="office-chat-empty-icon">
+              <span className="material-symbols-outlined">chat_bubble</span>
+            </div>
             Ξεκινήστε τη συνομιλία με τον οδηγό.
-          </p>
+          </div>
         ) : (
-          messages.map((m) => {
+          messages.map((m, idx) => {
             const mine = m.sender === 'office';
             const receipt = resolveChatReceipt(m, 'office');
             const showReceipt = mine && m.id === lastMineId;
             return (
-              <div key={m.id} className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-                <div
-                  className={`max-w-[90%] px-3 py-2 text-sm leading-snug shadow-sm ${
-                    mine
-                      ? 'bg-[#007aff] text-white rounded-[18px] rounded-br-[6px]'
-                      : 'bg-white text-slate-900 rounded-[18px] rounded-bl-[6px]'
-                  }`}
-                >
+              <div
+                key={m.id}
+                className={`office-chat-row ${mine ? 'is-mine' : 'is-theirs'}`}
+                style={{ animationDelay: `${Math.min(idx, 8) * 28}ms` }}
+              >
+                <div className="office-chat-bubble">
                   {!mine ? (
-                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-0.5">
-                      {m.sender_name || 'Οδηγός'}
-                    </div>
+                    <div className="office-chat-sender">{m.sender_name || 'Οδηγός'}</div>
                   ) : null}
-                  <div className="whitespace-pre-wrap break-words">{m.body}</div>
-                  <div
-                    className={`mt-1 flex justify-end ${mine ? 'text-white/80' : 'text-slate-400'}`}
-                  >
-                    <span className="text-[10px] tabular-nums">{formatChatTime(m.created_at)}</span>
-                  </div>
+                  <div className="office-chat-body">{m.body}</div>
+                  <div className="office-chat-meta">{formatChatTime(m.created_at)}</div>
                 </div>
                 {showReceipt ? (
-                  <div className="mt-0.5 px-1">
+                  <div className="office-chat-receipt">
                     <ChatReceiptStatus status={receipt} tone="light" />
                   </div>
                 ) : null}
@@ -192,22 +195,27 @@ export default function DriverOfficeChatPanel({
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={send} className="p-3 border-t border-black/5 flex gap-2 bg-[#f2f2f7]">
+      <form onSubmit={send} className="office-chat-composer">
         <input
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="iMessage"
+          placeholder="Γράψτε μήνυμα…"
+          aria-label={`Μήνυμα προς ${title}`}
           maxLength={2000}
-          className="flex-1 rounded-full border border-black/10 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#007aff]/20"
+          className="office-chat-input"
+          style={{ fontSize: '0.9375rem', padding: '0.6rem 0.95rem' }}
         />
         <button
           type="submit"
           disabled={sending || !text.trim()}
-          className="w-9 h-9 rounded-full bg-[#007aff] text-white disabled:opacity-40 inline-flex items-center justify-center shrink-0"
+          className="office-chat-send"
+          style={{ width: '2.35rem', height: '2.35rem' }}
           aria-label="Αποστολή"
         >
-          <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
+          <span className="material-symbols-outlined" style={{ fontSize: '1.15rem' }}>
+            arrow_upward
+          </span>
         </button>
       </form>
     </div>
