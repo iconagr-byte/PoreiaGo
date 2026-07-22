@@ -7,7 +7,7 @@ import mimetypes
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -274,7 +274,24 @@ async def get_public_checkout_settings():
 
 
 @router.get("/api/site/appearance", response_model=SiteAppearanceResponse)
-async def get_public_site_appearance():
+async def get_public_site_appearance(host: str | None = Query(default=None)):
+    # Prefer tenant homepage from Postgres when Host maps to an office.
+    if host:
+        try:
+            from app.core.database import AsyncSessionLocal
+            from olympus.tenant.domain_resolver import DomainResolver
+            from app.services.tenant_site_appearance_service import TenantSiteAppearanceService
+
+            async with AsyncSessionLocal() as session:
+                resolved = await DomainResolver(session).resolve(host)
+                if resolved:
+                    data = await TenantSiteAppearanceService(session).get_appearance(resolved.tenant_id)
+                    # Drop internal keys not in response model.
+                    clean = {k: v for k, v in data.items() if k in SiteAppearanceResponse.model_fields}
+                    return SiteAppearanceResponse(**{**DEFAULT_SITE_APPEARANCE, **clean})
+        except Exception:
+            pass
+
     data = _read_appearance()
     if not data.get("logo_url"):
         api_logo = _asset_api_url("logo")

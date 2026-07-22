@@ -24,6 +24,7 @@ import {
   isStorefrontPreviewMode,
   readHomepagePreviewDraft,
 } from '../lib/homepage/homepagePreview.js';
+import { isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
 import { fetchPublicFleet } from '../services/fleetPublicApi.js';
 import FleetShowcaseSection from '../components/FleetShowcaseSection.jsx';
 import StorefrontHeader from '../components/storefront/StorefrontHeader.jsx';
@@ -33,6 +34,9 @@ import TripsSection from '../components/storefront/TripsSection.jsx';
 export default function StorefrontDemoPage() {
   const navigate = useNavigate();
   const isPreview = isStorefrontPreviewMode();
+  const isLiveTenantSite = isTenantStorefrontHost();
+  // Preview from admin OR live office domain/subdomain.
+  const allowStorefront = isPreview || isLiveTenantSite;
 
   const [trips] = useState(() => loadTrips());
   const domesticTrips = useMemo(
@@ -289,7 +293,7 @@ export default function StorefrontDemoPage() {
     </form>
   );
 
-  if (!isPreview) {
+  if (!allowStorefront) {
     return <Navigate to="/" replace />;
   }
 

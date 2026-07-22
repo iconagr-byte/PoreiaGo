@@ -68,9 +68,10 @@ export function resolveSiteAssetUrl(url) {
   return url;
 }
 
-export async function fetchSiteAppearance() {
+export async function fetchSiteAppearance(host = typeof window !== 'undefined' ? window.location.hostname : '') {
   try {
-    const res = await fetch(`${API_BASE}/api/site/appearance`);
+    const qs = host ? `?host=${encodeURIComponent(host)}` : '';
+    const res = await fetch(`${API_BASE}/api/site/appearance${qs}`);
     if (res.ok) {
       const data = await res.json();
       cacheLocally(data);

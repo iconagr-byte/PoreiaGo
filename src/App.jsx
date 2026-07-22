@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { Toaster } from 'react-hot-toast';
-import FrontPage from './pages/FrontPage';
+import HomePage from './pages/HomePage.jsx';
 import StorefrontDemoPage from './pages/StorefrontDemoPage';
 import BackOffice from './pages/BackOffice';
 import LoginPage from './pages/LoginPage';
@@ -44,7 +44,7 @@ function App() {
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
-            <Route path="/" element={<FrontPage />} />
+            <Route path="/" element={<HomePage />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />
             <Route path="/grafeia" element={<AgencyPlansPage />} />
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />
