@@ -7,6 +7,7 @@ export const TENANT_SETTINGS_TABS = [
   { id: 'contracts', label: 'Συμβόλαιο', icon: 'description', section: 'office' },
   { id: 'compliance', label: 'GDPR & Audit', icon: 'shield', section: 'office' },
   { id: 'homepage', label: 'Αρχική σελίδα', icon: 'home', section: 'office' },
+  { id: 'domain', label: 'Domain', icon: 'language', section: 'office' },
   { id: 'users', label: 'Χρήστες', icon: 'group', section: 'office' },
   { id: 'drivers', label: 'Οδηγοί', icon: 'badge', section: 'office' },
   { id: 'telematics', label: 'Telematics', icon: 'tune', section: 'office' },
@@ -16,6 +17,7 @@ export const PLATFORM_OPERATOR_TABS = [
   { id: 'tenants', label: 'Γραφεία', icon: 'domain', section: 'platform' },
   { id: 'saas_infra', label: 'SaaS Infra', icon: 'dns', section: 'platform' },
   { id: 'backup', label: 'Backup', icon: 'backup', section: 'platform' },
+  // Partner webhooks / growth tools — platform only (όχι νέο γραφείο).
   { id: 'growth', label: 'Growth', icon: 'hub', section: 'platform' },
 ];
 

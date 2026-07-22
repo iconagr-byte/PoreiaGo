@@ -55,10 +55,11 @@ export default function SettingsTabPanels({
   }
   if (tab === 'compliance') return <GdprCompliancePanel />;
   if (tab === 'homepage') return <HomepageSettingsPanel />;
+  // Domain της προσωπικής σελίδας γραφείου — όχι κάτω από platform Growth.
+  if (tab === 'domain') return <BrandingPanel />;
   if (tab === 'growth') {
     return (
       <div className="space-y-6">
-        <BrandingPanel />
         <PartnerWebhooksPanel />
       </div>
     );

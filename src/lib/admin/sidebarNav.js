@@ -6,7 +6,7 @@ import {
 } from './settingsTabs.js';
 import { settingsTabToNavItem } from './settingsSidebar.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v5';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v6';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
