@@ -57,6 +57,7 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
           new Notification('Τέλος βάρδιας — PoreiaGo', {
             body: row.message || 'Οδηγός έκλεισε βάρδια',
             tag: `driver-offline-${row.id}`,
+            requireInteraction: true,
           });
         } catch {
           /* ignore */

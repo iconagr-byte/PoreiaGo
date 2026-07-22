@@ -142,18 +142,30 @@ async def notify_driver_shift(
 
     push_result: dict[str, Any] = {"skipped": True, "reason": "push_disabled"}
     if cfg["notify_push"]:
-        push_result = await _send_driver_shift_push(event=event, meta=meta, message=message)
+        push_result = await _send_driver_shift_push(
+            event=event,
+            meta=meta,
+            message=message,
+            reason=reason,
+        )
 
     logger.info(
-        "driver_shift notify event=%s tenant=%s push=%s",
+        "driver_shift notify event=%s reason=%s tenant=%s push=%s",
         event,
+        reason or "-",
         tenant_id,
         push_result,
     )
     return {"alert_id": alert.get("id"), "push": push_result}
 
 
-async def _send_driver_shift_push(*, event: str, meta: dict[str, Any], message: str) -> dict[str, Any]:
+async def _send_driver_shift_push(
+    *,
+    event: str,
+    meta: dict[str, Any],
+    message: str,
+    reason: str = "",
+) -> dict[str, Any]:
     from travel_platform.notifications.push_subscription_store import (
         list_all_subscriptions,
         list_subscriptions_for_email,
@@ -171,20 +183,23 @@ async def _send_driver_shift_push(*, event: str, meta: dict[str, Any], message: 
         return {"skipped": True, "reason": "vapid_not_configured"}
 
     title = "Έναρξη βάρδιας" if event == "online" else "Τέλος βάρδιας"
+    reason_key = (reason or "default").replace(" ", "_")[:40]
     payload = {
         "title": title,
         "body": message,
-        "tag": f"driver-shift-{meta['tenant_id']}-{meta['driver_id']}-{event}",
+        # Unique tag so shift_end is not collapsed with a prior generic offline alert.
+        "tag": f"driver-shift-{meta['tenant_id']}-{meta['driver_id']}-{event}-{reason_key}",
         "url": "/admin?tab=fleet_live_map",
         "data": {
             "type": "driver_shift",
             "event": event,
+            "reason": reason or None,
             "tenant_id": meta["tenant_id"],
             "trip_id": meta.get("trip_id"),
             "driver_id": meta.get("driver_id"),
             "tab": "fleet_live_map",
         },
-        "requireInteraction": event == "online",
+        "requireInteraction": True,
     }
 
     attempted = 0
