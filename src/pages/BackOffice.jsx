@@ -6,13 +6,11 @@ import { loadAllCustomers, getCustomerByEmail } from '../lib/customers/customerS
 import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
-import { adminScanTicket, ensureDriverSession } from '../services/ticketingApi.js';
-import { SCAN_RESULT } from '../lib/ticketing/constants.js';
+import { ensureDriverSession } from '../services/ticketingApi.js';
 import BookingDetailPanel from '../components/booking/BookingDetailPanel.jsx';
 import RecordCashPaymentModal from '../components/admin/RecordCashPaymentModal.jsx';
 import FiscalMarkCell from '../components/admin/FiscalMarkCell.jsx';
 import toast, { Toaster } from 'react-hot-toast';
-import BusQrScanner from '../components/BusQrScanner.jsx';
 import LiveFleetMap from '../components/admin/LiveFleetMap.jsx';
 import FleetLiveMapWebSocket from '../components/admin/FleetLiveMapWebSocket.jsx';
 import FleetRouteHistory from '../components/admin/FleetRouteHistory.jsx';
@@ -96,7 +94,6 @@ export default function BackOffice() {
   const [lostItemsLoading, setLostItemsLoading] = useState(false);
   const [bookings, setBookings] = useState(() => loadBookings());
   const [bookingsLoading, setBookingsLoading] = useState(false);
-  const [scanFlash, setScanFlash] = useState(null);
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
@@ -188,7 +185,6 @@ export default function BackOffice() {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [cashPaymentBooking, setCashPaymentBooking] = useState(null);
   const [cashPaymentSaving, setCashPaymentSaving] = useState(false);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [expandedTripBookings, setExpandedTripBookings] = useState(null);
   const [fleetVehicles, setFleetVehicles] = useState([]);
   const [fleetCards, setFleetCards] = useState(null);
@@ -1686,17 +1682,6 @@ export default function BackOffice() {
             <TemplateSearch onUseTemplate={useEmailTemplate} />
           </div>
           <div className="flex items-center gap-6">
-            <button
-              type="button"
-              onClick={() => {
-                ensureDriverSession();
-                setIsScannerOpen(true);
-              }}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold hover:bg-gray-800"
-            >
-              <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
-              Scan QR
-            </button>
             <button className="relative p-2 text-on-surface-variant hover:text-primary transition-colors">
               <span className="material-symbols-outlined">notifications</span>
               <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
@@ -1825,57 +1810,6 @@ export default function BackOffice() {
           </div>
         </div>
       </main>
-
-      {/* Mobile Scanner Modal */}
-      {isScannerOpen && (
-        <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center">
-          <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent z-10">
-            <h3 className="text-white font-bold text-xl flex items-center gap-2">
-              <span className="material-symbols-outlined">qr_code_scanner</span> Scanner Λεωφορείου
-            </h3>
-            <button 
-              onClick={() => setIsScannerOpen(false)}
-              className="w-12 h-12 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
-          </div>
-          
-          <div className="w-full max-w-md min-h-[360px] relative overflow-hidden rounded-[32px] border-4 border-white/20 shadow-2xl bg-black">
-            <BusQrScanner
-              onScan={async (raw) => {
-                const response = await adminScanTicket({ qr: raw, tripId: 1 });
-                setScanFlash(response.result);
-                if (response.result === SCAN_RESULT.SUCCESS) {
-                  setBookings(loadBookings());
-                  toast.success(
-                    `✅ ${response.passengerName} — Θέση ${response.seat}`,
-                    { duration: 4000 },
-                  );
-                  setIsScannerOpen(false);
-                } else {
-                  toast.error(response.message || 'Άκυρο εισιτήριο');
-                }
-              }}
-            />
-            {scanFlash && (
-              <div
-                className={`absolute inset-0 pointer-events-none flex items-center justify-center text-4xl font-bold ${
-                  scanFlash === SCAN_RESULT.SUCCESS ? 'bg-green-500/30' : 'bg-red-500/30'
-                }`}
-              >
-                {scanFlash === SCAN_RESULT.SUCCESS ? '✓' : '✗'}
-              </div>
-            )}
-            
-            <div className="absolute inset-0 pointer-events-none border-2 border-primary/50 m-12 rounded-3xl"></div>
-          </div>
-          
-          <div className="absolute bottom-10 left-0 right-0 text-center px-6">
-            <p className="text-white/80 font-medium">Κεντράρετε το QR Code του πελάτη μέσα στο πλαίσιο.</p>
-          </div>
-        </div>
-      )}
 
       <RecordCashPaymentModal
         booking={cashPaymentBooking}
