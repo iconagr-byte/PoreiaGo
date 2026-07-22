@@ -35,12 +35,33 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
         duration: 5000,
         id: `driver-online-${row.id}`,
       });
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          new Notification('Έναρξη βάρδιας — PoreiaGo', {
+            body: row.message || 'Οδηγός ξεκίνησε βάρδια',
+            tag: `driver-online-${row.id}`,
+            requireInteraction: true,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
     } else if (type === 'DRIVER_OFFLINE') {
       toast(row.message || 'Οδηγός έκλεισε βάρδια', {
         duration: 5000,
         icon: '🛑',
         id: `driver-offline-${row.id}`,
       });
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          new Notification('Τέλος βάρδιας — PoreiaGo', {
+            body: row.message || 'Οδηγός έκλεισε βάρδια',
+            tag: `driver-offline-${row.id}`,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }, [limit]);
 
