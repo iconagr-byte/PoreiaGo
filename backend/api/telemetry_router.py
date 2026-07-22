@@ -82,7 +82,11 @@ admin_router = APIRouter(prefix="/telemetry", tags=["telemetry-admin"])
 async def fleet_live(
     tenant_id: Annotated[UUID, Depends(get_tenant_id)],
 ):
-    """Latest GPS pins for the admin map — must never 500 (nginx would surface 502)."""
+    """Latest GPS pins for the admin map.
+
+    Per-row failures are skipped. A total list failure returns 503 (not empty [])
+    so the admin client keeps the last-known pin instead of wiping the map.
+    """
     import logging
 
     from travel_platform.telemetry.live_fleet_media import enrich_live_vehicle_media
@@ -92,9 +96,9 @@ async def fleet_live(
     try:
         live: LiveFleetService = get_live_fleet()
         vehicles = await live.list_active_for_admin_async(tenant_id)
-    except Exception:
+    except Exception as exc:
         log.exception("fleet_live list_active failed tenant=%s", tenant_id)
-        return []
+        raise HTTPException(status_code=503, detail="Live fleet temporarily unavailable") from exc
 
     for v in vehicles:
         try:

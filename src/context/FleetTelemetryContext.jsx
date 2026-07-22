@@ -7,17 +7,17 @@ import { adminAuthHeaders } from '../services/adminApi.js';
 
 export const DEMO_TENANT = import.meta.env.VITE_DEMO_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 
-/** Tenant για fleet egress — JWT impersonation, localStorage ή demo fallback. */
+/** Tenant για fleet egress — JWT tenant πρώτα (όχι stale localStorage). */
 export function resolveFleetTenantId() {
   const impersonated = getImpersonationTarget();
   if (impersonated) return impersonated;
-  const stored = getSaasTenantId();
-  if (stored) return stored;
   const token = getSaasToken();
   if (token) {
     const payload = decodeJwtPayload(token);
     if (payload?.tenant_id) return payload.tenant_id;
   }
+  const stored = getSaasTenantId();
+  if (stored) return stored;
   return DEMO_TENANT;
 }
 
@@ -91,10 +91,18 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
     let mode = 'poll';
     let pollMs = 3000;
     let pollTimer = null;
+    let emptyPollStreak = 0;
 
     const applyRows = (rows, { replace = true } = {}) => {
       if (!Array.isArray(rows)) return;
       setVehicles((prev) => {
+        // Never wipe known pins on a single empty poll — Redis/stale blips are common.
+        if (replace && rows.length === 0 && Object.keys(prev).length > 0) {
+          emptyPollStreak += 1;
+          if (emptyPollStreak < 3) return prev;
+        } else if (rows.length > 0) {
+          emptyPollStreak = 0;
+        }
         const map = replace ? {} : { ...prev };
         rows.forEach((row) => {
           const id = vehicleIdFromRow(row);
@@ -141,7 +149,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
         .catch((err) => {
           if (closed) return;
           const raw = String(err?.message || '');
-          const isGateway = /\b(502|503|504)\b/.test(raw) || err?.status === 502;
+          const isGateway = /\b(502|503|504)\b/.test(raw) || [502, 503, 504].includes(err?.status);
           const msg =
             raw === 'Failed to fetch' || /network|load failed|fetch/i.test(raw)
               ? 'Δεν συνδέει με το API (Failed to fetch). Ανανέωσε τη σελίδα· αν συνεχίζει, το api host είναι εκτός.'

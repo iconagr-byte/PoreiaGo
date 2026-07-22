@@ -81,9 +81,15 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
 
         meta = _live._vehicles.get(str(vehicle_id), {})
         if meta:
-            await save_live_vehicle(meta)
+            ok = await save_live_vehicle(meta)
+            if not ok:
+                logger.warning(
+                    "live fleet Redis save returned false tenant=%s vehicle=%s",
+                    update.tenant_id,
+                    vehicle_id,
+                )
     except Exception:
-        logger.debug("live fleet Redis save skipped", exc_info=True)
+        logger.warning("live fleet Redis save failed", exc_info=True)
 
     return NormalizedTelemetry(
         update=update,

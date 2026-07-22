@@ -196,7 +196,7 @@ export const DEFAULT_TELEMETRY_SETTINGS = {
   prefer_tracker_events: true,
   eta_refresh_seconds: 300,
   eta_ws_push_seconds: 30,
-  driver_stale_seconds: 90,
+  driver_stale_seconds: 360,
   google_maps_configured: false,
 };
 
