@@ -1,10 +1,11 @@
 # AUTO-GENERATED — tenant custom domains for Traefik + Let's Encrypt
-# Regenerated on Domain save / API startup when TRAEFIK_DYNAMIC_DIR is set.
+# Apex (non-www) is routed only when it also CNAMEs to the platform.
+# For Achillio today only www points at PoreiaGo — cert www only.
 
 http:
   routers:
-    tenant-domain-achilliotravel-com:
-      rule: Host(`achilliotravel.com`) || Host(`www.achilliotravel.com`)
+    tenant-domain-www-achilliotravel-com:
+      rule: Host(`www.achilliotravel.com`)
       entryPoints:
         - websecure
       service: tenant-custom-frontend
@@ -12,9 +13,7 @@ http:
       tls:
         certResolver: letsencrypt
         domains:
-          - main: "achilliotravel.com"
-            sans:
-              - "www.achilliotravel.com"
+          - main: "www.achilliotravel.com"
       middlewares:
         - security-headers@file
 
