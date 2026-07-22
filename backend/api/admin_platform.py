@@ -7,6 +7,7 @@ Admin platform API — ρυθμίσεις πλατφόρμας, χρήστες, 
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import uuid
@@ -86,15 +87,7 @@ def _driver_response(d) -> FleetDriverResponse:
     days = None
     if d.license_expires_at:
         days = (d.license_expires_at - date.today()).days
-    safety = d.safety_score
-    try:
-        from uuid import UUID
-        from travel_platform.telemetry.driving_behavior import DrivingBehaviorService
-
-        profile = DrivingBehaviorService().get_profile(UUID(d.id))
-        safety = profile.safety_score
-    except Exception:
-        pass
+    # Use persisted safety_score — avoid per-row DrivingBehaviorService lookups on list/CRUD.
     return FleetDriverResponse(
         id=d.id,
         name=d.name,
@@ -108,7 +101,7 @@ def _driver_response(d) -> FleetDriverResponse:
         salary_per_km=d.salary_per_km,
         salary_per_trip=d.salary_per_trip,
         current_balance=d.current_balance,
-        safety_score=safety,
+        safety_score=d.safety_score,
         trips_completed=d.trips_completed,
         total_km=d.total_km,
         license_expires_at=d.license_expires_at,
@@ -190,7 +183,8 @@ async def remove_user(user_id: str):
 
 @router.get("/drivers", response_model=list[FleetDriverResponse])
 async def get_drivers(status: str | None = None):
-    return [_driver_response(d) for d in list_drivers(status)]
+    rows = await asyncio.to_thread(list_drivers, status)
+    return [_driver_response(d) for d in rows]
 
 
 _DRIVER_PHOTO_DIR = Path(
@@ -230,7 +224,7 @@ async def upload_driver_photo(file: UploadFile = File(...)):
 @router.post("/drivers", response_model=FleetDriverResponse, status_code=201)
 async def post_driver(body: FleetDriverCreate):
     try:
-        d = create_driver(body.model_dump())
+        d = await asyncio.to_thread(create_driver, body.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -240,7 +234,7 @@ async def post_driver(body: FleetDriverCreate):
 
 @router.get("/drivers/{driver_id}", response_model=FleetDriverResponse)
 async def get_driver_api(driver_id: str):
-    d = get_driver(driver_id)
+    d = await asyncio.to_thread(get_driver, driver_id)
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
     return _driver_response(d)
@@ -249,7 +243,7 @@ async def get_driver_api(driver_id: str):
 @router.patch("/drivers/{driver_id}", response_model=FleetDriverResponse)
 async def patch_driver(driver_id: str, body: FleetDriverUpdate):
     try:
-        d = update_driver(driver_id, body.model_dump(exclude_unset=True))
+        d = await asyncio.to_thread(update_driver, driver_id, body.model_dump(exclude_unset=True))
     except KeyError:
         raise HTTPException(status_code=404, detail="Driver not found") from None
     except ValueError as e:
@@ -262,10 +256,10 @@ async def patch_driver(driver_id: str, body: FleetDriverUpdate):
 @router.delete("/drivers/{driver_id}", status_code=204)
 async def remove_driver(driver_id: str):
     try:
-        delete_driver(driver_id)
+        await asyncio.to_thread(delete_driver, driver_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Driver not found") from None
-
+    return Response(status_code=204)
 
 @router.get("/fleet/availability")
 async def get_fleet_availability(plate: str):

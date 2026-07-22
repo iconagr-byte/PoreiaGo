@@ -56,18 +56,18 @@ export default function DriversManagementPanel() {
     });
   }, [drivers, query]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ soft = false } = {}) => {
+    if (!soft) setLoading(true);
     setLoadError('');
     try {
       const rows = await fetchFleetDrivers(filter || undefined);
       setDrivers(Array.isArray(rows) ? rows : []);
     } catch (err) {
-      setDrivers([]);
+      if (!soft) setDrivers([]);
       setLoadError(err.message || 'Αποτυχία φόρτωσης οδηγών');
       toast.error(err.message || 'Αποτυχία φόρτωσης οδηγών');
     } finally {
-      setLoading(false);
+      if (!soft) setLoading(false);
     }
   }, [filter]);
 
@@ -77,11 +77,15 @@ export default function DriversManagementPanel() {
 
   const onDelete = async (d) => {
     if (!window.confirm(`Διαγραφή οδηγού ${d.name};`)) return;
+    const prev = drivers;
+    // Optimistic: remove instantly — no skeleton flash while DELETE + refetch run.
+    setDrivers((rows) => rows.filter((row) => row.id !== d.id));
     try {
       await deleteFleetDriver(d.id);
       toast.success('Διαγράφηκε');
-      load();
+      load({ soft: true });
     } catch (err) {
+      setDrivers(prev);
       toast.error(err.message);
     }
   };

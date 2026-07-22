@@ -153,11 +153,10 @@ export default function DriverFormPage() {
         toast.success('Ο οδηγός ενημερώθηκε');
         navigate(`/admin/drivers/${driverId}`);
       } else {
-        const created = await createFleetDriver(body);
+        await createFleetDriver(body);
         toast.success('Ο λογαριασμός δημιουργήθηκε');
-        navigate(created?.id ? `/admin/drivers/${created.id}` : '/admin', {
-          state: { activeTab: 'drivers' },
-        });
+        // Back to list immediately — skip detail GET round-trip.
+        navigate('/admin', { state: { activeTab: 'drivers' } });
       }
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');

@@ -11,13 +11,31 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-from ticketing.password_utils import hash_password, verify_password
+from ticketing.password_utils import (
+    DRIVER_PBKDF2_ITERATIONS,
+    hash_password,
+    verify_password,
+)
 
 logger = logging.getLogger(__name__)
 
 DriverStatus = Literal["active", "inactive", "on_leave", "suspended"]
 
 DEFAULT_DRIVER_PASSWORD = "driver123"
+_CACHED_DEFAULT_PASSWORD_HASH: str | None = None
+
+
+def _hash_driver_password(password: str) -> str:
+    """Faster PBKDF2 for bus-app passwords (create/update must stay snappy)."""
+    return hash_password(str(password), iterations=DRIVER_PBKDF2_ITERATIONS)
+
+
+def _default_password_hash() -> str:
+    """Hash DEFAULT_DRIVER_PASSWORD once — never re-hash on every row load."""
+    global _CACHED_DEFAULT_PASSWORD_HASH
+    if _CACHED_DEFAULT_PASSWORD_HASH is None:
+        _CACHED_DEFAULT_PASSWORD_HASH = _hash_driver_password(DEFAULT_DRIVER_PASSWORD)
+    return _CACHED_DEFAULT_PASSWORD_HASH
 
 # Prefer persistent volume in production (docker mount /app/data).
 _DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[2] / "data")
@@ -71,7 +89,7 @@ def _parse_datetime(value) -> datetime:
 def _driver_from_row(row: dict) -> FleetDriver:
     pwd_hash = row.get("password_hash")
     if not pwd_hash and row.get("password"):
-        pwd_hash = hash_password(str(row["password"]))
+        pwd_hash = _hash_driver_password(str(row["password"]))
     return FleetDriver(
         id=row.get("id") or str(uuid4()),
         name=row["name"],
@@ -90,7 +108,7 @@ def _driver_from_row(row: dict) -> FleetDriver:
         total_km=float(row.get("total_km", 0)),
         license_expires_at=_parse_date(row.get("license_expires_at")),
         avg_rating=row.get("avg_rating"),
-        password_hash=pwd_hash or hash_password(DEFAULT_DRIVER_PASSWORD),
+        password_hash=pwd_hash or _default_password_hash(),
         photo_url=(str(row["photo_url"]).strip() or None) if row.get("photo_url") else None,
         created_at=_parse_datetime(row.get("created_at")),
     )
@@ -131,7 +149,7 @@ def _seed() -> dict[str, FleetDriver]:
         ("a1000000-0000-4000-8000-000000000004", "Ανδρέας Ανδρέου", "XAH-4022", "XAH-4022", "AB456789", "+30 694 444 0004", "andreas.driver@aerostride.com", 42000, 89, 97),
     ]
     drivers: dict[str, FleetDriver] = {}
-    pwd_hash = hash_password(DEFAULT_DRIVER_PASSWORD)
+    pwd_hash = _default_password_hash()
     for did, name, vcode, plate, lic, phone, email, km, trips, safety in seeds:
         drivers[did] = FleetDriver(
             id=did,
@@ -205,9 +223,10 @@ _store_mtime: float | None = None
 
 def reset_drivers_cache() -> None:
     """Test helper — drop in-memory cache so next access reloads from disk."""
-    global _drivers, _store_mtime
+    global _drivers, _store_mtime, _CACHED_DEFAULT_PASSWORD_HASH
     _drivers = None
     _store_mtime = None
+    _CACHED_DEFAULT_PASSWORD_HASH = None
 
 
 def _ensure() -> dict[str, FleetDriver]:
@@ -295,7 +314,7 @@ def authenticate_driver(username: str, password: str) -> FleetDriver | None:
     if not stored:
         if password != DEFAULT_DRIVER_PASSWORD:
             return None
-        driver.password_hash = hash_password(password)
+        driver.password_hash = _hash_driver_password(password)
         _persist()
         return driver
     if not verify_password(password, stored):
@@ -343,7 +362,7 @@ def create_driver(data: dict) -> FleetDriver:
         current_balance=0.0,
         safety_score=100,
         license_expires_at=_parse_date(data.get("license_expires_at")),
-        password_hash=hash_password(str(pwd)),
+        password_hash=_hash_driver_password(str(pwd)),
         photo_url=(str(data["photo_url"]).strip() or None) if data.get("photo_url") else None,
     )
     _ensure()[did] = driver
@@ -402,7 +421,7 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         pwd = str(patch["password"])
         if len(pwd) < 4:
             raise ValueError("Ο κωδικός πρέπει να έχει τουλάχιστον 4 χαρακτήρες")
-        d.password_hash = hash_password(pwd)
+        d.password_hash = _hash_driver_password(pwd)
     _persist()
     return d
 
