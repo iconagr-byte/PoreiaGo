@@ -185,6 +185,8 @@ export default function BackOffice() {
   }, [activeTab, location.key]);
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  /** When opened from Κρατήσεις, back restores that booking instead of trapping on Πελάτες. */
+  const [customerReturn, setCustomerReturn] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [cashPaymentBooking, setCashPaymentBooking] = useState(null);
   const [cashPaymentSaving, setCashPaymentSaving] = useState(false);
@@ -216,9 +218,21 @@ export default function BackOffice() {
     bookings,
   ]);
 
+  const handleTabChange = (tab) => {
+    if (tab !== 'customers') {
+      setSelectedCustomer(null);
+      setCustomerReturn(null);
+    }
+    if (tab !== 'bookings') {
+      setSelectedBooking(null);
+    }
+    setActiveTab(tab);
+  };
+
   const openEmailHub = ({ to = '', subject = '', hubTab = 'mailbox' } = {}) => {
     setSelectedBooking(null);
     setSelectedCustomer(null);
+    setCustomerReturn(null);
     const toAddr = String(to).trim();
     const subj = String(subject).trim();
     setEmailIntent({
@@ -230,14 +244,14 @@ export default function BackOffice() {
 
   const goToEmailMailbox = () => {
     setEmailIntent({ hubTab: 'mailbox' });
-    setActiveTab('email');
+    handleTabChange('email');
   };
 
   const useEmailTemplate = (tpl) => {
     if (!tpl) return;
     const draft = applyStitchTemplate(tpl);
     setEmailIntent({ hubTab: 'marketing', initialDraft: draft });
-    setActiveTab('email');
+    handleTabChange('email');
     toast.success(`Φορτώθηκε το πρότυπο «${tpl.name}» — νέα καμπάνια`);
   };
 
@@ -266,13 +280,29 @@ export default function BackOffice() {
       tier: 'Silver',
       joinDate: '—',
     };
+    setCustomerReturn({ tab: 'bookings', bookingId: booking.id || null });
     setSelectedBooking(null);
     setSelectedCustomer(customer);
     setActiveTab('customers');
   };
 
+  const closeCustomerProfile = () => {
+    const ret = customerReturn;
+    setSelectedCustomer(null);
+    setCustomerReturn(null);
+    if (ret?.tab === 'bookings') {
+      setActiveTab('bookings');
+      if (ret.bookingId) {
+        const found = bookings.find((b) => b.id === ret.bookingId);
+        if (found) setSelectedBooking(found);
+      }
+      return;
+    }
+  };
+
   const openBookingTicket = (booking) => {
     setSelectedCustomer(null);
+    setCustomerReturn(null);
     setActiveTab('bookings');
     setSelectedBooking(booking);
   };
@@ -463,7 +493,7 @@ export default function BackOffice() {
             </div>
             <button
               type="button"
-              onClick={() => setActiveTab('bookings')}
+              onClick={() => handleTabChange('bookings')}
               className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
             >
               Όλες
@@ -748,12 +778,21 @@ export default function BackOffice() {
           <div className="flex items-center gap-4 mb-2">
             <button
               type="button"
-              onClick={() => setSelectedCustomer(null)}
+              onClick={closeCustomerProfile}
               className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              aria-label={
+                customerReturn?.tab === 'bookings'
+                  ? 'Πίσω στην κράτηση'
+                  : 'Πίσω στον κατάλογο πελατών'
+              }
             >
               <span className="material-symbols-outlined text-gray-600">arrow_back</span>
             </button>
-            <span className="font-bold text-gray-500">Πίσω στον κατάλογο πελατών</span>
+            <span className="font-bold text-gray-500">
+              {customerReturn?.tab === 'bookings'
+                ? 'Πίσω στην κράτηση'
+                : 'Πίσω στον κατάλογο πελατών'}
+            </span>
           </div>
 
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
@@ -861,7 +900,14 @@ export default function BackOffice() {
             </thead>
             <tbody className="divide-y divide-surface-container-high">
               {loadAllCustomers().map(customer => (
-                <tr key={customer.id} onClick={() => setSelectedCustomer(customer)} className="hover:bg-surface-container-lowest transition-colors cursor-pointer group">
+                <tr
+                  key={customer.id}
+                  onClick={() => {
+                    setCustomerReturn(null);
+                    setSelectedCustomer(customer);
+                  }}
+                  className="hover:bg-surface-container-lowest transition-colors cursor-pointer group"
+                >
                   <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface font-bold flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
                       {customer.name.substring(0, 2).toUpperCase()}
@@ -1673,7 +1719,7 @@ export default function BackOffice() {
         <SortableSidebarNav
           activeTab={activeTab}
           settingsSubTab={settingsSubTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
           onSettingsSubTabChange={setSettingsSubTab}
           onEmailClick={goToEmailMailbox}
           onNavigate={(path) => navigate(path)}
@@ -1755,7 +1801,7 @@ export default function BackOffice() {
                     setSettingsSubTab(
                       isSaasSuperAdmin() ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB,
                     );
-                    setActiveTab('settings');
+                    handleTabChange('settings');
                   }}
                   className="w-full flex items-center justify-between gap-4 p-4 rounded-2xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
                 >
