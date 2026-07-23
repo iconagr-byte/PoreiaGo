@@ -175,7 +175,7 @@ export default function FleetKpisDashboard() {
             </div>
 
             <div className="rounded-[28px] border border-black/[0.06] bg-white p-6">
-              <h3 className="font-bold mb-4">Alerts ανά τύπο</h3>
+              <h3 className="font-bold mb-4">Ειδοποιήσεις ανά τύπο</h3>
               <dl className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Απόκλιση διαδρομής</dt>
