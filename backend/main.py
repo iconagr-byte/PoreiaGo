@@ -148,6 +148,17 @@ async def lifespan(app: FastAPI):
         __import__("logging").getLogger("poreiago.startup").warning(
             "Traefik custom-domain sync skipped: %s", exc
         )
+    try:
+        # Fleet KPIs / route playback use root `database.AsyncSessionLocal`.
+        from database import AsyncSessionLocal as RootSessionLocal
+        from travel_platform.telemetry.ensure_gps_schema import ensure_trip_coordinates_schema
+
+        async with RootSessionLocal() as session:
+            await ensure_trip_coordinates_schema(session)
+    except Exception as gps_exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "GPS schema ensure skipped: %s", gps_exc
+        )
     if start_consumer and process_telemetry_payload:
         await start_consumer(process_telemetry_payload)
     try:

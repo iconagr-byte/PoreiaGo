@@ -86,10 +86,20 @@ export default function FleetKpisDashboard() {
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">{error}</p>
       ) : null}
       {data?.error === 'database_unavailable' ? (
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-          Η βάση GPS δεν είναι διαθέσιμη — εμφανίζονται μόνο live/alert metrics. Τρέξτε{' '}
-          <code className="font-mono text-xs">alembic upgrade head</code>.
-        </p>
+        <div className="rounded-2xl border border-black/[0.06] bg-white/80 backdrop-blur-md px-4 py-3.5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-[20px] text-amber-600 mt-0.5">info</span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold tracking-tight text-slate-900">
+                Ιστορικό GPS σε προετοιμασία
+              </p>
+              <p className="mt-0.5 text-sm text-slate-500 leading-snug">
+                Εμφανίζονται προς το παρόν μόνο ζωντανά δεδομένα και ειδοποιήσεις. Τα χιλιόμετρα και το
+                ιστορικό διαδρομών θα ενεργοποιηθούν αυτόματα μόλις ολοκληρωθεί η ενημέρωση βάσης.
+              </p>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {loading && !summary ? (
