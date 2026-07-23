@@ -22,7 +22,6 @@ export const FLEET_OPS_ONLY_IDS = [
   'fleet_availability',
   'fleet_documents',
   'fleet_expenses',
-  'fleet_assignments',
   'fleet_digest',
 ];
 
@@ -338,16 +337,6 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'fleet_expenses',
     navGroup: 'fleet_ops',
     accent: 'orange',
-  },
-  fleet_assignments: {
-    id: 'fleet_assignments',
-    label: 'Ανάθεση οχημάτων',
-    icon: 'link',
-    filled: true,
-    type: 'tab',
-    tab: 'fleet_assignments',
-    navGroup: 'fleet_ops',
-    accent: 'blue',
   },
   fleet_digest: {
     id: 'fleet_digest',
