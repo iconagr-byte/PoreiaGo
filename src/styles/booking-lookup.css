@@ -1,0 +1,302 @@
+/* Apple-inspired guest booking lookup */
+
+.booking-lookup-shell {
+  --bl-ink: #1d1d1f;
+  --bl-secondary: #6e6e73;
+  --bl-accent: #0071e3;
+  --bl-fill: #f5f5f7;
+  --bl-card: rgba(255, 255, 255, 0.78);
+  --bl-stroke: rgba(0, 0, 0, 0.06);
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--bl-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI',
+    system-ui, sans-serif;
+  background:
+    radial-gradient(900px 420px at 12% -8%, rgba(0, 113, 227, 0.1), transparent 55%),
+    radial-gradient(720px 360px at 92% 8%, rgba(52, 199, 89, 0.08), transparent 50%),
+    linear-gradient(180deg, #fbfbfd 0%, #f2f2f7 100%);
+}
+
+.booking-lookup-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(48px);
+  pointer-events: none;
+  opacity: 0.55;
+  animation: booking-lookup-float 10s ease-in-out infinite;
+}
+
+.booking-lookup-orb--a {
+  width: 220px;
+  height: 220px;
+  top: 18%;
+  left: -60px;
+  background: rgba(0, 113, 227, 0.18);
+}
+
+.booking-lookup-orb--b {
+  width: 260px;
+  height: 260px;
+  right: -80px;
+  bottom: 12%;
+  background: rgba(90, 200, 250, 0.16);
+  animation-delay: -4s;
+}
+
+@keyframes booking-lookup-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+.booking-lookup-top {
+  position: relative;
+  z-index: 2;
+  width: min(440px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1.15rem 0 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.booking-lookup-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid var(--bl-stroke);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 0.45rem 0.85rem 0.45rem 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--bl-secondary);
+  transition: color 0.18s ease, background 0.18s ease, transform 0.15s ease;
+}
+
+.booking-lookup-back .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.booking-lookup-back:hover {
+  color: var(--bl-ink);
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.booking-lookup-main {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem 1rem 2.5rem;
+}
+
+.booking-lookup-card {
+  width: min(420px, 100%);
+  border-radius: 28px;
+  border: 1px solid var(--bl-stroke);
+  background: var(--bl-card);
+  backdrop-filter: blur(22px) saturate(1.35);
+  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 24px 60px rgba(15, 23, 42, 0.08);
+  padding: 2rem 1.65rem 1.75rem;
+  text-align: center;
+  animation: booking-lookup-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes booking-lookup-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.booking-lookup-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 1rem;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(0, 113, 227, 0.12), rgba(0, 113, 227, 0.05));
+  color: var(--bl-accent);
+  box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.12);
+}
+
+.booking-lookup-icon .material-symbols-outlined {
+  font-size: 28px;
+  font-variation-settings: 'FILL' 1;
+}
+
+.booking-lookup-title {
+  margin: 0;
+  font-size: 1.625rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  color: var(--bl-ink);
+}
+
+.booking-lookup-lead {
+  margin: 0.65rem auto 0;
+  max-width: 30ch;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  letter-spacing: -0.015em;
+  color: var(--bl-secondary);
+}
+
+.booking-lookup-form {
+  margin-top: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+  text-align: left;
+}
+
+.booking-lookup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.booking-lookup-field > span {
+  padding-left: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--bl-secondary);
+}
+
+.booking-lookup-field input {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: rgba(245, 245, 247, 0.95);
+  padding: 0.95rem 1.05rem;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--bl-ink);
+  outline: none;
+  transition: background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.booking-lookup-field input::placeholder {
+  color: #a1a1a6;
+  font-weight: 450;
+}
+
+.booking-lookup-field input.is-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.booking-lookup-field input:hover {
+  background: #fff;
+}
+
+.booking-lookup-field input:focus {
+  background: #fff;
+  border-color: rgba(0, 113, 227, 0.35);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12);
+}
+
+.booking-lookup-submit {
+  margin-top: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bl-ink);
+  color: #fff;
+  padding: 1rem 1.25rem;
+  font-size: 0.9875rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.18s ease, opacity 0.18s ease;
+}
+
+.booking-lookup-submit .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.booking-lookup-submit:hover:not(:disabled) {
+  background: #000;
+  transform: translateY(-1px);
+}
+
+.booking-lookup-submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.booking-lookup-submit:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.booking-lookup-note {
+  margin: 1.35rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  color: var(--bl-secondary);
+}
+
+.booking-lookup-wallet {
+  display: inline-block;
+  margin-top: 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--bl-accent);
+  transition: opacity 0.15s ease;
+}
+
+.booking-lookup-wallet:hover {
+  opacity: 0.8;
+}
+
+@media (max-width: 480px) {
+  .booking-lookup-card {
+    padding: 1.65rem 1.25rem 1.45rem;
+    border-radius: 24px;
+  }
+
+  .booking-lookup-title {
+    font-size: 1.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .booking-lookup-orb,
+  .booking-lookup-card {
+    animation: none;
+  }
+}

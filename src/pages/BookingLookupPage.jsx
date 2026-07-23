@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { lookupGuestBooking, openBookingInWallet } from '../lib/bookingLookup.js';
+import '../styles/booking-lookup.css';
 
 export default function BookingLookupPage() {
   const navigate = useNavigate();
@@ -31,84 +32,88 @@ export default function BookingLookupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      <header className="px-6 py-5 border-b border-black/[0.05] flex items-center justify-between max-w-3xl mx-auto w-full">
-        <Link to="/" className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors">
-          <span className="material-symbols-outlined">arrow_back</span>
-          <span className="text-sm font-semibold">Αρχική</span>
+    <div className="booking-lookup-shell">
+      <div className="booking-lookup-orb booking-lookup-orb--a" aria-hidden />
+      <div className="booking-lookup-orb booking-lookup-orb--b" aria-hidden />
+
+      <header className="booking-lookup-top">
+        <Link to="/" className="booking-lookup-back">
+          <span className="material-symbols-outlined" aria-hidden>
+            arrow_back
+          </span>
+          Αρχική
         </Link>
         <OfficeBrandMark className="h-8" variant="light" />
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md bg-white rounded-[32px] border border-black/[0.05] shadow-sm p-8 md:p-10">
-          <div className="text-center mb-8">
-            <span className="material-symbols-outlined text-4xl text-primary mb-2">confirmation_number</span>
-            <h1 className="text-2xl font-bold text-gray-900">Εύρεση κράτησης</h1>
-            <p className="text-sm text-gray-500 mt-2">
-              Εισάγετε το email της κράτησης και τον κωδικό αναφοράς από το email επιβεβαίωσης
-              (π.χ. <span className="font-mono text-xs">BK-A1B2C3D4</span>).
-            </p>
+      <main className="booking-lookup-main">
+        <section className="booking-lookup-card" aria-labelledby="booking-lookup-title">
+          <div className="booking-lookup-icon" aria-hidden>
+            <span className="material-symbols-outlined">confirmation_number</span>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Email
-              </label>
+          <h1 id="booking-lookup-title" className="booking-lookup-title">
+            Εύρεση κράτησης
+          </h1>
+          <p className="booking-lookup-lead">
+            Βάλτε το email και τον κωδικό από το μήνυμα επιβεβαίωσης για να δείτε το εισιτήριό σας.
+          </p>
+
+          <form onSubmit={handleSubmit} className="booking-lookup-form">
+            <label className="booking-lookup-field" htmlFor="email">
+              <span>Email</span>
               <input
                 id="email"
                 name="email"
                 type="email"
                 required
                 autoComplete="email"
-                className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
                 placeholder="you@example.com"
               />
-            </div>
-            <div>
-              <label htmlFor="reference" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Κωδικός αναφοράς
-              </label>
+            </label>
+
+            <label className="booking-lookup-field" htmlFor="reference">
+              <span>Κωδικός αναφοράς</span>
               <input
                 id="reference"
                 name="reference"
                 type="text"
                 required
                 autoComplete="off"
-                className="w-full px-4 py-3 rounded-2xl border border-gray-200 font-mono uppercase focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+                spellCheck={false}
+                className="is-mono"
                 placeholder="BK-XXXXXXXX"
               />
-            </div>
+            </label>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 rounded-full bg-primary text-white font-bold hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
-            >
+            <button type="submit" disabled={loading} className="booking-lookup-submit">
               {loading ? (
                 <>
-                  <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                  <span className="material-symbols-outlined animate-spin" aria-hidden>
+                    progress_activity
+                  </span>
                   Αναζήτηση…
                 </>
               ) : (
                 <>
                   Εμφάνιση εισιτηρίου
-                  <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    arrow_forward
+                  </span>
                 </>
               )}
             </button>
           </form>
 
-          <p className="text-xs text-center text-gray-500 mt-6">
-            Για λόγους απορρήτου δεν εμφανίζονται όλες οι κρατήσεις του email — απαιτείται και ο κωδικός.
+          <p className="booking-lookup-note">
+            Για λόγους απορρήτου χρειάζονται και τα δύο στοιχεία — δεν εμφανίζονται όλες οι κρατήσεις του
+            email.
           </p>
-          <p className="text-xs text-center mt-3">
-            <Link to="/login" className="text-primary font-semibold hover:underline">
-              Σύνδεση στο My Wallet
-            </Link>
-          </p>
-        </div>
+
+          <Link to="/login" className="booking-lookup-wallet">
+            Σύνδεση στο My Wallet
+          </Link>
+        </section>
       </main>
     </div>
   );
