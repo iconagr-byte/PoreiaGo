@@ -11,6 +11,7 @@ import {
   flushOfflineScanQueue,
 } from '../services/ticketingApi.js';
 import { SCAN_RESULT } from '../lib/ticketing/constants.js';
+import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
 
 export default function DriverScan() {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ export default function DriverScan() {
     ensureDriverSession();
     flushOfflineScanQueue().catch(() => {});
     refreshManifest();
-    const id = setInterval(refreshManifest, 3000);
+    const id = setInterval(refreshManifest, LIVE_REFRESH_MS);
     return () => clearInterval(id);
   }, [navigate, refreshManifest]);
 

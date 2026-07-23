@@ -38,7 +38,7 @@ class PlatformSettings(BaseSettings):
     geofence_radius_m: int = 50
     corridor_buffer_m: int = 75
     gforce_spike_threshold_g: float = 0.45
-    eta_refresh_seconds: int = 300
+    eta_refresh_seconds: int = 5
     driver_stale_seconds: int = 90
     gps_retention_days: int = 90
     driver_gps_max_per_minute: int = 60

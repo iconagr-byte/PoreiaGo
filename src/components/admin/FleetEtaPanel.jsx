@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchFleetEtas } from '../../services/telemetryApi.js';
 import FleetPassengerTrackLinkButton from './FleetPassengerTrackLinkButton.jsx';
+import { LIVE_REFRESH_MS, LIVE_REFRESH_SEC } from '../../lib/liveRefresh.js';
 
 const TRAFFIC_TONES = {
   light: 'bg-emerald-100 text-emerald-800',
@@ -86,8 +87,6 @@ export default function FleetEtaPanel({ activeTripCount = 0 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const pollMs = useMemo(() => (data?.push_seconds || 5) * 1000, [data?.push_seconds]);
-
   useEffect(() => {
     let cancelled = false;
     const load = () => {
@@ -106,12 +105,12 @@ export default function FleetEtaPanel({ activeTripCount = 0 }) {
         });
     };
     load();
-    const id = setInterval(load, pollMs);
+    const id = setInterval(load, LIVE_REFRESH_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [pollMs, activeTripCount]);
+  }, [activeTripCount]);
 
   const items = data?.items || [];
 
@@ -124,7 +123,7 @@ export default function FleetEtaPanel({ activeTripCount = 0 }) {
             Live ETA
           </h3>
           <p className="text-[10px] text-gray-500">
-            refresh {data?.push_seconds || 5}s
+            refresh {LIVE_REFRESH_SEC}s
             {data?.google_maps_configured ? ' · Google Traffic' : ' · mock ETA'}
           </p>
         </div>

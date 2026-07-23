@@ -34,14 +34,6 @@ const SECTIONS = [
       { key: 'fuel_price_eur_per_liter', label: 'Τιμή καυσίμου (€/L)', min: 0.5, max: 5, step: 0.01 },
     ],
   },
-  {
-    title: 'ETA & Επιβάτες',
-    icon: 'schedule',
-    fields: [
-      { key: 'eta_refresh_seconds', label: 'Ανανέωση traffic API (δευτ.)', min: 60, max: 900, step: 30 },
-      { key: 'eta_ws_push_seconds', label: 'WebSocket push ETA (δευτ.)', min: 5, max: 120, step: 5 },
-    ],
-  },
 ];
 
 export default function TelemetrySettingsPanel() {
@@ -119,6 +111,15 @@ export default function TelemetrySettingsPanel() {
       </div>
 
       <form onSubmit={onSave} className="p-6 space-y-8">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-start gap-3">
+          <span className="material-symbols-outlined text-slate-500 text-[22px]">lock</span>
+          <div>
+            <div className="text-sm font-bold text-slate-900">Live refresh κλειδωμένο στα 5 δευτ.</div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              ETA, χάρτης στόλου και live panels ανανεώνονται κάθε 5 δευτερόλεπτα σε όλη την πλατφόρμα.
+            </p>
+          </div>
+        </div>
         {SECTIONS.map((section) => (
           <div key={section.title}>
             <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">

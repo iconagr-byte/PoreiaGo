@@ -3,6 +3,7 @@
  */
 import { useEffect, useState } from 'react';
 import { fetchDriverChatThreads, fetchDriverChatUnread } from '../../services/platformApi.js';
+import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
 function formatWhen(iso) {
   if (!iso) return '';
@@ -33,7 +34,7 @@ export default function DriverChatDashboardWidget({ onOpenInbox, onOpenLiveMap }
       }
     };
     load();
-    const id = window.setInterval(load, 8000);
+    const id = window.setInterval(load, LIVE_REFRESH_MS);
     return () => {
       cancelled = true;
       window.clearInterval(id);

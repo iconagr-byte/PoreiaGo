@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchDriverTripTelemetry } from '../../services/telemetryApi.js';
+import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
 export default function TelemetryStrip() {
   const [stats, setStats] = useState(null);
@@ -7,7 +8,7 @@ export default function TelemetryStrip() {
   useEffect(() => {
     const load = () => fetchDriverTripTelemetry().then(setStats);
     load();
-    const id = setInterval(load, 8000);
+    const id = setInterval(load, LIVE_REFRESH_MS);
     return () => clearInterval(id);
   }, []);
 

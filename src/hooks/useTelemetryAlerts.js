@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { fetchTelemetryAlerts } from '../services/telemetryApi.js';
 import { buildWsUrl } from '../lib/wsUrl.js';
+import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
 
 const DEMO_TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -96,7 +97,7 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
     };
 
     connect();
-    const poll = setInterval(load, 30000);
+    const poll = setInterval(load, LIVE_REFRESH_MS);
 
     return () => {
       closed = true;
