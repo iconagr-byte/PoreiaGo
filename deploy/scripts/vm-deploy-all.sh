@@ -12,6 +12,16 @@ APP_ORIGIN="${APP_ORIGIN:-https://www.poreiago.com}"
 COMPOSE="docker compose --env-file $ENV_FILE -f $DEPLOY_DIR/docker-compose.prod.yml"
 API_IMAGE="${API_IMAGE:-poreiago-api:latest}"
 
+# Serialize deploys on the VM (GitHub cancel-in-progress still leaves racing SSH sessions).
+DEPLOY_LOCK="${DEPLOY_LOCK:-/tmp/poreiago-vm-deploy.lock}"
+exec 200>"$DEPLOY_LOCK"
+echo "==> Waiting for deploy lock ($DEPLOY_LOCK)…"
+if ! flock -w 2400 200; then
+  echo "ERROR: timed out waiting for another deploy to finish ($DEPLOY_LOCK)"
+  exit 1
+fi
+echo "==> Deploy lock acquired"
+
 echo "=============================================="
 echo " PoreiaGo — full VM deploy"
 echo " Repo: $REPO_ROOT"
