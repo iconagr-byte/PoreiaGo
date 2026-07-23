@@ -111,3 +111,24 @@ export function ensureCustomerForPassenger({ name, email, phone }) {
   if (!email) return null;
   return upsertCustomer({ name, email, phone });
 }
+
+/**
+ * Pull unique passengers from bookings into the office πελατολόγιο.
+ * Returns how many *new* records were created.
+ */
+export function syncCustomersFromBookings(bookings = []) {
+  let created = 0;
+  for (const booking of bookings || []) {
+    const email = String(booking.email || booking.customerEmail || '').trim();
+    if (!email || !email.includes('@')) continue;
+    const existed = Boolean(getCustomerByEmail(email));
+    const row = upsertCustomer({
+      name: booking.customerName || booking.passenger_name || booking.passengerName || '',
+      email,
+      phone: booking.phone || booking.customerPhone || '',
+    });
+    if (row && !existed) created += 1;
+  }
+  return created;
+}
+

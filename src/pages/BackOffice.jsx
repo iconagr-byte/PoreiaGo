@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { mockFleet } from '../data/mockData';
 import { fetchAllLostItems, updateLostItemStatus } from '../services/lostItemsApi.js';
-import { loadAllCustomers, getCustomerByEmail } from '../lib/customers/customerStore.js';
+import { loadAllCustomers, getCustomerByEmail, syncCustomersFromBookings } from '../lib/customers/customerStore.js';
 import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
@@ -23,6 +23,8 @@ import TelemetryAlertsPanel from '../components/admin/TelemetryAlertsPanel.jsx';
 import ImpersonationBanner from '../components/admin/ImpersonationBanner.jsx';
 import SettingsHub from '../components/admin/SettingsHub.jsx';
 import CustomerBookingCard from '../components/admin/CustomerBookingCard.jsx';
+import AddCustomerModal from '../components/admin/AddCustomerModal.jsx';
+import AdminMobileNavDrawer from '../components/admin/AdminMobileNavDrawer.jsx';
 import { isPaid, isConfirmed, canRecordCashPayment } from '../lib/bookingDisplay.js';
 import { recordCashPayment } from '../lib/ticketing/bookingStore.js';
 import { DEFAULT_PAYMENT_SECURITY } from '../lib/payments/paymentSecurity.js';
@@ -110,6 +112,10 @@ export default function BackOffice() {
   const [chatFocusDriverId, setChatFocusDriverId] = useState(
     () => location.state?.driverId || null,
   );
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customers, setCustomers] = useState(() => loadAllCustomers());
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
@@ -197,6 +203,29 @@ export default function BackOffice() {
     };
   }, [activeTab, location.key]);
 
+  // Πελατολόγιο: hydrate from SaaS/local bookings + refresh list.
+  useEffect(() => {
+    if (activeTab !== 'customers') return;
+    let cancelled = false;
+    loadMergedBookings()
+      .then((merged) => {
+        if (cancelled) return;
+        setBookings(merged);
+        syncCustomersFromBookings(merged);
+        setCustomers(loadAllCustomers());
+      })
+      .catch(() => {
+        if (!cancelled) setCustomers(loadAllCustomers());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, location.key]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [activeTab]);
+
   useEffect(() => {
     if (activeTab !== 'lost_found') return;
     let cancelled = false;
@@ -219,7 +248,6 @@ export default function BackOffice() {
     };
   }, [activeTab, location.key]);
 
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [cashPaymentBooking, setCashPaymentBooking] = useState(null);
   const [cashPaymentSaving, setCashPaymentSaving] = useState(false);
@@ -770,7 +798,9 @@ export default function BackOffice() {
   const renderCustomers = () => {
     if (selectedCustomer) {
       const customer =
-        loadAllCustomers().find((c) => c.id === selectedCustomer.id) || selectedCustomer;
+        customers.find((c) => c.id === selectedCustomer.id) ||
+        loadAllCustomers().find((c) => c.id === selectedCustomer.id) ||
+        selectedCustomer;
       const customerName = customer.name || 'Άγνωστος πελάτης';
       const customerBookings = bookings.filter(
         (b) =>
@@ -885,6 +915,14 @@ export default function BackOffice() {
           </p>
           <p className="text-xs text-on-surface-variant mt-2">Κλικ σε γραμμή για προφίλ πελάτη.</p>
         </div>
+        <button
+          type="button"
+          onClick={() => setAddCustomerOpen(true)}
+          className="px-5 py-2.5 bg-primary text-white font-label-md text-label-md rounded-full hover:scale-105 transition-transform flex items-center gap-2 shadow-md shrink-0"
+        >
+          <span className="material-symbols-outlined text-[18px]">person_add</span>
+          Νέος πελάτης
+        </button>
       </div>
 
       <div className="bg-surface-container-lowest rounded-[32px] shadow-level-2 card-inner-border flex flex-col">
@@ -900,11 +938,32 @@ export default function BackOffice() {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container-high">
-              {loadAllCustomers().map(customer => (
+              {customers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <span className="material-symbols-outlined text-4xl text-gray-300">group_off</span>
+                      <p className="font-bold text-gray-700">Δεν υπάρχουν πελάτες ακόμα</p>
+                      <p className="text-sm text-gray-500 max-w-sm">
+                        Προσθέστε πελάτη χειροκίνητα ή θα εμφανιστούν αυτόματα από κρατήσεις.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setAddCustomerOpen(true)}
+                        className="mt-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-bold inline-flex items-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">person_add</span>
+                        Νέος πελάτης
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                customers.map((customer) => (
                 <tr key={customer.id} onClick={() => setSelectedCustomer(customer)} className="hover:bg-surface-container-lowest transition-colors cursor-pointer group">
                   <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface font-bold flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
-                      {customer.name.substring(0, 2).toUpperCase()}
+                      {(customer.name || '?').substring(0, 2).toUpperCase()}
                     </div>
                     {customer.name}
                   </td>
@@ -930,7 +989,8 @@ export default function BackOffice() {
                     {customer.joinDate}
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1789,17 +1849,47 @@ export default function BackOffice() {
         />
       </aside>
 
+      <AdminMobileNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        activeTab={activeTab}
+        settingsSubTab={settingsSubTab}
+        onTabChange={setActiveTab}
+        onSettingsSubTabChange={setSettingsSubTab}
+        onEmailClick={goToEmailMailbox}
+        onNavigate={(path) => navigate(path)}
+      />
+
+      <AddCustomerModal
+        open={addCustomerOpen}
+        onClose={() => setAddCustomerOpen(false)}
+        onCreated={(row) => {
+          setCustomers(loadAllCustomers());
+          setSelectedCustomer(row);
+        }}
+      />
+
       <main className="flex-1 flex flex-col relative h-full overflow-hidden">
-        <header className="h-20 glass-overlay border-b border-black/[0.05] flex items-center justify-between px-margin-desktop shrink-0 z-10 sticky top-0">
-          <div className="flex items-center gap-4 w-96">
-            <TemplateSearch onUseTemplate={useEmailTemplate} />
+        <header className="h-20 glass-overlay border-b border-black/[0.05] flex items-center justify-between px-4 sm:px-margin-desktop shrink-0 z-10 sticky top-0 gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+            <button
+              type="button"
+              className="md:hidden w-11 h-11 rounded-full bg-white border border-black/[0.08] shadow-sm flex items-center justify-center shrink-0"
+              aria-label="Άνοιγμα μενού"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+            <div className="flex items-center gap-4 w-full max-w-sm min-w-0">
+              <TemplateSearch onUseTemplate={useEmailTemplate} />
+            </div>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 sm:gap-6 shrink-0">
             <button className="relative p-2 text-on-surface-variant hover:text-primary transition-colors">
               <span className="material-symbols-outlined">notifications</span>
               <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
             </button>
-            <div className="flex items-center gap-3 pl-4 border-l border-black/[0.05]">
+            <div className="flex items-center gap-3 pl-3 sm:pl-4 border-l border-black/[0.05]">
               <div className="hidden sm:block">
                 <p className="font-label-md text-label-md text-on-surface cursor-pointer hover:text-primary" onClick={() => {
                   localStorage.removeItem('userRole');
