@@ -129,6 +129,13 @@ async def _board_booking(
         return scan_response_failure("NOT_FOUND", "Δεν βρέθηκε κράτηση.")
     boarded = row_to_booking(updated)
     _notify_passenger_boarded(boarded, trip_id)
+    # Push check-in to office platform (SaaS bookings + live fleet) immediately.
+    try:
+        from travel_platform.driver.office_boarding_notify import schedule_office_boarding_notify
+
+        schedule_office_boarding_notify(boarded, trip_id)
+    except Exception:
+        pass
     return scan_response_success(boarded)
 
 

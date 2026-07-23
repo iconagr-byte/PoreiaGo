@@ -34,21 +34,35 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
   useEffect(() => {
     if (!open || !vehicle) return undefined;
     let cancelled = false;
-    setLoading(true);
-    setError('');
-    setData(null);
-    loadVehicleTripHistory(vehicle)
-      .then((row) => {
-        if (!cancelled) setData(row);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err?.message || 'Αποτυχία φόρτωσης ιστορικού');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const load = ({ silent = false } = {}) => {
+      if (!silent) {
+        setLoading(true);
+        setError('');
+        setData(null);
+      }
+      return loadVehicleTripHistory(vehicle)
+        .then((row) => {
+          if (!cancelled) setData(row);
+        })
+        .catch((err) => {
+          if (!cancelled && !silent) setError(err?.message || 'Αποτυχία φόρτωσης ιστορικού');
+        })
+        .finally(() => {
+          if (!cancelled && !silent) setLoading(false);
+        });
+    };
+    load();
+    const pollTimer = window.setInterval(() => load({ silent: true }), 4000);
+    const onBoarded = (ev) => {
+      const tripId = ev?.detail?.tripId;
+      if (tripId != null && String(tripId) !== String(vehicle.trip_id)) return;
+      load({ silent: true });
+    };
+    window.addEventListener('office-boarding-updated', onBoarded);
     return () => {
       cancelled = true;
+      window.clearInterval(pollTimer);
+      window.removeEventListener('office-boarding-updated', onBoarded);
     };
   }, [open, vehicle?.id, vehicle?.trip_id, vehicle?.driver_id]);
 

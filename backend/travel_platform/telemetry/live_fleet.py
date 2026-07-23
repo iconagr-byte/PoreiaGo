@@ -88,6 +88,12 @@ class LiveFleetService:
             merged["bus_plate"] = plate
         if raw.get("heading_deg") is not None:
             merged["heading_deg"] = raw.get("heading_deg")
+        boarding = raw.get("boarding_snapshot") or raw.get("boarding")
+        if isinstance(boarding, dict):
+            merged["boarding"] = boarding
+        sensors = raw.get("device_sensors") or raw.get("sensors")
+        if isinstance(sensors, dict):
+            merged["sensors"] = sensors
 
         self._vehicles[vid] = merged
         # Keep code index in sync
