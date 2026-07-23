@@ -133,13 +133,24 @@ export default function AdminLoginPage() {
               <input
                 id="password"
                 name="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 defaultValue=""
-                className="w-full pl-12 pr-4 py-4 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container text-body-md font-body-md transition-shadow"
+                className="w-full pl-12 pr-12 py-4 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container text-body-md font-body-md transition-shadow"
                 placeholder="••••••••"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center text-outline hover:bg-black/[0.04] hover:text-on-surface transition-colors"
+                aria-label={showPassword ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
+                aria-pressed={showPassword}
+              >
+                <span className="material-symbols-outlined text-[22px]">
+                  {showPassword ? 'visibility_off' : 'visibility'}
+                </span>
+              </button>
             </div>
           </div>
 
