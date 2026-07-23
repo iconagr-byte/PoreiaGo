@@ -28,8 +28,17 @@ async def get_boarding_manifest(trip_id: int) -> dict:
         for p in boarded
     ]
 
+    trip_title = ""
+    try:
+        from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
+
+        trip_title = await resolve_trip_title(trip_id)
+    except Exception:
+        trip_title = f"Εκδρομή #{trip_id}"
+
     return {
         "trip_id": trip_id,
+        "trip_title": trip_title,
         "capacity": capacity,
         "booked_count": len(passengers),
         "boarded_count": len(boarded),

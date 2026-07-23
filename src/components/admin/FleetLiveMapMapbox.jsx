@@ -17,6 +17,7 @@ import {
   formatUpdatedAgo,
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
+import { formatFleetBusPillLabel, resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
 
 function HeatmapDots({ points = [], visible = true }) {
   if (!visible || !points.length) return null;
@@ -41,7 +42,8 @@ function HeatmapDots({ points = [], visible = true }) {
 function BusMarker({ vehicle, onVehicleHistory }) {
   const [open, setOpen] = useState(false);
   const img = resolveFleetMarkerImage(vehicle);
-  const shortName = String(vehicle.driver_name || 'Οδηγός').split(/\s+/)[0];
+  const pillLabel = formatFleetBusPillLabel(vehicle);
+  const tripTitle = resolveVehicleTripTitle(vehicle);
   const openHistory = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -57,7 +59,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
       >
         <div className="fleet-apple-bus-pin">
           <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
-            {shortName} · {Math.round(vehicle.speed || 0)} km/h
+            {pillLabel}
           </div>
           <div className="fleet-apple-bus-pin__ring">
             <div className="fleet-apple-bus-pin__avatar">
@@ -86,7 +88,10 @@ function BusMarker({ vehicle, onVehicleHistory }) {
               <img src={img} alt="" className="h-12 w-12 rounded-[14px] object-cover" />
               <div>
                 <div className="fleet-apple-popup__title">{vehicle.driver_name}</div>
-                <div className="fleet-apple-popup__meta">{vehicle.bus_plate}</div>
+                <div className="fleet-apple-popup__meta">
+                  {vehicle.bus_plate}
+                  {tripTitle ? ` · ${tripTitle}` : ''}
+                </div>
               </div>
             </div>
             <div>Ταχύτητα: {Math.round(vehicle.speed || 0)} km/h</div>

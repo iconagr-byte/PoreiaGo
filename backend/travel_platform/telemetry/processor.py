@@ -41,6 +41,13 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
         meta["heading_deg"] = raw.get("heading_deg")
     if raw.get("driver_id"):
         meta["driver_id"] = raw.get("driver_id")
+    preferred_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
+    if preferred_title:
+        meta["trip_title"] = str(preferred_title).strip()
+    elif update.trip_id is not None and not meta.get("trip_title"):
+        from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
+
+        meta["trip_title"] = await resolve_trip_title(update.trip_id)
     if meta:
         _live._vehicles[str(vehicle_id)] = {**_live._vehicles.get(str(vehicle_id), {}), **meta}
 
