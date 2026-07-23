@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  DND_NAV_ID,
   loadNavLayout,
   navItemsFromIds,
   reorderNav,
@@ -14,7 +13,7 @@ const SECTIONS = [
   { id: 'main', label: 'Λειτουργίες' },
   { id: 'fleet_ops', label: 'Λειτουργίες Στόλου' },
   { id: 'platform', label: 'Πλατφόρμα SaaS', superOnly: true },
-  { id: 'settings', label: 'Ρυθμίσεις', collapsible: true },
+  { id: 'settings', label: 'Ρυθμίσεις' },
 ];
 
 export default function SortableSidebarNav({
@@ -27,16 +26,11 @@ export default function SortableSidebarNav({
 }) {
   const superAdmin = isSaasSuperAdmin();
   const [layout, setLayout] = useState(() => loadNavLayout(superAdmin));
-  const [settingsOpen, setSettingsOpen] = useState(() => activeTab === 'settings');
   const [dragState, setDragState] = useState({ section: null, overIndex: null, draggingId: null });
 
   useEffect(() => {
     setLayout(loadNavLayout(superAdmin));
   }, [superAdmin]);
-
-  useEffect(() => {
-    if (activeTab === 'settings') setSettingsOpen(true);
-  }, [activeTab, settingsSubTab]);
 
   const sections = useMemo(() => {
     const visible = SECTIONS.filter((s) => !s.superOnly || superAdmin);
@@ -75,7 +69,6 @@ export default function SortableSidebarNav({
   };
 
   const openSettings = (subTab) => {
-    setSettingsOpen(true);
     onSettingsSubTabChange?.(sanitizeSettingsSubTab(subTab, superAdmin));
     onTabChange?.('settings');
   };
@@ -115,10 +108,6 @@ export default function SortableSidebarNav({
 
   const navAccent = (item) => item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
 
-  const settingsHasActive =
-    activeTab === 'settings' &&
-    layout.settings?.some((id) => id === `settings_${settingsSubTab}`);
-
   const renderRow = (item, sectionId, { nested = false } = {}) => {
     const dragging = dragState.draggingId === item.id;
     return (
@@ -138,6 +127,7 @@ export default function SortableSidebarNav({
           onClick={() => handleClick(item)}
           className={buttonClass(item)}
           data-accent={navAccent(item)}
+          title={item.label}
         >
           <span className="admin-nav-icon">
             <span
@@ -157,7 +147,6 @@ export default function SortableSidebarNav({
     const isSettingsSection = section.id === 'settings';
     const isFleetOpsSection = section.id === 'fleet_ops';
     const isPlatformSection = section.id === 'platform';
-    const collapsed = isSettingsSection && !settingsOpen;
 
     return (
       <div
@@ -166,88 +155,59 @@ export default function SortableSidebarNav({
           isSettingsSection ? 'admin-nav-section-settings' : ''
         } ${isFleetOpsSection ? 'admin-nav-section-fleet' : ''}`}
       >
-        {isSettingsSection ? (
-          <button
-            type="button"
-            className={`admin-nav-section-toggle ${settingsHasActive ? 'admin-nav-section-toggle-active' : ''}`}
-            onClick={() => {
-              if (!settingsOpen) {
-                openSettings(settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB);
-              } else {
-                setSettingsOpen(false);
-              }
-            }}
-            aria-expanded={settingsOpen}
-          >
-            <span className="admin-nav-section-toggle-icon">
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-                settings
-              </span>
-            </span>
-            <span className="admin-nav-section-toggle-label">Ρυθμίσεις</span>
-            <span
-              className={`material-symbols-outlined admin-nav-chevron ${settingsOpen ? 'admin-nav-chevron-open' : ''}`}
-            >
-              expand_more
-            </span>
-          </button>
-        ) : (
-          <p
-            className={`admin-nav-section-label ${
-              isPlatformSection ? 'admin-nav-section-label-platform' : ''
-            }`}
-          >
-            {section.label}
-          </p>
-        )}
+        <p
+          className={`admin-nav-section-label ${
+            isPlatformSection ? 'admin-nav-section-label-platform' : ''
+          } ${isSettingsSection ? 'admin-nav-section-label-settings' : ''}`}
+        >
+          {section.label}
+        </p>
 
-        {!collapsed && (
-          <ul className="admin-nav-list">
-            {section.items.map((item, idx) => (
-              <li key={item.id} className="admin-nav-item">
-                {dragState.section === section.id && dragState.overIndex === idx && (
-                  <div className="admin-nav-drop-line" aria-hidden />
-                )}
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    setDragState((prev) => ({ ...prev, section: section.id, overIndex: idx }));
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    handleDrop(section.id, idx);
-                  }}
-                >
-                  {renderRow(item, section.id, { nested: isSettingsSection || isFleetOpsSection })}
-                </div>
-              </li>
-            ))}
-            <li
-              className={`admin-nav-item ${
-                dragState.section === section.id && dragState.overIndex === section.items.length
-                  ? 'admin-nav-drop-end-active'
-                  : ''
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragState((prev) => ({
-                  ...prev,
-                  section: section.id,
-                  overIndex: section.items.length,
-                }));
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDrop(section.id, section.items.length);
-              }}
-            >
-              {dragState.section === section.id && dragState.overIndex === section.items.length && (
+        <ul className="admin-nav-list">
+          {section.items.map((item, idx) => (
+            <li key={item.id} className="admin-nav-item">
+              {dragState.section === section.id && dragState.overIndex === idx && (
                 <div className="admin-nav-drop-line" aria-hidden />
               )}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setDragState((prev) => ({ ...prev, section: section.id, overIndex: idx }));
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleDrop(section.id, idx);
+                }}
+              >
+                {renderRow(item, section.id, { nested: isSettingsSection || isFleetOpsSection })}
+              </div>
             </li>
-          </ul>
-        )}
+          ))}
+          <li
+            className={`admin-nav-item ${
+              dragState.section === section.id && dragState.overIndex === section.items.length
+                ? 'admin-nav-drop-end-active'
+                : ''
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragState((prev) => ({
+                ...prev,
+                section: section.id,
+                overIndex: section.items.length,
+              }));
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleDrop(section.id, section.items.length);
+            }}
+          >
+            {dragState.section === section.id && dragState.overIndex === section.items.length && (
+              <div className="admin-nav-drop-line" aria-hidden />
+            )}
+          </li>
+        </ul>
       </div>
     );
   };
@@ -261,7 +221,7 @@ export default function SortableSidebarNav({
         }
       }}
     >
-      <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 space-y-4">
+      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-2.5 py-2 space-y-3 admin-nav-scroll">
         <p className="admin-nav-hint">Σύρετε ⋮⋮ μέσα σε κάθε ενότητα</p>
         {sections.map((section) => renderSection(section))}
       </div>

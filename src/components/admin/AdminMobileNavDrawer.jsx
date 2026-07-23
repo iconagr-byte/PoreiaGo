@@ -44,7 +44,7 @@ export default function AdminMobileNavDrawer({
         aria-label="Κλείσιμο μενού"
         onClick={onClose}
       />
-      <aside className="absolute inset-y-0 left-0 w-[min(100%,20rem)] bg-surface-container-lowest shadow-2xl border-r border-black/[0.06] flex flex-col animate-in slide-in-from-left duration-200">
+      <aside className="absolute inset-y-0 left-0 w-[min(100%,22rem)] bg-surface-container-lowest shadow-2xl border-r border-black/[0.06] flex flex-col animate-in slide-in-from-left duration-200">
         <div className="flex items-center justify-between gap-3 p-4 border-b border-black/[0.05]">
           <OfficeBrandMark className="h-8" variant="light" asLink={false} fallbackLabel="Γραφείο" />
           <button

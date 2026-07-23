@@ -28,7 +28,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--color-on-surface-variant) 72%, transparent);
-  padding: 0 0.5rem 0.5rem;
+  padding: 0 0.5rem 0.35rem;
   margin: 0;
 }
 
@@ -36,65 +36,25 @@
   color: color-mix(in srgb, #4f46e5 75%, var(--color-on-surface-variant));
 }
 
-.admin-nav-section-toggle {
-  width: 100%;
-  min-height: 2.625rem;
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0 0.75rem;
-  margin-bottom: 0.375rem;
-  border: 1px solid transparent;
-  border-radius: 0.625rem;
-  background: transparent;
-  color: var(--color-on-surface-variant);
-  font-size: 0.875rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+.admin-nav-section-label-settings {
+  color: color-mix(in srgb, var(--color-primary) 55%, var(--color-on-surface-variant));
 }
 
-.admin-nav-section-toggle:hover {
-  background: var(--color-surface-container-low);
-  color: var(--color-primary);
+.admin-nav-scroll {
+  scrollbar-gutter: stable;
 }
 
-.admin-nav-section-toggle-active {
-  background: var(--color-surface-container-low);
-  color: var(--color-primary);
-  border-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
+.admin-nav-scroll::-webkit-scrollbar {
+  width: 6px;
 }
 
-.admin-nav-section-toggle-icon {
-  width: 1.375rem;
-  height: 1.375rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.admin-nav-section-toggle-icon .material-symbols-outlined {
-  font-size: 1.25rem;
-}
-
-.admin-nav-section-toggle-label {
-  flex: 1;
-  text-align: left;
-}
-
-.admin-nav-chevron {
-  font-size: 1.125rem;
-  transition: transform 0.2s ease;
-  color: color-mix(in srgb, var(--color-outline) 90%, transparent);
-}
-
-.admin-nav-chevron-open {
-  transform: rotate(180deg);
+.admin-nav-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-outline) 35%, transparent);
+  border-radius: 999px;
 }
 
 .admin-nav-row-nested {
-  padding-left: 0.375rem;
+  padding-left: 0.25rem;
 }
 
 .admin-nav-hint {
@@ -125,7 +85,7 @@
   display: flex;
   align-items: center;
   gap: 0.125rem;
-  min-height: 2.625rem;
+  min-height: 2.25rem;
   border-radius: 0.625rem;
   transition: opacity 0.15s ease;
 }
@@ -138,8 +98,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.625rem;
-  height: 2.25rem;
+  width: 1.375rem;
+  height: 2rem;
   flex-shrink: 0;
   color: color-mix(in srgb, var(--color-outline) 85%, transparent);
   cursor: grab;
@@ -165,18 +125,18 @@
 .admin-nav-btn {
   flex: 1;
   min-width: 0;
-  min-height: 2.625rem;
+  min-height: 2.25rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0 0.75rem 0 0.5rem;
+  gap: 0.5rem;
+  padding: 0.2rem 0.55rem 0.2rem 0.35rem;
   border: 1px solid transparent;
   border-radius: 0.625rem;
   background: transparent;
   color: var(--color-on-surface-variant);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
   text-align: left;
   cursor: pointer;
   transition:
@@ -208,9 +168,9 @@
 .admin-nav-label {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-nav-btn-active {
@@ -272,6 +232,18 @@
   color: #0f766e;
   border-color: color-mix(in srgb, #14b8a6 18%, transparent);
 }
+.admin-nav-btn[data-accent='orange']:hover,
+.admin-nav-btn-active[data-accent='orange'] {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: color-mix(in srgb, #f97316 18%, transparent);
+}
+.admin-nav-btn[data-accent='slate']:hover,
+.admin-nav-btn-active[data-accent='slate'] {
+  background: #f8fafc;
+  color: #334155;
+  border-color: color-mix(in srgb, #64748b 18%, transparent);
+}
 
 .admin-nav-btn[data-accent='indigo'] .admin-nav-icon { color: #6366f1; }
 .admin-nav-btn[data-accent='emerald'] .admin-nav-icon { color: #10b981; }
@@ -282,6 +254,8 @@
 .admin-nav-btn[data-accent='amber'] .admin-nav-icon { color: #f59e0b; }
 .admin-nav-btn[data-accent='blue'] .admin-nav-icon { color: #3b82f6; }
 .admin-nav-btn[data-accent='teal'] .admin-nav-icon { color: #14b8a6; }
+.admin-nav-btn[data-accent='orange'] .admin-nav-icon { color: #f97316; }
+.admin-nav-btn[data-accent='slate'] .admin-nav-icon { color: #64748b; }
 
 .admin-nav-btn-platform {
   background: color-mix(in srgb, #4f46e5 8%, white) !important;

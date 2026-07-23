@@ -1855,8 +1855,8 @@ export default function BackOffice() {
   return (
     <FleetTelemetryProvider>
     <div className="bg-surface text-on-surface h-screen flex overflow-hidden relative">
-      <aside className="w-64 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0 relative z-20">
-        <div className="p-6">
+      <aside className="w-[17.5rem] xl:w-80 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0 relative z-20">
+        <div className="px-4 pt-4 pb-2">
           <button
             type="button"
             className="block text-left"
