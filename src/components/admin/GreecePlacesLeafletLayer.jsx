@@ -14,7 +14,7 @@ function placeIcon(place) {
   });
 }
 
-/** Ελληνικές πόλεις & περιφέρειες — πάντα ευανάγνωστες ετικέτες. */
+/** Ελληνικές πόλεις & περιφέρειες — χωρίς επικαλύψεις (collision + zoom bands). */
 export default function GreecePlacesLeafletLayer({ visible = true }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());

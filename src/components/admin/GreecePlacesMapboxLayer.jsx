@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Marker, useMap } from 'react-map-gl/mapbox';
 import { placesVisibleAtZoom } from '../../lib/maps/greecePlaces.js';
-import { applyGreekMapboxLabels } from '../../lib/maps/mapboxConfig.js';
+import {
+  applyGreekMapboxLabels,
+  setMapboxPlaceLabelsVisible,
+} from '../../lib/maps/mapboxConfig.js';
 
-/** Ελληνικές πόλεις & περιφέρειες + ελληνικά ονόματα στο basemap. */
+/** Ελληνικές πόλεις & περιφέρειες — χωρίς διπλά basemap labels. */
 export default function GreecePlacesMapboxLayer({ visible = true }) {
   const map = useMap();
   const [zoom, setZoom] = useState(6);
@@ -13,7 +16,11 @@ export default function GreecePlacesMapboxLayer({ visible = true }) {
     if (!mapInstance?.on) return undefined;
 
     const syncZoom = () => setZoom(mapInstance.getZoom?.() ?? 6);
-    const onStyle = () => applyGreekMapboxLabels(mapInstance);
+    const onStyle = () => {
+      applyGreekMapboxLabels(mapInstance);
+      // Hide Mapbox place names while our overlay is on — avoids stacked Θεσσαλονίκη.
+      setMapboxPlaceLabelsVisible(mapInstance, !visible);
+    };
 
     syncZoom();
     mapInstance.on('zoom', syncZoom);
@@ -27,8 +34,9 @@ export default function GreecePlacesMapboxLayer({ visible = true }) {
       mapInstance.off('zoomend', syncZoom);
       mapInstance.off('load', onStyle);
       mapInstance.off('styledata', onStyle);
+      setMapboxPlaceLabelsVisible(mapInstance, true);
     };
-  }, [map]);
+  }, [map, visible]);
 
   const places = useMemo(() => (visible ? placesVisibleAtZoom(zoom) : []), [visible, zoom]);
 

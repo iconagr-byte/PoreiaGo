@@ -13,6 +13,9 @@ export function isMapboxEnabled() {
   return Boolean(MAPBOX_TOKEN);
 }
 
+const PLACE_LAYER_RE =
+  /(settlement|place-|state-label|country-label|continent-label|airport-label|poi-label|water-point-label|natural-point-label)/i;
+
 /**
  * Prefer Greek place names on Mapbox label layers when available.
  * Safe no-op if the style has no text-field layout.
@@ -39,6 +42,29 @@ export function applyGreekMapboxLabels(map) {
       ]);
     } catch {
       /* some layers reject expression updates */
+    }
+  }
+}
+
+/**
+ * Hide Mapbox settlement/place labels so our collision-aware Greek overlays stay clean.
+ */
+export function setMapboxPlaceLabelsVisible(map, visible) {
+  if (!map?.getStyle || !map?.setLayoutProperty) return;
+  let style;
+  try {
+    style = map.getStyle();
+  } catch {
+    return;
+  }
+  const visibility = visible ? 'visible' : 'none';
+  for (const layer of style?.layers || []) {
+    if (!layer?.id || layer.type !== 'symbol') continue;
+    if (!PLACE_LAYER_RE.test(layer.id)) continue;
+    try {
+      map.setLayoutProperty(layer.id, 'visibility', visibility);
+    } catch {
+      /* ignore */
     }
   }
 }
