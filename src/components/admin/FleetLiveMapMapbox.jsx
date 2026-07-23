@@ -41,6 +41,7 @@ function HeatmapDots({ points = [], visible = true }) {
 function BusMarker({ vehicle, onVehicleHistory }) {
   const [open, setOpen] = useState(false);
   const img = resolveFleetMarkerImage(vehicle);
+  const shortName = String(vehicle.driver_name || 'Οδηγός').split(/\s+/)[0];
   const openHistory = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -55,6 +56,9 @@ function BusMarker({ vehicle, onVehicleHistory }) {
         onDoubleClick={openHistory}
       >
         <div className="fleet-apple-bus-pin">
+          <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
+            {shortName} · {Math.round(vehicle.speed || 0)} km/h
+          </div>
           <div className="fleet-apple-bus-pin__ring">
             <div className="fleet-apple-bus-pin__avatar">
               <img src={img} alt="" />
@@ -65,9 +69,6 @@ function BusMarker({ vehicle, onVehicleHistory }) {
                 transform: `translateX(-50%) rotate(${vehicle.heading ?? 0}deg)`,
               }}
             />
-          </div>
-          <div className="fleet-apple-bus-pill">
-            {vehicle.driver_name} · {Math.round(vehicle.speed || 0)} km/h
           </div>
         </div>
       </button>

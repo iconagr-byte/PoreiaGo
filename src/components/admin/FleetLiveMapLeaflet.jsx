@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, ZoomControl, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../../styles/fleet-live-map.css';
@@ -30,19 +30,19 @@ function escapeAttr(value) {
 const busIcon = (vehicle) => {
   const heading = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
   const img = escapeAttr(resolveFleetMarkerImage(vehicle));
-  const name = escapeAttr(vehicle?.driver_name || 'Οδηγός');
+  const name = escapeAttr(String(vehicle?.driver_name || 'Οδηγός').split(/\s+/)[0]);
   const speed = Math.round(vehicle?.speed || 0);
   return L.divIcon({
     className: 'fleet-bus-marker-ws',
     html: `<div class="fleet-apple-bus-pin">
+      <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${name} · ${speed} km/h</div>
       <div class="fleet-apple-bus-pin__ring">
         <div class="fleet-apple-bus-pin__avatar"><img src="${img}" alt="" /></div>
         <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
-      <div class="fleet-apple-bus-pill">${name} · ${speed} km/h</div>
     </div>`,
     iconSize: [52, 72],
-    iconAnchor: [26, 26],
+    iconAnchor: [26, 40],
   });
 };
 
@@ -62,9 +62,6 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
         },
       }}
     >
-      <Tooltip className="fleet-apple-tooltip" direction="top" offset={[0, -34]} opacity={1} permanent={false}>
-        <strong>{v.driver_name}</strong> · {v.bus_plate}
-      </Tooltip>
       <Popup>
         <div className="fleet-apple-popup">
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
