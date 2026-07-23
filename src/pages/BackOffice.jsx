@@ -1817,12 +1817,17 @@ export default function BackOffice() {
               ? 'flex-1 overflow-auto p-3 md:p-4'
               : activeTab === 'dashboard'
                 ? 'flex-1 overflow-auto p-4 md:p-5 lg:p-6'
+                : activeTab === 'fleet_live_map'
+                  ? 'flex-1 overflow-auto p-2 sm:p-3 md:p-4'
                 : 'flex-1 overflow-auto p-margin-mobile md:p-margin-desktop'
           }
         >
           <div
             className={
-              activeTab === 'email' || activeTab === 'email_templates' || activeTab === 'dashboard'
+              activeTab === 'email' ||
+              activeTab === 'email_templates' ||
+              activeTab === 'dashboard' ||
+              activeTab === 'fleet_live_map'
                 ? 'w-full min-w-0'
                 : 'max-w-container-max mx-auto'
             }
