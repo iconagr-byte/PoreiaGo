@@ -56,7 +56,6 @@ import FleetCalendarPanel from '../components/admin/fleet/FleetCalendarPanel.jsx
 import FleetAvailabilityPanel from '../components/admin/fleet/FleetAvailabilityPanel.jsx';
 import FleetDocumentsPanel from '../components/admin/fleet/FleetDocumentsPanel.jsx';
 import FleetExpensesPanel from '../components/admin/fleet/FleetExpensesPanel.jsx';
-import FleetAssignmentsPanel from '../components/admin/fleet/FleetAssignmentsPanel.jsx';
 import FleetDigestPanel from '../components/admin/fleet/FleetDigestPanel.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
@@ -992,7 +991,6 @@ export default function BackOffice() {
                 ['fleet_availability', 'Διαθεσιμότητα', 'event_available'],
                 ['fleet_documents', 'Έγγραφα', 'folder_managed'],
                 ['fleet_expenses', 'Έξοδα', 'local_gas_station'],
-                ['fleet_assignments', 'Ανάθεση', 'link'],
                 ['fleet_digest', 'Ειδοποιήσεις', 'notifications_active'],
               ].map(([tab, label, icon]) => (
                 <button
@@ -1926,11 +1924,6 @@ export default function BackOffice() {
             {activeTab === 'fleet_expenses' && (
               <div className="pb-stack-lg">
                 <FleetExpensesPanel />
-              </div>
-            )}
-            {activeTab === 'fleet_assignments' && (
-              <div className="pb-stack-lg">
-                <FleetAssignmentsPanel />
               </div>
             )}
             {activeTab === 'fleet_digest' && (
