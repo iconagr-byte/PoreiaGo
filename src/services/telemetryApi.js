@@ -182,6 +182,9 @@ export const DEFAULT_TELEMETRY_SETTINGS = {
   eta_ws_push_seconds: 30,
   driver_stale_seconds: 90,
   google_maps_configured: false,
+  fleet_digest_enabled: true,
+  fleet_digest_email_enabled: true,
+  fleet_digest_sms_enabled: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'aerostride_telemetry_settings';
@@ -226,6 +229,18 @@ export async function updateTelemetrySettings(patch, authHeaders = adminAuthHead
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
     return merged;
   }
+}
+
+export async function sendFleetDigest({ days = 1 } = {}, authHeaders = adminAuthHeaders()) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/fleet-digest/send?days=${encodeURIComponent(days)}`,
+    { method: 'POST', headers: authHeaders },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία αποστολής digest');
+  }
+  return data;
 }
 
 export async function fetchTelemetryAlerts({ limit = 50 } = {}, authHeaders = adminAuthHeaders()) {

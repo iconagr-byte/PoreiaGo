@@ -173,6 +173,7 @@ class VehicleProfileResponse(BaseModel):
     public_image_url: str = ""
     public_summary: str = ""
     show_on_website: bool = True
+    documents: list[dict] = []
     service_status: str
     km_to_service: float
     days_to_legal_deadline: int | None = None
@@ -280,6 +281,34 @@ class DispatchBlockedRequest(BaseModel):
     plate: str = Field(..., min_length=2)
     reason: str = Field(..., min_length=3)
     trip_title: str | None = None
+
+
+class FleetExpenseCreate(BaseModel):
+    vehicle_id: str
+    expense_date: date | None = None
+    category: str = Field("fuel", pattern="^(fuel|tolls|insurance|other)$")
+    amount: float = Field(..., ge=0)
+    liters: float | None = Field(None, ge=0)
+    odometer: float | None = Field(None, ge=0)
+    note: str = ""
+
+
+class FleetExpenseResponse(BaseModel):
+    id: str
+    vehicle_id: str
+    tenant_id: str
+    expense_date: date
+    category: str
+    amount: float
+    liters: float | None = None
+    odometer: float | None = None
+    note: str = ""
+    created_at: datetime
+
+
+class FleetDocumentMeta(BaseModel):
+    kind: str = Field("registration", min_length=2)
+    expires_at: date | None = None
 
 
 class AbandonedCartUpsert(BaseModel):
