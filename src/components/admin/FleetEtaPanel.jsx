@@ -86,7 +86,7 @@ export default function FleetEtaPanel({ activeTripCount = 0 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const pollMs = useMemo(() => (data?.push_seconds || 30) * 1000, [data?.push_seconds]);
+  const pollMs = useMemo(() => (data?.push_seconds || 5) * 1000, [data?.push_seconds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,7 +124,7 @@ export default function FleetEtaPanel({ activeTripCount = 0 }) {
             Live ETA
           </h3>
           <p className="text-[10px] text-gray-500">
-            refresh {data?.push_seconds || 30}s
+            refresh {data?.push_seconds || 5}s
             {data?.google_maps_configured ? ' · Google Traffic' : ' · mock ETA'}
           </p>
         </div>
