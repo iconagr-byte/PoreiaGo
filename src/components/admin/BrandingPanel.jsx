@@ -9,6 +9,10 @@ import { DEFAULT_INGRESS_CNAME, getPlatformBaseDomain } from '../../lib/platform
 const EMPTY_DNS = {
   cname_host: '',
   cname_target: '',
+  apex_host: '',
+  apex_a_ip: '',
+  recommended_url: '',
+  apex_points_at_platform: false,
   notes: [],
 };
 
@@ -224,30 +228,62 @@ export default function BrandingPanel() {
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 space-y-4">
         <p className="text-sm font-bold text-emerald-950 flex items-center gap-2">
           <span className="material-symbols-outlined text-[18px]">route</span>
-          Οδηγίες DNS (μετά την αποθήκευση)
+          Οδηγίες DNS & HTTPS (μετά την αποθήκευση)
         </p>
 
         {hasCustomDomain ? (
           <div className="space-y-3 text-sm">
-            <div className="rounded-xl bg-white/80 border border-emerald-100 p-3 font-mono text-xs overflow-x-auto">
-              <p className="text-gray-500 mb-1"># Custom domain → platform ingress</p>
+            {dns.recommended_url && (
+              <div className="rounded-xl border border-emerald-200 bg-white px-3 py-2.5">
+                <p className="text-xs font-bold uppercase tracking-wide text-emerald-800/70">
+                  Ασφαλές σύνδεσμος (χρησιμοποιήστε αυτόν)
+                </p>
+                <a
+                  href={dns.recommended_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-flex items-center gap-1 font-mono text-sm font-bold text-emerald-900 underline"
+                >
+                  {dns.recommended_url}
+                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                </a>
+              </div>
+            )}
+
+            {dns.apex_points_at_platform === false && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-950">
+                <p className="text-sm font-bold flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[18px] text-amber-700">warning</span>
+                  Το apex χωρίς www δεν είναι ακόμα στην πλατφόρμα
+                </p>
+                <p className="text-xs mt-1 leading-relaxed">
+                  Αν ανοίγετε <code className="bg-white/80 px-1 rounded">{form.custom_domain}</code>, ο browser
+                  δείχνει «Μη ασφαλής» γιατί το domain δείχνει ακόμα στο παλιό hosting. Από άλλον υπολογιστή
+                  μπορεί να μην σας αφήσει καθόλου να μπείτε.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-xl bg-white/80 border border-emerald-100 p-3 font-mono text-xs overflow-x-auto space-y-2">
+              <p className="text-gray-500"># 1) www → πλατφόρμα (απαραίτητο για HTTPS)</p>
               <p>
-                <span className="text-emerald-800 font-bold">{dns.cname_host || form.custom_domain}</span>
+                <span className="text-emerald-800 font-bold">
+                  {dns.cname_host || dns.alternate_www_host || `www.${form.custom_domain}`}
+                </span>
                 {'  CNAME  '}
                 <span className="text-indigo-700 font-bold">{dns.cname_target || DEFAULT_INGRESS_CNAME}</span>
               </p>
-              {dns.alternate_www_host && (
-                <p className="mt-2">
-                  <span className="text-emerald-800 font-bold">{dns.alternate_www_host}</span>
-                  {'  CNAME  '}
-                  <span className="text-indigo-700 font-bold">{dns.cname_target || DEFAULT_INGRESS_CNAME}</span>
-                </p>
-              )}
+              <p className="text-gray-500 pt-2"># 2) apex (χωρίς www) → A record στο IP PoreiaGo</p>
+              <p>
+                <span className="text-emerald-800 font-bold">{dns.apex_host || form.custom_domain}</span>
+                {'  A  '}
+                <span className="text-indigo-700 font-bold">{dns.apex_a_ip || '34.141.98.145'}</span>
+              </p>
             </div>
           </div>
         ) : (
           <p className="text-sm text-emerald-900/80">
-            Συμπληρώστε custom domain παραπάνω και αποθηκεύστε — εδώ θα εμφανιστούν οι εγγραφές CNAME.
+            Συμπληρώστε custom domain παραπάνω και αποθηκεύστε — εδώ θα εμφανιστούν οι εγγραφές DNS.
           </p>
         )}
 
@@ -261,7 +297,7 @@ export default function BrandingPanel() {
 
         <p className="text-xs text-emerald-800/80">
           Env server: <code className="bg-white/70 px-1 rounded">OLYMPUS_INGRESS_CNAME</code>,{' '}
-          <code className="bg-white/70 px-1 rounded">OLYMPUS_BASE_DOMAIN</code>
+          <code className="bg-white/70 px-1 rounded">PLATFORM_INGRESS_IP</code>
         </p>
       </div>
 

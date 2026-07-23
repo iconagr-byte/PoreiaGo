@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import socket
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -38,11 +39,75 @@ def _router_id(domain: str) -> str:
     return f"tenant-domain-{slug}"[:63]
 
 
-def render_custom_domains_yaml(domains: list[str], *, include_apex: bool = False) -> str:
+def platform_ingress_ips() -> set[str]:
+    """IPs that serve PoreiaGo Traefik (apex A records must match one of these)."""
+    raw = (os.getenv("PLATFORM_INGRESS_IPS") or os.getenv("PLATFORM_INGRESS_IP") or "").strip()
+    ips: set[str] = {p.strip() for p in raw.split(",") if p.strip()}
+    cname = (os.getenv("OLYMPUS_INGRESS_CNAME") or os.getenv("DEFAULT_INGRESS_CNAME") or "www.poreiago.com").strip()
+    if cname:
+        try:
+            for info in socket.getaddrinfo(cname, None, type=socket.SOCK_STREAM):
+                ips.add(info[4][0])
+        except OSError:
+            logger.debug("Could not resolve ingress CNAME %s", cname, exc_info=True)
+    # Known production Droplet (belt-and-suspenders when DNS lookup is blocked).
+    ips.add("34.141.98.145")
+    return ips
+
+
+def resolve_host_ips(hostname: str) -> set[str]:
+    try:
+        return {info[4][0] for info in socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)}
+    except OSError:
+        return set()
+
+
+def apex_points_at_platform(domain: str, *, ingress_ips: set[str] | None = None) -> bool:
+    """True when apex A/AAAA already targets the PoreiaGo ingress."""
+    host = _normalize_domain(domain)
+    if not host:
+        return False
+    ips = resolve_host_ips(host)
+    if not ips:
+        return False
+    allowed = ingress_ips if ingress_ips is not None else platform_ingress_ips()
+    return bool(ips & allowed)
+
+
+def should_include_apex(domain: str, *, force: bool | None = None) -> bool:
+    """Include apex router when forced, env-enabled, or DNS already points at us."""
+    if force is not None:
+        return force
+    env = (os.getenv("TRAEFIK_INCLUDE_APEX") or "").strip().lower()
+    if env in {"1", "true", "yes", "always", "all"}:
+        return True
+    if env in {"0", "false", "no", "never"}:
+        return False
+    forced = {
+        _normalize_domain(d)
+        for d in (os.getenv("TRAEFIK_FORCE_APEX_DOMAINS") or "").split(",")
+        if d.strip()
+    }
+    host = _normalize_domain(domain)
+    if host in forced:
+        return True
+    # Default: provisional apex router so the moment DNS flips, LE can issue.
+    # Separate www/apex certs — failed apex ACME does not break www.
+    return True
+
+
+def render_custom_domains_yaml(
+    domains: list[str],
+    *,
+    include_apex: bool | None = None,
+) -> str:
     """Build Traefik dynamic YAML for custom domains.
 
-    By default only ``www.{domain}`` is certified/routed. Apex is included only
-    when ``include_apex=True`` (requires apex DNS to point at the platform).
+    Always routes ``www.{domain}`` with its own Let's Encrypt cert.
+
+    Apex (``{domain}``) gets a *separate* router/cert when ``include_apex`` is
+    true (default). Separate certs keep www working even if apex DNS still
+    points at old hosting and LE cannot validate the apex yet.
     """
     unique: list[str] = []
     seen: set[str] = set()
@@ -59,7 +124,7 @@ def render_custom_domains_yaml(domains: list[str], *, include_apex: bool = False
     lines = [
         "# AUTO-GENERATED — tenant custom domains for Traefik + Let's Encrypt",
         "# Do not edit by hand; regenerated when Domain settings are saved.",
-        "# Default: www only (apex often still points at old hosting).",
+        "# www and apex use separate routers/certs so apex DNS lag cannot break www TLS.",
         "",
         "http:",
         "  routers:",
@@ -80,16 +145,12 @@ def render_custom_domains_yaml(domains: list[str], *, include_apex: bool = False
         return "\n".join(lines)
 
     for domain in unique:
-        hosts = [f"www.{domain}"]
-        if include_apex:
-            hosts.insert(0, domain)
-        rid = _router_id("www-" + domain if not include_apex else domain)
-        rule = " || ".join(f"Host(`{h}`)" for h in hosts)
-        main = hosts[0]
+        www_host = f"www.{domain}"
+        www_rid = _router_id("www-" + domain)
         lines.extend(
             [
-                f"    {rid}:",
-                f"      rule: {rule}",
+                f"    {www_rid}:",
+                f"      rule: Host(`{www_host}`)",
                 "      entryPoints:",
                 "        - websecure",
                 "      service: tenant-custom-frontend",
@@ -97,20 +158,33 @@ def render_custom_domains_yaml(domains: list[str], *, include_apex: bool = False
                 "      tls:",
                 "        certResolver: letsencrypt",
                 "        domains:",
-                f'          - main: "{main}"',
-            ]
-        )
-        if len(hosts) > 1:
-            lines.append("            sans:")
-            for h in hosts[1:]:
-                lines.append(f'              - "{h}"')
-        lines.extend(
-            [
+                f'          - main: "{www_host}"',
                 "      middlewares:",
                 "        - security-headers@file",
                 "",
             ]
         )
+
+        use_apex = should_include_apex(domain) if include_apex is None else include_apex
+        if use_apex:
+            apex_rid = _router_id("apex-" + domain)
+            lines.extend(
+                [
+                    f"    {apex_rid}:",
+                    f"      rule: Host(`{domain}`)",
+                    "      entryPoints:",
+                    "        - websecure",
+                    "      service: tenant-custom-frontend",
+                    "      priority: 40",
+                    "      tls:",
+                    "        certResolver: letsencrypt",
+                    "        domains:",
+                    f'          - main: "{domain}"',
+                    "      middlewares:",
+                    "        - security-headers@file",
+                    "",
+                ]
+            )
 
     lines.extend(
         [
