@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -15,11 +15,33 @@ import {
 } from '../../services/billingApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
 
-const STATUS_STYLES = {
-  active: 'bg-emerald-100 text-emerald-800',
-  trialing: 'bg-sky-100 text-sky-800',
-  past_due: 'bg-amber-100 text-amber-900',
-  canceled: 'bg-rose-100 text-rose-800',
+const PLAN_ICONS = {
+  starter: 'storefront',
+  professional: 'apartment',
+  enterprise: 'domain',
+};
+
+const STATUS_META = {
+  active: {
+    label: 'Ενεργό',
+    icon: 'verified',
+    className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  },
+  trialing: {
+    label: 'Δοκιμή',
+    icon: 'hourglass_top',
+    className: 'bg-sky-50 text-sky-800 border-sky-200',
+  },
+  past_due: {
+    label: 'Εκκρεμεί πληρωμή',
+    icon: 'warning',
+    className: 'bg-amber-50 text-amber-900 border-amber-200',
+  },
+  canceled: {
+    label: 'Ακυρωμένο',
+    icon: 'cancel',
+    className: 'bg-rose-50 text-rose-800 border-rose-200',
+  },
 };
 
 function formatDate(iso) {
@@ -33,6 +55,17 @@ function formatDate(iso) {
   } catch {
     return iso;
   }
+}
+
+function daysUntil(iso) {
+  if (!iso) return null;
+  const end = new Date(iso).getTime();
+  if (Number.isNaN(end)) return null;
+  return Math.ceil((end - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function planDisplayName(planId) {
+  return AGENCY_PLANS.find((p) => p.id === planId)?.name || planId || '—';
 }
 
 export default function ContractsPanel({ initialPlan, initialInterval = 'month' }) {
@@ -57,6 +90,10 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
       ]);
       setSub(subscription);
       setBillingConfig(config);
+      if (subscription?.plan) setSelectedPlan(subscription.plan);
+      if (subscription?.interval === 'year' || subscription?.interval === 'month') {
+        setInterval(subscription.interval);
+      }
     } catch (e) {
       toast.error(e.message || 'Αποτυχία φόρτωσης συνδρομής');
       setSub(null);
@@ -66,18 +103,23 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
   }, []);
 
   useEffect(() => {
-    load();
+    // Initial subscription fetch — setState happens after the async resolve.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount fetch
+    void load();
     const params = new URLSearchParams(window.location.search);
     if (params.get('billing') === 'success') {
       toast.success('Το συμβόλαιο ενεργοποιήθηκε — ενημερώνουμε…');
-      load();
+      void load();
     }
   }, [load]);
 
-  useEffect(() => {
+  // Sync parent-provided plan/interval during render (avoids setState-in-effect).
+  const [propSeed, setPropSeed] = useState({ plan: initialPlan, interval: initialInterval });
+  if (initialPlan !== propSeed.plan || initialInterval !== propSeed.interval) {
+    setPropSeed({ plan: initialPlan, interval: initialInterval });
     if (initialPlan) setSelectedPlan(initialPlan);
     if (initialInterval) setInterval(initialInterval);
-  }, [initialPlan, initialInterval]);
+  }
 
   const startCheckout = async () => {
     setWorking(true);
@@ -117,193 +159,289 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     }
   };
 
-  if (!getSaasToken()) {
-    return (
-      <div className="bg-amber-50 border border-amber-200 rounded-[24px] p-6 text-sm space-y-3">
-        <p>Συνδεθείτε για να διαχειριστείτε το συμβόλαιο του γραφείου σας.</p>
-        <Link to="/admin/login" className="text-primary font-bold hover:underline">
-          Σύνδεση διαχείρισης
-        </Link>
-      </div>
-    );
-  }
-
   const catalogPlan = AGENCY_PLANS.find((p) => p.id === selectedPlan) || AGENCY_PLANS[1];
   const quote = displayPrice(catalogPlan, interval);
   const checkoutReady = billingConfig?.checkout_ready === true;
   const demoMode = billingConfig?.demo_mode === true;
   const trialDays = billingConfig?.trial_days || 14;
-  const onTrial = sub?.status === 'trialing' && !String(sub?.stripe_subscription_id || '').startsWith('demo_');
+  const onTrial = sub?.status === 'trialing';
+  const periodEnd = sub?.current_period_end || sub?.trial_ends_at;
+  const remaining = useMemo(() => daysUntil(periodEnd), [periodEnd]);
+  const statusMeta = STATUS_META[sub?.status] || {
+    label: sub?.status || '—',
+    icon: 'info',
+    className: 'bg-slate-50 text-slate-700 border-slate-200',
+  };
+  const sameTrialPlan = onTrial && sub?.plan === selectedPlan;
+  const hasToken = Boolean(getSaasToken());
+  const trialProgress =
+    onTrial && remaining != null && trialDays > 0
+      ? Math.max(0, Math.min(100, Math.round(((trialDays - Math.max(remaining, 0)) / trialDays) * 100)))
+      : null;
+
+  if (!hasToken) {
+    return (
+      <div className="rounded-[28px] border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-6 md:p-8 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+            <span className="material-symbols-outlined text-[24px]">lock</span>
+          </span>
+          <div>
+            <h3 className="font-bold text-lg text-amber-950">Απαιτείται σύνδεση</h3>
+            <p className="text-sm text-amber-900/80 mt-1 leading-relaxed">
+              Συνδεθείτε για να διαχειριστείτε το συμβόλαιο του γραφείου σας.
+            </p>
+            <Link
+              to="/admin/login"
+              className="inline-flex mt-4 px-5 py-2.5 rounded-full bg-amber-900 text-white text-sm font-bold hover:opacity-95"
+            >
+              Σύνδεση διαχείρισης
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {billingConfig && demoMode && (
-        <div className="bg-amber-50 border border-amber-200 rounded-[24px] p-4 text-sm text-amber-950">
-          <p className="font-bold">Demo πληρωμή ενεργή</p>
-          <p className="mt-1">
-            Μπορείτε να ξεκινήσετε <strong>δωρεάν δοκιμή {trialDays} ημερών</strong> χωρίς πραγματική χρέωση.
-            {!checkoutReady ? (
-              <>
-                {' '}
-                Για live Stripe δείτε{' '}
-                <code className="text-xs bg-white/80 px-1 rounded">deploy/STRIPE-SETUP.md</code>.
-              </>
-            ) : (
-              <> Για απενεργοποίηση demo: <code className="text-xs bg-white/80 px-1 rounded">BILLING_DEMO_MODE=0</code>.</>
+    <section className="bg-white rounded-[28px] border border-slate-200/70 shadow-[0_8px_30px_rgba(15,23,42,0.04)] overflow-hidden">
+      <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-primary/[0.06] via-white to-white">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <span className="material-symbols-outlined text-[24px]">workspace_premium</span>
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-xl font-bold tracking-tight text-slate-900">Συμβόλαιο γραφείου</h3>
+              <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
+                Κατάσταση, πλάνο και πληρωμή — όλα σε ένα σημείο
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {demoMode && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
+                <span className="material-symbols-outlined text-[16px]">science</span>
+                Demo · {trialDays}η δοκιμή
+              </span>
             )}
-          </p>
-        </div>
-      )}
-      {billingConfig && !checkoutReady && !demoMode && (
-        <div className="bg-sky-50 border border-sky-200 rounded-[24px] p-4 text-sm text-sky-950">
-          <p className="font-bold">Stripe δεν είναι ακόμα πλήρως ρυθμισμένο στο server.</p>
-          <p className="mt-1">
-            Μπορείτε να ξεκινήσετε <strong>δωρεάν δοκιμή {trialDays} ημερών</strong> τώρα.
-            Για πληρωμή μέσω Stripe, ο διαχειριστής server προσθέτει τα κλειδιά (βλ.{' '}
-            <code className="text-xs bg-white/80 px-1 rounded">deploy/STRIPE-SETUP.md</code>).
-          </p>
-        </div>
-      )}
-      <div className="bg-surface-container-lowest rounded-[24px] border border-black/[0.06] p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-          <div>
-            <h3 className="font-headline-sm font-bold text-on-surface flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">description</span>
-              Συμβόλαιο γραφείου
-            </h3>
-            <p className="text-sm text-on-surface-variant mt-1">
-              Επιλέξτε μηνιαίο ή ετήσιο πλάνο · πληρωμή μέσω Stripe
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={load}
-            disabled={loading}
-            className="p-2 rounded-xl hover:bg-gray-100 text-gray-500"
-            title="Ανανέωση"
-          >
-            <span className="material-symbols-outlined text-[20px]">refresh</span>
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="animate-pulse h-20 bg-gray-100 rounded-2xl mb-6" />
-        ) : sub ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <MiniStat label="Ενεργό πλάνο" value={sub.plan} />
-            <MiniStat
-              label="Κατάσταση"
-              value={
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${STATUS_STYLES[sub.status] || 'bg-gray-100'}`}>
-                  {sub.status}
-                </span>
-              }
-            />
-            <MiniStat label="Λήξη περιόδου" value={formatDate(sub.current_period_end || sub.trial_ends_at)} />
-            <MiniStat
-              label="Γραφείο ενεργό"
-              value={sub.is_active ? 'Ναι' : 'Αναστολή'}
-              warn={!sub.is_active}
-            />
-          </div>
-        ) : null}
-
-        <div className="inline-flex p-1 rounded-full bg-surface-container-low border mb-6">
-          {Object.values(BILLING_INTERVALS).map((opt) => (
+            {!checkoutReady && !demoMode && billingConfig && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900">
+                <span className="material-symbols-outlined text-[16px]">info</span>
+                Πληρωμές σε ρύθμιση
+              </span>
+            )}
             <button
-              key={opt.id}
               type="button"
-              onClick={() => setInterval(opt.id)}
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                interval === opt.id ? 'bg-white text-primary shadow-sm' : 'text-gray-500'
+              onClick={load}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              title="Ανανέωση"
+            >
+              <span className="material-symbols-outlined text-[18px]">refresh</span>
+              Ανανέωση
+            </button>
+          </div>
+        </div>
+
+        {!loading && sub && (
+          <div className="mt-4 rounded-[20px] border border-slate-200/80 bg-white/90 px-4 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${statusMeta.className}`}>
+              <span className="material-symbols-outlined text-[15px]">{statusMeta.icon}</span>
+              {statusMeta.label}
+            </span>
+            <span className="text-sm font-bold text-slate-900">{planDisplayName(sub.plan)}</span>
+            <span className="text-xs text-slate-500">
+              Λήξη {formatDate(periodEnd)}
+              {remaining != null && remaining >= 0 ? ` · ${remaining} ημ.` : ''}
+            </span>
+            <span
+              className={`ml-auto inline-flex items-center gap-1 text-xs font-bold ${
+                sub.is_active ? 'text-emerald-700' : 'text-rose-700'
               }`}
             >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid sm:grid-cols-3 gap-3 mb-6">
-          {AGENCY_PLANS.filter((p) => !p.contactSales).map((plan) => {
-            const p = displayPrice(plan, interval);
-            const active = selectedPlan === plan.id;
-            return (
-              <button
-                key={plan.id}
-                type="button"
-                onClick={() => setSelectedPlan(plan.id)}
-                className={`text-left rounded-2xl p-4 border transition-all ${
-                  active
-                    ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                    : 'border-black/[0.06] hover:border-primary/30'
-                }`}
-              >
-                <p className="font-bold">{plan.name}</p>
-                <p className="text-lg font-bold mt-1">
-                  {p.label}
-                  <span className="text-sm text-gray-500">{p.suffix}</span>
-                </p>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="rounded-2xl bg-surface-container-low p-4 mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-gray-500">Επιλεγμένο συμβόλαιο</p>
-            <p className="font-bold text-lg">
-              {catalogPlan.name} · {BILLING_INTERVALS[interval]?.label} — {quote.label}
-              {quote.suffix}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {checkoutReady && !demoMode ? (
-              <button
-                type="button"
-                disabled={working}
-                onClick={startCheckout}
-                className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold disabled:opacity-50"
-              >
-                Ενεργοποίηση / αναβάθμιση
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={working || (onTrial && sub?.plan === selectedPlan)}
-                onClick={startTrial}
-                className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold disabled:opacity-50"
-              >
-                {onTrial && sub?.plan === selectedPlan
-                  ? `Δοκιμή ενεργή (${trialDays} ημέρες)`
-                  : `Ξεκινήστε δωρεάν δοκιμή ${trialDays} ημερών`}
-              </button>
-            )}
-            {checkoutReady && billingConfig?.portal_ready && (
-              <button
-                type="button"
-                disabled={working}
-                onClick={openPortal}
-                className="px-5 py-2.5 border border-primary/30 text-primary rounded-full text-sm font-bold"
-              >
-                Διαχείριση στο Stripe
-              </button>
+              <span className="material-symbols-outlined text-[16px]">
+                {sub.is_active ? 'check_circle' : 'pause_circle'}
+              </span>
+              Γραφείο {sub.is_active ? 'ενεργό' : 'σε αναστολή'}
+            </span>
+            {trialProgress != null && (
+              <div className="w-full pt-1">
+                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${trialProgress}%` }} />
+                </div>
+              </div>
             )}
           </div>
-        </div>
-
-        <p className="text-xs text-gray-500">
-          Δημόσιες τιμές: <Link to="/grafeia" className="text-primary font-semibold hover:underline">/grafeia</Link>
-        </p>
+        )}
       </div>
-    </div>
-  );
-}
 
-function MiniStat({ label, value, warn }) {
-  return (
-    <div className={`rounded-xl p-3 ${warn ? 'bg-rose-50' : 'bg-surface-container-low'}`}>
-      <dt className="text-[10px] uppercase tracking-wide text-gray-500">{label}</dt>
-      <dd className="font-bold mt-0.5">{value}</dd>
-    </div>
+      <div className="p-6 space-y-5">
+        {loading ? (
+          <div className="h-40 animate-pulse rounded-[22px] bg-slate-100" />
+        ) : (
+          <>
+            {!sub && (
+              <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-center text-sm text-slate-500">
+                Δεν υπάρχει ακόμα ενεργό συμβόλαιο — επιλέξτε πλάνο παρακάτω.
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-slate-900">Επιλέξτε πλάνο</p>
+                <p className="text-xs text-slate-500 mt-0.5">Ετήσιο = 2 μήνες δώρο</p>
+              </div>
+              <div className="inline-flex p-1 rounded-full bg-slate-100 border border-slate-200/80">
+                {Object.values(BILLING_INTERVALS).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setInterval(opt.id)}
+                    className={`px-4 py-2 rounded-full text-sm font-bold transition ${
+                      interval === opt.id
+                        ? 'bg-white text-primary shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {opt.label}
+                    {opt.badge && interval === opt.id && (
+                      <span className="ml-1.5 text-[10px] font-bold text-emerald-600">{opt.badge}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {AGENCY_PLANS.map((plan) => {
+                const p = displayPrice(plan, interval);
+                const active = selectedPlan === plan.id;
+                const isCurrent = sub?.plan === plan.id;
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => !plan.contactSales && setSelectedPlan(plan.id)}
+                    className={`text-left rounded-[22px] border p-5 transition ${
+                      active && !plan.contactSales
+                        ? 'border-primary/40 bg-gradient-to-b from-primary/[0.07] to-white ring-2 ring-primary/15 shadow-sm'
+                        : 'border-slate-200/90 bg-gradient-to-b from-slate-50/50 to-white hover:border-primary/25'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <span
+                          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                            active && !plan.contactSales
+                              ? 'bg-primary/15 text-primary'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[20px]">
+                            {PLAN_ICONS[plan.id] || 'workspace_premium'}
+                          </span>
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 text-lg">{plan.name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{plan.tagline}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        {isCurrent && (
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Τρέχον
+                          </span>
+                        )}
+                        {plan.highlighted && !isCurrent && (
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                            Προτεινόμενο
+                          </span>
+                        )}
+                        {active && !plan.contactSales && (
+                          <span className="material-symbols-outlined text-primary text-[22px]">check_circle</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <p className="text-2xl font-bold text-slate-900 mt-3 tabular-nums">
+                      {p.label}
+                      {p.suffix && <span className="text-sm font-semibold text-slate-500">{p.suffix}</span>}
+                    </p>
+                    {interval === 'year' && p.compareAt && (
+                      <p className="text-xs text-emerald-700 font-semibold mt-1">
+                        Αντί €{p.compareAt}/έτος — εξοικονόμηση €{p.compareAt - p.amount}
+                      </p>
+                    )}
+
+                    <ul className="mt-4 space-y-1.5">
+                      {(plan.features || []).map((f) => (
+                        <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
+                          <span className="material-symbols-outlined text-[14px] text-primary mt-0.5">check</span>
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {plan.contactSales && (
+                      <Link
+                        to="/grafeia"
+                        className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Επικοινωνία πωλήσεων
+                      </Link>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="sticky bottom-3 z-10 rounded-[22px] border border-primary/15 bg-gradient-to-r from-primary/[0.06] to-white backdrop-blur shadow-lg px-4 py-3.5 flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Επιλεγμένο</p>
+                <p className="font-bold text-slate-900 truncate">
+                  {catalogPlan.name} · {BILLING_INTERVALS[interval]?.label} — {quote.label}
+                  {quote.suffix || ''}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {checkoutReady && !demoMode ? (
+                  <button
+                    type="button"
+                    disabled={working}
+                    onClick={startCheckout}
+                    className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold shadow-sm hover:opacity-95 disabled:opacity-50"
+                  >
+                    {working ? 'Αναμονή…' : 'Ενεργοποίηση / αναβάθμιση'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={working || sameTrialPlan}
+                    onClick={startTrial}
+                    className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold shadow-sm hover:opacity-95 disabled:opacity-50"
+                  >
+                    {sameTrialPlan
+                      ? `Δοκιμή ενεργή (${trialDays} ημέρες)`
+                      : `Ξεκινήστε δωρεάν δοκιμή ${trialDays} ημερών`}
+                  </button>
+                )}
+                {checkoutReady && billingConfig?.portal_ready && (
+                  <button
+                    type="button"
+                    disabled={working}
+                    onClick={openPortal}
+                    className="px-5 py-2.5 border border-primary/25 text-primary rounded-full text-sm font-bold hover:bg-primary/[0.05] disabled:opacity-50"
+                  >
+                    Διαχείριση πληρωμών
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
