@@ -104,7 +104,11 @@ export default function BookingDetailPanel({
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 text-sm font-bold text-white/90 hover:text-white transition-colors"
+          className={`flex items-center gap-2 text-sm font-bold transition-colors ${
+            fullPage
+              ? 'text-white/90 hover:text-white'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
           {mode === 'admin' ? 'Πίσω στις Κρατήσεις' : 'Πίσω στις κρατήσεις'}
