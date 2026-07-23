@@ -96,13 +96,13 @@
   background: #eef1f4 !important;
 }
 
-/* Soften light_nolabels / Mapbox light toward Apple Maps */
+/* Soften light_all / Mapbox light — keep place labels readable */
 .fleet-apple-map-frame .leaflet-tile-pane {
-  filter: saturate(0.82) brightness(1.03) contrast(0.96);
+  filter: saturate(0.9) brightness(1.02) contrast(0.98);
 }
 
 .fleet-apple-map-frame .mapboxgl-canvas {
-  filter: saturate(0.88) brightness(1.02) contrast(0.97);
+  filter: saturate(0.92) brightness(1.01) contrast(0.98);
 }
 
 .fleet-apple-map-frame .leaflet-control-attribution,

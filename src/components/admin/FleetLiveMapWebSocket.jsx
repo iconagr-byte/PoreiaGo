@@ -59,7 +59,7 @@ export default function FleetLiveMapWebSocket() {
             aria-pressed={showPlaces}
           >
             <span className="material-symbols-outlined text-[16px]">location_city</span>
-            Πόλεις &amp; περιφέρειες
+            Ονόματα τόπων
           </button>
           <button
             type="button"

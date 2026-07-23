@@ -77,10 +77,8 @@ export const GREECE_CITIES = [
   { id: 'orestiada', name: 'Ορεστιάδα', lat: 41.503, lng: 26.53, kind: 'town', minZoom: 8.2, maxZoom: 10.2 },
 ];
 
-/** Όλες οι ετικέτες (περιφέρειες + πόλεις). */
-export const GREECE_PLACES = [...GREECE_REGIONS, ...GREECE_CITIES];
-
-const KIND_RANK = { city: 0, town: 1, region: 2 };
+/** Overlay labels used on the map — regions only; πόλεις/δήμοι από το basemap. */
+export const GREECE_PLACES = [...GREECE_REGIONS];
 
 function approxDegDistance(a, b) {
   const dLat = a.lat - b.lat;
@@ -88,35 +86,25 @@ function approxDegDistance(a, b) {
   return Math.hypot(dLat, dLng);
 }
 
-/** Ελάχιστη απόσταση σε μοίρες — μεγαλώνει όταν zoom-out. */
+/** Ελάχιστη απόσταση σε μοίρες για περιφέρειες στο zoom-out. */
 function minSeparationForZoom(zoom) {
   const z = Number(zoom) || 6;
-  if (z < 6.5) return 1.15;
-  if (z < 7.5) return 0.72;
-  if (z < 8.5) return 0.42;
-  if (z < 9.5) return 0.28;
-  return 0.18;
+  if (z < 5.8) return 1.35;
+  return 1.05;
 }
 
 /**
- * Ετικέτες για το τρέχον zoom, χωρίς επικαλύψεις.
- * Προτεραιότητα: πόλη > κωμόπολη > περιφέρεια.
+ * Custom overlay: μόνο περιφέρειες σε χαμηλό zoom.
+ * Πόλεις, δήμοι και δρόμοι έρχονται από το basemap (light_all / Mapbox light).
  */
 export function placesVisibleAtZoom(zoom) {
   const z = Number(zoom) || 6;
-  // Πολύ κοντά: μόνο δρόμοι basemap — χωρίς custom labels.
-  if (z >= 10.4) return [];
+  if (z >= 6.8) return [];
 
-  const candidates = GREECE_PLACES.filter((p) => {
-    const minZ = p.minZoom ?? 6;
-    const maxZ = p.maxZoom ?? (p.kind === 'region' ? 6.6 : 10.2);
+  const candidates = GREECE_REGIONS.filter((p) => {
+    const minZ = p.minZoom ?? 5;
+    const maxZ = p.maxZoom ?? 6.6;
     return z >= minZ && z < maxZ;
-  });
-
-  candidates.sort((a, b) => {
-    const rank = (KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9);
-    if (rank !== 0) return rank;
-    return a.name.localeCompare(b.name, 'el');
   });
 
   const minSep = minSeparationForZoom(z);

@@ -1,13 +1,13 @@
 /**
- * Apple-inspired live map theme — soft light basemap, SF-like chrome, Greek labels.
+ * Apple-inspired live map theme — soft light basemap with place labels.
  */
 
 /**
- * CARTO light without place names — our collision-aware Greek labels sit cleanly on top
- * (avoids ΘΕΣΣΑΛΟΝΙΚΗ + ΚΕΝΤΡΙΚΗ ΜΑΚΕΔΟΝΙΑ stacking on Voyager).
+ * CARTO Positron (light_all) — soft light tiles WITH city / municipality / street names.
+ * Our overlay only adds Greek region labels at low zoom (no duplicate city pins).
  */
 export const APPLE_LEAFLET_TILES = {
-  url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+  url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
   attribution: '© OpenStreetMap · © CARTO',
   subdomains: 'abcd',
   maxZoom: 19,
