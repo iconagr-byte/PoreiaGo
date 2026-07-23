@@ -308,30 +308,36 @@ async def post_fleet_dispatch_blocked(body: DispatchBlockedRequest):
 
 
 @router.get("/fleet/vehicles", response_model=list[VehicleProfileResponse])
-async def get_fleet_vehicles():
-    return service_service.list_vehicles()
+async def get_fleet_vehicles(request: Request):
+    return service_service.list_vehicles(tenant_id=_request_tenant_id(request))
 
 
 @router.post("/fleet/vehicles", response_model=VehicleProfileResponse, status_code=201)
-async def post_fleet_vehicle(body: VehicleCreate):
+async def post_fleet_vehicle(request: Request, body: VehicleCreate):
+    data = body.model_dump(exclude_unset=True)
+    data["tenant_id"] = _request_tenant_id(request)
     try:
-        return service_service.create_vehicle(body.model_dump(exclude_unset=True))
+        return service_service.create_vehicle(data)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/fleet/vehicles/{vehicle_id}", response_model=VehicleProfileResponse)
-async def get_fleet_vehicle(vehicle_id: str):
-    row = service_service.get_vehicle(vehicle_id)
+async def get_fleet_vehicle(request: Request, vehicle_id: str):
+    row = service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request))
     if not row:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return row
 
 
 @router.patch("/fleet/vehicles/{vehicle_id}", response_model=VehicleProfileResponse)
-async def patch_fleet_vehicle(vehicle_id: str, body: VehicleUpdate):
+async def patch_fleet_vehicle(request: Request, vehicle_id: str, body: VehicleUpdate):
     try:
-        return service_service.update_vehicle(vehicle_id, body.model_dump(exclude_unset=True))
+        return service_service.update_vehicle(
+            vehicle_id,
+            body.model_dump(exclude_unset=True),
+            tenant_id=_request_tenant_id(request),
+        )
     except KeyError:
         raise HTTPException(status_code=404, detail="Vehicle not found") from None
     except Exception as e:
@@ -339,14 +345,16 @@ async def patch_fleet_vehicle(vehicle_id: str, body: VehicleUpdate):
 
 
 @router.delete("/fleet/vehicles/{vehicle_id}")
-async def delete_fleet_vehicle(vehicle_id: str):
-    if not service_service.delete_vehicle(vehicle_id):
+async def delete_fleet_vehicle(request: Request, vehicle_id: str):
+    if not service_service.delete_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return {"ok": True, "id": vehicle_id}
 
 
 @router.post("/fleet/vehicles/{vehicle_id}/odometer", response_model=VehicleProfileResponse)
-async def sync_vehicle_odometer(vehicle_id: str, odometer_km: float):
+async def sync_vehicle_odometer(request: Request, vehicle_id: str, odometer_km: float):
+    if not service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+        raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
         return service_service.sync_odometer_from_telemetry(vehicle_id, odometer_km)
     except KeyError:
@@ -354,14 +362,27 @@ async def sync_vehicle_odometer(vehicle_id: str, odometer_km: float):
 
 
 @router.get("/fleet/maintenance-events", response_model=list[MaintenanceEventResponse])
-async def get_maintenance_events(vehicle_id: str | None = None):
-    return service_service.list_maintenance_events(vehicle_id=vehicle_id)
+async def get_maintenance_events(request: Request, vehicle_id: str | None = None):
+    tenant_id = _request_tenant_id(request)
+    if vehicle_id and not service_service.get_vehicle(vehicle_id, tenant_id=tenant_id):
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    events = service_service.list_maintenance_events(vehicle_id=vehicle_id)
+    if vehicle_id:
+        return events
+    owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
+    return [e for e in events if e.get("vehicle_id") in owned]
 
 
 @router.post("/fleet/maintenance-events", response_model=MaintenanceEventResponse, status_code=201)
-async def post_maintenance_event(body: MaintenanceEventCreate):
+async def post_maintenance_event(request: Request, body: MaintenanceEventCreate):
+    data = body.model_dump(exclude_unset=True)
+    vehicle_id = data.get("vehicle_id")
+    if not vehicle_id or not service_service.get_vehicle(
+        vehicle_id, tenant_id=_request_tenant_id(request)
+    ):
+        raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
-        return service_service.create_maintenance_event(body.model_dump(exclude_unset=True))
+        return service_service.create_maintenance_event(data)
     except KeyError:
         raise HTTPException(status_code=404, detail="Vehicle not found") from None
     except Exception as e:
@@ -369,9 +390,15 @@ async def post_maintenance_event(body: MaintenanceEventCreate):
 
 
 @router.post("/fleet/maintenance-events/{event_id}/attachments")
-async def post_maintenance_attachment(event_id: str, file: UploadFile = File(...)):
+async def post_maintenance_attachment(request: Request, event_id: str, file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
+    event_rows = service_service.list_maintenance_events()
+    event = next((e for e in event_rows if e.get("id") == event_id), None)
+    if not event or not service_service.get_vehicle(
+        event.get("vehicle_id"), tenant_id=_request_tenant_id(request)
+    ):
+        raise HTTPException(status_code=404, detail="Maintenance event not found")
     safe_name = file.filename.replace("..", "_").replace("/", "_").replace("\\", "_")
     out_name = f"{event_id}-{int(datetime.now().timestamp())}-{safe_name}"
     out_path = Path(UPLOAD_DIR) / out_name
@@ -392,25 +419,40 @@ async def post_maintenance_attachment(event_id: str, file: UploadFile = File(...
 
 
 @router.post("/fleet/alerts/scan", response_model=list[FleetAlertResponse])
-async def post_fleet_alert_scan():
-    return service_service.scan_predictive_alerts()
+async def post_fleet_alert_scan(request: Request):
+    tenant_id = _request_tenant_id(request)
+    alerts = service_service.scan_predictive_alerts()
+    owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
+    return [a for a in alerts if a.get("vehicle_id") in owned]
 
 
 @router.get("/fleet/alerts", response_model=list[FleetAlertResponse])
-async def get_fleet_alerts(unresolved_only: bool = True):
-    return service_service.list_alerts(unresolved_only=unresolved_only)
+async def get_fleet_alerts(request: Request, unresolved_only: bool = True):
+    tenant_id = _request_tenant_id(request)
+    alerts = service_service.list_alerts(unresolved_only=unresolved_only)
+    owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
+    return [a for a in alerts if a.get("vehicle_id") in owned]
 
 
 @router.post("/fleet/alerts/{alert_id}/resolve", response_model=FleetAlertResponse)
-async def post_fleet_alert_resolve(alert_id: str):
+async def post_fleet_alert_resolve(request: Request, alert_id: str):
+    tenant_id = _request_tenant_id(request)
+    owned = {v["id"] for v in service_service.list_vehicles(tenant_id=tenant_id)}
     try:
-        return service_service.resolve_alert(alert_id)
+        alert = service_service.resolve_alert(alert_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Alert not found") from None
+    if alert.get("vehicle_id") not in owned:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return alert
 
 
 @router.get("/fleet/reports/costs", response_model=FleetCostReportResponse)
-async def get_fleet_cost_report(vehicle_id: str, date_from: date, date_to: date):
+async def get_fleet_cost_report(
+    request: Request, vehicle_id: str, date_from: date, date_to: date
+):
+    if not service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+        raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
         return service_service.get_vehicle_cost_report(vehicle_id, date_from, date_to)
     except KeyError:
@@ -418,7 +460,11 @@ async def get_fleet_cost_report(vehicle_id: str, date_from: date, date_to: date)
 
 
 @router.get("/fleet/reports/depreciation", response_model=FleetDepreciationResponse)
-async def get_fleet_depreciation(vehicle_id: str, as_of: date | None = None):
+async def get_fleet_depreciation(
+    request: Request, vehicle_id: str, as_of: date | None = None
+):
+    if not service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request)):
+        raise HTTPException(status_code=404, detail="Vehicle not found")
     try:
         return service_service.estimate_book_value(vehicle_id, as_of=as_of)
     except KeyError:
@@ -426,8 +472,8 @@ async def get_fleet_depreciation(vehicle_id: str, as_of: date | None = None):
 
 
 @router.get("/fleet/dashboard")
-async def get_fleet_dashboard_cards():
-    return service_service.dashboard_cards()
+async def get_fleet_dashboard_cards(request: Request):
+    return service_service.dashboard_cards(tenant_id=_request_tenant_id(request))
 
 
 @router.get("/backups", response_model=list[BackupInfoResponse])

@@ -10,7 +10,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from travel_platform.settings.platform_store import get_platform_config
-from travel_platform.settings.drivers_store import list_drivers
+from travel_platform.settings.drivers_store import DEMO_TENANT_ID, list_drivers
 
 ServiceStatus = Literal["OK", "Warning", "Urgent"]
 AlertSeverity = Literal["warning", "urgent"]
@@ -42,13 +42,25 @@ DEFAULT_AMENITIES: dict[str, list[str]] = {
         "Θέρμανση",
         "Μεγάλοι αποθηκευτικοί χώροι",
     ],
+    "Van": [
+        "Κλιματισμός",
+        "USB θύρες",
+        "Ευέλικτες θέσεις",
+        "Αποσκευές",
+    ],
 }
 
 DEFAULT_SEATS: dict[str, int] = {
     "Luxury Coach": 50,
     "Premium Express": 32,
     "Standard": 55,
+    "Van": 9,
 }
+
+
+def _normalize_tenant_id(value: str | None) -> str:
+    tid = str(value or "").strip()
+    return tid or DEMO_TENANT_ID
 
 
 def _default_amenities(category: str) -> list[str]:
@@ -84,6 +96,7 @@ class Vehicle:
     public_image_url: str = ""
     public_summary: str = ""
     show_on_website: bool = True
+    tenant_id: str = DEMO_TENANT_ID
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -165,6 +178,7 @@ class ServiceService:
                 "Luxury Coach": "Premium coach για μεγάλες αποστάσεις — άνεση VIP επιπέδου.",
                 "Premium Express": "Express στόλος για γρήγορες διαδρομές Ελλάδας & Ευρώπης.",
                 "Standard": "Αξιόπιστο coach για ομαδικές εκδρομές και σχολικές μεταφορές.",
+                "Van": "Van / minibus για transfers και μικρές ομάδες.",
             }.get(category, "")
             self._vehicles[vid] = Vehicle(
                 id=vid,
@@ -188,6 +202,7 @@ class ServiceService:
                 public_summary=summary,
                 public_image_url="/images/hero-bus-achillio.png",
                 show_on_website=True,
+                tenant_id=DEMO_TENANT_ID,
             )
 
     def _load(self) -> None:
@@ -221,6 +236,8 @@ class ServiceService:
                 public_image_url=str(r.get("public_image_url") or ""),
                 public_summary=str(r.get("public_summary") or ""),
                 show_on_website=bool(r.get("show_on_website", True)),
+                # Legacy rows without tenant_id belong to the demo office only.
+                tenant_id=_normalize_tenant_id(r.get("tenant_id")),
                 created_at=_parse_datetime(r.get("created_at")),
                 updated_at=_parse_datetime(r.get("updated_at")),
             )
@@ -290,13 +307,31 @@ class ServiceService:
             "days_to_legal_deadline": days_to_kteo,
         }
 
-    def list_vehicles(self) -> list[dict[str, Any]]:
-        return sorted((self._vehicle_response(v) for v in self._vehicles.values()), key=lambda x: x["plate_number"])
+    def _vehicle_tenant_id(self, v: Vehicle) -> str:
+        return _normalize_tenant_id(getattr(v, "tenant_id", None))
 
-    def list_public_vehicles(self) -> list[dict[str, Any]]:
+    def _vehicles_for_tenant(self, tenant_id: str | None) -> list[Vehicle]:
+        if tenant_id is None:
+            return list(self._vehicles.values())
+        tid = _normalize_tenant_id(tenant_id)
+        return [v for v in self._vehicles.values() if self._vehicle_tenant_id(v) == tid]
+
+    def get_vehicle_for_tenant(self, vehicle_id: str, tenant_id: str) -> Vehicle | None:
+        v = self._vehicles.get(vehicle_id)
+        if not v:
+            return None
+        if self._vehicle_tenant_id(v) != _normalize_tenant_id(tenant_id):
+            return None
+        return v
+
+    def list_vehicles(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+        vehicles = self._vehicles_for_tenant(tenant_id)
+        return sorted((self._vehicle_response(v) for v in vehicles), key=lambda x: x["plate_number"])
+
+    def list_public_vehicles(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
         """Vehicles for marketing homepage — no sensitive fleet data."""
         rows: list[dict[str, Any]] = []
-        for v in self._vehicles.values():
+        for v in self._vehicles_for_tenant(tenant_id):
             if not v.show_on_website:
                 continue
             status = self.compute_service_status(v)
@@ -322,14 +357,17 @@ class ServiceService:
             )
         return sorted(rows, key=lambda x: x["name"])
 
-    def get_vehicle(self, vehicle_id: str) -> dict[str, Any] | None:
+    def get_vehicle(self, vehicle_id: str, tenant_id: str | None = None) -> dict[str, Any] | None:
         v = self._vehicles.get(vehicle_id)
         if not v:
+            return None
+        if tenant_id is not None and self._vehicle_tenant_id(v) != _normalize_tenant_id(tenant_id):
             return None
         return self._vehicle_response(v)
 
     def create_vehicle(self, payload: dict[str, Any]) -> dict[str, Any]:
         vid = payload.get("id") or f"FL-{str(uuid4())[:8].upper()}"
+        category = str(payload.get("category") or "Standard")
         v = Vehicle(
             id=vid,
             make=payload["make"].strip(),
@@ -348,23 +386,33 @@ class ServiceService:
             purchase_price=float(payload.get("purchase_price", 100000)),
             fuel_cost_total=float(payload.get("fuel_cost_total", 0)),
             insurance_cost_total=float(payload.get("insurance_cost_total", 0)),
-            category=str(payload.get("category") or "Standard"),
-            seat_count=int(payload.get("seat_count") or _default_seats(str(payload.get("category") or "Standard"))),
-            amenities=list(payload.get("amenities") or _default_amenities(str(payload.get("category") or "Standard"))),
+            category=category,
+            seat_count=int(payload.get("seat_count") or _default_seats(category)),
+            amenities=list(payload.get("amenities") or _default_amenities(category)),
             public_image_url=str(payload.get("public_image_url") or ""),
             public_summary=str(payload.get("public_summary") or ""),
             show_on_website=bool(payload.get("show_on_website", True)),
+            tenant_id=_normalize_tenant_id(payload.get("tenant_id")),
         )
         self._vehicles[v.id] = v
         self._persist()
         return self._vehicle_response(v)
 
-    def update_vehicle(self, vehicle_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    def update_vehicle(
+        self,
+        vehicle_id: str,
+        patch: dict[str, Any],
+        tenant_id: str | None = None,
+    ) -> dict[str, Any]:
         v = self._vehicles.get(vehicle_id)
         if not v:
             raise KeyError("Vehicle not found")
+        if tenant_id is not None and self._vehicle_tenant_id(v) != _normalize_tenant_id(tenant_id):
+            raise KeyError("Vehicle not found")
         for key, value in patch.items():
             if value is None:
+                continue
+            if key == "tenant_id":
                 continue
             if key in {"last_service_date", "legal_deadline", "insurance_due_date"}:
                 setattr(v, key, _parse_date(str(value)))
@@ -384,8 +432,11 @@ class ServiceService:
         self._persist()
         return self._vehicle_response(v)
 
-    def delete_vehicle(self, vehicle_id: str) -> bool:
-        if vehicle_id not in self._vehicles:
+    def delete_vehicle(self, vehicle_id: str, tenant_id: str | None = None) -> bool:
+        v = self._vehicles.get(vehicle_id)
+        if not v:
+            return False
+        if tenant_id is not None and self._vehicle_tenant_id(v) != _normalize_tenant_id(tenant_id):
             return False
         del self._vehicles[vehicle_id]
         self._events = {eid: e for eid, e in self._events.items() if e.vehicle_id != vehicle_id}
@@ -642,9 +693,12 @@ class ServiceService:
             "mileage_factor": round(mileage_factor, 4),
         }
 
-    def dashboard_cards(self) -> dict[str, Any]:
-        vehicles = self.list_vehicles()
+    def dashboard_cards(self, tenant_id: str | None = None) -> dict[str, Any]:
+        vehicles = self.list_vehicles(tenant_id=tenant_id)
         unresolved = self.list_alerts(unresolved_only=True)
+        if tenant_id is not None:
+            owned_ids = {v["id"] for v in vehicles}
+            unresolved = [a for a in unresolved if a.get("vehicle_id") in owned_ids]
         urgent = [v for v in vehicles if v["service_status"] == "Urgent"]
         warning = [v for v in vehicles if v["service_status"] == "Warning"]
         monthly_cost = sum(v.get("insurance_cost_total", 0) for v in vehicles) / 12 + sum(v.get("fuel_cost_total", 0) for v in vehicles) / 12

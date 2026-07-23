@@ -48,6 +48,7 @@ import {
 } from '../services/platformApi.js';
 import { clearSaasSession, getSaasToken } from '../services/saasApi.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, DEFAULT_PLATFORM_TAB, sanitizeSettingsSubTab } from '../lib/admin/settingsTabs.js';
+import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
 import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
@@ -326,6 +327,7 @@ export default function BackOffice() {
   };
 
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [addVehicleOpen, setAddVehicleOpen] = useState(false);
   const [serviceForm, setServiceForm] = useState({
     vehicle_id: '',
     mileage: '',
@@ -934,13 +936,14 @@ export default function BackOffice() {
   const renderDrivers = () => <DriversHub />;
 
   const renderFleet = () => {
+    const authenticated = Boolean(getSaasToken());
     const rows = fleetVehicles.length
       ? fleetVehicles.map((v) => ({
           id: v.id,
           name: `${v.make} ${v.model}`,
           licensePlate: v.plate_number,
-          type: v.model,
-          seats: '-',
+          type: v.category || v.model,
+          seats: v.seat_count ?? '-',
           status:
             v.service_status === 'Urgent'
               ? 'Σε Service'
@@ -959,7 +962,9 @@ export default function BackOffice() {
           service_status: v.service_status,
           km_to_service: v.km_to_service,
         }))
-      : mockFleet;
+      : authenticated
+        ? []
+        : mockFleet;
     const totalFleet = rows.length;
     const activeFleet = rows.filter((f) => f.status === 'Ενεργό').length;
     const totalRevenue = rows.reduce((sum, f) => sum + Number(f.financials?.revenue || 0), 0);
@@ -976,7 +981,14 @@ export default function BackOffice() {
               Παρακολούθηση οχημάτων, κατάσταση συντήρησης και οικονομικά στοιχεία.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setAddVehicleOpen(true)}
+              className="px-6 py-2 bg-gray-900 text-white font-label-md text-label-md rounded-full hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-md"
+            >
+              <span className="material-symbols-outlined text-sm">add</span> Νέο όχημα
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -1103,9 +1115,29 @@ export default function BackOffice() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-16 text-center">
+                      <span className="material-symbols-outlined text-4xl text-gray-300 mb-3 block">directions_bus</span>
+                      <p className="font-bold text-gray-900 mb-1">Δεν υπάρχουν οχήματα στον στόλο</p>
+                      <p className="text-sm text-gray-500 mb-4">
+                        Πρόσθεσε λεωφορείο, coach ή van για να ξεκινήσεις.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setAddVehicleOpen(true)}
+                        className="px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-bold inline-flex items-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        Νέο όχημα
+                      </button>
+                    </td>
+                  </tr>
+                )}
                 {rows.map(bus => {
                   const kmUntilService = Number(bus.nextServiceKm || 0) - Number(bus.kilometers || 0);
                   const needsServiceSoon = kmUntilService < 5000 || bus.service_status === 'Warning' || bus.service_status === 'Urgent';
+                  const isVan = String(bus.type || '').toLowerCase().includes('van');
                   
                   return (
                     <tr
@@ -1118,7 +1150,9 @@ export default function BackOffice() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-2xl bg-surface-container-low text-primary flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                            <span className="material-symbols-outlined text-[24px]">directions_bus</span>
+                            <span className="material-symbols-outlined text-[24px]">
+                              {isVan ? 'airport_shuttle' : 'directions_bus'}
+                            </span>
                           </div>
                           <div>
                             <div className="font-bold text-gray-900">{bus.name} <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full ml-2">{bus.type} • {bus.seats} Θέσεις</span></div>
@@ -1289,6 +1323,14 @@ export default function BackOffice() {
             </form>
           </div>
         )}
+
+        <AddFleetVehicleModal
+          open={addVehicleOpen}
+          onClose={() => setAddVehicleOpen(false)}
+          onCreated={async (vehicle) => {
+            await reloadFleetData(vehicle?.id);
+          }}
+        />
       </div>
     );
   };
