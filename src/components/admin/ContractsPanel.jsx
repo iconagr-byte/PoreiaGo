@@ -103,18 +103,23 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
   }, []);
 
   useEffect(() => {
-    load();
+    // Initial subscription fetch — setState happens after the async resolve.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount fetch
+    void load();
     const params = new URLSearchParams(window.location.search);
     if (params.get('billing') === 'success') {
       toast.success('Το συμβόλαιο ενεργοποιήθηκε — ενημερώνουμε…');
-      load();
+      void load();
     }
   }, [load]);
 
-  useEffect(() => {
+  // Sync parent-provided plan/interval during render (avoids setState-in-effect).
+  const [propSeed, setPropSeed] = useState({ plan: initialPlan, interval: initialInterval });
+  if (initialPlan !== propSeed.plan || initialInterval !== propSeed.interval) {
+    setPropSeed({ plan: initialPlan, interval: initialInterval });
     if (initialPlan) setSelectedPlan(initialPlan);
     if (initialInterval) setInterval(initialInterval);
-  }, [initialPlan, initialInterval]);
+  }
 
   const startCheckout = async () => {
     setWorking(true);
