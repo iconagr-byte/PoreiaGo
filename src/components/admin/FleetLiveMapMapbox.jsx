@@ -5,10 +5,12 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '../../styles/fleet-live-map.css';
 import { MAPBOX_STYLE, MAPBOX_TOKEN } from '../../lib/maps/mapboxConfig.js';
 import { useAnimatedFleetVehicles } from '../../hooks/useAnimatedFleetVehicles.js';
+import { useFleetVehicleTrails } from '../../hooks/useFleetVehicleTrails.js';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import FleetGeofenceMapboxLayers from './FleetGeofenceMapboxLayers.jsx';
 import FleetSosPinsMapbox from './FleetSosPinsMapbox.jsx';
 import FleetMapFlyToMapbox from './FleetMapFlyToMapbox.jsx';
+import FleetLiveTrailsMapbox from './FleetLiveTrailsMapbox.jsx';
 import GreecePlacesMapboxLayer from './GreecePlacesMapboxLayer.jsx';
 import {
   formatBoardingLabel,
@@ -188,6 +190,7 @@ export default function FleetLiveMapMapbox({
   showGeofence = false,
   showSosPins = true,
   showPlaces = true,
+  showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
   onVehicleHistory,
@@ -207,6 +210,8 @@ export default function FleetLiveMapMapbox({
     return [...vehicles, ...extra];
   }, [vehicles, sosAlerts]);
 
+  const trails = useFleetVehicleTrails(vehicles, { enabled: showTrails });
+
   return (
     <Map
       mapboxAccessToken={MAPBOX_TOKEN}
@@ -220,6 +225,7 @@ export default function FleetLiveMapMapbox({
       <FitBounds vehicles={fitVehicles} fitNonce={fitNonce} />
       {focusSosAlert ? <FleetMapFlyToMapbox alert={focusSosAlert} /> : null}
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
+      <FleetLiveTrailsMapbox trails={trails} visible={showTrails} />
       <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} />
       <HeatmapDots points={heatmap} visible={showHeat} />
       <MapboxAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
