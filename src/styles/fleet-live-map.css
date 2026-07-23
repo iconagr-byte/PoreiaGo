@@ -221,7 +221,10 @@
   border-color: rgba(255, 59, 48, 0.18);
 }
 
-/* Place labels — Apple Maps typography */
+.fleet-live-trail {
+  filter: drop-shadow(0 0 1px rgba(0, 113, 227, 0.35));
+}
+
 .fleet-place-marker {
   background: transparent !important;
   border: 0 !important;

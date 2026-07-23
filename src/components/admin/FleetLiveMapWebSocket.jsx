@@ -26,6 +26,7 @@ export default function FleetLiveMapWebSocket() {
   const [selectedId, setSelectedId] = useState(null);
   const [historyVehicle, setHistoryVehicle] = useState(null);
   const [showPlaces, setShowPlaces] = useState(true);
+  const [showTrails, setShowTrails] = useState(true);
 
   // SOS pins always on (χωρίς toggle UI) — κρίσιμο για ασφάλεια.
   const { alerts } = useTelemetryAlerts({ tenantId, limit: 80, enabled: true });
@@ -64,6 +65,15 @@ export default function FleetLiveMapWebSocket() {
           </button>
           <button
             type="button"
+            onClick={() => setShowTrails((v) => !v)}
+            className={`fleet-apple-chip ${showTrails ? 'is-on' : ''}`}
+            aria-pressed={showTrails}
+          >
+            <span className="material-symbols-outlined text-[16px]">route</span>
+            Ίχνος διαδρομής
+          </button>
+          <button
+            type="button"
             onClick={() => setFitNonce((n) => n + 1)}
             className="fleet-apple-chip"
           >
@@ -98,6 +108,7 @@ export default function FleetLiveMapWebSocket() {
               showGeofence={false}
               showSosPins
               showPlaces={showPlaces}
+              showTrails={showTrails}
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
               onVehicleHistory={setHistoryVehicle}
@@ -114,6 +125,7 @@ export default function FleetLiveMapWebSocket() {
               showGeofence={false}
               showSosPins
               showPlaces={showPlaces}
+              showTrails={showTrails}
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
               onVehicleHistory={setHistoryVehicle}

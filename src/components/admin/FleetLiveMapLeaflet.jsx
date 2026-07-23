@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../../styles/fleet-live-map.css';
 import { useAnimatedFleetVehicles } from '../../hooks/useAnimatedFleetVehicles.js';
+import { useFleetVehicleTrails } from '../../hooks/useFleetVehicleTrails.js';
 import FleetHeatmapLayer from './FleetHeatmapLayer.jsx';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import {
@@ -17,6 +18,7 @@ import { formatFleetBusPillLabel } from '../../lib/admin/fleetBusPillLabel.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
 import FleetMapFlyTo from './FleetMapFlyTo.jsx';
+import FleetLiveTrailsLeaflet from './FleetLiveTrailsLeaflet.jsx';
 import GreecePlacesLeafletLayer from './GreecePlacesLeafletLayer.jsx';
 import { APPLE_LEAFLET_TILES } from '../../lib/maps/appleMapTheme.js';
 
@@ -172,6 +174,7 @@ export default function FleetLiveMapLeaflet({
   showGeofence = false,
   showSosPins = true,
   showPlaces = true,
+  showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
   onVehicleHistory,
@@ -181,6 +184,8 @@ export default function FleetLiveMapLeaflet({
     sosAlerts.forEach((a, i) => pts.push({ id: `sos-${a.id || i}`, lat: a.lat, lng: a.lng }));
     return pts;
   }, [vehicles, sosAlerts]);
+
+  const trails = useFleetVehicleTrails(vehicles, { enabled: showTrails });
 
   return (
     <MapContainer
@@ -201,6 +206,7 @@ export default function FleetLiveMapLeaflet({
       <FitBounds vehicles={fitPoints} fitNonce={fitNonce} />
       {focusSosAlert ? <FleetMapFlyTo alert={focusSosAlert} /> : null}
       <FleetGeofenceLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
+      <FleetLiveTrailsLeaflet trails={trails} visible={showTrails} />
       <FleetSosPins alerts={sosAlerts} visible={showSosPins} />
       <FleetHeatmapLayer points={heatmap} visible={showHeat} />
       <LeafletAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
