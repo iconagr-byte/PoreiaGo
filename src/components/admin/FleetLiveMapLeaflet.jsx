@@ -13,6 +13,7 @@ import {
   formatUpdatedAgo,
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
+import { formatFleetBusPillLabel } from '../../lib/admin/fleetBusPillLabel.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
 import FleetMapFlyTo from './FleetMapFlyTo.jsx';
@@ -30,12 +31,11 @@ function escapeAttr(value) {
 const busIcon = (vehicle) => {
   const heading = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
   const img = escapeAttr(resolveFleetMarkerImage(vehicle));
-  const name = escapeAttr(String(vehicle?.driver_name || 'Οδηγός').split(/\s+/)[0]);
-  const speed = Math.round(vehicle?.speed || 0);
+  const label = escapeAttr(formatFleetBusPillLabel(vehicle));
   return L.divIcon({
     className: 'fleet-bus-marker-ws',
     html: `<div class="fleet-apple-bus-pin">
-      <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${name} · ${speed} km/h</div>
+      <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${label}</div>
       <div class="fleet-apple-bus-pin__ring">
         <div class="fleet-apple-bus-pin__avatar"><img src="${img}" alt="" /></div>
         <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
@@ -72,7 +72,10 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
             />
             <div>
               <div className="fleet-apple-popup__title">{v.driver_name}</div>
-              <div className="fleet-apple-popup__meta">{v.bus_plate}</div>
+              <div className="fleet-apple-popup__meta">
+                {v.bus_plate}
+                {v.trip_title || v.trip_id ? ` · ${v.trip_title || `Εκδρομή #${v.trip_id}`}` : ''}
+              </div>
             </div>
           </div>
           Ταχύτητα: {Math.round(v.speed)} km/h

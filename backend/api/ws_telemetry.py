@@ -214,10 +214,13 @@ async def admin_fleet_egress_ws(
 
     live = get_live_fleet()
     snapshot = []
+    from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
+
     for vehicle in await live.list_active_for_admin_async(tenant_id):
         meta = await live.vehicle_meta_async(tenant_id, vehicle.vehicle_id)
         if not meta:
             meta = live._vehicles.get(vehicle.vehicle_id, {})
+        trip_title = await resolve_trip_title(vehicle.trip_id, preferred=meta.get("trip_title"))
         snapshot.append(
             {
                 "type": "fleet_snapshot",
@@ -227,6 +230,7 @@ async def admin_fleet_egress_ws(
                 "driver_name": meta.get("driver_name", "—"),
                 "driver_id": meta.get("driver_id"),
                 "trip_id": vehicle.trip_id,
+                "trip_title": trip_title or None,
                 "lat": vehicle.lat,
                 "lng": vehicle.lng,
                 "speed": vehicle.speed_kmh,

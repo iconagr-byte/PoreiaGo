@@ -15,7 +15,7 @@ import {
 } from './driverDeviceSensors.js';
 import { LIVE_REFRESH_MS } from '../liveRefresh.js';
 import { createDriverTelemetryTransport } from './driverTelemetryTransport.js';
-import { getDriverSession } from './driverSession.js';
+import { getDriverSession, saveDriverSession } from './driverSession.js';
 import { endDriverShift, fetchDriverManifest, startDriverShift } from '../../services/driverPortalApi.js';
 import { isWakeLockSupported, releaseWakeLock, requestWakeLock } from './wakeLock.js';
 import {
@@ -223,6 +223,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
               busPlate: plate,
               manifest: manifestRef.current,
               sensors: sensorsRef.current,
+              tripTitle: manifestRef.current?.trip_title || liveSession?.tripTitle,
             });
             const sent = conn.send(payload);
             if (sent) {
@@ -317,6 +318,12 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
         .then((manifest) => {
           manifestRef.current = manifest;
           setManifestSummary(manifest);
+          if (manifest?.trip_title) {
+            const session = getDriverSession();
+            if (session && session.tripTitle !== manifest.trip_title) {
+              saveDriverSession({ ...session, tripTitle: manifest.trip_title });
+            }
+          }
         })
         .catch(() => {});
     };

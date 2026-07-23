@@ -88,6 +88,13 @@ class LiveFleetService:
             merged["bus_plate"] = plate
         if raw.get("heading_deg") is not None:
             merged["heading_deg"] = raw.get("heading_deg")
+        trip_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
+        if trip_title:
+            merged["trip_title"] = str(trip_title).strip()
+        elif update.trip_id is not None and not merged.get("trip_title"):
+            from travel_platform.telemetry.trip_title_resolve import resolve_trip_title_sync
+
+            merged["trip_title"] = resolve_trip_title_sync(update.trip_id)
 
         self._vehicles[vid] = merged
         # Keep code index in sync

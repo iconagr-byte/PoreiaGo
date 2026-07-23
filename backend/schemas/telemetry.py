@@ -48,6 +48,7 @@ class LiveVehicleResponse(BaseModel):
     driver_id: str | None = None
     photo_url: str | None = None
     vehicle_image_url: str | None = None
+    trip_title: str | None = None
 
 
 class HeatmapPoint(BaseModel):

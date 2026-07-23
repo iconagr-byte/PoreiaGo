@@ -165,6 +165,19 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
     payload = driver_payload_to_telemetry(body, session=session)
     tenant_id = str(payload["tenant_id"])
 
+    preferred_title = (
+        body.get("trip_title")
+        or body.get("tripTitle")
+        or payload.get("trip_title")
+        or payload.get("tripTitle")
+    )
+    if preferred_title:
+        payload["trip_title"] = str(preferred_title).strip()
+    elif payload.get("trip_id") is not None:
+        from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
+
+        payload["trip_title"] = await resolve_trip_title(payload.get("trip_id"))
+
     await process_telemetry_payload(payload)
 
     vehicle_id = None
@@ -180,6 +193,7 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         "type": "fleet_location",
         "tenant_id": tenant_id,
         "trip_id": payload.get("trip_id"),
+        "trip_title": payload.get("trip_title"),
         "driver_id": payload.get("driver_id"),
         "driver_name": payload.get("driver_name"),
         "bus_plate": payload.get("bus_plate"),

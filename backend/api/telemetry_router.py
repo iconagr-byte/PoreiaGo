@@ -83,6 +83,7 @@ async def fleet_live(
     tenant_id: Annotated[UUID, Depends(get_tenant_id)],
 ):
     from travel_platform.telemetry.live_fleet_media import enrich_live_vehicle_media
+    from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
     live: LiveFleetService = get_live_fleet()
     rows = []
@@ -95,6 +96,7 @@ async def fleet_live(
             bus_plate=meta.get("bus_plate", v.vehicle_code),
             vehicle_code=v.vehicle_code,
         )
+        trip_title = await resolve_trip_title(v.trip_id, preferred=meta.get("trip_title"))
         rows.append(
             LiveVehicleResponse(
                 vehicle_id=v.vehicle_id,
@@ -113,6 +115,7 @@ async def fleet_live(
                 driver_id=meta.get("driver_id"),
                 photo_url=media.get("photo_url"),
                 vehicle_image_url=media.get("vehicle_image_url"),
+                trip_title=trip_title or None,
             ),
         )
     return rows

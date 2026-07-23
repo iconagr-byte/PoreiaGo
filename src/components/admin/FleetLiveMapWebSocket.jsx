@@ -8,6 +8,7 @@ import {
   formatUpdatedAgo,
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
+import { resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
 import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
@@ -159,7 +160,12 @@ export default function FleetLiveMapWebSocket() {
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-bold tracking-tight">{v.driver_name}</div>
                             <div className="truncate text-xs text-[var(--fleet-secondary)]">
-                              {v.bus_plate} · δρομολόγιο #{v.trip_id ?? '—'}
+                              {(() => {
+                                const trip = resolveVehicleTripTitle(v);
+                                return trip
+                                  ? `${v.bus_plate} · ${trip}`
+                                  : `${v.bus_plate} · δρομολόγιο #${v.trip_id ?? '—'}`;
+                              })()}
                             </div>
                             <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-[var(--fleet-secondary)]">
                               <span>{Math.round(v.speed || 0)} km/h</span>
