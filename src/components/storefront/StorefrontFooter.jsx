@@ -1,7 +1,33 @@
 import { Link } from 'react-router-dom';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import { resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
+
+function FooterBrandBlock({ siteAppearance, tone = 'light' }) {
+  const brand = resolveOfficeBrand(siteAppearance);
+  const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
+  const nameClass = tone === 'dark' ? 'text-white' : 'text-on-surface';
+  const copyClass = tone === 'dark' ? 'text-white/60' : 'text-secondary';
+
+  return (
+    <div>
+      {logoSrc ? (
+        <img
+          src={logoSrc}
+          alt={brand.name}
+          className="mb-4 h-12 w-auto max-w-[200px] object-contain"
+        />
+      ) : (
+        <p className={`text-2xl font-bold mb-3 ${nameClass}`}>{brand.name}</p>
+      )}
+      {brand.displayName && logoSrc && (
+        <p className={`font-bold text-lg mb-2 ${nameClass}`}>{brand.displayName}</p>
+      )}
+      {brand.copyright && <p className={`text-sm ${copyClass}`}>{brand.copyright}</p>}
+    </div>
+  );
+}
 
 export default function StorefrontFooter({ siteAppearance, templateId = 'classic_columns' }) {
-  const brand = siteAppearance.footer_brand_name || 'PoreiaGo';
   const contact = (
     <>
       {siteAppearance.footer_contact_email && (
@@ -39,7 +65,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white font-bold hover:bg-gray-800 transition-all"
       >
         <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
-        Admin Login
+        Σύνδεση γραφείου
       </Link>
     </>
   );
@@ -47,10 +73,9 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
   if (templateId === 'minimal_center') {
     return (
       <footer className="bg-surface-container-lowest py-16 border-t border-surface-container text-center">
-        <div className="max-w-container-max mx-auto px-margin-desktop">
-          <p className="font-headline-md font-bold text-on-surface mb-2">{brand}</p>
-          <p className="text-secondary text-sm mb-8">{siteAppearance.footer_copyright}</p>
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-secondary">{links}</div>
+        <div className="max-w-container-max mx-auto px-margin-desktop flex flex-col items-center">
+          <FooterBrandBlock siteAppearance={siteAppearance} />
+          <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-secondary">{links}</div>
         </div>
       </footer>
     );
@@ -61,8 +86,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
       <footer className="bg-slate-950 text-white py-16">
         <div className="max-w-container-max mx-auto px-margin-desktop grid md:grid-cols-2 gap-10">
           <div>
-            <p className="text-2xl font-bold mb-3">{brand}</p>
-            <p className="text-white/60 text-sm">{siteAppearance.footer_copyright}</p>
+            <FooterBrandBlock siteAppearance={siteAppearance} tone="dark" />
             <div className="mt-6 space-y-1 text-sm text-white/70">{contact}</div>
           </div>
           <div className="flex flex-wrap gap-6 items-start md:justify-end text-sm text-white/80">{links}</div>
@@ -75,10 +99,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
     return (
       <footer className="bg-white border-t border-black/[0.06] py-14">
         <div className="max-w-container-max mx-auto px-margin-desktop grid md:grid-cols-3 gap-10">
-          <div>
-            <p className="font-bold text-xl text-on-surface mb-2">{brand}</p>
-            <p className="text-sm text-secondary">{siteAppearance.footer_copyright}</p>
-          </div>
+          <FooterBrandBlock siteAppearance={siteAppearance} />
           <div className="space-y-3 text-sm text-on-surface-variant">
             <p className="font-bold text-on-surface flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[20px]">contact_mail</span>
@@ -115,10 +136,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <p className="font-bold text-on-surface">{brand}</p>
-              <p className="text-sm text-secondary mt-2">{siteAppearance.footer_copyright}</p>
-            </div>
+            <FooterBrandBlock siteAppearance={siteAppearance} />
             <div className="flex flex-wrap gap-6 justify-start md:justify-end text-sm text-secondary">{links}</div>
           </div>
         </div>
@@ -127,12 +145,19 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
   }
 
   if (templateId === 'compact_inline') {
+    const brand = resolveOfficeBrand(siteAppearance);
+    const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
     return (
       <footer className="bg-surface-container-low py-6 border-t">
         <div className="max-w-container-max mx-auto px-margin-desktop flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-sm text-secondary">
-          <p>
-            <span className="font-bold text-on-surface">{brand}</span> · {siteAppearance.footer_copyright}
-          </p>
+          <div className="flex items-center gap-3 min-w-0">
+            {logoSrc ? (
+              <img src={logoSrc} alt={brand.name} className="h-8 w-auto max-w-[140px] object-contain" />
+            ) : (
+              <span className="font-bold text-on-surface">{brand.name}</span>
+            )}
+            {brand.copyright && <span className="truncate">· {brand.copyright}</span>}
+          </div>
           <div className="flex flex-wrap gap-4">{links}</div>
         </div>
       </footer>
@@ -144,12 +169,11 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
     <footer className="bg-surface-container-lowest py-stack-lg border-t border-surface-container">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-gutter px-margin-desktop max-w-container-max mx-auto">
         <div className="col-span-1">
-          <div className="font-headline-md text-headline-md font-bold text-on-surface mb-4">{brand}</div>
-          <p className="font-label-md text-label-md text-secondary mb-3">{siteAppearance.footer_copyright}</p>
+          <FooterBrandBlock siteAppearance={siteAppearance} />
           {(siteAppearance.footer_contact_email ||
             siteAppearance.footer_contact_phone ||
             siteAppearance.footer_address) && (
-            <div className="space-y-1 text-sm text-secondary">{contact}</div>
+            <div className="mt-4 space-y-1 text-sm text-secondary">{contact}</div>
           )}
         </div>
         <div className="col-span-1 md:col-span-3 flex flex-wrap justify-end items-center gap-x-8 gap-y-3 text-sm text-secondary">

@@ -714,7 +714,7 @@ export default function HomepageSettingsPanel() {
           >
             <PanelCard
               title="Πρότυπα Footer"
-              description="Το κάτω μέρος της αρχικής — στήλες, dark band, newsletter κ.λπ."
+              description="Το κάτω μέρος της αρχικής — λογότυπο γραφείου, επωνυμία και κείμενα που επεξεργάζεστε εδώ."
               action={<SaveButton saving={saving} label="Αποθήκευση footer" />}
             >
               <TemplatePicker
@@ -724,19 +724,26 @@ export default function HomepageSettingsPanel() {
                 onChange={(id) => setForm((p) => ({ ...p, footer_template: id }))}
               />
 
+              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+                Το <strong>λογότυπο</strong> στο footer έρχεται από την ενότητα «Λογότυπο & εικόνες».
+                Συμπληρώστε επωνυμία / copyright παρακάτω — όχι AeroStride / PoreiaGo.
+              </div>
+
               <div className="mt-8 pt-8 border-t border-black/[0.06] grid md:grid-cols-2 gap-4">
                 <label className="block text-sm md:col-span-2">
-                  <span className="font-bold text-gray-700">Επωνυμία</span>
+                  <span className="font-bold text-gray-700">Επωνυμία γραφείου (footer)</span>
                   <input
                     className="mt-1 w-full rounded-xl border px-3 py-2"
+                    placeholder="π.χ. Achillio Travel"
                     value={form.footer_brand_name}
                     onChange={(e) => setForm((p) => ({ ...p, footer_brand_name: e.target.value }))}
                   />
                 </label>
                 <label className="block text-sm md:col-span-2">
-                  <span className="font-bold text-gray-700">Copyright</span>
+                  <span className="font-bold text-gray-700">Copyright / κείμενο κάτω</span>
                   <input
                     className="mt-1 w-full rounded-xl border px-3 py-2"
+                    placeholder="π.χ. © 2026 Achillio Travel"
                     value={form.footer_copyright}
                     onChange={(e) => setForm((p) => ({ ...p, footer_copyright: e.target.value }))}
                   />
