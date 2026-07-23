@@ -95,7 +95,7 @@ export default function FleetLiveMapWebSocket() {
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_280px] gap-3">
         <div className="fleet-apple-map-frame">
           {mapbox ? (
             <FleetLiveMapMapbox
