@@ -96,13 +96,13 @@
   background: #eef1f4 !important;
 }
 
-/* Soften tiles toward Apple Maps light */
+/* Soften light_nolabels / Mapbox light toward Apple Maps */
 .fleet-apple-map-frame .leaflet-tile-pane {
-  filter: saturate(0.72) brightness(1.06) contrast(0.92) hue-rotate(-6deg);
+  filter: saturate(0.82) brightness(1.03) contrast(0.96);
 }
 
 .fleet-apple-map-frame .mapboxgl-canvas {
-  filter: saturate(0.85) brightness(1.03) contrast(0.96);
+  filter: saturate(0.88) brightness(1.02) contrast(0.97);
 }
 
 .fleet-apple-map-frame .leaflet-control-attribution,
@@ -242,17 +242,17 @@
 }
 
 .fleet-place-label.is-region {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(29, 29, 31, 0.42);
+  letter-spacing: 0.08em;
+  color: rgba(29, 29, 31, 0.38);
 }
 
 .fleet-place-label.is-city {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(29, 29, 31, 0.78);
+  color: rgba(29, 29, 31, 0.72);
 }
 
 /* Bus markers — soft glass Apple pin */

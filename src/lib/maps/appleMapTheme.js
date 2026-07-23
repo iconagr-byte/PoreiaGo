@@ -2,9 +2,12 @@
  * Apple-inspired live map theme — soft light basemap, SF-like chrome, Greek labels.
  */
 
-/** Soft light raster tiles (Leaflet fallback). Voyager + CSS soften ≈ Apple Maps light. */
+/**
+ * CARTO light without place names — our collision-aware Greek labels sit cleanly on top
+ * (avoids ΘΕΣΣΑΛΟΝΙΚΗ + ΚΕΝΤΡΙΚΗ ΜΑΚΕΔΟΝΙΑ stacking on Voyager).
+ */
 export const APPLE_LEAFLET_TILES = {
-  url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
   attribution: '© OpenStreetMap · © CARTO',
   subdomains: 'abcd',
   maxZoom: 19,
