@@ -819,56 +819,86 @@ export default function BackOffice() {
             <button
               type="button"
               onClick={() => setSelectedCustomer(null)}
-              className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              className="w-10 h-10 rounded-full bg-white border border-sky-100 text-sky-700 hover:bg-sky-50 shadow-sm flex items-center justify-center transition-colors"
             >
-              <span className="material-symbols-outlined text-gray-600">arrow_back</span>
+              <span className="material-symbols-outlined">arrow_back</span>
             </button>
-            <span className="font-bold text-gray-500">Πίσω στον κατάλογο πελατών</span>
+            <span className="font-bold text-slate-500">Πίσω στον κατάλογο πελατών</span>
           </div>
 
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-xl font-bold">
-                {customerName.substring(0, 2).toUpperCase()}
+          <div className="relative overflow-hidden rounded-[32px] border border-sky-100/80 bg-gradient-to-br from-sky-50 via-white to-teal-50 p-5 sm:p-6 mb-2 shadow-[0_12px_40px_rgba(14,165,233,0.08)]">
+            <div
+              className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-primary/10 blur-2xl"
+              aria-hidden
+            />
+            <div
+              className="pointer-events-none absolute -bottom-12 left-1/3 h-36 w-36 rounded-full bg-teal-300/20 blur-2xl"
+              aria-hidden
+            />
+            <div className="relative flex flex-col sm:flex-row justify-between items-start gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-sky-500 text-white shadow-lg shadow-primary/25 flex items-center justify-center text-xl font-bold">
+                  {customerName.substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h2 className="font-headline-lg font-bold text-slate-900 tracking-tight">{customerName}</h2>
+                  <p className="text-slate-600">{customer.email}</p>
+                  <p className="text-sm text-slate-400 font-mono mt-1">{customer.id}</p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-headline-lg font-bold text-on-surface">{customerName}</h2>
-                <p className="text-on-surface-variant">{customer.email}</p>
-                <p className="text-sm text-gray-400 font-mono mt-1">{customer.id}</p>
-              </div>
+              <span
+                className={`px-4 py-2 rounded-full text-sm font-bold shadow-sm ${
+                  customer.tier === 'Platinum'
+                    ? 'bg-slate-800 text-slate-100'
+                    : customer.tier === 'Gold'
+                      ? 'bg-gradient-to-r from-amber-200 to-yellow-100 text-amber-900 border border-amber-300/60'
+                      : 'bg-sky-100 text-sky-800 border border-sky-200'
+                }`}
+              >
+                {customer.tier || 'Silver'}
+              </span>
             </div>
-            <span
-              className={`px-4 py-2 rounded-full text-sm font-bold ${
-                customer.tier === 'Platinum'
-                  ? 'bg-slate-800 text-slate-200'
-                  : customer.tier === 'Gold'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              {customer.tier || 'Silver'}
-            </span>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white p-5 rounded-3xl border border-black/[0.05] shadow-sm">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">AeroMiles</div>
-              <div className="text-2xl font-bold text-amber-600">{customer.points ?? 0}</div>
+            <div className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-orange-50/60 p-5 rounded-3xl border border-amber-100 shadow-sm hover:-translate-y-0.5 transition-transform duration-300">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3">
+                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  stars
+                </span>
+              </div>
+              <div className="text-[11px] font-bold text-amber-700/70 uppercase tracking-wider mb-1">AeroMiles</div>
+              <div className="text-2xl font-bold text-amber-700">{customer.points ?? 0}</div>
             </div>
-            <div className="bg-white p-5 rounded-3xl border border-black/[0.05] shadow-sm">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Επιβεβαιωμένες</div>
-              <div className="text-2xl font-bold text-emerald-600">
+            <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-50/50 p-5 rounded-3xl border border-emerald-100 shadow-sm hover:-translate-y-0.5 transition-transform duration-300">
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
+                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  verified
+                </span>
+              </div>
+              <div className="text-[11px] font-bold text-emerald-700/70 uppercase tracking-wider mb-1">Επιβεβαιωμένες</div>
+              <div className="text-2xl font-bold text-emerald-700">
                 {confirmedCount}
-                <span className="text-sm text-gray-400 font-normal"> / {customerBookings.length}</span>
+                <span className="text-sm text-emerald-600/50 font-normal"> / {customerBookings.length}</span>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-3xl border border-black/[0.05] shadow-sm">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Εισπράχθηκαν</div>
+            <div className="relative overflow-hidden bg-gradient-to-br from-sky-50 to-primary/[0.08] p-5 rounded-3xl border border-sky-100 shadow-sm hover:-translate-y-0.5 transition-transform duration-300">
+              <div className="w-9 h-9 rounded-xl bg-sky-100 text-primary flex items-center justify-center mb-3">
+                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  account_balance_wallet
+                </span>
+              </div>
+              <div className="text-[11px] font-bold text-sky-700/70 uppercase tracking-wider mb-1">Εισπράχθηκαν</div>
               <div className="text-2xl font-bold text-primary">€{paidTotal.toFixed(2)}</div>
             </div>
-            <div className="bg-white p-5 rounded-3xl border border-black/[0.05] shadow-sm">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Σύνολο τιμολογίων</div>
-              <div className="text-2xl font-bold text-gray-900">€{totalSpent.toFixed(2)}</div>
+            <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-indigo-50/40 p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:-translate-y-0.5 transition-transform duration-300">
+              <div className="w-9 h-9 rounded-xl bg-slate-200/80 text-slate-700 flex items-center justify-center mb-3">
+                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  receipt_long
+                </span>
+              </div>
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Σύνολο τιμολογίων</div>
+              <div className="text-2xl font-bold text-slate-900">€{totalSpent.toFixed(2)}</div>
               {pendingCount > 0 && (
                 <p className="text-xs text-amber-600 mt-1 font-bold">{pendingCount} εκκρεμείς</p>
               )}
@@ -876,12 +906,14 @@ export default function BackOffice() {
           </div>
 
           <div className="space-y-4">
-            <h3 className="font-bold text-lg flex items-center gap-2 px-1">
-              <span className="material-symbols-outlined text-primary">receipt_long</span>
+            <h3 className="font-bold text-lg flex items-center gap-2.5 px-1">
+              <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-sky-500 text-white shadow-md shadow-primary/20 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+              </span>
               Ιστορικό κρατήσεων & οικονομικά
             </h3>
             {customerBookings.length === 0 ? (
-              <p className="p-8 text-center text-gray-500 bg-white rounded-3xl border">
+              <p className="p-8 text-center text-slate-500 bg-gradient-to-br from-slate-50 to-sky-50/40 rounded-3xl border border-sky-100">
                 Δεν υπάρχουν καταγεγραμμένες κρατήσεις.
               </p>
             ) : (
@@ -896,7 +928,7 @@ export default function BackOffice() {
             )}
           </div>
 
-          <p className="text-xs text-gray-400 text-center">
+          <p className="text-xs text-slate-400 text-center">
             Εγγραφή: {customer.joinDate}
           </p>
         </div>
