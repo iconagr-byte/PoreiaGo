@@ -9,6 +9,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Only one VPS deploy at a time. Parallel SSH deploys fight over api-blue/Traefik
+# and surface Traefik's plain "404 page not found" on api.* while nginx returns 502 on www/api.
+concurrency:
+  group: deploy-vps-production
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
