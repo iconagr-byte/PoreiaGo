@@ -113,3 +113,66 @@ async def push_unsubscribe(
     if not removed:
         raise HTTPException(status_code=404, detail="Η εγγραφή δεν βρέθηκε")
     return {"ok": True}
+
+
+@router.post("/test")
+async def push_test(
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    payload: Annotated[dict, Depends(_require_admin)],
+):
+    """Send an immediate test Web Push to admin devices for this tenant."""
+    from travel_platform.notifications.push_subscription_store import (
+        list_all_subscriptions,
+        list_subscriptions_for_email,
+        list_subscriptions_for_tenant,
+    )
+    from travel_platform.notifications.web_push_service import (
+        ensure_web_push_keys,
+        send_push_to_subscription,
+        web_push_configured,
+    )
+
+    ensure_web_push_keys()
+    if not web_push_configured():
+        raise HTTPException(status_code=503, detail="Web Push δεν είναι ρυθμισμένο (VAPID)")
+
+    email = str(payload.get("email") or "").strip().lower()
+    body = {
+        "title": "Δοκιμή Push — PoreiaGo",
+        "body": "Οι ειδοποιήσεις βάρδιας λειτουργούν σε αυτόν τον υπολογιστή.",
+        "tag": "admin-push-test",
+        "url": "/admin?tab=fleet_live_map",
+        "data": {"type": "driver_shift", "event": "test", "tab": "fleet_live_map"},
+        "requireInteraction": True,
+    }
+
+    seen: set[str] = set()
+    attempted = 0
+    sent = 0
+
+    async def _try(sub: dict) -> None:
+        nonlocal attempted, sent
+        endpoint = str(sub.get("endpoint") or "")
+        if not endpoint or endpoint in seen:
+            return
+        seen.add(endpoint)
+        attempted += 1
+        result = await send_push_to_subscription(sub, body)
+        if result.get("sent"):
+            sent += 1
+
+    for sub in list_subscriptions_for_tenant(str(tenant_id), audience="admin"):
+        await _try(sub)
+    if email:
+        for sub in list_subscriptions_for_email(email, audience="admin"):
+            await _try(sub)
+    if attempted == 0:
+        for sub in list_all_subscriptions(audience="admin"):
+            await _try(sub)
+
+    if attempted == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Δεν υπάρχει εγγραφή push — πατήστε «Ενεργοποίηση push» πρώτα",
+        )
+    return {"ok": True, "attempted": attempted, "sent": sent}

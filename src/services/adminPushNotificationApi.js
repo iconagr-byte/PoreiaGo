@@ -39,6 +39,18 @@ export async function fetchAdminPushStatus() {
   return data;
 }
 
+/** True only if THIS browser has an active PushManager subscription. */
+export async function isThisBrowserAdminPushSubscribed() {
+  if (!isAdminPushSupported()) return false;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    return Boolean(subscription?.endpoint);
+  } catch {
+    return false;
+  }
+}
+
 async function registerServiceWorker() {
   const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
   await navigator.serviceWorker.ready;
@@ -65,11 +77,36 @@ export async function subscribeAdminFleetPush() {
   }
 
   const registration = await registerServiceWorker();
+  const serverKey = urlBase64ToUint8Array(config.public_key);
   let subscription = await registration.pushManager.getSubscription();
+
+  // VAPID key rotation / stale browser sub → must resubscribe or push silently fails.
+  if (subscription) {
+    const existingKey = subscription.options?.applicationServerKey;
+    const keyMismatch =
+      existingKey &&
+      (() => {
+        const existing = new Uint8Array(existingKey);
+        if (existing.length !== serverKey.length) return true;
+        for (let i = 0; i < existing.length; i += 1) {
+          if (existing[i] !== serverKey[i]) return true;
+        }
+        return false;
+      })();
+    if (keyMismatch) {
+      try {
+        await subscription.unsubscribe();
+      } catch {
+        /* ignore */
+      }
+      subscription = null;
+    }
+  }
+
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(config.public_key),
+      applicationServerKey: serverKey,
     });
   }
 
@@ -86,6 +123,17 @@ export async function subscribeAdminFleetPush() {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || 'Αποτυχία εγγραφής push');
+  return data;
+}
+
+/** Immediate test push to this admin's registered devices. */
+export async function sendAdminPushTest() {
+  const res = await fetch(`${API_BASE}/api/admin/push/test`, {
+    method: 'POST',
+    headers: saasAuthHeaders(),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || 'Αποτυχία δοκιμής push');
   return data;
 }
 
