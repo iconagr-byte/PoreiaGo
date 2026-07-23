@@ -155,6 +155,7 @@ export async function startDriverShift() {
   const res = await fetch(`${API_BASE}/api/driver/telemetry/shift/start`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    keepalive: true,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
