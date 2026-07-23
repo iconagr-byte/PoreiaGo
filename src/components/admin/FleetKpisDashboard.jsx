@@ -37,7 +37,7 @@ export default function FleetKpisDashboard() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err.message || 'Αποτυχία φόρτωσης KPIs');
+          setError(err.message || 'Αποτυχία φόρτωσης δεικτών στόλου');
           setData(null);
         }
       })
@@ -63,10 +63,9 @@ export default function FleetKpisDashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="font-headline-md font-bold">Fleet KPIs</h2>
+          <h2 className="font-headline-md font-bold">Δείκτες στόλου</h2>
           <p className="text-sm text-on-surface-variant">
-            Μετρικές από <code className="text-xs bg-gray-100 px-1 rounded">trip_coordinates</code> και live
-            στόλο
+            Απόδοση στόλου με βάση πραγματικά GPS traces και ζωντανή θέση οχημάτων.
           </p>
         </div>
         <label className="text-sm">
@@ -94,7 +93,7 @@ export default function FleetKpisDashboard() {
       ) : null}
 
       {loading && !summary ? (
-        <p className="text-sm text-gray-500">Φόρτωση KPIs…</p>
+        <p className="text-sm text-gray-500">Φόρτωση δεικτών στόλου…</p>
       ) : null}
 
       {summary ? (
@@ -146,7 +145,7 @@ export default function FleetKpisDashboard() {
               tone="amber"
             />
             <DashboardKpiCard
-              label="Alerts περιόδου"
+              label="Ειδοποιήσεις περιόδου"
               value={summary.alerts_total}
               icon="notifications"
               tone="violet"

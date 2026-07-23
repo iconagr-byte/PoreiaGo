@@ -260,7 +260,7 @@ export const ADMIN_NAV_ITEMS = {
   },
   fleet_kpis: {
     id: 'fleet_kpis',
-    label: 'Fleet KPIs',
+    label: 'Δείκτες στόλου',
     icon: 'analytics',
     filled: true,
     type: 'tab',
