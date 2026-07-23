@@ -15,6 +15,12 @@ import {
 } from '../../services/billingApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
 
+const PLAN_ICONS = {
+  starter: 'storefront',
+  professional: 'apartment',
+  enterprise: 'domain',
+};
+
 const STATUS_META = {
   active: {
     label: 'Ενεργό',
@@ -233,7 +239,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
             <div>
               <h3 className="text-xl font-bold tracking-tight text-slate-900">Συμβόλαιο γραφείου</h3>
               <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
-                Επιλέξτε πλάνο και περίοδο · δοκιμή ή πληρωμή μέσω Stripe
+                Σύγκριση πλάνων, δωρεάν δοκιμή και διαχείριση συνδρομής σε ένα μέρος
               </p>
             </div>
           </div>
@@ -305,10 +311,10 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-sm font-bold text-slate-900">Περίοδος χρέωσης</p>
-              <p className="text-xs text-slate-500 mt-0.5">Ετήσιο = 2 μήνες δώρο</p>
+              <p className="text-sm font-bold text-slate-900">Επιλέξτε πλάνο</p>
+              <p className="text-xs text-slate-500 mt-0.5">Κλικ στην κάρτα · ετήσιο = 2 μήνες δώρο</p>
             </div>
             <div className="inline-flex p-1 rounded-full bg-slate-100 border border-slate-200/80">
               {Object.values(BILLING_INTERVALS).map((opt) => (
@@ -348,9 +354,22 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <div>
-                      <p className="font-bold text-slate-900 text-lg">{plan.name}</p>
-                      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{plan.tagline}</p>
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <span
+                        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                          active && !plan.contactSales
+                            ? 'bg-primary/15 text-primary'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          {PLAN_ICONS[plan.id] || 'workspace_premium'}
+                        </span>
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 text-lg">{plan.name}</p>
+                        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{plan.tagline}</p>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {isCurrent && (
@@ -380,17 +399,12 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   )}
 
                   <ul className="mt-4 space-y-1.5">
-                    {(plan.features || []).slice(0, 4).map((f) => (
+                    {(plan.features || []).map((f) => (
                       <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
                         <span className="material-symbols-outlined text-[14px] text-primary mt-0.5">check</span>
                         <span>{f}</span>
                       </li>
                     ))}
-                    {(plan.features || []).length > 4 && (
-                      <li className="text-[11px] font-semibold text-slate-400 pl-5">
-                        +{(plan.features || []).length - 4} ακόμα
-                      </li>
-                    )}
                   </ul>
 
                   {plan.contactSales && (
@@ -444,14 +458,14 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   onClick={openPortal}
                   className="px-5 py-2.5 border border-primary/25 text-primary rounded-full text-sm font-bold hover:bg-primary/[0.05] disabled:opacity-50"
                 >
-                  Διαχείριση στο Stripe
+                  Διαχείριση πληρωμών
                 </button>
               )}
             </div>
           </div>
 
           <p className="text-xs text-slate-500">
-            Δημόσιες τιμές:{' '}
+            Δημόσια σύγκριση τιμών:{' '}
             <Link to="/grafeia" className="text-primary font-semibold hover:underline">
               /grafeia
             </Link>
