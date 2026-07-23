@@ -16,10 +16,26 @@ import {
 import { getSaasToken } from '../../services/saasApi.js';
 
 const STATUS_META = {
-  active: { label: 'Ενεργό', className: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
-  trialing: { label: 'Δοκιμή', className: 'bg-sky-50 text-sky-800 border-sky-200' },
-  past_due: { label: 'Εκκρεμεί πληρωμή', className: 'bg-amber-50 text-amber-900 border-amber-200' },
-  canceled: { label: 'Ακυρωμένο', className: 'bg-rose-50 text-rose-800 border-rose-200' },
+  active: {
+    label: 'Ενεργό',
+    icon: 'verified',
+    className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  },
+  trialing: {
+    label: 'Δοκιμή',
+    icon: 'hourglass_top',
+    className: 'bg-sky-50 text-sky-800 border-sky-200',
+  },
+  past_due: {
+    label: 'Εκκρεμεί πληρωμή',
+    icon: 'warning',
+    className: 'bg-amber-50 text-amber-900 border-amber-200',
+  },
+  canceled: {
+    label: 'Ακυρωμένο',
+    icon: 'cancel',
+    className: 'bg-rose-50 text-rose-800 border-rose-200',
+  },
 };
 
 function formatDate(iso) {
@@ -69,6 +85,9 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
       setSub(subscription);
       setBillingConfig(config);
       if (subscription?.plan) setSelectedPlan(subscription.plan);
+      if (subscription?.interval === 'year' || subscription?.interval === 'month') {
+        setInterval(subscription.interval);
+      }
     } catch (e) {
       toast.error(e.message || 'Αποτυχία φόρτωσης συνδρομής');
       setSub(null);
@@ -134,15 +153,20 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
   const checkoutReady = billingConfig?.checkout_ready === true;
   const demoMode = billingConfig?.demo_mode === true;
   const trialDays = billingConfig?.trial_days || 14;
-  const onTrial = sub?.status === 'trialing' && !String(sub?.stripe_subscription_id || '').startsWith('demo_');
+  const onTrial = sub?.status === 'trialing';
   const periodEnd = sub?.current_period_end || sub?.trial_ends_at;
   const remaining = useMemo(() => daysUntil(periodEnd), [periodEnd]);
   const statusMeta = STATUS_META[sub?.status] || {
     label: sub?.status || '—',
+    icon: 'info',
     className: 'bg-slate-50 text-slate-700 border-slate-200',
   };
   const sameTrialPlan = onTrial && sub?.plan === selectedPlan;
   const hasToken = Boolean(getSaasToken());
+  const trialProgress =
+    onTrial && remaining != null && trialDays > 0
+      ? Math.max(0, Math.min(100, Math.round(((trialDays - Math.max(remaining, 0)) / trialDays) * 100)))
+      : null;
 
   if (!hasToken) {
     return (
@@ -211,15 +235,15 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
       )}
 
       <section className="bg-white rounded-[28px] border border-slate-200/70 shadow-[0_8px_30px_rgba(15,23,42,0.04)] overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100 flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-indigo-50/70 via-white to-white">
+        <div className="px-6 py-5 border-b border-slate-100 flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-primary/5 via-white to-white">
           <div className="flex items-start gap-3 min-w-0">
-            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
-              <span className="material-symbols-outlined text-[24px]">contract</span>
+            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <span className="material-symbols-outlined text-[24px]">description</span>
             </span>
             <div>
               <h3 className="text-xl font-bold tracking-tight text-slate-900">Συμβόλαιο γραφείου</h3>
               <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
-                Επιλέξτε πλάνο και περίοδο · ενεργοποίηση δοκιμής ή πληρωμή μέσω Stripe
+                Επιλέξτε πλάνο και περίοδο · δοκιμή ή πληρωμή μέσω Stripe
               </p>
             </div>
           </div>
@@ -237,45 +261,56 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
 
         <div className="p-6 space-y-6">
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-24 animate-pulse rounded-[20px] bg-slate-100" />
-              ))}
-            </div>
+            <div className="h-28 animate-pulse rounded-[22px] bg-slate-100" />
           ) : sub ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatCard
-                icon="workspace_premium"
-                label="Ενεργό πλάνο"
-                value={planDisplayName(sub.plan)}
-                tone="indigo"
-              />
-              <StatCard
-                icon="verified"
-                label="Κατάσταση"
-                value={
-                  <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusMeta.className}`}>
+            <div className="rounded-[22px] border border-slate-200/80 bg-gradient-to-b from-slate-50/80 to-white p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${statusMeta.className}`}>
+                    <span className="material-symbols-outlined text-[16px]">{statusMeta.icon}</span>
                     {statusMeta.label}
                   </span>
-                }
-                tone="sky"
-              />
-              <StatCard
-                icon="event"
-                label="Λήξη περιόδου"
-                value={formatDate(periodEnd)}
-                hint={remaining != null ? (remaining >= 0 ? `${remaining} ημέρες ακόμα` : 'Έληξε') : null}
-                tone="violet"
-              />
-              <StatCard
-                icon={sub.is_active ? 'check_circle' : 'pause_circle'}
-                label="Γραφείο ενεργό"
-                value={sub.is_active ? 'Ναι' : 'Αναστολή'}
-                tone={sub.is_active ? 'emerald' : 'rose'}
-              />
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 truncate">{planDisplayName(sub.plan)}</p>
+                    <p className="text-xs text-slate-500">
+                      Λήξη {formatDate(periodEnd)}
+                      {remaining != null && remaining >= 0 ? ` · ${remaining} ημέρες ακόμα` : ''}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${
+                    sub.is_active
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {sub.is_active ? 'check_circle' : 'pause_circle'}
+                  </span>
+                  Γραφείο {sub.is_active ? 'ενεργό' : 'σε αναστολή'}
+                </span>
+              </div>
+
+              {trialProgress != null && (
+                <div>
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1.5">
+                    <span>Πρόοδος δοκιμής</span>
+                    <span>
+                      {Math.max(remaining, 0)} / {trialDays} ημέρες
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${trialProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center text-sm text-slate-500">
+            <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center text-sm text-slate-500">
               Δεν υπάρχει ακόμα ενεργό συμβόλαιο — επιλέξτε πλάνο και ξεκινήστε δοκιμή ή πληρωμή.
             </div>
           )}
@@ -293,7 +328,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   onClick={() => setInterval(opt.id)}
                   className={`px-4 py-2 rounded-full text-sm font-bold transition ${
                     interval === opt.id
-                      ? 'bg-white text-indigo-700 shadow-sm'
+                      ? 'bg-white text-primary shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
@@ -318,10 +353,8 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   onClick={() => !plan.contactSales && setSelectedPlan(plan.id)}
                   className={`text-left rounded-[22px] border p-5 transition ${
                     active && !plan.contactSales
-                      ? 'border-indigo-300 bg-gradient-to-b from-indigo-50/90 to-white ring-2 ring-indigo-200/60 shadow-sm'
-                      : plan.highlighted
-                        ? 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/30'
-                        : 'border-slate-200/90 bg-gradient-to-b from-slate-50/60 to-white hover:border-slate-300'
+                      ? 'border-primary/40 bg-gradient-to-b from-primary/[0.07] to-white ring-2 ring-primary/15 shadow-sm'
+                      : 'border-slate-200/90 bg-gradient-to-b from-slate-50/50 to-white hover:border-primary/25'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -336,9 +369,12 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                         </span>
                       )}
                       {plan.highlighted && !isCurrent && (
-                        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                           Προτεινόμενο
                         </span>
+                      )}
+                      {active && !plan.contactSales && (
+                        <span className="material-symbols-outlined text-primary text-[22px]">check_circle</span>
                       )}
                     </div>
                   </div>
@@ -354,9 +390,9 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   )}
 
                   <ul className="mt-4 space-y-1.5">
-                    {plan.features.slice(0, 4).map((f) => (
+                    {(plan.features || []).map((f) => (
                       <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
-                        <span className="material-symbols-outlined text-[14px] text-indigo-500 mt-0.5">check</span>
+                        <span className="material-symbols-outlined text-[14px] text-primary mt-0.5">check</span>
                         <span>{f}</span>
                       </li>
                     ))}
@@ -390,7 +426,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   type="button"
                   disabled={working}
                   onClick={startCheckout}
-                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-full text-sm font-bold shadow-sm hover:opacity-95 disabled:opacity-50"
+                  className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold shadow-sm hover:opacity-95 disabled:opacity-50"
                 >
                   {working ? 'Αναμονή…' : 'Ενεργοποίηση / αναβάθμιση'}
                 </button>
@@ -399,7 +435,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   type="button"
                   disabled={working || sameTrialPlan}
                   onClick={startTrial}
-                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-full text-sm font-bold shadow-sm hover:opacity-95 disabled:opacity-50"
+                  className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold shadow-sm hover:opacity-95 disabled:opacity-50"
                 >
                   {sameTrialPlan
                     ? `Δοκιμή ενεργή (${trialDays} ημέρες)`
@@ -411,7 +447,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   type="button"
                   disabled={working}
                   onClick={openPortal}
-                  className="px-5 py-2.5 border border-indigo-200 text-indigo-700 rounded-full text-sm font-bold hover:bg-indigo-50 disabled:opacity-50"
+                  className="px-5 py-2.5 border border-primary/25 text-primary rounded-full text-sm font-bold hover:bg-primary/[0.05] disabled:opacity-50"
                 >
                   Διαχείριση στο Stripe
                 </button>
@@ -421,34 +457,12 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
 
           <p className="text-xs text-slate-500">
             Δημόσιες τιμές:{' '}
-            <Link to="/grafeia" className="text-indigo-600 font-semibold hover:underline">
+            <Link to="/grafeia" className="text-primary font-semibold hover:underline">
               /grafeia
             </Link>
           </p>
         </div>
       </section>
-    </div>
-  );
-}
-
-const TONE = {
-  indigo: 'from-indigo-50/80 border-indigo-100 text-indigo-600',
-  sky: 'from-sky-50/80 border-sky-100 text-sky-600',
-  violet: 'from-violet-50/80 border-violet-100 text-violet-600',
-  emerald: 'from-emerald-50/80 border-emerald-100 text-emerald-600',
-  rose: 'from-rose-50/80 border-rose-100 text-rose-600',
-};
-
-function StatCard({ icon, label, value, hint, tone = 'indigo' }) {
-  const t = TONE[tone] || TONE.indigo;
-  return (
-    <div className={`rounded-[20px] border bg-gradient-to-b ${t} to-white p-4`}>
-      <div className="flex items-center gap-2 mb-2">
-        <span className="material-symbols-outlined text-[18px]">{icon}</span>
-        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      </div>
-      <div className="font-bold text-slate-900 text-base">{value}</div>
-      {hint && <p className="text-[11px] font-semibold text-slate-500 mt-1">{hint}</p>}
     </div>
   );
 }
