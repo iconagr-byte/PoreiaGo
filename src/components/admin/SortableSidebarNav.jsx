@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  DND_NAV_ID,
   loadNavLayout,
   navItemsFromIds,
   reorderNav,
