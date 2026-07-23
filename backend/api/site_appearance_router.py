@@ -20,6 +20,11 @@ _UPLOAD_DIR = _DATA / "uploads" / "site"
 _PLATFORM_SETTINGS_FILE = Path(__file__).resolve().parents[1] / "platform" / "settings" / "platform_settings.json"
 _ALLOWED_KINDS = frozenset({"logo", "hero"})
 _MAX_UPLOAD_BYTES = 4 * 1024 * 1024
+_PLATFORM_LOGO_RE = re.compile(r"/api/site/assets/logo|poreiago|aerostride", re.I)
+_PLATFORM_HOST_RE = re.compile(
+    r"^(www\.)?(poreiago\.com|localhost|127\.0\.0\.1)$",
+    re.I,
+)
 
 DEFAULT_SITE_APPEARANCE = {
     "logo_url": "",
@@ -299,6 +304,14 @@ async def get_public_site_appearance(host: str | None = Query(default=None)):
                     return SiteAppearanceResponse(**{**DEFAULT_SITE_APPEARANCE, **clean})
         except Exception:
             pass
+
+        # Custom / office host without DB row — never serve PoreiaGo platform logo.
+        if not _PLATFORM_HOST_RE.match(str(host).strip()):
+            data = {**DEFAULT_SITE_APPEARANCE, **_read_appearance()}
+            logo = str(data.get("logo_url") or "")
+            if _PLATFORM_LOGO_RE.search(logo):
+                data["logo_url"] = ""
+            return SiteAppearanceResponse(**data)
 
     data = _read_appearance()
     if not data.get("logo_url"):

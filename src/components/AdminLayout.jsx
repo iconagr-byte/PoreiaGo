@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import OfficeBrandMark from './storefront/OfficeBrandMark.jsx';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/admin', state: { activeTab: 'dashboard' } },
@@ -19,9 +20,10 @@ export default function AdminLayout({ activeTab, title, children, footer }) {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="font-headline-md text-headline-md font-bold text-on-surface tracking-tight text-left"
+            className="text-left"
+            aria-label="Αρχική"
           >
-            PoreiaGo
+            <OfficeBrandMark className="h-9" variant="light" asLink={false} fallbackLabel="Admin" />
           </button>
         </div>
         <nav className="flex-1 px-4 py-2 space-y-2 overflow-y-auto">
