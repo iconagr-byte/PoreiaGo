@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchTripEta } from '../services/passengerEtaApi.js';
 import { buildWsUrl } from '../lib/wsUrl.js';
+import { LIVE_REFRESH_SEC } from '../lib/liveRefresh.js';
 
 const DEMO_TENANT = '00000000-0000-0000-0000-000000000001';
 
 /**
  * Live ETA — WebSocket push (primary) + HTTP poll fallback.
  */
-export function useLiveEta(tripId, { syncIntervalSec = 60, enabled = true, tenantId = DEMO_TENANT } = {}) {
+export function useLiveEta(tripId, { syncIntervalSec = LIVE_REFRESH_SEC, enabled = true, tenantId = DEMO_TENANT } = {}) {
   const [eta, setEta] = useState(null);
   const [secondsRemaining, setSecondsRemaining] = useState(null);
   const [loading, setLoading] = useState(true);

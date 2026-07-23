@@ -328,8 +328,8 @@ class TelemetrySettingsResponse(BaseModel):
     fuel_price_eur_per_liter: float = Field(1.85, ge=0.5, le=5)
     gforce_spike_threshold_g: float = Field(0.45, ge=0.1, le=2.0)
     prefer_tracker_events: bool = True
-    eta_refresh_seconds: int = Field(300, ge=60, le=900)
-    eta_ws_push_seconds: int = Field(5, ge=5, le=120)
+    eta_refresh_seconds: int = Field(5, ge=5, le=5)
+    eta_ws_push_seconds: int = Field(5, ge=5, le=5)
     driver_stale_seconds: int = Field(90, ge=30, le=600)
     gps_retention_days: int = Field(90, ge=0, le=3650)
     driver_gps_max_per_minute: int = Field(60, ge=0, le=600)
@@ -351,8 +351,8 @@ class TelemetrySettingsUpdate(BaseModel):
     fuel_price_eur_per_liter: float | None = Field(None, ge=0.5, le=5)
     gforce_spike_threshold_g: float | None = Field(None, ge=0.1, le=2.0)
     prefer_tracker_events: bool | None = None
-    eta_refresh_seconds: int | None = Field(None, ge=60, le=900)
-    eta_ws_push_seconds: int | None = Field(None, ge=5, le=120)
+    eta_refresh_seconds: int | None = Field(None, ge=5, le=5)
+    eta_ws_push_seconds: int | None = Field(None, ge=5, le=5)
     driver_stale_seconds: int | None = Field(None, ge=30, le=600)
     gps_retention_days: int | None = Field(None, ge=0, le=3650)
     driver_gps_max_per_minute: int | None = Field(None, ge=0, le=600)

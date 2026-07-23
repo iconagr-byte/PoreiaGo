@@ -1,8 +1,9 @@
-/** Minimum live-fleet HTTP poll interval (admin map / markers). */
-export const FLEET_LIVE_POLL_MS = 5000;
+import { LIVE_REFRESH_MS } from '../liveRefresh.js';
 
-export function clampFleetLivePollMs(ms) {
-  const n = Number(ms);
-  if (!Number.isFinite(n)) return FLEET_LIVE_POLL_MS;
-  return Math.max(FLEET_LIVE_POLL_MS, Math.floor(n));
+/** Locked live-fleet HTTP poll interval (admin map / markers). */
+export const FLEET_LIVE_POLL_MS = LIVE_REFRESH_MS;
+
+/** Always 5s — callers cannot override. */
+export function clampFleetLivePollMs(_ms) {
+  return FLEET_LIVE_POLL_MS;
 }

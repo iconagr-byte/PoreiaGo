@@ -15,7 +15,7 @@ import {
 } from '../../services/driverPortalApi.js';
 import '../../styles/office-chat.css';
 
-const POLL_MS = 4000;
+const POLL_MS = 5000;
 
 function initials(name) {
   return (name || 'Γ')

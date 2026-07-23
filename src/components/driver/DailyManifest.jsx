@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchDriverManifest, fetchDriverSchedule } from '../../services/driverPortalApi.js';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
 import TelemetryStrip from './TelemetryStrip.jsx';
+import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
 const STATUS_LABEL = {
   completed: 'Ολοκληρώθηκε',
@@ -17,7 +18,7 @@ export default function DailyManifest() {
   useEffect(() => {
     fetchDriverSchedule().then(setStops);
     fetchDriverManifest().then(setManifest);
-    const id = setInterval(() => fetchDriverManifest().then(setManifest), 5000);
+    const id = setInterval(() => fetchDriverManifest().then(setManifest), LIVE_REFRESH_MS);
     return () => clearInterval(id);
   }, []);
 

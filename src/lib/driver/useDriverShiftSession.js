@@ -13,6 +13,7 @@ import {
   requestMotionPermission,
   startDeviceSensorWatch,
 } from './driverDeviceSensors.js';
+import { LIVE_REFRESH_MS } from '../liveRefresh.js';
 import { createDriverTelemetryTransport } from './driverTelemetryTransport.js';
 import { getDriverSession } from './driverSession.js';
 import { endDriverShift, fetchDriverManifest, startDriverShift } from '../../services/driverPortalApi.js';
@@ -263,7 +264,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     };
 
     ensureRunning();
-    const retryId = window.setInterval(ensureRunning, 8000);
+    const retryId = window.setInterval(ensureRunning, LIVE_REFRESH_MS);
     const onVisible = () => {
       if (document.visibilityState === 'visible') ensureRunning();
     };
@@ -296,7 +297,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
         .catch(() => {});
     };
     refreshManifest();
-    const manifestPollId = window.setInterval(refreshManifest, 10_000);
+    const manifestPollId = window.setInterval(refreshManifest, LIVE_REFRESH_MS);
     const onManifestUpdated = () => refreshManifest();
     window.addEventListener('driver-manifest-updated', onManifestUpdated);
     return () => {
