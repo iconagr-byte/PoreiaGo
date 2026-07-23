@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,11 +32,11 @@ DEFAULT_SITE_APPEARANCE = {
         "μόνο ταξίδια που οργανώνουμε εμείς."
     ),
     "hero_search_label": "Πρόγραμμα εκδρομών",
-    "footer_brand_name": "AeroStride",
-    "footer_copyright": "© 2024 AeroStride. Redefining the journey.",
-    "footer_privacy_label": "Privacy Policy",
+    "footer_brand_name": "",
+    "footer_copyright": "",
+    "footer_privacy_label": "Πολιτική Απορρήτου",
     "footer_privacy_url": "#",
-    "footer_terms_label": "Terms of Service",
+    "footer_terms_label": "Όροι Χρήσης",
     "footer_terms_url": "#",
     "footer_contact_email": "",
     "footer_contact_phone": "",
@@ -76,11 +77,11 @@ class SiteAppearanceResponse(BaseModel):
         "μόνο ταξίδια που οργανώνουμε εμείς."
     )
     hero_search_label: str = "Πρόγραμμα εκδρομών"
-    footer_brand_name: str = "AeroStride"
-    footer_copyright: str = "© 2024 AeroStride. Redefining the journey."
-    footer_privacy_label: str = "Privacy Policy"
+    footer_brand_name: str = ""
+    footer_copyright: str = ""
+    footer_privacy_label: str = "Πολιτική Απορρήτου"
     footer_privacy_url: str = "#"
-    footer_terms_label: str = "Terms of Service"
+    footer_terms_label: str = "Όροι Χρήσης"
     footer_terms_url: str = "#"
     footer_contact_email: str = ""
     footer_contact_phone: str = ""
@@ -167,7 +168,14 @@ def _read_appearance() -> dict:
         raw = json.loads(_APPEARANCE_FILE.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, TypeError):
         return {**DEFAULT_SITE_APPEARANCE}
-    return {**DEFAULT_SITE_APPEARANCE, **raw}
+    merged = {**DEFAULT_SITE_APPEARANCE, **raw}
+    brand = str(merged.get("footer_brand_name") or "").strip()
+    if not brand or brand.lower() in {"aerostride", "poreiago"}:
+        merged["footer_brand_name"] = ""
+    copyright_text = str(merged.get("footer_copyright") or "")
+    if not copyright_text or re.search(r"aerostride|poreiago", copyright_text, re.I):
+        merged["footer_copyright"] = ""
+    return merged
 
 
 def _write_appearance(data: dict) -> dict:

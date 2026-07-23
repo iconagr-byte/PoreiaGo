@@ -3,6 +3,7 @@ import { adminBearerHeaders, adminFetch } from './adminApi.js';
 import { getSaasToken, saasFetch } from './saasApi.js';
 import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
 import { HOMEPAGE_LAYOUT_DEFAULTS } from '../lib/homepage/homepageTemplates.js';
+import { scrubSiteAppearancePlaceholders } from '../lib/branding/officeBrand.js';
 
 const STORAGE_KEY = 'aerostride_site_appearance_v1';
 
@@ -15,11 +16,11 @@ export const DEFAULT_SITE_APPEARANCE = {
   hero_subtitle:
     'Διάλεξτε από τις προγραμματισμένες εκδρομές μας — χωρίς αναζήτηση προορισμού, μόνο ταξίδια που οργανώνουμε εμείς.',
   hero_search_label: 'Πρόγραμμα εκδρομών',
-  footer_brand_name: 'PoreiaGo',
-  footer_copyright: '© PoreiaGo. Redefining the journey.',
-  footer_privacy_label: 'Privacy Policy',
+  footer_brand_name: '',
+  footer_copyright: '',
+  footer_privacy_label: 'Πολιτική Απορρήτου',
   footer_privacy_url: '#',
-  footer_terms_label: 'Terms of Service',
+  footer_terms_label: 'Όροι Χρήσης',
   footer_terms_url: '#',
   footer_contact_email: '',
   footer_contact_phone: '',
@@ -35,7 +36,7 @@ async function parseError(res) {
 
 function cacheLocally(data) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(scrubSiteAppearancePlaceholders(data)));
   } catch {
     /* quota */
   }
@@ -44,7 +45,9 @@ function cacheLocally(data) {
 function loadCached() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...DEFAULT_SITE_APPEARANCE, ...JSON.parse(raw) } : null;
+    return raw
+      ? scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...JSON.parse(raw) })
+      : null;
   } catch {
     return null;
   }
@@ -53,7 +56,11 @@ function loadCached() {
 export { loadCached as loadCachedSiteAppearance };
 
 function mergeAppearance(patch = {}) {
-  return { ...DEFAULT_SITE_APPEARANCE, ...loadCached(), ...patch };
+  return scrubSiteAppearancePlaceholders({
+    ...DEFAULT_SITE_APPEARANCE,
+    ...loadCached(),
+    ...patch,
+  });
 }
 
 /** Resolve logo/hero URLs (API assets, static public paths, data URLs). */
@@ -74,8 +81,9 @@ export async function fetchSiteAppearance(host = typeof window !== 'undefined' ?
     const res = await fetch(`${API_BASE}/api/site/appearance${qs}`);
     if (res.ok) {
       const data = await res.json();
-      cacheLocally(data);
-      return { ...DEFAULT_SITE_APPEARANCE, ...data };
+      const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
+      cacheLocally(merged);
+      return merged;
     }
   } catch {
     /* offline */
@@ -88,7 +96,7 @@ export async function fetchAdminSiteAppearance() {
   if (getSaasToken()) {
     try {
       const data = await saasFetch('/api/v1/branding/site-appearance');
-      const merged = { ...DEFAULT_SITE_APPEARANCE, ...data };
+      const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
       cacheLocally(merged);
       return merged;
     } catch {
@@ -108,7 +116,7 @@ export async function updateSiteAppearance(patch) {
         method: 'PUT',
         body: JSON.stringify(patch),
       });
-      const merged = { ...DEFAULT_SITE_APPEARANCE, ...data };
+      const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
       cacheLocally(merged);
       return { data: merged, source: data.storage_source === 'postgres' ? 'postgres' : 'server', offline: false };
     } catch (saasErr) {
