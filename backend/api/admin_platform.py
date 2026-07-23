@@ -50,6 +50,8 @@ from schemas.platform_admin import (
     FleetDriverUpdate,
     FleetAlertResponse,
     DispatchBlockedRequest,
+    FleetExpenseCreate,
+    FleetExpenseResponse,
     AbandonedCartResponse,
     AbandonedScanRequest,
     AbandonedScanResponse,
@@ -474,6 +476,113 @@ async def get_fleet_depreciation(
 @router.get("/fleet/dashboard")
 async def get_fleet_dashboard_cards(request: Request):
     return service_service.dashboard_cards(tenant_id=_request_tenant_id(request))
+
+
+@router.get("/fleet/availability-board")
+async def get_fleet_availability_board(request: Request):
+    return service_service.list_availability(tenant_id=_request_tenant_id(request))
+
+
+@router.get("/fleet/calendar")
+async def get_fleet_calendar(request: Request, within_days: int = Query(120, ge=7, le=365)):
+    return service_service.list_calendar(
+        tenant_id=_request_tenant_id(request),
+        within_days=within_days,
+    )
+
+
+@router.get("/fleet/documents")
+async def get_fleet_documents(request: Request, vehicle_id: str | None = None):
+    return service_service.list_documents(
+        tenant_id=_request_tenant_id(request),
+        vehicle_id=vehicle_id,
+    )
+
+
+@router.post("/fleet/vehicles/{vehicle_id}/documents", status_code=201)
+async def post_fleet_vehicle_document(
+    request: Request,
+    vehicle_id: str,
+    file: UploadFile = File(...),
+    kind: str = Query("registration"),
+    expires_at: date | None = None,
+):
+    tenant_id = _request_tenant_id(request)
+    if not service_service.get_vehicle(vehicle_id, tenant_id=tenant_id):
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing filename")
+    safe_name = file.filename.replace("..", "_").replace("/", "_").replace("\\", "_")
+    out_name = f"doc-{vehicle_id}-{int(datetime.now().timestamp())}-{safe_name}"
+    out_path = Path(UPLOAD_DIR) / out_name
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(content)
+    try:
+        doc = service_service.add_vehicle_document(
+            vehicle_id,
+            {
+                "kind": kind,
+                "file_name": file.filename,
+                "mime_type": file.content_type or "application/octet-stream",
+                "size_bytes": len(content),
+                "storage_path": str(out_path),
+                "url": f"/api/admin/platform/fleet/documents/file/{out_name}",
+                "expires_at": expires_at.isoformat() if expires_at else None,
+            },
+            tenant_id=tenant_id,
+        )
+    except KeyError:
+        out_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=404, detail="Vehicle not found") from None
+    return doc
+
+
+@router.delete("/fleet/vehicles/{vehicle_id}/documents/{document_id}")
+async def delete_fleet_vehicle_document(request: Request, vehicle_id: str, document_id: str):
+    if not service_service.delete_vehicle_document(
+        vehicle_id, document_id, tenant_id=_request_tenant_id(request)
+    ):
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"ok": True}
+
+
+@router.get("/fleet/documents/file/{filename}")
+async def get_fleet_document_file(filename: str):
+    safe = Path(filename).name
+    path = Path(UPLOAD_DIR) / safe
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path)
+
+
+@router.get("/fleet/expenses", response_model=list[FleetExpenseResponse])
+async def get_fleet_expenses(request: Request, vehicle_id: str | None = None):
+    return service_service.list_expenses(
+        tenant_id=_request_tenant_id(request),
+        vehicle_id=vehicle_id,
+    )
+
+
+@router.post("/fleet/expenses", response_model=FleetExpenseResponse, status_code=201)
+async def post_fleet_expense(request: Request, body: FleetExpenseCreate):
+    data = body.model_dump(exclude_unset=True)
+    data["tenant_id"] = _request_tenant_id(request)
+    try:
+        return service_service.create_expense(data)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Vehicle not found") from None
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.delete("/fleet/expenses/{expense_id}")
+async def delete_fleet_expense(request: Request, expense_id: str):
+    if not service_service.delete_expense(expense_id, tenant_id=_request_tenant_id(request)):
+        raise HTTPException(status_code=404, detail="Expense not found")
+    return {"ok": True}
 
 
 @router.get("/backups", response_model=list[BackupInfoResponse])

@@ -411,6 +411,38 @@ export async function createFleetVehicle(payload) {
   return data;
 }
 
+export async function fetchFleetVehicle(vehicleId) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}`,
+  );
+  if (res.status === 404) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία φόρτωσης οχήματος');
+  }
+  return data;
+}
+
+export async function updateFleetVehicle(vehicleId, payload) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data.detail === 'string'
+        ? data.detail
+        : data.message || 'Αποτυχία ενημέρωσης οχήματος',
+    );
+  }
+  return data;
+}
+
 export async function deleteFleetVehicle(vehicleId) {
   const res = await adminFetch(
     `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}`,
@@ -421,6 +453,87 @@ export async function deleteFleetVehicle(vehicleId) {
     throw new Error(data.detail || data.message || 'Αποτυχία διαγραφής οχήματος');
   }
   return data;
+}
+
+export async function fetchFleetAvailabilityBoard() {
+  const res = await adminFetch('/api/admin/platform/fleet/availability-board');
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchFleetCalendar(withinDays = 120) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/calendar?within_days=${encodeURIComponent(withinDays)}`,
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchFleetDocuments(vehicleId) {
+  const q = vehicleId ? `?vehicle_id=${encodeURIComponent(vehicleId)}` : '';
+  const res = await adminFetch(`/api/admin/platform/fleet/documents${q}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function uploadFleetDocument(vehicleId, file, { kind = 'registration', expiresAt } = {}) {
+  const params = new URLSearchParams({ kind });
+  if (expiresAt) params.set('expires_at', expiresAt);
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(
+    `${API_BASE}/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}/documents?${params}`,
+    { method: 'POST', headers: adminBearerHeaders(), body: form },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία ανεβάσματος εγγράφου');
+  }
+  return data;
+}
+
+export async function deleteFleetDocument(vehicleId, documentId) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}/documents/${encodeURIComponent(documentId)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || 'Αποτυχία διαγραφής εγγράφου');
+  }
+  return true;
+}
+
+export async function fetchFleetExpenses(vehicleId) {
+  const q = vehicleId ? `?vehicle_id=${encodeURIComponent(vehicleId)}` : '';
+  const res = await adminFetch(`/api/admin/platform/fleet/expenses${q}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function createFleetExpense(payload) {
+  const res = await adminFetch('/api/admin/platform/fleet/expenses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία καταχώρισης εξόδου');
+  }
+  return data;
+}
+
+export async function deleteFleetExpense(expenseId) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/expenses/${encodeURIComponent(expenseId)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || 'Αποτυχία διαγραφής');
+  }
+  return true;
 }
 
 export async function fetchFleetDashboard() {

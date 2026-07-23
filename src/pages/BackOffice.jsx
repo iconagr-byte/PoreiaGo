@@ -52,6 +52,12 @@ import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
 import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
+import FleetCalendarPanel from '../components/admin/fleet/FleetCalendarPanel.jsx';
+import FleetAvailabilityPanel from '../components/admin/fleet/FleetAvailabilityPanel.jsx';
+import FleetDocumentsPanel from '../components/admin/fleet/FleetDocumentsPanel.jsx';
+import FleetExpensesPanel from '../components/admin/fleet/FleetExpensesPanel.jsx';
+import FleetAssignmentsPanel from '../components/admin/fleet/FleetAssignmentsPanel.jsx';
+import FleetDigestPanel from '../components/admin/fleet/FleetDigestPanel.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
@@ -980,6 +986,26 @@ export default function BackOffice() {
             <p className="font-body-md text-body-md text-on-surface-variant mt-1">
               Παρακολούθηση οχημάτων, κατάσταση συντήρησης και οικονομικά στοιχεία.
             </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {[
+                ['fleet_calendar', 'Ημερολόγιο', 'calendar_month'],
+                ['fleet_availability', 'Διαθεσιμότητα', 'event_available'],
+                ['fleet_documents', 'Έγγραφα', 'folder_managed'],
+                ['fleet_expenses', 'Έξοδα', 'local_gas_station'],
+                ['fleet_assignments', 'Ανάθεση', 'link'],
+                ['fleet_digest', 'Ειδοποιήσεις', 'notifications_active'],
+              ].map(([tab, label, icon]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-white border border-black/[0.08] text-gray-700 hover:bg-gray-50"
+                >
+                  <span className="material-symbols-outlined text-[16px]">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -1880,6 +1906,36 @@ export default function BackOffice() {
             {activeTab === 'fleet_route_playback' && (
               <div className="pb-stack-lg animate-in fade-in duration-300">
                 <FleetRouteHistory />
+              </div>
+            )}
+            {activeTab === 'fleet_calendar' && (
+              <div className="pb-stack-lg">
+                <FleetCalendarPanel />
+              </div>
+            )}
+            {activeTab === 'fleet_availability' && (
+              <div className="pb-stack-lg">
+                <FleetAvailabilityPanel />
+              </div>
+            )}
+            {activeTab === 'fleet_documents' && (
+              <div className="pb-stack-lg">
+                <FleetDocumentsPanel />
+              </div>
+            )}
+            {activeTab === 'fleet_expenses' && (
+              <div className="pb-stack-lg">
+                <FleetExpensesPanel />
+              </div>
+            )}
+            {activeTab === 'fleet_assignments' && (
+              <div className="pb-stack-lg">
+                <FleetAssignmentsPanel />
+              </div>
+            )}
+            {activeTab === 'fleet_digest' && (
+              <div className="pb-stack-lg">
+                <FleetDigestPanel />
               </div>
             )}
             {activeTab === 'lost_found' && renderLostFound()}
