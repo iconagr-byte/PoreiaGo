@@ -47,7 +47,8 @@ export function applyGreekMapboxLabels(map) {
 }
 
 /**
- * Hide Mapbox settlement/place labels so our collision-aware Greek overlays stay clean.
+ * Optional: toggle Mapbox settlement/place label layers.
+ * Live map keeps them visible — Greek overlays add πόλεις/δήμοι on top.
  */
 export function setMapboxPlaceLabelsVisible(map, visible) {
   if (!map?.getStyle || !map?.setLayoutProperty) return;

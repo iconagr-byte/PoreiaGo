@@ -3,9 +3,15 @@ import { Marker, useMap } from 'react-map-gl/mapbox';
 import { placesVisibleAtZoom } from '../../lib/maps/greecePlaces.js';
 import { applyGreekMapboxLabels } from '../../lib/maps/mapboxConfig.js';
 
+function placeClass(kind) {
+  if (kind === 'region') return 'fleet-place-label is-region';
+  if (kind === 'municipality') return 'fleet-place-label is-muni';
+  return 'fleet-place-label is-city';
+}
+
 /**
- * Region overlays at low zoom + Greek names on Mapbox settlement labels.
- * City / municipality names stay visible from the basemap (never hidden).
+ * Ελληνικές ετικέτες πόλεων/δήμων/περιφερειών + Greek names on Mapbox settlement labels.
+ * Basemap place labels stay visible (never hidden).
  */
 export default function GreecePlacesMapboxLayer({ visible = true }) {
   const map = useMap();
@@ -39,7 +45,7 @@ export default function GreecePlacesMapboxLayer({ visible = true }) {
 
   return places.map((p) => (
     <Marker key={p.id} longitude={p.lng} latitude={p.lat} anchor="center" style={{ pointerEvents: 'none' }}>
-      <span className={`fleet-place-label ${p.kind === 'region' ? 'is-region' : 'is-city'}`}>{p.name}</span>
+      <span className={placeClass(p.kind)}>{p.name}</span>
     </Marker>
   ));
 }
