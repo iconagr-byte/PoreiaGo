@@ -43,6 +43,7 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
 
 _PLATFORM_BRAND_RE = re.compile(r"^(aerostride|poreiago)$", re.I)
 _PLATFORM_COPY_RE = re.compile(r"aerostride|poreiago", re.I)
+_PLATFORM_LOGO_RE = re.compile(r"/api/site/assets/logo|poreiago|aerostride", re.I)
 
 
 def _parse_settings(raw: str | None) -> dict[str, Any]:
@@ -55,6 +56,13 @@ def _parse_settings(raw: str | None) -> dict[str, Any]:
         return {}
 
 
+def _is_platform_logo(url: str | None) -> bool:
+    value = str(url or "").strip()
+    if not value:
+        return True
+    return bool(_PLATFORM_LOGO_RE.search(value))
+
+
 def _scrub_platform_placeholders(data: dict[str, Any]) -> dict[str, Any]:
     out = {**data}
     brand = str(out.get("footer_brand_name") or "").strip()
@@ -63,6 +71,8 @@ def _scrub_platform_placeholders(data: dict[str, Any]) -> dict[str, Any]:
     copyright_text = str(out.get("footer_copyright") or "").strip()
     if not copyright_text or _PLATFORM_COPY_RE.search(copyright_text):
         out["footer_copyright"] = ""
+    if _is_platform_logo(out.get("logo_url")):
+        out["logo_url"] = ""
     return out
 
 
@@ -72,14 +82,16 @@ def _enrich_from_tenant(data: dict[str, Any], tenant: Tenant, settings: dict[str
     branding = settings.get("branding") if isinstance(settings.get("branding"), dict) else {}
     theme_cfg = tenant.theme_config if isinstance(tenant.theme_config, dict) else {}
     office_name = (tenant.legal_name or tenant.slug or "").strip()
-    branding_logo = str(
-        out.get("logo_url")
-        or theme_cfg.get("logoUrl")
-        or branding.get("logo_url")
-        or ""
-    ).strip()
+    branding_logo = str(theme_cfg.get("logoUrl") or branding.get("logo_url") or "").strip()
+    if _is_platform_logo(branding_logo):
+        branding_logo = ""
 
-    if not str(out.get("logo_url") or "").strip() and branding_logo:
+    current_logo = str(out.get("logo_url") or "").strip()
+    if _is_platform_logo(current_logo):
+        out["logo_url"] = ""
+        current_logo = ""
+
+    if not current_logo and branding_logo:
         out["logo_url"] = branding_logo
 
     if not str(out.get("footer_brand_name") or "").strip() and office_name:

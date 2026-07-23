@@ -48,6 +48,7 @@ import {
 } from '../services/platformApi.js';
 import { clearSaasSession, getSaasToken } from '../services/saasApi.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, DEFAULT_PLATFORM_TAB, sanitizeSettingsSubTab } from '../lib/admin/settingsTabs.js';
+import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
@@ -1764,9 +1765,19 @@ export default function BackOffice() {
     <div className="bg-surface text-on-surface h-screen flex overflow-hidden relative">
       <aside className="w-64 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0 relative z-20">
         <div className="p-6">
-          <h1 className="font-headline-md text-headline-md font-bold text-on-surface tracking-tight cursor-pointer" onClick={() => navigate('/')}>
-            PoreiaGo
-          </h1>
+          <button
+            type="button"
+            className="block text-left"
+            onClick={() => navigate('/')}
+            aria-label="Αρχική"
+          >
+            <OfficeBrandMark
+              className="h-9"
+              variant="light"
+              asLink={false}
+              fallbackLabel="Γραφείο"
+            />
+          </button>
         </div>
         <SortableSidebarNav
           activeTab={activeTab}

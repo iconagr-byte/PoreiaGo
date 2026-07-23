@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import AchillioLogo from '../components/AchillioLogo.jsx';
+import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { lookupGuestBooking, openBookingInWallet } from '../lib/bookingLookup.js';
 
 export default function BookingLookupPage() {
@@ -37,7 +37,7 @@ export default function BookingLookupPage() {
           <span className="material-symbols-outlined">arrow_back</span>
           <span className="text-sm font-semibold">Αρχική</span>
         </Link>
-        <AchillioLogo className="h-8" />
+        <OfficeBrandMark className="h-8" variant="light" />
       </header>
 
       <main className="flex-1 flex items-center justify-center px-4 py-12">
