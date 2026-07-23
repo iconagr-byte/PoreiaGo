@@ -389,7 +389,26 @@ export async function fetchFleetVehicles() {
   } catch {
     /* offline */
   }
+  // Authenticated office: never inject platform demo fleet.
+  try {
+    if (localStorage.getItem('saas_access_token')) return [];
+  } catch {
+    /* ignore */
+  }
   return getMockVehicles();
+}
+
+export async function createFleetVehicle(payload) {
+  const res = await adminFetch('/api/admin/platform/fleet/vehicles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία δημιουργίας οχήματος');
+  }
+  return data;
 }
 
 export async function deleteFleetVehicle(vehicleId) {
