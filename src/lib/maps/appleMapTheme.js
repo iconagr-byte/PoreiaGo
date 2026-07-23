@@ -3,8 +3,8 @@
  */
 
 /**
- * CARTO Positron (light_all) — soft light tiles WITH city / municipality / street names.
- * Our overlay only adds Greek region labels at low zoom (no duplicate city pins).
+ * CARTO Positron (light_all) — soft light tiles WITH street / place names.
+ * Greek πόλεις & δήμοι also come from our collision-aware overlay.
  */
 export const APPLE_LEAFLET_TILES = {
   url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',

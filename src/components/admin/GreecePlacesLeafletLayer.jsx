@@ -3,9 +3,14 @@ import { Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { placesVisibleAtZoom } from '../../lib/maps/greecePlaces.js';
 
+function placeClass(kind) {
+  if (kind === 'region') return 'fleet-place-label is-region';
+  if (kind === 'municipality') return 'fleet-place-label is-muni';
+  return 'fleet-place-label is-city';
+}
+
 function placeIcon(place) {
-  const isRegion = place.kind === 'region';
-  const cls = isRegion ? 'fleet-place-label is-region' : 'fleet-place-label is-city';
+  const cls = placeClass(place.kind);
   return L.divIcon({
     className: 'fleet-place-marker',
     html: `<span class="${cls}">${place.name}</span>`,
@@ -14,7 +19,7 @@ function placeIcon(place) {
   });
 }
 
-/** Ελληνικές πόλεις & περιφέρειες — χωρίς επικαλύψεις (collision + zoom bands). */
+/** Ελληνικές πόλεις, δήμοι & περιφέρειες — χωρίς επικαλύψεις (collision + zoom bands). */
 export default function GreecePlacesLeafletLayer({ visible = true }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
@@ -38,7 +43,7 @@ export default function GreecePlacesLeafletLayer({ visible = true }) {
       icon={placeIcon(p)}
       interactive={false}
       keyboard={false}
-      zIndexOffset={p.kind === 'region' ? -200 : -100}
+      zIndexOffset={p.kind === 'region' ? -200 : p.kind === 'municipality' ? -80 : -100}
     />
   ));
 }
