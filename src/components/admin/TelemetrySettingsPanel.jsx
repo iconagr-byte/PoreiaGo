@@ -39,7 +39,7 @@ const SECTIONS = [
     icon: 'schedule',
     fields: [
       { key: 'eta_refresh_seconds', label: 'Ανανέωση traffic API (δευτ.)', min: 60, max: 900, step: 30 },
-      { key: 'eta_ws_push_seconds', label: 'WebSocket push ETA (δευτ.)', min: 10, max: 120, step: 5 },
+      { key: 'eta_ws_push_seconds', label: 'WebSocket push ETA (δευτ.)', min: 5, max: 120, step: 5 },
     ],
   },
 ];

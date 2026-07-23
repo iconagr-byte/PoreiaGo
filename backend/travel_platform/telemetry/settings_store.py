@@ -23,7 +23,7 @@ class TelemetryRuntimeSettings:
     gforce_spike_threshold_g: float = 0.45
     prefer_tracker_events: bool = True
     eta_refresh_seconds: int = 300
-    eta_ws_push_seconds: int = 30
+    eta_ws_push_seconds: int = 5
     driver_stale_seconds: int = 90
     gps_retention_days: int = 90
     driver_gps_max_per_minute: int = 60

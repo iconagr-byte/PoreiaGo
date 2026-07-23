@@ -179,7 +179,7 @@ export const DEFAULT_TELEMETRY_SETTINGS = {
   gforce_spike_threshold_g: 0.45,
   prefer_tracker_events: true,
   eta_refresh_seconds: 300,
-  eta_ws_push_seconds: 30,
+  eta_ws_push_seconds: 5,
   driver_stale_seconds: 90,
   google_maps_configured: false,
   fleet_digest_enabled: true,
