@@ -84,3 +84,23 @@ CREATE TABLE IF NOT EXISTS stop_arrival_events (
     vehicle_id UUID NOT NULL,
     arrived_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Historical GPS trail (Fleet KPIs / route playback) — PostGIS points
+CREATE TABLE IF NOT EXISTS trip_coordinates (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    trip_id INT,
+    driver_id UUID,
+    vehicle_id UUID,
+    recorded_at TIMESTAMPTZ NOT NULL,
+    speed_kmh DOUBLE PRECISION NOT NULL DEFAULT 0,
+    heading_deg DOUBLE PRECISION,
+    geom geometry(POINT, 4326) NOT NULL,
+    raw_payload JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_trip_coordinates_tenant_time ON trip_coordinates (tenant_id, recorded_at);
+CREATE INDEX IF NOT EXISTS ix_trip_coordinates_trip_time ON trip_coordinates (trip_id, recorded_at);
+CREATE INDEX IF NOT EXISTS ix_trip_coordinates_geom ON trip_coordinates USING GIST (geom);

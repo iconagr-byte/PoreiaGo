@@ -101,6 +101,11 @@ $COMPOSE --profile bundled-db up -d --force-recreate --no-deps traefik
 # Recreate frontend so nginx picks up same-origin /api + /ws proxy config.
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps frontend
 
+echo "==> DB migrations (alembic → trip_coordinates / PostGIS GPS)"
+# Entrypoint also runs this on uvicorn start; explicit step makes deploy logs clear.
+$COMPOSE exec -T api-blue alembic upgrade head \
+  || echo "WARNING: alembic upgrade failed — will retry ensure on API lifespan"
+
 echo "==> Waiting for API health"
 api_ok=0
 APP_ORIGIN_HEALTH="${APP_ORIGIN:-https://www.poreiago.com}"
