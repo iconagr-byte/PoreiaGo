@@ -146,6 +146,14 @@ async def push_eta_snapshot(snap) -> None:
 
 
 async def push_telemetry_alert(alert: dict[str, Any]) -> None:
-    tenant_id = str(alert.get("tenant_id", ""))
-    if tenant_id:
-        await get_alerts_ws_hub().broadcast_alert(tenant_id, alert)
+    """Broadcast to the alert tenant room and legacy demo room (tenant-id drift)."""
+    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
+    primary = str(alert.get("tenant_id") or "").strip()
+    rooms = []
+    for tid in (primary, DEFAULT_TENANT):
+        if tid and tid not in rooms:
+            rooms.append(tid)
+    hub = get_alerts_ws_hub()
+    for tid in rooms:
+        await hub.broadcast_alert(tid, alert)

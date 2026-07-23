@@ -139,8 +139,15 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       // Explicit start → notify office immediately (before GPS/WS).
       if (!resume) {
         try {
-          await startDriverShift();
-        } catch {
+          const started = await startDriverShift();
+          const push = started?.notify?.push;
+          if (push?.reason === 'no_admin_subscriptions' || (push && push.sent === 0 && push.attempted === 0)) {
+            console.warn('[shift] office push: no admin subscriptions', push);
+          } else if (push?.sent > 0) {
+            console.info('[shift] office push sent', push.sent);
+          }
+        } catch (err) {
+          console.warn('[shift] start notify failed', err);
           /* GPS still proceeds; office push may retry on first ping */
         }
       }
