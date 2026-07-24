@@ -14,6 +14,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import FleetLiveMapWebSocket from '../components/admin/FleetLiveMapWebSocket.jsx';
 import FleetRouteHistory from '../components/admin/FleetRouteHistory.jsx';
 import FleetKpisDashboard from '../components/admin/FleetKpisDashboard.jsx';
+import HybridSlaDashboard from '../components/admin/HybridSlaDashboard.jsx';
 import ActiveDriversList from '../components/admin/ActiveDriversList.jsx';
 import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
 import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
@@ -2029,6 +2030,11 @@ export default function BackOffice() {
             {activeTab === 'fleet_kpis' && (
               <div className="pb-stack-lg animate-in fade-in duration-300">
                 <FleetKpisDashboard />
+              </div>
+            )}
+            {activeTab === 'hybrid_sla' && (
+              <div className="pb-stack-lg animate-in fade-in duration-300">
+                <HybridSlaDashboard />
               </div>
             )}
             {activeTab === 'fleet_active_drivers' && (

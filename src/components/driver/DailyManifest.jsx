@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchDriverManifest, fetchDriverSchedule } from '../../services/driverPortalApi.js';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
+import { getTripById } from '../../lib/trips/tripStore.js';
 import TelemetryStrip from './TelemetryStrip.jsx';
 import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
@@ -10,17 +11,56 @@ const STATUS_LABEL = {
   upcoming: 'Επόμενο',
 };
 
+function hybridStopsFromTrip(trip) {
+  if (!trip) return [];
+  const flights = trip.flights || [];
+  const delayByFlight = Object.fromEntries(
+    flights.map((f) => [f.id, Number(f.delay_minutes) || 0]),
+  );
+  return [...(trip.segments || [])]
+    .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+    .map((seg) => {
+      const start = seg.starts_at ? new Date(seg.starts_at) : null;
+      const time =
+        start && !Number.isNaN(start.getTime())
+          ? start.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })
+          : '—';
+      const delay =
+        (seg.flight_id && delayByFlight[seg.flight_id]) ||
+        Number(seg.metadata?.pickup_shifted_by_minutes) ||
+        0;
+      const label = [seg.title || seg.segment_type, seg.metadata?.address || seg.origin_label]
+        .filter(Boolean)
+        .join(' · ');
+      return {
+        time,
+        stop: label || 'Hybrid stop',
+        status: 'upcoming',
+        lat: seg.metadata?.lat,
+        lng: seg.metadata?.lng,
+        address: seg.metadata?.address,
+        delayMinutes: delay,
+        bufferNote: seg.destination_label || '',
+        hybrid: true,
+      };
+    });
+}
+
 export default function DailyManifest() {
   const [stops, setStops] = useState([]);
   const [manifest, setManifest] = useState(null);
   const session = getDriverSession();
 
   useEffect(() => {
-    fetchDriverSchedule().then(setStops);
+    const trip = getTripById(session?.tripId);
+    const hybrid = hybridStopsFromTrip(trip);
+    fetchDriverSchedule().then((apiStops) => {
+      setStops(hybrid.length ? hybrid : apiStops || []);
+    });
     fetchDriverManifest().then(setManifest);
     const id = setInterval(() => fetchDriverManifest().then(setManifest), LIVE_REFRESH_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [session?.tripId]);
 
   const boarded = manifest?.boarded_passengers?.length ?? 0;
   const total = manifest?.capacity ?? 45;
@@ -64,6 +104,11 @@ export default function DailyManifest() {
             route
           </span>
           Χρονοδιάγραμμα
+          {stops.some((s) => s.hybrid) ? (
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--driver-muted)]">
+              Hybrid
+            </span>
+          ) : null}
         </h3>
         <div className="driver-timeline">
           {stops.map((stop, i) => (
@@ -78,7 +123,18 @@ export default function DailyManifest() {
                 <div className="driver-timeline-stop">{stop.stop}</div>
                 <div className="driver-timeline-status">
                   {STATUS_LABEL[stop.status] || stop.status}
+                  {stop.delayMinutes ? ` · +${stop.delayMinutes}′` : ''}
                 </div>
+                {stop.lat && stop.lng ? (
+                  <a
+                    className="text-xs font-bold underline mt-1 inline-block text-[var(--driver-yellow)]"
+                    href={`https://www.google.com/maps?q=${encodeURIComponent(`${stop.lat},${stop.lng}`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    GPS pickup
+                  </a>
+                ) : null}
               </div>
             </div>
           ))}

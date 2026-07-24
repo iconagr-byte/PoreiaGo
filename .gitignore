@@ -38,3 +38,6 @@ deploy/.vapid_public.key
 backend/.env
 backend/data/
 deploy/runtime-data/
+
+__pycache__/
+*.py[cod]
