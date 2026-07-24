@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { mockFleet } from '../data/mockData';
 import { fetchAllLostItems, updateLostItemStatus } from '../services/lostItemsApi.js';
 import { loadAllCustomers, getCustomerByEmail, syncCustomersFromBookings } from '../lib/customers/customerStore.js';
 import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
@@ -516,6 +515,94 @@ export default function BackOffice() {
         onOpenInbox={() => setActiveTab('driver_chat')}
         onOpenLiveMap={() => setActiveTab('fleet_live_map')}
       />
+
+      <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-violet-100/60 flex flex-col min-w-0 overflow-hidden">
+        <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-headline-md text-lg sm:text-xl text-on-surface font-bold tracking-tight">
+              Στόλος γραφείου
+            </h3>
+            <p className="text-sm text-on-surface-variant mt-0.5">
+              {fleetVehicles.length
+                ? `${fleetVehicles.length} οχήματα από τις ρυθμίσεις στόλου`
+                : 'Χωρίς οχήματα — πρόσθεσε από Διαχείριση Στόλου'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('fleet')}
+            className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+          >
+            Διαχείριση
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </button>
+        </div>
+        {fleetVehicles.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <span className="material-symbols-outlined text-4xl text-slate-300">directions_bus</span>
+            <p className="font-bold text-gray-900 mt-2">Δεν υπάρχουν οχήματα στον στόλο</p>
+            <p className="text-sm text-on-surface-variant mt-1">
+              Δεν εμφανίζονται demo οχήματα. Πρόσθεσε λεωφορείο ή van για να ξεκινήσεις.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('fleet');
+                setAddVehicleOpen(true);
+              }}
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold"
+            >
+              <span className="material-symbols-outlined text-[16px]">add</span>
+              Νέο όχημα
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead>
+                <tr className="bg-surface-container-low/60">
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Όχημα
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Πινακίδα
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Κατάσταση
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Χλμ.
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/[0.04]">
+                {fleetVehicles.slice(0, 8).map((v) => (
+                  <tr
+                    key={v.id}
+                    className="hover:bg-primary/[0.03] cursor-pointer"
+                    onClick={() => setActiveTab('fleet')}
+                  >
+                    <td className="px-4 py-3 font-semibold text-sm text-on-surface">
+                      {v.make} {v.model}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-sm">{v.plate_number || '—'}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {v.service_status === 'Urgent'
+                        ? 'Σε Service'
+                        : v.service_status === 'Warning'
+                          ? 'Προειδοποίηση'
+                          : 'Ενεργό'}
+                    </td>
+                    <td className="px-4 py-3 text-sm tabular-nums">
+                      {Number(v.current_odometer || 0).toLocaleString('el-GR')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-sky-100/60 flex flex-col min-w-0 overflow-hidden">
           <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
@@ -1075,35 +1162,30 @@ export default function BackOffice() {
   const renderDrivers = () => <DriversHub />;
 
   const renderFleet = () => {
-    const authenticated = Boolean(getSaasToken());
-    const rows = fleetVehicles.length
-      ? fleetVehicles.map((v) => ({
-          id: v.id,
-          name: `${v.make} ${v.model}`,
-          licensePlate: v.plate_number,
-          type: v.category || v.model,
-          seats: v.seat_count ?? '-',
-          status:
-            v.service_status === 'Urgent'
-              ? 'Σε Service'
-              : v.service_status === 'Warning'
-                ? 'Προειδοποίηση'
-                : 'Ενεργό',
-          kilometers: v.current_odometer || 0,
-          lastService: v.last_service_date || '-',
-          nextServiceKm: v.next_service_threshold || v.current_odometer,
-          financials: {
-            revenue: 0,
-            expenses:
-              Number(v.fuel_cost_total || 0) +
-              Number(v.insurance_cost_total || 0),
-          },
-          service_status: v.service_status,
-          km_to_service: v.km_to_service,
-        }))
-      : authenticated
-        ? []
-        : mockFleet;
+    const rows = fleetVehicles.map((v) => ({
+      id: v.id,
+      name: `${v.make} ${v.model}`,
+      licensePlate: v.plate_number,
+      type: v.category || v.model,
+      seats: v.seat_count ?? '-',
+      status:
+        v.service_status === 'Urgent'
+          ? 'Σε Service'
+          : v.service_status === 'Warning'
+            ? 'Προειδοποίηση'
+            : 'Ενεργό',
+      kilometers: v.current_odometer || 0,
+      lastService: v.last_service_date || '-',
+      nextServiceKm: v.next_service_threshold || v.current_odometer,
+      financials: {
+        revenue: 0,
+        expenses:
+          Number(v.fuel_cost_total || 0) +
+          Number(v.insurance_cost_total || 0),
+      },
+      service_status: v.service_status,
+      km_to_service: v.km_to_service,
+    }));
     const totalFleet = rows.length;
     const activeFleet = rows.filter((f) => f.status === 'Ενεργό').length;
     const totalRevenue = rows.reduce((sum, f) => sum + Number(f.financials?.revenue || 0), 0);

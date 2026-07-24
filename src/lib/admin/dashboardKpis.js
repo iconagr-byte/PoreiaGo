@@ -24,6 +24,9 @@ function isActiveBooking(booking) {
 }
 
 function isFleetActive(vehicle) {
+  const service = String(vehicle?.service_status || '').toLowerCase();
+  if (service === 'ok') return true;
+  if (service === 'urgent' || service === 'warning') return service !== 'urgent';
   const st = String(vehicle?.status || '').toLowerCase();
   return st.includes('ενεργ') || st.includes('active') || st === 'ok';
 }

@@ -389,13 +389,8 @@ export async function fetchFleetVehicles() {
   } catch {
     /* offline */
   }
-  // Authenticated office: never inject platform demo fleet.
-  try {
-    if (localStorage.getItem('saas_access_token')) return [];
-  } catch {
-    /* ignore */
-  }
-  return getMockVehicles();
+  // Never inject platform demo fleet for offices.
+  return [];
 }
 
 export async function createFleetVehicle(payload) {
@@ -543,15 +538,12 @@ export async function fetchFleetDashboard() {
   } catch {
     /* offline */
   }
-  const vehicles = getMockVehicles();
-  const urgent = vehicles.filter((v) => v.service_status === 'Urgent');
-  const warning = vehicles.filter((v) => v.service_status === 'Warning');
   return {
-    urgent_count: urgent.length,
-    warning_count: warning.length,
-    alerts_count: urgent.length + warning.length,
-    monthly_cost_estimate: vehicles.reduce((sum, v) => sum + Number(v.insurance_cost_total || 0), 0) / 12,
-    needs_attention: [...urgent, ...warning].slice(0, 5),
+    urgent_count: 0,
+    warning_count: 0,
+    alerts_count: 0,
+    monthly_cost_estimate: 0,
+    needs_attention: [],
     alerts: [],
   };
 }
