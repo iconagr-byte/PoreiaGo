@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
+import { getDefaultIngressCname, getPlatformBaseDomain, tenantSubdomainFqdn } from '../../lib/platform/domain.js';
 import {
   createPlatformTenant,
   fetchPlatformOverview,
+  fetchPlatformTenant,
   fetchPlatformTenants,
   impersonatePlatformTenant,
   reactivatePlatformTenant,
   reportPlatformUsageAll,
   suspendPlatformTenant,
   updatePlatformTenant,
+  validatePlatformDomain,
 } from '../../services/platformSaasApi.js';
 import { getSaasToken, startImpersonationSession } from '../../services/saasApi.js';
 
@@ -84,8 +87,33 @@ function isRecent(iso, days = 7) {
 
 function officeHost(tenant) {
   if (tenant.custom_domain) return tenant.custom_domain;
-  if (tenant.subdomain) return `${tenant.subdomain}.poreiago.com`;
+  if (tenant.subdomain) return tenantSubdomainFqdn(tenant.subdomain);
   return null;
+}
+
+function formatMoneyCents(cents) {
+  const n = Number(cents);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  return new Intl.NumberFormat('el-GR', { style: 'currency', currency: 'EUR' }).format(n / 100);
+}
+
+function normalizeDomainInput(value) {
+  let raw = String(value || '').trim().toLowerCase();
+  raw = raw.replace(/^https?:\/\//, '');
+  raw = raw.split('/')[0].split('?')[0].replace(/\.$/, '');
+  if (raw.startsWith('www.')) raw = raw.slice(4);
+  return raw;
+}
+
+function isValidAfm(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return !digits || /^\d{9}$/.test(digits);
+}
+
+function isValidDomain(value) {
+  const raw = normalizeDomainInput(value);
+  if (!raw) return true;
+  return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(raw);
 }
 
 function copyText(text) {
@@ -115,7 +143,13 @@ export default function SuperAdminPanel() {
     plan: 'starter',
     vat_number: '',
     custom_domain: '',
+    is_active: true,
+    contact_email: '',
+    contact_phone: '',
+    admin_notes: '',
   });
+  const [domainCheck, setDomainCheck] = useState(null);
+  const [checkingDomain, setCheckingDomain] = useState(false);
 
   const load = useCallback(async ({ q = search, plan = planFilter, status = statusFilter } = {}) => {
     if (!getSaasToken() || !isSaasSuperAdmin()) {
@@ -245,29 +279,98 @@ export default function SuperAdminPanel() {
     }
   };
 
-  const openEdit = (tenant) => {
+  const openEdit = async (tenant) => {
+    setDomainCheck(null);
     setEditing(tenant);
     setEditForm({
       legal_name: tenant.legal_name || '',
       plan: tenant.plan || 'starter',
       vat_number: tenant.vat_number || '',
       custom_domain: tenant.custom_domain || '',
+      is_active: tenant.is_active !== false,
+      contact_email: tenant.contact_email || '',
+      contact_phone: tenant.contact_phone || '',
+      admin_notes: tenant.admin_notes || '',
     });
+    try {
+      const full = await fetchPlatformTenant(tenant.id);
+      setEditing(full);
+      setEditForm({
+        legal_name: full.legal_name || '',
+        plan: full.plan || 'starter',
+        vat_number: full.vat_number || '',
+        custom_domain: full.custom_domain || '',
+        is_active: full.is_active !== false,
+        contact_email: full.contact_email || '',
+        contact_phone: full.contact_phone || '',
+        admin_notes: full.admin_notes || '',
+      });
+    } catch {
+      /* keep list snapshot */
+    }
+  };
+
+  const checkDomain = async () => {
+    const domain = normalizeDomainInput(editForm.custom_domain);
+    if (!domain) {
+      toast.error('Συμπλήρωσε πρώτα το custom domain');
+      return;
+    }
+    if (!isValidDomain(domain)) {
+      toast.error('Μη έγκυρο domain (π.χ. achilliotravel.com)');
+      return;
+    }
+    setCheckingDomain(true);
+    setDomainCheck(null);
+    try {
+      // Registry check (TLS allowlist). Domain must be saved first to pass.
+      const result = await validatePlatformDomain(domain);
+      setDomainCheck({
+        ok: Boolean(result?.allowed),
+        domain,
+        message: result?.allowed
+          ? 'Το domain είναι καταχωρημένο στο registry — έτοιμο για TLS'
+          : 'Δεν είναι ακόμα στο registry. Αποθήκευσε το domain και ξαναέλεγξε.',
+      });
+    } catch (err) {
+      setDomainCheck({ ok: false, domain, message: err.message || 'Αποτυχία ελέγχου' });
+    } finally {
+      setCheckingDomain(false);
+    }
   };
 
   const submitEdit = async (e) => {
     e.preventDefault();
     if (!editing) return;
+    if (!isValidAfm(editForm.vat_number)) {
+      toast.error('Το ΑΦΜ πρέπει να έχει ακριβώς 9 ψηφία');
+      return;
+    }
+    const domain = normalizeDomainInput(editForm.custom_domain);
+    if (domain && !isValidDomain(domain)) {
+      toast.error('Μη έγκυρο custom domain');
+      return;
+    }
     setWorking(true);
     try {
+      const wasActive = editing.is_active !== false;
       await updatePlatformTenant(editing.id, {
         legal_name: editForm.legal_name.trim(),
         plan: editForm.plan,
-        vat_number: editForm.vat_number.trim() || null,
-        custom_domain: editForm.custom_domain.trim() || null,
+        vat_number: editForm.vat_number.trim(),
+        custom_domain: domain,
+        contact_email: editForm.contact_email.trim(),
+        contact_phone: editForm.contact_phone.trim(),
+        admin_notes: editForm.admin_notes.trim(),
       });
+      if (wasActive && !editForm.is_active) {
+        await suspendPlatformTenant(editing.id);
+      } else if (!wasActive && editForm.is_active) {
+        await reactivatePlatformTenant(editing.id);
+      }
       toast.success('Το γραφείο ενημερώθηκε');
       setEditing(null);
+      setDomainCheck(null);
       load();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία ενημέρωσης');
@@ -732,44 +835,312 @@ export default function SuperAdminPanel() {
       )}
 
       {editing && (
-        <Modal title={`Επεξεργασία: ${editing.slug}`} onClose={() => !working && setEditing(null)}>
-          <form onSubmit={submitEdit} className="space-y-4">
-            <Field
-              label="Επωνυμία"
-              value={editForm.legal_name}
-              onChange={(v) => setEditForm((f) => ({ ...f, legal_name: v }))}
-              required
-            />
-            <label className="block text-sm">
-              <span className="font-bold text-slate-500">Πλάνο</span>
-              <select
-                value={editForm.plan}
-                onChange={(e) => setEditForm((f) => ({ ...f, plan: e.target.value }))}
-                className="mt-1 w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-100 text-sm"
-              >
-                <option value="starter">Starter</option>
-                <option value="professional">Professional</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </label>
-            <Field label="ΑΦΜ" value={editForm.vat_number} onChange={(v) => setEditForm((f) => ({ ...f, vat_number: v }))} />
-            <Field
-              label="Custom domain"
-              value={editForm.custom_domain}
-              onChange={(v) => setEditForm((f) => ({ ...f, custom_domain: v }))}
-              placeholder="example.com"
-            />
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" disabled={working} onClick={() => setEditing(null)} className="px-4 py-2 rounded-full border text-sm font-bold">
-                Άκυρο
-              </button>
-              <button type="submit" disabled={working} className="px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-bold disabled:opacity-50">
-                Αποθήκευση
-              </button>
-            </div>
-          </form>
+        <Modal
+          title={`Επεξεργασία: ${editing.slug}`}
+          onClose={() => !working && setEditing(null)}
+          wide
+        >
+          <EditTenantForm
+            tenant={editing}
+            form={editForm}
+            setForm={setEditForm}
+            working={working}
+            domainCheck={domainCheck}
+            checkingDomain={checkingDomain}
+            onCheckDomain={checkDomain}
+            onOpenAsOffice={() => openAsOffice(editing)}
+            onSubmit={submitEdit}
+            onCancel={() => !working && setEditing(null)}
+          />
         </Modal>
       )}
+    </div>
+  );
+}
+
+function EditTenantForm({
+  tenant,
+  form,
+  setForm,
+  working,
+  domainCheck,
+  checkingDomain,
+  onCheckDomain,
+  onOpenAsOffice,
+  onSubmit,
+  onCancel,
+}) {
+  const plan = PLAN_META[form.plan] || PLAN_META.starter;
+  const subKey = String(tenant.subscription?.status || '').toLowerCase();
+  const sub = SUB_META[subKey] || {
+    label: tenant.subscription?.status || 'Χωρίς συνδρομή',
+    chip: 'bg-slate-100 text-slate-600',
+  };
+  const subdomainHost = tenant.subdomain
+    ? tenantSubdomainFqdn(tenant.subdomain, getPlatformBaseDomain())
+    : '—';
+  const ingress = getDefaultIngressCname();
+  const patch = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-5">
+      <div className="rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Γραφείο</p>
+            <h5 className="mt-0.5 text-lg font-bold text-slate-900 truncate">{tenant.legal_name}</h5>
+            <p className="mt-1 font-mono text-[11px] text-slate-500">{tenant.slug}</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${plan.chip}`}>
+              {plan.label}
+            </span>
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${sub.chip}`}>
+              {sub.label}
+            </span>
+            <span
+              className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                form.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+              }`}
+            >
+              {form.is_active ? 'ενεργό' : 'σε αναστολή'}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <MetaChip icon="group" label="Χρήστες" value={tenant.user_count ?? '—'} />
+          <MetaChip icon="confirmation_number" label="Κρατήσεις" value={tenant.booking_count ?? '—'} />
+          <MetaChip icon="event" label="Δημιουργία" value={formatDate(tenant.created_at)} />
+          <MetaChip
+            icon="payments"
+            label="Πλάνο €"
+            value={formatMoneyCents(tenant.subscription?.base_amount_cents)}
+          />
+        </div>
+
+        {(tenant.subscription?.trial_ends_at || tenant.subscription?.current_period_end) && (
+          <p className="mt-3 text-xs text-slate-500">
+            {tenant.subscription?.trial_ends_at
+              ? `Trial έως ${formatDate(tenant.subscription.trial_ends_at)}`
+              : `Περίοδος έως ${formatDate(tenant.subscription.current_period_end)}`}
+            {tenant.subscription?.cancel_at_period_end ? ' · ακύρωση στο τέλος περιόδου' : ''}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Βασικά</p>
+        <Field
+          label="Επωνυμία"
+          value={form.legal_name}
+          onChange={(v) => patch('legal_name', v)}
+          required
+        />
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="block text-sm">
+            <span className="font-bold text-slate-500">Πλάνο</span>
+            <select
+              value={form.plan}
+              onChange={(e) => patch('plan', e.target.value)}
+              className="mt-1 w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-100 text-sm"
+            >
+              <option value="starter">Starter</option>
+              <option value="professional">Professional</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </label>
+          <Field
+            label="ΑΦΜ"
+            value={form.vat_number}
+            onChange={(v) => patch('vat_number', v.replace(/\D/g, '').slice(0, 9))}
+            placeholder="9 ψηφία"
+            hint={!isValidAfm(form.vat_number) ? 'Απαιτούνται ακριβώς 9 ψηφία' : null}
+            error={!isValidAfm(form.vat_number)}
+          />
+        </div>
+
+        <div
+          className={`flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 ${
+            form.is_active ? 'border-emerald-200 bg-emerald-50/60' : 'border-rose-200 bg-rose-50/70'
+          }`}
+        >
+          <div>
+            <p className="text-sm font-bold text-slate-900">Κατάσταση γραφείου</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {form.is_active
+                ? 'Οι χρήστες μπορούν να συνδεθούν κανονικά'
+                : 'Σε αναστολή — το γραφείο δεν δέχεται είσοδο'}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.is_active}
+            onClick={() => patch('is_active', !form.is_active)}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+              form.is_active ? 'bg-emerald-500' : 'bg-slate-300'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                form.is_active ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Domain</p>
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3.5 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Subdomain</p>
+              <p className="mt-0.5 truncate font-mono text-sm text-slate-800">{subdomainHost}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyText(subdomainHost)}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+            >
+              <span className="material-symbols-outlined text-[14px]">content_copy</span>
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <Field
+            label="Custom domain"
+            value={form.custom_domain}
+            onChange={(v) => patch('custom_domain', v)}
+            placeholder="achilliotravel.com"
+            hint="Χωρίς https:// · αποθηκεύεται ως example.com"
+            error={Boolean(form.custom_domain) && !isValidDomain(form.custom_domain)}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={working || checkingDomain || !form.custom_domain.trim()}
+              onClick={onCheckDomain}
+              className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[15px]">dns</span>
+              {checkingDomain ? 'Έλεγχος…' : 'Έλεγχος DNS registry'}
+            </button>
+            {form.custom_domain.trim() && (
+              <span className="text-[11px] text-slate-500">
+                CNAME → <span className="font-mono font-bold text-slate-700">{ingress}</span>
+              </span>
+            )}
+          </div>
+          {domainCheck && (
+            <p
+              className={`mt-2 text-xs font-medium ${
+                domainCheck.ok ? 'text-emerald-700' : 'text-amber-700'
+              }`}
+            >
+              {domainCheck.message}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          Επικοινωνία & σημειώσεις
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field
+            label="Email επικοινωνίας"
+            type="email"
+            value={form.contact_email}
+            onChange={(v) => patch('contact_email', v)}
+            placeholder="office@example.com"
+          />
+          <Field
+            label="Τηλέφωνο"
+            value={form.contact_phone}
+            onChange={(v) => patch('contact_phone', v)}
+            placeholder="+30 …"
+          />
+        </div>
+        <label className="block text-sm">
+          <span className="font-bold text-slate-500">Εσωτερικές σημειώσεις</span>
+          <textarea
+            value={form.admin_notes}
+            onChange={(e) => patch('admin_notes', e.target.value)}
+            rows={3}
+            placeholder="π.χ. εκκρεμεί ΑΦΜ, κάλεσε Τρίτη…"
+            className="mt-1 w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-100 text-sm outline-none focus:ring-2 focus:ring-sky-200 resize-y min-h-[84px]"
+          />
+        </label>
+      </div>
+
+      {(tenant.stripe_customer_id || tenant.suspended_at) && (
+        <div className="rounded-2xl border border-slate-100 bg-white px-3.5 py-3 space-y-2">
+          {tenant.stripe_customer_id && (
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-slate-500 font-bold">Stripe customer</span>
+              <button
+                type="button"
+                onClick={() => copyText(tenant.stripe_customer_id)}
+                className="font-mono text-slate-700 hover:text-sky-700"
+              >
+                {tenant.stripe_customer_id}
+              </button>
+            </div>
+          )}
+          {tenant.suspended_at && (
+            <p className="text-xs text-rose-700">
+              Αναστολή από {formatDate(tenant.suspended_at)}
+              {tenant.suspended_reason ? ` · ${tenant.suspended_reason}` : ''}
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+        <button
+          type="button"
+          disabled={working || !form.is_active}
+          onClick={onOpenAsOffice}
+          className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3.5 py-2 text-xs font-bold text-sky-800 hover:bg-sky-100 disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">login</span>
+          Άνοιγμα ως γραφείο
+        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={working}
+            onClick={onCancel}
+            className="px-4 py-2 rounded-full border text-sm font-bold"
+          >
+            Άκυρο
+          </button>
+          <button
+            type="submit"
+            disabled={working}
+            className="px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-bold disabled:opacity-50"
+          >
+            {working ? 'Αποθήκευση…' : 'Αποθήκευση'}
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+function MetaChip({ icon, label, value }) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white px-2.5 py-2">
+      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <span className="material-symbols-outlined text-[13px]">{icon}</span>
+        {label}
+      </div>
+      <p className="mt-0.5 truncate text-sm font-bold text-slate-800">{value}</p>
     </div>
   );
 }
@@ -855,10 +1226,14 @@ function Metric({ label, value, warn, icon }) {
   );
 }
 
-function Modal({ title, onClose, children }) {
+function Modal({ title, onClose, children, wide = false }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-[28px] bg-white shadow-2xl border border-slate-100 p-6">
+      <div
+        className={`w-full max-h-[90vh] overflow-y-auto rounded-[28px] bg-white shadow-2xl border border-slate-100 p-6 ${
+          wide ? 'max-w-2xl' : 'max-w-lg'
+        }`}
+      >
         <div className="flex items-center justify-between gap-3 mb-4">
           <h4 className="text-lg font-bold text-slate-900">{title}</h4>
           <button type="button" onClick={onClose} className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center">
@@ -871,7 +1246,7 @@ function Modal({ title, onClose, children }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', required, minLength, placeholder }) {
+function Field({ label, value, onChange, type = 'text', required, minLength, placeholder, hint, error }) {
   return (
     <label className="block text-sm">
       <span className="font-bold text-slate-500">{label}</span>
@@ -882,8 +1257,15 @@ function Field({ label, value, onChange, type = 'text', required, minLength, pla
         minLength={minLength}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-100 text-sm outline-none focus:ring-2 focus:ring-sky-200"
+        className={`mt-1 w-full px-3 py-2.5 rounded-2xl bg-slate-50 border text-sm outline-none focus:ring-2 focus:ring-sky-200 ${
+          error ? 'border-rose-300' : 'border-slate-100'
+        }`}
       />
+      {hint ? (
+        <p className={`mt-1 text-[11px] ${error ? 'text-rose-600 font-medium' : 'text-slate-500'}`}>
+          {hint}
+        </p>
+      ) : null}
     </label>
   );
 }

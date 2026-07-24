@@ -238,6 +238,12 @@ class PlatformTenantSummary(BaseModel):
     subscription: PlatformTenantSubscription | None = None
     user_count: int | None = None
     booking_count: int | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
+    admin_notes: str | None = None
+    suspended_at: datetime | None = None
+    suspended_reason: str | None = None
+    domain_in_registry: bool = False
 
 
 class PlatformTenantListResponse(BaseModel):
@@ -269,6 +275,9 @@ class PlatformTenantUpdateRequest(BaseModel):
     is_active: bool | None = None
     vat_number: str | None = None
     custom_domain: str | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
+    admin_notes: str | None = None
 
 
 class PlatformOverviewResponse(BaseModel):
