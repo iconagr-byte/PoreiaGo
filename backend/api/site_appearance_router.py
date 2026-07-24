@@ -20,11 +20,22 @@ _UPLOAD_DIR = _DATA / "uploads" / "site"
 _PLATFORM_SETTINGS_FILE = Path(__file__).resolve().parents[1] / "platform" / "settings" / "platform_settings.json"
 _ALLOWED_KINDS = frozenset({"logo", "hero"})
 _MAX_UPLOAD_BYTES = 4 * 1024 * 1024
-_PLATFORM_LOGO_RE = re.compile(r"/api/site/assets/logo|poreiago|aerostride", re.I)
+# Only legacy PoreiaGo/AeroStride brand marks — not /api/site/assets/logo
+# (that path is the real uploaded office logo from the upload API).
+_PLATFORM_LOGO_RE = re.compile(r"poreiago|aerostride", re.I)
 _PLATFORM_HOST_RE = re.compile(
     r"^(www\.)?(poreiago\.com|localhost|127\.0\.0\.1)$",
     re.I,
 )
+
+
+def _is_platform_placeholder_logo(url: str | None) -> bool:
+    value = str(url or "").strip()
+    if not value:
+        return True
+    if value.startswith("data:image/") or value.startswith("/api/site/assets/"):
+        return False
+    return bool(_PLATFORM_LOGO_RE.search(value))
 
 DEFAULT_SITE_APPEARANCE = {
     "logo_url": "",
@@ -335,7 +346,7 @@ async def get_public_site_appearance(host: str | None = Query(default=None)):
         if not _PLATFORM_HOST_RE.match(str(host).strip()):
             data = {**DEFAULT_SITE_APPEARANCE, **_read_appearance()}
             logo = str(data.get("logo_url") or "")
-            if _PLATFORM_LOGO_RE.search(logo):
+            if _is_platform_placeholder_logo(logo):
                 data["logo_url"] = ""
             return SiteAppearanceResponse(**data)
 

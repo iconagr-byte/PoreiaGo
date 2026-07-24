@@ -46,7 +46,9 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
 
 _PLATFORM_BRAND_RE = re.compile(r"^(aerostride|poreiago)$", re.I)
 _PLATFORM_COPY_RE = re.compile(r"aerostride|poreiago", re.I)
-_PLATFORM_LOGO_RE = re.compile(r"/api/site/assets/logo|poreiago|aerostride", re.I)
+# Only legacy PoreiaGo/AeroStride brand marks — uploaded logos use
+# /api/site/assets/logo or data: URLs and must not be scrubbed.
+_PLATFORM_LOGO_RE = re.compile(r"poreiago|aerostride", re.I)
 
 
 def _parse_settings(raw: str | None) -> dict[str, Any]:
@@ -63,6 +65,9 @@ def _is_platform_logo(url: str | None) -> bool:
     value = str(url or "").strip()
     if not value:
         return True
+    # Real tenant uploads — never treat as platform placeholder.
+    if value.startswith("data:image/") or value.startswith("/api/site/assets/"):
+        return False
     return bool(_PLATFORM_LOGO_RE.search(value))
 
 

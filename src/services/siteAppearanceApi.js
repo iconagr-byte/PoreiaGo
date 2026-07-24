@@ -4,6 +4,8 @@ import { getSaasToken, saasFetch } from './saasApi.js';
 import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
 import { HOMEPAGE_LAYOUT_DEFAULTS } from '../lib/homepage/homepageTemplates.js';
 import { scrubSiteAppearancePlaceholders } from '../lib/branding/officeBrand.js';
+import { fileToLogoDataUrl } from '../lib/branding/logoImage.js';
+import { fileToTripCoverDataUrl } from '../lib/trips/tripImage.js';
 
 const STORAGE_KEY = 'aerostride_site_appearance_v1';
 
@@ -170,6 +172,22 @@ async function updateSiteAppearanceLegacy(patch) {
 }
 
 export async function uploadSiteAsset(kind, file) {
+  // SaaS / office tenants: persist logo in Postgres site_appearance so the
+  // storefront (host-resolved) actually receives it. File-store upload alone
+  // only updates the shared platform JSON and was invisible on office sites.
+  if (getSaasToken()) {
+    const url =
+      kind === 'hero' ? await fileToTripCoverDataUrl(file) : await fileToLogoDataUrl(file);
+    const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
+    const saved = await updateSiteAppearance({ [key]: url });
+    return {
+      ok: true,
+      kind,
+      url,
+      appearance: saved.data,
+    };
+  }
+
   const form = new FormData();
   form.append('file', file);
   const res = await fetch(
@@ -187,6 +205,13 @@ export async function uploadSiteAsset(kind, file) {
 }
 
 export async function clearSiteAsset(kind) {
+  if (getSaasToken()) {
+    const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
+    const value = kind === 'logo' ? '' : DEFAULT_SITE_APPEARANCE.hero_image_url;
+    const saved = await updateSiteAppearance({ [key]: value });
+    return { ok: true, appearance: saved.data };
+  }
+
   const res = await adminFetch(
     `/api/admin/platform/site-appearance/upload/${encodeURIComponent(kind)}`,
     { method: 'DELETE' },
