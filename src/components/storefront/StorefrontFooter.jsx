@@ -1,21 +1,22 @@
 import { Link } from 'react-router-dom';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
-import { resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
+import { officeLogoImageStyle, resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
 
 function FooterBrandBlock({ siteAppearance, tone = 'light' }) {
   const brand = resolveOfficeBrand(siteAppearance);
   const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const nameClass = tone === 'dark' ? 'text-white' : 'text-on-surface';
   const copyClass = tone === 'dark' ? 'text-white/60' : 'text-secondary';
+  const logoStyle = {
+    ...officeLogoImageStyle(siteAppearance),
+    // Footer reads a bit larger than header by default when unset height is small.
+    height: `${Math.max(brand.heightPx, 36)}px`,
+  };
 
   return (
     <div>
       {logoSrc ? (
-        <img
-          src={logoSrc}
-          alt={brand.name}
-          className="mb-4 h-12 w-auto max-w-[200px] object-contain"
-        />
+        <img src={logoSrc} alt={brand.name} style={logoStyle} className="mb-4 object-contain" />
       ) : (
         <p className={`text-2xl font-bold mb-3 ${nameClass}`}>{brand.name}</p>
       )}
@@ -147,12 +148,13 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
   if (templateId === 'compact_inline') {
     const brand = resolveOfficeBrand(siteAppearance);
     const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
+    const logoStyle = officeLogoImageStyle(siteAppearance);
     return (
       <footer className="bg-surface-container-low py-6 border-t">
         <div className="max-w-container-max mx-auto px-margin-desktop flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-sm text-secondary">
           <div className="flex items-center gap-3 min-w-0">
             {logoSrc ? (
-              <img src={logoSrc} alt={brand.name} className="h-8 w-auto max-w-[140px] object-contain" />
+              <img src={logoSrc} alt={brand.name} style={logoStyle} className="object-contain" />
             ) : (
               <span className="font-bold text-on-surface">{brand.name}</span>
             )}

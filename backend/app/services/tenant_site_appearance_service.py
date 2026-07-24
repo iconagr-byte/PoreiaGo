@@ -17,6 +17,9 @@ from app.services.audit_service import AuditService
 
 DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "logo_url": "",
+    "logo_height_px": 40,
+    "logo_max_width_px": 180,
+    "logo_show_name": False,
     "hero_image_url": "/images/hero-bus-achillio.png",
     "hero_badge": "Premium Ταξιδιωτική Εμπειρία",
     "hero_title": "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:",
@@ -132,6 +135,19 @@ class TenantSiteAppearanceService:
         current = settings.get("site_appearance")
         base = current if isinstance(current, dict) else {}
         updated = _scrub_platform_placeholders({**DEFAULT_SITE_APPEARANCE, **base, **patch})
+        # Clamp logo sizing if present.
+        try:
+            if "logo_height_px" in updated:
+                updated["logo_height_px"] = max(20, min(96, int(updated["logo_height_px"])))
+        except (TypeError, ValueError):
+            updated["logo_height_px"] = 40
+        try:
+            if "logo_max_width_px" in updated:
+                updated["logo_max_width_px"] = max(60, min(400, int(updated["logo_max_width_px"])))
+        except (TypeError, ValueError):
+            updated["logo_max_width_px"] = 180
+        if "logo_show_name" in updated:
+            updated["logo_show_name"] = bool(updated["logo_show_name"])
         # Persist only appearance keys — drop enrichment helpers.
         updated.pop("display_name", None)
         updated.pop("storage_source", None)

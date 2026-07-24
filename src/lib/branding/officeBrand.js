@@ -39,6 +39,31 @@ export function resolveOfficeBrand(siteAppearance = {}) {
     displayName: name,
     copyright,
     hasLogo: Boolean(logoUrl),
+    heightPx: clampLogoHeight(siteAppearance.logo_height_px),
+    maxWidthPx: clampLogoMaxWidth(siteAppearance.logo_max_width_px),
+    showName: Boolean(siteAppearance.logo_show_name) && Boolean(name),
+  };
+}
+
+export function clampLogoHeight(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 40;
+  return Math.max(20, Math.min(96, Math.round(n)));
+}
+
+export function clampLogoMaxWidth(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 180;
+  return Math.max(60, Math.min(400, Math.round(n)));
+}
+
+/** Inline styles for office logo images (header / footer / admin). */
+export function officeLogoImageStyle(siteAppearance = {}) {
+  return {
+    height: `${clampLogoHeight(siteAppearance.logo_height_px)}px`,
+    width: 'auto',
+    maxWidth: `${clampLogoMaxWidth(siteAppearance.logo_max_width_px)}px`,
+    objectFit: 'contain',
   };
 }
 

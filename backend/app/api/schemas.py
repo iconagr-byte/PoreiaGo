@@ -379,6 +379,9 @@ class TenantSiteAppearanceResponse(BaseModel):
     storage_source: str = "postgres"
     tenant_slug: str | None = None
     logo_url: str = ""
+    logo_height_px: int = 40
+    logo_max_width_px: int = 180
+    logo_show_name: bool = False
     hero_image_url: str = ""
     hero_badge: str = ""
     hero_title: str = ""
@@ -395,6 +398,9 @@ class TenantSiteAppearanceResponse(BaseModel):
 
 class TenantSiteAppearanceUpdate(BaseModel):
     logo_url: str | None = None
+    logo_height_px: int | None = Field(default=None, ge=20, le=96)
+    logo_max_width_px: int | None = Field(default=None, ge=60, le=400)
+    logo_show_name: bool | None = None
     hero_image_url: str | None = None
     hero_badge: str | None = None
     hero_title: str | None = None
