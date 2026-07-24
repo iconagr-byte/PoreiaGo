@@ -16,6 +16,7 @@ export function settingsTabToNavItem(tab) {
     tab: 'settings',
     settingsSubTab: tab.id,
     settingsSection: tab.section,
+    accent: tab.accent || (tab.section === 'platform' ? 'indigo' : 'blue'),
   };
 }
 
