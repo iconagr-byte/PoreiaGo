@@ -59,12 +59,12 @@ Default: 2.5 L/h @ €1.85/L → ~€0.15/min idle
 
 ## 4. Admin Live Map
 
-- **UI:** `src/components/admin/LiveFleetMap.jsx` (Leaflet dark tiles)
-- **Mapbox GL:** set `VITE_MAPBOX_TOKEN` and replace `TileLayer` with Mapbox style URL
+- **UI:** `src/components/admin/FleetLiveMapWebSocket.jsx` (Mapbox / Leaflet)
+- **Mapbox GL:** set `VITE_MAPBOX_TOKEN` for the production-style live map
 - **Heatmap:** grid aggregation of stop coordinates (`GET /api/v1/telemetry/heatmap`)
-- **Poll:** `GET /api/v1/telemetry/fleet/live` every 5s
+- **Poll:** `GET /api/v1/telemetry/fleet/live` every 5s (HTTP poll is primary)
 
-BackOffice tab: **Live GPS**
+BackOffice tab: **Ζωντανός Χάρτης** (`fleet_live_map`)
 
 ## 5. Driver App
 

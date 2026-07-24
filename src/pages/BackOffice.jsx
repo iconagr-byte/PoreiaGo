@@ -11,7 +11,6 @@ import BookingDetailPanel from '../components/booking/BookingDetailPanel.jsx';
 import RecordCashPaymentModal from '../components/admin/RecordCashPaymentModal.jsx';
 import FiscalMarkCell from '../components/admin/FiscalMarkCell.jsx';
 import toast, { Toaster } from 'react-hot-toast';
-import LiveFleetMap from '../components/admin/LiveFleetMap.jsx';
 import FleetLiveMapWebSocket from '../components/admin/FleetLiveMapWebSocket.jsx';
 import FleetRouteHistory from '../components/admin/FleetRouteHistory.jsx';
 import FleetKpisDashboard from '../components/admin/FleetKpisDashboard.jsx';
@@ -19,7 +18,6 @@ import ActiveDriversList from '../components/admin/ActiveDriversList.jsx';
 import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
 import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
 import { FleetTelemetryProvider } from '../context/FleetTelemetryContext.jsx';
-import TelemetryAlertsPanel from '../components/admin/TelemetryAlertsPanel.jsx';
 import ImpersonationBanner from '../components/admin/ImpersonationBanner.jsx';
 import SettingsHub from '../components/admin/SettingsHub.jsx';
 import CustomerBookingCard from '../components/admin/CustomerBookingCard.jsx';
@@ -145,10 +143,10 @@ export default function BackOffice() {
     ensureDriverSession();
   }, [navigate]);
 
-  // Tenant offices must not stay on platform-operator / debug tabs.
+  // Legacy debug tab removed — send any leftover state to the live map.
   useEffect(() => {
-    if (!isSaasSuperAdmin() && activeTab === 'live_tracking') {
-      setActiveTab('dashboard');
+    if (activeTab === 'live_tracking') {
+      setActiveTab('fleet_live_map');
     }
   }, [activeTab]);
 
@@ -1970,50 +1968,6 @@ export default function BackOffice() {
                     interval: location.state?.interval,
                   }}
                 />
-              </div>
-            )}
-            {activeTab === 'live_tracking' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300 space-y-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSettingsSubTab(
-                      isSaasSuperAdmin() ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB,
-                    );
-                    setActiveTab('settings');
-                  }}
-                  className="w-full flex items-center justify-between gap-4 p-4 rounded-2xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
-                >
-                  <span className="flex items-center gap-2 font-bold text-primary">
-                    <span className="material-symbols-outlined">settings</span>
-                    Control Panel — πλατφόρμα, πληρωμές, οδηγοί
-                  </span>
-                  <span className="material-symbols-outlined text-primary">arrow_forward</span>
-                </button>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  <TelemetryAlertsPanel />
-                  <div className="bg-white rounded-[28px] border border-black/[0.05] p-6 shadow-sm">
-                    <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary">info</span>
-                      Γρήγορη δοκιμή
-                    </h3>
-                    <p className="text-sm text-gray-500 mb-4">
-                      Στείλτε GPS εκτός διαδρόμου ή{' '}
-                      <code className="text-xs bg-gray-100 px-1 rounded">tracker_event_id: 101</code> για live
-                      ειδοποίηση εδώ και στο wallet ETA.
-                    </p>
-                    <pre className="text-[11px] bg-gray-900 text-gray-100 p-4 rounded-xl overflow-x-auto">
-{`curl -X POST http://localhost:8000/telemetry/update \\
-  -H "X-Device-Key: dev-gps-key" \\
-  -H "Content-Type: application/json" \\
-  -d '{"tenant_id":"00000000-0000-0000-0000-000000000001",
-       "vehicle_code":"XAH-4021","trip_id":1,
-       "latitude":38.5,"longitude":23.5,
-       "speed_kmh":60,"engine_status":"on"}'`}
-                    </pre>
-                  </div>
-                </div>
-                <LiveFleetMap pollMs={5000} />
               </div>
             )}
             {activeTab === 'fleet_live_map' && (
