@@ -86,8 +86,10 @@ export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
     departureTime: '',
     arrivalTime: '',
     price: 0,
+    childPrice: '',
     vehicleType: 'Luxury Coach',
     availableSeats: 30,
+    totalSeats: 30,
     description: '',
     driverId: '',
     driverName: '',
@@ -95,6 +97,12 @@ export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
     vehicleCode: '',
     image: '',
     hook: '',
+    durationLabel: 'Ημερήσια',
+    badge: '',
+    featured: false,
+    status: 'published',
+    meetingPoint: '',
+    highlights: [],
     stops: [],
   };
 }
@@ -110,12 +118,42 @@ export function tripToFormData(trip) {
 }
 
 export function formDataToTrip(formData, existingId = null) {
+  const highlights = Array.isArray(formData.highlights)
+    ? formData.highlights.map((h) => String(h).trim()).filter(Boolean)
+    : String(formData.highlights || '')
+        .split(/[\n,]/)
+        .map((h) => h.trim())
+        .filter(Boolean);
+
+  const childRaw = formData.childPrice;
+  const childPrice =
+    childRaw === '' || childRaw === null || childRaw === undefined
+      ? null
+      : Number(childRaw);
+
   return normalizeTrip({
     ...formData,
     id: existingId ?? Date.now(),
-    price: Number(formData.price),
-    availableSeats: Number(formData.availableSeats),
+    price: Number(formData.price) || 0,
+    childPrice: Number.isFinite(childPrice) ? childPrice : null,
+    availableSeats: Number(formData.availableSeats) || 0,
+    totalSeats: Number(formData.totalSeats || formData.availableSeats) || 0,
+    featured: Boolean(formData.featured),
+    status: formData.status === 'draft' ? 'draft' : 'published',
+    durationLabel: String(formData.durationLabel || '').trim(),
+    badge: String(formData.badge || '').trim(),
+    meetingPoint: String(formData.meetingPoint || '').trim(),
+    highlights,
     departureTime: formData.departureTime ? new Date(formData.departureTime).toISOString() : '',
     arrivalTime: formData.arrivalTime ? new Date(formData.arrivalTime).toISOString() : '',
   });
+}
+
+/** Storefront: hide drafts. */
+export function isPublishedTrip(trip) {
+  return !trip || trip.status !== 'draft';
+}
+
+export function listPublishedTrips(trips = loadTrips()) {
+  return trips.filter(isPublishedTrip);
 }

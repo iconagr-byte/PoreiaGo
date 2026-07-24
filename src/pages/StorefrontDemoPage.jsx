@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { loadTrips } from '../lib/trips/tripStore.js';
+import { listPublishedTrips } from '../lib/trips/tripStore.js';
 import { getTripMarket, MARKET_DOMESTIC, MARKET_INTERNATIONAL } from '../lib/trips/tripMarket.js';
 import {
   filterTrips,
@@ -38,13 +38,19 @@ export default function StorefrontDemoPage() {
   // Preview from admin OR live office domain/subdomain.
   const allowStorefront = isPreview || isLiveTenantSite;
 
-  const [trips] = useState(() => loadTrips());
+  const [trips] = useState(() => listPublishedTrips());
   const domesticTrips = useMemo(
-    () => trips.filter((t) => getTripMarket(t) === MARKET_DOMESTIC),
+    () =>
+      trips
+        .filter((t) => getTripMarket(t) === MARKET_DOMESTIC)
+        .sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured))),
     [trips],
   );
   const internationalTrips = useMemo(
-    () => trips.filter((t) => getTripMarket(t) === MARKET_INTERNATIONAL),
+    () =>
+      trips
+        .filter((t) => getTripMarket(t) === MARKET_INTERNATIONAL)
+        .sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured))),
     [trips],
   );
   const [searchFilters, setSearchFilters] = useState({

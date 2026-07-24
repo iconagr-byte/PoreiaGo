@@ -11,11 +11,13 @@ function TripMeta({ trip, compact = false }) {
     hour: '2-digit',
     minute: '2-digit',
   });
+  const duration = trip.durationLabel ? ` · ${trip.durationLabel}` : '';
 
   if (compact) {
     return (
       <p className="text-xs text-on-surface-variant">
-        {dateStr} · {timeStr} · {trip.availableSeats} θέσεις
+        {dateStr} · {timeStr}
+        {duration} · {trip.availableSeats} θέσεις
       </p>
     );
   }
@@ -26,6 +28,7 @@ function TripMeta({ trip, compact = false }) {
         <span className="material-symbols-outlined text-[18px] text-blue-600">calendar_today</span>
         <span>
           {dateStr} · {timeStr}
+          {duration}
         </span>
       </div>
       <div className="flex items-center gap-3 text-sm text-emerald-700">
@@ -206,6 +209,11 @@ export default function TripCard({
           alt={trip.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         />
+        {trip.badge ? (
+          <span className="absolute top-4 left-4 z-20 rounded-full bg-white/95 text-slate-900 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 shadow-sm">
+            {trip.badge}
+          </span>
+        ) : null}
         {(trip.hook || trip.title) && (
           <div className="absolute bottom-4 left-6 right-6 z-20">
             <p className="text-white font-headline-sm font-bold leading-tight drop-shadow-md">

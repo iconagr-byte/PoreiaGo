@@ -137,18 +137,16 @@ export default function TripEditorPage() {
   return (
     <AdminLayout activeTab="routes" title={header}>
       <div className="max-w-5xl mx-auto pb-16">
-        <div className="bg-surface-container-lowest rounded-[32px] border border-black/[0.05] shadow-sm p-6 md:p-10">
-          <TripForm
-            formData={formData}
-            setFormData={setFormData}
-            activeStopId={activeStopId}
-            setActiveStopId={setActiveStopId}
-            onSubmit={handleSave}
-            onCancel={handleCancel}
-            isEdit={isEdit}
-            saving={saving}
-          />
-        </div>
+        <TripForm
+          formData={formData}
+          setFormData={setFormData}
+          activeStopId={activeStopId}
+          setActiveStopId={setActiveStopId}
+          onSubmit={handleSave}
+          onCancel={handleCancel}
+          isEdit={isEdit}
+          saving={saving}
+        />
       </div>
 
       <MasterQrIssuedModal

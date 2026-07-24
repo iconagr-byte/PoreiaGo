@@ -744,6 +744,16 @@ export default function BackOffice() {
                         </div>
                       )}
                       <span className="truncate">{trip.title}</span>
+                      {trip.status === 'draft' && (
+                        <span className="ml-2 shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                          Draft
+                        </span>
+                      )}
+                      {trip.featured && (
+                        <span className="ml-1 shrink-0 material-symbols-outlined text-[16px] text-amber-500">
+                          star
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface">
