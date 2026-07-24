@@ -207,6 +207,22 @@ async def remove_user(user_id: str):
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+@router.get("/login-audits")
+async def get_login_audits(
+    limit: int = Query(100, ge=1, le=500),
+    actor_type: str | None = Query(default=None, pattern="^(admin|customer|driver)$"),
+    success: bool | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=120),
+):
+    """Login history: χρόνος, IP, συσκευή — admin / customer / driver."""
+    from travel_platform.settings.login_audit_store import actor_type_label, list_login_events
+
+    rows = list_login_events(limit=limit, actor_type=actor_type, success=success, q=q)
+    for row in rows:
+        row["actor_type_label"] = actor_type_label(row.get("actor_type"))
+    return {"items": rows, "total": len(rows)}
+
+
 @router.get("/drivers", response_model=list[FleetDriverResponse])
 async def get_drivers(request: Request, status: str | None = None):
     tenant_id = _request_tenant_id(request)
