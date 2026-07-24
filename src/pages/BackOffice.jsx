@@ -878,7 +878,7 @@ export default function BackOffice() {
               </div>
               <span
                 className={`px-4 py-2 rounded-full text-sm font-bold shadow-sm ${
-                  customer.tier === 'Platinum'
+                  customer.tier === 'Platinum' || customer.tier === 'VIP'
                     ? 'bg-slate-800 text-slate-100'
                     : customer.tier === 'Gold'
                       ? 'bg-gradient-to-r from-amber-200 to-yellow-100 text-amber-900 border border-amber-300/60'
