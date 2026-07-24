@@ -48,6 +48,7 @@ export default function SettingsHub({ initialTab, onSubTabChange, contractPrefs 
       telematics: 'Geofence, ETA, ρελαντί και fleet digests',
       tenants: 'Διαχείριση γραφείων / tenants της πλατφόρμας',
       saas_infra: 'Υποδομή SaaS και σύνδεση υπηρεσιών',
+      integrations: 'Aviationstack / Twilio API keys (μόνο super admin)',
       backup: 'Αντίγραφα ασφαλείας και επαναφορά',
       growth: 'Partner webhooks και growth εργαλεία',
     };

@@ -16,6 +16,7 @@ export const TENANT_SETTINGS_TABS = [
 export const PLATFORM_OPERATOR_TABS = [
   { id: 'tenants', label: 'Γραφεία', icon: 'domain', section: 'platform' },
   { id: 'saas_infra', label: 'SaaS Infra', icon: 'dns', section: 'platform' },
+  { id: 'integrations', label: 'Integrations', icon: 'key', section: 'platform' },
   { id: 'backup', label: 'Backup', icon: 'backup', section: 'platform' },
   // Partner webhooks / growth tools — platform only (όχι νέο γραφείο).
   { id: 'growth', label: 'Growth', icon: 'hub', section: 'platform' },

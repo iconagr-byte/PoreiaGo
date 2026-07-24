@@ -64,3 +64,14 @@ export async function fetchTenantAuditLogs(tenantId, { offset = 0, limit = 50 } 
   const q = new URLSearchParams({ offset: String(offset), limit: String(limit) });
   return saasFetch(`/api/v1/platform/tenants/${tenantId}/audit?${q}`);
 }
+
+export async function fetchPlatformIntegrations() {
+  return saasFetch('/api/v1/platform/integrations');
+}
+
+export async function updatePlatformIntegrations(body) {
+  return saasFetch('/api/v1/platform/integrations', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
