@@ -2,8 +2,12 @@
 
 const PLATFORM_BRAND_RE = /^(aerostride|poreiago)$/i;
 const PLATFORM_COPY_RE = /aerostride|poreiago/i;
-/** Shared PoreiaGo platform asset — never show on office storefronts. */
-const PLATFORM_LOGO_RE = /\/api\/site\/assets\/logo|poreiago|aerostride/i;
+/**
+ * Only strip legacy PoreiaGo / AeroStride brand assets.
+ * Do NOT treat `/api/site/assets/logo` as a placeholder — that is the real
+ * uploaded office logo URL from the site-appearance upload API.
+ */
+const PLATFORM_LOGO_RE = /poreiago|aerostride/i;
 
 export function isPlatformPlaceholderBrand(name) {
   return !name || PLATFORM_BRAND_RE.test(String(name).trim());
@@ -16,6 +20,9 @@ export function isPlatformPlaceholderCopyright(text) {
 export function isPlatformPlaceholderLogo(url) {
   const value = String(url || '').trim();
   if (!value) return true;
+  // Tenant uploads (data URLs, absolute CDN, /api/site/assets/…) are valid.
+  if (value.startsWith('data:image/')) return false;
+  if (value.startsWith('/api/site/assets/')) return false;
   return PLATFORM_LOGO_RE.test(value);
 }
 
