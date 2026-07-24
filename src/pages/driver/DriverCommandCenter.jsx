@@ -279,7 +279,7 @@ export default function DriverCommandCenter() {
       <div className="driver-app">
         <DriverHeader session={session} telemetryOnline={telemetryOnline} onLogout={logout} />
 
-        {tab !== 'chat' ? (
+        {tab !== 'chat' && tab !== 'summary' ? (
           <div className="driver-shell">
             <TachographStrip
               drivingLabel={tachograph.drivingLabel}
