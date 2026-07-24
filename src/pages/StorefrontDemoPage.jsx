@@ -343,7 +343,7 @@ export default function StorefrontDemoPage() {
         <FleetShowcaseSection
           vehicles={fleetShowcase}
           loading={fleetLoading}
-          hidden={siteAppearance.show_fleet_section === false}
+          hidden={false}
         />
 
         {siteAppearance.show_why_us_section !== false && (

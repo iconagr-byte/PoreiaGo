@@ -1,14 +1,19 @@
 /** Shared labels for live fleet vehicle popups / cards. */
 
-export const DEFAULT_FLEET_BUS_IMAGE = '/images/hero-bus-achillio.png';
+import {
+  NEUTRAL_FLEET_BUS_IMAGE,
+  resolvePublicFleetImage,
+} from '../fleet/fleetBusImage.js';
+
+export const DEFAULT_FLEET_BUS_IMAGE = NEUTRAL_FLEET_BUS_IMAGE;
 
 export function resolveFleetMarkerImage(vehicle) {
-  return (
+  return resolvePublicFleetImage(
     vehicle?.vehicle_image_url ||
-    vehicle?.vehicleImageUrl ||
-    vehicle?.photo_url ||
-    vehicle?.photoUrl ||
-    DEFAULT_FLEET_BUS_IMAGE
+      vehicle?.vehicleImageUrl ||
+      vehicle?.photo_url ||
+      vehicle?.photoUrl ||
+      DEFAULT_FLEET_BUS_IMAGE,
   );
 }
 

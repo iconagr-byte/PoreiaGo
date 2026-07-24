@@ -216,7 +216,7 @@ class ServiceService:
                 seat_count=seats,
                 amenities=amenities,
                 public_summary=summary,
-                public_image_url="/images/hero-bus-achillio.png",
+                public_image_url="/images/fleet-bus-neutral.png",
                 show_on_website=True,
                 tenant_id=DEMO_TENANT_ID,
             )
@@ -382,7 +382,13 @@ class ServiceService:
                     "amenities": amenities,
                     "summary": v.public_summary
                     or f"{v.category} · {v.seat_count} θέσεις · Euro VI",
-                    "image_url": v.public_image_url or "/images/hero-bus-achillio.png",
+                    "image_url": (
+                        "/images/fleet-bus-neutral.png"
+                        if not (v.public_image_url or "").strip()
+                        or "achillio" in (v.public_image_url or "").lower()
+                        or "achillion" in (v.public_image_url or "").lower()
+                        else v.public_image_url
+                    ),
                     "status_label": status_label,
                 }
             )
