@@ -125,16 +125,30 @@ async def dispatch_delay_alerts(
     delay_minutes: int,
     channels: list[str],
     trip_title: str | None = None,
+    pickup_time: str | None = None,
+    template_id: str = "flight_delay_pickup",
 ) -> dict[str, Any]:
     """
     Send delay alerts to recipients with phone/email.
+    Uses WhatsApp-style templates when template_id is provided.
     recipient: {phone?, email?, name?}
     """
-    message = (
-        f"PoreiaGo: η πτήση {flight_number} έχει καθυστέρηση"
-        + (f" +{delay_minutes}′" if delay_minutes else "")
-        + (f" ({trip_title})" if trip_title else "")
-        + ". Ελέγξτε την ενημερωμένη ώρα pickup."
+    templates = {
+        "flight_delay_pickup": (
+            "PoreiaGo: Η πτήση {flight_number} έχει καθυστέρηση +{delay_minutes}′. "
+            "Νέα ώρα pickup: {pickup_time}. {trip_title}"
+        ),
+        "connection_risk": (
+            "PoreiaGo: Στενή σύνδεση στην εκδρομή {trip_title}. "
+            "Παρακαλούμε είστε έγκαιρα στο σημείο συνάντησης."
+        ),
+    }
+    tpl = templates.get(template_id) or templates["flight_delay_pickup"]
+    message = tpl.format(
+        flight_number=flight_number or "—",
+        delay_minutes=delay_minutes or 0,
+        pickup_time=pickup_time or "—",
+        trip_title=trip_title or "Εκδρομή",
     )
     results: list[dict[str, Any]] = []
     for r in recipients or []:

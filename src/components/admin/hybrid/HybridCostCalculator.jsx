@@ -1,16 +1,43 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import { calculateTripYield } from '../../../lib/hybrid/costYieldCalculator.js';
-import { formatMoney, SUPPORTED_CURRENCIES } from '../../../lib/currency/multiCurrency.js';
+import { formatMoney, SUPPORTED_CURRENCIES, DEFAULT_FX_TO_EUR } from '../../../lib/currency/multiCurrency.js';
+import { fetchLiveFxToEur } from '../../../lib/currency/liveFx.js';
 
 const SCENARIO_MARGINS = [15, 25, 35];
 
 export default function HybridCostCalculator({ formData, setFormData }) {
   const currency = formData.currency || 'EUR';
   const margin = formData.targetMarginPct ?? 25;
+  const [fxRates, setFxRates] = useState(() => formData.fxRatesToEur || DEFAULT_FX_TO_EUR);
+  const [fxMeta, setFxMeta] = useState({ source: 'default' });
+  const [fxLoading, setFxLoading] = useState(false);
+
   const pax =
     Number(formData.availableSeats) ||
     Math.max(...(formData.flights || []).map((f) => Number(f.seats_allocated) || 0), 0) ||
     1;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setFxLoading(true);
+      const result = await fetchLiveFxToEur();
+      if (cancelled) return;
+      setFxRates(result.rates);
+      setFxMeta({
+        source: result.source || (result.fromCache ? 'cache' : 'live'),
+        error: result.error,
+      });
+      setFormData((prev) => ({ ...prev, fxRatesToEur: result.rates }));
+      setFxLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Mount-once live FX hydrate
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const yieldSummary = useMemo(
     () =>
@@ -20,8 +47,9 @@ export default function HybridCostCalculator({ formData, setFormData }) {
         passengerCount: pax,
         targetMarginPct: margin,
         displayCurrency: currency,
+        fxRatesToEur: fxRates,
       }),
-    [formData.flights, formData.segments, pax, margin, currency],
+    [formData.flights, formData.segments, pax, margin, currency, fxRates],
   );
 
   const scenarios = useMemo(
@@ -33,15 +61,38 @@ export default function HybridCostCalculator({ formData, setFormData }) {
           passengerCount: pax,
           targetMarginPct: m,
           displayCurrency: currency,
+          fxRatesToEur: fxRates,
         }),
       ),
-    [formData.flights, formData.segments, pax, currency],
+    [formData.flights, formData.segments, pax, currency, fxRates],
   );
 
   const patch = (partial) => setFormData((prev) => ({ ...prev, ...partial }));
 
+  const refreshFx = async () => {
+    localStorage.removeItem('poreiago_fx_to_eur_v1');
+    setFxLoading(true);
+    const result = await fetchLiveFxToEur();
+    setFxRates(result.rates);
+    setFxMeta({ source: result.source || 'live', error: result.error });
+    patch({ fxRatesToEur: result.rates });
+    setFxLoading(false);
+    if (result.error) toast(result.error);
+    else toast.success('Ενημερώθηκαν live FX rates (Frankfurter/ECB)');
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span>
+          FX: {fxLoading ? '…' : fxMeta.source}
+          {fxMeta.error ? ` (${fxMeta.error})` : ''}
+        </span>
+        <button type="button" onClick={refreshFx} className="px-2 py-1 rounded-lg border border-slate-200 font-bold text-slate-700">
+          Ανανέωση ισοτιμιών
+        </button>
+      </div>
+
       <div className="grid sm:grid-cols-3 gap-3">
         <label className="block">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">

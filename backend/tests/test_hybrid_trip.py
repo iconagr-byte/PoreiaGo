@@ -66,5 +66,16 @@ class HybridNotifyDispatchImportTests(unittest.TestCase):
         self.assertTrue(callable(dispatcher.dispatch_delay_alerts))
 
 
+class HybridSlaLogicTests(unittest.TestCase):
+    def test_whatsapp_template_render_shape(self):
+        # Frontend templates are mirrored in dispatcher — ensure delay template keys exist.
+        from travel_platform.notifications.dispatcher import dispatch_delay_alerts
+        import inspect
+
+        sig = inspect.signature(dispatch_delay_alerts)
+        self.assertIn("template_id", sig.parameters)
+        self.assertIn("pickup_time", sig.parameters)
+
+
 if __name__ == "__main__":
     unittest.main()

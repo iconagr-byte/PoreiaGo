@@ -23,6 +23,8 @@ import TourLeaderLuggagePage from './pages/tour/TourLeaderLuggagePage.jsx';
 import SharedItineraryPage from './pages/tour/SharedItineraryPage.jsx';
 import PassengerSelfCheckinPage from './pages/tour/PassengerSelfCheckinPage.jsx';
 import PartnerItineraryPage from './pages/tour/PartnerItineraryPage.jsx';
+import PartnerLoginPage from './pages/partner/PartnerLoginPage.jsx';
+import PartnerPortalPage from './pages/partner/PartnerPortalPage.jsx';
 import AgencyPlansPage from './pages/AgencyPlansPage';
 import AgencySignupPage from './pages/AgencySignupPage';
 import AgencySignupSuccessPage from './pages/AgencySignupSuccessPage';
@@ -68,6 +70,8 @@ function App() {
             <Route path="/itinerary/:tripId" element={<SharedItineraryPage />} />
             <Route path="/passenger-checkin" element={<PassengerSelfCheckinPage />} />
             <Route path="/partner/itinerary" element={<PartnerItineraryPage />} />
+            <Route path="/partner/login" element={<PartnerLoginPage />} />
+            <Route path="/partner/portal" element={<PartnerPortalPage />} />
             <Route path="/admin/drivers/new" element={<DriverFormPage />} />
             <Route path="/admin/drivers/:driverId/edit" element={<DriverFormPage />} />
             <Route path="/admin/drivers/:driverId" element={<DriverDetailPage />} />

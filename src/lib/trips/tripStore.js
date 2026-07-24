@@ -123,6 +123,9 @@ export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
     airportBuffers: {},
     crew: { tourLeader: '', driverName: '', guideName: '' },
     hybridChangeLog: [],
+    roomingList: [],
+    passengerExtras: [],
+    supplierCostSheets: [],
     flights: [],
     segments: [],
     passengerFlightSeats: [],
@@ -180,6 +183,13 @@ export function formDataToTrip(formData, existingId = null) {
         : {},
     crew: formData.crew || {},
     hybridChangeLog: Array.isArray(formData.hybridChangeLog) ? formData.hybridChangeLog : [],
+    roomingList: Array.isArray(formData.roomingList) ? formData.roomingList : [],
+    passengerExtras: Array.isArray(formData.passengerExtras) ? formData.passengerExtras : [],
+    supplierCostSheets: Array.isArray(formData.supplierCostSheets)
+      ? formData.supplierCostSheets
+      : [],
+    fxRatesToEur: formData.fxRatesToEur,
+    rebookSuggestion: formData.rebookSuggestion || null,
     flights: Array.isArray(formData.flights) ? formData.flights : [],
     segments: Array.isArray(formData.segments) ? formData.segments : [],
     passengerFlightSeats: Array.isArray(formData.passengerFlightSeats)
