@@ -5,7 +5,9 @@ import {
   MARKET_INTERNATIONAL,
   normalizeTrip,
 } from './tripMarket.js';
+import { normalizeHybridTripFields } from '../hybrid/hybridDefaults.js';
 import { syncTripToPostgres } from '../../services/tripsSyncApi.js';
+import { syncHybridTripToServer } from '../../services/hybridTripApi.js';
 import {
   isAuthenticatedOfficeSession,
   officeStorageKey,
@@ -67,6 +69,7 @@ export function upsertTrip(trip) {
   }
   saveTrips(trips);
   syncTripToPostgres(normalized);
+  syncHybridTripToServer(normalized);
   return normalized;
 }
 
@@ -79,7 +82,7 @@ export function deleteTrip(tripId) {
 export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
   const market =
     defaultMarket === MARKET_INTERNATIONAL ? MARKET_INTERNATIONAL : MARKET_DOMESTIC;
-  return {
+  return normalizeHybridTripFields({
     title: '',
     market,
     destination: '',
@@ -104,17 +107,27 @@ export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
     meetingPoint: '',
     highlights: [],
     stops: [],
-  };
+    currency: 'EUR',
+    targetMarginPct: 25,
+    flights: [],
+    segments: [],
+    passengerFlightSeats: [],
+    luggageCheckins: [],
+  });
 }
 
 export function tripToFormData(trip) {
   if (!trip) return createEmptyTripForm();
-  return {
+  return normalizeHybridTripFields({
     ...trip,
     departureTime: trip.departureTime ? trip.departureTime.substring(0, 16) : '',
     arrivalTime: trip.arrivalTime ? trip.arrivalTime.substring(0, 16) : '',
     stops: trip.stops ? [...trip.stops] : [],
-  };
+    flights: trip.flights ? [...trip.flights] : [],
+    segments: trip.segments ? [...trip.segments] : [],
+    passengerFlightSeats: trip.passengerFlightSeats ? [...trip.passengerFlightSeats] : [],
+    luggageCheckins: trip.luggageCheckins ? [...trip.luggageCheckins] : [],
+  });
 }
 
 export function formDataToTrip(formData, existingId = null) {
@@ -144,6 +157,14 @@ export function formDataToTrip(formData, existingId = null) {
     badge: String(formData.badge || '').trim(),
     meetingPoint: String(formData.meetingPoint || '').trim(),
     highlights,
+    currency: formData.currency || 'EUR',
+    targetMarginPct: Number(formData.targetMarginPct) || 25,
+    flights: Array.isArray(formData.flights) ? formData.flights : [],
+    segments: Array.isArray(formData.segments) ? formData.segments : [],
+    passengerFlightSeats: Array.isArray(formData.passengerFlightSeats)
+      ? formData.passengerFlightSeats
+      : [],
+    luggageCheckins: Array.isArray(formData.luggageCheckins) ? formData.luggageCheckins : [],
     departureTime: formData.departureTime ? new Date(formData.departureTime).toISOString() : '',
     arrivalTime: formData.arrivalTime ? new Date(formData.arrivalTime).toISOString() : '',
   });
