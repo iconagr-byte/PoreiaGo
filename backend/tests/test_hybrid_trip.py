@@ -103,7 +103,11 @@ class HybridSchemaHardeningTests(unittest.TestCase):
 class HybridProviderEnvTests(unittest.TestCase):
     def test_provider_status_stub_without_keys(self):
         import os
+        import tempfile
+        from pathlib import Path
+
         from core.config import get_platform_settings, hybrid_provider_status
+        from travel_platform.integrations import secrets_store
 
         get_platform_settings.cache_clear()
         for key in (
@@ -115,14 +119,22 @@ class HybridProviderEnvTests(unittest.TestCase):
         ):
             os.environ.pop(key, None)
         get_platform_settings.cache_clear()
-        status = hybrid_provider_status()
-        self.assertEqual(status["aviationstack"]["mode"], "stub")
-        self.assertEqual(status["twilio_sms"]["mode"], "stub")
-        self.assertEqual(status["twilio_whatsapp"]["mode"], "stub")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            secrets_store.STORE_PATH = Path(tmp) / "integrations_secrets.json"
+            secrets_store.clear_cache()
+            status = hybrid_provider_status()
+            self.assertEqual(status["aviationstack"]["mode"], "stub")
+            self.assertEqual(status["twilio_sms"]["mode"], "stub")
+            self.assertEqual(status["twilio_whatsapp"]["mode"], "stub")
 
     def test_provider_status_live_when_env_set(self):
         import os
+        import tempfile
+        from pathlib import Path
+
         from core.config import get_platform_settings, hybrid_provider_status
+        from travel_platform.integrations import secrets_store
 
         os.environ["AVIATIONSTACK_API_KEY"] = "test-key"
         os.environ["TWILIO_ACCOUNT_SID"] = "ACtest"
@@ -131,10 +143,13 @@ class HybridProviderEnvTests(unittest.TestCase):
         os.environ["TWILIO_WHATSAPP_FROM"] = "whatsapp:+14155238886"
         get_platform_settings.cache_clear()
         try:
-            status = hybrid_provider_status()
-            self.assertEqual(status["aviationstack"]["mode"], "live")
-            self.assertEqual(status["twilio_sms"]["mode"], "live")
-            self.assertEqual(status["twilio_whatsapp"]["mode"], "live")
+            with tempfile.TemporaryDirectory() as tmp:
+                secrets_store.STORE_PATH = Path(tmp) / "integrations_secrets.json"
+                secrets_store.clear_cache()
+                status = hybrid_provider_status()
+                self.assertEqual(status["aviationstack"]["mode"], "live")
+                self.assertEqual(status["twilio_sms"]["mode"], "live")
+                self.assertEqual(status["twilio_whatsapp"]["mode"], "live")
         finally:
             for key in (
                 "AVIATIONSTACK_API_KEY",
@@ -145,6 +160,29 @@ class HybridProviderEnvTests(unittest.TestCase):
             ):
                 os.environ.pop(key, None)
             get_platform_settings.cache_clear()
+
+    def test_ui_store_overrides_and_masks(self):
+        import os
+        import tempfile
+        from pathlib import Path
+
+        from travel_platform.integrations import secrets_store
+
+        for key in ("AVIATIONSTACK_API_KEY",):
+            os.environ.pop(key, None)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            secrets_store.STORE_PATH = Path(tmp) / "integrations_secrets.json"
+            secrets_store.clear_cache()
+            secrets_store.save_secrets({"aviationstack_api_key": "ui-secret-key"})
+            status = secrets_store.public_status()
+            self.assertEqual(status["aviationstack"]["mode"], "live")
+            self.assertEqual(status["aviationstack"]["source"], "ui")
+            self.assertEqual(secrets_store.effective_secrets()["aviationstack_api_key"], "ui-secret-key")
+            # Disk must not contain plaintext
+            raw = secrets_store.STORE_PATH.read_text(encoding="utf-8")
+            self.assertNotIn("ui-secret-key", raw)
+            self.assertIn("enc:", raw)
 
 
 class HybridSlaLogicTests(unittest.TestCase):

@@ -261,3 +261,30 @@ async def platform_tenant_audit(
         offset=offset,
         limit=limit,
     )
+
+
+@router.get("/integrations")
+async def get_platform_integrations(
+    _: Annotated[None, Depends(require_superadmin)],
+):
+    """Super-admin only — readiness flags, never plaintext secrets."""
+    from travel_platform.integrations.secrets_store import public_status
+
+    return public_status()
+
+
+@router.put("/integrations")
+async def upsert_platform_integrations(
+    body: dict,
+    _: Annotated[None, Depends(require_superadmin)],
+):
+    """
+    Super-admin only — save Aviationstack / Twilio keys (encrypted at rest).
+    Empty fields keep existing values. Pass clear_fields to wipe.
+    """
+    from travel_platform.integrations.secrets_store import public_status, save_secrets
+
+    payload = body or {}
+    clear_fields = payload.get("clear_fields") if isinstance(payload.get("clear_fields"), list) else []
+    save_secrets(payload, clear_fields=clear_fields)
+    return public_status()

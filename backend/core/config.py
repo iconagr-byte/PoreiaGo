@@ -57,7 +57,7 @@ class PlatformSettings(BaseSettings):
     usage_metering_cron_hour: int = 2
     usage_metering_cron_minute: int = 0
 
-    # Notifications / hybrid providers (live when keys set in env)
+    # Notifications / hybrid providers (live when keys set in env or UI store)
     smtp_from_email: str = "noreply@aerostride.app"
     sms_sender_id: str = "AEROSTRIDE"
     aviationstack_api_key: str = ""
@@ -76,29 +76,48 @@ platform_settings = get_platform_settings()
 
 
 def hybrid_provider_status() -> dict:
-    """Public readiness flags (never expose secret values)."""
-    s = get_platform_settings()
-    aviation = bool(str(s.aviationstack_api_key or "").strip())
-    twilio_sms = bool(
-        str(s.twilio_account_sid or "").strip()
-        and str(s.twilio_auth_token or "").strip()
-        and str(s.twilio_from_number or "").strip()
-    )
-    wa_from = str(s.twilio_whatsapp_from or "").strip()
-    if not wa_from and twilio_sms:
-        wa_from = f"whatsapp:{s.twilio_from_number.strip()}"
-    twilio_whatsapp = twilio_sms and bool(wa_from)
-    return {
-        "aviationstack": {
-            "configured": aviation,
-            "mode": "live" if aviation else "stub",
-        },
-        "twilio_sms": {
-            "configured": twilio_sms,
-            "mode": "live" if twilio_sms else "stub",
-        },
-        "twilio_whatsapp": {
-            "configured": twilio_whatsapp,
-            "mode": "live" if twilio_whatsapp else "stub",
-        },
-    }
+    """Public readiness flags (never expose secret values). Prefers UI store over env."""
+    try:
+        from travel_platform.integrations.secrets_store import public_status
+
+        return public_status()
+    except Exception:
+        s = get_platform_settings()
+        aviation = bool(str(s.aviationstack_api_key or "").strip())
+        twilio_sms = bool(
+            str(s.twilio_account_sid or "").strip()
+            and str(s.twilio_auth_token or "").strip()
+            and str(s.twilio_from_number or "").strip()
+        )
+        wa_from = str(s.twilio_whatsapp_from or "").strip()
+        if not wa_from and twilio_sms:
+            wa_from = f"whatsapp:{s.twilio_from_number.strip()}"
+        twilio_whatsapp = twilio_sms and bool(wa_from)
+        return {
+            "aviationstack": {
+                "configured": aviation,
+                "mode": "live" if aviation else "stub",
+                "source": "env" if aviation else "none",
+            },
+            "twilio_sms": {
+                "configured": twilio_sms,
+                "mode": "live" if twilio_sms else "stub",
+                "source": "env" if twilio_sms else "none",
+            },
+            "twilio_whatsapp": {
+                "configured": twilio_whatsapp,
+                "mode": "live" if twilio_whatsapp else "stub",
+                "source": "env" if twilio_whatsapp else "none",
+            },
+        }
+
+
+def effective_hybrid_secret(field: str) -> str:
+    """Resolved secret: UI store if set, else env/settings."""
+    try:
+        from travel_platform.integrations.secrets_store import effective_secrets
+
+        return (effective_secrets().get(field) or "").strip()
+    except Exception:
+        s = get_platform_settings()
+        return str(getattr(s, field, "") or "").strip()

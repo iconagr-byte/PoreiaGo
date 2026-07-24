@@ -622,9 +622,9 @@ class HybridTripService(TenantScopedService):
         """Live Aviationstack lookup. Returns (status, delay_minutes, raw)."""
         import httpx
 
-        from core.config import get_platform_settings
+        from core.config import effective_hybrid_secret
 
-        api_key = (get_platform_settings().aviationstack_api_key or os.getenv("AVIATIONSTACK_API_KEY") or "").strip()
+        api_key = effective_hybrid_secret("aviationstack_api_key")
         flight_iata = str(row["flight_number"] or "").replace(" ", "").upper()
         params: dict[str, Any] = {"access_key": api_key, "flight_iata": flight_iata, "limit": 1}
         dep = str(row["departure_airport"] or "").upper()
@@ -660,7 +660,7 @@ class HybridTripService(TenantScopedService):
         Flight status poll. Uses Aviationstack when AVIATIONSTACK_API_KEY is set;
         otherwise a deterministic stub for connection-monitor UX.
         """
-        from core.config import get_platform_settings
+        from core.config import effective_hybrid_secret
 
         await self._bind_tenant_rls()
         result = await self.session.execute(
@@ -678,7 +678,7 @@ class HybridTripService(TenantScopedService):
         if not row:
             raise ValueError("Flight not found")
 
-        api_key = (get_platform_settings().aviationstack_api_key or os.getenv("AVIATIONSTACK_API_KEY") or "").strip()
+        api_key = effective_hybrid_secret("aviationstack_api_key")
         provider = "aviationstack" if api_key else "stub"
         delay = int(row["delay_minutes"] or 0)
         status = row["status"] or "scheduled"
