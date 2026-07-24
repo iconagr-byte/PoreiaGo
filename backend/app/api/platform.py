@@ -156,14 +156,20 @@ async def update_tenant(
     _: Annotated[None, Depends(require_superadmin)],
 ):
     plan = TenantPlan(body.plan) if body.plan else None
-    tenant = await PlatformAdminService(db).update_tenant(
-        tenant_id,
-        legal_name=body.legal_name,
-        plan=plan,
-        is_active=body.is_active,
-        vat_number=body.vat_number,
-        custom_domain=body.custom_domain,
-    )
+    try:
+        tenant = await PlatformAdminService(db).update_tenant(
+            tenant_id,
+            legal_name=body.legal_name,
+            plan=plan,
+            is_active=body.is_active,
+            vat_number=body.vat_number,
+            custom_domain=body.custom_domain,
+            contact_email=body.contact_email,
+            contact_phone=body.contact_phone,
+            admin_notes=body.admin_notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if not tenant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     try:

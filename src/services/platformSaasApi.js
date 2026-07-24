@@ -25,11 +25,20 @@ export async function createPlatformTenant(body) {
   });
 }
 
+export async function fetchPlatformTenant(tenantId) {
+  return saasFetch(`/api/v1/platform/tenants/${tenantId}`);
+}
+
 export async function updatePlatformTenant(tenantId, body) {
   return saasFetch(`/api/v1/platform/tenants/${tenantId}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
   });
+}
+
+export async function validatePlatformDomain(domain) {
+  const q = new URLSearchParams({ domain: String(domain || '').trim().toLowerCase() });
+  return saasFetch(`/api/v1/platform/tls/validate-domain?${q}`);
 }
 
 export async function suspendPlatformTenant(tenantId) {
