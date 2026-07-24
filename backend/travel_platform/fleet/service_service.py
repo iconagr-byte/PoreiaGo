@@ -223,7 +223,7 @@ class ServiceService:
 
     def _load(self) -> None:
         if not STORE_FILE.exists():
-            self._seed()
+            # Start empty — never inject demo coaches for new offices.
             self._persist()
             return
         raw = json.loads(STORE_FILE.read_text(encoding="utf-8"))

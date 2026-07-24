@@ -465,7 +465,20 @@ class PublicFleetVehicleResponse(BaseModel):
 
 
 @router.get("/api/site/fleet", response_model=list[PublicFleetVehicleResponse])
-async def get_public_fleet():
+async def get_public_fleet(host: str | None = Query(default=None)):
     from api.fleet_public_reader import read_public_fleet
 
-    return read_public_fleet()
+    tenant_id: str | None = None
+    if host:
+        try:
+            from app.core.database import AsyncSessionLocal
+            from olympus.tenant.domain_resolver import DomainResolver
+
+            async with AsyncSessionLocal() as session:
+                resolved = await DomainResolver(session).resolve(host)
+                if resolved:
+                    tenant_id = str(resolved.tenant_id)
+        except Exception:
+            tenant_id = None
+
+    return read_public_fleet(tenant_id=tenant_id)
