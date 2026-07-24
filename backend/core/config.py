@@ -57,9 +57,14 @@ class PlatformSettings(BaseSettings):
     usage_metering_cron_hour: int = 2
     usage_metering_cron_minute: int = 0
 
-    # Notifications (stubs — wire SendGrid/Twilio)
+    # Notifications / hybrid providers (live when keys set in env)
     smtp_from_email: str = "noreply@aerostride.app"
     sms_sender_id: str = "AEROSTRIDE"
+    aviationstack_api_key: str = ""
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from_number: str = ""
+    twilio_whatsapp_from: str = ""
 
 
 @lru_cache
@@ -68,3 +73,32 @@ def get_platform_settings() -> PlatformSettings:
 
 
 platform_settings = get_platform_settings()
+
+
+def hybrid_provider_status() -> dict:
+    """Public readiness flags (never expose secret values)."""
+    s = get_platform_settings()
+    aviation = bool(str(s.aviationstack_api_key or "").strip())
+    twilio_sms = bool(
+        str(s.twilio_account_sid or "").strip()
+        and str(s.twilio_auth_token or "").strip()
+        and str(s.twilio_from_number or "").strip()
+    )
+    wa_from = str(s.twilio_whatsapp_from or "").strip()
+    if not wa_from and twilio_sms:
+        wa_from = f"whatsapp:{s.twilio_from_number.strip()}"
+    twilio_whatsapp = twilio_sms and bool(wa_from)
+    return {
+        "aviationstack": {
+            "configured": aviation,
+            "mode": "live" if aviation else "stub",
+        },
+        "twilio_sms": {
+            "configured": twilio_sms,
+            "mode": "live" if twilio_sms else "stub",
+        },
+        "twilio_whatsapp": {
+            "configured": twilio_whatsapp,
+            "mode": "live" if twilio_whatsapp else "stub",
+        },
+    }

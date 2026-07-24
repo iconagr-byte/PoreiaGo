@@ -5,12 +5,14 @@
 Το `vm-deploy-all.sh`:
 
 1. `git fetch` + `reset --hard origin/main` (όχι `git pull` — αποφεύγει conflicts από παλιές χειροκίνητες αλλαγές στο VM)
-2. Ρυθμίζει `.env.prod` (domains, Redis/Celery, VAPID push keys)
+2. Ρυθμίζει `.env.prod` (domains, Redis/Celery, VAPID push keys, hybrid provider placeholders)
 3. Διορθώνει Traefik (ACME email, απενεργοποίηση λάθος dynamic configs)
 4. `npm run build` frontend
 5. `docker build` API
 6. `docker compose up` (Traefik, API, frontend, Postgres, Redis)
 
+Live **Aviationstack / Twilio** keys: βάλε τα στο `deploy/.env.prod` (δες `deploy/HYBRID-PROVIDERS.md`).
+Χωρίς keys το hybrid μένει σε stub mode.
 ## Βήμα 1 — GitHub Desktop
 
 Κάνε **Push** στο repo `PoreiaGo` (όλα τα νέα αρχεία).

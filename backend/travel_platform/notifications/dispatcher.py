@@ -63,9 +63,12 @@ async def send_email(to: str, subject: str, body_html: str) -> str:
 
 
 def _twilio_creds() -> dict[str, str] | None:
-    sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
-    token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
-    from_number = os.getenv("TWILIO_FROM_NUMBER", "").strip()
+    from core.config import get_platform_settings
+
+    s = get_platform_settings()
+    sid = (s.twilio_account_sid or os.getenv("TWILIO_ACCOUNT_SID", "")).strip()
+    token = (s.twilio_auth_token or os.getenv("TWILIO_AUTH_TOKEN", "")).strip()
+    from_number = (s.twilio_from_number or os.getenv("TWILIO_FROM_NUMBER", "")).strip()
     if sid and token and from_number:
         return {"sid": sid, "token": token, "from": from_number}
     return None
@@ -95,13 +98,16 @@ async def send_sms(to: str, body: str) -> str:
 
 async def send_whatsapp(to: str, body: str) -> str:
     """WhatsApp via Twilio WhatsApp sender (whatsapp:+E164)."""
+    from core.config import get_platform_settings
+
     ts = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
     _append_log(f"[{ts}] WHATSAPP to={to} body={body[:160]}")
 
     creds = _twilio_creds()
-    wa_from = os.getenv("TWILIO_WHATSAPP_FROM", "").strip() or (
-        f"whatsapp:{creds['from']}" if creds else ""
-    )
+    s = get_platform_settings()
+    wa_from = (
+        s.twilio_whatsapp_from or os.getenv("TWILIO_WHATSAPP_FROM", "")
+    ).strip() or (f"whatsapp:{creds['from']}" if creds else "")
     if not creds or not wa_from:
         logger.info("WhatsApp stub to=%s (set TWILIO_* + TWILIO_WHATSAPP_FROM)", to)
         return f"whatsapp-log-{to}"

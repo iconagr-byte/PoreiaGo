@@ -93,6 +93,11 @@ export async function calculateYieldRemote(payload) {
   });
 }
 
+/** Aviationstack / Twilio readiness (booleans only — no secrets). */
+export async function fetchHybridProvidersStatus() {
+  return hybridFetch('/api/v1/operations/hybrid/providers');
+}
+
 /**
  * Best-effort sync of local hybrid trip fields to Postgres:
  * flights, segments, seats, luggage, rooming/extras/crew/buffers.

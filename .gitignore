@@ -16,6 +16,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+!.env.prod.example
+!deploy/.env.prod.example
 deploy/gcp/domain-contact.yaml
 deploy/.vapid_private.pem
 deploy/.vapid_public.key

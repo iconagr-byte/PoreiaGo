@@ -118,4 +118,12 @@ done
 # Keep custom-domains.yml active (tenant Host → frontend + Let's Encrypt).
 replace_kv "TRAEFIK_DYNAMIC_DIR" "/etc/traefik/dynamic"
 
+# Hybrid providers — empty placeholders (fill real keys on the VPS; see HYBRID-PROVIDERS.md)
+echo "==> Ensuring hybrid provider env keys (placeholders if missing)"
+set_kv "AVIATIONSTACK_API_KEY" ""
+set_kv "TWILIO_ACCOUNT_SID" ""
+set_kv "TWILIO_AUTH_TOKEN" ""
+set_kv "TWILIO_FROM_NUMBER" ""
+set_kv "TWILIO_WHATSAPP_FROM" ""
+
 echo "==> .env.prod ready"
