@@ -147,7 +147,7 @@ export default function TripDetails() {
                 </span>
               )}
               <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-xs uppercase tracking-widest font-bold w-max">
-                Premium Εμπειρια
+                {trip.badge || trip.durationLabel || 'Premium Εμπειρία'}
               </span>
               <span className="text-on-surface-variant font-label-md bg-surface-container-lowest px-3 py-1 rounded-full border border-black/[0.05] shadow-sm flex items-center gap-2">
                 <span className="material-symbols-outlined text-[16px] text-primary">calendar_month</span>
@@ -213,6 +213,34 @@ export default function TripDetails() {
                 </div>
               </div>
             </div>
+
+            {(trip.meetingPoint || trip.durationLabel || (Array.isArray(trip.highlights) && trip.highlights.length > 0)) && (
+              <div className="mt-8 pt-6 border-t border-black/[0.05] space-y-4">
+                {trip.durationLabel ? (
+                  <p className="text-sm text-on-surface-variant">
+                    <span className="font-bold text-on-surface">Διάρκεια:</span> {trip.durationLabel}
+                  </p>
+                ) : null}
+                {trip.meetingPoint ? (
+                  <p className="text-sm text-on-surface-variant">
+                    <span className="font-bold text-on-surface">Σημείο συνάντησης:</span> {trip.meetingPoint}
+                  </p>
+                ) : null}
+                {Array.isArray(trip.highlights) && trip.highlights.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {trip.highlights.map((h) => (
+                      <span
+                        key={h}
+                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                      >
+                        <span className="material-symbols-outlined text-[14px] text-emerald-600">check</span>
+                        {h}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
 
           <div className="bg-surface-container-lowest rounded-[32px] p-8 shadow-level-2 mb-8 flex-1">
