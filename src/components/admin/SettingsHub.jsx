@@ -34,6 +34,26 @@ export default function SettingsHub({ initialTab, onSubTabChange, contractPrefs 
     onSubTabChange?.(next);
   };
 
+  const tabHint = useMemo(() => {
+    const hints = {
+      platform: 'Επωνυμία, locale, abandoned recovery, δυναμική τιμολόγηση και θέσεις',
+      payments: 'Τρόποι πληρωμής, προκαταβολή και τραπεζικοί λογαριασμοί',
+      fiscal: 'ΑΑΔΕ / myDATA και φορολογικές ρυθμίσεις',
+      contracts: 'Πλάνο συνδρομής και συμβόλαιο γραφείου',
+      compliance: 'GDPR, audit trail και δικαιώματα υποκειμένων',
+      homepage: 'Θέμα, hero, κάρτες εκδρομών και footer',
+      domain: 'Custom domain και branding της ιστοσελίδας',
+      users: 'Λογαριασμοί διαχειριστών του γραφείου',
+      drivers: 'Προφίλ οδηγών, έγγραφα και πρόσβαση portal',
+      telematics: 'Geofence, ETA, ρελαντί και fleet digests',
+      tenants: 'Διαχείριση γραφείων / tenants της πλατφόρμας',
+      saas_infra: 'Υποδομή SaaS και σύνδεση υπηρεσιών',
+      backup: 'Αντίγραφα ασφαλείας και επαναφορά',
+      growth: 'Partner webhooks και growth εργαλεία',
+    };
+    return hints[tab] || 'Επιλέξτε ενότητα από το μενού στα αριστερά';
+  }, [tab]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -41,9 +61,7 @@ export default function SettingsHub({ initialTab, onSubTabChange, contractPrefs 
           <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
             {activeTab?.label || (superAdmin ? 'Ρυθμίσεις πλατφόρμας' : 'Ρυθμίσεις γραφείου')}
           </h2>
-          <p className="text-sm text-on-surface-variant mt-1">
-            Επιλέξτε ενότητα από το μενού στα αριστερά
-          </p>
+          <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">{tabHint}</p>
         </div>
         {activeTab && (
           <div
