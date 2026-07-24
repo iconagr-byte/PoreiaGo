@@ -2046,7 +2046,10 @@ export default function BackOffice() {
             )}
             {activeTab === 'fleet_calendar' && (
               <div className="pb-stack-lg">
-                <FleetCalendarPanel />
+                <FleetCalendarPanel
+                  onOpenDocuments={() => setActiveTab('fleet_documents')}
+                  onOpenFleet={() => setActiveTab('fleet')}
+                />
               </div>
             )}
             {activeTab === 'fleet_availability' && (
