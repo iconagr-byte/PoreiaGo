@@ -221,6 +221,14 @@ async def notify_flight_delay(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.get("/hybrid/providers")
+async def hybrid_providers_status() -> dict[str, Any]:
+    """Readiness flags for Aviationstack / Twilio (no secret values)."""
+    from core.config import hybrid_provider_status
+
+    return hybrid_provider_status()
+
+
 @router.post("/hybrid/yield")
 async def calculate_yield(body: YieldCalculateRequest) -> dict[str, Any]:
     return HybridTripService.calculate_yield(

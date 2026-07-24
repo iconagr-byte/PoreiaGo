@@ -100,6 +100,53 @@ class HybridSchemaHardeningTests(unittest.TestCase):
         self.assertEqual(resp.meta["currency"], "EUR")
 
 
+class HybridProviderEnvTests(unittest.TestCase):
+    def test_provider_status_stub_without_keys(self):
+        import os
+        from core.config import get_platform_settings, hybrid_provider_status
+
+        get_platform_settings.cache_clear()
+        for key in (
+            "AVIATIONSTACK_API_KEY",
+            "TWILIO_ACCOUNT_SID",
+            "TWILIO_AUTH_TOKEN",
+            "TWILIO_FROM_NUMBER",
+            "TWILIO_WHATSAPP_FROM",
+        ):
+            os.environ.pop(key, None)
+        get_platform_settings.cache_clear()
+        status = hybrid_provider_status()
+        self.assertEqual(status["aviationstack"]["mode"], "stub")
+        self.assertEqual(status["twilio_sms"]["mode"], "stub")
+        self.assertEqual(status["twilio_whatsapp"]["mode"], "stub")
+
+    def test_provider_status_live_when_env_set(self):
+        import os
+        from core.config import get_platform_settings, hybrid_provider_status
+
+        os.environ["AVIATIONSTACK_API_KEY"] = "test-key"
+        os.environ["TWILIO_ACCOUNT_SID"] = "ACtest"
+        os.environ["TWILIO_AUTH_TOKEN"] = "token"
+        os.environ["TWILIO_FROM_NUMBER"] = "+12025550123"
+        os.environ["TWILIO_WHATSAPP_FROM"] = "whatsapp:+14155238886"
+        get_platform_settings.cache_clear()
+        try:
+            status = hybrid_provider_status()
+            self.assertEqual(status["aviationstack"]["mode"], "live")
+            self.assertEqual(status["twilio_sms"]["mode"], "live")
+            self.assertEqual(status["twilio_whatsapp"]["mode"], "live")
+        finally:
+            for key in (
+                "AVIATIONSTACK_API_KEY",
+                "TWILIO_ACCOUNT_SID",
+                "TWILIO_AUTH_TOKEN",
+                "TWILIO_FROM_NUMBER",
+                "TWILIO_WHATSAPP_FROM",
+            ):
+                os.environ.pop(key, None)
+            get_platform_settings.cache_clear()
+
+
 class HybridSlaLogicTests(unittest.TestCase):
     def test_whatsapp_template_render_shape(self):
         # Frontend templates are mirrored in dispatcher — ensure delay template keys exist.

@@ -622,7 +622,9 @@ class HybridTripService(TenantScopedService):
         """Live Aviationstack lookup. Returns (status, delay_minutes, raw)."""
         import httpx
 
-        api_key = os.getenv("AVIATIONSTACK_API_KEY") or ""
+        from core.config import get_platform_settings
+
+        api_key = (get_platform_settings().aviationstack_api_key or os.getenv("AVIATIONSTACK_API_KEY") or "").strip()
         flight_iata = str(row["flight_number"] or "").replace(" ", "").upper()
         params: dict[str, Any] = {"access_key": api_key, "flight_iata": flight_iata, "limit": 1}
         dep = str(row["departure_airport"] or "").upper()
@@ -658,6 +660,8 @@ class HybridTripService(TenantScopedService):
         Flight status poll. Uses Aviationstack when AVIATIONSTACK_API_KEY is set;
         otherwise a deterministic stub for connection-monitor UX.
         """
+        from core.config import get_platform_settings
+
         await self._bind_tenant_rls()
         result = await self.session.execute(
             text(
@@ -674,7 +678,7 @@ class HybridTripService(TenantScopedService):
         if not row:
             raise ValueError("Flight not found")
 
-        api_key = os.getenv("AVIATIONSTACK_API_KEY")
+        api_key = (get_platform_settings().aviationstack_api_key or os.getenv("AVIATIONSTACK_API_KEY") or "").strip()
         provider = "aviationstack" if api_key else "stub"
         delay = int(row["delay_minutes"] or 0)
         status = row["status"] or "scheduled"
@@ -771,6 +775,7 @@ class HybridTripService(TenantScopedService):
         Queue SMS/WhatsApp/email passenger delay alerts.
         Uses Twilio when TWILIO_* env vars are set; otherwise logs stubs.
         """
+        from core.config import hybrid_provider_status
         from travel_platform.notifications.dispatcher import dispatch_delay_alerts
 
         await self._bind_tenant_rls()
@@ -800,6 +805,7 @@ class HybridTripService(TenantScopedService):
             channels=chans,
             trip_title=trip_title,
         )
+        providers = hybrid_provider_status()
         payload = {
             "type": "delay_notify",
             "channels": chans,
@@ -807,7 +813,7 @@ class HybridTripService(TenantScopedService):
             "delay_minutes": delay,
             "trip_id": trip_id or row["trip_id"],
             "dispatch": dispatch_result,
-            "provider": "twilio" if os.getenv("TWILIO_ACCOUNT_SID") else "notify_stub",
+            "provider": "twilio" if providers["twilio_sms"]["configured"] else "notify_stub",
         }
         await self.session.execute(
             text(
