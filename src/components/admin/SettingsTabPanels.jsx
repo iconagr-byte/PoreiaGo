@@ -37,10 +37,19 @@ export default function SettingsTabPanels({
 
   if (tab === 'platform') {
     return (
-      <>
+      <div className="space-y-8">
         <PlatformSettingsPanel onOpenPayments={onOpenPayments} />
-        <SeatPricingPanel />
-      </>
+        <div id="seat-pricing" className="scroll-mt-28 space-y-3">
+          <div className="flex items-center gap-3 px-1">
+            <div className="h-px flex-1 bg-slate-200" />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Θέσεις & τιμές
+            </p>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+          <SeatPricingPanel />
+        </div>
+      </div>
     );
   }
   if (tab === 'payments') return <PaymentManagementPanel />;

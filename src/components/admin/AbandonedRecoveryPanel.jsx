@@ -33,7 +33,7 @@ export default function AbandonedRecoveryPanel({ pendingMinutes }) {
         pendingMinutes: immediate ? 0 : pendingMinutes ?? 60,
       });
       toast.success(
-        `Recovery: ${result.sent}/${result.candidates} απεστάληκαν (log: backend/data/notifications.log)`,
+        `Recovery: ${result.sent}/${result.candidates} απεστάλησαν`,
       );
       if (result.errors?.length) {
         toast.error(result.errors.join('; '));
@@ -47,54 +47,70 @@ export default function AbandonedRecoveryPanel({ pendingMinutes }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm overflow-hidden mt-6">
-      <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="font-bold text-gray-900 flex items-center gap-2">
-            <span className="material-symbols-outlined text-amber-600">shopping_cart_checkout</span>
-            Abandoned checkouts
-          </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Email/SMS μετά από {pendingMinutes ?? 60} λεπτά · log: notifications.log · Celery beat
-            κάθε 15′ (<code className="bg-gray-100 px-1 rounded">make celery-beat</code>)
-          </p>
+    <div className="overflow-hidden rounded-[24px] border border-black/[0.06] bg-white shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/[0.04] bg-gradient-to-r from-amber-50/80 to-white px-5 py-4 sm:px-6">
+        <div className="flex items-start gap-3 min-w-0">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-sm">
+            <span className="material-symbols-outlined text-[22px]">shopping_cart_checkout</span>
+          </span>
+          <div>
+            <h3 className="font-bold text-slate-900 text-[17px]">Εγκαταλειμμένα checkouts</h3>
+            <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-xl">
+              Email/SMS μετά από {pendingMinutes ?? 60} λεπτά · αυτόματο scan κάθε ~15′
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => handleScan(false)}
             disabled={scanning}
-            className="px-4 py-2 rounded-full bg-primary text-white text-sm font-bold hover:opacity-90 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-60"
           >
+            <span className="material-symbols-outlined text-[16px]">send</span>
             {scanning ? 'Αποστολή…' : 'Recovery (κανόνας)'}
           </button>
           <button
             type="button"
             onClick={() => handleScan(true)}
             disabled={scanning}
-            className="px-4 py-2 rounded-full border border-primary text-primary text-sm font-bold hover:bg-primary/5 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
           >
             Δοκιμή άμεσα
+          </button>
+          <button
+            type="button"
+            onClick={reload}
+            disabled={loading || scanning}
+            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+            title="Ανανέωση λίστας"
+          >
+            <span className="material-symbols-outlined text-[16px]">refresh</span>
           </button>
         </div>
       </div>
 
       {loading ? (
-        <p className="p-6 text-sm text-gray-500">Φόρτωση…</p>
+        <p className="p-6 text-sm text-slate-500">Φόρτωση ημιτελών κρατήσεων…</p>
       ) : !carts.length ? (
-        <p className="p-6 text-sm text-gray-500 text-center">Δεν υπάρχουν ημιτελείς κράτησεις.</p>
+        <div className="px-6 py-10 text-center">
+          <span className="material-symbols-outlined text-[32px] text-slate-300">inbox</span>
+          <p className="mt-2 text-sm font-medium text-slate-500">Δεν υπάρχουν ημιτελείς κρατήσεις.</p>
+        </div>
       ) : (
-        <ul className="divide-y divide-gray-100 max-h-[280px] overflow-y-auto">
+        <ul className="max-h-[300px] divide-y divide-slate-100 overflow-y-auto">
           {carts.map((c) => (
-            <li key={c.id} className="px-5 py-3 text-sm">
-              <div className="flex justify-between gap-2">
-                <span className="font-bold text-gray-900">{c.trip_title}</span>
-                <span className="text-gray-500 font-mono text-xs">{c.id}</span>
+            <li key={c.id} className="px-5 py-3.5 text-sm sm:px-6">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <span className="font-bold text-slate-900">{c.trip_title}</span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] text-slate-500">
+                  {c.id}
+                </span>
               </div>
-              <p className="text-gray-600 mt-0.5">
+              <p className="mt-1 text-slate-600">
                 {c.passenger_email || '—'} · θέσεις {c.seats || '—'} · €{c.amount_eur}
               </p>
-              <p className="text-[10px] text-gray-400 mt-1">
+              <p className="mt-1 text-[11px] text-slate-400">
                 {c.recovery_sent_at
                   ? `Recovery στάλθηκε ${new Date(c.recovery_sent_at).toLocaleString('el-GR')}`
                   : 'Αναμονή recovery'}
