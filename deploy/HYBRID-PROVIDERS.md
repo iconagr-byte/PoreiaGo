@@ -1,7 +1,17 @@
 # Hybrid providers — Aviationstack + Twilio
 
-Live flight status και SMS/WhatsApp delay alerts διαβάζουν keys από **`deploy/.env.prod`** στο VPS
-(το compose φορτώνει `env_file: .env.prod` στο API). Χωρίς keys → stub mode.
+## Super Admin UI (προτιμώμενο)
+
+Μετά το deploy: **Ρυθμίσεις → Integrations** (μόνο super admin).
+
+- Αποθήκευση encrypted στον server (`/app/data/integrations_secrets.json`)
+- Δεν εμφανίζονται τα keys μετά το save
+- Το Hybrid SLA δείχνει Live / Stub + source (`ui` ή `env`)
+
+## VPS env (fallback)
+
+Live flight status και SMS/WhatsApp delay alerts διαβάζουν keys από **UI store** ή, αν λείπουν, από **`deploy/.env.prod`** στο VPS.
+Χωρίς keys → stub mode.
 
 ## Μεταβλητές
 
