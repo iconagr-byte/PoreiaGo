@@ -26,6 +26,11 @@ import {
   updateSiteAppearance,
   uploadSiteAsset,
 } from '../../services/siteAppearanceApi.js';
+import {
+  clampLogoHeight,
+  clampLogoMaxWidth,
+  officeLogoImageStyle,
+} from '../../lib/branding/officeBrand.js';
 
 const SECTIONS = [
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-violet-500' },
@@ -92,6 +97,239 @@ function ImageBlock({ title, hint, previewUrl, uploading, onUpload, onClear, has
               Επαναφορά προεπιλογής
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LogoBlock({
+  form,
+  setForm,
+  previewUrl,
+  uploading,
+  hasCustom,
+  onUpload,
+  onClear,
+  onApplyUrl,
+}) {
+  const [previewTone, setPreviewTone] = useState('light');
+  const [dragOver, setDragOver] = useState(false);
+  const [urlDraft, setUrlDraft] = useState('');
+  const height = clampLogoHeight(form.logo_height_px);
+  const maxWidth = clampLogoMaxWidth(form.logo_max_width_px);
+  const logoStyle = officeLogoImageStyle(form);
+  const brandName = (form.footer_brand_name || '').trim();
+
+  const onDropFile = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    onUpload({ target: { files: [file], value: '' } });
+  };
+
+  const copyUrl = () => {
+    if (!previewUrl) return;
+    navigator.clipboard?.writeText(previewUrl).then(
+      () => toast.success('Το URL αντιγράφηκε'),
+      () => toast.error('Αποτυχία αντιγραφής'),
+    );
+  };
+
+  return (
+    <div className="rounded-2xl border border-black/[0.06] bg-surface-container-lowest p-5 space-y-5">
+      <div>
+        <h5 className="font-bold text-gray-900">Λογότυπο</h5>
+        <p className="text-xs text-gray-500 mt-1">
+          PNG, JPG ή WebP. Εμφανίζεται στο header / footer του storefront.
+        </p>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-5">
+        <div className="space-y-2 shrink-0 w-full lg:w-72">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Προεπισκόπηση</span>
+            <div className="flex rounded-full border border-slate-200 overflow-hidden text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => setPreviewTone('light')}
+                className={`px-2.5 py-1 ${previewTone === 'light' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}
+              >
+                Light
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewTone('dark')}
+                className={`px-2.5 py-1 ${previewTone === 'dark' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}
+              >
+                Dark
+              </button>
+            </div>
+          </div>
+          <div
+            className={`relative h-40 rounded-2xl overflow-hidden border border-dashed flex items-center justify-center px-4 transition ${
+              dragOver ? 'border-primary bg-primary/5' : 'border-gray-200'
+            } ${
+              previewTone === 'dark'
+                ? 'bg-slate-900'
+                : 'bg-[linear-gradient(45deg,#f1f5f9_25%,transparent_25%),linear-gradient(-45deg,#f1f5f9_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f1f5f9_75%),linear-gradient(-45deg,transparent_75%,#f1f5f9_75%)] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0] bg-white'
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDropFile}
+          >
+            {previewUrl ? (
+              <span className="inline-flex items-center gap-2">
+                <img src={previewUrl} alt="" style={logoStyle} className="object-contain drop-shadow-sm" />
+                {form.logo_show_name && brandName ? (
+                  <span className={`font-bold text-sm ${previewTone === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    {brandName}
+                  </span>
+                ) : null}
+              </span>
+            ) : (
+              <div className={`flex flex-col items-center gap-1 ${previewTone === 'dark' ? 'text-slate-400' : 'text-gray-400'}`}>
+                <span className="material-symbols-outlined text-[32px] opacity-40">image</span>
+                <span className="text-xs font-medium">Σύρετε αρχείο ή ανεβάστε</span>
+              </div>
+            )}
+            {uploading && (
+              <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+              </div>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Ύψος {height}px · μέγ. πλάτος {maxWidth}px
+          </p>
+        </div>
+
+        <div className="flex-1 space-y-4 min-w-0">
+          <div className="flex flex-wrap gap-2">
+            <label className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-primary text-white text-sm font-bold cursor-pointer hover:opacity-90">
+              <span className="material-symbols-outlined text-[18px]">upload</span>
+              {hasCustom ? 'Αλλαγή' : 'Ανέβασμα'}
+              <input type="file" accept={TRIP_COVER_ACCEPT} className="hidden" disabled={uploading} onChange={onUpload} />
+            </label>
+            {hasCustom && (
+              <>
+                <button
+                  type="button"
+                  onClick={copyUrl}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  <span className="material-symbols-outlined text-[16px]">link</span>
+                  Copy URL
+                </button>
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                  Άνοιγμα
+                </a>
+                <button
+                  type="button"
+                  onClick={onClear}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-full border border-rose-100 bg-rose-50 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                  Αφαίρεση
+                </button>
+              </>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700">
+              Ύψος λογοτύπου
+              <span className="ml-2 text-xs font-semibold text-slate-400">{height}px</span>
+            </label>
+            <input
+              type="range"
+              min={20}
+              max={96}
+              step={2}
+              value={height}
+              onChange={(e) => setForm((p) => ({ ...p, logo_height_px: Number(e.target.value) }))}
+              className="mt-2 w-full accent-primary"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+              <span>Μικρό</span>
+              <span>Μεγάλο</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700">
+              Μέγιστο πλάτος
+              <span className="ml-2 text-xs font-semibold text-slate-400">{maxWidth}px</span>
+            </label>
+            <input
+              type="range"
+              min={60}
+              max={400}
+              step={10}
+              value={maxWidth}
+              onChange={(e) => setForm((p) => ({ ...p, logo_max_width_px: Number(e.target.value) }))}
+              className="mt-2 w-full accent-primary"
+            />
+          </div>
+
+          <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <div>
+              <p className="text-sm font-bold text-slate-900">Εμφάνιση ονόματος δίπλα στο logo</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Χρησιμοποιεί την επωνυμία footer ({brandName || 'μη ορισμένη'})
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(form.logo_show_name)}
+              onClick={() => setForm((p) => ({ ...p, logo_show_name: !p.logo_show_name }))}
+              className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                form.logo_show_name ? 'bg-primary' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                  form.logo_show_name ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </label>
+
+          <div>
+            <p className="text-sm font-bold text-slate-700 mb-1.5">Ή επικόλληση URL</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="url"
+                value={urlDraft}
+                onChange={(e) => setUrlDraft(e.target.value)}
+                placeholder="https://…/logo.png"
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                type="button"
+                disabled={!urlDraft.trim()}
+                onClick={() => {
+                  onApplyUrl?.(urlDraft.trim());
+                  setUrlDraft('');
+                }}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+              >
+                Εφαρμογή URL
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -247,8 +485,8 @@ export default function HomepageSettingsPanel() {
   );
 
   const handleImageUpload = async (kind, e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
+    const file = e.target?.files?.[0];
+    if (e?.target && 'value' in e.target) e.target.value = '';
     if (!file) return;
     const setUploading = kind === 'logo' ? setUploadingLogo : setUploadingHero;
     setUploading(true);
@@ -667,31 +905,48 @@ export default function HomepageSettingsPanel() {
         )}
 
         {section === 'branding' && (
-          <PanelCard
-            title="Λογότυπο & εικόνες"
-            description="Το λογότυπο στο header και η hero φωτογραφία."
+          <form
+            onSubmit={patchForm(
+              {
+                logo_url: form.logo_url,
+                logo_height_px: clampLogoHeight(form.logo_height_px),
+                logo_max_width_px: clampLogoMaxWidth(form.logo_max_width_px),
+                logo_show_name: Boolean(form.logo_show_name),
+              },
+              'Οι ρυθμίσεις λογοτύπου αποθηκεύτηκαν',
+            )}
           >
-            <div className="space-y-6">
-              <ImageBlock
-                title="Λογότυπο"
-                hint="PNG ή JPG. Εμφανίζεται στο header του storefront."
-                previewUrl={logoPreview}
-                uploading={uploadingLogo}
-                hasCustom={hasCustomLogo}
-                onUpload={(e) => handleImageUpload('logo', e)}
-                onClear={() => handleClearAsset('logo')}
-              />
-              <ImageBlock
-                title="Hero φωτογραφία"
-                hint="Φόντο πίσω από τον τίτλο. Συμπιέζεται αυτόματα (JPG)."
-                previewUrl={heroPreview}
-                uploading={uploadingHero}
-                hasCustom={hasCustomHero}
-                onUpload={(e) => handleImageUpload('hero', e)}
-                onClear={() => handleClearAsset('hero')}
-              />
-            </div>
-          </PanelCard>
+            <PanelCard
+              title="Λογότυπο & εικόνες"
+              description="Μέγεθος, προεπισκόπηση light/dark, URL και hero φωτογραφία."
+              action={<SaveButton saving={saving} label="Αποθήκευση λογοτύπου" />}
+            >
+              <div className="space-y-6">
+                <LogoBlock
+                  form={form}
+                  setForm={setForm}
+                  previewUrl={logoPreview}
+                  uploading={uploadingLogo}
+                  hasCustom={hasCustomLogo}
+                  onUpload={(e) => handleImageUpload('logo', e)}
+                  onClear={() => handleClearAsset('logo')}
+                  onApplyUrl={(url) => {
+                    setForm((p) => ({ ...p, logo_url: url }));
+                    toast.success('Το URL ορίστηκε — πατήστε Αποθήκευση');
+                  }}
+                />
+                <ImageBlock
+                  title="Hero φωτογραφία"
+                  hint="Φόντο πίσω από τον τίτλο. Συμπιέζεται αυτόματα (JPG)."
+                  previewUrl={heroPreview}
+                  uploading={uploadingHero}
+                  hasCustom={hasCustomHero}
+                  onUpload={(e) => handleImageUpload('hero', e)}
+                  onClear={() => handleClearAsset('hero')}
+                />
+              </div>
+            </PanelCard>
+          </form>
         )}
 
         {section === 'footer' && (

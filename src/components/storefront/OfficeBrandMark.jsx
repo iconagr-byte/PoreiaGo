@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchSiteAppearance, resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
-import { resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
+import { officeLogoImageStyle, resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
 import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
 
 /**
@@ -13,14 +13,17 @@ export default function OfficeBrandMark({
   asLink = true,
   fallbackLabel = 'Γραφείο',
 }) {
+  const [appearance, setAppearance] = useState({});
   const [brand, setBrand] = useState(() => resolveOfficeBrand({}));
   const isDark = variant === 'dark';
 
   useEffect(() => {
     let cancelled = false;
     fetchSiteAppearance()
-      .then((appearance) => {
-        if (!cancelled) setBrand(resolveOfficeBrand(appearance));
+      .then((data) => {
+        if (cancelled) return;
+        setAppearance(data || {});
+        setBrand(resolveOfficeBrand(data));
       })
       .catch(() => {});
     return () => {
@@ -30,15 +33,18 @@ export default function OfficeBrandMark({
 
   const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();
-  // Tenant sites: office name or «Γραφείο». Platform admin: PoreiaGo text only (never gold SVG).
   const label = brand.displayName || (onTenant ? fallbackLabel : 'PoreiaGo');
+  const logoStyle = officeLogoImageStyle(appearance);
 
   const inner = logoSrc ? (
-    <img
-      src={logoSrc}
-      alt={label || 'Logo'}
-      className={`h-8 w-auto max-w-[180px] object-contain ${className}`}
-    />
+    <span className={`inline-flex items-center gap-2 ${className}`}>
+      <img src={logoSrc} alt={label || 'Logo'} style={logoStyle} className="object-contain" />
+      {brand.showName && (
+        <span className={`font-bold tracking-tight text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          {brand.displayName}
+        </span>
+      )}
+    </span>
   ) : (
     <span
       className={`inline-flex items-center gap-2 font-bold tracking-tight ${

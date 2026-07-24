@@ -28,6 +28,9 @@ _PLATFORM_HOST_RE = re.compile(
 
 DEFAULT_SITE_APPEARANCE = {
     "logo_url": "",
+    "logo_height_px": 40,
+    "logo_max_width_px": 180,
+    "logo_show_name": False,
     "hero_image_url": "/images/hero-bus-achillio.png",
     "hero_badge": "Premium Ταξιδιωτική Εμπειρία",
     "hero_title": "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:",
@@ -73,6 +76,9 @@ DEFAULT_SITE_APPEARANCE = {
 
 class SiteAppearanceResponse(BaseModel):
     logo_url: str = ""
+    logo_height_px: int = 40
+    logo_max_width_px: int = 180
+    logo_show_name: bool = False
     hero_image_url: str = "/images/hero-bus-achillio.png"
     hero_badge: str = "Premium Ταξιδιωτική Εμπειρία"
     hero_title: str = "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:"
@@ -132,6 +138,9 @@ class CheckoutSettingsResponse(BaseModel):
 
 class SiteAppearanceUpdate(BaseModel):
     logo_url: str | None = None
+    logo_height_px: int | None = None
+    logo_max_width_px: int | None = None
+    logo_show_name: bool | None = None
     hero_image_url: str | None = None
     hero_badge: str | None = None
     hero_title: str | None = None
@@ -164,6 +173,23 @@ class SiteAppearanceUpdate(BaseModel):
     intl_section_eyebrow: str | None = None
     intl_section_title: str | None = None
     intl_section_subtitle: str | None = None
+
+
+def _clamp_logo_fields(data: dict) -> dict:
+    out = {**data}
+    if "logo_height_px" in out and out["logo_height_px"] is not None:
+        try:
+            out["logo_height_px"] = max(20, min(96, int(out["logo_height_px"])))
+        except (TypeError, ValueError):
+            out["logo_height_px"] = 40
+    if "logo_max_width_px" in out and out["logo_max_width_px"] is not None:
+        try:
+            out["logo_max_width_px"] = max(60, min(400, int(out["logo_max_width_px"])))
+        except (TypeError, ValueError):
+            out["logo_max_width_px"] = 180
+    if "logo_show_name" in out and out["logo_show_name"] is not None:
+        out["logo_show_name"] = bool(out["logo_show_name"])
+    return out
 
 
 def _read_appearance() -> dict:
@@ -361,7 +387,7 @@ async def get_admin_site_appearance():
 @router.patch("/api/admin/platform/site-appearance", response_model=SiteAppearanceResponse)
 async def patch_site_appearance(body: SiteAppearanceUpdate):
     current = _read_appearance()
-    patch = body.model_dump(exclude_unset=True)
+    patch = _clamp_logo_fields(body.model_dump(exclude_unset=True))
     for key, value in patch.items():
         if value is not None:
             current[key] = value
