@@ -37,6 +37,25 @@ class HybridYieldTests(unittest.TestCase):
         self.assertAlmostEqual(result["flight_cost"], 92.0, places=2)
         self.assertAlmostEqual(result["recommended_price_per_person"], 92.0, places=2)
 
+    def test_yield_scenarios_scale_with_margin(self):
+        base = HybridTripService.calculate_yield(
+            flights=[{"total_cost": 500, "currency": "EUR"}],
+            segments=[{"ground_cost": 100, "currency": "EUR"}],
+            passenger_count=10,
+            target_margin_pct=0,
+            display_currency="EUR",
+        )
+        high = HybridTripService.calculate_yield(
+            flights=[{"total_cost": 500, "currency": "EUR"}],
+            segments=[{"ground_cost": 100, "currency": "EUR"}],
+            passenger_count=10,
+            target_margin_pct=35,
+            display_currency="EUR",
+        )
+        self.assertEqual(base["total_cost"], 600.0)
+        self.assertEqual(base["recommended_price_per_person"], 60.0)
+        self.assertEqual(high["recommended_price_per_person"], 81.0)
+
 
 if __name__ == "__main__":
     unittest.main()

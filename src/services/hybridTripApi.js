@@ -52,6 +52,13 @@ export async function pollFlightStatus(flightId) {
   });
 }
 
+export async function notifyFlightDelay(flightId, payload = {}) {
+  return hybridFetch(`/api/v1/operations/flights/${flightId}/notify-delay`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function calculateYieldRemote(payload) {
   return hybridFetch('/api/v1/operations/hybrid/yield', {
     method: 'POST',

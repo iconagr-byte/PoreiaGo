@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { emptyPassengerSeat } from '../../../lib/hybrid/hybridDefaults.js';
+import { parsePnrCsv, PNR_CSV_TEMPLATE } from '../../../lib/hybrid/pnrImport.js';
 import { exportHybridManifestCsv, exportTripManifestPdf } from '../../../lib/manifest/exportManifestPdf.js';
 import toast from 'react-hot-toast';
 
@@ -6,6 +8,7 @@ const fieldClass =
   'w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-slate-400';
 
 export default function HybridPassengerManifest({ formData, setFormData }) {
+  const fileRef = useRef(null);
   const seats = formData.passengerFlightSeats || [];
   const flights = formData.flights || [];
 
@@ -64,6 +67,38 @@ export default function HybridPassengerManifest({ formData, setFormData }) {
     }
   };
 
+  const downloadTemplate = () => {
+    const blob = new Blob([PNR_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'group-pnr-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { rows, errors } = parsePnrCsv(text, {
+        flights,
+        defaultFlightId: flights[0]?.id || '',
+      });
+      if (!rows.length) {
+        toast.error(errors[0] || 'Καμία έγκυρη γραμμή');
+        return;
+      }
+      patchSeats([...seats, ...rows]);
+      toast.success(`Εισήχθησαν ${rows.length} επιβάτες από PNR CSV`);
+      if (errors.length) toast(`${errors.length} γραμμές παραλείφθηκαν`);
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία import');
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
@@ -74,6 +109,22 @@ export default function HybridPassengerManifest({ formData, setFormData }) {
         >
           <span className="material-symbols-outlined text-[16px]">person_add</span>
           Επιβάτης
+        </button>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">upload_file</span>
+          Import PNR CSV
+        </button>
+        <button
+          type="button"
+          onClick={downloadTemplate}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">download</span>
+          Template
         </button>
         <button
           type="button"
@@ -91,11 +142,18 @@ export default function HybridPassengerManifest({ formData, setFormData }) {
           <span className="material-symbols-outlined text-[16px]">table_view</span>
           Excel / CSV
         </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onChange={handleImportFile}
+        />
       </div>
 
       {seats.length === 0 ? (
         <p className="text-sm text-slate-500 italic py-6 text-center border border-dashed border-slate-200 rounded-xl">
-          Προσθέστε επιβάτες για χαρτογράφηση θέσης λεωφορείου και πτήσης.
+          Προσθέστε επιβάτες ή κάντε import group PNR CSV για χαρτογράφηση θέσης λεωφορείου και πτήσης.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200">

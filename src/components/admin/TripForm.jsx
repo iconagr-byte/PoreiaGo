@@ -605,7 +605,7 @@ export default function TripForm({
         title="Hybrid χρονολόγιο (έδαφος + αέρας)"
         hint="Συνδυάστε hotel transfer, πτήσεις και τοπικά van σε ενιαία ακολουθία."
       >
-        <HybridTimelineBuilder formData={formData} setFormData={setFormData} />
+        <HybridTimelineBuilder formData={formData} setFormData={setFormData} tripId={tripId} />
       </Section>
 
       <Section
