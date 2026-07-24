@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import TemplatePicker from './homepage/TemplatePicker.jsx';
 import ThemeGallery from './homepage/ThemeGallery.jsx';
 import HomepageLivePreview from './homepage/HomepageLivePreview.jsx';
+import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import {
   FOOTER_TEMPLATES,
   HEADER_TEMPLATES,
@@ -649,17 +650,27 @@ export default function HomepageSettingsPanel() {
               <div className="space-y-8">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Ενεργό θέμα</p>
-                  <div className="flex flex-wrap items-center gap-3 p-4 rounded-2xl bg-slate-50 border border-black/[0.06]">
-                    <span
-                      className="w-10 h-10 rounded-xl shrink-0"
-                      style={{ background: form.accent_color || '#0ea5e9' }}
-                    />
-                    <div>
+                  <div className="flex flex-wrap items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-black/[0.06]">
+                    <div className="flex -space-x-1.5 shrink-0" aria-hidden>
+                      {[form.accent_color || '#0ea5e9', form.secondary_color || '#1e3a5f', form.surface_color || '#f8fafc'].map(
+                        (c, i) => (
+                          <span
+                            key={`${c}-${i}`}
+                            className="w-10 h-10 rounded-xl border-2 border-white shadow-sm"
+                            style={{ background: c }}
+                          />
+                        ),
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
                       <p className="font-bold text-gray-900">{getHomepageThemeById(form.homepage_theme_id).nameEl}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                        {getHomepageThemeById(form.homepage_theme_id).description}
+                      </p>
                       <button
                         type="button"
                         onClick={() => setSection('themes')}
-                        className="text-xs font-bold text-primary hover:underline mt-0.5"
+                        className="text-xs font-bold text-primary hover:underline mt-1"
                       >
                         Αλλαγή θέματος →
                       </button>
@@ -667,58 +678,79 @@ export default function HomepageSettingsPanel() {
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Χρώματα</p>
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    {[
-                      { key: 'accent_color', label: 'Κύριο (accent)' },
-                      { key: 'secondary_color', label: 'Δευτερεύον' },
-                      { key: 'surface_color', label: 'Φόντο σελίδας' },
-                    ].map(({ key, label }) => (
-                      <label key={key} className="block">
-                        <span className="text-sm font-bold text-gray-700">{label}</span>
-                        <div className="mt-2 flex items-center gap-3">
-                          <input
-                            type="color"
-                            value={form[key] || '#0ea5e9'}
-                            onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
-                            className="w-12 h-12 rounded-xl border border-black/10 cursor-pointer"
-                          />
-                          <input
-                            type="text"
-                            value={form[key] || ''}
-                            onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
-                            className="flex-1 rounded-xl border px-3 py-2 text-sm font-mono"
-                          />
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <BrandColorEditor
+                  accent={form.accent_color}
+                  secondary={form.secondary_color}
+                  surface={form.surface_color}
+                  themeName={getHomepageThemeById(form.homepage_theme_id).nameEl}
+                  onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
+                  onResetTheme={() => {
+                    const theme = getHomepageThemeById(form.homepage_theme_id);
+                    setForm((p) => ({
+                      ...p,
+                      accent_color: theme.palette.primary,
+                      secondary_color: theme.palette.secondary,
+                      surface_color: theme.palette.surface,
+                    }));
+                    toast.success('Χρώματα από το ενεργό θέμα');
+                  }}
+                />
 
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Ενότητες σελίδας</p>
                   <div className="space-y-3">
                     {[
-                      { key: 'show_fleet_section', label: 'Εμφάνιση στόλου', hint: 'Premium λεωφορεία & παροχές' },
-                      { key: 'show_why_us_section', label: 'Εμφάνιση «Γιατί να μας επιλέξετε»', hint: 'Τα 3 πλεονεκτήματα κάτω από τις εκδρομές' },
-                    ].map(({ key, label, hint }) => (
-                      <label
-                        key={key}
-                        className="flex items-start gap-3 p-4 rounded-2xl border border-black/[0.06] bg-white cursor-pointer hover:border-primary/20 transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={form[key] !== false}
-                          onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.checked }))}
-                          className="mt-1 w-4 h-4 rounded border-gray-300 text-primary"
-                        />
-                        <div>
-                          <span className="font-bold text-gray-900 text-sm">{label}</span>
-                          <p className="text-xs text-gray-500 mt-0.5">{hint}</p>
-                        </div>
-                      </label>
-                    ))}
+                      {
+                        key: 'show_fleet_section',
+                        label: 'Εμφάνιση στόλου',
+                        hint: 'Premium λεωφορεία & παροχές',
+                        icon: 'directions_bus',
+                      },
+                      {
+                        key: 'show_why_us_section',
+                        label: 'Εμφάνιση «Γιατί να μας επιλέξετε»',
+                        hint: 'Τα 3 πλεονεκτήματα κάτω από τις εκδρομές',
+                        icon: 'star',
+                      },
+                    ].map(({ key, label, hint, icon }) => {
+                      const on = form[key] !== false;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setForm((p) => ({ ...p, [key]: !on }))}
+                          className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-colors ${
+                            on
+                              ? 'border-primary/25 bg-primary/[0.04]'
+                              : 'border-black/[0.06] bg-white hover:border-primary/20'
+                          }`}
+                        >
+                          <span
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                              on ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[22px]">{icon}</span>
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-gray-900 text-sm block">{label}</span>
+                            <p className="text-xs text-gray-500 mt-0.5">{hint}</p>
+                          </div>
+                          <span
+                            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                              on ? 'bg-primary' : 'bg-slate-200'
+                            }`}
+                            aria-hidden
+                          >
+                            <span
+                              className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                                on ? 'translate-x-5' : ''
+                              }`}
+                            />
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
