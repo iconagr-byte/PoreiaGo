@@ -229,29 +229,33 @@ async def login_with_password(body: DriverLoginBody):
 async def exchange_master_qr(body: MasterQrExchangeBody):
     """Scan bus dashboard QR → day session (secondary login path)."""
     from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
-    from travel_platform.operations.master_qr_bridge import exchange_master_qr_hybrid, preview_master_qr_payload
+    from travel_platform.operations.master_qr_bridge import (
+        coerce_driver_tenant_id,
+        exchange_master_qr_hybrid,
+        preview_master_qr_payload,
+        resolve_platform_tenant_id,
+    )
 
     hybrid = await exchange_master_qr_hybrid(body.qr_raw)
     if hybrid:
         trip_id = int(hybrid["trip_id"])
         driver_id = hybrid.get("driver_id")
-        tenant_id = str(hybrid["tenant_id"])
+        platform_tid = await resolve_platform_tenant_id()
+        tenant_id = coerce_driver_tenant_id(
+            str(hybrid.get("tenant_id") or ""),
+            platform_tenant_id=platform_tid,
+        )
         # Load office travelers into SQLite so scan validates against real bookings.
         try:
             await sync_trip_passengers_to_ticketing(trip_id, tenant_id=tenant_id)
         except Exception:
             pass
-        profile = _profile_fields(driver_id)
-        ctx = _trip_context(trip_id)
-        return DriverSessionResponse(
-            access_token=hybrid["access_token"],
-            trip_id=trip_id,
-            tenant_id=tenant_id,
+        # Re-issue JWT with the coerced SaaS tenant so GPS ingest matches the live map.
+        return _issue_driver_session(
             driver_id=driver_id,
-            expires_at=int(hybrid["expires_at"]),
-            schedule=_build_daily_schedule(trip_id),
-            **profile,
-            **ctx,
+            tenant_id=tenant_id,
+            trip_id=trip_id,
+            expires_at=int(hybrid["expires_at"]) if hybrid.get("expires_at") else None,
         )
 
     preview = preview_master_qr_payload(body.qr_raw)

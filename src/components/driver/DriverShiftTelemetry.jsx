@@ -28,6 +28,7 @@ export default function DriverShiftTelemetry({ shift }) {
           </h2>
           <p className="text-xs text-[var(--driver-muted)] mt-1 truncate">
             Βάρδια #{session?.tripId || '—'}
+            {session?.destination ? ` · ${session.destination}` : ''}
           </p>
         </div>
         <span
@@ -50,6 +51,21 @@ export default function DriverShiftTelemetry({ shift }) {
       >
         {online ? 'ΤΕΛΟΣ ΒΑΡΔΙΑΣ' : 'ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ'}
       </button>
+
+      {!online ? (
+        <p className="text-xs text-[var(--driver-muted)] leading-relaxed">
+          Πατήστε «Έναρξη βάρδιας» και επιτρέψτε την τοποθεσία — το στίγμα εμφανίζεται στον live χάρτη
+          του γραφείου.
+        </p>
+      ) : !lastPing ? (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+          Αναμονή πρώτης θέσης GPS… Επιτρέψτε την τοποθεσία αν σας το ζητήσει το τηλέφωνο.
+        </p>
+      ) : (
+        <p className="text-xs text-emerald-700 leading-relaxed">
+          Το στίγμα σας είναι ζωντανό στον χάρτη του γραφείου.
+        </p>
+      )}
 
       {gpsError ? <p className="text-sm text-rose-400">{gpsError}</p> : null}
       {backgroundWarning ? (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { exchangeMasterQr } from '../../services/driverPortalApi.js';
+import { requestDriverGpsAutostart } from '../../lib/driver/useDriverShiftSession.js';
 import '../../styles/driver-app.css';
 
 /**
@@ -28,6 +29,7 @@ export default function DriverAuthPage() {
     const timer = window.setTimeout(async () => {
       try {
         await exchangeMasterQr(token);
+        requestDriverGpsAutostart();
         if (!cancelled) {
           navigate('/driver', { replace: true });
         }
