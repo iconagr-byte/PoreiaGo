@@ -1741,10 +1741,19 @@ export default function BackOffice() {
                           onClick={(e) => {
                             e.stopPropagation();
                             try {
+                              const trip =
+                                trips.find((t) => t.title === group.tripTitle) ||
+                                getTripById(group.bookings[0]?.tripId);
                               exportTripManifestPdf({
                                 tripTitle: group.tripTitle,
                                 date: group.date,
-                                bookings: group.bookings,
+                                bookings: group.bookings.map((b) => ({
+                                  ...b,
+                                  flightSeat: b.flightSeat || b.flight_seat,
+                                  currency: trip?.currency || b.currency || 'EUR',
+                                })),
+                                flights: trip?.flights || [],
+                                currency: trip?.currency || 'EUR',
                               });
                               toast.success('Άνοιγμα εκτύπωσης manifest…');
                             } catch (err) {

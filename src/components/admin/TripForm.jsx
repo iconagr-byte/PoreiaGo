@@ -7,6 +7,9 @@ import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripI
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import LocationPicker from './LocationPicker.jsx';
+import HybridTimelineBuilder from './hybrid/HybridTimelineBuilder.jsx';
+import HybridCostCalculator from './hybrid/HybridCostCalculator.jsx';
+import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import {
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
@@ -73,6 +76,7 @@ export default function TripForm({
   onCancel,
   isEdit,
   saving = false,
+  tripId = null,
 }) {
   const [drivers, setDrivers] = useState([]);
   const [coverUploading, setCoverUploading] = useState(false);
@@ -594,6 +598,43 @@ export default function TripForm({
             />
           </Field>
         </div>
+      </Section>
+
+      <Section
+        icon="connecting_airports"
+        title="Hybrid χρονολόγιο (έδαφος + αέρας)"
+        hint="Συνδυάστε hotel transfer, πτήσεις και τοπικά van σε ενιαία ακολουθία."
+      >
+        <HybridTimelineBuilder formData={formData} setFormData={setFormData} />
+      </Section>
+
+      <Section
+        icon="calculate"
+        title="Αυτόματο κόστος & yield"
+        hint="Συγκεντρώνει fuel/rental ground + group PNR και προτείνει τιμή ανά άτομο."
+      >
+        <HybridCostCalculator formData={formData} setFormData={setFormData} />
+      </Section>
+
+      <Section
+        icon="airline_seat_recline_extra"
+        title="Ενιαίο manifest (λεωφορείο + πτήση)"
+        hint="Χαρτογράφηση θέσης λεωφορείου, θέσης πτήσης και PNR/ticket ανά επιβάτη."
+        action={
+          tripId ? (
+            <a
+              href={`/tour-leader/${tripId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              <span className="material-symbols-outlined text-[16px]">luggage</span>
+              Tour leader
+            </a>
+          ) : null
+        }
+      >
+        <HybridPassengerManifest formData={formData} setFormData={setFormData} />
       </Section>
 
       <Section

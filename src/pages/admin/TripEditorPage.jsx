@@ -146,6 +146,7 @@ export default function TripEditorPage() {
           onCancel={handleCancel}
           isEdit={isEdit}
           saving={saving}
+          tripId={isEdit ? tripId : null}
         />
       </div>
 

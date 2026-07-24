@@ -28,5 +28,11 @@ export function normalizeTrip(trip) {
     ...trip,
     market,
     ...(market === MARKET_INTERNATIONAL ? { category: 'international' } : {}),
+    currency: trip.currency || 'EUR',
+    targetMarginPct: trip.targetMarginPct ?? 25,
+    flights: Array.isArray(trip.flights) ? trip.flights : [],
+    segments: Array.isArray(trip.segments) ? trip.segments : [],
+    passengerFlightSeats: Array.isArray(trip.passengerFlightSeats) ? trip.passengerFlightSeats : [],
+    luggageCheckins: Array.isArray(trip.luggageCheckins) ? trip.luggageCheckins : [],
   };
 }

@@ -124,3 +124,123 @@ ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation_audit ON audit_events;
 CREATE POLICY tenant_isolation_audit ON audit_events
     USING (tenant_id::text = current_setting('app.current_tenant', true));
+
+-- ---------------------------------------------------------------------------
+-- Hybrid travel (flights + unified timeline)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS flights (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    trip_id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+    flight_number VARCHAR(32) NOT NULL,
+    airline VARCHAR(120) NOT NULL DEFAULT '',
+    departure_airport VARCHAR(8) NOT NULL,
+    arrival_airport VARCHAR(8) NOT NULL,
+    departure_time TIMESTAMPTZ NOT NULL,
+    arrival_time TIMESTAMPTZ NOT NULL,
+    pnr_code VARCHAR(32),
+    seats_allocated INT NOT NULL DEFAULT 0,
+    cost_per_seat NUMERIC(12,2) NOT NULL DEFAULT 0,
+    total_cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+    currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+    status VARCHAR(32) NOT NULL DEFAULT 'scheduled',
+    delay_minutes INT NOT NULL DEFAULT 0,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_flights_tenant_trip ON flights (tenant_id, trip_id);
+CREATE INDEX IF NOT EXISTS ix_flights_departure ON flights (departure_time);
+CREATE INDEX IF NOT EXISTS ix_flights_pnr ON flights (pnr_code);
+
+CREATE TABLE IF NOT EXISTS trip_segments (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    trip_id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+    sequence INT NOT NULL DEFAULT 0,
+    segment_type VARCHAR(32) NOT NULL,
+    title VARCHAR(255) NOT NULL DEFAULT '',
+    starts_at TIMESTAMPTZ,
+    ends_at TIMESTAMPTZ,
+    flight_id UUID REFERENCES flights(id) ON DELETE SET NULL,
+    vehicle_ref VARCHAR(64),
+    origin_label VARCHAR(255),
+    destination_label VARCHAR(255),
+    ground_cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+    currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (tenant_id, trip_id, sequence)
+);
+CREATE INDEX IF NOT EXISTS ix_trip_segments_tenant_trip ON trip_segments (tenant_id, trip_id);
+
+CREATE TABLE IF NOT EXISTS passenger_flight_seats (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    trip_id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+    flight_id UUID NOT NULL REFERENCES flights(id) ON DELETE CASCADE,
+    booking_id VARCHAR(64),
+    passenger_name VARCHAR(255) NOT NULL,
+    ground_seat VARCHAR(32),
+    flight_seat VARCHAR(16),
+    ticket_code VARCHAR(64),
+    pnr_code VARCHAR(32),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_passenger_flight_seats_trip ON passenger_flight_seats (tenant_id, trip_id);
+
+CREATE TABLE IF NOT EXISTS luggage_checkins (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    trip_id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+    booking_id VARCHAR(64),
+    passenger_name VARCHAR(255) NOT NULL,
+    checkin_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    luggage_count INT NOT NULL DEFAULT 0,
+    luggage_notes TEXT,
+    checked_by VARCHAR(120),
+    checked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_luggage_checkins_trip ON luggage_checkins (tenant_id, trip_id);
+
+CREATE TABLE IF NOT EXISTS flight_status_events (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    flight_id UUID NOT NULL REFERENCES flights(id) ON DELETE CASCADE,
+    provider VARCHAR(64) NOT NULL DEFAULT 'stub',
+    status VARCHAR(32) NOT NULL,
+    delay_minutes INT NOT NULL DEFAULT 0,
+    suggested_pickup_adjustment_minutes INT NOT NULL DEFAULT 0,
+    raw_payload JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_flight_status_events_flight ON flight_status_events (flight_id, created_at);
+
+ALTER TABLE flights ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_flights ON flights;
+CREATE POLICY tenant_isolation_flights ON flights
+    USING (tenant_id::text = current_setting('app.current_tenant', true));
+
+ALTER TABLE trip_segments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_trip_segments ON trip_segments;
+CREATE POLICY tenant_isolation_trip_segments ON trip_segments
+    USING (tenant_id::text = current_setting('app.current_tenant', true));
+
+ALTER TABLE passenger_flight_seats ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_passenger_flight_seats ON passenger_flight_seats;
+CREATE POLICY tenant_isolation_passenger_flight_seats ON passenger_flight_seats
+    USING (tenant_id::text = current_setting('app.current_tenant', true));
+
+ALTER TABLE luggage_checkins ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_luggage_checkins ON luggage_checkins;
+CREATE POLICY tenant_isolation_luggage_checkins ON luggage_checkins
+    USING (tenant_id::text = current_setting('app.current_tenant', true));
+
+ALTER TABLE flight_status_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_flight_status_events ON flight_status_events;
+CREATE POLICY tenant_isolation_flight_status_events ON flight_status_events
+    USING (tenant_id::text = current_setting('app.current_tenant', true));
