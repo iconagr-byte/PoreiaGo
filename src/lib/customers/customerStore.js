@@ -67,11 +67,11 @@ export function getCustomerById(id) {
 }
 
 /**
- * Δημιουργία/ενημέρωση καρτέλας πελάτη (registration, checkout, login).
- * @param {{ email: string, name?: string, phone?: string, picture?: string, authProvider?: string }} input
+ * Δημιουργία/ενημέρωση καρτέλας πελάτη (registration, checkout, login, admin).
+ * @param {object} input
  */
 export function upsertCustomer(input) {
-  const email = input.email.trim().toLowerCase();
+  const email = String(input.email || '').trim().toLowerCase();
   if (!email) return null;
 
   const stored = loadStoredCustomers();
@@ -83,13 +83,41 @@ export function upsertCustomer(input) {
   const existing = idx >= 0 ? stored[idx] : mock || null;
   const idPool = useMocks ? [...mockCustomers, ...stored] : stored;
 
+  const pick = (key, fallback = '') => {
+    if (input[key] !== undefined && input[key] !== null) {
+      return typeof input[key] === 'string' ? input[key].trim() : input[key];
+    }
+    return existing?.[key] ?? fallback;
+  };
+
+  const tagsRaw = input.tags !== undefined ? input.tags : existing?.tags;
+  const tags = Array.isArray(tagsRaw)
+    ? tagsRaw.map((t) => String(t).trim()).filter(Boolean)
+    : String(tagsRaw || '')
+        .split(/[,;]/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+  const tierIn = pick('tier', existing?.tier || 'Silver');
+  const tier = ['Silver', 'Gold', 'Platinum', 'VIP'].includes(tierIn) ? tierIn : 'Silver';
+
   const record = {
     id: input.id || existing?.id || nextCustomerId(idPool),
-    name: input.name?.trim() || existing?.name || email.split('@')[0],
+    name: pick('name') || existing?.name || email.split('@')[0],
     email,
-    phone: input.phone?.trim() || existing?.phone || '',
+    phone: pick('phone'),
+    company: pick('company'),
+    afm: pick('afm'),
+    city: pick('city'),
+    address: pick('address'),
+    notes: pick('notes'),
+    source: pick('source', 'manual'),
+    marketingOptIn: Boolean(
+      input.marketingOptIn !== undefined ? input.marketingOptIn : existing?.marketingOptIn,
+    ),
+    tags,
     points: existing?.points ?? 0,
-    tier: existing?.tier ?? 'Silver',
+    tier,
     joinDate: existing?.joinDate ?? todayIsoDate(),
     picture: input.picture || existing?.picture || '',
     authProvider: input.authProvider || existing?.authProvider || 'email',
