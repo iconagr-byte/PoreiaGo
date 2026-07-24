@@ -83,6 +83,28 @@ fi
 
 if [[ -f "$DEPLOY_DIR/.vapid_private.pem" ]]; then
   set_kv "WEB_PUSH_VAPID_PRIVATE_KEY_FILE" "/app/data/vapid_private.pem"
+  # Escape newlines so docker env_file can load the PEM without a bind-mount.
+  # Use Python (not sed) — PEM base64 + \n sequences break sed replacements.
+  python3 - <<'PY' "$ENV_FILE" "$DEPLOY_DIR/.vapid_private.pem"
+import sys
+from pathlib import Path
+
+env_path = Path(sys.argv[1])
+pem = Path(sys.argv[2]).read_text(encoding="utf-8").strip().replace("\n", "\\n")
+key = "WEB_PUSH_VAPID_PRIVATE_KEY"
+lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+out, found = [], False
+for line in lines:
+    if line.startswith(key + "="):
+        out.append(f"{key}={pem}")
+        found = True
+    else:
+        out.append(line)
+if not found:
+    out.append(f"{key}={pem}")
+env_path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+print(f"  ~ set {key} (inline PEM)")
+PY
   if [[ -f "$DEPLOY_DIR/.vapid_public.key" ]]; then
     pub="$(tr -d '\n' < "$DEPLOY_DIR/.vapid_public.key")"
     replace_kv "WEB_PUSH_VAPID_PUBLIC_KEY" "$pub"

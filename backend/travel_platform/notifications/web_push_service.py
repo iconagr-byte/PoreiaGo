@@ -64,17 +64,31 @@ def _apply_vapid_env(*, public_key: str, private_pem: str, private_path: Path) -
         os.environ["WEB_PUSH_VAPID_SUBJECT"] = "mailto:iconagr@gmail.com"
 
 
+def _persist_vapid_files(data: Path, *, public_key: str, private_pem: str) -> Path:
+    public_path = data / "vapid_public.key"
+    private_path = data / "vapid_private.pem"
+    public_path.write_text(public_key + "\n", encoding="utf-8")
+    private_path.write_text(private_pem, encoding="utf-8")
+    try:
+        private_path.chmod(0o600)
+    except OSError:
+        pass
+    return private_path
+
+
 def ensure_web_push_keys() -> bool:
     """
     Ensure VAPID keys exist for Web Push.
 
-    If env/files are missing, generate a keypair into POREIAGO_DATA_DIR and
-    export WEB_PUSH_VAPID_* into the process environment so admin/driver push
-    works without a manual VPS bootstrap step.
-    """
-    if web_push_configured():
-        return True
+    Priority:
+    1. Durable pair in POREIAGO_DATA_DIR (canonical in production volume)
+    2. Already-configured process env (persist into data dir when possible)
+    3. Auto-generate a new keypair into the data dir
 
+    Host deploy often sets WEB_PUSH_VAPID_PUBLIC_KEY + a PRIVATE_KEY_FILE path
+    that does not exist inside the container until keys are synced/generated.
+    Preferring the data-dir pair avoids pub/priv mismatch with stale env.
+    """
     data = _data_dir()
     public_path = data / "vapid_public.key"
     private_path = data / "vapid_private.pem"
@@ -83,7 +97,7 @@ def ensure_web_push_keys() -> bool:
         data.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         logger.warning("Cannot create VAPID data dir %s: %s", data, exc)
-        return False
+        return web_push_configured()
 
     if public_path.is_file() and private_path.is_file():
         public_key = public_path.read_text(encoding="utf-8").strip()
@@ -92,6 +106,17 @@ def ensure_web_push_keys() -> bool:
             _apply_vapid_env(public_key=public_key, private_pem=private_pem, private_path=private_path)
             logger.info("Loaded Web Push VAPID keys from %s", data)
             return web_push_configured()
+
+    if web_push_configured():
+        public_key = _vapid_public_key()
+        private_pem = _vapid_private_key()
+        try:
+            private_path = _persist_vapid_files(data, public_key=public_key, private_pem=private_pem)
+            _apply_vapid_env(public_key=public_key, private_pem=private_pem, private_path=private_path)
+            logger.info("Persisted Web Push VAPID keys into %s", data)
+        except OSError as exc:
+            logger.warning("Could not persist VAPID keys into %s: %s", data, exc)
+        return True
 
     try:
         from cryptography.hazmat.primitives import serialization
@@ -106,12 +131,7 @@ def ensure_web_push_keys() -> bool:
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption(),
         ).decode("ascii")
-        public_path.write_text(public_key + "\n", encoding="utf-8")
-        private_path.write_text(private_pem, encoding="utf-8")
-        try:
-            private_path.chmod(0o600)
-        except OSError:
-            pass
+        private_path = _persist_vapid_files(data, public_key=public_key, private_pem=private_pem)
         _apply_vapid_env(public_key=public_key, private_pem=private_pem, private_path=private_path)
         logger.info("Generated Web Push VAPID keys in %s", data)
         return web_push_configured()
