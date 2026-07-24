@@ -52,6 +52,25 @@
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
 }
 
+.office-chat--focus {
+  height: 100%;
+  min-height: 0;
+  gap: 0;
+}
+
+.office-chat-shell--fill {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.office-chat-thread--fill {
+  min-height: 0 !important;
+  max-height: none !important;
+  flex: 1;
+  overscroll-behavior: contain;
+}
+
 .office-chat-header {
   display: flex;
   align-items: center;

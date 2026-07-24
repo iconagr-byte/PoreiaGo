@@ -488,6 +488,18 @@ html.driver-route body {
   padding-bottom: 1rem;
 }
 
+.driver-main--chat {
+  padding-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 7.5rem);
+}
+
+.driver-main--chat .office-chat--focus {
+  flex: 1;
+  min-height: 0;
+}
+
 .driver-stack {
   display: flex;
   flex-direction: column;
