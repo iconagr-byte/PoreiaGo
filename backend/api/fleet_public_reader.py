@@ -80,6 +80,13 @@ def _service_status(row: dict) -> str:
     return "OK"
 
 
+def _public_fleet_image(url: str | None) -> str:
+    raw = str(url or "").strip()
+    if not raw or "achillio" in raw.lower() or "achillion" in raw.lower():
+        return "/images/fleet-bus-neutral.png"
+    return raw
+
+
 def _public_row(row: dict) -> dict:
     category = str(row.get("category") or "Standard")
     seats = int(row.get("seat_count") or DEFAULT_SEATS.get(category, 49))
@@ -97,7 +104,7 @@ def _public_row(row: dict) -> dict:
         "seat_count": seats,
         "amenities": _amenities(category, row.get("amenities")),
         "summary": str(row.get("public_summary") or SUMMARIES.get(category, f"{category} · {seats} θέσεις")),
-        "image_url": str(row.get("public_image_url") or "/images/hero-bus-achillio.png"),
+        "image_url": _public_fleet_image(row.get("public_image_url")),
         "status_label": status_label,
     }
 
@@ -122,7 +129,7 @@ def _fallback_seed() -> list[dict]:
                     "seat_count": seats,
                     "amenities": DEFAULT_AMENITIES[category],
                     "public_summary": SUMMARIES[category],
-                    "public_image_url": "/images/hero-bus-achillio.png",
+                    "public_image_url": "/images/fleet-bus-neutral.png",
                     "show_on_website": True,
                     "current_odometer": 42000,
                     "last_service_date": today.isoformat(),

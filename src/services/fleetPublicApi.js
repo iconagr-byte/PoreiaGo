@@ -1,5 +1,9 @@
 import { API_BASE } from '../config/api.js';
 import { mockFleet } from '../data/mockData.js';
+import {
+  NEUTRAL_FLEET_BUS_IMAGE,
+  resolvePublicFleetImage,
+} from '../lib/fleet/fleetBusImage.js';
 
 const AMENITY_DEFAULTS = {
   'Luxury Coach': [
@@ -38,9 +42,16 @@ function mockPublicFleet() {
       seat_count: bus.seats,
       amenities: AMENITY_DEFAULTS[bus.type] || AMENITY_DEFAULTS.Standard,
       summary: `${bus.engineType} · ${bus.fuelConsumption}`,
-      image_url: '/images/hero-bus-achillio.png',
+      image_url: NEUTRAL_FLEET_BUS_IMAGE,
       status_label: 'Διαθέσιμο',
     }));
+}
+
+function normalizePublicFleet(rows) {
+  return (rows || []).map((bus) => ({
+    ...bus,
+    image_url: resolvePublicFleetImage(bus.image_url || bus.public_image_url),
+  }));
 }
 
 export async function fetchPublicFleet() {
@@ -48,12 +59,12 @@ export async function fetchPublicFleet() {
     const res = await fetch(`${API_BASE}/api/site/fleet`);
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length) return data;
+      if (Array.isArray(data) && data.length) return normalizePublicFleet(data);
     }
   } catch {
     /* offline */
   }
-  return mockPublicFleet();
+  return normalizePublicFleet(mockPublicFleet());
 }
 
 export const AMENITY_ICONS = {

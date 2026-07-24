@@ -1,4 +1,5 @@
 import { amenityIcon } from '../services/fleetPublicApi.js';
+import { resolvePublicFleetImage } from '../lib/fleet/fleetBusImage.js';
 
 export default function FleetShowcaseSection({ vehicles, loading, hidden = false }) {
   if (hidden) return null;
@@ -37,7 +38,7 @@ export default function FleetShowcaseSection({ vehicles, loading, hidden = false
               <div className="relative h-52 w-full overflow-hidden shrink-0">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent z-10" />
                 <img
-                  src={bus.image_url || '/images/hero-bus-achillio.png'}
+                  src={resolvePublicFleetImage(bus.image_url)}
                   alt={bus.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 />
