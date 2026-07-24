@@ -617,7 +617,7 @@ export default function HomepageSettingsPanel() {
         {section === 'themes' && (
           <PanelCard
             title="Θέματα αρχικής σελίδας"
-            description="20 πλήρη σχέδια — header, hero, κάρτες, χρώματα & footer σε ένα κλικ. Η προεπισκόπηση ενημερώνεται αυτόματα."
+            description="Κάθε θέμα είναι πλήρες custom πακέτο πάνω στα templates της πλατφόρμας — διαφορετική ταυτότητα, ίδιο σταθερό σύστημα."
           >
             <ThemeGallery
               activeThemeId={form.homepage_theme_id || 'aegean_classic'}
