@@ -1,19 +1,28 @@
-import { useEffect, useState } from 'react';
-import { emptyFlight } from '../../lib/hybrid/hybridDefaults.js';
-import { SUPPORTED_CURRENCIES } from '../../lib/currency/multiCurrency.js';
+import { useState } from 'react';
+import { emptyFlight } from '../../../lib/hybrid/hybridDefaults.js';
+import { SUPPORTED_CURRENCIES } from '../../../lib/currency/multiCurrency.js';
 
 const fieldClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10';
 
+/**
+ * Remount via `key` from the parent whenever `open` / flight id changes so the
+ * form resets without a setState-in-effect pattern.
+ */
 export default function FlightManagementModal({ open, initial = null, onClose, onSave }) {
-  const [form, setForm] = useState(() => emptyFlight());
-
-  useEffect(() => {
-    if (!open) return;
-    setForm(emptyFlight(initial || {}));
-  }, [open, initial]);
-
   if (!open) return null;
+  return (
+    <FlightForm
+      key={initial?.id || 'new-flight'}
+      initial={initial}
+      onClose={onClose}
+      onSave={onSave}
+    />
+  );
+}
+
+function FlightForm({ initial = null, onClose, onSave }) {
+  const [form, setForm] = useState(() => emptyFlight(initial || {}));
 
   const patch = (partial) => setForm((prev) => ({ ...prev, ...partial }));
 

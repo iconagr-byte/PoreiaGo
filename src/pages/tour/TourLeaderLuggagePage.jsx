@@ -5,6 +5,19 @@ import { getTripById, upsertTrip } from '../../lib/trips/tripStore.js';
 import { emptyPassengerSeat } from '../../lib/hybrid/hybridDefaults.js';
 import { listLuggageRemote, upsertLuggageRemote } from '../../services/hybridTripApi.js';
 
+function buildLocalLuggage(trip) {
+  if (!trip) return [];
+  if (trip.luggageCheckins?.length) return trip.luggageCheckins;
+  return (trip.passengerFlightSeats || []).map((p) => ({
+    id: p.id || emptyPassengerSeat().id,
+    booking_id: p.booking_id || '',
+    passenger_name: p.passenger_name,
+    checkin_status: 'pending',
+    luggage_count: 0,
+    luggage_notes: '',
+  }));
+}
+
 /**
  * Tour leader PWA-style luggage & check-in tracker.
  */
@@ -12,31 +25,32 @@ export default function TourLeaderLuggagePage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const trip = useMemo(() => getTripById(tripId), [tripId]);
-  const [items, setItems] = useState([]);
+  const seedItems = useMemo(() => buildLocalLuggage(trip), [trip]);
+  const [items, setItems] = useState(seedItems);
+  const [activeTripId, setActiveTripId] = useState(trip?.id ?? null);
   const [draftName, setDraftName] = useState('');
   const [leaderName, setLeaderName] = useState(() => localStorage.getItem('tour_leader_name') || '');
+
+  // Reset local list when the trip identity changes (render-time adjustment).
+  if (trip?.id !== activeTripId) {
+    setActiveTripId(trip?.id ?? null);
+    setItems(seedItems);
+  }
 
   useEffect(() => {
     if (!trip) {
       toast.error('Η εκδρομή δεν βρέθηκε τοπικά');
-      return;
+      return undefined;
     }
-    const local = trip.luggageCheckins?.length
-      ? trip.luggageCheckins
-      : (trip.passengerFlightSeats || []).map((p) => ({
-          id: p.id || emptyPassengerSeat().id,
-          booking_id: p.booking_id || '',
-          passenger_name: p.passenger_name,
-          checkin_status: 'pending',
-          luggage_count: 0,
-          luggage_notes: '',
-        }));
-    setItems(local);
+    let cancelled = false;
     listLuggageRemote(trip.id)
       .then((remote) => {
-        if (Array.isArray(remote) && remote.length) setItems(remote);
+        if (!cancelled && Array.isArray(remote) && remote.length) setItems(remote);
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [trip]);
 
   if (!trip) {
