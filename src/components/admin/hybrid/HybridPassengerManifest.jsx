@@ -1,13 +1,19 @@
 import { useRef } from 'react';
+import toast from 'react-hot-toast';
 import { emptyPassengerSeat } from '../../../lib/hybrid/hybridDefaults.js';
 import { parsePnrCsv, PNR_CSV_TEMPLATE } from '../../../lib/hybrid/pnrImport.js';
+import { syncSeatsFromBookings } from '../../../lib/hybrid/seatSync.js';
+import {
+  buildPartnerViewUrl,
+  buildPassengerCheckinUrl,
+} from '../../../lib/hybrid/shareTokens.js';
 import { exportHybridManifestCsv, exportTripManifestPdf } from '../../../lib/manifest/exportManifestPdf.js';
-import toast from 'react-hot-toast';
+import { loadBookings } from '../../../lib/ticketing/bookingStore.js';
 
 const fieldClass =
   'w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-slate-400';
 
-export default function HybridPassengerManifest({ formData, setFormData }) {
+export default function HybridPassengerManifest({ formData, setFormData, tripId }) {
   const fileRef = useRef(null);
   const seats = formData.passengerFlightSeats || [];
   const flights = formData.flights || [];
@@ -99,6 +105,38 @@ export default function HybridPassengerManifest({ formData, setFormData }) {
     }
   };
 
+  const handleSeatSync = () => {
+    const id = tripId || formData.id;
+    if (!id) {
+      toast.error('Αποθηκεύστε πρώτα την εκδρομή');
+      return;
+    }
+    const result = syncSeatsFromBookings({
+      bookings: loadBookings(),
+      tripId: id,
+      existingSeats: seats,
+      defaultFlightId: flights[0]?.id || '',
+      defaultPnr: flights[0]?.pnr_code || '',
+    });
+    patchSeats(result.seats);
+    toast.success(
+      `Seat sync: ${result.scanned} bookings · +${result.created} νέοι · ${result.updated} ενημερώσεις`,
+    );
+  };
+
+  const copyLink = async (url, label) => {
+    if (!url) {
+      toast.error('Δεν υπάρχει σύνδεσμος');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`${label} αντιγράφηκε`);
+    } catch {
+      toast(url);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
@@ -109,6 +147,40 @@ export default function HybridPassengerManifest({ formData, setFormData }) {
         >
           <span className="material-symbols-outlined text-[16px]">person_add</span>
           Επιβάτης
+        </button>
+        <button
+          type="button"
+          onClick={handleSeatSync}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">sync_alt</span>
+          Seat sync
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            copyLink(
+              buildPassengerCheckinUrl({ ...formData, id: tripId || formData.id }),
+              'Passenger check-in',
+            )
+          }
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">how_to_reg</span>
+          Self check-in
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            copyLink(
+              buildPartnerViewUrl({ ...formData, id: tripId || formData.id }),
+              'Partner link',
+            )
+          }
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">handshake</span>
+          Partner
         </button>
         <button
           type="button"

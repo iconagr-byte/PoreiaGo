@@ -10,6 +10,9 @@ import LocationPicker from './LocationPicker.jsx';
 import HybridTimelineBuilder from './hybrid/HybridTimelineBuilder.jsx';
 import HybridCostCalculator from './hybrid/HybridCostCalculator.jsx';
 import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
+import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
+import AirportBufferEditor from './hybrid/AirportBufferEditor.jsx';
+import HybridChangeLogPanel from './hybrid/HybridChangeLogPanel.jsx';
 import {
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
@@ -609,6 +612,22 @@ export default function TripForm({
       </Section>
 
       <Section
+        icon="groups"
+        title="Πλήρωμα εκδρομής"
+        hint="Tour leader, οδηγός και ξεναγός για το hybrid πρόγραμμα."
+      >
+        <HybridCrewEditor formData={formData} setFormData={setFormData} />
+      </Section>
+
+      <Section
+        icon="flight_land"
+        title="Airport buffer rules"
+        hint="Ελάχιστα λεπτά buffer ανά αεροδρόμιο για connection risk."
+      >
+        <AirportBufferEditor formData={formData} setFormData={setFormData} />
+      </Section>
+
+      <Section
         icon="calculate"
         title="Αυτόματο κόστος & yield"
         hint="Συγκεντρώνει fuel/rental ground + group PNR και προτείνει τιμή ανά άτομο."
@@ -634,7 +653,15 @@ export default function TripForm({
           ) : null
         }
       >
-        <HybridPassengerManifest formData={formData} setFormData={setFormData} />
+        <HybridPassengerManifest formData={formData} setFormData={setFormData} tripId={tripId} />
+      </Section>
+
+      <Section
+        icon="history"
+        title="Hybrid change log"
+        hint="Ποιος άλλαξε πτήσεις / pickup / manifest και πότε."
+      >
+        <HybridChangeLogPanel formData={formData} />
       </Section>
 
       <Section

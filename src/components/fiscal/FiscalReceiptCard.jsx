@@ -1,3 +1,5 @@
+import { formatMoney } from '../../lib/currency/multiCurrency.js';
+
 function Field({ label, children }) {
   return (
     <div>
@@ -50,7 +52,10 @@ export default function FiscalReceiptCard({ document, booking, issuerName, issue
           </Field>
           <Field label="Ποσό">
             <span className="font-bold text-2xl text-gray-900 tabular-nums">
-              €{Number(document.amount_eur || 0).toFixed(2)}
+              {formatMoney(
+                document.amount_eur || document.amount || 0,
+                document.currency || booking?.currency || 'EUR',
+              )}
             </span>
           </Field>
           <Field label="MARK (ΑΑΔΕ)">

@@ -6,6 +6,7 @@ import {
   normalizeTrip,
 } from './tripMarket.js';
 import { normalizeHybridTripFields } from '../hybrid/hybridDefaults.js';
+import { appendHybridChange, summarizeHybridDiff } from '../hybrid/changeLog.js';
 import { syncTripToPostgres } from '../../services/tripsSyncApi.js';
 import { syncHybridTripToServer } from '../../services/hybridTripApi.js';
 import {
@@ -62,15 +63,24 @@ export function upsertTrip(trip) {
   const trips = loadTrips();
   const normalized = normalizeTrip(trip);
   const idx = trips.findIndex((t) => t.id === normalized.id);
+  const previous = idx >= 0 ? trips[idx] : null;
+  const withLog = {
+    ...normalized,
+    hybridChangeLog: appendHybridChange(normalized, {
+      actor: 'office',
+      action: previous ? 'update' : 'create',
+      summary: summarizeHybridDiff(previous, normalized),
+    }),
+  };
   if (idx >= 0) {
-    trips[idx] = { ...trips[idx], ...normalized };
+    trips[idx] = { ...trips[idx], ...withLog };
   } else {
-    trips.push(normalized);
+    trips.push(withLog);
   }
   saveTrips(trips);
-  syncTripToPostgres(normalized);
-  syncHybridTripToServer(normalized);
-  return normalized;
+  syncTripToPostgres(withLog);
+  syncHybridTripToServer(withLog);
+  return withLog;
 }
 
 export function deleteTrip(tripId) {
@@ -110,6 +120,9 @@ export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
     currency: 'EUR',
     targetMarginPct: 25,
     connectionThresholdMin: 90,
+    airportBuffers: {},
+    crew: { tourLeader: '', driverName: '', guideName: '' },
+    hybridChangeLog: [],
     flights: [],
     segments: [],
     passengerFlightSeats: [],
@@ -161,6 +174,12 @@ export function formDataToTrip(formData, existingId = null) {
     currency: formData.currency || 'EUR',
     targetMarginPct: Number(formData.targetMarginPct) || 25,
     connectionThresholdMin: Number(formData.connectionThresholdMin) || 90,
+    airportBuffers:
+      formData.airportBuffers && typeof formData.airportBuffers === 'object'
+        ? formData.airportBuffers
+        : {},
+    crew: formData.crew || {},
+    hybridChangeLog: Array.isArray(formData.hybridChangeLog) ? formData.hybridChangeLog : [],
     flights: Array.isArray(formData.flights) ? formData.flights : [],
     segments: Array.isArray(formData.segments) ? formData.segments : [],
     passengerFlightSeats: Array.isArray(formData.passengerFlightSeats)

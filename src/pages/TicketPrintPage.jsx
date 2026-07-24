@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
+import { formatMoney } from '../lib/currency/multiCurrency.js';
 
 function Field({ label, children }) {
   return (
@@ -62,7 +63,9 @@ function TicketCard({ booking, tripTitle }) {
           </Field>
           <Field label="Τιμή">
             <span className="font-bold">
-              {booking.price != null ? `€${Number(booking.price).toFixed(2)}` : '—'}
+              {booking.price != null
+                ? formatMoney(booking.price, booking.currency || 'EUR')
+                : '—'}
             </span>
           </Field>
           <Field label="Τηλέφωνο">
@@ -93,15 +96,11 @@ function TicketCard({ booking, tripTitle }) {
 export default function TicketPrintPage() {
   const { bookingId: rawId } = useParams();
   const bookingId = decodeURIComponent(rawId || '').trim();
-
-  if (!bookingId || bookingId === 'demo') {
-    return <Navigate to="/my-booking" replace />;
-  }
-
   const [resolved, setResolved] = useState(null);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
+    if (!bookingId || bookingId === 'demo') return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -133,6 +132,10 @@ export default function TicketPrintPage() {
       cancelled = true;
     };
   }, [bookingId]);
+
+  if (!bookingId || bookingId === 'demo') {
+    return <Navigate to="/my-booking" replace />;
+  }
 
   if (!resolved && !loadError) {
     return (

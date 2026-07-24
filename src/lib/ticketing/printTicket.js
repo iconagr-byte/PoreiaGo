@@ -3,6 +3,7 @@
  */
 import { issueSignedQrToken } from './qrToken.js';
 import { isBookingPaid } from './bookingStore.js';
+import { formatMoney } from '../currency/multiCurrency.js';
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -58,7 +59,8 @@ export async function openTicketPrintWindow(booking, trip, opts = {}) {
       })
     : '—';
   const timeStr = booking.time || '—';
-  const price = booking.price != null ? `€${Number(booking.price).toFixed(2)}` : '—';
+  const price =
+    booking.price != null ? formatMoney(booking.price, booking.currency || 'EUR') : '—';
   const invoice = booking.invoiceNumber || '—';
   const qrSrc = qrImageUrl(qrToken, 220);
 

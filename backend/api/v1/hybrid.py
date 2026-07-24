@@ -164,6 +164,8 @@ async def notify_flight_delay(
             trip_id=payload.get("trip_id"),
             delay_minutes=int(payload.get("delay_minutes") or 0),
             channels=payload.get("channels"),
+            recipients=payload.get("recipients"),
+            trip_title=payload.get("trip_title"),
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

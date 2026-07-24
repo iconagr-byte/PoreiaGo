@@ -12,6 +12,7 @@ import {
   applyPickupDelayShift,
   DEFAULT_CONNECTION_THRESHOLD_MIN,
 } from '../../../lib/hybrid/connectionRisk.js';
+import { effectiveConnectionThreshold } from '../../../lib/hybrid/airportBuffers.js';
 import { buildItineraryShareUrl } from '../../../lib/hybrid/itineraryShare.js';
 import { notifyFlightDelay, pollFlightStatus } from '../../../services/hybridTripApi.js';
 
@@ -32,7 +33,37 @@ export default function HybridTimelineBuilder({ formData, setFormData, tripId })
     () => [...(formData.segments || [])].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0)),
     [formData.segments],
   );
-  const risks = useMemo(() => analyzeConnectionRisks(segments, threshold), [segments, threshold]);
+  const risks = useMemo(() => {
+    // Use airport buffer of the arriving flight (or destination IATA) when available.
+    return analyzeConnectionRisks(segments, threshold).map((risk, idx) => {
+      const from = segments[idx];
+      const arrivalCode =
+        from?.destination_label ||
+        flights.find((f) => f.id === from?.flight_id)?.arrival_airport ||
+        '';
+      const eff = effectiveConnectionThreshold({
+        baseThreshold: threshold,
+        arrivalAirport: String(arrivalCode).slice(0, 3),
+        airportBuffers: formData.airportBuffers || {},
+      });
+      if (eff === threshold || risk.layoverMinutes == null) return risk;
+      // Re-evaluate level with effective threshold for this pair.
+      const layoverMinutes = risk.layoverMinutes;
+      let level = 'ok';
+      let message = `Σύνδεση ${layoverMinutes}′ (buffer ${eff}′)`;
+      if (layoverMinutes < 0) {
+        level = 'critical';
+        message = `Επικάλυψη ${Math.abs(layoverMinutes)}′ — τα τμήματα συγκρούονται`;
+      } else if (layoverMinutes < Math.max(eff, 30) / 2) {
+        level = 'critical';
+        message = `Κρίσιμη σύνδεση ${layoverMinutes}′ (< ${Math.round(eff / 2)}′, buffer ${eff}′)`;
+      } else if (layoverMinutes < eff) {
+        level = 'tight';
+        message = `Στενή σύνδεση ${layoverMinutes}′ (buffer αεροδρομίου ${eff}′)`;
+      }
+      return { ...risk, level, message, effectiveThreshold: eff };
+    });
+  }, [segments, threshold, flights, formData.airportBuffers]);
   const riskByTo = useMemo(() => Object.fromEntries(risks.map((r) => [r.toId, r])), [risks]);
   const alertRisks = risks.filter((r) => r.level === 'tight' || r.level === 'critical');
 
@@ -167,16 +198,35 @@ export default function HybridTimelineBuilder({ formData, setFormData, tripId })
 
   const handleNotify = async (flight) => {
     setNotifyingId(flight.id);
+    let recipients = [];
+    try {
+      const { loadBookings } = await import('../../../lib/ticketing/bookingStore.js');
+      const tid = tripId || formData.id;
+      recipients = loadBookings()
+        .filter((b) => Number(b.tripId ?? b.trip_id) === Number(tid))
+        .map((b) => ({
+          phone: b.phone,
+          email: b.email,
+          name: b.customerName || b.passenger_name,
+        }))
+        .filter((r) => r.phone || r.email);
+    } catch {
+      /* bookings unavailable — still queue audit notify */
+    }
+    const recipientCount = recipients.length;
     try {
       const result = await notifyFlightDelay(flight.id, {
         trip_id: tripId || formData.id,
+        trip_title: formData.title,
         delay_minutes: flight.delay_minutes || 0,
         channels: ['sms', 'whatsapp'],
+        recipients,
       });
       toast.success(result.message || 'Ουρά ειδοποιήσεων καθυστέρησης');
     } catch (err) {
       toast.success(
-        `Τοπική ουρά: ειδοποίηση +${flight.delay_minutes || 0}′ για ${flight.flight_number} (SMS/WhatsApp stub)`,
+        `Τοπική ουρά: ειδοποίηση +${flight.delay_minutes || 0}′ για ${flight.flight_number}` +
+          (recipientCount ? ` · ${recipientCount} επιβάτες` : ''),
       );
       if (err?.message && !String(err.message).includes('σύνδεση')) {
         console.warn('[delay-notify]', err.message);
@@ -457,6 +507,33 @@ export default function HybridTimelineBuilder({ formData, setFormData, tripId })
                           onChange={(e) => updateMeta(seg.id, { driver_notes: e.target.value })}
                           placeholder="Οδηγίες για οδηγό"
                         />
+                        <input
+                          className={fieldClass}
+                          value={seg.metadata?.lat ?? ''}
+                          onChange={(e) => updateMeta(seg.id, { lat: e.target.value })}
+                          placeholder="Lat (GPS)"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            className={fieldClass}
+                            value={seg.metadata?.lng ?? ''}
+                            onChange={(e) => updateMeta(seg.id, { lng: e.target.value })}
+                            placeholder="Lng (GPS)"
+                          />
+                          {seg.metadata?.lat && seg.metadata?.lng ? (
+                            <a
+                              href={`https://www.google.com/maps?q=${encodeURIComponent(
+                                `${seg.metadata.lat},${seg.metadata.lng}`,
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="shrink-0 inline-flex items-center px-2 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                              title="Άνοιγμα χάρτη"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">map</span>
+                            </a>
+                          ) : null}
+                        </div>
                       </div>
                     ) : null}
                   </div>
