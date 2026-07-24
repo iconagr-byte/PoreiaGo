@@ -105,6 +105,8 @@ export default function BackOffice() {
   });
   const [trips, setTrips] = useState(() => loadTrips());
   const [routesMarket, setRoutesMarket] = useState(MARKET_DOMESTIC);
+  const [routesSearch, setRoutesSearch] = useState('');
+  const [routesSort, setRoutesSort] = useState('departure_asc');
   const [lostItems, setLostItems] = useState([]);
   const [lostItemsLoading, setLostItemsLoading] = useState(false);
   const [bookings, setBookings] = useState(() => loadBookings());
@@ -651,147 +653,329 @@ export default function BackOffice() {
   );
 
   const renderRoutes = () => {
-    const filteredTrips = trips.filter((t) => getTripMarket(t) === routesMarket);
+    const marketCounts = {
+      [MARKET_DOMESTIC]: trips.filter((t) => getTripMarket(t) === MARKET_DOMESTIC).length,
+      [MARKET_INTERNATIONAL]: trips.filter((t) => getTripMarket(t) === MARKET_INTERNATIONAL).length,
+    };
+    const q = routesSearch.trim().toLowerCase();
+    let filteredTrips = trips.filter((t) => getTripMarket(t) === routesMarket);
+    if (q) {
+      filteredTrips = filteredTrips.filter((t) => {
+        const hay = [
+          t.title,
+          t.driverName,
+          t.vehiclePlate,
+          t.vehicleType,
+          t.destination,
+          t.origin,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    filteredTrips = [...filteredTrips].sort((a, b) => {
+      if (routesSort === 'price_asc') return Number(a.price || 0) - Number(b.price || 0);
+      if (routesSort === 'price_desc') return Number(b.price || 0) - Number(a.price || 0);
+      if (routesSort === 'seats_desc') return Number(b.availableSeats || 0) - Number(a.availableSeats || 0);
+      if (routesSort === 'title_asc') {
+        return String(a.title || '').localeCompare(String(b.title || ''), 'el');
+      }
+      const da = a.departureTime ? new Date(a.departureTime).getTime() : 0;
+      const db = b.departureTime ? new Date(b.departureTime).getTime() : 0;
+      return routesSort === 'departure_desc' ? db - da : da - db;
+    });
+
+    const totalSeats = filteredTrips.reduce((s, t) => s + Number(t.availableSeats || 0), 0);
+    const soldOut = filteredTrips.filter((t) => Number(t.availableSeats || 0) === 0).length;
+    const upcoming = filteredTrips.filter((t) => {
+      if (!t.departureTime) return false;
+      return new Date(t.departureTime).getTime() >= Date.now();
+    }).length;
     const marketBadgeClass =
       routesMarket === MARKET_INTERNATIONAL
-        ? 'bg-indigo-100 text-indigo-800'
-        : 'bg-emerald-100 text-emerald-800';
+        ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+        : 'bg-emerald-50 text-emerald-800 border-emerald-200';
+
+    const openNewTrip = () =>
+      navigate('/admin/trips/new', { state: { market: routesMarket, activeTab: 'routes' } });
 
     return (
-    <div className="space-y-stack-lg pb-stack-lg relative">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-            Διαχείριση Εκδρομών
-          </h2>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-            Προσθήκη, επεξεργασία και αφαίρεση εκδρομών σε πραγματικό χρόνο.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            navigate('/admin/trips/new', { state: { market: routesMarket, activeTab: 'routes' } })
-          }
-          className="px-6 py-2 bg-primary text-white font-label-md text-label-md rounded-full hover:scale-105 transition-transform flex items-center gap-2 shadow-md"
-        >
-          <span className="material-symbols-outlined text-sm">add</span> Νέα Εκδρομή
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2 p-1 bg-surface-container rounded-full w-fit">
-        {[MARKET_DOMESTIC, MARKET_INTERNATIONAL].map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setRoutesMarket(key)}
-            className={`px-5 py-2 rounded-full font-label-md text-label-md transition-all ${
-              routesMarket === key
-                ? 'bg-primary text-white shadow-md'
-                : 'text-on-surface-variant hover:bg-surface-container-high'
-            }`}
-          >
-            {MARKET_LABELS[key]}
-            <span className="ml-2 opacity-80 text-xs">
-              ({trips.filter((t) => getTripMarket(t) === key).length})
+      <div className="space-y-5 pb-8 animate-in fade-in duration-300">
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <span className="material-symbols-outlined text-[24px]">route</span>
             </span>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">Διαχείριση Εκδρομών</h2>
+              <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
+                Προσθήκη, επεξεργασία και ανάθεση οδηγού/οχήματος σε πραγματικό χρόνο.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={openNewTrip}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold shadow-sm hover:opacity-95"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Νέα Εκδρομή
           </button>
-        ))}
-      </div>
+        </div>
 
-      <div className="bg-surface-container-lowest rounded-[32px] shadow-level-2 card-inner-border flex flex-col">
-        <div className="flex-1 overflow-x-auto p-2">
-          <table className="min-w-full divide-y divide-surface-container-high">
-            <thead>
-              <tr>
-                <th className="px-6 py-3 bg-surface-container-lowest text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Αγορά</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Όνομα Εκδρομής</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Αναχώρηση</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Οδηγός</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Όχημα</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-center text-xs font-medium text-on-surface-variant uppercase tracking-wider">Διαθέσιμες Θέσεις</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">Τιμή</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">Ενέργειες</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-container-high">
-              {filteredTrips.map(trip => (
-                <tr
-                  key={trip.id}
-                  onDoubleClick={() => navigate(`/admin/trips/${trip.id}`)}
-                  className="hover:bg-surface-container-lowest transition-colors cursor-pointer"
-                  title="Διπλό κλικ για επεξεργασία εκδρομής"
+        <div className="flex flex-wrap gap-2">
+          {[MARKET_DOMESTIC, MARKET_INTERNATIONAL].map((key) => {
+            const active = routesMarket === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setRoutesMarket(key)}
+                className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition ${
+                  active
+                    ? key === MARKET_INTERNATIONAL
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-800 shadow-sm'
+                      : 'border-emerald-300 bg-emerald-50 text-emerald-800 shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {key === MARKET_INTERNATIONAL ? 'public' : 'flag'}
+                </span>
+                {MARKET_LABELS[key]}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                    active ? 'bg-white/80' : 'bg-slate-100 text-slate-500'
+                  }`}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${marketBadgeClass}`}
+                  {marketCounts[key]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="rounded-[20px] border border-slate-200/80 bg-gradient-to-b from-slate-50/80 to-white p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Στη λίστα</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">{filteredTrips.length}</p>
+          </div>
+          <div className="rounded-[20px] border border-sky-100 bg-gradient-to-b from-sky-50/70 to-white p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-sky-600/70">Επερχόμενες</p>
+            <p className="text-2xl font-bold text-sky-900 mt-1 tabular-nums">{upcoming}</p>
+          </div>
+          <div className="rounded-[20px] border border-emerald-100 bg-gradient-to-b from-emerald-50/70 to-white p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600/70">Διαθ. θέσεις</p>
+            <p className="text-2xl font-bold text-emerald-900 mt-1 tabular-nums">{totalSeats}</p>
+          </div>
+          <div className="rounded-[20px] border border-rose-100 bg-gradient-to-b from-rose-50/60 to-white p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-rose-600/70">Sold out</p>
+            <p className="text-2xl font-bold text-rose-900 mt-1 tabular-nums">{soldOut}</p>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-slate-200/80 bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] flex flex-col sm:flex-row gap-3">
+          <label className="relative flex-1 min-w-0">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
+              search
+            </span>
+            <input
+              type="search"
+              value={routesSearch}
+              onChange={(e) => setRoutesSearch(e.target.value)}
+              placeholder="Αναζήτηση τίτλου, οδηγού, πινακίδας…"
+              className="w-full rounded-full border border-slate-200 bg-slate-50/80 pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
+            />
+          </label>
+          <select
+            value={routesSort}
+            onChange={(e) => setRoutesSort(e.target.value)}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-primary/40"
+          >
+            <option value="departure_asc">Αναχώρηση ↑</option>
+            <option value="departure_desc">Αναχώρηση ↓</option>
+            <option value="price_asc">Τιμή ↑</option>
+            <option value="price_desc">Τιμή ↓</option>
+            <option value="seats_desc">Θέσεις ↓</option>
+            <option value="title_asc">Όνομα Α–Ω</option>
+          </select>
+        </div>
+
+        <div className="bg-white rounded-[28px] border border-slate-200/70 shadow-[0_8px_30px_rgba(15,23,42,0.04)] overflow-hidden">
+          {filteredTrips.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                <span className="material-symbols-outlined text-[28px]">explore_off</span>
+              </span>
+              <p className="mt-4 font-bold text-slate-900">
+                {q
+                  ? 'Καμία εκδρομή δεν ταιριάζει στην αναζήτηση'
+                  : `Δεν υπάρχουν εκδρομές για ${MARKET_LABELS[routesMarket]}`}
+              </p>
+              <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+                {q
+                  ? 'Δοκιμάστε άλλο όρο ή καθαρίστε την αναζήτηση.'
+                  : 'Δημιουργήστε την πρώτη εκδρομή για αυτή την αγορά.'}
+              </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                {q ? (
+                  <button
+                    type="button"
+                    onClick={() => setRoutesSearch('')}
+                    className="px-4 py-2 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Καθαρισμός αναζήτησης
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openNewTrip}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold shadow-sm hover:opacity-95"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    Νέα Εκδρομή
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/80">
+                    {[
+                      'Αγορά',
+                      'Όνομα',
+                      'Αναχώρηση',
+                      'Οδηγός',
+                      'Όχημα',
+                      'Θέσεις',
+                      'Τιμή',
+                      'Ενέργειες',
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className={`px-5 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400 ${
+                          h === 'Θέσεις' || h === 'Τιμή' || h === 'Ενέργειες' ? 'text-right' : 'text-left'
+                        }`}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTrips.map((trip) => (
+                    <tr
+                      key={trip.id}
+                      onDoubleClick={() => navigate(`/admin/trips/${trip.id}`)}
+                      className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors cursor-pointer"
+                      title="Διπλό κλικ για επεξεργασία"
                     >
-                      <span className="material-symbols-outlined text-[14px]">
-                        {getTripMarket(trip) === MARKET_INTERNATIONAL ? 'public' : 'flag'}
-                      </span>
-                      {MARKET_LABELS[getTripMarket(trip)]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 font-body-md text-on-surface font-medium">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {trip.image ? (
-                        <img
-                          src={trip.image}
-                          alt=""
-                          className="w-11 h-11 rounded-xl object-cover border border-black/[0.06] shrink-0"
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-gray-400 text-[20px]">image</span>
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${marketBadgeClass}`}
+                        >
+                          <span className="material-symbols-outlined text-[14px]">
+                            {getTripMarket(trip) === MARKET_INTERNATIONAL ? 'public' : 'flag'}
+                          </span>
+                          {MARKET_LABELS[getTripMarket(trip)]}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {trip.image ? (
+                            <img
+                              src={trip.image}
+                              alt=""
+                              className="w-11 h-11 rounded-2xl object-cover border border-slate-200 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0">
+                              <span className="material-symbols-outlined text-slate-400 text-[20px]">image</span>
+                            </div>
+                          )}
+                          <span className="font-semibold text-slate-900 truncate">{trip.title}</span>
                         </div>
-                      )}
-                      <span className="truncate">{trip.title}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface">
-                    {trip.departureTime ? new Date(trip.departureTime).toLocaleString('el-GR', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface">
-                    {trip.driverName ? (
-                      <span className="font-medium">{trip.driverName}</span>
-                    ) : (
-                      <span className="text-on-surface-variant italic">—</span>
-                    )}
-                    {trip.vehiclePlate && (
-                      <span className="block text-xs font-mono text-gray-500">{trip.vehiclePlate}</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface">{trip.vehicleType}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className={`px-3 py-1 bg-surface-container text-on-surface rounded-full font-label-sm ${trip.availableSeats === 0 ? 'bg-error text-white' : ''}`}>
-                      {trip.availableSeats}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right font-body-md text-on-surface">
-                    €{Number(trip.price).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right font-body-md text-on-surface">
-                    <button onClick={() => navigate(`/admin/trips/${trip.id}`)} className="text-primary hover:text-[#002244] mr-4 transition-colors" title="Επεξεργασία">
-                      <span className="material-symbols-outlined text-[20px]">edit</span>
-                    </button>
-                    <button onClick={() => handleDeleteTrip(trip.id)} className="text-error hover:text-red-800 transition-colors" title="Διαγραφή">
-                      <span className="material-symbols-outlined text-[20px]">delete</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredTrips.length === 0 && (
-                <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center text-on-surface-variant font-body-md">
-                    Δεν βρέθηκαν εκδρομές για {MARKET_LABELS[routesMarket]}. Πατήστε «Νέα Εκδρομή» για να προσθέσετε.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-slate-700">
+                        {trip.departureTime
+                          ? new Date(trip.departureTime).toLocaleString('el-GR', {
+                              dateStyle: 'short',
+                              timeStyle: 'short',
+                            })
+                          : '—'}
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-sm">
+                        {trip.driverName ? (
+                          <span className="font-semibold text-slate-800">{trip.driverName}</span>
+                        ) : (
+                          <span className="text-slate-400 italic">Χωρίς οδηγό</span>
+                        )}
+                        {trip.vehiclePlate && (
+                          <span className="block text-xs font-mono text-slate-500 mt-0.5">
+                            {trip.vehiclePlate}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-slate-700">
+                        {trip.vehicleType || '—'}
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-right">
+                        <span
+                          className={`inline-flex min-w-[2.5rem] justify-center px-2.5 py-1 rounded-full text-xs font-bold tabular-nums ${
+                            Number(trip.availableSeats) === 0
+                              ? 'bg-rose-500 text-white'
+                              : Number(trip.availableSeats) <= 5
+                                ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {trip.availableSeats}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-right text-sm font-bold text-slate-900 tabular-nums">
+                        €{Number(trip.price || 0).toFixed(2)}
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-right">
+                        <div className="inline-flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/admin/trips/${trip.id}`);
+                            }}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-primary hover:bg-primary/5"
+                            title="Επεξεργασία"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTrip(trip.id);
+                            }}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50"
+                            title="Διαγραφή"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="px-5 py-3 text-[11px] text-slate-400 border-t border-slate-50">
+                Διπλό κλικ στη γραμμή για πλήρη επεξεργασία εκδρομής.
+              </p>
+            </div>
+          )}
         </div>
       </div>
-    </div>
     );
   };
 
