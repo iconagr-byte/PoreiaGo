@@ -493,10 +493,45 @@ class HybridTripService(TenantScopedService):
         return next(i for i in items if i["id"] == str(lid))
 
     # ----------------------------------------------------------- delay monitor
+    async def _fetch_aviationstack_status(self, row: Any) -> tuple[str, int, dict[str, Any]]:
+        """Live Aviationstack lookup. Returns (status, delay_minutes, raw)."""
+        import httpx
+
+        api_key = os.getenv("AVIATIONSTACK_API_KEY") or ""
+        flight_iata = str(row["flight_number"] or "").replace(" ", "").upper()
+        params: dict[str, Any] = {"access_key": api_key, "flight_iata": flight_iata, "limit": 1}
+        dep = str(row["departure_airport"] or "").upper()
+        if dep:
+            params["dep_iata"] = dep
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.get("https://api.aviationstack.com/v1/flights", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        items = data.get("data") or []
+        if not items:
+            return "scheduled", 0, {"provider": "aviationstack", "empty": True, "flight_iata": flight_iata}
+        item = items[0]
+        live = item.get("live") or {}
+        dep_info = item.get("departure") or {}
+        delay = int(dep_info.get("delay") or live.get("delay") or 0)
+        raw_status = str(item.get("flight_status") or "scheduled").lower()
+        status_map = {
+            "scheduled": "scheduled",
+            "active": "active",
+            "landed": "landed",
+            "cancelled": "cancelled",
+            "incident": "incident",
+            "diverted": "diverted",
+        }
+        status = status_map.get(raw_status, raw_status)
+        if delay > 0 and status in {"scheduled", "active"}:
+            status = "delayed"
+        return status, max(delay, 0), {"provider": "aviationstack", "flight": item}
+
     async def poll_flight_status(self, flight_id: UUID) -> dict[str, Any]:
         """
-        Provider-ready stub. Set AVIATIONSTACK_API_KEY to enable live lookups later.
-        Currently simulates status and suggests ground pickup adjustments.
+        Flight status poll. Uses Aviationstack when AVIATIONSTACK_API_KEY is set;
+        otherwise a deterministic stub for connection-monitor UX.
         """
         await self._bind_tenant_rls()
         result = await self.session.execute(
@@ -514,25 +549,37 @@ class HybridTripService(TenantScopedService):
         if not row:
             raise ValueError("Flight not found")
 
-        provider = "aviationstack" if os.getenv("AVIATIONSTACK_API_KEY") else "stub"
-        # Stub: no delay unless already stored; live provider hook left for future wiring.
+        api_key = os.getenv("AVIATIONSTACK_API_KEY")
+        provider = "aviationstack" if api_key else "stub"
         delay = int(row["delay_minutes"] or 0)
         status = row["status"] or "scheduled"
-        if provider == "stub" and delay == 0:
-            # Deterministic demo delay for connection monitoring UX (0–45 by flight hash).
-            delay = (sum(ord(c) for c in str(row["flight_number"])) % 4) * 15
-            if delay:
-                status = "delayed"
-
-        suggested = delay  # 1:1 pickup shift for delayed inbound flights
-        event_id = uuid4()
-        payload = {
+        payload: dict[str, Any] = {
             "flight_number": row["flight_number"],
             "departure_airport": row["departure_airport"],
             "arrival_airport": row["arrival_airport"],
             "provider": provider,
-            "note": "Wire Aviationstack/Skyscanner here when API key is present.",
         }
+
+        if provider == "aviationstack":
+            try:
+                status, delay, raw = await self._fetch_aviationstack_status(row)
+                payload.update(raw)
+            except Exception as exc:  # noqa: BLE001 — fall back to stub on provider errors
+                provider = "stub_fallback"
+                payload["aviationstack_error"] = str(exc)[:300]
+                if delay == 0:
+                    delay = (sum(ord(c) for c in str(row["flight_number"])) % 4) * 15
+                    if delay:
+                        status = "delayed"
+        elif delay == 0:
+            # Deterministic demo delay for connection monitoring UX (0–45 by flight hash).
+            delay = (sum(ord(c) for c in str(row["flight_number"])) % 4) * 15
+            if delay:
+                status = "delayed"
+            payload["note"] = "Set AVIATIONSTACK_API_KEY for live flight status."
+
+        suggested = delay  # 1:1 pickup shift for delayed inbound flights
+        event_id = uuid4()
         await self.session.execute(
             text(
                 """
@@ -553,7 +600,7 @@ class HybridTripService(TenantScopedService):
                 "status": status,
                 "delay": delay,
                 "suggested": suggested,
-                "raw": json.dumps(payload),
+                "raw": json.dumps(payload, default=str),
             },
         )
         await self.session.execute(
@@ -582,6 +629,81 @@ class HybridTripService(TenantScopedService):
             "message": (
                 f"Flight {row['flight_number']} is {status}"
                 + (f" (+{delay} min). Adjust ground pickup by {suggested} min." if delay else ".")
+            ),
+        }
+
+    async def queue_delay_notifications(
+        self,
+        flight_id: UUID,
+        *,
+        trip_id: int | None = None,
+        delay_minutes: int = 0,
+        channels: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Stub queue for SMS/WhatsApp passenger delay alerts.
+        Persists a flight_status_events row with provider=notify_stub for audit.
+        """
+        await self._bind_tenant_rls()
+        result = await self.session.execute(
+            text(
+                """
+                SELECT id, trip_id, flight_number, delay_minutes, status
+                FROM flights
+                WHERE tenant_id = :tenant AND id = :id
+                """
+            ),
+            {"tenant": str(self.tenant_id), "id": str(flight_id)},
+        )
+        row = result.mappings().first()
+        if not row:
+            raise ValueError("Flight not found")
+
+        delay = int(delay_minutes or row["delay_minutes"] or 0)
+        chans = [c for c in (channels or ["sms", "whatsapp"]) if c in {"sms", "whatsapp", "email", "push"}]
+        if not chans:
+            chans = ["sms"]
+        event_id = uuid4()
+        payload = {
+            "type": "delay_notify",
+            "channels": chans,
+            "flight_number": row["flight_number"],
+            "delay_minutes": delay,
+            "trip_id": trip_id or row["trip_id"],
+            "note": "Wire Twilio/WhatsApp Business when credentials are present.",
+        }
+        await self.session.execute(
+            text(
+                """
+                INSERT INTO flight_status_events (
+                    id, tenant_id, flight_id, provider, status, delay_minutes,
+                    suggested_pickup_adjustment_minutes, raw_payload, created_at
+                ) VALUES (
+                    :id, :tenant, :flight_id, 'notify_stub', :status, :delay,
+                    :suggested, CAST(:raw AS jsonb), NOW()
+                )
+                """
+            ),
+            {
+                "id": str(event_id),
+                "tenant": str(self.tenant_id),
+                "flight_id": str(flight_id),
+                "status": row["status"] or "delayed",
+                "delay": delay,
+                "suggested": delay,
+                "raw": json.dumps(payload),
+            },
+        )
+        return {
+            "queued": True,
+            "event_id": str(event_id),
+            "flight_id": str(flight_id),
+            "trip_id": trip_id or row["trip_id"],
+            "channels": chans,
+            "delay_minutes": delay,
+            "message": (
+                f"Queued {', '.join(chans)} delay notice for {row['flight_number']}"
+                + (f" (+{delay} min)." if delay else ".")
             ),
         }
 

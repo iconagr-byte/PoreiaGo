@@ -30,6 +30,7 @@ export function normalizeTrip(trip) {
     ...(market === MARKET_INTERNATIONAL ? { category: 'international' } : {}),
     currency: trip.currency || 'EUR',
     targetMarginPct: trip.targetMarginPct ?? 25,
+    connectionThresholdMin: trip.connectionThresholdMin ?? 90,
     flights: Array.isArray(trip.flights) ? trip.flights : [],
     segments: Array.isArray(trip.segments) ? trip.segments : [],
     passengerFlightSeats: Array.isArray(trip.passengerFlightSeats) ? trip.passengerFlightSeats : [],

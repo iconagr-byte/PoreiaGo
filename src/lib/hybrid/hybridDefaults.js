@@ -75,6 +75,7 @@ export function normalizeHybridTripFields(trip) {
     ...trip,
     currency: trip.currency || 'EUR',
     targetMarginPct: trip.targetMarginPct ?? 25,
+    connectionThresholdMin: trip.connectionThresholdMin ?? 90,
     flights,
     segments,
     passengerFlightSeats: Array.isArray(trip.passengerFlightSeats) ? trip.passengerFlightSeats : [],

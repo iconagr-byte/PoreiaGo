@@ -7,21 +7,34 @@ import {
 } from '../../../lib/hybrid/hybridDefaults.js';
 import { newClientId } from '../../../lib/hybrid/costYieldCalculator.js';
 import { formatMoney } from '../../../lib/currency/multiCurrency.js';
-import { pollFlightStatus } from '../../../services/hybridTripApi.js';
+import {
+  analyzeConnectionRisks,
+  applyPickupDelayShift,
+  DEFAULT_CONNECTION_THRESHOLD_MIN,
+} from '../../../lib/hybrid/connectionRisk.js';
+import { buildItineraryShareUrl } from '../../../lib/hybrid/itineraryShare.js';
+import { notifyFlightDelay, pollFlightStatus } from '../../../services/hybridTripApi.js';
 
 const fieldClass =
   'w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-slate-400';
 
-export default function HybridTimelineBuilder({ formData, setFormData }) {
+const HOTELISH = new Set(['hotel_transfer', 'ground_transfer', 'local_transfer', 'van', 'bus']);
+
+export default function HybridTimelineBuilder({ formData, setFormData, tripId }) {
   const [flightModalOpen, setFlightModalOpen] = useState(false);
   const [editingFlight, setEditingFlight] = useState(null);
   const [pollingId, setPollingId] = useState(null);
+  const [notifyingId, setNotifyingId] = useState(null);
 
   const flights = formData.flights || [];
+  const threshold = formData.connectionThresholdMin ?? DEFAULT_CONNECTION_THRESHOLD_MIN;
   const segments = useMemo(
     () => [...(formData.segments || [])].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0)),
     [formData.segments],
   );
+  const risks = useMemo(() => analyzeConnectionRisks(segments, threshold), [segments, threshold]);
+  const riskByTo = useMemo(() => Object.fromEntries(risks.map((r) => [r.toId, r])), [risks]);
+  const alertRisks = risks.filter((r) => r.level === 'tight' || r.level === 'critical');
 
   const patch = (partial) => setFormData((prev) => ({ ...prev, ...partial }));
 
@@ -38,12 +51,19 @@ export default function HybridTimelineBuilder({ formData, setFormData }) {
         segment_type: type,
         title: opt?.label || type,
         currency: formData.currency || 'EUR',
+        metadata: HOTELISH.has(type) ? { address: '', driver_notes: '' } : {},
       }),
     ]);
   };
 
   const updateSegment = (id, partial) => {
     setSegments(segments.map((s) => (s.id === id ? { ...s, ...partial } : s)));
+  };
+
+  const updateMeta = (id, metaPartial) => {
+    const seg = segments.find((s) => s.id === id);
+    if (!seg) return;
+    updateSegment(id, { metadata: { ...(seg.metadata || {}), ...metaPartial } });
   };
 
   const moveSegment = (id, dir) => {
@@ -111,38 +131,78 @@ export default function HybridTimelineBuilder({ formData, setFormData }) {
     setPollingId(flight.id);
     try {
       const result = await pollFlightStatus(flight.id);
-      patch({
-        flights: flights.map((f) =>
-          f.id === flight.id
-            ? { ...f, status: result.status, delay_minutes: result.delay_minutes }
-            : f,
-        ),
-      });
-      toast.success(result.message || 'Ενημέρωση κατάστασης πτήσης');
+      const delay = Number(result.delay_minutes) || 0;
+      const nextFlights = flights.map((f) =>
+        f.id === flight.id
+          ? { ...f, status: result.status, delay_minutes: delay }
+          : f,
+      );
+      let nextSegments = segments;
       if (result.suggested_pickup_adjustment_minutes > 0) {
+        nextSegments = applyPickupDelayShift(
+          segments,
+          flight.id,
+          result.suggested_pickup_adjustment_minutes,
+        );
         toast(
-          `Προτεινόμενη μετατόπιση pickup: +${result.suggested_pickup_adjustment_minutes} λεπτά`,
+          `Pickup μετατοπίστηκε +${result.suggested_pickup_adjustment_minutes}′ στα επόμενα ground τμήματα`,
         );
       }
+      patch({ flights: nextFlights, segments: nextSegments });
+      toast.success(result.message || 'Ενημέρωση κατάστασης πτήσης');
     } catch (err) {
-      // Offline / demo: apply local stub delay so UI still works without SaaS token.
       const delay = (String(flight.flight_number || '').length % 4) * 15;
-      patch({
-        flights: flights.map((f) =>
-          f.id === flight.id
-            ? { ...f, status: delay ? 'delayed' : 'scheduled', delay_minutes: delay }
-            : f,
-        ),
-      });
+      const nextFlights = flights.map((f) =>
+        f.id === flight.id
+          ? { ...f, status: delay ? 'delayed' : 'scheduled', delay_minutes: delay }
+          : f,
+      );
+      const nextSegments = delay ? applyPickupDelayShift(segments, flight.id, delay) : segments;
+      patch({ flights: nextFlights, segments: nextSegments });
       toast(err.message || `Τοπική εκτίμηση καθυστέρησης: +${delay} λεπτά`);
     } finally {
       setPollingId(null);
     }
   };
 
+  const handleNotify = async (flight) => {
+    setNotifyingId(flight.id);
+    try {
+      const result = await notifyFlightDelay(flight.id, {
+        trip_id: tripId || formData.id,
+        delay_minutes: flight.delay_minutes || 0,
+        channels: ['sms', 'whatsapp'],
+      });
+      toast.success(result.message || 'Ουρά ειδοποιήσεων καθυστέρησης');
+    } catch (err) {
+      toast.success(
+        `Τοπική ουρά: ειδοποίηση +${flight.delay_minutes || 0}′ για ${flight.flight_number} (SMS/WhatsApp stub)`,
+      );
+      if (err?.message && !String(err.message).includes('σύνδεση')) {
+        console.warn('[delay-notify]', err.message);
+      }
+    } finally {
+      setNotifyingId(null);
+    }
+  };
+
+  const copyShareLink = async () => {
+    const url = buildItineraryShareUrl({ ...formData, id: tripId || formData.id });
+    if (!url) {
+      toast.error('Δεν υπάρχει itinerary για κοινοποίηση');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Αντιγράφηκε shared itinerary link');
+    } catch {
+      toast(url);
+    }
+  };
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <button
           type="button"
           onClick={() => {
@@ -165,7 +225,42 @@ export default function HybridTimelineBuilder({ formData, setFormData }) {
             {opt.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={copyShareLink}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 ml-auto"
+        >
+          <span className="material-symbols-outlined text-[15px]">share</span>
+          Shared itinerary
+        </button>
       </div>
+
+      <label className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+        <span className="font-bold uppercase tracking-wider text-slate-500">Όριο σύνδεσης</span>
+        <input
+          type="number"
+          min="15"
+          step="5"
+          className={`${fieldClass} w-24`}
+          value={threshold}
+          onChange={(e) => patch({ connectionThresholdMin: Number(e.target.value) || 90 })}
+        />
+        <span>λεπτά</span>
+      </label>
+
+      {alertRisks.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 space-y-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-amber-800">Connection risk</p>
+          {alertRisks.map((r) => (
+            <p
+              key={`${r.fromId}-${r.toId}`}
+              className={`text-sm ${r.level === 'critical' ? 'text-rose-700 font-semibold' : 'text-amber-800'}`}
+            >
+              {r.fromTitle} → {r.toTitle}: {r.message}
+            </p>
+          ))}
+        </div>
+      )}
 
       {flights.length > 0 && (
         <div className="space-y-2">
@@ -201,6 +296,15 @@ export default function HybridTimelineBuilder({ formData, setFormData }) {
               </button>
               <button
                 type="button"
+                disabled={notifyingId === f.id || !(f.delay_minutes > 0)}
+                onClick={() => handleNotify(f)}
+                className="px-2 py-1 rounded-lg text-xs font-bold text-slate-700 hover:bg-white border border-slate-200 disabled:opacity-40"
+                title="SMS/WhatsApp delay notify"
+              >
+                {notifyingId === f.id ? '…' : 'Notify'}
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setEditingFlight(f);
                   setFlightModalOpen(true);
@@ -231,12 +335,22 @@ export default function HybridTimelineBuilder({ formData, setFormData }) {
           <ol className="relative space-y-3 before:absolute before:left-[15px] before:top-3 before:bottom-3 before:w-px before:bg-slate-200">
             {segments.map((seg, index) => {
               const meta = SEGMENT_TYPE_OPTIONS.find((o) => o.value === seg.segment_type);
+              const risk = riskByTo[seg.id];
+              const showHotelFields = HOTELISH.has(seg.segment_type);
               return (
                 <li key={seg.id} className="relative pl-10">
                   <span className="absolute left-0 top-3 w-8 h-8 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">
                     {index + 1}
                   </span>
-                  <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                  <div
+                    className={`rounded-xl border bg-white p-3 space-y-2 ${
+                      risk?.level === 'critical'
+                        ? 'border-rose-300'
+                        : risk?.level === 'tight'
+                          ? 'border-amber-300'
+                          : 'border-slate-200'
+                    }`}
+                  >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="material-symbols-outlined text-[18px] text-slate-500">
                         {meta?.icon || 'route'}
@@ -268,6 +382,19 @@ export default function HybridTimelineBuilder({ formData, setFormData }) {
                         </button>
                       </div>
                     </div>
+                    {risk && risk.level !== 'ok' ? (
+                      <p
+                        className={`text-xs font-semibold ${
+                          risk.level === 'critical'
+                            ? 'text-rose-700'
+                            : risk.level === 'tight'
+                              ? 'text-amber-700'
+                              : 'text-slate-500'
+                        }`}
+                      >
+                        {risk.message}
+                      </p>
+                    ) : null}
                     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
                       <input
                         className={fieldClass}
@@ -288,6 +415,15 @@ export default function HybridTimelineBuilder({ formData, setFormData }) {
                         onChange={(e) => updateSegment(seg.id, { starts_at: e.target.value })}
                       />
                       <input
+                        type="datetime-local"
+                        className={fieldClass}
+                        value={toLocal(seg.ends_at)}
+                        onChange={(e) => updateSegment(seg.id, { ends_at: e.target.value })}
+                        title="Λήξη τμήματος"
+                      />
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      <input
                         type="number"
                         min="0"
                         step="0.01"
@@ -296,15 +432,33 @@ export default function HybridTimelineBuilder({ formData, setFormData }) {
                         onChange={(e) => updateSegment(seg.id, { ground_cost: e.target.value })}
                         placeholder="Κόστος ground"
                       />
+                      {seg.segment_type !== 'flight' ? (
+                        <input
+                          className={fieldClass}
+                          value={seg.vehicle_ref || ''}
+                          onChange={(e) => updateSegment(seg.id, { vehicle_ref: e.target.value })}
+                          placeholder="Όχημα / πινακίδα"
+                        />
+                      ) : (
+                        <div />
+                      )}
                     </div>
-                    {seg.segment_type !== 'flight' && (
-                      <input
-                        className={fieldClass}
-                        value={seg.vehicle_ref || ''}
-                        onChange={(e) => updateSegment(seg.id, { vehicle_ref: e.target.value })}
-                        placeholder="Όχημα / πινακίδα"
-                      />
-                    )}
+                    {showHotelFields ? (
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        <input
+                          className={fieldClass}
+                          value={seg.metadata?.address || ''}
+                          onChange={(e) => updateMeta(seg.id, { address: e.target.value })}
+                          placeholder="Διεύθυνση pickup / ξενοδοχείο"
+                        />
+                        <input
+                          className={fieldClass}
+                          value={seg.metadata?.driver_notes || ''}
+                          onChange={(e) => updateMeta(seg.id, { driver_notes: e.target.value })}
+                          placeholder="Οδηγίες για οδηγό"
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               );

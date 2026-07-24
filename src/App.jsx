@@ -20,6 +20,7 @@ import DriverDetailPage from './pages/admin/DriverDetailPage';
 import DriverFormPage from './pages/admin/DriverFormPage.jsx';
 import PlatformAdminRedirect from './pages/admin/PlatformAdminRedirect';
 import TourLeaderLuggagePage from './pages/tour/TourLeaderLuggagePage.jsx';
+import SharedItineraryPage from './pages/tour/SharedItineraryPage.jsx';
 import AgencyPlansPage from './pages/AgencyPlansPage';
 import AgencySignupPage from './pages/AgencySignupPage';
 import AgencySignupSuccessPage from './pages/AgencySignupSuccessPage';
@@ -61,6 +62,8 @@ function App() {
             <Route path="/admin/fleet/:vehicleId" element={<FleetVehicleDetail />} />
             <Route path="/admin/trips/:tripId" element={<TripEditorPage />} />
             <Route path="/tour-leader/:tripId" element={<TourLeaderLuggagePage />} />
+            <Route path="/itinerary/share" element={<SharedItineraryPage />} />
+            <Route path="/itinerary/:tripId" element={<SharedItineraryPage />} />
             <Route path="/admin/drivers/new" element={<DriverFormPage />} />
             <Route path="/admin/drivers/:driverId/edit" element={<DriverFormPage />} />
             <Route path="/admin/drivers/:driverId" element={<DriverDetailPage />} />

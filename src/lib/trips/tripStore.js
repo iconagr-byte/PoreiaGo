@@ -109,6 +109,7 @@ export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
     stops: [],
     currency: 'EUR',
     targetMarginPct: 25,
+    connectionThresholdMin: 90,
     flights: [],
     segments: [],
     passengerFlightSeats: [],
@@ -159,6 +160,7 @@ export function formDataToTrip(formData, existingId = null) {
     highlights,
     currency: formData.currency || 'EUR',
     targetMarginPct: Number(formData.targetMarginPct) || 25,
+    connectionThresholdMin: Number(formData.connectionThresholdMin) || 90,
     flights: Array.isArray(formData.flights) ? formData.flights : [],
     segments: Array.isArray(formData.segments) ? formData.segments : [],
     passengerFlightSeats: Array.isArray(formData.passengerFlightSeats)

@@ -149,6 +149,26 @@ async def poll_flight_status(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.post("/flights/{flight_id}/notify-delay")
+async def notify_flight_delay(
+    flight_id: UUID,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    session: Annotated[AsyncSession, Depends(get_tenant_db)],
+    actor_id: Annotated[str | None, Depends(get_actor_id)],
+    body: dict[str, Any] | None = None,
+):
+    payload = body or {}
+    try:
+        return await _svc(session, tenant_id, actor_id).queue_delay_notifications(
+            flight_id,
+            trip_id=payload.get("trip_id"),
+            delay_minutes=int(payload.get("delay_minutes") or 0),
+            channels=payload.get("channels"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.post("/hybrid/yield")
 async def calculate_yield(body: YieldCalculateRequest) -> dict[str, Any]:
     return HybridTripService.calculate_yield(

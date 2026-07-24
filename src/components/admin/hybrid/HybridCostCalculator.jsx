@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { calculateTripYield } from '../../../lib/hybrid/costYieldCalculator.js';
 import { formatMoney, SUPPORTED_CURRENCIES } from '../../../lib/currency/multiCurrency.js';
 
+const SCENARIO_MARGINS = [15, 25, 35];
+
 export default function HybridCostCalculator({ formData, setFormData }) {
   const currency = formData.currency || 'EUR';
   const margin = formData.targetMarginPct ?? 25;
@@ -20,6 +22,20 @@ export default function HybridCostCalculator({ formData, setFormData }) {
         displayCurrency: currency,
       }),
     [formData.flights, formData.segments, pax, margin, currency],
+  );
+
+  const scenarios = useMemo(
+    () =>
+      SCENARIO_MARGINS.map((m) =>
+        calculateTripYield({
+          flights: formData.flights || [],
+          segments: formData.segments || [],
+          passengerCount: pax,
+          targetMarginPct: m,
+          displayCurrency: currency,
+        }),
+      ),
+    [formData.flights, formData.segments, pax, currency],
   );
 
   const patch = (partial) => setFormData((prev) => ({ ...prev, ...partial }));
@@ -77,6 +93,44 @@ export default function HybridCostCalculator({ formData, setFormData }) {
           value={formatMoney(yieldSummary.recommendedPricePerPerson, currency)}
           emphasize
         />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Yield scenarios
+        </p>
+        <div className="grid sm:grid-cols-3 gap-2">
+          {scenarios.map((s) => {
+            const active = Number(s.targetMarginPct) === Number(margin);
+            return (
+              <button
+                key={s.targetMarginPct}
+                type="button"
+                onClick={() =>
+                  patch({
+                    targetMarginPct: s.targetMarginPct,
+                    price: s.recommendedPricePerPerson,
+                  })
+                }
+                className={`rounded-xl border px-3 py-3 text-left transition ${
+                  active
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 bg-white hover:border-slate-400'
+                }`}
+              >
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${active ? 'text-slate-300' : 'text-slate-500'}`}>
+                  Margin {s.targetMarginPct}%
+                </p>
+                <p className={`text-lg font-bold mt-1 ${active ? 'text-white' : 'text-slate-900'}`}>
+                  {formatMoney(s.recommendedPricePerPerson, currency)}
+                </p>
+                <p className={`text-xs mt-1 ${active ? 'text-slate-300' : 'text-slate-500'}`}>
+                  Στόχος {formatMoney(s.targetRevenue, currency)}
+                </p>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
