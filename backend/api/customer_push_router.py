@@ -11,7 +11,11 @@ from travel_platform.notifications.push_subscription_store import (
     list_subscriptions_for_email,
     upsert_subscription,
 )
-from travel_platform.notifications.web_push_service import get_public_vapid_key, web_push_configured
+from travel_platform.notifications.web_push_service import (
+    ensure_web_push_keys,
+    get_public_vapid_key,
+    web_push_configured,
+)
 
 router = APIRouter(prefix="/api/push", tags=["Customer Push"])
 
@@ -28,6 +32,7 @@ class PushUnsubscribeRequest(BaseModel):
 
 @router.get("/config")
 async def push_config():
+    ensure_web_push_keys()
     return {
         "enabled": web_push_configured(),
         "public_key": get_public_vapid_key(),
@@ -36,6 +41,7 @@ async def push_config():
 
 @router.get("/status")
 async def push_status(customer: dict = Depends(get_current_customer)):
+    ensure_web_push_keys()
     email = str(customer.get("email") or "").strip().lower()
     subs = list_subscriptions_for_email(email)
     return {
@@ -51,6 +57,7 @@ async def push_subscribe(
     customer: dict = Depends(get_current_customer),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ):
+    ensure_web_push_keys()
     if not web_push_configured():
         raise HTTPException(status_code=503, detail="Web Push is not configured on this server")
     email = str(customer.get("email") or "").strip().lower()

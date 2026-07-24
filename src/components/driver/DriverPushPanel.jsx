@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
+  fetchDriverPushConfig,
   fetchDriverPushStatus,
   isDriverPushSupported,
   subscribeDriverPush,
@@ -10,20 +11,43 @@ import {
 /** Ενεργοποίηση push — «Άνοιξε βάρδια» από το γραφείο. */
 export default function DriverPushPanel() {
   const [supported, setSupported] = useState(false);
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(null); // null = loading
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     const ok = isDriverPushSupported();
     setSupported(ok);
     if (!ok) return;
-    fetchDriverPushStatus()
-      .then((status) => {
-        setEnabled(Boolean(status.enabled));
-        setSubscribed(Boolean(status.subscribed));
-      })
-      .catch(() => {});
+
+    let cancelled = false;
+    (async () => {
+      try {
+        // /config auto-provisions VAPID and does not require a session.
+        const config = await fetchDriverPushConfig();
+        if (cancelled) return;
+        setEnabled(Boolean(config.enabled && config.public_key));
+        try {
+          const status = await fetchDriverPushStatus();
+          if (cancelled) return;
+          setSubscribed(Boolean(status.subscribed));
+          if (status.enabled != null) {
+            setEnabled(Boolean(status.enabled));
+          }
+        } catch {
+          // Session may be cold; still show enable if VAPID is ready.
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setEnabled(false);
+        setLoadError(err?.message || 'Αποτυχία ελέγχου push');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const onSubscribe = async () => {
@@ -31,6 +55,7 @@ export default function DriverPushPanel() {
     try {
       await subscribeDriverPush();
       setSubscribed(true);
+      setEnabled(true);
       toast.success('Push ενεργό — θα λαμβάνετε κλήση βάρδιας από το γραφείο');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία ενεργοποίησης');
@@ -67,9 +92,11 @@ export default function DriverPushPanel() {
           </p>
         </div>
       </div>
-      {!enabled ? (
+      {enabled === null ? (
+        <p className="text-xs text-[var(--driver-muted)] px-1 py-2">Έλεγχος ειδοποιήσεων…</p>
+      ) : !enabled ? (
         <p className="text-xs text-amber-300 bg-amber-950/40 border border-amber-600/30 rounded-xl px-3 py-2">
-          Ο server δεν έχει VAPID keys — ζητήστε από τον διαχειριστή.
+          {loadError || 'Οι ειδοποιήσεις δεν είναι διαθέσιμες ακόμα — δοκιμάστε ξανά σε λίγο.'}
         </p>
       ) : subscribed ? (
         <button

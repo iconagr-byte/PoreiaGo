@@ -84,6 +84,7 @@ async def push_subscribe(
     _: Annotated[dict, Depends(_require_admin)],
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ):
+    ensure_web_push_keys()
     if not web_push_configured():
         raise HTTPException(status_code=503, detail="Web Push δεν είναι ρυθμισμένο (VAPID)")
     try:

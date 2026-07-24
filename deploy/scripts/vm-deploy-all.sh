@@ -106,6 +106,13 @@ if [[ -n "$API_CID" ]]; then
   echo "  api-blue networks:"
   docker inspect "$API_CID" --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
 fi
+# Sync host VAPID keys into the durable api_data volume (env often pointed here without a copy).
+if [[ -n "$API_CID" && -f "$DEPLOY_DIR/.vapid_private.pem" && -f "$DEPLOY_DIR/.vapid_public.key" ]]; then
+  echo "==> Syncing Web Push VAPID keys into api-blue:/app/data"
+  docker cp "$DEPLOY_DIR/.vapid_private.pem" "$API_CID:/app/data/vapid_private.pem" || true
+  docker cp "$DEPLOY_DIR/.vapid_public.key" "$API_CID:/app/data/vapid_public.key" || true
+  docker exec "$API_CID" chmod 600 /app/data/vapid_private.pem 2>/dev/null || true
+fi
 # Recreate Traefik so docker provider reloads API router labels cleanly.
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps traefik
 # Recreate frontend so nginx picks up same-origin /api + /ws proxy config.
