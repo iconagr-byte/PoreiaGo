@@ -10,6 +10,12 @@ async function hybridFetch(path, options = {}) {
   return saasFetch(path, options);
 }
 
+function looksLikeUuid(v) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(v || ''),
+  );
+}
+
 export async function fetchHybridTrip(tripId) {
   return hybridFetch(`/api/v1/operations/trips/${tripId}/hybrid`);
 }
@@ -34,6 +40,13 @@ export async function replaceSegments(tripId, segments) {
   });
 }
 
+export async function replacePassengerSeatsRemote(tripId, seats) {
+  return hybridFetch(`/api/v1/operations/trips/${tripId}/passenger-seats`, {
+    method: 'PUT',
+    body: JSON.stringify({ seats }),
+  });
+}
+
 export async function upsertLuggageRemote(tripId, item) {
   return hybridFetch(`/api/v1/operations/trips/${tripId}/luggage`, {
     method: 'POST',
@@ -41,8 +54,22 @@ export async function upsertLuggageRemote(tripId, item) {
   });
 }
 
+export async function replaceLuggageRemote(tripId, items) {
+  return hybridFetch(`/api/v1/operations/trips/${tripId}/luggage`, {
+    method: 'PUT',
+    body: JSON.stringify({ items }),
+  });
+}
+
 export async function listLuggageRemote(tripId) {
   return hybridFetch(`/api/v1/operations/trips/${tripId}/luggage`);
+}
+
+export async function upsertHybridMetaRemote(tripId, meta) {
+  return hybridFetch(`/api/v1/operations/trips/${tripId}/meta`, {
+    method: 'PUT',
+    body: JSON.stringify(meta),
+  });
 }
 
 export async function pollFlightStatus(flightId) {
@@ -66,7 +93,10 @@ export async function calculateYieldRemote(payload) {
   });
 }
 
-/** Best-effort sync of local hybrid trip fields to Postgres. */
+/**
+ * Best-effort sync of local hybrid trip fields to Postgres:
+ * flights, segments, seats, luggage, rooming/extras/crew/buffers.
+ */
 export async function syncHybridTripToServer(trip) {
   if (!trip?.id || !getSaasToken()) return null;
   try {
@@ -93,15 +123,50 @@ export async function syncHybridTripToServer(trip) {
     if (segments.length) {
       await replaceSegments(trip.id, segments);
     }
+
+    const seats = (trip.passengerFlightSeats || [])
+      .filter((s) => String(s.passenger_name || '').trim())
+      .map((s) => ({
+        id: looksLikeUuid(s.id) ? s.id : undefined,
+        flight_id: looksLikeUuid(s.flight_id) ? s.flight_id : null,
+        booking_id: s.booking_id || null,
+        passenger_name: String(s.passenger_name).trim(),
+        ground_seat: s.ground_seat || null,
+        flight_seat: s.flight_seat || null,
+        ticket_code: s.ticket_code || null,
+        pnr_code: s.pnr_code || null,
+      }));
+    await replacePassengerSeatsRemote(trip.id, seats);
+
+    const luggage = (trip.luggageCheckins || [])
+      .filter((l) => String(l.passenger_name || '').trim())
+      .map((l) => ({
+        id: looksLikeUuid(l.id) ? l.id : undefined,
+        booking_id: l.booking_id || null,
+        passenger_name: String(l.passenger_name).trim(),
+        checkin_status: l.checkin_status || 'pending',
+        luggage_count: Number(l.luggage_count || 0),
+        luggage_notes: l.luggage_notes || null,
+        checked_by: l.checked_by || null,
+        checked_at: l.checked_at || null,
+      }));
+    await replaceLuggageRemote(trip.id, luggage);
+
+    await upsertHybridMetaRemote(trip.id, {
+      rooming_list: Array.isArray(trip.roomingList) ? trip.roomingList : [],
+      passenger_extras: Array.isArray(trip.passengerExtras) ? trip.passengerExtras : [],
+      supplier_cost_sheets: Array.isArray(trip.supplierCostSheets) ? trip.supplierCostSheets : [],
+      crew: trip.crew && typeof trip.crew === 'object' ? trip.crew : {},
+      airport_buffers:
+        trip.airportBuffers && typeof trip.airportBuffers === 'object' ? trip.airportBuffers : {},
+      currency: trip.currency || 'EUR',
+      target_margin_pct: Number(trip.targetMarginPct ?? 25),
+      connection_threshold_min: Number(trip.connectionThresholdMin ?? 90),
+    });
+
     return true;
   } catch (err) {
     console.warn('[hybrid-sync]', err.message || err);
     return false;
   }
-}
-
-function looksLikeUuid(v) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    String(v || ''),
-  );
 }

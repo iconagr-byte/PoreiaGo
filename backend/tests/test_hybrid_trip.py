@@ -66,6 +66,40 @@ class HybridNotifyDispatchImportTests(unittest.TestCase):
         self.assertTrue(callable(dispatcher.dispatch_delay_alerts))
 
 
+class HybridSchemaHardeningTests(unittest.TestCase):
+    def test_replace_request_schemas_exist(self):
+        from schemas.platform.hybrid import (
+            HybridMetaUpsertRequest,
+            LuggageReplaceRequest,
+            PassengerSeatsReplaceRequest,
+        )
+
+        seats = PassengerSeatsReplaceRequest(
+            seats=[{"passenger_name": "Νίκος", "flight_id": None}]
+        )
+        self.assertEqual(len(seats.seats), 1)
+        self.assertIsNone(seats.seats[0].flight_id)
+
+        luggage = LuggageReplaceRequest(
+            items=[{"passenger_name": "Μαρία", "luggage_count": 2}]
+        )
+        self.assertEqual(luggage.items[0].luggage_count, 2)
+
+        meta = HybridMetaUpsertRequest(
+            rooming_list=[{"room": "101"}],
+            crew={"tourLeader": "Άννα"},
+            target_margin_pct=30,
+        )
+        self.assertEqual(meta.crew["tourLeader"], "Άννα")
+        self.assertEqual(meta.target_margin_pct, 30)
+
+    def test_hybrid_trip_response_includes_meta(self):
+        from schemas.platform.hybrid import HybridTripResponse
+
+        resp = HybridTripResponse(trip_id=1, meta={"currency": "EUR"})
+        self.assertEqual(resp.meta["currency"], "EUR")
+
+
 class HybridSlaLogicTests(unittest.TestCase):
     def test_whatsapp_template_render_shape(self):
         # Frontend templates are mirrored in dispatcher — ensure delay template keys exist.

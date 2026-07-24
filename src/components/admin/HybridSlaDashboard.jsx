@@ -17,12 +17,12 @@ export default function HybridSlaDashboard() {
 
   const refreshPartners = () => setPartners(listPartnerAccounts());
 
-  const addPartner = () => {
+  const addPartner = async () => {
     if (!form.email.trim()) {
       toast.error('Email συνεργάτη');
       return;
     }
-    upsertPartnerAccount({
+    await upsertPartnerAccount({
       name: form.name,
       email: form.email,
       password: form.password || 'partner',

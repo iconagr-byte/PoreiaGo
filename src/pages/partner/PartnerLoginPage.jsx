@@ -9,9 +9,9 @@ export default function PartnerLoginPage() {
   const [email, setEmail] = useState(existing?.email || '');
   const [password, setPassword] = useState('');
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    const session = partnerLogin(email, password);
+    const session = await partnerLogin(email, password);
     if (!session) {
       toast.error('Λάθος στοιχεία συνεργάτη');
       return;

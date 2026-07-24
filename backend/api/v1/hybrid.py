@@ -10,9 +10,12 @@ from core.dependencies import get_actor_id, get_tenant_db, get_tenant_id
 from schemas.platform.hybrid import (
     FlightResponse,
     FlightUpsertRequest,
+    HybridMetaUpsertRequest,
     HybridTripResponse,
+    LuggageReplaceRequest,
     LuggageUpsertRequest,
     PassengerSeatUpsertRequest,
+    PassengerSeatsReplaceRequest,
     SegmentResponse,
     SegmentsReplaceRequest,
     YieldCalculateRequest,
@@ -115,6 +118,19 @@ async def upsert_passenger_seat(
     return await _svc(session, tenant_id, actor_id).upsert_passenger_seat(trip_id, body.model_dump())
 
 
+@router.put("/trips/{trip_id}/passenger-seats")
+async def replace_passenger_seats(
+    trip_id: int,
+    body: PassengerSeatsReplaceRequest,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    session: Annotated[AsyncSession, Depends(get_tenant_db)],
+    actor_id: Annotated[str | None, Depends(get_actor_id)],
+):
+    return await _svc(session, tenant_id, actor_id).replace_passenger_seats(
+        trip_id, [s.model_dump() for s in body.seats]
+    )
+
+
 @router.get("/trips/{trip_id}/luggage")
 async def list_luggage(
     trip_id: int,
@@ -134,6 +150,40 @@ async def upsert_luggage(
     actor_id: Annotated[str | None, Depends(get_actor_id)],
 ):
     return await _svc(session, tenant_id, actor_id).upsert_luggage(trip_id, body.model_dump())
+
+
+@router.put("/trips/{trip_id}/luggage")
+async def replace_luggage(
+    trip_id: int,
+    body: LuggageReplaceRequest,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    session: Annotated[AsyncSession, Depends(get_tenant_db)],
+    actor_id: Annotated[str | None, Depends(get_actor_id)],
+):
+    return await _svc(session, tenant_id, actor_id).replace_luggage(
+        trip_id, [i.model_dump() for i in body.items]
+    )
+
+
+@router.get("/trips/{trip_id}/meta")
+async def get_hybrid_meta(
+    trip_id: int,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    session: Annotated[AsyncSession, Depends(get_tenant_db)],
+    actor_id: Annotated[str | None, Depends(get_actor_id)],
+):
+    return await _svc(session, tenant_id, actor_id).get_trip_meta(trip_id)
+
+
+@router.put("/trips/{trip_id}/meta")
+async def upsert_hybrid_meta(
+    trip_id: int,
+    body: HybridMetaUpsertRequest,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    session: Annotated[AsyncSession, Depends(get_tenant_db)],
+    actor_id: Annotated[str | None, Depends(get_actor_id)],
+):
+    return await _svc(session, tenant_id, actor_id).upsert_trip_meta(trip_id, body.model_dump())
 
 
 @router.post("/flights/{flight_id}/status/poll")

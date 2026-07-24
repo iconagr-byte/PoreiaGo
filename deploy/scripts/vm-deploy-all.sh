@@ -111,8 +111,9 @@ $COMPOSE --profile bundled-db up -d --force-recreate --no-deps traefik
 # Recreate frontend so nginx picks up same-origin /api + /ws proxy config.
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps frontend
 
-echo "==> DB migrations (alembic → trip_coordinates / PostGIS GPS)"
+echo "==> DB migrations (alembic → hybrid flights/meta, trip_coordinates / PostGIS GPS)"
 # Entrypoint also runs this on uvicorn start; explicit step makes deploy logs clear.
+# Applies through head (009 hybrid flights + 010 hybrid_trip_meta / nullable seats).
 $COMPOSE exec -T api-blue alembic upgrade head \
   || echo "WARNING: alembic upgrade failed — will retry ensure on API lifespan"
 

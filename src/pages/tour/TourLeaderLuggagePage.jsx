@@ -57,6 +57,37 @@ export default function TourLeaderLuggagePage() {
   }, []);
 
   useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined;
+    let refreshing = false;
+    const onControllerChange = () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    navigator.serviceWorker
+      .register('/tour-leader-sw.js', { updateViaCache: 'none', scope: '/tour' })
+      .then((reg) => {
+        reg.update().catch(() => {});
+        const askWaitingToActivate = () => {
+          if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        };
+        askWaitingToActivate();
+        reg.addEventListener('updatefound', () => {
+          const installing = reg.installing;
+          if (!installing) return;
+          installing.addEventListener('statechange', () => {
+            if (installing.state === 'installed') askWaitingToActivate();
+          });
+        });
+      })
+      .catch(() => {});
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!trip) {
       toast.error('Η εκδρομή δεν βρέθηκε τοπικά');
       return undefined;
