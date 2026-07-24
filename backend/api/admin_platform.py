@@ -641,9 +641,14 @@ async def remove_backup(backup_id: str):
 
 @router.post("/operations/master-qr", response_model=MasterQrIssueResponse)
 async def issue_master_qr(body: MasterQrIssueRequest):
+    from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
     from travel_platform.operations.master_qr_bridge import issue_master_qr_hybrid
 
     result = await issue_master_qr_hybrid(body.trip_id, driver_id=body.driver_id)
+    try:
+        await sync_trip_passengers_to_ticketing(body.trip_id)
+    except Exception:
+        pass
     return MasterQrIssueResponse(
         qr_content=result["qr_content"],
         qr_token=result.get("qr_token"),
@@ -664,6 +669,12 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest):
     from travel_platform.operations.master_qr_normalize import build_driver_auth_url, driver_app_public_base
 
     result = await issue_master_qr_hybrid(body.trip_id, driver_id=body.driver_id)
+    try:
+        from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
+
+        await sync_trip_passengers_to_ticketing(body.trip_id, tenant_id=str(result.get("tenant_id") or ""))
+    except Exception:
+        pass
     auth_url = result.get("auth_url") or result.get("qr_content")
     qr_token = result.get("qr_token")
     if qr_token:

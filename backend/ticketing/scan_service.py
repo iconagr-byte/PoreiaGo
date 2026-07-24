@@ -129,6 +129,7 @@ async def _board_booking(
         return scan_response_failure("NOT_FOUND", "Δεν βρέθηκε κράτηση.")
     boarded = row_to_booking(updated)
     _notify_passenger_boarded(boarded, trip_id)
+    _sync_office_boarded(boarded, trip_id)
     return scan_response_success(boarded)
 
 
@@ -146,6 +147,29 @@ def _notify_passenger_boarded(booking: dict, trip_id: int) -> None:
                 "phone": booking.get("phone"),
             },
         )
+    except Exception:
+        pass
+
+
+def _sync_office_boarded(booking: dict, trip_id: int) -> None:
+    """Fire-and-forget: flip office booking + broadcast boarding WS."""
+    try:
+        import asyncio
+
+        from travel_platform.operations.boarding_office_sync import (
+            broadcast_boarding_refresh,
+            mark_office_booking_boarded,
+        )
+
+        async def _run() -> None:
+            await mark_office_booking_boarded(booking=booking, trip_id=trip_id)
+            await broadcast_boarding_refresh(trip_id)
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_run())
+        except RuntimeError:
+            asyncio.run(_run())
     except Exception:
         pass
 

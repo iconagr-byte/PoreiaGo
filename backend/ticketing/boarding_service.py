@@ -29,16 +29,29 @@ async def get_boarding_manifest(trip_id: int) -> dict:
     ]
 
     trip_title = ""
+    destination = ""
+    meeting_point = ""
     try:
+        from travel_platform.operations.trip_ops_store import get_trip_ops
         from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
-        trip_title = await resolve_trip_title(trip_id)
+        ops = get_trip_ops(trip_id) or {}
+        trip_title = await resolve_trip_title(trip_id, preferred=ops.get("title"))
+        destination = str(ops.get("destination") or "").strip()
+        meeting_point = str(ops.get("meeting_point") or "").strip()
+        if ops.get("total_seats"):
+            try:
+                capacity = max(int(ops["total_seats"]), capacity)
+            except (TypeError, ValueError):
+                pass
     except Exception:
         trip_title = f"Εκδρομή #{trip_id}"
 
     return {
         "trip_id": trip_id,
         "trip_title": trip_title,
+        "destination": destination,
+        "meeting_point": meeting_point,
         "capacity": capacity,
         "booked_count": len(passengers),
         "boarded_count": len(boarded),

@@ -49,6 +49,9 @@ class DriverSessionResponse(BaseModel):
     vehicle_plate: str | None = None
     vehicle_code: str | None = None
     vehicle_image_url: str | None = None
+    trip_title: str | None = None
+    destination: str | None = None
+    meeting_point: str | None = None
 
 
 class DriverMeResponse(BaseModel):
@@ -61,6 +64,9 @@ class DriverMeResponse(BaseModel):
     vehicle_image_url: str | None = None
     trip_id: int | None = None
     tenant_id: str | None = None
+    trip_title: str | None = None
+    destination: str | None = None
+    meeting_point: str | None = None
 
 
 async def get_db():
@@ -139,6 +145,19 @@ def _profile_fields(driver_id: str | None) -> dict:
     }
 
 
+def _trip_context(trip_id: int) -> dict:
+    from travel_platform.operations.trip_ops_store import get_trip_ops
+    from travel_platform.telemetry.trip_title_resolve import resolve_trip_title_sync
+
+    ops = get_trip_ops(trip_id) or {}
+    title = str(ops.get("title") or "").strip() or resolve_trip_title_sync(trip_id)
+    return {
+        "trip_title": title,
+        "destination": str(ops.get("destination") or "").strip() or None,
+        "meeting_point": str(ops.get("meeting_point") or "").strip() or None,
+    }
+
+
 def _issue_driver_session(
     *,
     driver_id: str | None,
@@ -161,6 +180,7 @@ def _issue_driver_session(
         algorithm=JWT_ALGORITHM,
     )
     profile = _profile_fields(driver_id)
+    ctx = _trip_context(trip_id)
     return DriverSessionResponse(
         access_token=driver_jwt,
         trip_id=trip_id,
@@ -169,6 +189,7 @@ def _issue_driver_session(
         expires_at=exp,
         schedule=_build_daily_schedule(trip_id),
         **profile,
+        **ctx,
     )
 
 
@@ -207,21 +228,30 @@ async def login_with_password(body: DriverLoginBody):
 @router.post("/session/master-qr", response_model=DriverSessionResponse)
 async def exchange_master_qr(body: MasterQrExchangeBody):
     """Scan bus dashboard QR → day session (secondary login path)."""
+    from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
     from travel_platform.operations.master_qr_bridge import exchange_master_qr_hybrid, preview_master_qr_payload
 
     hybrid = await exchange_master_qr_hybrid(body.qr_raw)
     if hybrid:
         trip_id = int(hybrid["trip_id"])
         driver_id = hybrid.get("driver_id")
+        tenant_id = str(hybrid["tenant_id"])
+        # Load office travelers into SQLite so scan validates against real bookings.
+        try:
+            await sync_trip_passengers_to_ticketing(trip_id, tenant_id=tenant_id)
+        except Exception:
+            pass
         profile = _profile_fields(driver_id)
+        ctx = _trip_context(trip_id)
         return DriverSessionResponse(
             access_token=hybrid["access_token"],
             trip_id=trip_id,
-            tenant_id=str(hybrid["tenant_id"]),
+            tenant_id=tenant_id,
             driver_id=driver_id,
             expires_at=int(hybrid["expires_at"]),
             schedule=_build_daily_schedule(trip_id),
             **profile,
+            **ctx,
         )
 
     preview = preview_master_qr_payload(body.qr_raw)
@@ -237,13 +267,46 @@ async def driver_me(session_payload: dict = Depends(require_driver_session)):
         driver_id = session_payload.get("driver_id")
     profile = _profile_fields(driver_id if driver_id and driver_id != "master-qr-driver" else None)
     driver = get_driver(driver_id) if driver_id and driver_id != "master-qr-driver" else None
+    trip_id = int(session_payload.get("trip_id") or 0) or None
+    ctx = _trip_context(trip_id) if trip_id else {}
     return DriverMeResponse(
         driver_id=driver_id if driver_id != "master-qr-driver" else None,
         email=driver.email if driver else None,
-        trip_id=int(session_payload.get("trip_id") or 0) or None,
+        trip_id=trip_id,
         tenant_id=str(session_payload.get("tenant_id") or ""),
         **profile,
+        **ctx,
     )
+
+
+@router.get("/trip")
+async def driver_trip(session_payload: dict = Depends(require_driver_session)):
+    """Full excursion context for the bound Master QR / shift trip."""
+    from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
+    from travel_platform.operations.trip_ops_store import get_trip_ops
+
+    trip_id = int(session_payload.get("trip_id", 0))
+    if not trip_id:
+        raise HTTPException(status_code=403, detail="No trip bound to session")
+    tenant_id = str(session_payload.get("tenant_id") or "")
+    try:
+        await sync_trip_passengers_to_ticketing(trip_id, tenant_id=tenant_id or None)
+    except Exception:
+        pass
+    ops = get_trip_ops(trip_id) or {}
+    ctx = _trip_context(trip_id)
+    schedule = _build_daily_schedule(trip_id)
+    return {
+        "trip_id": trip_id,
+        "trip_title": ctx.get("trip_title"),
+        "destination": ctx.get("destination") or ops.get("destination"),
+        "meeting_point": ctx.get("meeting_point") or ops.get("meeting_point"),
+        "departure_time": ops.get("departure_time"),
+        "arrival_time": ops.get("arrival_time"),
+        "total_seats": ops.get("total_seats"),
+        "stops": schedule,
+        "schedule": schedule,
+    }
 
 
 @router.get("/manifest")
@@ -251,45 +314,52 @@ async def driver_manifest(
     session_payload: dict = Depends(require_driver_session),
 ):
     """Boarding manifest only for trip_id embedded in session token."""
+    from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
+
     trip_id = int(session_payload.get("trip_id", 0))
     if not trip_id:
         raise HTTPException(status_code=403, detail="No trip bound to session")
+    try:
+        await sync_trip_passengers_to_ticketing(
+            trip_id,
+            tenant_id=str(session_payload.get("tenant_id") or "") or None,
+        )
+    except Exception:
+        pass
     return await get_boarding_manifest(trip_id)
 
 
 @router.get("/schedule")
 async def driver_schedule(session_payload: dict = Depends(require_driver_session)):
     trip_id = int(session_payload.get("trip_id", 0))
-    return {"trip_id": trip_id, "stops": _build_daily_schedule(trip_id)}
+    ctx = _trip_context(trip_id) if trip_id else {}
+    return {
+        "trip_id": trip_id,
+        "trip_title": ctx.get("trip_title"),
+        "destination": ctx.get("destination"),
+        "meeting_point": ctx.get("meeting_point"),
+        "stops": _build_daily_schedule(trip_id),
+    }
 
 
 def _build_daily_schedule(trip_id: int) -> list[dict]:
-    """Placeholder timeline — replace with trips/stops tables."""
+    """Real excursion timeline from synced trip ops (stops / hybrid / destination)."""
+    from travel_platform.operations.trip_ops_store import build_schedule_from_ops, get_trip_ops
+
+    ops = get_trip_ops(trip_id)
+    stops = build_schedule_from_ops(trip_id, ops)
+    if stops:
+        return stops
+    # Soft fallback — never invent a fake Athens→Meteora route for a real trip id.
+    ctx_title = (ops or {}).get("title") if ops else None
+    label = ctx_title or f"Εκδρομή #{trip_id}"
     return [
         {
-            "time": "08:00",
-            "stop": "Αθήνα — Σταθμός Λαρίσης",
-            "status": "completed",
-            "trip_id": trip_id,
-        },
-        {
-            "time": "10:30",
-            "stop": "Λαμία — Κέντρο",
+            "time": "—",
+            "stop": label,
             "status": "current",
             "trip_id": trip_id,
-        },
-        {
-            "time": "13:00",
-            "stop": "Μετέωρα — Θέα",
-            "status": "upcoming",
-            "trip_id": trip_id,
-        },
-        {
-            "time": "18:00",
-            "stop": "Επιστροφή Αθήνα",
-            "status": "upcoming",
-            "trip_id": trip_id,
-        },
+        }
     ]
 
 

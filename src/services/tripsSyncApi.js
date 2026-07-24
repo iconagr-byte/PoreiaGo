@@ -11,6 +11,15 @@ function tripToPayload(trip) {
     price: Number(trip.price) || 0,
     available_seats: trip.availableSeats ?? null,
     total_seats: trip.totalSeats || trip.capacity || null,
+    destination: trip.destination || '',
+    meeting_point: trip.meetingPoint || trip.meeting_point || '',
+    meetingPoint: trip.meetingPoint || trip.meeting_point || '',
+    departure_time: trip.departureTime || trip.departure_time || '',
+    departureTime: trip.departureTime || trip.departure_time || '',
+    arrival_time: trip.arrivalTime || trip.arrival_time || '',
+    arrivalTime: trip.arrivalTime || trip.arrival_time || '',
+    stops: Array.isArray(trip.stops) ? trip.stops : [],
+    segments: Array.isArray(trip.segments) ? trip.segments : [],
   };
 }
 

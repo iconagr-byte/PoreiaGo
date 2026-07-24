@@ -29,6 +29,9 @@ function mapSessionPayload(data) {
     vehiclePlate: data.vehicle_plate || null,
     vehicleCode: data.vehicle_code || null,
     vehicleImageUrl: data.vehicle_image_url || null,
+    tripTitle: data.trip_title || null,
+    destination: data.destination || null,
+    meetingPoint: data.meeting_point || null,
   };
 }
 
@@ -200,8 +203,6 @@ export async function fetchDriverManifest() {
 }
 
 export async function fetchDriverSchedule() {
-  const session = getDriverSession();
-  if (session?.schedule?.length) return session.schedule;
   try {
     const res = await fetch(`${API_BASE}/api/driver/schedule`, {
       headers: driverSessionHeaders(),
@@ -213,7 +214,29 @@ export async function fetchDriverSchedule() {
   } catch {
     /* offline */
   }
+  const session = getDriverSession();
   return session?.schedule || [];
+}
+
+export async function fetchDriverTrip() {
+  try {
+    const res = await fetch(`${API_BASE}/api/driver/trip`, {
+      headers: driverSessionHeaders(),
+    });
+    if (res.ok) return res.json();
+  } catch {
+    /* offline */
+  }
+  const session = getDriverSession();
+  if (!session?.tripId) return null;
+  return {
+    trip_id: session.tripId,
+    trip_title: session.tripTitle,
+    destination: session.destination,
+    meeting_point: session.meetingPoint,
+    stops: session.schedule || [],
+    schedule: session.schedule || [],
+  };
 }
 
 export async function cacheManifestForOffline(tripId, manifest) {
