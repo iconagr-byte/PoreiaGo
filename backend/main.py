@@ -96,6 +96,11 @@ except ImportError:
 
 # WebSocket GPS must load independently — do not bundle with unrelated imports.
 try:
+    from api.seat_pricing_router import router as seat_pricing_router
+except ImportError:
+    seat_pricing_router = None
+
+try:
     from api.ws_telemetry import router as ws_telemetry_router
 except ImportError as exc:
     import logging as _logging
@@ -271,6 +276,8 @@ if admin_telemetry_router:
     app.include_router(admin_telemetry_router)
 if ws_telemetry_router:
     app.include_router(ws_telemetry_router)
+if seat_pricing_router:
+    app.include_router(seat_pricing_router)
 
 
 class ConnectionManager:
