@@ -437,6 +437,15 @@ class TripSyncItem(BaseModel):
     price: float = Field(default=0, ge=0)
     available_seats: int | None = None
     total_seats: int | None = None
+    destination: str = ""
+    meeting_point: str | None = None
+    meetingPoint: str | None = None
+    departure_time: str | None = None
+    departureTime: str | None = None
+    arrival_time: str | None = None
+    arrivalTime: str | None = None
+    stops: list[dict] = Field(default_factory=list)
+    segments: list[dict] = Field(default_factory=list)
 
 
 class TripsSyncRequest(BaseModel):

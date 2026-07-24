@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { fetchDriverManifest, fetchDriverSchedule } from '../../services/driverPortalApi.js';
+import {
+  fetchDriverManifest,
+  fetchDriverSchedule,
+  fetchDriverTrip,
+} from '../../services/driverPortalApi.js';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
-import { getTripById } from '../../lib/trips/tripStore.js';
 import TelemetryStrip from './TelemetryStrip.jsx';
 import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
@@ -11,60 +14,52 @@ const STATUS_LABEL = {
   upcoming: 'Επόμενο',
 };
 
-function hybridStopsFromTrip(trip) {
-  if (!trip) return [];
-  const flights = trip.flights || [];
-  const delayByFlight = Object.fromEntries(
-    flights.map((f) => [f.id, Number(f.delay_minutes) || 0]),
-  );
-  return [...(trip.segments || [])]
-    .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
-    .map((seg) => {
-      const start = seg.starts_at ? new Date(seg.starts_at) : null;
-      const time =
-        start && !Number.isNaN(start.getTime())
-          ? start.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })
-          : '—';
-      const delay =
-        (seg.flight_id && delayByFlight[seg.flight_id]) ||
-        Number(seg.metadata?.pickup_shifted_by_minutes) ||
-        0;
-      const label = [seg.title || seg.segment_type, seg.metadata?.address || seg.origin_label]
-        .filter(Boolean)
-        .join(' · ');
-      return {
-        time,
-        stop: label || 'Hybrid stop',
-        status: 'upcoming',
-        lat: seg.metadata?.lat,
-        lng: seg.metadata?.lng,
-        address: seg.metadata?.address,
-        delayMinutes: delay,
-        bufferNote: seg.destination_label || '',
-        hybrid: true,
-      };
-    });
-}
-
 export default function DailyManifest() {
   const [stops, setStops] = useState([]);
   const [manifest, setManifest] = useState(null);
+  const [tripMeta, setTripMeta] = useState(null);
   const session = getDriverSession();
 
   useEffect(() => {
-    const trip = getTripById(session?.tripId);
-    const hybrid = hybridStopsFromTrip(trip);
-    fetchDriverSchedule().then((apiStops) => {
-      setStops(hybrid.length ? hybrid : apiStops || []);
-    });
-    fetchDriverManifest().then(setManifest);
-    const id = setInterval(() => fetchDriverManifest().then(setManifest), LIVE_REFRESH_MS);
-    return () => clearInterval(id);
+    let cancelled = false;
+
+    const load = async () => {
+      const [trip, apiStops, man] = await Promise.all([
+        fetchDriverTrip().catch(() => null),
+        fetchDriverSchedule().catch(() => []),
+        fetchDriverManifest().catch(() => null),
+      ]);
+      if (cancelled) return;
+      setTripMeta(trip);
+      const schedule = (trip?.stops?.length ? trip.stops : null) || apiStops || session?.schedule || [];
+      setStops(schedule);
+      setManifest(man);
+    };
+
+    load();
+    const id = setInterval(() => {
+      fetchDriverManifest().then((m) => {
+        if (!cancelled) setManifest(m);
+      });
+    }, LIVE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, [session?.tripId]);
 
   const boarded = manifest?.boarded_passengers?.length ?? 0;
-  const total = manifest?.capacity ?? 45;
+  const total = manifest?.capacity ?? tripMeta?.total_seats ?? 45;
   const pct = total > 0 ? Math.min(100, Math.round((boarded / total) * 100)) : 0;
+  const title =
+    manifest?.trip_title ||
+    tripMeta?.trip_title ||
+    session?.tripTitle ||
+    `Εκδρομή #${session?.tripId ?? '—'}`;
+  const destination =
+    manifest?.destination || tripMeta?.destination || session?.destination || '';
+  const meetingPoint =
+    manifest?.meeting_point || tripMeta?.meeting_point || session?.meetingPoint || '';
 
   return (
     <div className="driver-stack">
@@ -74,9 +69,20 @@ export default function DailyManifest() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="driver-card-label">Σημερινό δρομολόγιο</p>
-            <h2 className="text-xl font-extrabold mt-1 tracking-tight">
-              {manifest?.trip_title || `Εκδρομή #${session?.tripId ?? '—'}`}
-            </h2>
+            <h2 className="text-xl font-extrabold mt-1 tracking-tight">{title}</h2>
+            {destination ? (
+              <p className="text-sm font-bold text-[var(--driver-muted)] mt-1 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px] text-[var(--driver-yellow)]">
+                  location_on
+                </span>
+                {destination}
+              </p>
+            ) : null}
+            {meetingPoint ? (
+              <p className="text-xs text-[var(--driver-muted)] mt-1">
+                Συνάντηση: {meetingPoint}
+              </p>
+            ) : null}
           </div>
           <div className="shrink-0 w-11 h-11 rounded-xl bg-[var(--driver-yellow-soft)] border border-[var(--driver-yellow)]/30 flex items-center justify-center">
             <span className="material-symbols-outlined text-[var(--driver-yellow)]">groups</span>
@@ -141,7 +147,7 @@ export default function DailyManifest() {
         </div>
         {!stops.length && (
           <p className="text-[var(--driver-muted)] py-6 text-center text-sm">
-            Φόρτωση χρονοδιαγράμματος…
+            Δεν υπάρχει χρονοδιάγραμμα για αυτή την εκδρομή ακόμα.
           </p>
         )}
       </div>
