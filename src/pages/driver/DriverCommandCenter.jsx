@@ -9,7 +9,6 @@ import MasterQrGate from '../../components/driver/MasterQrGate.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import DailyManifest from '../../components/driver/DailyManifest.jsx';
 import Scanner from '../../components/driver/enterprise/Scanner.jsx';
-import PreTripForm from '../../components/driver/enterprise/PreTripForm.jsx';
 import SOSButton from '../../components/driver/enterprise/SOSButton.jsx';
 import TachographStrip from '../../components/driver/enterprise/TachographStrip.jsx';
 import DaySummary from '../../components/driver/DaySummary.jsx';
@@ -27,11 +26,6 @@ const TABS = [
   { id: 'sos', icon: 'emergency', label: 'SOS', short: 'SOS' },
   { id: 'summary', icon: 'summarize', label: 'Σύνοψη', short: 'Σύν.' },
 ];
-
-function safetyComplete(tripId) {
-  if (!tripId) return false;
-  return !!localStorage.getItem(`safety_done_${tripId}`);
-}
 
 function driverInitials(name) {
   return (name || 'Ο')
@@ -118,18 +112,14 @@ export default function DriverCommandCenter() {
   const tab = params.get('tab') || 'home';
   const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
   const tripId = session?.tripId;
-  const [safetyOk, setSafetyOk] = useState(() => {
-    const s = getDriverSession();
-    return s?.tripId ? safetyComplete(s.tripId) : false;
-  });
 
   const [onBreak, setOnBreak] = useState(false);
   const shift = useDriverShiftSession({
     driverName: session?.driverName || 'Οδηγός',
-    enabled: authenticated && safetyOk,
+    enabled: authenticated,
   });
   const telemetryOnline = shift.online;
-  // Duty clock starts only on GPS «Έναρξη βάρδιας», not on login / pre-trip.
+  // Duty clock starts only on GPS «Έναρξη βάρδιας», not on login.
   const tachograph = useTachograph({
     active: telemetryOnline,
     onBreak,
@@ -241,12 +231,6 @@ export default function DriverCommandCenter() {
   }, [authenticated]);
 
   useEffect(() => {
-    if (authenticated && tripId) {
-      setSafetyOk(safetyComplete(tripId));
-    }
-  }, [authenticated, tripId]);
-
-  useEffect(() => {
     if (tachograph.limitReached && telemetryOnline) {
       toast('Required Rest Stop in 15 minutes', { icon: '⏱️', duration: 8000 });
     }
@@ -260,12 +244,6 @@ export default function DriverCommandCenter() {
     if (tab === 'logs') setParams({ tab: 'home' }, { replace: true });
   }, [tab, setParams]);
 
-  const handlePreTripComplete = () => {
-    setSafetyOk(true);
-    setParams({ tab: 'gps' });
-    toast('Ενεργοποιήστε το GPS για ζωντανή θέση στο χάρτη', { icon: '📍', duration: 5000 });
-  };
-
   const logout = async () => {
     toast.dismiss();
     // Await shift/end (+ office push) while the access token is still present.
@@ -276,7 +254,6 @@ export default function DriverCommandCenter() {
     }
     clearDriverSession();
     setAuthenticated(false);
-    setSafetyOk(false);
     navigate('/driver');
   };
 
@@ -296,21 +273,6 @@ export default function DriverCommandCenter() {
           }, 80);
         }}
       />
-    );
-  } else if (!safetyOk) {
-    body = (
-      <div className="driver-app">
-        <DriverHeader
-          session={session}
-          telemetryOnline={telemetryOnline}
-          onLogout={logout}
-          kicker="Pre-trip"
-          title="Έλεγχος ασφαλείας"
-        />
-        <div className="driver-shell driver-main">
-          <PreTripForm onComplete={handlePreTripComplete} />
-        </div>
-      </div>
     );
   } else {
     body = (
