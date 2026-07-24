@@ -2069,7 +2069,13 @@ export default function BackOffice() {
             )}
             {activeTab === 'fleet_digest' && (
               <div className="pb-stack-lg">
-                <FleetDigestPanel />
+                <FleetDigestPanel
+                  onOpenPayments={() => {
+                    setSettingsSubTab('payments');
+                    setActiveTab('settings');
+                  }}
+                  onOpenCalendar={() => setActiveTab('fleet_calendar')}
+                />
               </div>
             )}
             {activeTab === 'lost_found' && renderLostFound()}
