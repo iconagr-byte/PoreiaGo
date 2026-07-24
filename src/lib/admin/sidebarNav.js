@@ -25,9 +25,6 @@ export const FLEET_OPS_ONLY_IDS = [
   'fleet_digest',
 ];
 
-/** Debug / platform-operator tools — not for normal office admins. */
-export const SUPER_ONLY_MAIN_IDS = ['live_tracking'];
-
 /** Platform SaaS tabs (Tenants, SaaS Infra, Backup, Growth) — superadmin only. */
 export const PLATFORM_NAV_IDS = PLATFORM_OPERATOR_TABS.map((t) => `settings_${t.id}`);
 
@@ -54,9 +51,7 @@ function stripPlatformIds(ids) {
 }
 export function getDefaultNavLayout(isSuperAdmin) {
   return {
-    main: isSuperAdmin
-      ? [...DEFAULT_MAIN_NAV_ORDER.slice(0, 5), 'live_tracking', ...DEFAULT_MAIN_NAV_ORDER.slice(5)]
-      : [...DEFAULT_MAIN_NAV_ORDER],
+    main: [...DEFAULT_MAIN_NAV_ORDER],
     fleet_ops: [...FLEET_OPS_ONLY_IDS],
     platform: isSuperAdmin ? [...PLATFORM_IDS] : [],
     settings: [...OFFICE_SETTINGS_IDS],
@@ -77,15 +72,14 @@ function mergeSectionOrder(saved, defaults) {
 function migrateNavLayout(layout, isSuperAdmin) {
   const defaults = getDefaultNavLayout(isSuperAdmin);
   const fleetOpsSet = new Set(FLEET_OPS_ONLY_IDS);
-  const superOnlyMain = new Set(SUPER_ONLY_MAIN_IDS);
 
   let main = [...(layout.main || [])].filter(
     (id) =>
       id !== 'drivers' &&
       id !== 'email_templates' &&
+      id !== 'live_tracking' &&
       !fleetOpsSet.has(id) &&
-      !PLATFORM_ID_SET.has(id) &&
-      (isSuperAdmin || !superOnlyMain.has(id)),
+      !PLATFORM_ID_SET.has(id),
   );
   // Never keep Growth / Tenants / etc. under office settings for tenant admins.
   let settings = stripPlatformIds([...(layout.settings || [])]).filter((id) =>
@@ -106,10 +100,7 @@ function migrateNavLayout(layout, isSuperAdmin) {
 
   // Re-merge against defaults, then force-dedupe fleet ops out of main again.
   main = mergeSectionOrder(main, defaults.main).filter(
-    (id) =>
-      !fleetOpsSet.has(id) &&
-      !PLATFORM_ID_SET.has(id) &&
-      (isSuperAdmin || !superOnlyMain.has(id)),
+    (id) => id !== 'live_tracking' && !fleetOpsSet.has(id) && !PLATFORM_ID_SET.has(id),
   );
 
   return {
@@ -236,17 +227,6 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'drivers',
     navGroup: 'main',
     accent: 'indigo',
-  },
-  live_tracking: {
-    id: 'live_tracking',
-    label: 'Live GPS (poll)',
-    icon: 'share_location',
-    filled: true,
-    type: 'tab',
-    tab: 'live_tracking',
-    navGroup: 'main',
-    accent: 'cyan',
-    superOnly: true,
   },
   fleet_live_map: {
     id: 'fleet_live_map',
