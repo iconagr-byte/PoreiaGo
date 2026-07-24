@@ -28,6 +28,17 @@ describe('resolveOfficeBrand', () => {
     });
     expect(brand.hasLogo).toBe(true);
     expect(brand.logoUrl).toContain('/api/site/assets/logo');
+    expect(brand.showName).toBe(true);
+    expect(brand.displayName).toBe('Achillio Travel');
+  });
+
+  it('hides name only when logo_show_name is explicitly false', () => {
+    const brand = resolveOfficeBrand({
+      logo_url: '/api/site/assets/logo',
+      footer_brand_name: 'Achillio Travel',
+      logo_show_name: false,
+    });
+    expect(brand.showName).toBe(false);
   });
 });
 

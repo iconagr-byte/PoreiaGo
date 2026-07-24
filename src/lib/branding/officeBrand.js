@@ -48,7 +48,8 @@ export function resolveOfficeBrand(siteAppearance = {}) {
     hasLogo: Boolean(logoUrl),
     heightPx: clampLogoHeight(siteAppearance.logo_height_px),
     maxWidthPx: clampLogoMaxWidth(siteAppearance.logo_max_width_px),
-    showName: Boolean(siteAppearance.logo_show_name) && Boolean(name),
+    // Default ON when a real office name exists — brand must be visible in the header.
+    showName: siteAppearance.logo_show_name !== false && Boolean(name),
   };
 }
 

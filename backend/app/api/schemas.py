@@ -381,7 +381,7 @@ class TenantSiteAppearanceResponse(BaseModel):
     logo_url: str = ""
     logo_height_px: int = 40
     logo_max_width_px: int = 180
-    logo_show_name: bool = False
+    logo_show_name: bool = True
     hero_image_url: str = ""
     hero_badge: str = ""
     hero_title: str = ""

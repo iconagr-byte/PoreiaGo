@@ -121,7 +121,7 @@ function LogoBlock({
   const maxWidth = clampLogoMaxWidth(form.logo_max_width_px);
   const logoStyle = officeLogoImageStyle(form);
   const brandName = (form.footer_brand_name || '').trim();
-  const showName = Boolean(form.logo_show_name);
+  const showName = form.logo_show_name !== false;
 
   const onDropFile = (e) => {
     e.preventDefault();
@@ -303,7 +303,7 @@ function LogoBlock({
             type="button"
             role="switch"
             aria-checked={showName}
-            onClick={() => setForm((p) => ({ ...p, logo_show_name: !p.logo_show_name }))}
+            onClick={() => setForm((p) => ({ ...p, logo_show_name: !(p.logo_show_name !== false) }))}
             className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
               showName ? 'border-slate-900/15 bg-slate-900/[0.03]' : 'border-slate-200 bg-white hover:bg-slate-50'
             }`}
@@ -964,7 +964,7 @@ export default function HomepageSettingsPanel() {
                 logo_url: form.logo_url,
                 logo_height_px: clampLogoHeight(form.logo_height_px),
                 logo_max_width_px: clampLogoMaxWidth(form.logo_max_width_px),
-                logo_show_name: Boolean(form.logo_show_name),
+                logo_show_name: form.logo_show_name !== false,
               },
               'Οι ρυθμίσεις λογοτύπου αποθηκεύτηκαν',
             )}
