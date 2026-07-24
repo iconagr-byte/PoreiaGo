@@ -327,12 +327,14 @@ class HybridTripService(TenantScopedService):
         segments = await self.list_segments(trip_id)
         seats = await self.list_passenger_seats(trip_id)
         luggage = await self.list_luggage(trip_id)
+        meta = await self.get_trip_meta(trip_id)
         return {
             "trip_id": trip_id,
             "flights": [f.to_dict() for f in flights],
             "segments": [s.to_dict() for s in segments],
             "passenger_seats": seats,
             "luggage": luggage,
+            "meta": meta,
             "cost_summary": self.calculate_yield(
                 flights=[f.to_dict() for f in flights],
                 segments=[s.to_dict() for s in segments],
@@ -362,7 +364,7 @@ class HybridTripService(TenantScopedService):
                 {
                     "id": str(r["id"]),
                     "trip_id": r["trip_id"],
-                    "flight_id": str(r["flight_id"]),
+                    "flight_id": str(r["flight_id"]) if r["flight_id"] else None,
                     "booking_id": r["booking_id"],
                     "passenger_name": r["passenger_name"],
                     "ground_seat": r["ground_seat"],
@@ -376,7 +378,17 @@ class HybridTripService(TenantScopedService):
     async def upsert_passenger_seat(self, trip_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         await self.ensure_trip_row(trip_id)
         await self._bind_tenant_rls()
-        sid = UUID(str(payload["id"])) if payload.get("id") else uuid4()
+        try:
+            sid = UUID(str(payload["id"])) if payload.get("id") else uuid4()
+        except (TypeError, ValueError):
+            sid = uuid4()
+        flight_raw = payload.get("flight_id")
+        flight_id = None
+        if flight_raw:
+            try:
+                flight_id = str(UUID(str(flight_raw)))
+            except (TypeError, ValueError):
+                flight_id = None
         await self.session.execute(
             text(
                 """
@@ -402,7 +414,7 @@ class HybridTripService(TenantScopedService):
                 "id": str(sid),
                 "tenant": str(self.tenant_id),
                 "trip": trip_id,
-                "flight_id": str(payload["flight_id"]),
+                "flight_id": flight_id,
                 "booking_id": payload.get("booking_id"),
                 "name": str(payload.get("passenger_name") or "").strip()[:255],
                 "ground": payload.get("ground_seat"),
@@ -413,6 +425,116 @@ class HybridTripService(TenantScopedService):
         )
         seats = await self.list_passenger_seats(trip_id)
         return next(s for s in seats if s["id"] == str(sid))
+
+    async def replace_passenger_seats(self, trip_id: int, seats: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        await self.ensure_trip_row(trip_id)
+        await self._bind_tenant_rls()
+        await self.session.execute(
+            text("DELETE FROM passenger_flight_seats WHERE tenant_id = :tenant AND trip_id = :trip"),
+            {"tenant": str(self.tenant_id), "trip": trip_id},
+        )
+        out: list[dict[str, Any]] = []
+        for raw in seats or []:
+            name = str(raw.get("passenger_name") or "").strip()
+            if not name:
+                continue
+            out.append(await self.upsert_passenger_seat(trip_id, raw))
+        await self._audit("hybrid.seats_replaced", "trip", str(trip_id), metadata={"count": len(out)})
+        return out
+
+    async def replace_luggage(self, trip_id: int, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        await self.ensure_trip_row(trip_id)
+        await self._bind_tenant_rls()
+        await self.session.execute(
+            text("DELETE FROM luggage_checkins WHERE tenant_id = :tenant AND trip_id = :trip"),
+            {"tenant": str(self.tenant_id), "trip": trip_id},
+        )
+        out: list[dict[str, Any]] = []
+        for raw in items or []:
+            name = str(raw.get("passenger_name") or "").strip()
+            if not name:
+                continue
+            out.append(await self.upsert_luggage(trip_id, raw))
+        await self._audit("hybrid.luggage_replaced", "trip", str(trip_id), metadata={"count": len(out)})
+        return out
+
+    async def get_trip_meta(self, trip_id: int) -> dict[str, Any]:
+        await self._bind_tenant_rls()
+        result = await self.session.execute(
+            text(
+                """
+                SELECT rooming_list, passenger_extras, supplier_cost_sheets, crew,
+                       airport_buffers, currency, target_margin_pct, connection_threshold_min
+                FROM hybrid_trip_meta
+                WHERE tenant_id = :tenant AND trip_id = :trip
+                """
+            ),
+            {"tenant": str(self.tenant_id), "trip": trip_id},
+        )
+        row = result.mappings().first()
+        if not row:
+            return {
+                "rooming_list": [],
+                "passenger_extras": [],
+                "supplier_cost_sheets": [],
+                "crew": {},
+                "airport_buffers": {},
+                "currency": "EUR",
+                "target_margin_pct": 25.0,
+                "connection_threshold_min": 90,
+            }
+        return {
+            "rooming_list": row["rooming_list"] or [],
+            "passenger_extras": row["passenger_extras"] or [],
+            "supplier_cost_sheets": row["supplier_cost_sheets"] or [],
+            "crew": row["crew"] or {},
+            "airport_buffers": row["airport_buffers"] or {},
+            "currency": row["currency"] or "EUR",
+            "target_margin_pct": float(row["target_margin_pct"] or 25),
+            "connection_threshold_min": int(row["connection_threshold_min"] or 90),
+        }
+
+    async def upsert_trip_meta(self, trip_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        await self.ensure_trip_row(trip_id)
+        await self._bind_tenant_rls()
+        await self.session.execute(
+            text(
+                """
+                INSERT INTO hybrid_trip_meta (
+                    tenant_id, trip_id, rooming_list, passenger_extras, supplier_cost_sheets,
+                    crew, airport_buffers, currency, target_margin_pct, connection_threshold_min,
+                    updated_at
+                ) VALUES (
+                    :tenant, :trip, CAST(:rooming AS jsonb), CAST(:extras AS jsonb),
+                    CAST(:sheets AS jsonb), CAST(:crew AS jsonb), CAST(:buffers AS jsonb),
+                    :currency, :margin, :threshold, NOW()
+                )
+                ON CONFLICT (tenant_id, trip_id) DO UPDATE SET
+                    rooming_list = EXCLUDED.rooming_list,
+                    passenger_extras = EXCLUDED.passenger_extras,
+                    supplier_cost_sheets = EXCLUDED.supplier_cost_sheets,
+                    crew = EXCLUDED.crew,
+                    airport_buffers = EXCLUDED.airport_buffers,
+                    currency = EXCLUDED.currency,
+                    target_margin_pct = EXCLUDED.target_margin_pct,
+                    connection_threshold_min = EXCLUDED.connection_threshold_min,
+                    updated_at = NOW()
+                """
+            ),
+            {
+                "tenant": str(self.tenant_id),
+                "trip": trip_id,
+                "rooming": json.dumps(payload.get("rooming_list") or []),
+                "extras": json.dumps(payload.get("passenger_extras") or []),
+                "sheets": json.dumps(payload.get("supplier_cost_sheets") or []),
+                "crew": json.dumps(payload.get("crew") or {}),
+                "buffers": json.dumps(payload.get("airport_buffers") or {}),
+                "currency": str(payload.get("currency") or "EUR").upper()[:3],
+                "margin": float(payload.get("target_margin_pct") or 25),
+                "threshold": int(payload.get("connection_threshold_min") or 90),
+            },
+        )
+        return await self.get_trip_meta(trip_id)
 
     # ----------------------------------------------------------------- luggage
     async def list_luggage(self, trip_id: int) -> list[dict[str, Any]]:
@@ -449,7 +571,10 @@ class HybridTripService(TenantScopedService):
     async def upsert_luggage(self, trip_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         await self.ensure_trip_row(trip_id)
         await self._bind_tenant_rls()
-        lid = UUID(str(payload["id"])) if payload.get("id") else uuid4()
+        try:
+            lid = UUID(str(payload["id"])) if payload.get("id") else uuid4()
+        except (TypeError, ValueError):
+            lid = uuid4()
         status = str(payload.get("checkin_status") or "pending").strip().lower()
         checked_at = _parse_dt(payload.get("checked_at"))
         if status in {"checked_in", "boarded"} and not checked_at:

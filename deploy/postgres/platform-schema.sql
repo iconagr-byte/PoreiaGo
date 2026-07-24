@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS passenger_flight_seats (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,
     trip_id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-    flight_id UUID NOT NULL REFERENCES flights(id) ON DELETE CASCADE,
+    flight_id UUID REFERENCES flights(id) ON DELETE CASCADE,
     booking_id VARCHAR(64),
     passenger_name VARCHAR(255) NOT NULL,
     ground_seat VARCHAR(32),
@@ -220,6 +220,22 @@ CREATE TABLE IF NOT EXISTS flight_status_events (
 );
 CREATE INDEX IF NOT EXISTS ix_flight_status_events_flight ON flight_status_events (flight_id, created_at);
 
+CREATE TABLE IF NOT EXISTS hybrid_trip_meta (
+    tenant_id UUID NOT NULL,
+    trip_id INT NOT NULL,
+    rooming_list JSONB NOT NULL DEFAULT '[]'::jsonb,
+    passenger_extras JSONB NOT NULL DEFAULT '[]'::jsonb,
+    supplier_cost_sheets JSONB NOT NULL DEFAULT '[]'::jsonb,
+    crew JSONB NOT NULL DEFAULT '{}'::jsonb,
+    airport_buffers JSONB NOT NULL DEFAULT '{}'::jsonb,
+    currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+    target_margin_pct NUMERIC(6,2) NOT NULL DEFAULT 25,
+    connection_threshold_min INT NOT NULL DEFAULT 90,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (tenant_id, trip_id)
+);
+CREATE INDEX IF NOT EXISTS ix_hybrid_trip_meta_trip ON hybrid_trip_meta (trip_id);
+
 ALTER TABLE flights ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation_flights ON flights;
 CREATE POLICY tenant_isolation_flights ON flights
@@ -243,4 +259,9 @@ CREATE POLICY tenant_isolation_luggage_checkins ON luggage_checkins
 ALTER TABLE flight_status_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation_flight_status_events ON flight_status_events;
 CREATE POLICY tenant_isolation_flight_status_events ON flight_status_events
+    USING (tenant_id::text = current_setting('app.current_tenant', true));
+
+ALTER TABLE hybrid_trip_meta ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_hybrid_trip_meta ON hybrid_trip_meta;
+CREATE POLICY tenant_isolation_hybrid_trip_meta ON hybrid_trip_meta
     USING (tenant_id::text = current_setting('app.current_tenant', true));

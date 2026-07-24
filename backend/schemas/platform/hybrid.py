@@ -82,13 +82,17 @@ class SegmentResponse(BaseModel):
 
 class PassengerSeatUpsertRequest(BaseModel):
     id: UUID | None = None
-    flight_id: UUID
+    flight_id: UUID | None = None
     booking_id: str | None = None
     passenger_name: str = Field(..., min_length=1)
     ground_seat: str | None = None
     flight_seat: str | None = None
     ticket_code: str | None = None
     pnr_code: str | None = None
+
+
+class PassengerSeatsReplaceRequest(BaseModel):
+    seats: list[PassengerSeatUpsertRequest] = Field(default_factory=list)
 
 
 class LuggageUpsertRequest(BaseModel):
@@ -100,6 +104,21 @@ class LuggageUpsertRequest(BaseModel):
     luggage_notes: str | None = None
     checked_by: str | None = None
     checked_at: datetime | None = None
+
+
+class LuggageReplaceRequest(BaseModel):
+    items: list[LuggageUpsertRequest] = Field(default_factory=list)
+
+
+class HybridMetaUpsertRequest(BaseModel):
+    rooming_list: list[dict[str, Any]] = Field(default_factory=list)
+    passenger_extras: list[dict[str, Any]] = Field(default_factory=list)
+    supplier_cost_sheets: list[dict[str, Any]] = Field(default_factory=list)
+    crew: dict[str, Any] = Field(default_factory=dict)
+    airport_buffers: dict[str, Any] = Field(default_factory=dict)
+    currency: str = "EUR"
+    target_margin_pct: float = 25.0
+    connection_threshold_min: int = 90
 
 
 class YieldCalculateRequest(BaseModel):
@@ -117,4 +136,5 @@ class HybridTripResponse(BaseModel):
     segments: list[SegmentResponse] = Field(default_factory=list)
     passenger_seats: list[dict[str, Any]] = Field(default_factory=list)
     luggage: list[dict[str, Any]] = Field(default_factory=list)
+    meta: dict[str, Any] = Field(default_factory=dict)
     cost_summary: dict[str, Any] = Field(default_factory=dict)
