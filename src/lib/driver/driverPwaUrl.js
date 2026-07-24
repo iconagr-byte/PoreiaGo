@@ -14,3 +14,17 @@ export function getDriverPwaStartUrl(tab = 'gps') {
   const qs = tab ? `?tab=${encodeURIComponent(tab)}` : '';
   return `${base}/driver${qs}`;
 }
+
+/**
+ * Deep link for a specific driver account — opens /driver with username prefilled.
+ * Safe to put in a QR / WhatsApp message (does not include the password).
+ */
+export function getDriverLoginUrl({ username, tab } = {}) {
+  const base = getDriverAppOrigin();
+  const params = new URLSearchParams();
+  const user = String(username || '').trim();
+  if (user) params.set('user', user);
+  if (tab) params.set('tab', String(tab));
+  const qs = params.toString();
+  return `${base}/driver${qs ? `?${qs}` : ''}`;
+}

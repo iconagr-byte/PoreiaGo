@@ -6,6 +6,7 @@ import AdminLayout from '../../components/AdminLayout.jsx';
 import { loadTrips } from '../../lib/trips/tripStore.js';
 import { fetchFleetDriver, updateFleetDriver, uploadDriverPhoto } from '../../services/platformApi.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
+import DriverAppQrCard from '../../components/admin/DriverAppQrCard.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 const STATUS_LABELS = {
@@ -91,6 +92,12 @@ export default function DriverDetailPage() {
         setDriver(d);
         setPhotoUrl(d?.photo_url || '');
         setLoading(false);
+        // Deep-link from list QR button.
+        if (typeof window !== 'undefined' && window.location.hash === '#driver-qr') {
+          window.setTimeout(() => {
+            document.getElementById('driver-qr')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 80);
+        }
       }
     })();
     return () => {
@@ -427,6 +434,8 @@ export default function DriverDetailPage() {
             </div>
           </form>
         </section>
+
+        <DriverAppQrCard driver={driver} assignedTrips={assignedTrips} />
 
         {fleetVehicle && (
           <div className="bg-primary/5 border border-primary/10 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
