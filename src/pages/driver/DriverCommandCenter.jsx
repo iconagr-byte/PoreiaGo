@@ -279,38 +279,40 @@ export default function DriverCommandCenter() {
       <div className="driver-app">
         <DriverHeader session={session} telemetryOnline={telemetryOnline} onLogout={logout} />
 
-        <div className="driver-shell">
-          <TachographStrip
-            drivingLabel={tachograph.drivingLabel}
-            limitReached={tachograph.limitReached}
-            progressPct={tachograph.progressPct}
-            isCounting={tachograph.isCounting}
-            onBreak={onBreak}
-          />
+        {tab !== 'chat' ? (
+          <div className="driver-shell">
+            <TachographStrip
+              drivingLabel={tachograph.drivingLabel}
+              limitReached={tachograph.limitReached}
+              progressPct={tachograph.progressPct}
+              isCounting={tachograph.isCounting}
+              onBreak={onBreak}
+            />
 
-          <div className="driver-break-bar">
-            <button
-              type="button"
-              onClick={() => {
-                if (onBreak) {
-                  setOnBreak(false);
-                  tachograph.resetBreak();
-                } else {
-                  setOnBreak(true);
-                }
-              }}
-              className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
-                onBreak
-                  ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
-                  : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
-              }`}
-            >
-              {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
-            </button>
+            <div className="driver-break-bar">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onBreak) {
+                    setOnBreak(false);
+                    tachograph.resetBreak();
+                  } else {
+                    setOnBreak(true);
+                  }
+                }}
+                className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
+                  onBreak
+                    ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
+                    : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
+                }`}
+              >
+                {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        <main className="driver-shell driver-main">
+        <main className={`driver-shell driver-main ${tab === 'chat' ? 'driver-main--chat' : ''}`}>
           {tab === 'home' && (
             <>
               <button
