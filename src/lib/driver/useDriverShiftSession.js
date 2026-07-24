@@ -26,6 +26,7 @@ import {
 import { useIosBackgroundGpsWarning } from './useIosBackgroundGpsWarning.js';
 
 const SHIFT_KEY = 'driver_shift_online';
+const AUTOSTART_GPS_KEY = 'driver_autostart_gps';
 
 function setShiftFlag(online) {
   localStorage.setItem(SHIFT_KEY, online ? '1' : '0');
@@ -34,6 +35,25 @@ function setShiftFlag(online) {
 
 export function isDriverShiftOnline() {
   return localStorage.getItem(SHIFT_KEY) === '1';
+}
+
+/** Call after Master QR / password login so GPS starts without a second tap. */
+export function requestDriverGpsAutostart() {
+  try {
+    sessionStorage.setItem(AUTOSTART_GPS_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+function consumeDriverGpsAutostart() {
+  try {
+    if (sessionStorage.getItem(AUTOSTART_GPS_KEY) !== '1') return false;
+    sessionStorage.removeItem(AUTOSTART_GPS_KEY);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = true } = {}) {
@@ -288,7 +308,13 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       }
     };
 
-    ensureRunning();
+    // After Master QR / password login, start GPS immediately so the office
+    // live map gets a pin without requiring a second «Έναρξη βάρδιας» tap.
+    if (consumeDriverGpsAutostart() && !isDriverShiftOnline()) {
+      void goOnline({ resume: false });
+    } else {
+      ensureRunning();
+    }
     const retryId = window.setInterval(ensureRunning, LIVE_REFRESH_MS);
     const onVisible = () => {
       if (document.visibilityState === 'visible') ensureRunning();

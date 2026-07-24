@@ -85,6 +85,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
   const [pollError, setPollError] = useState('');
   const [lastPollAt, setLastPollAt] = useState(null);
   const wsRef = useRef(null);
+  const lastNonEmptyAtRef = useRef(0);
 
   // HTTP poll is primary in production — Traefik often 404s WebSocket upgrades.
   useEffect(() => {
@@ -96,6 +97,16 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
     const applyRows = (rows, { replace = true } = {}) => {
       if (!Array.isArray(rows)) return;
       setVehicles((prev) => {
+        // Never wipe a fresh pin with an empty poll (worker lag / brief Redis gap).
+        if (replace && rows.length === 0 && Object.keys(prev).length > 0) {
+          const ageMs = Date.now() - (lastNonEmptyAtRef.current || 0);
+          if (ageMs < 45000) {
+            return prev;
+          }
+        }
+        if (rows.length > 0) {
+          lastNonEmptyAtRef.current = Date.now();
+        }
         const map = replace ? {} : { ...prev };
         rows.forEach((row) => {
           const id = vehicleIdFromRow(row);

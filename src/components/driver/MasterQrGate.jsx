@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { exchangeMasterQr, loginDriver } from '../../services/driverPortalApi.js';
+import { requestDriverGpsAutostart } from '../../lib/driver/useDriverShiftSession.js';
 import BusQrScanner from '../BusQrScanner.jsx';
 import '../../styles/driver-app.css';
 
@@ -35,6 +36,7 @@ export default function MasterQrGate({ onAuthenticated }) {
     setLoading(true);
     try {
       const session = await loginDriver(username.trim(), password);
+      requestDriverGpsAutostart();
       onAuthenticated(session);
     } catch (err) {
       setError(err.message || 'Αποτυχία σύνδεσης');
@@ -48,6 +50,7 @@ export default function MasterQrGate({ onAuthenticated }) {
     setLoading(true);
     try {
       const session = await exchangeMasterQr(raw);
+      requestDriverGpsAutostart();
       onAuthenticated(session);
     } catch (err) {
       setError(err.message || 'Αποτυχία σύνδεσης');

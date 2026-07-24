@@ -237,10 +237,17 @@ class LiveFleetService:
         return merged
 
     def vehicle_meta(self, tenant_id: UUID, vehicle_id: str) -> dict:
+        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
         meta = self._vehicles.get(vehicle_id, {})
-        if meta.get("tenant_id") != str(tenant_id):
-            return {}
-        return meta
+        meta_tid = str(meta.get("tenant_id") or "")
+        want = str(tenant_id)
+        if meta_tid == want:
+            return meta
+        # Admin map merges legacy demo-tenant GPS — still return enrichment meta.
+        if meta_tid == DEFAULT_TENANT and want != DEFAULT_TENANT:
+            return meta
+        return {}
 
     async def vehicle_meta_async(self, tenant_id: UUID, vehicle_id: str) -> dict:
         local = self.vehicle_meta(tenant_id, vehicle_id)

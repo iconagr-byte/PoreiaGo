@@ -640,13 +640,23 @@ async def remove_backup(backup_id: str):
 
 
 @router.post("/operations/master-qr", response_model=MasterQrIssueResponse)
-async def issue_master_qr(body: MasterQrIssueRequest):
+async def issue_master_qr(body: MasterQrIssueRequest, request: Request):
     from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
-    from travel_platform.operations.master_qr_bridge import issue_master_qr_hybrid
+    from travel_platform.operations.master_qr_bridge import (
+        issue_master_qr_hybrid,
+        resolve_platform_tenant_id,
+    )
 
-    result = await issue_master_qr_hybrid(body.trip_id, driver_id=body.driver_id)
+    tenant_id = _request_tenant_id(request)
+    if tenant_id == DEMO_TENANT_ID:
+        tenant_id = await resolve_platform_tenant_id()
+    result = await issue_master_qr_hybrid(
+        body.trip_id,
+        driver_id=body.driver_id,
+        tenant_id=tenant_id,
+    )
     try:
-        await sync_trip_passengers_to_ticketing(body.trip_id)
+        await sync_trip_passengers_to_ticketing(body.trip_id, tenant_id=tenant_id)
     except Exception:
         pass
     return MasterQrIssueResponse(
@@ -662,17 +672,27 @@ async def issue_master_qr(body: MasterQrIssueRequest):
 
 
 @router.post("/operations/notify-driver-push", response_model=DriverShiftPushResponse)
-async def notify_driver_shift_push(body: DriverShiftPushRequest):
+async def notify_driver_shift_push(body: DriverShiftPushRequest, request: Request):
     """Έκδοση Master QR + Web Push «Άνοιξε βάρδια» στο κινητό οδηγού."""
     from travel_platform.notifications.driver_push_service import send_driver_shift_invite_push
-    from travel_platform.operations.master_qr_bridge import issue_master_qr_hybrid
+    from travel_platform.operations.master_qr_bridge import (
+        issue_master_qr_hybrid,
+        resolve_platform_tenant_id,
+    )
     from travel_platform.operations.master_qr_normalize import build_driver_auth_url, driver_app_public_base
 
-    result = await issue_master_qr_hybrid(body.trip_id, driver_id=body.driver_id)
+    tenant_id = _request_tenant_id(request)
+    if tenant_id == DEMO_TENANT_ID:
+        tenant_id = await resolve_platform_tenant_id()
+    result = await issue_master_qr_hybrid(
+        body.trip_id,
+        driver_id=body.driver_id,
+        tenant_id=tenant_id,
+    )
     try:
         from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
 
-        await sync_trip_passengers_to_ticketing(body.trip_id, tenant_id=str(result.get("tenant_id") or ""))
+        await sync_trip_passengers_to_ticketing(body.trip_id, tenant_id=str(result.get("tenant_id") or tenant_id))
     except Exception:
         pass
     auth_url = result.get("auth_url") or result.get("qr_content")
@@ -701,19 +721,26 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest):
 
 @router.get("/operations/master-qr/{trip_id}/png")
 async def master_qr_png(
+    request: Request,
     trip_id: int,
     driver_id: str | None = Query(default=None),
     frontend_base: str | None = Query(default=None, description="Override public driver app URL"),
 ):
     """Issue Master QR and return PNG (magic link URL encoded)."""
-    from travel_platform.operations.master_qr_bridge import issue_master_qr_hybrid
+    from travel_platform.operations.master_qr_bridge import (
+        issue_master_qr_hybrid,
+        resolve_platform_tenant_id,
+    )
     from travel_platform.operations.master_qr_image import render_qr_png
     from travel_platform.operations.master_qr_normalize import build_driver_auth_url
 
     if trip_id <= 0:
         raise HTTPException(status_code=400, detail="Invalid trip_id")
 
-    result = await issue_master_qr_hybrid(trip_id, driver_id=driver_id)
+    tenant_id = _request_tenant_id(request)
+    if tenant_id == DEMO_TENANT_ID:
+        tenant_id = await resolve_platform_tenant_id()
+    result = await issue_master_qr_hybrid(trip_id, driver_id=driver_id, tenant_id=tenant_id)
     qr_token = result.get("qr_token")
     auth_url = result.get("auth_url") or result.get("qr_content")
     if frontend_base and qr_token:

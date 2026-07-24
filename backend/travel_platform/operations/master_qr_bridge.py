@@ -135,7 +135,13 @@ async def issue_master_qr_hybrid(
     driver_id: str | None = None,
     tenant_id: str | None = None,
 ) -> dict[str, Any]:
-    tid = tenant_id or default_tenant_id()
+    # Prefer explicit office tenant, else the real SaaS platform tenant (never
+    # silently stick to the legacy …0001 demo UUID when Postgres has achillio).
+    tid = (tenant_id or "").strip() or await resolve_platform_tenant_id()
+    if tid == DEFAULT_TENANT:
+        platform = await resolve_platform_tenant_id()
+        if platform and platform != DEFAULT_TENANT:
+            tid = platform
 
     if await saas_db_available():
         try:
@@ -175,12 +181,16 @@ async def exchange_master_qr_hybrid(qr_raw: str) -> dict[str, Any] | None:
     """
     Exchange Master QR for driver session.
     Postgres first (production tokens), then local JSON store.
+    Always remaps legacy demo tenant onto the live SaaS tenant so GPS lands
+    on the office live map.
     """
     preview = preview_master_qr_payload(qr_raw, verify_exp=True)
     if not preview or preview.get("typ") != "master_qr":
         return None
 
-    tid = str(preview.get("tenant_id") or default_tenant_id())
+    platform_tid = await resolve_platform_tenant_id()
+    raw_tid = str(preview.get("tenant_id") or default_tenant_id())
+    tid = coerce_driver_tenant_id(raw_tid, platform_tenant_id=platform_tid)
 
     if await saas_db_available():
         try:
@@ -188,24 +198,30 @@ async def exchange_master_qr_hybrid(qr_raw: str) -> dict[str, Any] | None:
             from middleware.tenant import apply_tenant_to_session
             from travel_platform.operations.master_qr import MasterQrService
 
-            async with AsyncSessionLocal() as session:
-                uid = UUID(tid)
-                await apply_tenant_to_session(session, uid)
-                svc = MasterQrService(session, uid)
-                result = await svc.exchange_for_driver_session(qr_raw)
-                await session.commit()
-                return {
-                    "access_token": result["access_token"],
-                    "trip_id": int(result["trip_id"]),
-                    "tenant_id": tid,
-                    "driver_id": preview.get("driver_id"),
-                    "expires_at": int(preview.get("exp", 0)),
-                    "source": "postgres",
-                }
+            # Try remapped tenant first, then the tenant embedded in the QR.
+            for attempt_tid in dict.fromkeys([tid, raw_tid]):
+                try:
+                    async with AsyncSessionLocal() as session:
+                        uid = UUID(attempt_tid)
+                        await apply_tenant_to_session(session, uid)
+                        svc = MasterQrService(session, uid)
+                        result = await svc.exchange_for_driver_session(qr_raw)
+                        await session.commit()
+                        return {
+                            "access_token": result["access_token"],
+                            "trip_id": int(result["trip_id"]),
+                            "tenant_id": tid,
+                            "driver_id": preview.get("driver_id") or result.get("driver_id"),
+                            "expires_at": int(preview.get("exp", 0)),
+                            "source": "postgres",
+                        }
+                except Exception:
+                    continue
         except Exception as exc:
             logger.debug("Master QR Postgres exchange failed, trying local: %s", exc)
 
     local = exchange_local(qr_raw)
     if local:
+        local["tenant_id"] = tid
         local["source"] = "local"
     return local
