@@ -57,5 +57,14 @@ class HybridYieldTests(unittest.TestCase):
         self.assertEqual(high["recommended_price_per_person"], 81.0)
 
 
+class HybridNotifyDispatchImportTests(unittest.TestCase):
+    def test_dispatcher_exports_whatsapp_and_delay_alerts(self):
+        from travel_platform.notifications import dispatcher
+
+        self.assertTrue(callable(dispatcher.send_sms))
+        self.assertTrue(callable(dispatcher.send_whatsapp))
+        self.assertTrue(callable(dispatcher.dispatch_delay_alerts))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getTripById, upsertTrip } from '../../lib/trips/tripStore.js';
 import { emptyPassengerSeat } from '../../lib/hybrid/hybridDefaults.js';
+import {
+  enqueueTourLeaderAction,
+  flushTourLeaderOfflineQueue,
+  isBrowserOnline,
+  listTourLeaderOfflineQueue,
+} from '../../lib/hybrid/tourLeaderOffline.js';
 import { listLuggageRemote, upsertLuggageRemote } from '../../services/hybridTripApi.js';
 
 function buildLocalLuggage(trip) {
@@ -19,7 +25,7 @@ function buildLocalLuggage(trip) {
 }
 
 /**
- * Tour leader PWA-style luggage & check-in tracker.
+ * Tour leader PWA-style luggage & check-in tracker (offline-capable).
  */
 export default function TourLeaderLuggagePage() {
   const { tripId } = useParams();
@@ -30,12 +36,25 @@ export default function TourLeaderLuggagePage() {
   const [activeTripId, setActiveTripId] = useState(trip?.id ?? null);
   const [draftName, setDraftName] = useState('');
   const [leaderName, setLeaderName] = useState(() => localStorage.getItem('tour_leader_name') || '');
+  const [online, setOnline] = useState(() => isBrowserOnline());
+  const [pendingCount, setPendingCount] = useState(() => listTourLeaderOfflineQueue(tripId).length);
+  const [syncing, setSyncing] = useState(false);
 
-  // Reset local list when the trip identity changes (render-time adjustment).
   if (trip?.id !== activeTripId) {
     setActiveTripId(trip?.id ?? null);
     setItems(seedItems);
   }
+
+  useEffect(() => {
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   useEffect(() => {
     if (!trip) {
@@ -52,6 +71,25 @@ export default function TourLeaderLuggagePage() {
       cancelled = true;
     };
   }, [trip]);
+
+  useEffect(() => {
+    if (!trip || !online) return undefined;
+    let cancelled = false;
+    (async () => {
+      setSyncing(true);
+      const result = await flushTourLeaderOfflineQueue(trip.id, (payload) =>
+        upsertLuggageRemote(trip.id, payload),
+      );
+      if (!cancelled) {
+        setPendingCount(listTourLeaderOfflineQueue(trip.id).length);
+        if (result.synced) toast.success(`Offline sync: ${result.synced} εγγραφές`);
+      }
+      setSyncing(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [trip, online]);
 
   if (!trip) {
     return (
@@ -70,13 +108,17 @@ export default function TourLeaderLuggagePage() {
     setItems(next);
     upsertTrip({ ...trip, luggageCheckins: next });
     for (const item of next) {
+      const payload = { ...item, checked_by: leaderName || undefined };
+      if (!isBrowserOnline()) {
+        enqueueTourLeaderAction({ tripId: trip.id, type: 'luggage_upsert', payload });
+        setPendingCount(listTourLeaderOfflineQueue(trip.id).length);
+        continue;
+      }
       try {
-        await upsertLuggageRemote(trip.id, {
-          ...item,
-          checked_by: leaderName || undefined,
-        });
+        await upsertLuggageRemote(trip.id, payload);
       } catch {
-        /* local-first */
+        enqueueTourLeaderAction({ tripId: trip.id, type: 'luggage_upsert', payload });
+        setPendingCount(listTourLeaderOfflineQueue(trip.id).length);
       }
     }
   };
@@ -104,6 +146,18 @@ export default function TourLeaderLuggagePage() {
     persist(next);
   };
 
+  const flushNow = async () => {
+    setSyncing(true);
+    const result = await flushTourLeaderOfflineQueue(trip.id, (payload) =>
+      upsertLuggageRemote(trip.id, payload),
+    );
+    setPendingCount(listTourLeaderOfflineQueue(trip.id).length);
+    setSyncing(false);
+    if (result.synced) toast.success(`Συγχρονίστηκαν ${result.synced}`);
+    else if (result.failed) toast.error(`Απέτυχαν ${result.failed}`);
+    else toast('Η ουρά είναι άδεια');
+  };
+
   const checked = items.filter((i) => i.checkin_status === 'checked_in' || i.checkin_status === 'boarded').length;
   const bags = items.reduce((s, i) => s + (Number(i.luggage_count) || 0), 0);
 
@@ -116,19 +170,39 @@ export default function TourLeaderLuggagePage() {
             <h1 className="text-lg font-bold leading-tight">{trip.title}</h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Check-in {checked}/{items.length} · Αποσκευές {bags}
+              {!online ? ' · Offline' : ''}
+              {pendingCount ? ` · Ουρά ${pendingCount}` : ''}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
-          >
-            <span className="material-symbols-outlined">close</span>
-          </button>
+          <div className="flex items-center gap-1">
+            {pendingCount > 0 ? (
+              <button
+                type="button"
+                disabled={syncing || !online}
+                onClick={flushNow}
+                className="px-2 py-1 rounded-lg text-xs font-bold border border-slate-200 disabled:opacity-40"
+              >
+                {syncing ? '…' : 'Sync'}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-4 pb-24">
+        {!online ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+            Λειτουργία offline — οι αλλαγές θα συγχρονιστούν όταν επανέλθει το δίκτυο.
+          </div>
+        ) : null}
+
         <label className="block rounded-2xl border border-slate-200 bg-white p-3">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Όνομα tour leader</span>
           <input

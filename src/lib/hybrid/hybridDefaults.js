@@ -1,4 +1,5 @@
 import { newClientId } from './costYieldCalculator.js';
+import { emptyCrew } from './changeLog.js';
 
 export const SEGMENT_TYPE_OPTIONS = [
   { value: 'hotel_transfer', label: 'Μεταφορά ξενοδοχείου', icon: 'hotel' },
@@ -76,6 +77,10 @@ export function normalizeHybridTripFields(trip) {
     currency: trip.currency || 'EUR',
     targetMarginPct: trip.targetMarginPct ?? 25,
     connectionThresholdMin: trip.connectionThresholdMin ?? 90,
+    airportBuffers:
+      trip.airportBuffers && typeof trip.airportBuffers === 'object' ? trip.airportBuffers : {},
+    crew: { ...emptyCrew(), ...(trip.crew || {}) },
+    hybridChangeLog: Array.isArray(trip.hybridChangeLog) ? trip.hybridChangeLog : [],
     flights,
     segments,
     passengerFlightSeats: Array.isArray(trip.passengerFlightSeats) ? trip.passengerFlightSeats : [],

@@ -639,11 +639,15 @@ class HybridTripService(TenantScopedService):
         trip_id: int | None = None,
         delay_minutes: int = 0,
         channels: list[str] | None = None,
+        recipients: list[dict[str, Any]] | None = None,
+        trip_title: str | None = None,
     ) -> dict[str, Any]:
         """
-        Stub queue for SMS/WhatsApp passenger delay alerts.
-        Persists a flight_status_events row with provider=notify_stub for audit.
+        Queue SMS/WhatsApp/email passenger delay alerts.
+        Uses Twilio when TWILIO_* env vars are set; otherwise logs stubs.
         """
+        from travel_platform.notifications.dispatcher import dispatch_delay_alerts
+
         await self._bind_tenant_rls()
         result = await self.session.execute(
             text(
@@ -664,13 +668,21 @@ class HybridTripService(TenantScopedService):
         if not chans:
             chans = ["sms"]
         event_id = uuid4()
+        dispatch_result = await dispatch_delay_alerts(
+            recipients=recipients or [],
+            flight_number=row["flight_number"],
+            delay_minutes=delay,
+            channels=chans,
+            trip_title=trip_title,
+        )
         payload = {
             "type": "delay_notify",
             "channels": chans,
             "flight_number": row["flight_number"],
             "delay_minutes": delay,
             "trip_id": trip_id or row["trip_id"],
-            "note": "Wire Twilio/WhatsApp Business when credentials are present.",
+            "dispatch": dispatch_result,
+            "provider": "twilio" if os.getenv("TWILIO_ACCOUNT_SID") else "notify_stub",
         }
         await self.session.execute(
             text(
@@ -679,7 +691,7 @@ class HybridTripService(TenantScopedService):
                     id, tenant_id, flight_id, provider, status, delay_minutes,
                     suggested_pickup_adjustment_minutes, raw_payload, created_at
                 ) VALUES (
-                    :id, :tenant, :flight_id, 'notify_stub', :status, :delay,
+                    :id, :tenant, :flight_id, :provider, :status, :delay,
                     :suggested, CAST(:raw AS jsonb), NOW()
                 )
                 """
@@ -688,10 +700,11 @@ class HybridTripService(TenantScopedService):
                 "id": str(event_id),
                 "tenant": str(self.tenant_id),
                 "flight_id": str(flight_id),
+                "provider": payload["provider"],
                 "status": row["status"] or "delayed",
                 "delay": delay,
                 "suggested": delay,
-                "raw": json.dumps(payload),
+                "raw": json.dumps(payload, default=str),
             },
         )
         return {
@@ -701,9 +714,11 @@ class HybridTripService(TenantScopedService):
             "trip_id": trip_id or row["trip_id"],
             "channels": chans,
             "delay_minutes": delay,
+            "dispatch": dispatch_result,
             "message": (
                 f"Queued {', '.join(chans)} delay notice for {row['flight_number']}"
                 + (f" (+{delay} min)." if delay else ".")
+                + (f" Recipients: {dispatch_result.get('sent', 0)}." if recipients else " (no recipients — audit only).")
             ),
         }
 

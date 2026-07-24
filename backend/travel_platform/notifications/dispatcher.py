@@ -1,4 +1,4 @@
-"""Email/SMS dispatch — log file always; optional SMTP when configured."""
+"""Email/SMS/WhatsApp dispatch — log file always; Twilio when configured."""
 
 from __future__ import annotations
 
@@ -7,7 +7,10 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Any
 from pathlib import Path
+
+import httpx
 
 from travel_platform.settings.platform_store import get_platform_config
 
@@ -59,10 +62,104 @@ async def send_email(to: str, subject: str, body_html: str) -> str:
     return f"email-smtp-{to}"
 
 
+def _twilio_creds() -> dict[str, str] | None:
+    sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+    token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+    from_number = os.getenv("TWILIO_FROM_NUMBER", "").strip()
+    if sid and token and from_number:
+        return {"sid": sid, "token": token, "from": from_number}
+    return None
+
+
 async def send_sms(to: str, body: str) -> str:
     ts = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
     cfg = get_platform_config()
     sender = cfg.sms_sender_id or "AEROSTRIDE"
     _append_log(f"[{ts}] SMS from={sender} to={to} body={body[:160]}")
-    logger.info("SMS stub to=%s (wire Twilio via SMS_PROVIDER)", to)
-    return f"sms-log-{to}"
+
+    creds = _twilio_creds()
+    if not creds:
+        logger.info("SMS stub to=%s (set TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM_NUMBER)", to)
+        return f"sms-log-{to}"
+
+    url = f"https://api.twilio.com/2010-04-01/Accounts/{creds['sid']}/Messages.json"
+    data = {"To": to, "From": creds["from"], "Body": body}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(url, data=data, auth=(creds["sid"], creds["token"]))
+        resp.raise_for_status()
+        payload = resp.json()
+    sid = payload.get("sid") or "ok"
+    _append_log(f"[{ts}] SMS-TWILIO to={to} sid={sid}")
+    return f"sms-twilio-{sid}"
+
+
+async def send_whatsapp(to: str, body: str) -> str:
+    """WhatsApp via Twilio WhatsApp sender (whatsapp:+E164)."""
+    ts = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
+    _append_log(f"[{ts}] WHATSAPP to={to} body={body[:160]}")
+
+    creds = _twilio_creds()
+    wa_from = os.getenv("TWILIO_WHATSAPP_FROM", "").strip() or (
+        f"whatsapp:{creds['from']}" if creds else ""
+    )
+    if not creds or not wa_from:
+        logger.info("WhatsApp stub to=%s (set TWILIO_* + TWILIO_WHATSAPP_FROM)", to)
+        return f"whatsapp-log-{to}"
+
+    to_addr = to if to.startswith("whatsapp:") else f"whatsapp:{to}"
+    url = f"https://api.twilio.com/2010-04-01/Accounts/{creds['sid']}/Messages.json"
+    data = {"To": to_addr, "From": wa_from, "Body": body}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(url, data=data, auth=(creds["sid"], creds["token"]))
+        resp.raise_for_status()
+        payload = resp.json()
+    sid = payload.get("sid") or "ok"
+    _append_log(f"[{ts}] WHATSAPP-TWILIO to={to} sid={sid}")
+    return f"whatsapp-twilio-{sid}"
+
+
+async def dispatch_delay_alerts(
+    *,
+    recipients: list[dict[str, Any]],
+    flight_number: str,
+    delay_minutes: int,
+    channels: list[str],
+    trip_title: str | None = None,
+) -> dict[str, Any]:
+    """
+    Send delay alerts to recipients with phone/email.
+    recipient: {phone?, email?, name?}
+    """
+    message = (
+        f"PoreiaGo: η πτήση {flight_number} έχει καθυστέρηση"
+        + (f" +{delay_minutes}′" if delay_minutes else "")
+        + (f" ({trip_title})" if trip_title else "")
+        + ". Ελέγξτε την ενημερωμένη ώρα pickup."
+    )
+    results: list[dict[str, Any]] = []
+    for r in recipients or []:
+        phone = str(r.get("phone") or "").strip()
+        email = str(r.get("email") or "").strip()
+        name = str(r.get("name") or "").strip()
+        entry: dict[str, Any] = {"name": name, "channels": {}}
+        if "sms" in channels and phone:
+            try:
+                entry["channels"]["sms"] = await send_sms(phone, message)
+            except Exception as exc:  # noqa: BLE001
+                entry["channels"]["sms"] = f"error:{exc}"
+        if "whatsapp" in channels and phone:
+            try:
+                entry["channels"]["whatsapp"] = await send_whatsapp(phone, message)
+            except Exception as exc:  # noqa: BLE001
+                entry["channels"]["whatsapp"] = f"error:{exc}"
+        if "email" in channels and email:
+            try:
+                entry["channels"]["email"] = await send_email(
+                    email,
+                    f"Καθυστέρηση πτήσης {flight_number}",
+                    f"<p>{message}</p>",
+                )
+            except Exception as exc:  # noqa: BLE001
+                entry["channels"]["email"] = f"error:{exc}"
+        results.append(entry)
+    return {"sent": len(results), "results": results, "message": message}
