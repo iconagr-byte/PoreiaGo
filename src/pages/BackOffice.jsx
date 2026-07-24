@@ -851,7 +851,29 @@ export default function BackOffice() {
                 <div>
                   <h2 className="font-headline-lg font-bold text-slate-900 tracking-tight">{customerName}</h2>
                   <p className="text-slate-600">{customer.email}</p>
+                  {customer.phone ? <p className="text-sm text-slate-500 mt-0.5">{customer.phone}</p> : null}
+                  {customer.company ? (
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      {customer.company}
+                      {customer.afm ? ` · ΑΦΜ ${customer.afm}` : ''}
+                    </p>
+                  ) : null}
                   <p className="text-sm text-slate-400 font-mono mt-1">{customer.id}</p>
+                  {Array.isArray(customer.tags) && customer.tags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {customer.tags.map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full bg-white/80 border border-sky-100 px-2 py-0.5 text-[10px] font-bold text-slate-600"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {customer.notes ? (
+                    <p className="text-xs text-slate-500 mt-2 max-w-md leading-relaxed">{customer.notes}</p>
+                  ) : null}
                 </div>
               </div>
               <span
@@ -1006,13 +1028,23 @@ export default function BackOffice() {
                       {(customer.name || '?').substring(0, 2).toUpperCase()}
                     </div>
                     {customer.name}
+                    {customer.tier === 'VIP' && (
+                      <span className="ml-2 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-100 text-violet-800">
+                        VIP
+                      </span>
+                    )}
+                    {customer.company ? (
+                      <span className="block text-xs font-normal text-slate-400 truncate max-w-[220px]">
+                        {customer.company}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface-variant">
                     {customer.email}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      customer.tier === 'Platinum' ? 'bg-slate-800 text-slate-200' :
+                      customer.tier === 'Platinum' || customer.tier === 'VIP' ? 'bg-slate-800 text-slate-200' :
                       customer.tier === 'Gold' ? 'bg-amber-100 text-amber-700' :
                       'bg-gray-100 text-gray-600'
                     }`}>
