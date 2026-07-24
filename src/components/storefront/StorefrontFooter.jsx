@@ -73,7 +73,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
 
   if (templateId === 'minimal_center') {
     return (
-      <footer className="bg-surface-container-lowest py-16 border-t border-surface-container text-center">
+      <footer id="contact" className="scroll-mt-24 bg-surface-container-lowest py-16 border-t border-surface-container text-center">
         <div className="max-w-container-max mx-auto px-margin-desktop flex flex-col items-center">
           <FooterBrandBlock siteAppearance={siteAppearance} />
           <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-secondary">{links}</div>
@@ -84,7 +84,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
 
   if (templateId === 'dark_band') {
     return (
-      <footer className="bg-slate-950 text-white py-16">
+      <footer id="contact" className="scroll-mt-24 bg-slate-950 text-white py-16">
         <div className="max-w-container-max mx-auto px-margin-desktop grid md:grid-cols-2 gap-10">
           <div>
             <FooterBrandBlock siteAppearance={siteAppearance} tone="dark" />
@@ -98,7 +98,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
 
   if (templateId === 'split_contact') {
     return (
-      <footer className="bg-white border-t border-black/[0.06] py-14">
+      <footer id="contact" className="scroll-mt-24 bg-white border-t border-black/[0.06] py-14">
         <div className="max-w-container-max mx-auto px-margin-desktop grid md:grid-cols-3 gap-10">
           <FooterBrandBlock siteAppearance={siteAppearance} />
           <div className="space-y-3 text-sm text-on-surface-variant">
@@ -116,7 +116,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
 
   if (templateId === 'newsletter_cta') {
     return (
-      <footer className="bg-gradient-to-b from-surface-container-lowest to-slate-100 border-t py-16">
+      <footer id="contact" className="scroll-mt-24 bg-gradient-to-b from-surface-container-lowest to-slate-100 border-t py-16">
         <div className="max-w-container-max mx-auto px-margin-desktop">
           <div className="rounded-3xl bg-slate-900 text-white p-8 md:p-10 mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -150,7 +150,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
     const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
     const logoStyle = officeLogoImageStyle(siteAppearance);
     return (
-      <footer className="bg-surface-container-low py-6 border-t">
+      <footer id="contact" className="scroll-mt-24 bg-surface-container-low py-6 border-t">
         <div className="max-w-container-max mx-auto px-margin-desktop flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-sm text-secondary">
           <div className="flex items-center gap-3 min-w-0">
             {logoSrc ? (
@@ -168,7 +168,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
 
   // classic_columns
   return (
-    <footer className="bg-surface-container-lowest py-stack-lg border-t border-surface-container">
+    <footer id="contact" className="scroll-mt-24 bg-surface-container-lowest py-stack-lg border-t border-surface-container">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-gutter px-margin-desktop max-w-container-max mx-auto">
         <div className="col-span-1">
           <FooterBrandBlock siteAppearance={siteAppearance} />
