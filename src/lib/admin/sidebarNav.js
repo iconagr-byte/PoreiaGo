@@ -6,7 +6,7 @@ import {
 } from './settingsTabs.js';
 import { settingsTabToNavItem } from './settingsSidebar.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v6';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v7';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
@@ -14,7 +14,6 @@ export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 /** Ids that belong only under «Λειτουργίες Στόλου» — never also in main. */
 export const FLEET_OPS_ONLY_IDS = [
   'fleet_kpis',
-  'fleet_live_map',
   'fleet_active_drivers',
   'driver_chat',
   'fleet_route_playback',
@@ -30,6 +29,7 @@ export const PLATFORM_NAV_IDS = PLATFORM_OPERATOR_TABS.map((t) => `settings_${t.
 
 export const DEFAULT_MAIN_NAV_ORDER = [
   'dashboard',
+  'fleet_live_map',
   'routes',
   'customers',
   'fleet',
@@ -103,11 +103,16 @@ function migrateNavLayout(layout, isSuperAdmin) {
     (id) => id !== 'live_tracking' && !fleetOpsSet.has(id) && !PLATFORM_ID_SET.has(id),
   );
 
+  // Ζωντανός Χάρτης: πάντα αμέσως κάτω από Dashboard στο κύριο μενού.
+  main = main.filter((id) => id !== 'fleet_live_map');
+  const dashIdx = main.indexOf('dashboard');
+  main.splice(dashIdx >= 0 ? dashIdx + 1 : 0, 0, 'fleet_live_map');
+
   return {
     main,
     fleet_ops: stripPlatformIds(
       mergeSectionOrder(layout.fleet_ops || defaults.fleet_ops || [], defaults.fleet_ops || []),
-    ),
+    ).filter((id) => id !== 'fleet_live_map'),
     platform: isSuperAdmin
       ? mergeSectionOrder(layout.platform || [], defaults.platform)
       : [],
@@ -138,9 +143,12 @@ function splitLegacyFlatOrder(flat, isSuperAdmin) {
 export function loadNavLayout(isSuperAdmin) {
   const defaults = getDefaultNavLayout(isSuperAdmin);
   const storageKey = layoutStorageKey(isSuperAdmin);
+  const legacyV6Key = isSuperAdmin
+    ? 'aerostride_admin_nav_layout_v6_super'
+    : 'aerostride_admin_nav_layout_v6';
 
   try {
-    const raw = localStorage.getItem(storageKey);
+    const raw = localStorage.getItem(storageKey) || localStorage.getItem(legacyV6Key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.main)) {
@@ -235,7 +243,7 @@ export const ADMIN_NAV_ITEMS = {
     filled: true,
     type: 'tab',
     tab: 'fleet_live_map',
-    navGroup: 'fleet_ops',
+    navGroup: 'main',
     accent: 'cyan',
   },
   fleet_kpis: {
