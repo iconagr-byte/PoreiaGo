@@ -4,7 +4,12 @@ import toast from 'react-hot-toast';
 import { mockFleet } from '../../data/mockData.js';
 import AdminLayout from '../../components/AdminLayout.jsx';
 import { loadTrips } from '../../lib/trips/tripStore.js';
-import { fetchFleetDriver, updateFleetDriver, uploadDriverPhoto } from '../../services/platformApi.js';
+import {
+  fetchDriverHistory,
+  fetchFleetDriver,
+  updateFleetDriver,
+  uploadDriverPhoto,
+} from '../../services/platformApi.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
@@ -22,6 +27,13 @@ const STATUS_STYLES = {
   suspended: 'bg-rose-50 text-rose-700 border-rose-100',
 };
 
+const HISTORY_TABS = [
+  { id: 'timeline', label: 'Χρονολόγιο', icon: 'history' },
+  { id: 'logins', label: 'Συνδέσεις', icon: 'login' },
+  { id: 'shifts', label: 'Βάρδιες', icon: 'schedule' },
+  { id: 'km', label: 'Χιλιόμετρα', icon: 'straighten' },
+];
+
 function safetyRingColor(score) {
   if (score >= 90) return 'text-emerald-500';
   if (score >= 75) return 'text-amber-500';
@@ -38,6 +50,61 @@ function formatDate(value) {
     });
   } catch {
     return value;
+  }
+}
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  try {
+    return new Date(value).toLocaleString('el-GR', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  } catch {
+    return value;
+  }
+}
+
+function formatDuration(min) {
+  if (min == null || Number.isNaN(Number(min))) return '—';
+  const m = Math.max(0, Math.round(Number(min)));
+  if (m < 60) return `${m} λεπτά`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem ? `${h} ώρ. ${rem} λεπ.` : `${h} ώρ.`;
+}
+
+function loginMethodLabel(method, kind) {
+  if (kind === 'login_master_qr' || method === 'master_qr') return 'Master QR';
+  return 'Κωδικός';
+}
+
+function timelineLabel(item) {
+  switch (item?.kind) {
+    case 'login':
+      return 'Σύνδεση με κωδικό';
+    case 'login_master_qr':
+      return 'Σύνδεση με Master QR';
+    case 'shift_start':
+      return 'Έναρξη βάρδιας';
+    case 'shift_end':
+      return 'Τέλος βάρδιας';
+    default:
+      return item?.kind || 'Συμβάν';
+  }
+}
+
+function timelineIcon(kind) {
+  switch (kind) {
+    case 'login':
+    case 'login_master_qr':
+      return 'login';
+    case 'shift_start':
+      return 'play_circle';
+    case 'shift_end':
+      return 'stop_circle';
+    default:
+      return 'history';
   }
 }
 
@@ -69,6 +136,9 @@ export default function DriverDetailPage() {
   const [appPasswordConfirm, setAppPasswordConfirm] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
   const [savingAccount, setSavingAccount] = useState(false);
+  const [history, setHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyTab, setHistoryTab] = useState('timeline');
 
   const reloadDriver = async () => {
     const d = await fetchFleetDriver(driverId);
@@ -86,11 +156,17 @@ export default function DriverDetailPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const d = await fetchFleetDriver(driverId);
+      setHistoryLoading(true);
+      const [d, h] = await Promise.all([
+        fetchFleetDriver(driverId),
+        fetchDriverHistory(driverId).catch(() => null),
+      ]);
       if (!cancelled) {
         setDriver(d);
         setPhotoUrl(d?.photo_url || '');
+        setHistory(h);
         setLoading(false);
+        setHistoryLoading(false);
       }
     })();
     return () => {
@@ -207,6 +283,9 @@ export default function DriverDetailPage() {
   const safety = driver.safety_score ?? 100;
   const licenseDays = driver.days_until_license_expiry;
   const licenseUrgent = licenseDays != null && licenseDays < 30;
+  const summary = history?.summary || {};
+  const displayKm =
+    summary.display_total_km ?? summary.gps_total_km ?? driver.total_km ?? 0;
 
   return (
     <AdminLayout activeTab="settings" title={header}>
@@ -278,13 +357,13 @@ export default function DriverDetailPage() {
                     Εκδρομές
                   </div>
                   <div className="text-xl font-bold text-on-surface">
-                    {driver.trips_completed?.toLocaleString('el-GR') ?? 0}
+                    {(summary.trips_completed ?? driver.trips_completed)?.toLocaleString('el-GR') ?? 0}
                   </div>
                 </div>
                 <div className="bg-surface-container-low rounded-2xl p-4 text-center md:text-left">
                   <div className="text-xs text-on-surface-variant font-bold uppercase mb-1">Km</div>
                   <div className="text-xl font-bold text-on-surface">
-                    {Number(driver.total_km || 0).toLocaleString('el-GR')}
+                    {Number(displayKm || 0).toLocaleString('el-GR')}
                   </div>
                 </div>
                 <div className="bg-surface-container-low rounded-2xl p-4 text-center md:text-left">
@@ -340,6 +419,221 @@ export default function DriverDetailPage() {
             sub={driver.vehicle_code && driver.vehicle_code !== driver.license_plate ? driver.vehicle_code : undefined}
           />
         </div>
+
+        <section className="bg-surface-container-lowest rounded-[28px] border border-black/[0.05] shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-lg flex items-center gap-2 text-on-surface">
+                <span className="material-symbols-outlined text-primary">history</span>
+                Πλήρες ιστορικό
+              </h3>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Συνδέσεις, βάρδιες και χιλιόμετρα από GPS / εφαρμογή
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs font-bold">
+              <span className="px-3 py-1 rounded-full bg-surface-container-low text-on-surface-variant">
+                {summary.login_count ?? 0} συνδέσεις
+              </span>
+              <span className="px-3 py-1 rounded-full bg-surface-container-low text-on-surface-variant">
+                {summary.shift_count ?? 0} βάρδιες
+              </span>
+              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary">
+                {Number(displayKm || 0).toLocaleString('el-GR')} km
+              </span>
+            </div>
+          </div>
+
+          <div className="px-4 pt-4 flex flex-wrap gap-2 border-b border-black/[0.04]">
+            {HISTORY_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setHistoryTab(tab.id)}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+                  historyTab === tab.id
+                    ? 'bg-primary text-white'
+                    : 'text-on-surface-variant hover:bg-surface-container-low'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {historyLoading ? (
+            <p className="text-sm text-on-surface-variant text-center py-12">Φόρτωση ιστορικού…</p>
+          ) : !history ? (
+            <p className="text-sm text-on-surface-variant text-center py-12">
+              Δεν ήταν δυνατή η φόρτωση του ιστορικού.
+            </p>
+          ) : (
+            <>
+              {historyTab === 'timeline' && (
+                <ul className="divide-y divide-black/[0.05]">
+                  {(history.timeline || []).length === 0 ? (
+                    <li className="text-sm text-on-surface-variant text-center py-12">
+                      Δεν υπάρχουν ακόμα καταγραφές. Θα εμφανιστούν μετά από συνδέσεις και βάρδιες.
+                    </li>
+                  ) : (
+                    (history.timeline || []).map((item) => (
+                      <li key={item.id || `${item.kind}-${item.at}`} className="px-6 py-4 flex gap-3">
+                        <span className="material-symbols-outlined text-primary text-[22px] mt-0.5">
+                          {timelineIcon(item.kind)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-on-surface">{timelineLabel(item)}</div>
+                          <div className="text-xs text-on-surface-variant mt-0.5">
+                            {formatDateTime(item.at)}
+                            {item.trip_id != null ? ` · Δρομολόγιο #${item.trip_id}` : ''}
+                            {item.km != null
+                              ? ` · ${Number(item.km).toLocaleString('el-GR')} km`
+                              : ''}
+                            {item.duration_min != null
+                              ? ` · ${formatDuration(item.duration_min)}`
+                              : ''}
+                          </div>
+                        </div>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+
+              {historyTab === 'logins' && (
+                <ul className="divide-y divide-black/[0.05]">
+                  {(history.logins || []).length === 0 ? (
+                    <li className="text-sm text-on-surface-variant text-center py-12">
+                      Καμία καταγεγραμμένη σύνδεση ακόμα.
+                    </li>
+                  ) : (
+                    (history.logins || []).map((row) => (
+                      <li
+                        key={row.id}
+                        className="px-6 py-4 flex flex-wrap items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="font-bold text-on-surface">
+                            {loginMethodLabel(row.method, row.type)}
+                          </div>
+                          <div className="text-xs text-on-surface-variant mt-0.5">
+                            {formatDateTime(row.at)}
+                            {row.trip_id != null ? ` · Δρομολόγιο #${row.trip_id}` : ''}
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-sky-50 text-sky-800">
+                          Login
+                        </span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+
+              {historyTab === 'shifts' && (
+                <ul className="divide-y divide-black/[0.05]">
+                  {(history.shifts || []).length === 0 ? (
+                    <li className="text-sm text-on-surface-variant text-center py-12">
+                      Καμία καταγεγραμμένη βάρδια ακόμα.
+                    </li>
+                  ) : (
+                    (history.shifts || []).map((row) => (
+                      <li
+                        key={row.shift_id}
+                        className="px-6 py-4 flex flex-wrap items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="font-bold text-on-surface">
+                            {row.status === 'open' ? 'Βάρδια σε εξέλιξη' : 'Ολοκληρωμένη βάρδια'}
+                          </div>
+                          <div className="text-xs text-on-surface-variant mt-0.5">
+                            Έναρξη: {formatDateTime(row.started_at)}
+                            {row.ended_at ? ` · Τέλος: ${formatDateTime(row.ended_at)}` : ''}
+                            {row.trip_id != null ? ` · Δρομολόγιο #${row.trip_id}` : ''}
+                          </div>
+                          <div className="text-xs text-on-surface-variant mt-1">
+                            Διάρκεια: {formatDuration(row.duration_min)}
+                            {row.km != null
+                              ? ` · ${Number(row.km).toLocaleString('el-GR')} km`
+                              : ''}
+                          </div>
+                        </div>
+                        <span
+                          className={`text-xs font-bold px-3 py-1 rounded-full ${
+                            row.status === 'open'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-surface-container-low text-on-surface-variant'
+                          }`}
+                        >
+                          {row.status === 'open' ? 'Ανοιχτή' : 'Κλειστή'}
+                        </span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+
+              {historyTab === 'km' && (
+                <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-6 py-5 border-b border-black/[0.04]">
+                    <div className="rounded-2xl bg-surface-container-low p-4">
+                      <div className="text-[11px] font-bold uppercase text-on-surface-variant">
+                        Σύνολο (εμφάνιση)
+                      </div>
+                      <div className="text-xl font-bold text-on-surface mt-1">
+                        {Number(displayKm || 0).toLocaleString('el-GR')} km
+                      </div>
+                    </div>
+                    <div className="rounded-2xl bg-surface-container-low p-4">
+                      <div className="text-[11px] font-bold uppercase text-on-surface-variant">
+                        Από GPS
+                      </div>
+                      <div className="text-xl font-bold text-on-surface mt-1">
+                        {Number(summary.gps_total_km || 0).toLocaleString('el-GR')} km
+                      </div>
+                    </div>
+                    <div className="rounded-2xl bg-surface-container-low p-4">
+                      <div className="text-[11px] font-bold uppercase text-on-surface-variant">
+                        Από βάρδιες
+                      </div>
+                      <div className="text-xl font-bold text-on-surface mt-1">
+                        {Number(summary.shift_km_total || 0).toLocaleString('el-GR')} km
+                      </div>
+                    </div>
+                  </div>
+                  <ul className="divide-y divide-black/[0.05]">
+                    {(history.km_by_trip || []).length === 0 ? (
+                      <li className="text-sm text-on-surface-variant text-center py-12">
+                        Δεν υπάρχουν ακόμη GPS διαδρομές για αυτόν τον οδηγό.
+                      </li>
+                    ) : (
+                      (history.km_by_trip || []).map((row) => (
+                        <li
+                          key={`${row.trip_id}-${row.first_at}`}
+                          className="px-6 py-4 flex flex-wrap items-center justify-between gap-3"
+                        >
+                          <div>
+                            <div className="font-bold text-on-surface">
+                              Δρομολόγιο #{row.trip_id}
+                            </div>
+                            <div className="text-xs text-on-surface-variant mt-0.5">
+                              {formatDateTime(row.first_at)} → {formatDateTime(row.last_at)}
+                              {row.point_count ? ` · ${row.point_count} σημεία` : ''}
+                            </div>
+                          </div>
+                          <div className="text-sm font-bold text-primary">
+                            {Number(row.distance_km || 0).toLocaleString('el-GR')} km
+                          </div>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </section>
 
         <section className="bg-surface-container-lowest rounded-[28px] border border-black/[0.05] shadow-sm overflow-hidden">
           <div className="px-6 py-5 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">

@@ -197,6 +197,17 @@ async def login_with_password(body: DriverLoginBody):
     # Must match the SaaS tenant the admin live map filters by (not the local demo UUID).
     tenant_id = await resolve_platform_tenant_id()
     trip_id = _resolve_trip_for_driver(driver.id, tenant_id)
+    try:
+        from travel_platform.settings.driver_activity_store import record_driver_login
+
+        record_driver_login(
+            driver_id=driver.id,
+            tenant_id=tenant_id,
+            trip_id=trip_id,
+            method="password",
+        )
+    except Exception:
+        pass
     return _issue_driver_session(
         driver_id=driver.id,
         tenant_id=tenant_id,
@@ -214,6 +225,18 @@ async def exchange_master_qr(body: MasterQrExchangeBody):
         trip_id = int(hybrid["trip_id"])
         driver_id = hybrid.get("driver_id")
         profile = _profile_fields(driver_id)
+        try:
+            from travel_platform.settings.driver_activity_store import record_driver_login
+
+            if driver_id:
+                record_driver_login(
+                    driver_id=str(driver_id),
+                    tenant_id=str(hybrid.get("tenant_id") or ""),
+                    trip_id=trip_id,
+                    method="master_qr",
+                )
+        except Exception:
+            pass
         return DriverSessionResponse(
             access_token=hybrid["access_token"],
             trip_id=trip_id,
@@ -392,6 +415,20 @@ async def driver_shift_start(session_payload: dict = Depends(require_driver_sess
     )
     was_offline = on_driver_connected(session_payload, connection_id)
 
+    driver_id = str(session_payload.get("sub") or session_payload.get("driver_id") or "")
+    trip_id = session_payload.get("trip_id")
+    try:
+        from travel_platform.settings.driver_activity_store import record_shift_start
+
+        record_shift_start(
+            driver_id=driver_id,
+            tenant_id=tenant_id,
+            trip_id=int(trip_id) if trip_id is not None else None,
+            meta={"reason": "shift_start"},
+        )
+    except Exception:
+        pass
+
     notify_result: dict = {"skipped": True}
     try:
         notify_result = await notify_driver_shift(
@@ -460,6 +497,56 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
         except Exception:
             pass
 
+    shift_km: float | None = None
+    try:
+        from travel_platform.settings.driver_activity_store import get_open_shift, record_shift_end
+        from travel_platform.telemetry.driver_history_service import compute_shift_km
+
+        open_shift = get_open_shift(driver_id)
+        started_at = None
+        if open_shift and open_shift.get("started_at"):
+            try:
+                started_at = datetime.fromisoformat(
+                    str(open_shift["started_at"]).replace("Z", "+00:00"),
+                )
+            except (TypeError, ValueError):
+                started_at = None
+        if started_at and tenant_id and driver_id:
+            try:
+                async with AsyncSessionLocal() as db:
+                    shift_km = await compute_shift_km(
+                        db,
+                        tenant_id=tenant_id,
+                        driver_id=driver_id,
+                        from_time=started_at,
+                    )
+            except Exception:
+                shift_km = None
+        record_shift_end(
+            driver_id=driver_id,
+            tenant_id=tenant_id,
+            trip_id=int(trip_id) if trip_id is not None else None,
+            km=shift_km,
+            meta={"reason": "shift_end"},
+        )
+        if shift_km and shift_km > 0:
+            try:
+                from travel_platform.settings.drivers_store import get_driver, update_driver
+
+                existing = get_driver(driver_id)
+                if existing:
+                    update_driver(
+                        driver_id,
+                        {
+                            "total_km": round(float(existing.total_km or 0) + float(shift_km), 2),
+                            "trips_completed": int(existing.trips_completed or 0) + 1,
+                        },
+                    )
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     notify_result: dict = {"skipped": True}
     try:
         notify_result = await notify_driver_shift(
@@ -474,5 +561,6 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
         "ok": True,
         "was_online": was_online,
         "removed_vehicles": removed,
+        "km": shift_km,
         "notify": notify_result,
     }

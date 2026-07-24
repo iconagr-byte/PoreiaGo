@@ -300,6 +300,15 @@ export async function fetchFleetDriver(driverId) {
   return getMockDrivers().find((d) => d.id === driverId) || null;
 }
 
+/** Full driver history — logins, shifts, km (GPS + activity). */
+export async function fetchDriverHistory(driverId, { limit = 100 } = {}) {
+  const q = limit ? `?limit=${encodeURIComponent(limit)}` : '';
+  const res = await adminFetch(`/api/admin/platform/drivers/${driverId}/history${q}`);
+  if (res.status === 404) return null;
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function createFleetDriver(body) {
   const res = await adminFetch('/api/admin/platform/drivers', {
     method: 'POST',

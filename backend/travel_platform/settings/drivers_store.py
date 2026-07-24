@@ -425,6 +425,10 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         d.salary_per_km = float(patch["salary_per_km"])
     if patch.get("salary_per_trip") is not None:
         d.salary_per_trip = float(patch["salary_per_trip"])
+    if patch.get("total_km") is not None:
+        d.total_km = float(patch["total_km"])
+    if patch.get("trips_completed") is not None:
+        d.trips_completed = int(patch["trips_completed"])
     if patch.get("password"):
         pwd = str(patch["password"])
         if len(pwd) < 4:
