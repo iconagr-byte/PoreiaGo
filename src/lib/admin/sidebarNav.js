@@ -6,12 +6,12 @@ import {
 } from './settingsTabs.js';
 import { settingsTabToNavItem } from './settingsSidebar.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v7';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v8';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 
-/** Ids that belong only under «Λειτουργίες Στόλου» — never also in main. */
+/** Default ids under «Λειτουργίες Στόλου» (users can drag them anywhere). */
 export const FLEET_OPS_ONLY_IDS = [
   'fleet_kpis',
   'fleet_active_drivers',
@@ -45,10 +45,8 @@ export const LEGACY_NAV_IDS = new Set(['settings', 'payments']);
 const PLATFORM_IDS = PLATFORM_NAV_IDS;
 const OFFICE_SETTINGS_IDS = TENANT_SETTINGS_TABS.map((t) => `settings_${t.id}`);
 const PLATFORM_ID_SET = new Set(PLATFORM_IDS);
+const SECTION_KEYS = ['main', 'fleet_ops', 'platform', 'settings'];
 
-function stripPlatformIds(ids) {
-  return (ids || []).filter((id) => !PLATFORM_ID_SET.has(id));
-}
 export function getDefaultNavLayout(isSuperAdmin) {
   return {
     main: [...DEFAULT_MAIN_NAV_ORDER],
@@ -62,62 +60,45 @@ function layoutStorageKey(isSuperAdmin) {
   return isSuperAdmin ? `${NAV_LAYOUT_STORAGE_KEY}_super` : NAV_LAYOUT_STORAGE_KEY;
 }
 
-function mergeSectionOrder(saved, defaults) {
-  const known = new Set(defaults);
-  const valid = saved.filter((id) => known.has(id));
-  const missing = defaults.filter((id) => !valid.includes(id));
-  return [...valid, ...missing];
+function allKnownNavIds(isSuperAdmin) {
+  const defaults = getDefaultNavLayout(isSuperAdmin);
+  return new Set(SECTION_KEYS.flatMap((key) => defaults[key] || []));
 }
 
+/** Preserve free cross-section placement; only drop unknown / forbidden ids. */
 function migrateNavLayout(layout, isSuperAdmin) {
   const defaults = getDefaultNavLayout(isSuperAdmin);
-  const fleetOpsSet = new Set(FLEET_OPS_ONLY_IDS);
+  const known = allKnownNavIds(isSuperAdmin);
+  const next = { main: [], fleet_ops: [], platform: [], settings: [] };
+  const seen = new Set();
 
-  let main = [...(layout.main || [])].filter(
-    (id) =>
-      id !== 'drivers' &&
-      id !== 'email_templates' &&
-      id !== 'live_tracking' &&
-      !fleetOpsSet.has(id) &&
-      !PLATFORM_ID_SET.has(id),
-  );
-  // Never keep Growth / Tenants / etc. under office settings for tenant admins.
-  let settings = stripPlatformIds([...(layout.settings || [])]).filter((id) =>
-    OFFICE_SETTINGS_IDS.includes(id),
-  );
-
-  const fleetIdx = main.indexOf('fleet');
-  const driversInsertAt = fleetIdx >= 0 ? fleetIdx + 1 : main.length;
-  if (!main.includes('drivers')) {
-    main.splice(driversInsertAt, 0, 'drivers');
+  for (const section of SECTION_KEYS) {
+    if (section === 'platform' && !isSuperAdmin) continue;
+    for (const id of layout[section] || []) {
+      if (!id || LEGACY_NAV_IDS.has(id) || id === 'live_tracking') continue;
+      if (!known.has(id)) continue;
+      if (!isSuperAdmin && PLATFORM_ID_SET.has(id)) continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      next[section].push(id);
+    }
   }
 
-  const emailIdx = main.indexOf('email');
-  const templatesInsertAt = emailIdx >= 0 ? emailIdx + 1 : main.length;
-  if (!main.includes('email_templates')) {
-    main.splice(templatesInsertAt, 0, 'email_templates');
+  // Missing defaults land in their home section (first-time / new items only).
+  for (const section of SECTION_KEYS) {
+    if (section === 'platform' && !isSuperAdmin) {
+      next.platform = [];
+      continue;
+    }
+    for (const id of defaults[section] || []) {
+      if (seen.has(id)) continue;
+      if (!isSuperAdmin && PLATFORM_ID_SET.has(id)) continue;
+      seen.add(id);
+      next[section].push(id);
+    }
   }
 
-  // Re-merge against defaults, then force-dedupe fleet ops out of main again.
-  main = mergeSectionOrder(main, defaults.main).filter(
-    (id) => id !== 'live_tracking' && !fleetOpsSet.has(id) && !PLATFORM_ID_SET.has(id),
-  );
-
-  // Ζωντανός Χάρτης: πάντα αμέσως κάτω από Dashboard στο κύριο μενού.
-  main = main.filter((id) => id !== 'fleet_live_map');
-  const dashIdx = main.indexOf('dashboard');
-  main.splice(dashIdx >= 0 ? dashIdx + 1 : 0, 0, 'fleet_live_map');
-
-  return {
-    main,
-    fleet_ops: stripPlatformIds(
-      mergeSectionOrder(layout.fleet_ops || defaults.fleet_ops || [], defaults.fleet_ops || []),
-    ).filter((id) => id !== 'fleet_live_map'),
-    platform: isSuperAdmin
-      ? mergeSectionOrder(layout.platform || [], defaults.platform)
-      : [],
-    settings: mergeSectionOrder(settings, defaults.settings),
-  };
+  return next;
 }
 
 function splitLegacyFlatOrder(flat, isSuperAdmin) {
@@ -125,39 +106,41 @@ function splitLegacyFlatOrder(flat, isSuperAdmin) {
   const main = [];
   const platform = [];
   const settings = [];
+  const fleet_ops = [];
 
   for (const id of flat) {
-    if (LEGACY_NAV_IDS.has(id)) continue;
-    if (layout.main.includes(id) || ADMIN_NAV_ITEMS[id]) main.push(id);
-    else if (PLATFORM_IDS.includes(id)) platform.push(id);
-    else if (OFFICE_SETTINGS_IDS.includes(id)) settings.push(id);
+    if (LEGACY_NAV_IDS.has(id) || id === 'live_tracking') continue;
+    if (PLATFORM_IDS.includes(id)) {
+      if (isSuperAdmin) platform.push(id);
+    } else if (OFFICE_SETTINGS_IDS.includes(id)) settings.push(id);
+    else if (FLEET_OPS_ONLY_IDS.includes(id)) fleet_ops.push(id);
+    else if (layout.main.includes(id) || ADMIN_NAV_ITEMS[id]) main.push(id);
   }
 
-  return {
-    main: mergeSectionOrder(main, layout.main),
-    platform: mergeSectionOrder(platform, layout.platform),
-    settings: mergeSectionOrder(settings, layout.settings),
-  };
+  return migrateNavLayout({ main, fleet_ops, platform, settings }, isSuperAdmin);
 }
 
 export function loadNavLayout(isSuperAdmin) {
   const defaults = getDefaultNavLayout(isSuperAdmin);
   const storageKey = layoutStorageKey(isSuperAdmin);
-  const legacyV6Key = isSuperAdmin
-    ? 'aerostride_admin_nav_layout_v6_super'
-    : 'aerostride_admin_nav_layout_v6';
+  const legacyKeys = [
+    storageKey,
+    isSuperAdmin ? 'aerostride_admin_nav_layout_v7_super' : 'aerostride_admin_nav_layout_v7',
+    isSuperAdmin ? 'aerostride_admin_nav_layout_v6_super' : 'aerostride_admin_nav_layout_v6',
+  ];
 
   try {
-    const raw = localStorage.getItem(storageKey) || localStorage.getItem(legacyV6Key);
-    if (raw) {
+    for (const key of legacyKeys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.main)) {
         return migrateNavLayout(
           {
-            main: mergeSectionOrder(parsed.main, defaults.main),
-            fleet_ops: mergeSectionOrder(parsed.fleet_ops || [], defaults.fleet_ops || []),
-            platform: mergeSectionOrder(parsed.platform || [], defaults.platform),
-            settings: mergeSectionOrder(parsed.settings || [], defaults.settings),
+            main: parsed.main || [],
+            fleet_ops: parsed.fleet_ops || [],
+            platform: parsed.platform || [],
+            settings: parsed.settings || [],
           },
           isSuperAdmin,
         );
@@ -429,6 +412,40 @@ export function reorderNav(order, fromId, toIndex) {
   if (fromIdx < toIdx) toIdx -= 1;
   copy.splice(toIdx, 0, moved);
   return copy;
+}
+
+/** Move a nav item within or across sections. */
+export function moveNavItem(layout, itemId, toSection, toIndex) {
+  if (!SECTION_KEYS.includes(toSection)) return layout;
+
+  const next = {
+    main: [...(layout.main || [])],
+    fleet_ops: [...(layout.fleet_ops || [])],
+    platform: [...(layout.platform || [])],
+    settings: [...(layout.settings || [])],
+  };
+
+  let fromSection = null;
+  let fromIdx = -1;
+  for (const section of SECTION_KEYS) {
+    const idx = next[section].indexOf(itemId);
+    if (idx >= 0) {
+      fromSection = section;
+      fromIdx = idx;
+      break;
+    }
+  }
+  if (fromSection == null) return layout;
+
+  if (fromSection === toSection) {
+    next[toSection] = reorderNav(layout[toSection] || [], itemId, toIndex);
+    return { ...layout, ...next };
+  }
+
+  next[fromSection].splice(fromIdx, 1);
+  const insertAt = Math.max(0, Math.min(toIndex, next[toSection].length));
+  next[toSection].splice(insertAt, 0, itemId);
+  return { ...layout, ...next };
 }
 
 export function updateSectionOrder(layout, section, nextOrder) {
