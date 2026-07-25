@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from typing import Any
 from uuid import UUID
@@ -260,22 +261,28 @@ class TenantBrandingService:
     ) -> dict[str, Any]:
         ingress = self._olympus.get("ingress_cname", "ingress.olympus-saas.com")
         base_domain = self._olympus["base_domain"]
+        ingress_ip = (os.getenv("PLATFORM_INGRESS_IP") or "34.141.98.145").strip()
         notes = [
             f"Το subdomain {subdomain_fqdn} λειτουργεί αυτόματα (wildcard SSL).",
-            "Για δικό σας domain, προσθέστε CNAME στον DNS provider σας.",
-            "Μετά την αποθήκευση, το Traefik ζητά έλεγχο από /api/v1/platform/tls/validate-domain πριν εκδώσει πιστοποιητικό.",
+            "Για δικό σας domain: CNAME το www → www.poreiago.com (ή στον ingress).",
+            f"Για ασφαλές HTTPS χωρίς www: A record στο apex (@) → {ingress_ip}.",
+            "Αν το apex δείχνει ακόμα στο παλιό hosting, ο browser εμφανίζει «Μη ασφαλής σύνδεση».",
+            "Μετά την αποθήκευση, το Traefik εκδίδει Let's Encrypt όταν το DNS δείχνει στο VPS.",
         ]
         if not custom_domain:
             return {
                 "cname_host": custom_domain or "your-domain.example",
                 "cname_target": ingress,
+                "apex_a_record": ingress_ip,
                 "subdomain_cname_host": subdomain_fqdn.split(".")[0],
                 "subdomain_cname_target": base_domain,
                 "notes": notes,
             }
         return {
-            "cname_host": custom_domain,
-            "cname_target": ingress,
+            "cname_host": f"www.{custom_domain}",
+            "cname_target": "www.poreiago.com",
+            "apex_host": custom_domain,
+            "apex_a_record": ingress_ip,
             "alternate_www_host": f"www.{custom_domain}",
             "subdomain_cname_host": subdomain_fqdn,
             "subdomain_cname_target": base_domain,
