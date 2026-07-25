@@ -77,115 +77,291 @@ const RECON_VIEW_OPTIONS = [
 ];
 
 const METHOD_KEYS = [
-  { key: 'card', icon: 'credit_card' },
-  { key: 'paypal', icon: 'account_balance_wallet' },
-  { key: 'apple', icon: 'phone_iphone' },
-  { key: 'bank_transfer', icon: 'account_balance' },
-  { key: 'cash_office', icon: 'storefront' },
-  { key: 'cash_driver', icon: 'directions_bus' },
+  { key: 'card', icon: 'credit_card', hint: 'Κάρτα στο checkout' },
+  { key: 'paypal', icon: 'account_balance_wallet', hint: 'PayPal wallet' },
+  { key: 'apple', icon: 'phone_iphone', hint: 'Apple Pay / Wallet' },
+  { key: 'bank_transfer', icon: 'account_balance', hint: 'IBAN & οδηγίες' },
+  { key: 'cash_office', icon: 'storefront', hint: 'Πληρωμή στο γκισέ' },
+  { key: 'cash_driver', icon: 'directions_bus', hint: 'Είσπραξη από οδηγό' },
 ];
+
+const DEPOSIT_PRESETS = [20, 30, 50];
+
+const NAV_SECTIONS = [
+  { id: 'pay-checkout', label: 'Checkout', icon: 'shopping_cart' },
+  { id: 'pay-banks', label: 'Τράπεζες', icon: 'account_balance' },
+  { id: 'pay-security', label: 'Ασφάλεια', icon: 'shield' },
+  { id: 'pay-pending', label: 'Εκκρεμή', icon: 'hourglass_top' },
+  { id: 'pay-fiscal', label: 'Fiscal', icon: 'receipt_long' },
+];
+
+const SECURITY_TOGGLES = [
+  {
+    key: 'require_amount_on_confirm',
+    label: 'Υποχρεωτικό ποσό κατά την επιβεβαίωση κατάθεσης',
+    hint: 'Ο υπάλληλος πρέπει να καταχωρήσει το ποσό που εμφανίστηκε στον λογαριασμό.',
+  },
+  {
+    key: 'require_reference_on_confirm',
+    label: 'Υποχρεωτική αναφορά / PNR κατά την επιβεβαίωση',
+    hint: 'Μειώνει λάθη αντιστοίχισης καταθέσεων.',
+  },
+  {
+    key: 'validate_iban_checksum',
+    label: 'Έλεγχος εγκυρότητας IBAN (MOD-97)',
+    hint: 'Αποτρέπει αποθήκευση λάθους IBAN.',
+  },
+  {
+    key: 'audit_payment_actions',
+    label: 'Καταγραφή audit log για επιβεβαιώσεις',
+    hint: 'Ιστορικό ποιος επιβεβαίωσε κάθε πληρωμή.',
+  },
+  {
+    key: 'mask_iban_public',
+    label: 'Απόκρυψη πλήρους IBAN στο checkout μέχρι κλικ',
+    hint: 'Εμφανίζει μόνο μέρος του IBAN δημόσια.',
+  },
+  {
+    key: 'notify_customer_on_payment',
+    label: 'Email επιβεβαίωσης στον πελάτη',
+    hint: 'Μερική ή πλήρης πληρωμή.',
+  },
+  {
+    key: 'notify_admin_on_payment',
+    label: 'Email ειδοποίησης στον διαχειριστή',
+    hint: 'Όταν καταχωρείται πληρωμή.',
+  },
+  {
+    key: 'notify_sms_on_fiscal_receipt',
+    label: 'SMS στον πελάτη όταν εκδοθεί MARK',
+    hint: 'myDATA φορολογική απόδειξη.',
+  },
+  {
+    key: 'notify_push_on_fiscal_receipt',
+    label: 'Browser push στον πελάτη (Wallet)',
+    hint: 'Όταν εκδοθεί MARK.',
+  },
+  {
+    key: 'notify_erp_on_fiscal_receipt',
+    label: 'Webhook ERP σε φορολογική απόδειξη',
+    hint: 'Συγχρονισμός με εξωτερικό σύστημα.',
+  },
+  {
+    key: 'notify_admin_on_fiscal_issues',
+    label: 'Email admin για αποτυχίες / stuck fiscal',
+    hint: 'Digest και alerts.',
+  },
+];
+
+const SPAM_TOGGLES = [
+  { key: 'email_spam_filter_enabled', label: 'Ενεργό φίλτρο spam', hint: 'Ελέγχει αποστολή & checkout.' },
+  {
+    key: 'block_disposable_emails',
+    label: 'Αποκλεισμός disposable / temp mail',
+    hint: 'yopmail, mailinator κ.ά.',
+  },
+  {
+    key: 'email_deliverability_headers',
+    label: 'Headers anti-spam',
+    hint: 'Message-ID, Auto-Submitted…',
+  },
+];
+
+const inputClass =
+  'mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
+
+const textareaClass = `${inputClass} resize-y min-h-[88px]`;
+
+function Field({ label, hint, children, className = '' }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="text-sm font-bold text-slate-800">{label}</span>
+      {hint ? <p className="mt-0.5 text-xs text-slate-500 leading-snug">{hint}</p> : null}
+      {children}
+    </label>
+  );
+}
+
+function SectionCard({ id, icon, title, description, children, accent = 'bg-primary', action = null }) {
+  return (
+    <section
+      id={id}
+      className="scroll-mt-28 overflow-hidden rounded-[24px] border border-black/[0.06] bg-white shadow-sm"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/[0.04] bg-gradient-to-r from-slate-50 to-white px-5 py-4 sm:px-6">
+        <div className="flex items-start gap-3 min-w-0">
+          <span
+            className={`mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${accent} text-white shadow-sm`}
+          >
+            <span className="material-symbols-outlined text-[22px]">{icon}</span>
+          </span>
+          <div className="min-w-0">
+            <h3 className="font-bold text-slate-900 text-[17px] leading-tight">{title}</h3>
+            {description ? (
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-2xl">{description}</p>
+            ) : null}
+          </div>
+        </div>
+        {action}
+      </div>
+      <div className="p-5 sm:p-6">{children}</div>
+    </section>
+  );
+}
+
+function ToggleRow({ checked, onChange, title, hint, danger = false }) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-4 rounded-2xl border px-4 py-3.5 transition-colors ${
+        danger && checked
+          ? 'border-amber-300 bg-amber-50'
+          : checked
+            ? 'border-primary/20 bg-primary/[0.04]'
+            : 'border-slate-200 bg-slate-50/80'
+      }`}
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-slate-900">{title}</p>
+        {hint ? <p className="mt-0.5 text-xs text-slate-500 leading-snug">{hint}</p> : null}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+          checked ? (danger ? 'bg-amber-500' : 'bg-primary') : 'bg-slate-300'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+            checked ? 'translate-x-5' : 'translate-x-0'
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+function StatusChip({ icon, label, value, tone = 'slate' }) {
+  const tones = {
+    slate: 'border-slate-200 bg-slate-50 text-slate-700',
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    amber: 'border-amber-200 bg-amber-50 text-amber-900',
+    sky: 'border-sky-200 bg-sky-50 text-sky-800',
+    violet: 'border-violet-200 bg-violet-50 text-violet-800',
+  };
+  return (
+    <div className={`rounded-2xl border px-3.5 py-3 ${tones[tone] || tones.slate}`}>
+      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider opacity-70">
+        <span className="material-symbols-outlined text-[14px]">{icon}</span>
+        {label}
+      </div>
+      <p className="mt-1 truncate text-sm font-bold">{value}</p>
+    </div>
+  );
+}
 
 function BankAccountForm({ form, setForm, onSubmit, onCancel, submitLabel }) {
   return (
-    <form onSubmit={onSubmit} className="rounded-2xl border border-black/[0.08] bg-surface-container-lowest p-4 space-y-3">
-      <div className="grid md:grid-cols-2 gap-3">
-        <label className="block text-sm">
-          <span className="font-bold text-gray-700">Ετικέτα λογαριασμού</span>
+    <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/80 to-white p-4 sm:p-5 space-y-4">
+      <div className="grid md:grid-cols-2 gap-3.5">
+        <Field label="Ετικέτα λογαριασμού" hint="Εμφανίζεται στο checkout">
           <input
-            className="mt-1 w-full rounded-xl border px-3 py-2"
+            className={inputClass}
             value={form.label}
             onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))}
             placeholder="π.χ. Eurobank EUR"
           />
-        </label>
-        <label className="block text-sm">
-          <span className="font-bold text-gray-700">Τράπεζα</span>
+        </Field>
+        <Field label="Τράπεζα">
           <input
             required
-            className="mt-1 w-full rounded-xl border px-3 py-2"
+            className={inputClass}
             value={form.bank_name}
             onChange={(e) => setForm((p) => ({ ...p, bank_name: e.target.value }))}
           />
-        </label>
-        <label className="block text-sm md:col-span-2">
-          <span className="font-bold text-gray-700">Δικαιούχος</span>
+        </Field>
+        <Field label="Δικαιούχος" className="md:col-span-2">
           <input
             required
-            className="mt-1 w-full rounded-xl border px-3 py-2"
+            className={inputClass}
             value={form.beneficiary}
             onChange={(e) => setForm((p) => ({ ...p, beneficiary: e.target.value }))}
           />
-        </label>
-        <label className="block text-sm">
-          <span className="font-bold text-gray-700">IBAN</span>
+        </Field>
+        <Field label="IBAN">
           <input
             required
-            className="mt-1 w-full rounded-xl border px-3 py-2 font-mono"
+            className={`${inputClass} font-mono tracking-wide`}
             value={form.iban}
             onChange={(e) => setForm((p) => ({ ...p, iban: e.target.value }))}
           />
-        </label>
-        <label className="block text-sm">
-          <span className="font-bold text-gray-700">BIC / SWIFT</span>
+        </Field>
+        <Field label="BIC / SWIFT">
           <input
-            className="mt-1 w-full rounded-xl border px-3 py-2 font-mono"
+            className={`${inputClass} font-mono`}
             value={form.bic}
             onChange={(e) => setForm((p) => ({ ...p, bic: e.target.value }))}
           />
-        </label>
-        <label className="block text-sm">
-          <span className="font-bold text-gray-700">Νόμισμα</span>
+        </Field>
+        <Field label="Νόμισμα">
           <input
-            className="mt-1 w-full rounded-xl border px-3 py-2"
+            className={inputClass}
             value={form.currency}
             onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
           />
-        </label>
-        <label className="block text-sm">
-          <span className="font-bold text-gray-700">Αιτιολογία κατάθεσης</span>
+        </Field>
+        <Field label="Αιτιολογία κατάθεσης" hint="π.χ. VOY-{pnr}">
           <input
-            className="mt-1 w-full rounded-xl border px-3 py-2 font-mono text-sm"
+            className={`${inputClass} font-mono text-sm`}
             value={form.reference_template}
             onChange={(e) => setForm((p) => ({ ...p, reference_template: e.target.value }))}
           />
-        </label>
-        <label className="block text-sm md:col-span-2">
-          <span className="font-bold text-gray-700">Οδηγίες πελάτη</span>
+        </Field>
+        <Field label="Οδηγίες πελάτη" className="md:col-span-2" hint="Εμφανίζονται μαζί με τον λογαριασμό">
           <textarea
             rows={2}
-            className="mt-1 w-full rounded-xl border px-3 py-2 text-sm resize-y"
+            className={textareaClass}
             value={form.instructions}
             onChange={(e) => setForm((p) => ({ ...p, instructions: e.target.value }))}
           />
-        </label>
+        </Field>
       </div>
-      <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-        <input
-          type="checkbox"
+      <div className="grid sm:grid-cols-2 gap-3">
+        <ToggleRow
           checked={Boolean(form.enabled)}
-          onChange={(e) => setForm((p) => ({ ...p, enabled: e.target.checked }))}
+          onChange={(v) => setForm((p) => ({ ...p, enabled: v }))}
+          title="Ενεργός στο checkout"
+          hint="Ο πελάτης μπορεί να τον επιλέξει για έμβασμα."
         />
-        Ενεργός στο checkout
-      </label>
-      <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-        <input
-          type="checkbox"
+        <ToggleRow
           checked={Boolean(form.is_default)}
-          onChange={(e) => setForm((p) => ({ ...p, is_default: e.target.checked }))}
+          onChange={(v) => setForm((p) => ({ ...p, is_default: v }))}
+          title="Προεπιλεγμένος λογαριασμός"
+          hint="Εμφανίζεται πρώτος στις οδηγίες κατάθεσης."
         />
-        Προεπιλεγμένος λογαριασμός
-      </label>
-      <div className="flex gap-2 pt-1">
-        <button type="submit" className="px-4 py-2 rounded-full bg-primary text-white text-sm font-bold">
+      </div>
+      <div className="flex flex-wrap gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onSubmit}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-primary text-white text-sm font-bold shadow-sm hover:opacity-90"
+        >
+          <span className="material-symbols-outlined text-[18px]">save</span>
           {submitLabel}
         </button>
         {onCancel && (
-          <button type="button" onClick={onCancel} className="px-4 py-2 rounded-full border text-sm font-bold">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2.5 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          >
             Ακύρωση
           </button>
         )}
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -194,6 +370,9 @@ export default function PaymentManagementPanel() {
   const [settings, setSettings] = useState(normalizePaymentSettings(DEFAULT_PAYMENT_SETTINGS));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [activeNav, setActiveNav] = useState('pay-checkout');
   const [pendingBookings, setPendingBookings] = useState([]);
   const [showAddBank, setShowAddBank] = useState(false);
   const [editBankId, setEditBankId] = useState(null);
@@ -214,6 +393,31 @@ export default function PaymentManagementPanel() {
   const [retryingFiscalId, setRetryingFiscalId] = useState(null);
   const [auditLog, setAuditLog] = useState([]);
   const [auditExporting, setAuditExporting] = useState(false);
+
+  const applySettings = useCallback((data, { markClean = false } = {}) => {
+    const normalized = normalizePaymentSettings(data);
+    setSettings(normalized);
+    if (markClean) {
+      setDirty(false);
+    }
+  }, []);
+
+  /** Refresh bank list from server without wiping unsaved checkout/security edits. */
+  const mergeBankAccountsFromServer = useCallback(async () => {
+    const data = normalizePaymentSettings(await fetchAdminPaymentSettings());
+    setSettings((prev) => ({
+      ...prev,
+      bank_accounts: data.bank_accounts,
+    }));
+  }, []);
+
+  const patchSettings = useCallback((updater) => {
+    setSettings((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return next;
+    });
+    setDirty(true);
+  }, []);
 
   const refreshFiscalPanels = useCallback(async () => {
     try {
@@ -262,7 +466,7 @@ export default function PaymentManagementPanel() {
     setLoading(true);
     try {
       const data = await fetchAdminPaymentSettings();
-      setSettings(data);
+      applySettings(data, { markClean: true });
       await loadPending();
       try {
         setAuditLog(await fetchPaymentAuditLog(30));
@@ -274,11 +478,28 @@ export default function PaymentManagementPanel() {
     } finally {
       setLoading(false);
     }
-  }, [loadPending]);
+  }, [applySettings, loadPending]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const ids = NAV_SECTIONS.map((s) => s.id);
+    const nodes = ids.map((id) => document.getElementById(id)).filter(Boolean);
+    if (!nodes.length) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target?.id) setActiveNav(visible.target.id);
+      },
+      { rootMargin: '-20% 0px -55% 0px', threshold: [0.15, 0.4, 0.7] },
+    );
+    nodes.forEach((n) => observer.observe(n));
+    return () => observer.disconnect();
+  }, [loading]);
 
   const fiscalPipelineBusy = useMemo(() => {
     const reconBusy = (fiscalReconciliation?.in_progress || 0) > 0;
@@ -319,7 +540,7 @@ export default function PaymentManagementPanel() {
   }, [editAccount]);
 
   const saveCoreSettings = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setSaving(true);
     try {
       const data = await updatePaymentSettings({
@@ -328,7 +549,8 @@ export default function PaymentManagementPanel() {
         global_bank_instructions: settings.global_bank_instructions,
         security: settings.security,
       });
-      setSettings(data);
+      applySettings(data, { markClean: true });
+      setLastSavedAt(new Date());
       toast.success('Οι ρυθμίσεις πληρωμών αποθηκεύτηκαν');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');
@@ -337,20 +559,59 @@ export default function PaymentManagementPanel() {
     }
   };
 
+  const discardCoreChanges = async () => {
+    await load();
+    toast.success('Οι αλλαγές απορρίφθηκαν');
+  };
+
+  const enabledMethodsCount = useMemo(
+    () => METHOD_KEYS.filter(({ key }) => settings.methods[key]?.enabled !== false).length,
+    [settings.methods],
+  );
+
+  const enabledBanksCount = useMemo(
+    () => (settings.bank_accounts || []).filter((a) => a.enabled !== false).length,
+    [settings.bank_accounts],
+  );
+
+  const scrollTo = (id) => {
+    setActiveNav(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const setSecurityFlag = (key, value) => {
+    patchSettings((p) => ({
+      ...p,
+      security: {
+        ...(p.security || DEFAULT_PAYMENT_SECURITY),
+        [key]: value,
+      },
+    }));
+  };
+
+  const securityChecked = (key) => {
+    if (key === 'mask_iban_public') return Boolean(settings.security?.mask_iban_public);
+    return settings.security?.[key] !== false;
+  };
+
   const validateBankIban = (iban) => {
     if (settings.security?.validate_iban_checksum === false) return true;
     return validateIbanChecksum(iban);
   };
 
   const onAddBank = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
+    if (!String(bankForm.bank_name || '').trim() || !String(bankForm.beneficiary || '').trim() || !String(bankForm.iban || '').trim()) {
+      toast.error('Συμπληρώστε τράπεζα, δικαιούχο και IBAN');
+      return;
+    }
     if (!validateBankIban(bankForm.iban)) {
       toast.error('Μη έγκυρο IBAN (έλεγχος MOD-97)');
       return;
     }
     try {
       await createBankAccount(bankForm);
-      setSettings(await fetchAdminPaymentSettings());
+      await mergeBankAccountsFromServer();
       setShowAddBank(false);
       setBankForm(emptyBankAccountForm());
       toast.success('Προστέθηκε τραπεζικός λογαριασμός');
@@ -360,15 +621,19 @@ export default function PaymentManagementPanel() {
   };
 
   const onUpdateBank = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (!editBankId) return;
+    if (!String(bankForm.bank_name || '').trim() || !String(bankForm.beneficiary || '').trim() || !String(bankForm.iban || '').trim()) {
+      toast.error('Συμπληρώστε τράπεζα, δικαιούχο και IBAN');
+      return;
+    }
     if (!validateBankIban(bankForm.iban)) {
       toast.error('Μη έγκυρο IBAN (έλεγχος MOD-97)');
       return;
     }
     try {
       await updateBankAccount(editBankId, bankForm);
-      setSettings(await fetchAdminPaymentSettings());
+      await mergeBankAccountsFromServer();
       setEditBankId(null);
       toast.success('Ο λογαριασμός ενημερώθηκε');
     } catch (err) {
@@ -380,7 +645,10 @@ export default function PaymentManagementPanel() {
     if (!window.confirm('Διαγραφή τραπεζικού λογαριασμού;')) return;
     try {
       const data = await deleteBankAccount(accountId);
-      setSettings(data);
+      setSettings((prev) => ({
+        ...prev,
+        bank_accounts: normalizePaymentSettings(data).bank_accounts,
+      }));
       toast.success('Ο λογαριασμός διαγράφηκε');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία διαγραφής');
@@ -390,7 +658,7 @@ export default function PaymentManagementPanel() {
   const onSetDefault = async (accountId) => {
     try {
       await updateBankAccount(accountId, { is_default: true });
-      setSettings(await fetchAdminPaymentSettings());
+      await mergeBankAccountsFromServer();
       toast.success('Ορισμός προεπιλογής');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία');
@@ -541,284 +809,302 @@ export default function PaymentManagementPanel() {
   };
 
   if (loading) {
-    return <p className="text-sm text-gray-500 py-4">Φόρτωση διαχείρισης πληρωμών…</p>;
+    return (
+      <div className="rounded-[24px] border border-black/[0.06] bg-white px-6 py-16 text-center shadow-sm">
+        <span className="material-symbols-outlined animate-spin text-primary text-[28px]">
+          progress_activity
+        </span>
+        <p className="mt-3 text-sm text-slate-500">Φόρτωση διαχείρισης πληρωμών…</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={saveCoreSettings} className="bg-white rounded-[24px] border border-black/[0.06] p-6 shadow-sm space-y-5">
-        <div>
-          <h4 className="font-bold text-gray-900 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">payments</span>
-            Διαχείριση πληρωμών
-          </h4>
-          <p className="text-xs text-gray-500 mt-1">
-            Τρόποι πληρωμής, προκαταβολή, τραπεζικοί λογαριασμοί και εκκρεμείς καταθέσεις.
-          </p>
+    <form onSubmit={saveCoreSettings} className="relative space-y-5 pb-24">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.06] bg-white shadow-sm">
+        <div className="bg-gradient-to-br from-sky-50 via-white to-emerald-50/50 px-5 py-5 sm:px-6 sm:py-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-sky-700/80">
+                Checkout & εισπράξεις
+              </p>
+              <h3 className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                Διαχείριση πληρωμών
+              </h3>
+              <p className="mt-1.5 max-w-xl text-sm text-slate-600">
+                Προκαταβολή, τρόποι πληρωμής, τραπεζικοί λογαριασμοί και επιβεβαίωση καταθέσεων — με ένα αποθήκευση.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={load}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined text-[16px]">refresh</span>
+                Ανανέωση
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !dirty}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[16px]">save</span>
+                {saving ? 'Αποθήκευση…' : 'Αποθήκευση'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+            <StatusChip
+              icon="percent"
+              label="Προκαταβολή"
+              value={settings.deposit.enabled ? `${settings.deposit.percent}%` : 'Ανενεργή'}
+              tone={settings.deposit.enabled ? 'sky' : 'slate'}
+            />
+            <StatusChip
+              icon="payments"
+              label="Ενεργοί τρόποι"
+              value={`${enabledMethodsCount} / ${METHOD_KEYS.length}`}
+              tone="emerald"
+            />
+            <StatusChip
+              icon="account_balance"
+              label="Τράπεζες"
+              value={`${enabledBanksCount} ενεργ${enabledBanksCount === 1 ? 'ή' : 'ές'}`}
+              tone="violet"
+            />
+            <StatusChip
+              icon="hourglass_top"
+              label="Εκκρεμή"
+              value={`${pendingBookings.length + cashDueBookings.length} ανοιχτά`}
+              tone={pendingBookings.length + cashDueBookings.length ? 'amber' : 'slate'}
+            />
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-black/[0.06] p-4 space-y-3">
-            <p className="text-sm font-bold text-gray-900">Προκαταβολή</p>
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-              <input
-                type="checkbox"
-                checked={settings.deposit.enabled}
-                onChange={(e) =>
-                  setSettings((p) => ({ ...p, deposit: { ...p.deposit, enabled: e.target.checked } }))
+        <nav className="flex gap-1.5 overflow-x-auto border-t border-black/[0.04] px-3 py-2.5 sm:px-4">
+          {NAV_SECTIONS.map((item) => {
+            const active = activeNav === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => scrollTo(item.id)}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                  active
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[15px]">{item.icon}</span>
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      <SectionCard
+        id="pay-checkout"
+        icon="shopping_cart"
+        title="Checkout"
+        description="Προκαταβολή και τρόποι πληρωμής που βλέπει ο πελάτης."
+        accent="bg-sky-600"
+      >
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/90 to-white p-4 sm:p-5 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-slate-900">Προκαταβολή</p>
+                <p className="mt-0.5 text-xs text-slate-500">Ποσοστό που ζητείται στο checkout.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.deposit.enabled}
+                onClick={() =>
+                  patchSettings((p) => ({
+                    ...p,
+                    deposit: { ...p.deposit, enabled: !p.deposit.enabled },
+                  }))
                 }
-              />
-              Ενεργή στο checkout
-            </label>
-            <label className="block text-sm">
-              <span className="font-bold text-gray-600">Ποσοστό %</span>
+                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                  settings.deposit.enabled ? 'bg-primary' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                    settings.deposit.enabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div
+              className={`rounded-2xl border px-4 py-5 text-center transition ${
+                settings.deposit.enabled
+                  ? 'border-primary/20 bg-primary/[0.04]'
+                  : 'border-slate-200 bg-slate-50 opacity-60'
+              }`}
+            >
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Ποσοστό</p>
+              <p className="mt-1 text-4xl font-bold tabular-nums tracking-tight text-slate-900">
+                {settings.deposit.percent}
+                <span className="ml-1 text-2xl text-slate-400">%</span>
+              </p>
+            </div>
+
+            <Field label="Προσαρμογή %" hint="Επιτρεπτό εύρος 5–90%">
               <input
                 type="number"
                 min={5}
                 max={90}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
+                disabled={!settings.deposit.enabled}
+                className={inputClass}
                 value={settings.deposit.percent}
                 onChange={(e) =>
-                  setSettings((p) => ({
+                  patchSettings((p) => ({
                     ...p,
                     deposit: { ...p.deposit, percent: Number(e.target.value) },
                   }))
                 }
               />
-            </label>
+            </Field>
+
+            <div className="flex flex-wrap gap-2">
+              {DEPOSIT_PRESETS.map((pct) => {
+                const active = settings.deposit.percent === pct;
+                return (
+                  <button
+                    key={pct}
+                    type="button"
+                    disabled={!settings.deposit.enabled}
+                    onClick={() =>
+                      patchSettings((p) => ({
+                        ...p,
+                        deposit: { ...p.deposit, percent: pct },
+                      }))
+                    }
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition disabled:opacity-40 ${
+                      active
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-black/[0.06] p-4 space-y-3">
-            <p className="text-sm font-bold text-gray-900">Online τρόποι πληρωμής</p>
-            {METHOD_KEYS.map(({ key, icon }) => (
-              <label key={key} className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={settings.methods[key]?.enabled !== false}
-                  onChange={(e) =>
-                    setSettings((p) => ({
-                      ...p,
-                      methods: {
-                        ...p.methods,
-                        [key]: { ...p.methods[key], enabled: e.target.checked },
-                      },
-                    }))
-                  }
-                />
-                <span className="material-symbols-outlined text-[18px] text-gray-500">{icon}</span>
-                <input
-                  className="flex-1 rounded-lg border px-2 py-1 text-sm"
-                  value={settings.methods[key]?.label || ''}
-                  onChange={(e) =>
-                    setSettings((p) => ({
-                      ...p,
-                      methods: {
-                        ...p.methods,
-                        [key]: { ...p.methods[key], label: e.target.value },
-                      },
-                    }))
-                  }
-                />
-              </label>
-            ))}
+          <div className="space-y-3">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-slate-900">Τρόποι πληρωμής</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Ενεργοποίηση και όνομα όπως εμφανίζεται στον πελάτη.
+                </p>
+              </div>
+              <span className="text-[11px] font-bold text-slate-500 tabular-nums">
+                {enabledMethodsCount} ενεργοί
+              </span>
+            </div>
+
+            <div className="space-y-2.5">
+              {METHOD_KEYS.map(({ key, icon, hint }) => {
+                const enabled = settings.methods[key]?.enabled !== false;
+                return (
+                  <div
+                    key={key}
+                    className={`flex flex-col gap-3 rounded-2xl border px-3.5 py-3 sm:flex-row sm:items-center transition-colors ${
+                      enabled
+                        ? 'border-primary/20 bg-primary/[0.03]'
+                        : 'border-slate-200 bg-slate-50/70'
+                    }`}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <span
+                        className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                          enabled ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[20px]">{icon}</span>
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <input
+                          className="w-full rounded-lg border border-transparent bg-transparent px-1 py-1 text-sm font-bold text-slate-900 outline-none transition focus:border-slate-200 focus:bg-white focus:px-2"
+                          value={settings.methods[key]?.label || ''}
+                          onChange={(e) =>
+                            patchSettings((p) => ({
+                              ...p,
+                              methods: {
+                                ...p.methods,
+                                [key]: { ...p.methods[key], label: e.target.value },
+                              },
+                            }))
+                          }
+                          aria-label={`Όνομα τρόπου ${key}`}
+                        />
+                        <p className="px-1 text-[11px] text-slate-500">{hint}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={enabled}
+                      onClick={() =>
+                        patchSettings((p) => ({
+                          ...p,
+                          methods: {
+                            ...p.methods,
+                            [key]: { ...p.methods[key], enabled: !enabled },
+                          },
+                        }))
+                      }
+                      className={`relative h-7 w-12 shrink-0 self-end rounded-full transition-colors sm:self-center ${
+                        enabled ? 'bg-primary' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                          enabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        <label className="block text-sm">
-          <span className="font-bold text-gray-700">Γενικές οδηγίες τραπεζικής κατάθεσης</span>
-          <textarea
-            rows={2}
-            className="mt-1 w-full rounded-xl border px-3 py-2 text-sm resize-y"
-            value={settings.global_bank_instructions}
-            onChange={(e) => setSettings((p) => ({ ...p, global_bank_instructions: e.target.value }))}
-          />
-        </label>
-
-        <div className="rounded-2xl border border-emerald-200/60 bg-emerald-50/40 p-4 space-y-3">
-          <p className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <span className="material-symbols-outlined text-emerald-700">shield</span>
-            Ασφάλεια πληρωμών
-          </p>
-          {[
-            {
-              key: 'require_amount_on_confirm',
-              label: 'Υποχρεωτικό ποσό κατά την επιβεβαίωση κατάθεσης',
-            },
-            {
-              key: 'require_reference_on_confirm',
-              label: 'Υποχρεωτική αναφορά / PNR κατά την επιβεβαίωση',
-            },
-            {
-              key: 'validate_iban_checksum',
-              label: 'Έλεγχος εγκυρότητας IBAN (MOD-97)',
-            },
-            {
-              key: 'audit_payment_actions',
-              label: 'Καταγραφή audit log για επιβεβαιώσεις',
-            },
-            {
-              key: 'mask_iban_public',
-              label: 'Απόκρυψη πλήρους IBAN στο checkout μέχρι κλικ',
-            },
-            {
-              key: 'notify_customer_on_payment',
-              label: 'Email επιβεβαίωσης στον πελάτη (μερική / πλήρης πληρωμή)',
-            },
-            {
-              key: 'notify_admin_on_payment',
-              label: 'Email ειδοποίησης στον διαχειριστή',
-            },
-            {
-              key: 'notify_sms_on_fiscal_receipt',
-              label: 'SMS στον πελάτη όταν εκδοθεί MARK (myDATA)',
-            },
-            {
-              key: 'notify_push_on_fiscal_receipt',
-              label: 'Browser push στον πελάτη όταν εκδοθεί MARK (Wallet)',
-            },
-            {
-              key: 'notify_erp_on_fiscal_receipt',
-              label: 'Webhook ERP όταν εκδοθεί φορολογική απόδειξη',
-            },
-            {
-              key: 'notify_admin_on_fiscal_issues',
-              label: 'Email admin για αποτυχίες / stuck fiscal (digest + alerts)',
-            },
-          ].map(({ key, label }) => (
-            <label key={key} className="flex items-start gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={
-                  key === 'mask_iban_public'
-                    ? Boolean(settings.security?.mask_iban_public)
-                    : key.startsWith('notify_')
-                      ? settings.security?.[key] !== false
-                      : settings.security?.[key] !== false
-                }
-                onChange={(e) =>
-                  setSettings((p) => ({
-                    ...p,
-                    security: {
-                      ...(p.security || DEFAULT_PAYMENT_SECURITY),
-                      [key]: e.target.checked,
-                    },
-                  }))
-                }
-              />
-              {label}
-            </label>
-          ))}
-          <label className="block text-sm pt-1">
-            <span className="font-bold text-gray-700">Email διαχειριστή (κενό = support email πλατφόρμας)</span>
-            <input
-              type="email"
-              className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
-              value={settings.security?.admin_notification_email || ''}
+        <div className="mt-5">
+          <Field
+            label="Γενικές οδηγίες τραπεζικής κατάθεσης"
+            hint="Εμφανίζονται σε όλους τους λογαριασμούς. Οι οδηγίες ανά λογαριασμό προστίθενται από κάτω."
+          >
+            <textarea
+              rows={3}
+              className={textareaClass}
+              value={settings.global_bank_instructions}
               onChange={(e) =>
-                setSettings((p) => ({
-                  ...p,
-                  security: {
-                    ...(p.security || DEFAULT_PAYMENT_SECURITY),
-                    admin_notification_email: e.target.value,
-                  },
-                }))
+                patchSettings((p) => ({ ...p, global_bank_instructions: e.target.value }))
               }
-              placeholder="admin@company.gr"
+              placeholder="π.χ. Μετά την κατάθεση στείλτε το αποδεικτικό στο…"
             />
-          </label>
-
-          <div className="pt-3 mt-2 border-t border-emerald-200/60 space-y-3">
-            <p className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <span className="material-symbols-outlined text-amber-600">mark_email_unread</span>
-              Φίλτρο spam email
-            </p>
-            {[
-              { key: 'email_spam_filter_enabled', label: 'Ενεργό φίλτρο spam (αποστολή & checkout)' },
-              { key: 'block_disposable_emails', label: 'Αποκλεισμός disposable / temp mail (yopmail, mailinator…)' },
-              { key: 'email_deliverability_headers', label: 'Headers anti-spam (Message-ID, Auto-Submitted…)' },
-            ].map(({ key, label }) => (
-              <label key={key} className="flex items-start gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={settings.security?.[key] !== false}
-                  onChange={(e) =>
-                    setSettings((p) => ({
-                      ...p,
-                      security: {
-                        ...(p.security || DEFAULT_PAYMENT_SECURITY),
-                        [key]: e.target.checked,
-                      },
-                    }))
-                  }
-                />
-                {label}
-              </label>
-            ))}
-            <label className="block text-sm">
-              <span className="font-bold text-gray-700">Αποκλεισμένα domains (ένα ανά γραμμή)</span>
-              <textarea
-                rows={3}
-                className="mt-1 w-full rounded-xl border px-3 py-2 text-sm font-mono resize-y"
-                value={(settings.security?.blocked_email_domains || []).join('\n')}
-                onChange={(e) =>
-                  setSettings((p) => ({
-                    ...p,
-                    security: {
-                      ...(p.security || DEFAULT_PAYMENT_SECURITY),
-                      blocked_email_domains: e.target.value
-                        .split(/[\n,;]+/)
-                        .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
-                        .filter(Boolean),
-                    },
-                  }))
-                }
-                placeholder="spamdomain.gr&#10;tempmail.net"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-bold text-gray-700">Επιτρεπόμενα domains μόνο (κενό = όλα εκτός blocklist)</span>
-              <textarea
-                rows={2}
-                className="mt-1 w-full rounded-xl border px-3 py-2 text-sm font-mono resize-y"
-                value={(settings.security?.allowed_email_domains || []).join('\n')}
-                onChange={(e) =>
-                  setSettings((p) => ({
-                    ...p,
-                    security: {
-                      ...(p.security || DEFAULT_PAYMENT_SECURITY),
-                      allowed_email_domains: e.target.value
-                        .split(/[\n,;]+/)
-                        .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
-                        .filter(Boolean),
-                    },
-                  }))
-                }
-                placeholder="gmail.com&#10;yahoo.gr"
-              />
-            </label>
-          </div>
+          </Field>
         </div>
+      </SectionCard>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold disabled:opacity-60"
-        >
-          {saving ? 'Αποθήκευση…' : 'Αποθήκευση ρυθμίσεων'}
-        </button>
-      </form>
-
-      <div className="bg-white rounded-[24px] border border-black/[0.06] p-6 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h4 className="font-bold text-gray-900 flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">account_balance</span>
-              Τραπεζικοί λογαριασμοί
-            </h4>
-            <p className="text-xs text-gray-500 mt-1">Προσθήκη, επεξεργασία και αφαίρεση λογαριασμών για έμβασμα.</p>
-          </div>
+      <SectionCard
+        id="pay-banks"
+        icon="account_balance"
+        title="Τραπεζικοί λογαριασμοί"
+        description="IBAN για έμβασμα — αποθηκεύονται αμέσως (ξεχωριστά από το Αποθήκευση πάνω)."
+        accent="bg-violet-600"
+        action={
           <button
             type="button"
             onClick={() => {
@@ -826,119 +1112,238 @@ export default function PaymentManagementPanel() {
               setEditBankId(null);
               setBankForm(emptyBankAccountForm());
             }}
-            className="px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold"
+            className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800"
           >
-            + Νέος λογαριασμός
+            <span className="material-symbols-outlined text-[16px]">add</span>
+            Νέος λογαριασμός
           </button>
-        </div>
-
+        }
+      >
         {showAddBank && (
-          <BankAccountForm
-            form={bankForm}
-            setForm={setBankForm}
-            onSubmit={onAddBank}
-            onCancel={() => setShowAddBank(false)}
-            submitLabel="Προσθήκη λογαριασμού"
-          />
+          <div className="mb-4">
+            <BankAccountForm
+              form={bankForm}
+              setForm={setBankForm}
+              onSubmit={onAddBank}
+              onCancel={() => setShowAddBank(false)}
+              submitLabel="Προσθήκη λογαριασμού"
+            />
+          </div>
         )}
 
         {editBankId && editAccount && (
-          <BankAccountForm
-            form={bankForm}
-            setForm={setBankForm}
-            onSubmit={onUpdateBank}
-            onCancel={() => setEditBankId(null)}
-            submitLabel="Αποθήκευση αλλαγών"
-          />
+          <div className="mb-4">
+            <BankAccountForm
+              form={bankForm}
+              setForm={setBankForm}
+              onSubmit={onUpdateBank}
+              onCancel={() => setEditBankId(null)}
+              submitLabel="Αποθήκευση αλλαγών"
+            />
+          </div>
         )}
 
         <div className="space-y-3">
-          {settings.bank_accounts.map((acc) => (
-            <div
-              key={acc.id}
-              className={`rounded-2xl border p-4 flex flex-wrap gap-4 justify-between ${
-                acc.is_default ? 'border-primary/30 bg-primary/[0.04]' : 'border-black/[0.06]'
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <p className="font-bold text-gray-900">{acc.label || acc.bank_name}</p>
-                  {acc.is_default && (
-                    <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                      Προεπιλογή
-                    </span>
-                  )}
-                  {!acc.enabled && (
-                    <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                      Ανενεργός
-                    </span>
-                  )}
+          {settings.bank_accounts.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-500">
+              Δεν υπάρχουν λογαριασμοί — προσθέστε έναν για τραπεζική μεταφορά.
+            </p>
+          ) : (
+            settings.bank_accounts.map((acc) => (
+              <div
+                key={acc.id}
+                className={`rounded-2xl border p-4 flex flex-wrap gap-4 justify-between transition ${
+                  acc.is_default
+                    ? 'border-primary/30 bg-primary/[0.04]'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <p className="font-bold text-slate-900">{acc.label || acc.bank_name}</p>
+                    {acc.is_default && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                        Προεπιλογή
+                      </span>
+                    )}
+                    {!acc.enabled && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                        Ανενεργός
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    {acc.bank_name} · {acc.beneficiary}
+                  </p>
+                  <p className="text-sm font-mono text-slate-800 mt-1.5 tracking-wide">
+                    {formatIbanDisplay(acc.iban)}
+                  </p>
+                  {acc.bic ? <p className="text-xs text-slate-500 mt-1">BIC: {acc.bic}</p> : null}
                 </div>
-                <p className="text-sm text-gray-600">{acc.bank_name} · {acc.beneficiary}</p>
-                <p className="text-sm font-mono text-gray-800 mt-1">{formatIbanDisplay(acc.iban)}</p>
-                {acc.bic && <p className="text-xs text-gray-500 mt-1">BIC: {acc.bic}</p>}
-              </div>
-              <div className="flex flex-wrap gap-2 items-start">
-                {!acc.is_default && (
+                <div className="flex flex-wrap gap-2 items-start">
+                  {!acc.is_default && (
+                    <button
+                      type="button"
+                      onClick={() => onSetDefault(acc.id)}
+                      className="px-3 py-1.5 rounded-full border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      Προεπιλογή
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => onSetDefault(acc.id)}
-                    className="px-3 py-1.5 rounded-full border text-xs font-bold"
+                    onClick={() => {
+                      setEditBankId(acc.id);
+                      setShowAddBank(false);
+                    }}
+                    className="px-3 py-1.5 rounded-full border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
                   >
-                    Προεπιλογή
+                    Επεξεργασία
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditBankId(acc.id);
-                    setShowAddBank(false);
-                  }}
-                  className="px-3 py-1.5 rounded-full border text-xs font-bold"
-                >
-                  Επεξεργασία
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDeleteBank(acc.id)}
-                  className="px-3 py-1.5 rounded-full border border-red-200 text-red-700 text-xs font-bold"
-                >
-                  Διαγραφή
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteBank(acc.id)}
+                    className="px-3 py-1.5 rounded-full border border-red-200 text-red-700 text-xs font-bold hover:bg-red-50"
+                  >
+                    Διαγραφή
+                  </button>
+                </div>
               </div>
-            </div>
+            ))
+          )}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        id="pay-security"
+        icon="shield"
+        title="Ασφάλεια & ειδοποιήσεις"
+        description="Έλεγχοι επιβεβαίωσης, απόκρυψη IBAN, emails και φίλτρο spam."
+        accent="bg-emerald-600"
+      >
+        <div className="space-y-2.5">
+          {SECURITY_TOGGLES.map(({ key, label, hint }) => (
+            <ToggleRow
+              key={key}
+              checked={securityChecked(key)}
+              onChange={(v) => setSecurityFlag(key, v)}
+              title={label}
+              hint={hint}
+            />
           ))}
         </div>
-      </div>
 
-      <div className="bg-white rounded-[24px] border border-amber-200/60 p-6 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h4 className="font-bold text-gray-900 flex items-center gap-2">
-              <span className="material-symbols-outlined text-amber-600">hourglass_top</span>
-              Εκκρεμείς τραπεζικές καταθέσεις
-            </h4>
-            <p className="text-xs text-gray-500 mt-1">Επιβεβαιώστε όταν εμφανιστεί η κατάθεση στον λογαριασμό.</p>
+        <div className="mt-5">
+          <Field
+            label="Email διαχειριστή"
+            hint="Κενό = support email πλατφόρμας"
+          >
+            <input
+              type="email"
+              className={inputClass}
+              value={settings.security?.admin_notification_email || ''}
+              onChange={(e) => setSecurityFlag('admin_notification_email', e.target.value)}
+              placeholder="admin@company.gr"
+            />
+          </Field>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-amber-200/70 bg-amber-50/40 p-4 sm:p-5 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
+              <span className="material-symbols-outlined text-[18px]">mark_email_unread</span>
+            </span>
+            <div>
+              <p className="text-sm font-bold text-slate-900">Φίλτρο spam email</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Μπλοκάρει ύποπτες διευθύνσεις στο checkout και στις αποστολές.
+              </p>
+            </div>
           </div>
+          <div className="space-y-2.5">
+            {SPAM_TOGGLES.map(({ key, label, hint }) => (
+              <ToggleRow
+                key={key}
+                checked={settings.security?.[key] !== false}
+                onChange={(v) => setSecurityFlag(key, v)}
+                title={label}
+                hint={hint}
+              />
+            ))}
+          </div>
+          <div className="grid gap-3.5 md:grid-cols-2 pt-1">
+            <Field label="Αποκλεισμένα domains" hint="Ένα ανά γραμμή">
+              <textarea
+                rows={3}
+                className={`${textareaClass} font-mono text-[13px]`}
+                value={(settings.security?.blocked_email_domains || []).join('\n')}
+                onChange={(e) =>
+                  setSecurityFlag(
+                    'blocked_email_domains',
+                    e.target.value
+                      .split(/[\n,;]+/)
+                      .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+                      .filter(Boolean),
+                  )
+                }
+                placeholder={'spamdomain.gr\ntempmail.net'}
+              />
+            </Field>
+            <Field label="Επιτρεπόμενα domains μόνο" hint="Κενό = όλα εκτός blocklist">
+              <textarea
+                rows={3}
+                className={`${textareaClass} font-mono text-[13px]`}
+                value={(settings.security?.allowed_email_domains || []).join('\n')}
+                onChange={(e) =>
+                  setSecurityFlag(
+                    'allowed_email_domains',
+                    e.target.value
+                      .split(/[\n,;]+/)
+                      .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+                      .filter(Boolean),
+                  )
+                }
+                placeholder={'gmail.com\nyahoo.gr'}
+              />
+            </Field>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        id="pay-pending"
+        icon="hourglass_top"
+        title="Εκκρεμείς τραπεζικές καταθέσεις"
+        description="Επιβεβαιώστε όταν εμφανιστεί η κατάθεση στον λογαριασμό."
+        accent="bg-amber-500"
+        action={
           <button
             type="button"
             onClick={loadPending}
-            className="px-3 py-1.5 rounded-full border text-xs font-bold"
+            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
           >
+            <span className="material-symbols-outlined text-[15px]">refresh</span>
             Ανανέωση
           </button>
-        </div>
-
+        }
+      >
         {pendingBookings.length === 0 ? (
-          <p className="text-sm text-gray-500">Δεν υπάρχουν εκκρεμείς καταθέσεις.</p>
+          <p className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/40 px-4 py-8 text-center text-sm text-slate-500">
+            Δεν υπάρχουν εκκρεμείς καταθέσεις.
+          </p>
         ) : (
           <div className="space-y-3">
             {pendingBookings.map((b) => (
-              <div key={b.id} className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 flex flex-wrap gap-3 justify-between">
+              <div
+                key={b.id}
+                className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 flex flex-wrap gap-3 justify-between"
+              >
                 <div>
-                  <p className="font-bold text-gray-900">{b.customerName || '—'}</p>
-                  <p className="text-sm text-gray-600">{b.tripTitle} · {b.seat || b.seats?.join(', ')}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="font-bold text-slate-900">{b.customerName || '—'}</p>
+                  <p className="text-sm text-slate-600">
+                    {b.tripTitle} · {b.seat || b.seats?.join(', ')}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
                     {b.pnr || b.id} · €{Number(b.balanceDue || b.price || 0).toFixed(2)} εκκρεμές
                   </p>
                 </div>
@@ -946,7 +1351,7 @@ export default function PaymentManagementPanel() {
                   type="button"
                   disabled={confirmingId === b.id}
                   onClick={() => setConfirmBooking(b)}
-                  className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-bold disabled:opacity-60 self-center"
+                  className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-bold disabled:opacity-60 self-center hover:bg-emerald-700"
                 >
                   {confirmingId === b.id ? '…' : 'Επιβεβαίωση κατάθεσης'}
                 </button>
@@ -954,30 +1359,29 @@ export default function PaymentManagementPanel() {
             ))}
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      <div className="bg-white rounded-[24px] border border-amber-200/60 p-6 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h4 className="font-bold text-gray-900 flex items-center gap-2">
-              <span className="material-symbols-outlined text-amber-600">payments</span>
-              Εκκρεμή υπόλοιπα (μετρητά)
-            </h4>
-            <p className="text-xs text-gray-500 mt-1">
-              Κρατήσεις με υπόλοιπο προς είσπραξη στο γκισέ ή από τον οδηγό.
-            </p>
-          </div>
+      <SectionCard
+        icon="payments"
+        title="Εκκρεμή υπόλοιπα (μετρητά)"
+        description="Κρατήσεις με υπόλοιπο προς είσπραξη στο γκισέ ή από τον οδηγό."
+        accent="bg-amber-600"
+        action={
           <button
             type="button"
             onClick={loadPending}
-            className="px-3 py-1.5 rounded-full border text-xs font-bold"
+            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
           >
+            <span className="material-symbols-outlined text-[15px]">refresh</span>
             Ανανέωση
           </button>
-        </div>
+        }
+      >
 
         {cashDueBookings.length === 0 ? (
-          <p className="text-sm text-gray-500">Δεν υπάρχουν κρατήσεις με εκκρεμές υπόλοιπο.</p>
+          <p className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/40 px-4 py-8 text-center text-sm text-slate-500">
+            Δεν υπάρχουν κρατήσεις με εκκρεμές υπόλοιπο.
+          </p>
         ) : (
           <div className="space-y-3">
             {cashDueBookings.map((b) => {
@@ -988,12 +1392,14 @@ export default function PaymentManagementPanel() {
                   className="rounded-2xl border border-amber-100 bg-gradient-to-r from-amber-50/80 to-white p-4 flex flex-wrap gap-3 justify-between"
                 >
                   <div>
-                    <p className="font-bold text-gray-900">{b.customerName || '—'}</p>
-                    <p className="text-sm text-gray-600">{b.tripTitle} · {b.seat || b.seats?.join(', ')}</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="font-bold text-slate-900">{b.customerName || '—'}</p>
+                    <p className="text-sm text-slate-600">
+                      {b.tripTitle} · {b.seat || b.seats?.join(', ')}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
                       {b.pnr || b.id} · υπόλοιπο <strong className="text-amber-800">€{due.toFixed(2)}</strong>
                       {b.amountPaid > 0 && (
-                        <span className="text-gray-400"> · πληρώθηκε €{Number(b.amountPaid).toFixed(2)}</span>
+                        <span className="text-slate-400"> · πληρώθηκε €{Number(b.amountPaid).toFixed(2)}</span>
                       )}
                     </p>
                   </div>
@@ -1010,14 +1416,17 @@ export default function PaymentManagementPanel() {
             })}
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      <div className="bg-white rounded-[24px] border border-violet-200/60 p-6 shadow-sm space-y-4">
+      <div
+        id="pay-fiscal"
+        className="scroll-mt-28 bg-white rounded-[24px] border border-violet-200/60 p-6 shadow-sm space-y-4"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h4 className="font-bold text-gray-900 flex items-center gap-2">
+            <h4 className="font-bold text-slate-900 flex items-center gap-2">
               <span className="material-symbols-outlined text-violet-600">receipt_long</span>
-              Φορολογικές εκκολήσεις
+              Φορολογικές εκδόσεις
             </h4>
             <p className="text-xs text-gray-500 mt-1">
               Αποδείξεις σε ουρά, εκκρεμείς ή αποτυχημένες — myDATA MARK.
@@ -1412,6 +1821,45 @@ export default function PaymentManagementPanel() {
         )}
       </div>
 
+      <div
+        className={`sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-lg backdrop-blur-md transition ${
+          dirty ? 'border-amber-200 bg-white/95' : 'border-slate-200 bg-white/90'
+        }`}
+      >
+        <div className="text-xs font-medium text-slate-600">
+          {saving ? (
+            <span className="text-slate-500">Αποθήκευση σε εξέλιξη…</span>
+          ) : dirty ? (
+            <span className="text-amber-800">Υπάρχουν μη αποθηκευμένες αλλαγές</span>
+          ) : lastSavedAt ? (
+            <span className="text-emerald-700">
+              Αποθηκεύτηκε{' '}
+              {lastSavedAt.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          ) : (
+            <span>Όλα αποθηκευμένα</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={saving || !dirty}
+            onClick={discardCoreChanges}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            Απόρριψη
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !dirty}
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[16px]">save</span>
+            {saving ? 'Αποθήκευση…' : 'Αποθήκευση πληρωμών'}
+          </button>
+        </div>
+      </div>
+
       <ConfirmBankDepositModal
         booking={confirmBooking}
         security={settings.security || DEFAULT_PAYMENT_SECURITY}
@@ -1429,6 +1877,6 @@ export default function PaymentManagementPanel() {
         onConfirm={onConfirmCash}
         confirming={Boolean(cashConfirmingId)}
       />
-    </div>
+    </form>
   );
 }
