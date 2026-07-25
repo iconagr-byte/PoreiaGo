@@ -91,7 +91,8 @@ export default function FleetLiveMapWebSocket() {
 
       {!vehicles.length && connected ? (
         <p className="fleet-apple-banner">
-          Δεν υπάρχουν ενεργοί οδηγοί. Ζητήστε «Έναρξη βάρδιας» στην PWA με άδεια τοποθεσίας.
+          Δεν υπάρχουν ενεργοί οδηγοί. Στην PWA πατήστε «Έναρξη βάρδιας», επιτρέψτε τοποθεσία και
+          περιμένετε μήνυμα επιβεβαίωσης θέσης — μετά hard-refresh αυτόν τον χάρτη.
         </p>
       ) : null}
 
