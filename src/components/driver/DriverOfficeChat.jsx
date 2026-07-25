@@ -1,5 +1,6 @@
 /**
  * Driver PWA — chat with office.
+ * Unread is surfaced via header/nav badge (no toast spam).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -34,7 +35,7 @@ function messageSignature(rows) {
   return `${rows.length}:${last?.id || ''}:${last?.read_at || ''}:${last?.delivered_at || ''}`;
 }
 
-export default function DriverOfficeChat() {
+export default function DriverOfficeChat({ isActive = false, onUnreadChange } = {}) {
   const [messages, setMessages] = useState([]);
   const [unread, setUnread] = useState(0);
   const [text, setText] = useState('');
@@ -45,6 +46,16 @@ export default function DriverOfficeChat() {
   const seenIdsRef = useRef(new Set());
   const signatureRef = useRef('');
   const stickToBottomRef = useRef(true);
+  const isActiveRef = useRef(isActive);
+  const onUnreadChangeRef = useRef(onUnreadChange);
+  isActiveRef.current = isActive;
+  onUnreadChangeRef.current = onUnreadChange;
+
+  const publishUnread = useCallback((n) => {
+    const count = Math.max(0, Number(n) || 0);
+    setUnread(count);
+    onUnreadChangeRef.current?.(count);
+  }, []);
 
   const isNearBottom = () => {
     const el = threadRef.current;
@@ -56,7 +67,6 @@ export default function DriverOfficeChat() {
     if (!force && !stickToBottomRef.current) return;
     const el = threadRef.current;
     if (!el) return;
-    // Scroll only the thread — never window.scrollIntoView (jumps the whole app).
     el.scrollTop = el.scrollHeight;
   };
 
@@ -73,27 +83,25 @@ export default function DriverOfficeChat() {
       signatureRef.current = nextSig;
 
       setMessages(rows);
-      setUnread(Number(data.unread || 0));
+      for (const m of rows) {
+        if (m?.id) seenIdsRef.current.add(m.id);
+      }
+
+      const serverUnread = Math.max(0, Number(data.unread || 0));
+      if (isActiveRef.current && serverUnread > 0) {
+        // Viewing chat — clear server unread; badge goes to zero.
+        markDriverChatRead()
+          .then(() => publishUnread(0))
+          .catch(() => publishUnread(serverUnread));
+      } else {
+        publishUnread(serverUnread);
+      }
+
       if (!silent) setLoading(false);
 
-      for (const m of rows) {
-        if (m.sender === 'office' && m.id && !seenIdsRef.current.has(m.id)) {
-          if (seenIdsRef.current.size > 0) {
-            toast('Νέο μήνυμα από το γραφείο', { icon: '💬', id: `chat-${m.id}` });
-            stickToBottomRef.current = true;
-          }
-          seenIdsRef.current.add(m.id);
-        } else if (m.id) {
-          seenIdsRef.current.add(m.id);
-        }
-      }
-
-      if (!silent || changed) {
+      if (isActiveRef.current && (!silent || changed)) {
+        stickToBottomRef.current = true;
         window.requestAnimationFrame(() => scrollThreadBottom({ force: !silent }));
-      }
-
-      if (Number(data.unread || 0) > 0) {
-        markDriverChatRead().catch(() => {});
       }
     } catch (err) {
       if (!silent) {
@@ -101,13 +109,29 @@ export default function DriverOfficeChat() {
         toast.error(err.message || 'Αποτυχία chat');
       }
     }
-  }, []);
+  }, [publishUnread]);
 
   useEffect(() => {
     load();
     const id = window.setInterval(() => load({ silent: true }), POLL_MS);
     return () => window.clearInterval(id);
   }, [load]);
+
+  // Opening the chat tab marks messages read immediately.
+  useEffect(() => {
+    if (!isActive || unread <= 0) return undefined;
+    let cancelled = false;
+    markDriverChatRead()
+      .then(() => {
+        if (!cancelled) publishUnread(0);
+      })
+      .catch(() => {});
+    stickToBottomRef.current = true;
+    window.requestAnimationFrame(() => scrollThreadBottom({ force: true }));
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, unread, publishUnread]);
 
   const send = async (e) => {
     e.preventDefault();

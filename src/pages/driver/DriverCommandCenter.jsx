@@ -41,11 +41,20 @@ function driverInitials(name) {
     .toUpperCase();
 }
 
-function DriverHeader({ session, telemetryOnline, onLogout, kicker, title }) {
+function DriverHeader({
+  session,
+  telemetryOnline,
+  onLogout,
+  kicker,
+  title,
+  chatUnread = 0,
+  onOpenChat,
+}) {
   const name = session?.driverName || 'Οδηγός';
   const plate = session?.vehiclePlate || session?.vehicleCode;
   const photoUrl = session?.photoUrl ? resolveSiteAssetUrl(session.photoUrl) : '';
   const busUrl = session?.vehicleImageUrl ? resolveSiteAssetUrl(session.vehicleImageUrl) : '';
+  const unread = Math.max(0, Number(chatUnread) || 0);
 
   return (
     <header className="driver-header driver-shell flex justify-between items-center gap-3">
@@ -77,6 +86,24 @@ function DriverHeader({ session, telemetryOnline, onLogout, kicker, title }) {
         </div>
       </div>
       <div className="driver-header-actions">
+        <button
+          type="button"
+          onClick={onOpenChat}
+          className={`driver-notif-btn${unread > 0 ? ' has-unread' : ''}`}
+          aria-label={
+            unread > 0
+              ? `Μηνύματα γραφείου, ${unread} μη αναγνωσμένα`
+              : 'Μηνύματα γραφείου'
+          }
+          title="Μηνύματα γραφείου"
+        >
+          <span className="material-symbols-outlined" aria-hidden>
+            notifications
+          </span>
+          {unread > 0 ? (
+            <span className="driver-notif-badge">{unread > 99 ? '99+' : unread}</span>
+          ) : null}
+        </button>
         <span
           className={`driver-live-badge ${telemetryOnline ? 'is-live' : 'is-offline'}`}
           title={telemetryOnline ? 'Ζωντανή μετάδοση GPS' : 'Εκτός σύνδεσης'}
@@ -118,6 +145,7 @@ export default function DriverCommandCenter() {
   const tripId = session?.tripId;
 
   const [onBreak, setOnBreak] = useState(false);
+  const [chatUnread, setChatUnread] = useState(0);
   const shift = useDriverShiftSession({
     driverName: session?.driverName || 'Οδηγός',
     enabled: authenticated,
@@ -309,7 +337,13 @@ export default function DriverCommandCenter() {
   } else {
     body = (
       <div className="driver-app">
-        <DriverHeader session={session} telemetryOnline={telemetryOnline} onLogout={logout} />
+        <DriverHeader
+          session={session}
+          telemetryOnline={telemetryOnline}
+          onLogout={logout}
+          chatUnread={chatUnread}
+          onOpenChat={() => setTab('chat')}
+        />
 
         {tab !== 'chat' && tab !== 'summary' ? (
           <div className="driver-shell">
@@ -351,13 +385,28 @@ export default function DriverCommandCenter() {
                 type="button"
                 onClick={() => setTab('chat')}
                 className="driver-card flex items-center gap-3 text-left w-full !py-3.5"
-                aria-label="Άνοιγμα chat με το γραφείο"
+                aria-label={
+                  chatUnread > 0
+                    ? `Άνοιγμα chat με το γραφείο, ${chatUnread} νέα`
+                    : 'Άνοιγμα chat με το γραφείο'
+                }
               >
-                <span className="material-symbols-outlined text-[28px] text-[#007aff]">forum</span>
+                <span className="relative shrink-0">
+                  <span className="material-symbols-outlined text-[28px] text-[var(--driver-accent)]">
+                    forum
+                  </span>
+                  {chatUnread > 0 ? (
+                    <span className="driver-inline-badge">
+                      {chatUnread > 99 ? '99+' : chatUnread}
+                    </span>
+                  ) : null}
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-extrabold text-base text-slate-900">Chat γραφείου</span>
                   <span className="block text-xs text-slate-500 mt-0.5">
-                    Μηνύματα με το γραφείο · παράδοση &amp; ανάγνωση
+                    {chatUnread > 0
+                      ? `${chatUnread} νέο${chatUnread === 1 ? '' : 'α'} μήνυμα${chatUnread === 1 ? '' : 'τα'}`
+                      : 'Μηνύματα με το γραφείο · παράδοση & ανάγνωση'}
                   </span>
                 </span>
                 <span className="material-symbols-outlined text-slate-400">chevron_right</span>
@@ -371,7 +420,7 @@ export default function DriverCommandCenter() {
             <DriverShiftTelemetry shift={shift} />
           </div>
           <div hidden={tab !== 'chat'} aria-hidden={tab !== 'chat'}>
-            <DriverOfficeChat />
+            <DriverOfficeChat isActive={tab === 'chat'} onUnreadChange={setChatUnread} />
           </div>
           {tab === 'scan' && <Scanner />}
           {tab === 'sos' && <SOSButton />}
@@ -380,28 +429,40 @@ export default function DriverCommandCenter() {
 
         <nav className="driver-nav" aria-label="Driver navigation">
           <div className="driver-nav-inner">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={tab === t.id ? 'active' : ''}
-                onClick={() => {
-                  setTab(t.id);
-                  // Tab tap is a user gesture — best moment to start iOS GPS.
-                  if (t.id === 'gps' && !shift.online) {
-                    void shift.goOnline({ resume: false });
+            {TABS.map((t) => {
+              const showChatBadge = t.id === 'chat' && chatUnread > 0;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={tab === t.id ? 'active' : ''}
+                  onClick={() => {
+                    setTab(t.id);
+                    // Tab tap is a user gesture — best moment to start iOS GPS.
+                    if (t.id === 'gps' && !shift.online) {
+                      void shift.goOnline({ resume: false });
+                    }
+                  }}
+                  aria-label={
+                    showChatBadge ? `${t.label}, ${chatUnread} νέα` : t.label
                   }
-                }}
-                aria-label={t.label}
-                aria-current={tab === t.id ? 'page' : undefined}
-              >
-                <span className="material-symbols-outlined">{t.icon}</span>
-                <span className="driver-nav-label">
-                  <span className="hidden min-[360px]:inline">{t.label}</span>
-                  <span className="min-[360px]:hidden">{t.short}</span>
-                </span>
-              </button>
-            ))}
+                  aria-current={tab === t.id ? 'page' : undefined}
+                >
+                  <span className="driver-nav-icon-wrap">
+                    <span className="material-symbols-outlined">{t.icon}</span>
+                    {showChatBadge ? (
+                      <span className="driver-nav-badge">
+                        {chatUnread > 99 ? '99+' : chatUnread}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="driver-nav-label">
+                    <span className="hidden min-[360px]:inline">{t.label}</span>
+                    <span className="min-[360px]:hidden">{t.short}</span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </nav>
       </div>
