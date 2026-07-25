@@ -63,6 +63,6 @@ echo "=== redis live keys ==="
 $COMPOSE exec -T redis redis-cli --scan --pattern 'fleet:live:*' | head -80 || true
 
 echo "=== recent api logs ==="
-$COMPOSE logs --tail=300 api-blue 2>&1 | rg -i 'telemetry|gps|ingest|fleet_live|rate_limit|driver.*location|Redis save|fleet:live' | tail -100 || true
+$COMPOSE logs --tail=300 api-blue 2>&1 | grep -iE 'telemetry|gps|ingest|fleet_live|rate_limit|driver.*location|Redis save|fleet:live' | tail -100 || true
 
 echo "=== done ==="

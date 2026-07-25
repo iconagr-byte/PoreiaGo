@@ -183,58 +183,81 @@ class LiveFleetService:
                 by_id[state.vehicle_id] = state
         return list(by_id.values())
 
+    def _merge_admin_fleets(
+        self,
+        primary: list[LiveVehicleState],
+        *extras: list[LiveVehicleState],
+    ) -> list[LiveVehicleState]:
+        seen_ids = {v.vehicle_id for v in primary if v.vehicle_id}
+        seen_codes = {v.vehicle_code for v in primary if v.vehicle_code}
+        merged = list(primary)
+        for group in extras:
+            for v in group or []:
+                if v.vehicle_id and v.vehicle_id in seen_ids:
+                    continue
+                if v.vehicle_code and v.vehicle_code in seen_codes:
+                    continue
+                merged.append(v)
+                if v.vehicle_id:
+                    seen_ids.add(v.vehicle_id)
+                if v.vehicle_code:
+                    seen_codes.add(v.vehicle_code)
+        return merged
+
     def list_active_for_admin(self, tenant_id: UUID) -> list[LiveVehicleState]:
         """
         Active vehicles for the admin map.
 
-        Also includes GPS still keyed under the legacy demo tenant
-        (…0001) from older driver password-login sessions, so LIVE
-        drivers like Achilleas appear before they re-login.
+        Merges:
+        - legacy demo tenant (…0001) GPS into a real office tenant
+        - platform SaaS tenant GPS into a legacy demo-tenant admin session
+          (drivers are remapped onto the platform tenant; old admin JWTs
+          still carry …0001 and would otherwise see an empty map)
         """
         from travel_platform.operations.master_qr_local import DEFAULT_TENANT
 
         primary = self.list_active(tenant_id)
         demo = UUID(DEFAULT_TENANT)
-        if str(tenant_id) == str(demo):
-            return primary
+        extras: list[list[LiveVehicleState]] = []
 
-        legacy = self.list_active(demo)
-        if not legacy:
-            return primary
+        if str(tenant_id) != str(demo):
+            extras.append(self.list_active(demo))
+        else:
+            # Demo admin JWT → also show remapped platform GPS.
+            try:
+                import os
 
-        seen_ids = {v.vehicle_id for v in primary if v.vehicle_id}
-        seen_codes = {v.vehicle_code for v in primary if v.vehicle_code}
-        merged = list(primary)
-        for v in legacy:
-            if v.vehicle_id and v.vehicle_id in seen_ids:
-                continue
-            if v.vehicle_code and v.vehicle_code in seen_codes:
-                continue
-            merged.append(v)
-        return merged
+                platform_raw = (
+                    os.getenv("SAAS_DEFAULT_TENANT_ID")
+                    or os.getenv("DEFAULT_TENANT_ID")
+                    or ""
+                ).strip()
+                if platform_raw and platform_raw != str(demo):
+                    extras.append(self.list_active(UUID(platform_raw)))
+            except Exception:
+                pass
+
+        return self._merge_admin_fleets(primary, *extras)
 
     async def list_active_for_admin_async(self, tenant_id: UUID) -> list[LiveVehicleState]:
+        from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
         from travel_platform.operations.master_qr_local import DEFAULT_TENANT
 
         primary = await self.list_active_async(tenant_id)
         demo = UUID(DEFAULT_TENANT)
-        if str(tenant_id) == str(demo):
-            return primary
+        extras: list[list[LiveVehicleState]] = []
 
-        legacy = await self.list_active_async(demo)
-        if not legacy:
-            return primary
+        if str(tenant_id) != str(demo):
+            extras.append(await self.list_active_async(demo))
+        else:
+            try:
+                platform = UUID(await resolve_platform_tenant_id())
+                if str(platform) != str(demo):
+                    extras.append(await self.list_active_async(platform))
+            except Exception:
+                pass
 
-        seen_ids = {v.vehicle_id for v in primary if v.vehicle_id}
-        seen_codes = {v.vehicle_code for v in primary if v.vehicle_code}
-        merged = list(primary)
-        for v in legacy:
-            if v.vehicle_id and v.vehicle_id in seen_ids:
-                continue
-            if v.vehicle_code and v.vehicle_code in seen_codes:
-                continue
-            merged.append(v)
-        return merged
+        return self._merge_admin_fleets(primary, *extras)
 
     def vehicle_meta(self, tenant_id: UUID, vehicle_id: str) -> dict:
         from travel_platform.operations.master_qr_local import DEFAULT_TENANT
@@ -244,8 +267,13 @@ class LiveFleetService:
         want = str(tenant_id)
         if meta_tid == want:
             return meta
-        # Admin map merges legacy demo-tenant GPS — still return enrichment meta.
+        # Admin map merges legacy demo ↔ platform GPS — still return enrichment meta.
         if meta_tid == DEFAULT_TENANT and want != DEFAULT_TENANT:
+            return meta
+        if want == DEFAULT_TENANT and meta_tid and meta_tid != DEFAULT_TENANT:
+            return meta
+        # Merged pin from another tenant id (same vehicle_id lookup).
+        if meta.get("lat") is not None:
             return meta
         return {}
 
@@ -253,12 +281,26 @@ class LiveFleetService:
         local = self.vehicle_meta(tenant_id, vehicle_id)
         if local.get("lat") is not None:
             return local
+        from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
+        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
         from travel_platform.telemetry.live_fleet_redis import load_live_vehicle
 
-        remote = await load_live_vehicle(str(tenant_id), vehicle_id)
-        if remote.get("tenant_id") and remote.get("tenant_id") != str(tenant_id):
-            # Allow legacy demo rows when looking up by id during admin merge.
-            pass
+        candidates = [str(tenant_id)]
+        if str(tenant_id) != DEFAULT_TENANT:
+            candidates.append(DEFAULT_TENANT)
+        else:
+            try:
+                platform = str(await resolve_platform_tenant_id())
+                if platform and platform not in candidates:
+                    candidates.append(platform)
+            except Exception:
+                pass
+
+        remote: dict = {}
+        for tid in candidates:
+            remote = await load_live_vehicle(tid, vehicle_id)
+            if remote.get("lat") is not None:
+                break
         if remote:
             self._vehicles[vehicle_id] = {**self._vehicles.get(vehicle_id, {}), **remote}
         return remote or local
