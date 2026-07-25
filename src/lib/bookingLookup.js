@@ -56,25 +56,23 @@ export function findLocalBookingByEmailAndRef(email, referenceCode) {
  * @returns {Promise<import('./ticketing/bookingStore.js').BookingRecord | null>}
  */
 export async function lookupGuestBooking({ email, referenceCode }) {
-  const tenantId = getSaasTenantId();
-  if (tenantId) {
-    try {
-      const row = await saasLookupGuestBooking({
-        tenantId,
-        email,
-        referenceCode,
-      });
-      const mapped = mapSaasBookingToLocal(row);
-      const existing = findLocalBookingByEmailAndRef(email, referenceCode);
-      if (!existing) addBooking(mapped);
-      return existing ? { ...existing, ...mapped } : mapped;
-    } catch (err) {
-      const msg = String(err.message || '');
-      const notFound =
-        msg.includes('Δεν βρέθηκε') || msg.includes('404') || msg.includes('not found');
-      if (!notFound) {
-        console.warn('[lookup] SaaS failed, trying local', err);
-      }
+  const tenantId = getSaasTenantId() || undefined;
+  try {
+    const row = await saasLookupGuestBooking({
+      tenantId,
+      email,
+      referenceCode,
+    });
+    const mapped = mapSaasBookingToLocal(row);
+    const existing = findLocalBookingByEmailAndRef(email, referenceCode);
+    if (!existing) addBooking(mapped);
+    return existing ? { ...existing, ...mapped } : mapped;
+  } catch (err) {
+    const msg = String(err.message || '');
+    const notFound =
+      msg.includes('Δεν βρέθηκε') || msg.includes('404') || msg.includes('not found');
+    if (!notFound) {
+      console.warn('[lookup] SaaS failed, trying local', err);
     }
   }
 

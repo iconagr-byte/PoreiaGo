@@ -50,7 +50,8 @@ class BookingCreate(BaseModel):
 class GuestBookingLookup(BaseModel):
     """B2C — recover ticket; requires email + reference (no listing by email alone)."""
 
-    tenant_id: UUID
+    # Optional when Host maps to a tenant (custom domain). Frontend may omit it.
+    tenant_id: UUID | None = None
     passenger_email: EmailStr
     reference_code: str = Field(min_length=4, max_length=32)
 

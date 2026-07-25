@@ -225,18 +225,17 @@ export async function fetchSaasBookings() {
 /** B2C checkout — no JWT; uses VITE_SAAS_TENANT_ID or stored tenant. */
 /** POST /api/v1/bookings/lookup — email + reference required. */
 export async function saasLookupGuestBooking({ tenantId, email, referenceCode }) {
-  const tid = tenantId || getSaasTenantId();
-  if (!tid) {
-    throw new Error('Δεν έχει οριστεί tenant (VITE_SAAS_TENANT_ID)');
-  }
+  const tid = tenantId || getSaasTenantId() || undefined;
+  const body = {
+    passenger_email: email.trim().toLowerCase(),
+    reference_code: referenceCode.trim(),
+  };
+  // Backend can resolve tenant from Host on custom domains when omitted.
+  if (tid) body.tenant_id = tid;
   const res = await fetch(`${API_BASE}/api/v1/bookings/lookup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tenant_id: tid,
-      passenger_email: email.trim().toLowerCase(),
-      reference_code: referenceCode.trim(),
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) await parseError(res);
   return res.json();

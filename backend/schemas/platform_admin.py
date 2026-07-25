@@ -360,6 +360,8 @@ class BrandingAdminResponse(BaseModel):
     verified_domain: bool = False
     checkout_base_url: str = "http://localhost:5173"
     updated_at: str | None = None
+    # Present when Host maps to a Postgres tenant — used by guest booking lookup / wallet.
+    tenant_id: str | None = None
 
 
 class BrandingAdminUpdate(BaseModel):

@@ -31,6 +31,18 @@ export default function BrandingBoot() {
     fetchBranding(host)
       .then((branding) => {
         cacheBranding(branding);
+        // Guest booking lookup / wallet need tenant_id on custom domains (no SaaS login).
+        if (branding?.tenant_id && typeof localStorage !== 'undefined') {
+          try {
+            const prev = localStorage.getItem('saas_tenant_id') || '';
+            if (!prev || onTenant) {
+              localStorage.setItem('saas_tenant_id', branding.tenant_id);
+              window.dispatchEvent(new Event('saas-session-changed'));
+            }
+          } catch {
+            /* ignore */
+          }
+        }
       })
       .catch(async () => {
         if (!onTenant) {
