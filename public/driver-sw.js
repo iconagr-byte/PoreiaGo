@@ -1,7 +1,7 @@
 /**
  * Driver Command Center — cache manifest, offline σελίδα, PWA assets.
  */
-const CACHE = 'aerostride-driver-v4';
+const CACHE = 'aerostride-driver-v5';
 const MANIFEST_PREFIX = '/driver-cache/manifest/';
 const OFFLINE_URL = '/driver-offline.html';
 
@@ -21,6 +21,12 @@ function offlineHtmlResponse() {
   });
 }
 
+async function clearAllNotifications() {
+  if (!self.registration?.getNotifications) return;
+  const list = await self.registration.getNotifications();
+  await Promise.all(list.map((n) => n.close()));
+}
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
@@ -30,17 +36,27 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key.startsWith('aerostride-driver-') && key !== CACHE).map((key) => caches.delete(key)),
-      ),
-    ).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key.startsWith('aerostride-driver-') && key !== CACHE)
+            .map((key) => caches.delete(key)),
+        ),
+      )
+      .then(() => clearAllNotifications())
+      .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
+    return;
+  }
+  if (event.data?.type === 'CLEAR_NOTIFICATIONS') {
+    event.waitUntil(clearAllNotifications());
     return;
   }
   if (event.data?.type === 'CACHE_MANIFEST' && event.data.tripId) {
@@ -73,18 +89,40 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  const createdAt = Date.now();
   const options = {
     body: payload.body,
     tag: payload.tag || 'driver-pwa',
+    renotify: false,
+    requireInteraction: false,
+    silent: false,
     data: {
       url: payload.url || '/driver',
+      createdAt,
       ...(payload.data || {}),
     },
     icon: '/icons/driver-pwa-192.png',
     badge: '/icons/driver-pwa-192.png',
   };
 
-  event.waitUntil(self.registration.showNotification(payload.title || 'PoreiaGo Οδηγός', options));
+  event.waitUntil(
+    (async () => {
+      try {
+        const existing = await self.registration.getNotifications();
+        await Promise.all(
+          existing
+            .filter((n) => {
+              const tag = String(n.tag || '');
+              return tag.startsWith('driver-') || tag === 'driver-pwa';
+            })
+            .map((n) => n.close()),
+        );
+      } catch {
+        /* ignore */
+      }
+      await self.registration.showNotification(payload.title || 'PoreiaGo Οδηγός', options);
+    })(),
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
@@ -95,18 +133,21 @@ self.addEventListener('notificationclick', (event) => {
     target = `${self.location.origin}${target}`;
   }
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const client of list) {
-        if ('focus' in client && client.url.includes('/driver')) {
-          client.navigate(target);
-          return client.focus();
+    clearAllNotifications().then(() =>
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+        for (const client of list) {
+          if ('focus' in client && client.url.includes('/driver')) {
+            client.postMessage({ type: 'DRIVER_NOTIFICATION_OPENED' });
+            if (client.navigate) client.navigate(target);
+            return client.focus();
+          }
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(target);
-      }
-      return undefined;
-    }),
+        if (clients.openWindow) {
+          return clients.openWindow(target);
+        }
+        return undefined;
+      }),
+    ),
   );
 });
 
@@ -127,11 +168,15 @@ self.addEventListener('fetch', (event) => {
 
   if (PRECACHE_URLS.includes(url.pathname)) {
     event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, clone));
-        return res;
-      })),
+      caches.match(request).then(
+        (cached) =>
+          cached ||
+          fetch(request).then((res) => {
+            const clone = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, clone));
+            return res;
+          }),
+      ),
     );
     return;
   }

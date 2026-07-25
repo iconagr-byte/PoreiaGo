@@ -17,6 +17,10 @@ import DriverPushPanel from '../../components/driver/DriverPushPanel.jsx';
 import DriverOfficeChat from '../../components/driver/DriverOfficeChat.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
 import { useDriverShiftSession } from '../../lib/driver/useDriverShiftSession.js';
+import {
+  clearDriverNotifications,
+  resetDriverEntryAlerts,
+} from '../../lib/driver/clearDriverNotifications.js';
 
 const TABS = [
   { id: 'home', icon: 'home', label: 'Αρχική', short: 'Αρχ.' },
@@ -230,6 +234,34 @@ export default function DriverCommandCenter() {
     };
   }, [authenticated]);
 
+  // Drop leftover OS / SW tray notifications when opening or returning to the driver app.
+  useEffect(() => {
+    // OS notifications only — avoid toast.dismiss racing the login success toast.
+    clearDriverNotifications({ onlyStale: false }).catch(() => {});
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        clearDriverNotifications({ onlyStale: false }).catch(() => {});
+      }
+    };
+    const onSwMessage = (event) => {
+      if (event?.data?.type === 'DRIVER_NOTIFICATION_OPENED') {
+        clearDriverNotifications({ onlyStale: false }).catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onSwMessage);
+    }
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', onSwMessage);
+      }
+    };
+  }, [authenticated]);
+
   useEffect(() => {
     if (tachograph.limitReached && telemetryOnline) {
       toast('Required Rest Stop in 15 minutes', { icon: '⏱️', duration: 8000 });
@@ -245,7 +277,7 @@ export default function DriverCommandCenter() {
   }, [tab, setParams]);
 
   const logout = async () => {
-    toast.dismiss();
+    resetDriverEntryAlerts().catch(() => {});
     // Await shift/end (+ office push) while the access token is still present.
     try {
       await shift.goOffline({ silent: true });
@@ -262,7 +294,7 @@ export default function DriverCommandCenter() {
     body = (
       <MasterQrGate
         onAuthenticated={() => {
-          toast.dismiss();
+          resetDriverEntryAlerts().catch(() => {});
           setAuthenticated(true);
           setProfileTick((n) => n + 1);
           window.setTimeout(() => {
