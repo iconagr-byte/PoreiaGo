@@ -38,14 +38,35 @@ def _normalize_reference(code: str) -> str:
 
 
 @router.post("/lookup", response_model=BookingResponse)
-async def lookup_guest_booking(body: GuestBookingLookup):
+async def lookup_guest_booking(body: GuestBookingLookup, request: Request):
     """Public B2C — email + reference code must both match (no email-only search)."""
     ref = _normalize_reference(body.reference_code)
     email = body.passenger_email.strip().lower()
+    tenant_id = body.tenant_id
+    if tenant_id is None:
+        host = (
+            request.headers.get("x-forwarded-host")
+            or request.headers.get("host")
+            or ""
+        ).split(",")[0].strip()
+        try:
+            from olympus.tenant.domain_resolver import DomainResolver
+
+            async with AsyncSessionLocal() as session:
+                resolved = await DomainResolver(session).resolve(host)
+                if resolved:
+                    tenant_id = resolved.tenant_id
+        except Exception:
+            tenant_id = None
+    if tenant_id is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Δεν βρέθηκε γραφείο για αυτό το domain — δοκιμάστε ξανά από το site του γραφείου.",
+        )
     async with AsyncSessionLocal() as db:
-        await apply_tenant_rls(db, body.tenant_id)
+        await apply_tenant_rls(db, tenant_id)
         stmt = select(Booking).where(
-            Booking.tenant_id == body.tenant_id,
+            Booking.tenant_id == tenant_id,
             func.lower(Booking.passenger_email) == email,
             Booking.reference_code == ref,
         )

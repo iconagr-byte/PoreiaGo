@@ -64,8 +64,14 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {backendOk === false && (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              Ο server δεν τρέχει. Ανοίξτε νέο terminal και εκτελέστε:{' '}
-              <code className="text-xs bg-white px-1 rounded">npm run dev:backend</code>
+              {import.meta.env.PROD
+                ? 'Η σύνδεση με τον server απέτυχε. Ανανεώστε τη σελίδα ή δοκιμάστε σε λίγο.'
+                : (
+                  <>
+                    Ο server δεν τρέχει. Ανοίξτε νέο terminal και εκτελέστε:{' '}
+                    <code className="text-xs bg-white px-1 rounded">npm run dev:backend</code>
+                  </>
+                )}
             </p>
           )}
           {error && (
