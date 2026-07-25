@@ -287,7 +287,7 @@
 }
 
 .booking-lookup-field:focus-within .booking-lookup-input-wrap .material-symbols-outlined {
-  color: var(--bl-accent-deep);
+  color: var(--bl-accent);
 }
 
 .booking-lookup-field.has-error .booking-lookup-input-wrap {
@@ -304,8 +304,9 @@
 }
 
 .booking-lookup-field small {
-  font-size: 0.72rem;
-  color: #94a3b8;
+  font-size: 0.75rem;
+  letter-spacing: -0.01em;
+  color: var(--bl-secondary);
   padding-left: 0.15rem;
 }
 
