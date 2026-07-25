@@ -41,10 +41,15 @@ _PLATFORM_TENANT_CACHE_TTL_SEC = 60
 
 async def resolve_platform_tenant_id() -> str:
     """
-    Tenant UUID that admin JWT / live map use for the default agency.
+    Tenant UUID that admin JWT / live map / driver GPS remap use.
 
-    Env wins when set; otherwise look up DEFAULT_TENANT_SLUG (achillio) in Postgres.
-    Falls back to the local demo UUID only when DB is unavailable.
+    Priority:
+    1. SAAS_DEFAULT_TENANT_ID / DEFAULT_TENANT_ID env
+    2. Tenant that owns PLATFORM_CUSTOM_DOMAINS (default: achilliotravel.com)
+       — the real Achillio office is slug ``admin-achillio-gr``, while an older
+       seed slug ``achillio`` still exists and previously stole GPS pins
+    3. DEFAULT_TENANT_SLUG (default: achillio)
+    4. Local demo UUID when DB is unavailable
     """
     global _PLATFORM_TENANT_CACHE
     now = time.time()
@@ -62,17 +67,47 @@ async def resolve_platform_tenant_id() -> str:
 
     tid = DEFAULT_TENANT
     slug = (os.getenv("DEFAULT_TENANT_SLUG") or "achillio").strip().lower()
+    domain_csv = (
+        os.getenv("PLATFORM_CUSTOM_DOMAINS") or "achilliotravel.com"
+    ).strip()
+    preferred_domains = [
+        d.strip().lower().removeprefix("www.")
+        for d in domain_csv.split(",")
+        if d.strip()
+    ]
     try:
-        from sqlalchemy import select
+        from sqlalchemy import or_, select
 
         from app.core.database import AsyncSessionLocal
         from app.models.tenant import Tenant
 
         async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Tenant).where(Tenant.slug == slug).limit(1))
-            tenant = result.scalar_one_or_none()
-            if tenant:
-                tid = str(tenant.id)
+            for apex in preferred_domains:
+                result = await db.execute(
+                    select(Tenant)
+                    .where(
+                        or_(
+                            Tenant.custom_domain == apex,
+                            Tenant.custom_domain == f"www.{apex}",
+                        ),
+                    )
+                    .limit(1),
+                )
+                tenant = result.scalar_one_or_none()
+                if tenant:
+                    tid = str(tenant.id)
+                    logger.info(
+                        "resolve_platform_tenant_id via custom_domain=%s → %s (%s)",
+                        apex,
+                        tid,
+                        tenant.slug,
+                    )
+                    break
+            else:
+                result = await db.execute(select(Tenant).where(Tenant.slug == slug).limit(1))
+                tenant = result.scalar_one_or_none()
+                if tenant:
+                    tid = str(tenant.id)
     except Exception as exc:
         logger.debug("resolve_platform_tenant_id DB lookup failed: %s", exc)
 

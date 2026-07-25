@@ -246,16 +246,36 @@ class LiveFleetService:
         primary = await self.list_active_async(tenant_id)
         demo = UUID(DEFAULT_TENANT)
         extras: list[list[LiveVehicleState]] = []
+        seen_tenants = {str(tenant_id)}
 
         if str(tenant_id) != str(demo):
             extras.append(await self.list_active_async(demo))
+            seen_tenants.add(str(demo))
         else:
             try:
-                platform = UUID(await resolve_platform_tenant_id())
-                if str(platform) != str(demo):
-                    extras.append(await self.list_active_async(platform))
+                platform = str(await resolve_platform_tenant_id())
+                if platform not in seen_tenants:
+                    extras.append(await self.list_active_async(UUID(platform)))
+                    seen_tenants.add(platform)
             except Exception:
                 pass
+
+        # GPS was briefly remapped onto the obsolete seed slug «achillio»
+        # while the real office (custom_domain) is admin-achillio-gr — merge both.
+        try:
+            from sqlalchemy import select
+
+            from app.core.database import AsyncSessionLocal
+            from app.models.tenant import Tenant
+
+            seed_slug = (__import__("os").getenv("DEFAULT_TENANT_SLUG") or "achillio").strip().lower()
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(Tenant).where(Tenant.slug == seed_slug).limit(1))
+                seed = result.scalar_one_or_none()
+                if seed and str(seed.id) not in seen_tenants:
+                    extras.append(await self.list_active_async(seed.id))
+        except Exception:
+            pass
 
         return self._merge_admin_fleets(primary, *extras)
 
