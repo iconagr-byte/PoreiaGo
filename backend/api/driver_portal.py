@@ -167,6 +167,8 @@ def _issue_driver_session(
 ) -> DriverSessionResponse:
     exp = expires_at or int(time.time()) + 24 * 3600
     tid = tenant_id or DEFAULT_TENANT
+    profile = _profile_fields(driver_id)
+    vehicle_code = profile.get("vehicle_plate") or profile.get("vehicle_code") or f"BUS-{trip_id}"
     driver_jwt = jwt.encode(
         {
             "sub": driver_id or "master-qr-driver",
@@ -175,11 +177,14 @@ def _issue_driver_session(
             "roles": ["driver"],
             "scope": "manifest:read driver:scan",
             "exp": exp,
+            "driver_id": driver_id,
+            "driver_name": profile.get("driver_name"),
+            "vehicle_code": vehicle_code,
+            "bus_plate": vehicle_code,
         },
         _jwt_secret(),
         algorithm=JWT_ALGORITHM,
     )
-    profile = _profile_fields(driver_id)
     ctx = _trip_context(trip_id)
     return DriverSessionResponse(
         access_token=driver_jwt,

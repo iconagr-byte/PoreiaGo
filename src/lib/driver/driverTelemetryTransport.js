@@ -3,6 +3,7 @@ import { postDriverTelemetryLocation } from '../../services/driverPortalApi.js';
 
 /**
  * Driver GPS transport — prefer WebSocket, fall back to HTTP POST when WS is blocked.
+ * Always keeps the latest pending position so httpInFlight never drops the map pin.
  */
 export function createDriverTelemetryTransport({
   onMessage,
@@ -16,6 +17,7 @@ export function createDriverTelemetryTransport({
   let wsConn = null;
   let fallbackTimer = null;
   let httpInFlight = false;
+  let pendingPayload = null;
   let lastHttpErrorAt = 0;
 
   const useHttp = (reason) => {
@@ -29,6 +31,43 @@ export function createDriverTelemetryTransport({
     wsConn = null;
     onTransport?.('http', reason);
     onOpen?.({ transport: 'http' });
+  };
+
+  const postHttp = (payload) => {
+    if (closed || !payload) return;
+    if (httpInFlight) {
+      pendingPayload = payload;
+      return;
+    }
+    httpInFlight = true;
+    postDriverTelemetryLocation(payload)
+      .then((msg) => {
+        if (mode === 'connecting') {
+          mode = 'http';
+          onTransport?.('http', 'http_ok');
+          onOpen?.({ transport: 'http' });
+        }
+        onMessage?.(msg);
+      })
+      .catch((err) => {
+        const now = Date.now();
+        if (now - lastHttpErrorAt > 5000) {
+          lastHttpErrorAt = now;
+          onError?.(err instanceof Error ? err : new Error('http_telemetry_failed'));
+          onMessage?.({
+            type: 'error',
+            detail: err?.message || 'http_telemetry_failed',
+          });
+        }
+      })
+      .finally(() => {
+        httpInFlight = false;
+        if (pendingPayload && !closed) {
+          const next = pendingPayload;
+          pendingPayload = null;
+          postHttp(next);
+        }
+      });
   };
 
   try {
@@ -78,33 +117,14 @@ export function createDriverTelemetryTransport({
         return wsConn.send(payload);
       }
       if (mode === 'http' || mode === 'connecting') {
-        if (httpInFlight) return false;
-        httpInFlight = true;
-        postDriverTelemetryLocation(payload)
-          .then((msg) => {
-            if (mode === 'connecting') {
-              mode = 'http';
-              onTransport?.('http', 'http_ok');
-              onOpen?.({ transport: 'http' });
-            }
-            onMessage?.(msg);
-          })
-          .catch(() => {
-            const now = Date.now();
-            if (now - lastHttpErrorAt > 8000) {
-              lastHttpErrorAt = now;
-              onError?.(new Error('http_telemetry_failed'));
-            }
-          })
-          .finally(() => {
-            httpInFlight = false;
-          });
+        postHttp(payload);
         return true;
       }
       return false;
     },
     close() {
       closed = true;
+      pendingPayload = null;
       if (fallbackTimer) {
         window.clearTimeout(fallbackTimer);
         fallbackTimer = null;

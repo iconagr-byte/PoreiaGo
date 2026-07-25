@@ -353,7 +353,13 @@ export default function DriverCommandCenter() {
                 key={t.id}
                 type="button"
                 className={tab === t.id ? 'active' : ''}
-                onClick={() => setTab(t.id)}
+                onClick={() => {
+                  setTab(t.id);
+                  // Tab tap is a user gesture — best moment to start iOS GPS.
+                  if (t.id === 'gps' && !shift.online) {
+                    void shift.goOnline({ resume: false });
+                  }
+                }}
                 aria-label={t.label}
                 aria-current={tab === t.id ? 'page' : undefined}
               >
