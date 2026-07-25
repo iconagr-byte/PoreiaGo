@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { loginAsCustomer, getCustomerEmail } from '../lib/auth.js';
+import { getCustomerEmail, getCustomerToken, isCustomer } from '../lib/auth.js';
+import {
+  saveWalletClaim,
+  walletClaimAuthPath,
+  walletClaimNavState,
+} from '../lib/wallet/walletClaim.js';
 import { createBookingFromCheckout } from '../lib/ticketing/bookingStore.js';
 import {
   clearPendingCheckout,
@@ -239,33 +244,41 @@ export default function CheckoutPage() {
         paymentMethod,
         bankAccountId: selectedBankAccount?.id || null,
       });
-      loginAsCustomer(form.email, {
-        name: form.name,
-        phone: form.phone,
-        provider: 'checkout',
-      });
       clearPendingCheckout();
       const resumeToken = getStoredResumeToken();
       if (resumeToken) await completeAbandonedCart(resumeToken);
       sessionStorage.setItem('lastBookingId', booking.id);
-      if (booking.syncedToSaas) {
+
+      const hasWalletSession = Boolean(isCustomer() && getCustomerToken());
+      if (hasWalletSession) {
         toast.success(
           isBankTransfer
-            ? 'Η κράτηση καταχωρήθηκε — ολοκληρώστε την τραπεζική κατάθεση'
+            ? 'Η κράτηση καταχωρήθηκε — εμφανίζεται στο My Wallet'
             : isDepositPlan
-              ? 'Προκαταβολή OK — η κράτηση επιβεβαιώθηκε'
-              : 'Πληρωμή OK — κράτηση & τιμολόγιο myDATA σε επεξεργασία',
+              ? 'Προκαταβολή OK — η κράτηση είναι στο My Wallet'
+              : 'Πληρωμή OK — ανοίγει το My Wallet με το εισιτήριό σας',
         );
-      } else {
-        toast.success(
-          isBankTransfer
-            ? 'Η κράτηση καταχωρήθηκε — ολοκληρώστε την τραπεζική κατάθεση'
-            : isDepositPlan
-              ? 'Η προκαταβολή ολοκληρώθηκε — κράτηση επιβεβαιωμένη!'
-              : 'Η πληρωμή ολοκληρώθηκε!',
-        );
+        navigate('/wallet', { state: { highlightBooking: booking.id } });
+        return;
       }
-      navigate('/wallet', { state: { highlightBooking: booking.id } });
+
+      const claim = saveWalletClaim({
+        email: form.email,
+        name: form.name,
+        phone: form.phone,
+        bookingId: booking.id,
+        reference: booking.pnr || booking.id,
+        source: 'checkout',
+      });
+      toast.success(
+        isBankTransfer
+          ? 'Κράτηση OK — δημιουργήστε My Wallet για το εισιτήριο'
+          : 'Πληρωμή OK — δημιουργήστε My Wallet για να δείτε το εισιτήριο',
+      );
+      navigate(walletClaimAuthPath({ preferLogin: false }), {
+        replace: true,
+        state: walletClaimNavState(claim),
+      });
     } catch {
       toast.error('Αποτυχία πληρωμής. Δοκιμάστε ξανά.');
     } finally {
@@ -290,7 +303,7 @@ export default function CheckoutPage() {
           <p className="text-primary text-xs font-bold uppercase tracking-wide mb-1">Checkout</p>
           <h1 className="text-2xl md:text-3xl font-bold text-on-surface">Ολοκλήρωση & πληρωμή</h1>
           <p className="text-sm text-on-surface-variant mt-1">
-            Ασφαλής πληρωμή · κράτηση άμεσα στο My Wallet
+            Ασφαλής πληρωμή · μετά δημιουργείτε My Wallet για το εισιτήριο
           </p>
         </div>
 
@@ -537,7 +550,7 @@ export default function CheckoutPage() {
                         {bankReferencePreview}
                       </dd>
                       <p className="text-[11px] text-sky-700/80 mt-1">
-                        Το ακριβές reference θα εμφανιστεί στο My Wallet μετά την κράτηση.
+                        Το ακριβές reference θα εμφανιστεί αφού δημιουργήσετε My Wallet.
                       </p>
                     </div>
                   </dl>

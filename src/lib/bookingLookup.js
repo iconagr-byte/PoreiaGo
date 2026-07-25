@@ -1,7 +1,8 @@
 import { loadBookings, addBooking } from './ticketing/bookingStore.js';
 import { mapSaasBookingToLocal } from './ticketing/bookingMerge.js';
 import { getSaasTenantId, saasLookupGuestBooking } from '../services/saasApi.js';
-import { loginAsCustomer } from './auth.js';
+import { getCustomerToken, isCustomer } from './auth.js';
+import { saveWalletClaim } from './wallet/walletClaim.js';
 
 /** @returns {string[]} */
 export function referenceVariants(raw) {
@@ -80,10 +81,37 @@ export async function lookupGuestBooking({ email, referenceCode }) {
 }
 
 /**
+ * Prepare a looked-up booking for My Wallet.
+ * Returns whether the customer already has a real JWT session for /wallet.
+ *
  * @param {import('./ticketing/bookingStore.js').BookingRecord} booking
  * @param {string} email
+ * @returns {{ hasWalletSession: boolean, claim: object | null }}
  */
 export function openBookingInWallet(booking, email) {
-  if (email) loginAsCustomer(email);
-  if (booking?.id) sessionStorage.setItem('lastBookingId', booking.id);
+  const cleanEmail = String(email || '')
+    .trim()
+    .toLowerCase();
+  if (booking?.id) {
+    try {
+      sessionStorage.setItem('lastBookingId', booking.id);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const hasWalletSession = Boolean(isCustomer() && getCustomerToken());
+  if (hasWalletSession) {
+    return { hasWalletSession: true, claim: null };
+  }
+
+  const claim = saveWalletClaim({
+    email: cleanEmail,
+    name: booking?.passengerName || booking?.name || '',
+    phone: booking?.phone || '',
+    bookingId: booking?.id,
+    reference: booking?.pnr || booking?.id,
+    source: 'lookup',
+  });
+  return { hasWalletSession: false, claim };
 }

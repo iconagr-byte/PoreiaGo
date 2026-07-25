@@ -11,6 +11,11 @@ import {
   isDriver,
   logoutCustomer,
 } from '../lib/auth.js';
+import {
+  getWalletClaim,
+  walletClaimAuthPath,
+  walletClaimNavState,
+} from '../lib/wallet/walletClaim.js';
 import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookingStore.js';
 import { loadTrips } from '../lib/trips/tripStore.js';
 import { ticketPrintPath } from '../lib/ticketing/printTicket.js';
@@ -86,7 +91,17 @@ export default function SimpleWalletPage() {
         </div>
       );
     }
-    return <Navigate to="/login" replace state={{ from: '/wallet' }} />;
+    const claim = getWalletClaim();
+    if (claim) {
+      return (
+        <Navigate
+          to={walletClaimAuthPath({ preferLogin: false })}
+          replace
+          state={walletClaimNavState(claim)}
+        />
+      );
+    }
+    return <Navigate to="/login" replace state={{ from: '/wallet', walletClaim: true }} />;
   }
 
   const profile = useMemo(() => resolveCustomerProfile(), []);

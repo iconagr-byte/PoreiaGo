@@ -3,6 +3,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { lookupGuestBooking, openBookingInWallet, referenceVariants } from '../lib/bookingLookup.js';
+import {
+  walletClaimAuthPath,
+  walletClaimNavState,
+} from '../lib/wallet/walletClaim.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import '../styles/booking-lookup.css';
 
@@ -111,9 +115,20 @@ export default function BookingLookupPage() {
         toast.error('Δεν βρέθηκε κράτηση. Ελέγξτε email και κωδικό (π.χ. BK-…).');
         return;
       }
-      openBookingInWallet(booking, cleanEmail);
-      toast.success('Η κράτησή σας βρέθηκε');
-      navigate('/wallet', { replace: true });
+      const { hasWalletSession, claim } = openBookingInWallet(booking, cleanEmail);
+      if (hasWalletSession) {
+        toast.success('Η κράτησή σας βρέθηκε');
+        navigate('/wallet', {
+          replace: true,
+          state: { highlightBooking: booking.id },
+        });
+        return;
+      }
+      toast.success('Βρέθηκε η κράτηση — συνδεθείτε στο My Wallet');
+      navigate(walletClaimAuthPath({ preferLogin: false }), {
+        replace: true,
+        state: walletClaimNavState(claim),
+      });
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αναζήτησης');
     } finally {
