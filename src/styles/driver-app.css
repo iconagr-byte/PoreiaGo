@@ -203,6 +203,72 @@ html.driver-route body {
   flex-shrink: 0;
 }
 
+.driver-notif-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 0.95rem;
+  background: rgba(15, 23, 42, 0.05);
+  border: 1px solid transparent;
+  color: #334155;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.driver-notif-btn .material-symbols-outlined {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.driver-notif-btn.has-unread {
+  color: var(--driver-accent);
+  background: var(--driver-accent-soft);
+}
+
+.driver-notif-btn:active {
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.driver-notif-badge,
+.driver-nav-badge,
+.driver-inline-badge {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: #e11d48;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.05rem;
+  text-align: center;
+  letter-spacing: 0;
+  box-shadow: 0 0 0 2px #fff;
+  pointer-events: none;
+}
+
+.driver-nav-badge {
+  top: -0.15rem;
+  right: -0.35rem;
+}
+
+.driver-inline-badge {
+  top: -0.2rem;
+  right: -0.35rem;
+}
+
+.driver-nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  line-height: 1;
+}
+
 .driver-header-btn {
   font-size: 0.8125rem;
   font-weight: 600;
