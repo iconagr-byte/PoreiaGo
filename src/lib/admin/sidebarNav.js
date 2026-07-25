@@ -15,7 +15,6 @@ export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 export const FLEET_OPS_ONLY_IDS = [
   'fleet_kpis',
   'hybrid_sla',
-  'fleet_active_drivers',
   'driver_chat',
   'fleet_route_playback',
   'fleet_calendar',
@@ -41,7 +40,7 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'bookings',
 ];
 
-export const LEGACY_NAV_IDS = new Set(['settings', 'payments']);
+export const LEGACY_NAV_IDS = new Set(['settings', 'payments', 'fleet_active_drivers']);
 
 const PLATFORM_IDS = PLATFORM_NAV_IDS;
 const OFFICE_SETTINGS_IDS = TENANT_SETTINGS_TABS.map((t) => `settings_${t.id}`);
@@ -249,16 +248,6 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'hybrid_sla',
     navGroup: 'fleet_ops',
     accent: 'indigo',
-  },
-  fleet_active_drivers: {
-    id: 'fleet_active_drivers',
-    label: 'Ενεργοί Οδηγοί',
-    icon: 'groups',
-    filled: true,
-    type: 'tab',
-    tab: 'fleet_active_drivers',
-    navGroup: 'fleet_ops',
-    accent: 'teal',
   },
   driver_chat: {
     id: 'driver_chat',
