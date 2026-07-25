@@ -60,7 +60,7 @@ def get_trip_ops(trip_id: int | str) -> dict[str, Any] | None:
     return dict(row) if isinstance(row, dict) else None
 
 
-def upsert_trip_ops(trip_id: int | str, payload: dict[str, Any]) -> dict[str, Any]:
+def _clean_trip_ops_payload(trip_id: int | str, payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     try:
         key = str(int(trip_id))
     except (TypeError, ValueError) as exc:
@@ -83,6 +83,11 @@ def upsert_trip_ops(trip_id: int | str, payload: dict[str, Any]) -> dict[str, An
         "stops": _normalize_stops(payload.get("stops")),
         "segments": _normalize_segments(payload.get("segments")),
     }
+    return key, clean
+
+
+def upsert_trip_ops(trip_id: int | str, payload: dict[str, Any]) -> dict[str, Any]:
+    key, clean = _clean_trip_ops_payload(trip_id, payload)
     with _LOCK:
         data = _read_all()
         prev = data.get(key) if isinstance(data.get(key), dict) else {}
@@ -96,6 +101,32 @@ def upsert_trip_ops(trip_id: int | str, payload: dict[str, Any]) -> dict[str, An
         data[key] = merged
         _write_all(data)
     return dict(merged)
+
+
+def upsert_trip_ops_batch(items: list[tuple[int | str, dict[str, Any]]]) -> int:
+    """Upsert many trips with a single read/write of trip_ops.json."""
+    if not items:
+        return 0
+    saved = 0
+    with _LOCK:
+        data = _read_all()
+        for trip_id, payload in items:
+            try:
+                key, clean = _clean_trip_ops_payload(trip_id, payload)
+            except ValueError:
+                continue
+            prev = data.get(key) if isinstance(data.get(key), dict) else {}
+            merged = {**prev, **{k: v for k, v in clean.items() if v not in (None, "", [])}}
+            merged["id"] = int(key)
+            if "stops" in payload:
+                merged["stops"] = clean["stops"]
+            if "segments" in payload:
+                merged["segments"] = clean["segments"]
+            data[key] = merged
+            saved += 1
+        if saved:
+            _write_all(data)
+    return saved
 
 
 def _normalize_stops(raw: Any) -> list[dict[str, Any]]:

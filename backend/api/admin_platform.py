@@ -86,19 +86,21 @@ from schemas.platform_admin import (
 router = APIRouter(prefix="/api/admin/platform", tags=["admin-platform"])
 
 
-def _driver_response(d) -> FleetDriverResponse:
+def _driver_response(d, *, enrich_safety: bool = False) -> FleetDriverResponse:
     days = None
     if d.license_expires_at:
         days = (d.license_expires_at - date.today()).days
     safety = d.safety_score
-    try:
-        from uuid import UUID
-        from travel_platform.telemetry.driving_behavior import DrivingBehaviorService
+    # List endpoints skip live telemetry enrichment — keeps /drivers snappy for dropdowns.
+    if enrich_safety:
+        try:
+            from uuid import UUID
+            from travel_platform.telemetry.driving_behavior import DrivingBehaviorService
 
-        profile = DrivingBehaviorService().get_profile(UUID(d.id))
-        safety = profile.safety_score
-    except Exception:
-        pass
+            profile = DrivingBehaviorService().get_profile(UUID(d.id))
+            safety = profile.safety_score
+        except Exception:
+            pass
     return FleetDriverResponse(
         id=d.id,
         name=d.name,
@@ -210,7 +212,10 @@ async def remove_user(user_id: str):
 @router.get("/drivers", response_model=list[FleetDriverResponse])
 async def get_drivers(request: Request, status: str | None = None):
     tenant_id = _request_tenant_id(request)
-    return [_driver_response(d) for d in list_drivers(status, tenant_id=tenant_id)]
+    return [
+        _driver_response(d, enrich_safety=False)
+        for d in list_drivers(status, tenant_id=tenant_id)
+    ]
 
 
 _DRIVER_PHOTO_DIR = Path(
@@ -257,7 +262,7 @@ async def post_driver(request: Request, body: FleetDriverCreate):
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
-    return _driver_response(d)
+    return _driver_response(d, enrich_safety=True)
 
 
 @router.get("/drivers/{driver_id}", response_model=FleetDriverResponse)
@@ -265,7 +270,7 @@ async def get_driver_api(request: Request, driver_id: str):
     d = _driver_for_tenant(driver_id, _request_tenant_id(request))
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
-    return _driver_response(d)
+    return _driver_response(d, enrich_safety=True)
 
 
 @router.patch("/drivers/{driver_id}", response_model=FleetDriverResponse)
@@ -280,7 +285,7 @@ async def patch_driver(request: Request, driver_id: str, body: FleetDriverUpdate
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
-    return _driver_response(d)
+    return _driver_response(d, enrich_safety=True)
 
 
 @router.delete("/drivers/{driver_id}", status_code=204)
@@ -639,9 +644,29 @@ async def remove_backup(backup_id: str):
         raise HTTPException(status_code=404, detail="Backup not found") from None
 
 
+def _spawn_passenger_sync(trip_id: int, tenant_id: str | None) -> None:
+    """Passenger↔ticketing sync must not delay Master QR minting."""
+    import asyncio
+    import logging
+
+    async def _run() -> None:
+        try:
+            from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
+
+            await sync_trip_passengers_to_ticketing(trip_id, tenant_id=tenant_id)
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "background passenger sync failed trip=%s: %s", trip_id, exc
+            )
+
+    try:
+        asyncio.get_running_loop().create_task(_run())
+    except RuntimeError:
+        pass
+
+
 @router.post("/operations/master-qr", response_model=MasterQrIssueResponse)
 async def issue_master_qr(body: MasterQrIssueRequest, request: Request):
-    from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
     from travel_platform.operations.master_qr_bridge import (
         issue_master_qr_hybrid,
         resolve_platform_tenant_id,
@@ -655,10 +680,7 @@ async def issue_master_qr(body: MasterQrIssueRequest, request: Request):
         driver_id=body.driver_id,
         tenant_id=tenant_id,
     )
-    try:
-        await sync_trip_passengers_to_ticketing(body.trip_id, tenant_id=tenant_id)
-    except Exception:
-        pass
+    _spawn_passenger_sync(body.trip_id, str(result.get("tenant_id") or tenant_id))
     return MasterQrIssueResponse(
         qr_content=result["qr_content"],
         qr_token=result.get("qr_token"),
@@ -689,12 +711,7 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest, request: Reques
         driver_id=body.driver_id,
         tenant_id=tenant_id,
     )
-    try:
-        from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
-
-        await sync_trip_passengers_to_ticketing(body.trip_id, tenant_id=str(result.get("tenant_id") or tenant_id))
-    except Exception:
-        pass
+    _spawn_passenger_sync(body.trip_id, str(result.get("tenant_id") or tenant_id))
     auth_url = result.get("auth_url") or result.get("qr_content")
     qr_token = result.get("qr_token")
     if qr_token:

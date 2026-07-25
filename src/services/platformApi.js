@@ -269,11 +269,30 @@ export async function downloadBackupFile(backupId, filename) {
   URL.revokeObjectURL(url);
 }
 
+const _driversListCache = { key: '', at: 0, rows: null };
+const DRIVERS_LIST_TTL_MS = 20_000;
+
 export async function fetchFleetDrivers(status) {
+  const key = status || '';
+  const now = Date.now();
+  if (
+    _driversListCache.rows &&
+    _driversListCache.key === key &&
+    now - _driversListCache.at < DRIVERS_LIST_TTL_MS
+  ) {
+    return _driversListCache.rows;
+  }
+
   const q = status ? `?status=${status}` : '';
   try {
     const res = await adminFetch(`/api/admin/platform/drivers${q}`);
-    if (res.ok) return res.json();
+    if (res.ok) {
+      const rows = await res.json();
+      _driversListCache.key = key;
+      _driversListCache.at = now;
+      _driversListCache.rows = rows;
+      return rows;
+    }
     // Authenticated failures must not swap in demo mocks (hides real drivers e.g. Achilleas).
     if (getSaasToken()) {
       const err = await res.json().catch(() => ({}));
@@ -283,6 +302,13 @@ export async function fetchFleetDrivers(status) {
     if (getSaasToken()) throw err;
   }
   return getMockDrivers();
+}
+
+/** Invalidate after create/update/delete so the next list fetch is fresh. */
+export function invalidateFleetDriversCache() {
+  _driversListCache.key = '';
+  _driversListCache.at = 0;
+  _driversListCache.rows = null;
 }
 
 export async function fetchFleetDriver(driverId) {
@@ -310,6 +336,7 @@ export async function createFleetDriver(body) {
     throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά');
   }
   if (!res.ok) await parseError(res);
+  invalidateFleetDriversCache();
   return res.json();
 }
 
@@ -323,6 +350,7 @@ export async function updateFleetDriver(driverId, body) {
     throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά');
   }
   if (!res.ok) await parseError(res);
+  invalidateFleetDriversCache();
   return res.json();
 }
 
@@ -331,6 +359,7 @@ export async function deleteFleetDriver(driverId) {
     method: 'DELETE',
   });
   if (!res.ok && res.status !== 204) await parseError(res);
+  invalidateFleetDriversCache();
 }
 
 /** Upload driver headshot — returns relative `/api/site/driver-photos/...` URL. */
@@ -696,8 +725,10 @@ export async function fetchFleetCostReport(vehicleId, dateFrom, dateTo) {
   };
 }
 
-export async function issueMasterQr({ tripId, driverId } = {}) {
-  if (getSaasToken()) {
+export async function issueMasterQr({ tripId, driverId, preferAdmin = false } = {}) {
+  // Admin hybrid path issues immediately (Postgres or local). SaaS-only path
+  // often fails/retries when the trip is not synced yet — prefer admin for UI.
+  if (!preferAdmin && getSaasToken()) {
     try {
       return await issueSaasMasterQr({ tripId, driverId });
     } catch {

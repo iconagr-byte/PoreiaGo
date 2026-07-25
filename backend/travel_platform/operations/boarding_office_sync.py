@@ -27,11 +27,12 @@ async def sync_trip_passengers_to_ticketing(
         return {"synced": 0, "skipped": True, "reason": "invalid_trip_id"}
 
     try:
-        from sqlalchemy import select
+        from sqlalchemy import or_, select, text
 
         from app.core.database import AsyncSessionLocal
         from app.models.booking import Booking, BookingStatus, PaymentStatus
         from middleware.tenant import apply_tenant_to_session
+        from ticketing.db import get_db
         from ticketing.saas_sync import upsert_ticket_booking
         from travel_platform.operations.master_qr_bridge import default_tenant_id
     except Exception as exc:
@@ -41,6 +42,7 @@ async def sync_trip_passengers_to_ticketing(
     tid = (tenant_id or "").strip() or default_tenant_id()
     synced = 0
     skipped = 0
+    trip_key = str(trip_id)
 
     try:
         async with AsyncSessionLocal() as session:
@@ -49,22 +51,40 @@ async def sync_trip_passengers_to_ticketing(
             except Exception:
                 pass
 
-            result = await session.execute(
-                select(Booking)
-                .where(Booking.tenant_id == UUID(tid))
-                .order_by(Booking.created_at.desc())
-                .limit(800)
-            )
-            bookings = list(result.scalars().all())
+            # Prefer JSONB path filter so we do not load up to 800 unrelated bookings.
+            try:
+                result = await session.execute(
+                    select(Booking)
+                    .where(
+                        Booking.tenant_id == UUID(tid),
+                        text(
+                            "(metadata_json->>'external_trip_id' = :trip_key "
+                            "OR metadata_json->>'trip_id' = :trip_key)"
+                        ).bindparams(trip_key=trip_key),
+                    )
+                    .order_by(Booking.created_at.desc())
+                    .limit(500)
+                )
+                bookings = list(result.scalars().all())
+            except Exception:
+                result = await session.execute(
+                    select(Booking)
+                    .where(Booking.tenant_id == UUID(tid))
+                    .order_by(Booking.created_at.desc())
+                    .limit(800)
+                )
+                bookings = []
+                for b in result.scalars().all():
+                    meta = dict(b.metadata_json or {})
+                    ext = meta.get("external_trip_id") or meta.get("trip_id")
+                    try:
+                        if int(ext) == trip_id:
+                            bookings.append(b)
+                    except (TypeError, ValueError):
+                        continue
 
             for b in bookings:
                 meta = dict(b.metadata_json or {})
-                ext = meta.get("external_trip_id") or meta.get("trip_id")
-                try:
-                    if int(ext) != trip_id:
-                        continue
-                except (TypeError, ValueError):
-                    continue
                 if b.status in (BookingStatus.CANCELLED, BookingStatus.REFUNDED):
                     skipped += 1
                     continue
@@ -98,15 +118,22 @@ async def sync_trip_passengers_to_ticketing(
                             "office_status": b.status.value if hasattr(b.status, "value") else str(b.status),
                             "saas_booking_id": saas_id,
                         },
+                        commit=False,
                     )
                     if b.status == BookingStatus.BOARDED or meta.get("checked_in") or meta.get(
                         "check_in_status"
                     ) in ("CHECKED_IN", "BOARDED"):
-                        await _mark_sqlite_boarded(local_id, saas_id)
+                        await _mark_sqlite_boarded(local_id, saas_id, commit=False)
                     synced += 1
                 except Exception as exc:
                     skipped += 1
                     logger.debug("passenger sync skip %s: %s", local_id, exc)
+
+            if synced:
+                try:
+                    await get_db().commit()
+                except Exception as exc:
+                    logger.warning("passenger sync commit failed trip=%s: %s", trip_id, exc)
     except Exception as exc:
         logger.warning("sync_trip_passengers_to_ticketing failed trip=%s: %s", trip_id, exc)
         return {"synced": synced, "skipped": skipped, "error": str(exc)[:200]}
@@ -114,7 +141,7 @@ async def sync_trip_passengers_to_ticketing(
     return {"synced": synced, "skipped": skipped, "trip_id": trip_id, "tenant_id": tid}
 
 
-async def _mark_sqlite_boarded(local_id: str, saas_id: str) -> None:
+async def _mark_sqlite_boarded(local_id: str, saas_id: str, *, commit: bool = True) -> None:
     from ticketing.db import get_db
 
     db = get_db()
@@ -127,7 +154,8 @@ async def _mark_sqlite_boarded(local_id: str, saas_id: str) -> None:
         """,
         (now, local_id, saas_id or ""),
     )
-    await db.commit()
+    if commit:
+        await db.commit()
 
 
 async def mark_office_booking_boarded(

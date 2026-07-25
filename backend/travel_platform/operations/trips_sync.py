@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 from sqlalchemy import text
 
 from travel_platform.operations.master_qr_bridge import default_tenant_id, saas_db_available
-from travel_platform.operations.trip_ops_store import upsert_trip_ops
+from travel_platform.operations.trip_ops_store import upsert_trip_ops_batch
 
 logger = logging.getLogger(__name__)
 
@@ -65,16 +66,20 @@ async def sync_trips_to_postgres(
     ops_saved = 0
 
     # Always persist rich ops metadata (works even when Postgres is down).
+    # One file write off the event loop — avoids blocking concurrent admin requests
+    # (e.g. GET /drivers while Master QR panel mounts).
+    ops_items: list[tuple[int, dict[str, Any]]] = []
     for raw in trips:
         row = _normalize_trip_row(raw if isinstance(raw, dict) else dict(raw))
         if not row:
             skipped += 1
             continue
-        try:
-            upsert_trip_ops(row["id"], row)
-            ops_saved += 1
-        except Exception as exc:
-            logger.warning("trip ops upsert failed for %s: %s", row.get("id"), exc)
+        ops_items.append((row["id"], row))
+    try:
+        ops_saved = await asyncio.to_thread(upsert_trip_ops_batch, ops_items)
+    except Exception as exc:
+        logger.warning("trip ops batch upsert failed: %s", exc)
+        ops_saved = 0
 
     if not await saas_db_available():
         return {
