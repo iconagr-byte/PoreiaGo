@@ -21,6 +21,7 @@ async def upsert_ticket_booking(
     saas_booking_id: str | None = None,
     email: str | None = None,
     special_requirements: dict | None = None,
+    commit: bool = True,
 ) -> dict:
     db = get_db()
     dep = departure_at or datetime.now(timezone.utc).isoformat()
@@ -82,7 +83,8 @@ async def upsert_ticket_booking(
                 saas_booking_id,
             ),
         )
-    await db.commit()
+    if commit:
+        await db.commit()
     cur2 = await db.execute("SELECT * FROM ticket_bookings WHERE id = ?", (booking_id,))
     row = await cur2.fetchone()
     return row_to_booking(row) if row else {}
