@@ -170,12 +170,21 @@ fi
 echo "==> Live fleet diagnose"
 bash "$DEPLOY_DIR/scripts/diagnose-live-fleet.sh" || true
 
+echo "==> TLS / admin smoke"
+for host in www.poreiago.com www.achilliotravel.com; do
+  code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 "https://${host}/admin" || echo "fail")
+  echo "  https://${host}/admin → ${code}"
+  echo | openssl s_client -connect "${host}:443" -servername "${host}" 2>/dev/null \
+    | openssl x509 -noout -subject -issuer 2>/dev/null | sed "s/^/  /" || true
+done
+
 echo ""
 echo "=============================================="
 echo " DONE"
 echo "  Back Office:  $APP_ORIGIN/admin/login"
 echo "  Driver PWA:   $APP_ORIGIN/driver"
 echo "  API docs:     $API_BASE/docs"
+echo "  Use www (not apex) until poreiago.com A → 34.141.98.145"
 echo ""
 echo " Driver push: enable on phone → /driver → Αρχική → Ενεργοποίηση push"
 echo " Admin push:   Back Office → Ζωντανός Χάρτης → Ενεργοποίηση push"
