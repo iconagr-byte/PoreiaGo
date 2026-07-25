@@ -258,7 +258,21 @@ export function getTemplateById(list, id) {
   return list.find((t) => t.id === id) || list[0];
 }
 
-export function tripsGridClass(layoutId) {
+export function tripsGridClass(layoutId, tripCount = 0) {
+  // One trip in a full-bleed grid looks oversized — constrain and center.
+  if (tripCount === 1) {
+    switch (layoutId) {
+      case 'compact_list':
+        return 'flex flex-col gap-3 max-w-xl mx-auto w-full';
+      case 'horizontal_scroll':
+        return 'flex justify-center gap-6';
+      case 'alternating_rows':
+        return 'flex flex-col gap-10 max-w-3xl mx-auto w-full';
+      default:
+        return 'grid grid-cols-1 max-w-md sm:max-w-lg md:max-w-xl mx-auto gap-8 w-full';
+    }
+  }
+
   switch (layoutId) {
     case 'grid_two_large':
       return 'grid grid-cols-1 lg:grid-cols-2 gap-10';
@@ -276,8 +290,11 @@ export function tripsGridClass(layoutId) {
   }
 }
 
-export function tripCardWrapperClass(layoutId) {
+export function tripCardWrapperClass(layoutId, tripCount = 0) {
   if (layoutId === 'horizontal_scroll') {
+    if (tripCount === 1) {
+      return 'w-full max-w-md';
+    }
     return 'snap-start shrink-0 w-[min(88vw,340px)]';
   }
   if (layoutId === 'masonry_two') {

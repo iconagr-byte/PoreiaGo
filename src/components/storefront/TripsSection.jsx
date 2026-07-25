@@ -16,18 +16,27 @@ export default function TripsSection({
 
   const layoutId = siteAppearance.trips_layout_template || 'grid_three';
   const cardId = siteAppearance.trip_card_template || 'premium';
-  const gridClass = tripsGridClass(layoutId);
-  const wrapClass = tripCardWrapperClass(layoutId);
+  const tripCount = trips.length;
+  const solo = tripCount === 1;
+  const gridClass = tripsGridClass(layoutId, tripCount);
+  const wrapClass = tripCardWrapperClass(layoutId, tripCount);
 
   return (
-    <section id={id} className="py-24 px-margin-desktop max-w-container-max mx-auto bg-surface">
-      <div className="text-center mb-16">
+    <section
+      id={id}
+      className={`${solo ? 'py-14 md:py-16' : 'py-24'} px-margin-desktop max-w-container-max mx-auto bg-surface`}
+    >
+      <div className={`text-center ${solo ? 'mb-8' : 'mb-16'}`}>
         {eyebrow && (
           <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
             {eyebrow}
           </span>
         )}
-        <h2 className="font-headline-lg text-4xl md:text-5xl font-bold text-on-surface tracking-tight">
+        <h2
+          className={`font-headline-lg font-bold text-on-surface tracking-tight ${
+            solo ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl'
+          }`}
+        >
           {title}
         </h2>
         {subtitle && (
@@ -47,6 +56,7 @@ export default function TripsSection({
                 templateId={cardId}
                 layoutId={layoutId}
                 index={index}
+                solo={solo}
               />
             </div>
           ))}
