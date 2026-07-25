@@ -61,6 +61,7 @@ export default function TripCard({
   templateId = 'premium',
   layoutId = 'grid_three',
   index = 0,
+  solo = false,
 }) {
   const navigate = useNavigate();
   const priceQuote = computeDynamicPrice(trip, pricingSettings);
@@ -90,18 +91,44 @@ export default function TripCard({
   if (templateId === 'image_overlay') {
     return (
       <article
-        className="relative h-[420px] rounded-[28px] overflow-hidden group cursor-pointer shadow-lg"
+        className={`relative ${
+          solo ? 'h-[260px] sm:h-[300px]' : 'h-[360px] md:h-[420px]'
+        } rounded-[28px] overflow-hidden group cursor-pointer shadow-lg`}
         onClick={go}
       >
         <img src={img} alt={trip.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
-        <div className="absolute inset-0 p-8 flex flex-col justify-end text-white">
-          <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-2">{trip.destination || 'Εκδρομή'}</p>
-          <h3 className="text-2xl font-bold mb-3 leading-tight">{trip.title}</h3>
-          <TripMeta trip={trip} compact />
-          <div className="mt-4 flex items-end justify-between">
-            <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="lg" />
-            <BookButton onClick={go} className="px-5 py-2.5 rounded-full bg-white text-slate-900 text-sm" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
+        <div
+          className={`absolute inset-0 flex flex-col justify-end text-white ${
+            solo ? 'p-5 sm:p-6' : 'p-8'
+          }`}
+        >
+          <p className="text-xs font-bold uppercase tracking-widest text-white/80 mb-1.5">
+            {trip.destination || 'Εκδρομή'}
+          </p>
+          <h3
+            className={`font-bold leading-tight mb-2 ${
+              solo ? 'text-xl sm:text-2xl' : 'text-2xl'
+            }`}
+          >
+            {trip.title}
+          </h3>
+          <div className="text-white/85 [&_p]:text-white/85">
+            <TripMeta trip={trip} compact />
+          </div>
+          <div className={`flex items-end justify-between gap-3 ${solo ? 'mt-3' : 'mt-4'}`}>
+            <div className="text-white [&_*]:text-white">
+              <TripPriceDisplay
+                trip={trip}
+                quote={priceQuote}
+                fetchServer={false}
+                size={solo ? 'md' : 'lg'}
+              />
+            </div>
+            <BookButton
+              onClick={go}
+              className="px-5 py-2.5 rounded-full bg-white text-slate-900 text-sm shrink-0"
+            />
           </div>
         </div>
       </article>
@@ -202,7 +229,7 @@ export default function TripCard({
   // premium (default)
   return (
     <article className="relative group bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden">
-      <div className="relative h-48 w-full overflow-hidden shrink-0">
+      <div className={`relative w-full overflow-hidden shrink-0 ${solo ? 'h-40' : 'h-48'}`}>
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
         <img
           src={img}
