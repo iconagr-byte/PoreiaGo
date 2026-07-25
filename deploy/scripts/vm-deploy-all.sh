@@ -167,6 +167,9 @@ if [[ "${RUN_SEED:-0}" == "1" ]]; then
   $COMPOSE exec -T api-blue python -m scripts.seed_saas_dev || true
 fi
 
+echo "==> Live fleet diagnose"
+bash "$DEPLOY_DIR/scripts/diagnose-live-fleet.sh" || true
+
 echo ""
 echo "=============================================="
 echo " DONE"

@@ -189,6 +189,16 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
     except Exception:
         pass
 
+    logger.info(
+        "driver GPS ingested tenant=%s vehicle=%s plate=%s lat=%.5f lng=%.5f driver=%s",
+        tenant_id,
+        vehicle_id,
+        payload.get("vehicle_code"),
+        float(payload["latitude"]),
+        float(payload["longitude"]),
+        payload.get("driver_id"),
+    )
+
     egress = {
         "type": "fleet_location",
         "tenant_id": tenant_id,
