@@ -64,6 +64,15 @@ replace_kv "OLYMPUS_BASE_DOMAIN" "$PLATFORM_DOMAIN"
 replace_kv "OLYMPUS_INGRESS_CNAME" "$INGRESS_CNAME"
 replace_kv "VITE_OLYMPUS_BASE_DOMAIN" "$PLATFORM_DOMAIN"
 replace_kv "VITE_OLYMPUS_INGRESS_CNAME" "$INGRESS_CNAME"
+# Apex A-record target shown in Domain settings (must match Traefik Droplet).
+PLATFORM_IP="${PLATFORM_INGRESS_IP:-}"
+if [[ -z "$PLATFORM_IP" ]]; then
+  PLATFORM_IP="$(getent ahostsv4 "$INGRESS_CNAME" 2>/dev/null | awk '{print $1; exit}')"
+fi
+PLATFORM_IP="${PLATFORM_IP:-34.141.98.145}"
+replace_kv "PLATFORM_INGRESS_IP" "$PLATFORM_IP"
+replace_kv "PLATFORM_INGRESS_IPS" "$PLATFORM_IP"
+replace_kv "TRAEFIK_INCLUDE_APEX" "1"
 
 if ! [[ -f "$DEPLOY_DIR/.vapid_private.pem" ]]; then
   echo "==> Generating Web Push VAPID keys"

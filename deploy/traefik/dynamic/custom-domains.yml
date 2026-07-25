@@ -1,6 +1,5 @@
 # AUTO-GENERATED — tenant custom domains for Traefik + Let's Encrypt
-# Apex (non-www) is routed only when it also CNAMEs to the platform.
-# For Achillio today only www points at PoreiaGo — cert www only.
+# www and apex use separate routers/certs so apex DNS lag cannot break www TLS.
 
 http:
   routers:
@@ -14,6 +13,19 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "www.achilliotravel.com"
+      middlewares:
+        - security-headers@file
+
+    tenant-domain-apex-achilliotravel-com:
+      rule: Host(`achilliotravel.com`)
+      entryPoints:
+        - websecure
+      service: tenant-custom-frontend
+      priority: 40
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "achilliotravel.com"
       middlewares:
         - security-headers@file
 
