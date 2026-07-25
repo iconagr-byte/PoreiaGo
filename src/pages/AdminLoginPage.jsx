@@ -70,7 +70,12 @@ export default function AdminLoginPage() {
         },
       });
     } catch (apiErr) {
-      const msg = apiErr.message || 'Αποτυχία σύνδεσης';
+      const raw = String(apiErr?.message || '').trim();
+      const msg =
+        raw ||
+        (apiErr?.name === 'TypeError'
+          ? 'Δεν υπάρχει σύνδεση με τον server — ελέγξτε δίκτυο / δοκιμάστε ξανά σε λίγο.'
+          : 'Αποτυχία σύνδεσης');
       if (msg.includes('πολλές εταιρείες')) {
         setShowAgency(true);
       }
