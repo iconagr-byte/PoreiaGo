@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   getCustomerEmail,
+  getCustomerToken,
   isCustomer,
   loginAsCustomer,
   isAdmin,
@@ -14,16 +15,38 @@ import {
   loginCustomer,
   isCustomerAuthBackendAvailable,
 } from '../services/customerAuthApi.js';
+import {
+  clearWalletClaim,
+  getWalletClaim,
+  walletClaimNavState,
+} from '../lib/wallet/walletClaim.js';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from || '/wallet';
-  const walletIntent = location.state?.from === '/wallet';
+  const walletIntent = location.state?.from === '/wallet' || Boolean(location.state?.walletClaim);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
+
+  const claim = useMemo(() => {
+    const fromState = location.state?.walletClaim
+      ? {
+          email: location.state.email,
+          name: location.state.name,
+          phone: location.state.phone,
+          bookingId: location.state.highlightBooking,
+          reference: location.state.reference,
+          source: location.state.claimSource || 'manual',
+        }
+      : null;
+    return fromState?.email ? fromState : getWalletClaim();
+  }, [location.state]);
+
+  const prefillEmail = claim?.email || getCustomerEmail() || '';
+  const highlightBooking = claim?.bookingId || location.state?.highlightBooking;
 
   useEffect(() => {
     isCustomerAuthBackendAvailable().then(setBackendOk);
@@ -31,7 +54,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (walletIntent) return;
-    if (isCustomer()) {
+    if (isCustomer() && getCustomerToken()) {
       navigate(redirectTo, { replace: true });
       return;
     }
@@ -46,7 +69,11 @@ export default function LoginPage() {
 
   const finishLogin = (email, profile = {}, accessToken = null) => {
     loginAsCustomer(email, profile, accessToken);
-    navigate(redirectTo, { replace: true });
+    clearWalletClaim();
+    navigate(redirectTo, {
+      replace: true,
+      state: highlightBooking ? { highlightBooking } : undefined,
+    });
   };
 
   const handleLogin = async (e) => {
@@ -129,9 +156,21 @@ export default function LoginPage() {
             My Wallet
           </h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Σύνδεση πελάτη — ο λογαριασμός σας αποθηκεύεται στον server
+            {claim
+              ? 'Συνδεθείτε για να δείτε το εισιτήριο της κράτησής σας'
+              : 'Σύνδεση πελάτη — ο λογαριασμός σας αποθηκεύεται στον server'}
           </p>
         </div>
+
+        {claim ? (
+          <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-on-surface">
+            <p className="font-bold text-primary mb-1">Κράτηση έτοιμη για το Wallet</p>
+            <p className="text-on-surface-variant">
+              Χρησιμοποιήστε το ίδιο email:{' '}
+              <span className="font-semibold text-on-surface">{prefillEmail}</span>
+            </p>
+          </div>
+        ) : null}
 
         <div className="space-y-4 mb-6">
           <GoogleSignInButton
@@ -184,7 +223,7 @@ export default function LoginPage() {
                 id="email"
                 name="email"
                 type="email"
-                defaultValue={getCustomerEmail() || ''}
+                defaultValue={prefillEmail}
                 className="w-full pl-12 pr-4 py-4 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container"
                 placeholder="email@example.com"
                 required
@@ -228,7 +267,23 @@ export default function LoginPage() {
 
         <p className="text-sm text-center text-gray-600 mt-6">
           Δεν έχετε λογαριασμό;{' '}
-          <Link to="/register" className="text-primary font-bold hover:underline">
+          <Link
+            to="/register"
+            state={walletClaimNavState(
+              claim
+                ? {
+                    email: prefillEmail,
+                    name: claim.name,
+                    phone: claim.phone,
+                    bookingId: highlightBooking,
+                    reference: claim.reference,
+                    source: claim.source || 'manual',
+                    createdAt: Date.now(),
+                  }
+                : null,
+            )}
+            className="text-primary font-bold hover:underline"
+          >
             Εγγραφή
           </Link>
         </p>
