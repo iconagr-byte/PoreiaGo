@@ -81,6 +81,23 @@ cd /opt/poreiago && RUN_SEED=1 bash deploy/scripts/vm-deploy-all.sh
 
 **Push οδηγού:** Driver → Αρχική → Ενεργοποίηση push → Back Office → Master QR → Push οδηγού
 
+## Custom domain SSL (π.χ. Achillio)
+
+Το `https://www.achilliotravel.com` έχει έγκυρο Let's Encrypt. Αν ο browser δείχνει
+**«Μη ασφαλής σύνδεση»** στο `https://achilliotravel.com` (χωρίς www), το apex A record
+ακόμα δείχνει στο παλιό hosting (intechs), όχι στο VPS.
+
+Στο DNS του domain (intechs / όπου είναι τα NS):
+
+| Τύπος | Όνομα | Τιμή |
+|-------|--------|------|
+| A | `@` (achilliotravel.com) | `34.141.98.145` |
+| CNAME | `www` | `www.poreiago.com` |
+
+Μετά το DNS (συνήθως λίγα λεπτά–ώρες), κάνε restart το API ή αποθήκευσε ξανά το
+custom domain στο Super Admin — το Traefik θα εκδώσει πιστοποιητικό και για το apex.
+Βεβαιώσου ότι στο `deploy/.env.prod` υπάρχει `PLATFORM_INGRESS_IP=34.141.98.145`.
+
 ## Secrets
 
 - `deploy/.env.prod` — δεν ανεβαίνει στο GitHub
