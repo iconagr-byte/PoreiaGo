@@ -1,16 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
-
-/* Guest booking lookup — travel-office polish */
+/* Guest booking lookup — Apple-like system typography */
 
 .booking-lookup-shell {
-  --bl-ink: #0f172a;
-  --bl-secondary: #64748b;
-  --bl-accent: #0ea5e9;
-  --bl-accent-deep: #0369a1;
-  --bl-card: rgba(255, 255, 255, 0.88);
-  --bl-stroke: rgba(15, 23, 42, 0.08);
-  --bl-font: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --bl-display: 'Fraunces', 'Times New Roman', serif;
+  --bl-ink: #1c1c1e;
+  --bl-secondary: #8e8e93;
+  --bl-accent: #007aff;
+  --bl-accent-deep: #0071e3;
+  --bl-card: rgba(255, 255, 255, 0.82);
+  --bl-stroke: rgba(60, 60, 67, 0.12);
+  --bl-font:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --bl-display:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+    'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --bl-mono:
+    ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   position: relative;
   min-height: 100dvh;
   display: flex;
@@ -18,10 +22,12 @@
   overflow: hidden;
   color: var(--bl-ink);
   font-family: var(--bl-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background:
-    radial-gradient(900px 480px at 8% -10%, rgba(14, 165, 233, 0.16), transparent 55%),
-    radial-gradient(720px 400px at 100% 0%, rgba(15, 23, 42, 0.08), transparent 52%),
-    linear-gradient(165deg, #f8fafc 0%, #eef2f7 48%, #e2e8f0 100%);
+    radial-gradient(900px 480px at 8% -10%, rgba(0, 122, 255, 0.12), transparent 55%),
+    radial-gradient(720px 400px at 100% 0%, rgba(60, 60, 67, 0.06), transparent 52%),
+    linear-gradient(180deg, #f5f5f7 0%, #eef0f4 55%, #e8e9ed 100%);
 }
 
 .booking-lookup-glow {
@@ -38,7 +44,7 @@
   height: 280px;
   top: 10%;
   left: -90px;
-  background: rgba(14, 165, 233, 0.22);
+  background: rgba(0, 122, 255, 0.16);
 }
 
 .booking-lookup-glow--b {
@@ -46,7 +52,7 @@
   height: 320px;
   right: -110px;
   bottom: 8%;
-  background: rgba(15, 23, 42, 0.12);
+  background: rgba(60, 60, 67, 0.1);
   animation-delay: -5s;
 }
 
@@ -88,14 +94,15 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  border-radius: 999px;
+  border-radius: 980px;
   border: 1px solid var(--bl-stroke);
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
   padding: 0.45rem 0.9rem 0.45rem 0.65rem;
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 510;
+  letter-spacing: -0.01em;
   color: var(--bl-secondary);
   transition: color 0.18s ease, background 0.18s ease, transform 0.15s ease;
 }
@@ -125,12 +132,12 @@
   border-radius: 28px;
   border: 1px solid var(--bl-stroke);
   background: var(--bl-card);
-  backdrop-filter: blur(22px) saturate(1.2);
-  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(28px) saturate(1.55);
+  -webkit-backdrop-filter: blur(28px) saturate(1.55);
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 28px 64px rgba(15, 23, 42, 0.1);
-  padding: 1.75rem 1.65rem 1.55rem;
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 18px 48px rgba(0, 0, 0, 0.08);
+  padding: 1.85rem 1.7rem 1.6rem;
   text-align: center;
   animation: booking-lookup-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -153,10 +160,9 @@
   gap: 0.55rem;
   margin-bottom: 1.15rem;
   font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #94a3b8;
+  font-weight: 590;
+  letter-spacing: -0.01em;
+  color: var(--bl-secondary);
 }
 
 .booking-lookup-steps .is-active {
@@ -173,12 +179,12 @@
   width: 58px;
   height: 58px;
   margin: 0 auto 0.95rem;
-  border-radius: 18px;
+  border-radius: 16px;
   display: grid;
   place-items: center;
-  background: linear-gradient(160deg, rgba(14, 165, 233, 0.18), rgba(3, 105, 161, 0.08));
+  background: linear-gradient(180deg, rgba(0, 122, 255, 0.16), rgba(0, 113, 227, 0.08));
   color: var(--bl-accent-deep);
-  box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(0, 122, 255, 0.14);
 }
 
 .booking-lookup-icon .material-symbols-outlined {
@@ -189,18 +195,20 @@
 .booking-lookup-title {
   margin: 0;
   font-family: var(--bl-display);
-  font-size: 1.75rem;
+  font-size: clamp(1.7rem, 4.5vw, 2rem);
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
   color: var(--bl-ink);
 }
 
 .booking-lookup-lead {
-  margin: 0.6rem auto 0;
-  max-width: 34ch;
-  font-size: 0.9375rem;
-  line-height: 1.5;
+  margin: 0.65rem auto 0;
+  max-width: 36ch;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.45;
   color: var(--bl-secondary);
 }
 
@@ -220,11 +228,11 @@
 
 .booking-lookup-field > span {
   padding-left: 0.15rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--bl-secondary);
+  font-size: 0.78rem;
+  font-weight: 590;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: #636366;
 }
 
 .booking-lookup-input-wrap {
@@ -232,15 +240,15 @@
   align-items: center;
   gap: 0.45rem;
   border: 1px solid transparent;
-  border-radius: 16px;
-  background: rgba(241, 245, 249, 0.95);
+  border-radius: 14px;
+  background: rgba(118, 118, 128, 0.1);
   padding: 0 0.95rem;
   transition: background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .booking-lookup-input-wrap .material-symbols-outlined {
   font-size: 20px;
-  color: #94a3b8;
+  color: #aeaeb2;
   flex-shrink: 0;
 }
 
@@ -249,21 +257,23 @@
   border: 0;
   background: transparent;
   padding: 0.95rem 0;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.0625rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
   color: var(--bl-ink);
   outline: none;
   font-family: inherit;
 }
 
 .booking-lookup-field input::placeholder {
-  color: #94a3b8;
-  font-weight: 500;
+  color: #aeaeb2;
+  font-weight: 400;
 }
 
 .booking-lookup-field input.is-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  letter-spacing: 0.05em;
+  font-family: var(--bl-mono);
+  letter-spacing: 0.04em;
+  font-weight: 500;
 }
 
 .booking-lookup-input-wrap:hover {
@@ -272,12 +282,12 @@
 
 .booking-lookup-field:focus-within .booking-lookup-input-wrap {
   background: #fff;
-  border-color: rgba(14, 165, 233, 0.45);
-  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.14);
+  border-color: rgba(0, 122, 255, 0.45);
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.14);
 }
 
 .booking-lookup-field:focus-within .booking-lookup-input-wrap .material-symbols-outlined {
-  color: var(--bl-accent-deep);
+  color: var(--bl-accent);
 }
 
 .booking-lookup-field.has-error .booking-lookup-input-wrap {
@@ -294,8 +304,9 @@
 }
 
 .booking-lookup-field small {
-  font-size: 0.72rem;
-  color: #94a3b8;
+  font-size: 0.75rem;
+  letter-spacing: -0.01em;
+  color: var(--bl-secondary);
   padding-left: 0.15rem;
 }
 
@@ -307,16 +318,17 @@
   gap: 0.45rem;
   width: 100%;
   border: 0;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-radius: 980px;
+  background: #1c1c1e;
   color: #fff;
   padding: 1rem 1.25rem;
-  font-size: 0.9875rem;
-  font-weight: 700;
+  font-size: 1.0625rem;
+  font-weight: 590;
+  letter-spacing: -0.02em;
   font-family: inherit;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
-  transition: transform 0.15s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+  transition: transform 0.15s ease, opacity 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .booking-lookup-submit .material-symbols-outlined {
@@ -325,7 +337,8 @@
 
 .booking-lookup-submit:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.28);
+  background: #000;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.18);
 }
 
 .booking-lookup-submit:active:not(:disabled) {
@@ -346,8 +359,9 @@
   border: 0;
   background: transparent;
   color: var(--bl-accent-deep);
-  font-size: 0.8125rem;
-  font-weight: 700;
+  font-size: 0.875rem;
+  font-weight: 510;
+  letter-spacing: -0.015em;
   font-family: inherit;
   cursor: pointer;
 }
@@ -359,8 +373,8 @@
 .booking-lookup-help {
   margin-top: 0.75rem;
   text-align: left;
-  border-radius: 16px;
-  background: rgba(241, 245, 249, 0.9);
+  border-radius: 14px;
+  background: rgba(118, 118, 128, 0.08);
   border: 1px solid var(--bl-stroke);
   padding: 0.9rem 1rem;
   animation: booking-lookup-rise 0.35s ease both;
@@ -369,20 +383,23 @@
 .booking-lookup-help ol {
   margin: 0;
   padding-left: 1.15rem;
-  color: var(--bl-secondary);
+  color: #636366;
   font-size: 0.8125rem;
+  letter-spacing: -0.01em;
   line-height: 1.55;
 }
 
 .booking-lookup-help p {
   margin: 0.7rem 0 0;
   font-size: 0.8125rem;
-  color: var(--bl-secondary);
+  letter-spacing: -0.01em;
+  color: #636366;
 }
 
 .booking-lookup-note {
   margin: 1.15rem 0 0;
   font-size: 0.75rem;
+  letter-spacing: -0.01em;
   line-height: 1.45;
   color: var(--bl-secondary);
 }
@@ -398,7 +415,8 @@
 
 .booking-lookup-wallet {
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 510;
+  letter-spacing: -0.015em;
   color: var(--bl-accent-deep);
 }
 
@@ -411,7 +429,8 @@
   align-items: center;
   gap: 0.3rem;
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 510;
+  letter-spacing: -0.015em;
   color: var(--bl-ink);
 }
 
