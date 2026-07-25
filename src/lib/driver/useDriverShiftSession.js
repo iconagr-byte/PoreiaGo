@@ -358,10 +358,28 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', ensureRunning);
 
+    // Real document unload (close tab / kill PWA) — clear office pin immediately.
+    // App-switch usually only fires visibilitychange; pagehide+persisted=bfcache.
+    const onPageHide = (event) => {
+      if (event?.persisted) return;
+      if (!isDriverShiftOnline() && !runningRef.current) return;
+      try {
+        void endDriverShift();
+      } catch {
+        /* best effort */
+      }
+      stopRuntime();
+      setOnline(false);
+      setStarting(false);
+      setShiftFlag(false);
+    };
+    window.addEventListener('pagehide', onPageHide);
+
     return () => {
       window.clearInterval(retryId);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', ensureRunning);
+      window.removeEventListener('pagehide', onPageHide);
       // Do NOT stopRuntime here — Strict Mode remount would kill GPS.
       // Teardown only when enabled flips false (above) or goOffline/logout.
     };

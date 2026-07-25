@@ -505,9 +505,12 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
     from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
     from travel_platform.telemetry.processor import get_live_fleet
 
+    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
     platform_tid = await resolve_platform_tenant_id()
+    raw_tenant = str(session_payload.get("tenant_id") or "").strip()
     tenant_id = coerce_driver_tenant_id(
-        str(session_payload.get("tenant_id") or ""),
+        raw_tenant,
         platform_tenant_id=platform_tid,
     )
     session_payload = {**session_payload, "tenant_id": tenant_id}
@@ -516,10 +519,35 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
 
     was_online = force_driver_offline(session_payload)
 
+    # Also wipe demo + obsolete seed-slug mirrors so merged admin maps go dark.
+    extra_tenants = {DEFAULT_TENANT, platform_tid, raw_tenant}
+    try:
+        import os
+
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+
+        seed_slug = (os.getenv("DEFAULT_TENANT_SLUG") or "achillio").strip().lower()
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Tenant).where(Tenant.slug == seed_slug).limit(1))
+            seed = result.scalar_one_or_none()
+            if seed:
+                extra_tenants.add(str(seed.id))
+    except Exception:
+        pass
+    extra_tenants.discard(tenant_id)
+    extra_tenants.discard("")
+
     removed: list[str] = []
     if tenant_id and driver_id:
         try:
-            removed = await get_live_fleet().remove_driver_vehicles(tenant_id, driver_id)
+            removed = await get_live_fleet().remove_driver_vehicles(
+                tenant_id,
+                driver_id,
+                extra_tenant_ids=list(extra_tenants),
+            )
         except Exception:
             removed = []
 
