@@ -8,17 +8,17 @@ import { FLEET_LIVE_POLL_MS } from '../lib/admin/fleetLivePoll.js';
 
 export const DEMO_TENANT = import.meta.env.VITE_DEMO_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 
-/** Tenant για fleet egress — JWT impersonation, localStorage ή demo fallback. */
+/** Tenant για fleet egress — JWT tenant πρώτα (όχι stale localStorage). */
 export function resolveFleetTenantId() {
   const impersonated = getImpersonationTarget();
   if (impersonated) return impersonated;
-  const stored = getSaasTenantId();
-  if (stored) return stored;
   const token = getSaasToken();
   if (token) {
     const payload = decodeJwtPayload(token);
     if (payload?.tenant_id) return payload.tenant_id;
   }
+  const stored = getSaasTenantId();
+  if (stored) return stored;
   return DEMO_TENANT;
 }
 

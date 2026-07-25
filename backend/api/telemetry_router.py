@@ -82,42 +82,59 @@ admin_router = APIRouter(prefix="/telemetry", tags=["telemetry-admin"])
 async def fleet_live(
     tenant_id: Annotated[UUID, Depends(get_tenant_id)],
 ):
+    """Latest GPS pins for the admin map.
+
+    Per-row failures are skipped. A total list failure returns 503 (not empty [])
+    so the admin client keeps the last-known pin instead of wiping the map.
+    """
+    import logging
+
     from travel_platform.telemetry.live_fleet_media import enrich_live_vehicle_media
     from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
-    live: LiveFleetService = get_live_fleet()
+    log = logging.getLogger(__name__)
+    try:
+        live: LiveFleetService = get_live_fleet()
+        vehicles = await live.list_active_for_admin_async(tenant_id)
+    except Exception as exc:
+        log.exception("fleet_live list_active failed tenant=%s", tenant_id)
+        raise HTTPException(status_code=503, detail="Live fleet temporarily unavailable") from exc
+
     rows = []
-    for v in await live.list_active_for_admin_async(tenant_id):
-        meta = await live.vehicle_meta_async(tenant_id, v.vehicle_id)
-        if not meta:
-            meta = live._vehicles.get(v.vehicle_id, {})
-        media = enrich_live_vehicle_media(
-            driver_id=meta.get("driver_id"),
-            bus_plate=meta.get("bus_plate", v.vehicle_code),
-            vehicle_code=v.vehicle_code,
-        )
-        trip_title = await resolve_trip_title(v.trip_id, preferred=meta.get("trip_title"))
-        rows.append(
-            LiveVehicleResponse(
-                vehicle_id=v.vehicle_id,
-                vehicle_code=v.vehicle_code,
-                trip_id=v.trip_id,
-                lat=v.lat,
-                lng=v.lng,
-                speed_kmh=v.speed_kmh,
-                engine_on=v.engine_on,
-                fuel_level_pct=v.fuel_level_pct,
-                idle_seconds_trip=v.idle_seconds_trip,
-                updated_at=v.updated_at,
-                driver_name=meta.get("driver_name"),
-                bus_plate=media.get("bus_plate") or meta.get("bus_plate", v.vehicle_code),
-                heading_deg=meta.get("heading_deg"),
+    for v in vehicles:
+        try:
+            meta = await live.vehicle_meta_async(tenant_id, v.vehicle_id)
+            if not meta:
+                meta = live._vehicles.get(v.vehicle_id, {})
+            media = enrich_live_vehicle_media(
                 driver_id=meta.get("driver_id"),
-                photo_url=media.get("photo_url"),
-                vehicle_image_url=media.get("vehicle_image_url"),
-                trip_title=trip_title or None,
-            ),
-        )
+                bus_plate=meta.get("bus_plate", v.vehicle_code),
+                vehicle_code=v.vehicle_code,
+            )
+            trip_title = await resolve_trip_title(v.trip_id, preferred=meta.get("trip_title"))
+            rows.append(
+                LiveVehicleResponse(
+                    vehicle_id=v.vehicle_id,
+                    vehicle_code=v.vehicle_code,
+                    trip_id=v.trip_id,
+                    lat=v.lat,
+                    lng=v.lng,
+                    speed_kmh=v.speed_kmh,
+                    engine_on=v.engine_on,
+                    fuel_level_pct=v.fuel_level_pct,
+                    idle_seconds_trip=v.idle_seconds_trip,
+                    updated_at=v.updated_at,
+                    driver_name=meta.get("driver_name"),
+                    bus_plate=media.get("bus_plate") or meta.get("bus_plate", v.vehicle_code),
+                    heading_deg=meta.get("heading_deg"),
+                    driver_id=meta.get("driver_id"),
+                    photo_url=media.get("photo_url"),
+                    vehicle_image_url=media.get("vehicle_image_url"),
+                    trip_title=trip_title or None,
+                ),
+            )
+        except Exception:
+            log.exception("fleet_live row enrich failed vehicle=%s", getattr(v, "vehicle_id", None))
     return rows
 
 
