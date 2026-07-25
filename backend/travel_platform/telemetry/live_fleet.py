@@ -325,27 +325,70 @@ class LiveFleetService:
             self._vehicles[vehicle_id] = {**self._vehicles.get(vehicle_id, {}), **remote}
         return remote or local
 
-    async def remove_driver_vehicles(self, tenant_id: str, driver_id: str) -> list[str]:
-        """Drop live vehicles for a driver (end shift). Returns removed vehicle ids."""
-        from travel_platform.telemetry.live_fleet_redis import delete_live_vehicle
+    async def remove_driver_vehicles(
+        self,
+        tenant_id: str,
+        driver_id: str,
+        *,
+        extra_tenant_ids: list[str] | None = None,
+    ) -> list[str]:
+        """
+        Drop live vehicles for a driver (end shift).
 
-        tid = str(tenant_id or "")
-        did = str(driver_id or "")
+        Clears memory + Redis for the primary tenant and any extras (demo /
+        obsolete seed slug). GPS briefly landed on the wrong Achillio tenant;
+        end-shift must wipe every mirror or the admin map keeps showing the pin.
+        """
+        from travel_platform.telemetry.live_fleet_redis import (
+            delete_live_vehicle,
+            load_live_vehicles,
+        )
+
+        did = str(driver_id or "").strip()
+        if not did:
+            return []
+
+        tenants: set[str] = set()
+        for raw in [tenant_id, *(extra_tenant_ids or [])]:
+            tid = str(raw or "").strip()
+            if tid:
+                tenants.add(tid)
+        if not tenants:
+            return []
+
         removed: list[str] = []
-        if not tid or not did:
-            return removed
+        seen: set[tuple[str, str]] = set()
 
-        for vid, meta in list(self._vehicles.items()):
-            if str(meta.get("tenant_id") or "") != tid:
-                continue
-            if str(meta.get("driver_id") or "") != did:
-                continue
-            code = meta.get("vehicle_code")
+        async def _drop(tid: str, vid: str, meta: dict[str, Any] | None = None) -> None:
+            key = (tid, vid)
+            if not vid or key in seen:
+                return
+            seen.add(key)
+            code = (meta or {}).get("vehicle_code") or self._vehicles.get(vid, {}).get("vehicle_code")
             self._vehicles.pop(vid, None)
             if code:
                 self._code_index.pop(f"{tid}:{code}", None)
             await delete_live_vehicle(tid, vid)
             removed.append(vid)
+
+        for tid in tenants:
+            for vid, meta in list(self._vehicles.items()):
+                if str(meta.get("tenant_id") or "") != tid:
+                    continue
+                if str(meta.get("driver_id") or "") != did:
+                    continue
+                await _drop(tid, vid, meta)
+
+            try:
+                remote_rows = await load_live_vehicles(tid)
+            except Exception:
+                remote_rows = []
+            for meta in remote_rows:
+                if str(meta.get("driver_id") or "") != did:
+                    continue
+                vid = str(meta.get("vehicle_id") or "")
+                await _drop(tid, vid, meta)
+
         return removed
 
     def heatmap_grid(self, tenant_id: UUID, cell_size: float = 0.01) -> list[dict]:
