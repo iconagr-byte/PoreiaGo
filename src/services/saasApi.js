@@ -20,14 +20,30 @@ function notifySaasSessionChanged() {
 }
 
 async function parseError(res) {
-  const err = await res.json().catch(() => ({}));
+  if ([502, 503, 504].includes(res.status)) {
+    throw new Error(
+      'Ο server είναι προσωρινά εκτός (deploy/αναβάθμιση). Περιμένετε ~1 λεπτό και δοκιμάστε ξανά.',
+    );
+  }
+  const raw = await res.text().catch(() => '');
+  let err = {};
+  try {
+    err = raw ? JSON.parse(raw) : {};
+  } catch {
+    if (/bad gateway|gateway time-out|503|502|504/i.test(raw)) {
+      throw new Error(
+        'Ο server είναι προσωρινά εκτός (deploy/αναβάθμιση). Περιμένετε ~1 λεπτό και δοκιμάστε ξανά.',
+      );
+    }
+  }
   let detail = err.detail ?? res.statusText ?? 'Request failed';
   if (Array.isArray(detail)) {
     detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
-  } else if (typeof detail === 'object') {
+  } else if (typeof detail === 'object' && detail) {
     detail = JSON.stringify(detail);
   }
-  throw new Error(String(detail));
+  const msg = String(detail || '').trim();
+  throw new Error(msg || `Αποτυχία αίτησης (${res.status})`);
 }
 
 export function getSaasToken() {
