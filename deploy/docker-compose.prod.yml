@@ -175,11 +175,12 @@ services:
       # are routed via traefik/dynamic/custom-domains.yml — do NOT pin
       # tls.domains to a tenant host here (that made Traefik serve the wrong
       # / default cert for www.poreiago.com → NET::ERR_CERT_AUTHORITY_INVALID).
-      - traefik.http.routers.app.rule=Host(`${APP_HOST:-www.poreiago.com}`) || Host(`www.poreiago.com`) || Host(`poreiago.com`)
+      # Do NOT add poreiago.com to tls.domains until apex DNS A exists — ACME
+      # fails + rate-limits and can break cert renewal for www.
+      - traefik.http.routers.app.rule=Host(`${APP_HOST:-www.poreiago.com}`) || Host(`www.poreiago.com`)
       - traefik.http.routers.app.entrypoints=websecure
       - traefik.http.routers.app.tls.certresolver=letsencrypt
       - traefik.http.routers.app.tls.domains[0].main=www.poreiago.com
-      - traefik.http.routers.app.tls.domains[0].sans=poreiago.com
       - traefik.http.routers.app.priority=100
       - traefik.http.services.app.loadbalancer.server.port=80
     networks:
