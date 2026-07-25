@@ -171,12 +171,16 @@ services:
       - ./nginx/frontend.conf:/etc/nginx/conf.d/default.conf:ro
     labels:
       - traefik.enable=true
-      # Custom apex domains (e.g. achilliotravel.com) are added by
-      # traefik/dynamic/custom-domains.yml once their DNS A record points here.
-      - traefik.http.routers.app.rule=Host(`${APP_HOST}`) || Host(`www.poreiago.com`) || Host(`poreiago.com`) || Host(`www.achilliotravel.com`)
+      # PoreiaGo platform hosts only. Tenant custom domains (e.g. Achillio)
+      # are routed via traefik/dynamic/custom-domains.yml — do NOT pin
+      # tls.domains to a tenant host here (that made Traefik serve the wrong
+      # / default cert for www.poreiago.com → NET::ERR_CERT_AUTHORITY_INVALID).
+      - traefik.http.routers.app.rule=Host(`${APP_HOST:-www.poreiago.com}`) || Host(`www.poreiago.com`) || Host(`poreiago.com`)
       - traefik.http.routers.app.entrypoints=websecure
       - traefik.http.routers.app.tls.certresolver=letsencrypt
-      - traefik.http.routers.app.tls.domains[0].main=www.achilliotravel.com
+      - traefik.http.routers.app.tls.domains[0].main=www.poreiago.com
+      - traefik.http.routers.app.tls.domains[0].sans=poreiago.com
+      - traefik.http.routers.app.priority=100
       - traefik.http.services.app.loadbalancer.server.port=80
     networks:
       - edge
