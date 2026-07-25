@@ -1,0 +1,73 @@
+name: Diagnose live fleet (VPS)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: diagnose-live-fleet
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump live fleet + Redis + recent GPS logs
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 5m
+          script: |
+            set -euo pipefail
+            cd /opt/poreiago
+            ENV_FILE=deploy/.env.prod
+            COMPOSE="docker compose --env-file $ENV_FILE -f deploy/docker-compose.prod.yml"
+            echo "=== git ==="
+            git rev-parse --short HEAD || true
+            echo "=== platform tenant ==="
+            $COMPOSE exec -T api-blue python - <<'PY'
+            import asyncio, os
+            async def main():
+                from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id, DEFAULT_TENANT
+                tid = await resolve_platform_tenant_id()
+                print("platform_tenant_id=", tid)
+                print("DEFAULT_TENANT=", DEFAULT_TENANT)
+                print("SAAS_DEFAULT_TENANT_ID=", os.getenv("SAAS_DEFAULT_TENANT_ID"))
+                print("DEFAULT_TENANT_ID=", os.getenv("DEFAULT_TENANT_ID"))
+                print("DEFAULT_TENANT_SLUG=", os.getenv("DEFAULT_TENANT_SLUG"))
+            asyncio.run(main())
+            PY
+            echo "=== in-memory live fleet ==="
+            $COMPOSE exec -T api-blue python - <<'PY'
+            import asyncio
+            from uuid import UUID
+            async def main():
+                from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id, DEFAULT_TENANT
+                from travel_platform.telemetry.processor import get_live_fleet
+                live = get_live_fleet()
+                print("memory_vehicle_count=", len(getattr(live, "_vehicles", {})))
+                for vid, meta in list(getattr(live, "_vehicles", {}).items())[:20]:
+                    print("mem", vid, "tenant=", meta.get("tenant_id"), "lat=", meta.get("lat"), "lng=", meta.get("lng"), "updated=", meta.get("updated_at"), "plate=", meta.get("bus_plate") or meta.get("vehicle_code"), "driver=", meta.get("driver_name"))
+                platform = await resolve_platform_tenant_id()
+                for label, tid in [("platform", platform), ("demo", DEFAULT_TENANT)]:
+                    try:
+                        rows = await live.list_active_for_admin_async(UUID(tid))
+                    except Exception as exc:
+                        print(label, "list_error", exc)
+                        continue
+                    print(label, "active=", len(rows), "tenant=", tid)
+                    for r in rows[:10]:
+                        print(" ", r.vehicle_id, r.vehicle_code, r.lat, r.lng, r.updated_at)
+            asyncio.run(main())
+            PY
+            echo "=== redis live keys ==="
+            $COMPOSE exec -T redis redis-cli --scan --pattern 'fleet:live:*' | head -50 || true
+            $COMPOSE exec -T redis redis-cli --scan --pattern '*live*' | head -50 || true
+            echo "=== recent api logs (telemetry/gps/ingest) ==="
+            $COMPOSE logs --tail=200 api-blue 2>&1 | rg -i 'telemetry|gps|ingest|fleet_live|rate_limit|driver.*location|ws_stale|Redis save' | tail -80 || true
+            echo "=== nginx proxy check ==="
+            $COMPOSE exec -T frontend wget -qO- http://127.0.0.1/health 2>/dev/null || true
+            echo
+            echo "=== done ==="
