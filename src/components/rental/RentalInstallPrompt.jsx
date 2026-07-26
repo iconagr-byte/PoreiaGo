@@ -24,10 +24,10 @@ function isStandalone() {
 const DISMISS_KEY = 'rental_install_dismissed_v2';
 
 /**
- * @param {{ force?: boolean }} props
+ * @param {{ force?: boolean, compact?: boolean }} props
  * force=true: always show install guidance until the app is installed
  */
-export default function RentalInstallPrompt({ force = false } = {}) {
+export default function RentalInstallPrompt({ force = false, compact = false } = {}) {
   const [deferred, setDeferred] = useState(() => getRentalDeferredInstallPrompt());
   const [showIos, setShowIos] = useState(() => isIosSafari() && !isStandalone());
   const [hidden, setHidden] = useState(() => {
@@ -43,18 +43,29 @@ export default function RentalInstallPrompt({ force = false } = {}) {
       return undefined;
     }
     const sync = () => {
+      if (isStandalone()) {
+        setHidden(true);
+        return;
+      }
       const evt = getRentalDeferredInstallPrompt();
       if (evt) {
         setDeferred(evt);
         setShowIos(false);
+        if (force) setHidden(false);
       } else if (isIosSafari()) {
         setShowIos(true);
       }
     };
     sync();
     window.addEventListener('rental-pwa-install-available', sync);
-    return () => window.removeEventListener('rental-pwa-install-available', sync);
-  }, []);
+    window.addEventListener('rental-pwa-installed', sync);
+    window.addEventListener('rental-pwa-sw-ready', sync);
+    return () => {
+      window.removeEventListener('rental-pwa-install-available', sync);
+      window.removeEventListener('rental-pwa-installed', sync);
+      window.removeEventListener('rental-pwa-sw-ready', sync);
+    };
+  }, [force]);
 
   if (hidden) return null;
 
@@ -77,20 +88,25 @@ export default function RentalInstallPrompt({ force = false } = {}) {
     dismiss();
   };
 
-  const howto = showIos && !deferred
-    ? 'iPhone: Share → «Προσθήκη στην οθόνη Αφετηρίας».'
-    : deferred
-      ? 'Εγκαταστήστε την εφαρμογή στην αρχική οθόνη — μία αφή για κράτηση.'
-      : 'Chrome/Android: μενού ⋮ → «Εγκατάσταση εφαρμογής» ή «Add to Home screen».';
+  const howto =
+    showIos && !deferred
+      ? 'iPhone/iPad: πατήστε Share (□↑) → «Προσθήκη στην οθόνη Αφετηρίας».'
+      : deferred
+        ? 'Εγκαταστήστε την εφαρμογή στην αρχική οθόνη — μία αφή για κράτηση.'
+        : 'Android Chrome: μενού ⋮ → «Εγκατάσταση εφαρμογής» ή «Add to Home screen».';
 
   return (
-    <div className="rent-install" role="region" aria-label="Εγκατάσταση εφαρμογής ενοικίασης">
+    <div
+      className={`rent-install${compact ? ' rent-install--compact' : ''}`}
+      role="region"
+      aria-label="Εγκατάσταση εφαρμογής ενοικίασης"
+    >
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
         <div className="rent-install-icon" aria-hidden>
           <span className="material-symbols-outlined">install_mobile</span>
         </div>
         <div>
-          <p className="rent-install-title">Εγκατάσταση Ενοικίασης</p>
+          <p className="rent-install-title">Εγκατάσταση στο κινητό</p>
           <p className="rent-install-text">{howto}</p>
         </div>
       </div>

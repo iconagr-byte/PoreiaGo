@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   getCustomerEmail,
   getCustomerName,
@@ -37,13 +37,14 @@ function readAdminPreview() {
   }
 }
 
-function RentalGateCard({ title, body, children }) {
+function RentalGateCard({ title, body, children, showInstall = false }) {
   return (
     <div className="rent-phone-stage">
       <div className="rent-gate">
         <div className="rent-gate-card">
           <h1>{title}</h1>
           <p>{body}</p>
+          {showInstall ? <RentalInstallPrompt force compact /> : null}
           <div className="rent-gate-actions">{children}</div>
         </div>
       </div>
@@ -51,8 +52,56 @@ function RentalGateCard({ title, body, children }) {
   );
 }
 
+function RentalGuestLanding({ brandName }) {
+  return (
+    <div className="rent-phone-stage">
+      <div className="rent-app rent-app--guest">
+        <main className="rent-home">
+          <section className="rent-hero" aria-label="Ενοικίαση">
+            <p className="rent-hero-brand">{brandName}</p>
+            <h1 className="rent-hero-title">Το όχημά σας, σε λίγα βήματα</h1>
+            <p className="rent-hero-copy">
+              Εγκαταστήστε την εφαρμογή στο κινητό — κράτηση, ημερολόγιο και χάρτης παραλαβής.
+            </p>
+            <Link to="/login" state={{ from: '/rent' }} className="rent-hero-cta">
+              <span className="material-symbols-outlined" aria-hidden>
+                login
+              </span>
+              Σύνδεση πελάτη
+            </Link>
+          </section>
+          <div className="rent-home-stack">
+            <RentalInstallPrompt force />
+            <p className="rent-guest-hint">
+              Μετά την εγκατάσταση ανοίγει από την αρχική οθόνη σαν εφαρμογή.
+            </p>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
 function RentalAuthGate() {
   const [adminPreview, setAdminPreview] = useState(readAdminPreview);
+  const [brandName, setBrandName] = useState('Ενοικίαση');
+
+  useEffect(() => setupRentalPwa(), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSiteAppearance()
+      .then((data) => {
+        if (cancelled) return;
+        const brand = resolveOfficeBrand(data || {});
+        const office = brand.displayName || 'Γραφείο';
+        setBrandName(`${office} Rent`);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (isCustomer() && !getCustomerToken()) {
     logoutCustomer();
@@ -67,6 +116,7 @@ function RentalAuthGate() {
       <RentalGateCard
         title="Ενοικίαση"
         body="Συνδεδεμένοι ως οδηγός — η εφαρμογή είναι για πελάτες."
+        showInstall
       >
         <Link to="/driver" className="rent-gate-btn-primary">
           Driver Portal
@@ -98,7 +148,8 @@ function RentalAuthGate() {
     return (
       <RentalGateCard
         title="Ενοικίαση"
-        body="Είστε συνδεδεμένοι ως γραφείο. Δείτε την εφαρμογή πελατών ή συνδεθείτε ως πελάτης για πραγματική κράτηση."
+        body="Είστε συνδεδεμένοι ως γραφείο. Δείτε την εφαρμογή πελατών, εγκαταστήστε την στο κινητό ή συνδεθείτε ως πελάτης."
+        showInstall
       >
         <button
           type="button"
@@ -124,7 +175,8 @@ function RentalAuthGate() {
     );
   }
 
-  return <Navigate to="/login" replace state={{ from: '/rent' }} />;
+  // Stay on /rent so Android BIP + iOS Add to Home Screen use start_url=/rent.
+  return <RentalGuestLanding brandName={brandName} />;
 }
 
 function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {}) {

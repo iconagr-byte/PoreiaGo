@@ -10,6 +10,7 @@ const APPLE_ICON = '/icons/rental-pwa-192.png';
 /** Captured early so React install UI can still fire the prompt. */
 let deferredInstallPrompt = null;
 let bipListening = false;
+let swRegistered = false;
 
 function upsertLink(rel, href, attrs = {}) {
   let el = document.querySelector(`link[rel="${rel}"][data-rental-pwa="1"]`);
@@ -39,6 +40,13 @@ function upsertMeta(name, content) {
   return el;
 }
 
+/** Avoid competing wallet/driver manifests while on /rent. */
+function clearForeignManifests() {
+  document
+    .querySelectorAll('link[rel="manifest"]:not([data-rental-pwa="1"])')
+    .forEach((el) => el.remove());
+}
+
 export function captureRentalInstallPrompt() {
   if (typeof window === 'undefined' || bipListening) return;
   bipListening = true;
@@ -46,6 +54,10 @@ export function captureRentalInstallPrompt() {
     e.preventDefault();
     deferredInstallPrompt = e;
     window.dispatchEvent(new CustomEvent('rental-pwa-install-available'));
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    window.dispatchEvent(new CustomEvent('rental-pwa-installed'));
   });
 }
 
@@ -59,10 +71,12 @@ export function clearRentalDeferredInstallPrompt() {
 
 export function injectRentalPwaHead() {
   if (typeof document === 'undefined') return;
+  clearForeignManifests();
   upsertLink('manifest', MANIFEST_HREF);
   upsertLink('apple-touch-icon', APPLE_ICON);
   upsertMeta('theme-color', THEME);
   upsertMeta('apple-mobile-web-app-capable', 'yes');
+  upsertMeta('mobile-web-app-capable', 'yes');
   upsertMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
   upsertMeta('apple-mobile-web-app-title', 'Ενοικίαση');
   captureRentalInstallPrompt();
@@ -81,29 +95,37 @@ export function registerRentalServiceWorker() {
   };
   navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
-  navigator.serviceWorker
-    .register(SW_HREF, { updateViaCache: 'none', scope: '/rent' })
-    .then((reg) => {
-      reg.update().catch(() => {});
-      const askWaiting = () => {
-        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-      };
-      askWaiting();
-      reg.addEventListener('updatefound', () => {
-        const worker = reg.installing;
-        if (!worker) return;
-        worker.addEventListener('statechange', () => {
-          if (worker.state === 'installed') askWaiting();
+  if (!swRegistered) {
+    swRegistered = true;
+    navigator.serviceWorker
+      .register(SW_HREF, { updateViaCache: 'none', scope: '/rent' })
+      .then((reg) => {
+        reg.update().catch(() => {});
+        const askWaiting = () => {
+          if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        };
+        askWaiting();
+        reg.addEventListener('updatefound', () => {
+          const worker = reg.installing;
+          if (!worker) return;
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed') askWaiting();
+          });
         });
+        window.dispatchEvent(new CustomEvent('rental-pwa-sw-ready'));
+      })
+      .catch((err) => {
+        swRegistered = false;
+        console.warn('[rental-pwa] service worker registration failed', err);
       });
-    })
-    .catch(() => {});
+  }
 
   return () => {
     navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
   };
 }
 
+/** Head + SW — safe to call for guests and authenticated users on /rent. */
 export function setupRentalPwa() {
   injectRentalPwaHead();
   return registerRentalServiceWorker();
