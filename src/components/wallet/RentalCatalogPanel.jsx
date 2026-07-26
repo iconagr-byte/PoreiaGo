@@ -45,7 +45,10 @@ const EMPTY = {
   client_phone: '',
 };
 
-export default function RentalCatalogPanel() {
+export default function RentalCatalogPanel({ mode = 'full' } = {}) {
+  const showBook = mode === 'full' || mode === 'book';
+  const showMine = mode === 'full' || mode === 'mine';
+  const bare = mode !== 'full';
   const [form, setForm] = useState(EMPTY);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -146,8 +149,10 @@ export default function RentalCatalogPanel() {
   };
 
   return (
-    <div className="wallet-stack">
-      <section className="wallet-panel">
+    <div className={bare ? 'rent-catalog' : 'wallet-stack'}>
+      {showBook ? (
+      <section className={bare ? '' : 'wallet-panel'}>
+        {!bare ? (
         <div className="wallet-panel-head">
           <span className="wallet-panel-head-icon" aria-hidden>
             <span className="material-symbols-outlined">directions_car</span>
@@ -157,6 +162,7 @@ export default function RentalCatalogPanel() {
             <p>Βρείτε διαθέσιμο όχημα και κλείστε άμεσα από το κινητό.</p>
           </div>
         </div>
+        ) : null}
 
         <form className="wallet-form" onSubmit={search}>
           <div className="wallet-field">
@@ -257,9 +263,10 @@ export default function RentalCatalogPanel() {
           </button>
         </form>
       </section>
+      ) : null}
 
-      {suggestions.length > 0 ? (
-        <section className="wallet-panel">
+      {showBook && suggestions.length > 0 ? (
+        <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>
           <h2>Διαθέσιμα</h2>
           <p className="wallet-panel-lead">{suggestions.length} οχήματα</p>
           <div className="wallet-list">
@@ -316,8 +323,9 @@ export default function RentalCatalogPanel() {
         </section>
       ) : null}
 
-      <section className="wallet-panel">
-        <h2>Οι ενοικιάσεις μου</h2>
+      {showMine ? (
+      <section className={bare ? '' : 'wallet-panel'} style={bare && mode === 'full' ? { marginTop: '1rem' } : undefined}>
+        {!bare ? <h2>Οι ενοικιάσεις μου</h2> : null}
         <p className="wallet-panel-lead">
           {loading ? 'Φόρτωση…' : mine.length ? `${mine.length} κρατήσεις` : 'Καμία κράτηση ακόμα'}
         </p>
@@ -368,6 +376,7 @@ export default function RentalCatalogPanel() {
           </div>
         ) : null}
       </section>
+      ) : null}
     </div>
   );
 }

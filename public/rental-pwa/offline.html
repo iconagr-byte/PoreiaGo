@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="el">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b3d4a" />
+    <title>Ενοικίαση — Offline</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        color: #f4f7f6;
+        background: radial-gradient(120% 80% at 20% 0%, #1a7a6d 0%, #0b3d4a 55%, #072830 100%);
+        font-family: 'Segoe UI', system-ui, sans-serif;
+      }
+      h1 { font-size: 1.35rem; margin: 0 0 0.5rem; }
+      p { color: #c5ebe4; line-height: 1.5; margin: 0; }
+      button {
+        margin-top: 1.25rem;
+        padding: 14px 20px;
+        border: 0;
+        border-radius: 14px;
+        background: #f4f7f6;
+        color: #0b3d4a;
+        font-weight: 800;
+        font-size: 1rem;
+        width: 100%;
+        max-width: 280px;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1>Χωρίς σύνδεση</h1>
+      <p>Η κράτηση ενοικίασης χρειάζεται δίκτυο. Δοκιμάστε ξανά σε λίγο.</p>
+      <button type="button" onclick="location.reload()">Δοκιμή ξανά</button>
+    </div>
+  </body>
+</html>

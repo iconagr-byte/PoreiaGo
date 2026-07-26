@@ -600,11 +600,23 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
             ))}
           </div>
 
-          <div className="sm:col-span-2 lg:col-span-4 rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-3 text-sm text-sky-950">
-            <p className="font-bold">Wallet πελατών</p>
-            <p className="mt-0.5 text-sky-900/80">
-              Οι πελάτες κλείνουν από My Wallet → «Ενοικίαση». Νέα κράτηση στέλνει push στο γραφείο· εμφανίζεται εδώ στο tab «Κρατήσεις».
-            </p>
+          <div className="sm:col-span-2 lg:col-span-4 rounded-2xl border border-teal-100 bg-teal-50/80 px-4 py-3 text-sm text-teal-950 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-bold">Εφαρμογή πελατών · /rent</p>
+              <p className="mt-0.5 text-teal-900/80">
+                Οι πελάτες κλείνουν από την dedicated PWA ενοικίασης. Νέα κράτηση στέλνει push στο
+                γραφείο· φαίνεται στα tabs Πελάτες / Κρατήσεις.
+              </p>
+            </div>
+            <a
+              href="/rent"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-teal-700 text-white text-xs font-bold"
+            >
+              Άνοιγμα /rent
+              <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+            </a>
           </div>
 
           {(summary?.service_alerts || []).length > 0 ? (

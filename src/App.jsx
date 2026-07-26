@@ -10,6 +10,7 @@ import SeatSelection from './pages/SeatSelection';
 import TripDetails from './pages/TripDetails';
 import SimpleWalletPage from './pages/SimpleWalletPage.jsx';
 import WalletMagicPage from './pages/WalletMagicPage.jsx';
+import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
 import InBusPortal from './pages/InBusPortal';
 import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
@@ -52,6 +53,8 @@ function App() {
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
             <Route path="/wallet/magic" element={<WalletMagicPage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
+            <Route path="/rent" element={<RentalCustomerApp />} />
+            <Route path="/rent/*" element={<RentalCustomerApp />} />
             <Route path="/" element={<HomePage />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />
             <Route path="/grafeia" element={<AgencyPlansPage />} />

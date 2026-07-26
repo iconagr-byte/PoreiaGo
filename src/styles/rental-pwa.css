@@ -1,0 +1,325 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap');
+
+.rent-app {
+  --rent-ink: #072830;
+  --rent-deep: #0b3d4a;
+  --rent-teal: #1a7a6d;
+  --rent-mist: #c5ebe4;
+  --rent-sand: #f3efe6;
+  --rent-foam: #f7fbfa;
+  --rent-accent: #e8a54b;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--rent-foam);
+  color: var(--rent-ink);
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.rent-app * {
+  box-sizing: border-box;
+}
+
+.rent-hero {
+  position: relative;
+  min-height: min(92dvh, 720px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 1.25rem 1.25rem 6.5rem;
+  overflow: hidden;
+  color: var(--rent-foam);
+  background:
+    radial-gradient(90% 70% at 85% 10%, rgba(232, 165, 75, 0.28), transparent 55%),
+    radial-gradient(120% 90% at 10% 100%, rgba(26, 122, 109, 0.55), transparent 50%),
+    linear-gradient(165deg, #0b3d4a 0%, #0f5c52 42%, #072830 100%);
+  animation: rent-hero-in 700ms ease-out both;
+}
+
+.rent-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 85%);
+  pointer-events: none;
+}
+
+.rent-hero-brand {
+  position: relative;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: clamp(2.4rem, 9vw, 3.6rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  margin: 0 0 1rem;
+  max-width: 12ch;
+  animation: rent-rise 800ms 80ms ease-out both;
+}
+
+.rent-hero-title {
+  position: relative;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  max-width: 22ch;
+  animation: rent-rise 800ms 160ms ease-out both;
+}
+
+.rent-hero-copy {
+  position: relative;
+  margin: 0.55rem 0 1.4rem;
+  max-width: 30ch;
+  color: var(--rent-mist);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  animation: rent-rise 800ms 220ms ease-out both;
+}
+
+.rent-hero-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 3.1rem;
+  padding: 0.85rem 1.35rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--rent-sand);
+  color: var(--rent-deep);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  animation: rent-rise 800ms 280ms ease-out both;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.rent-hero-cta:active {
+  transform: scale(0.98);
+}
+
+.rent-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  background: rgba(247, 251, 250, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(7, 40, 48, 0.06);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.rent-topbar-brand {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--rent-deep);
+  text-decoration: none;
+}
+
+.rent-main {
+  flex: 1;
+  padding: 1rem 1rem 6.5rem;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.rent-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.15rem;
+  padding: 0.45rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom));
+  background: rgba(247, 251, 250, 0.96);
+  border-top: 1px solid rgba(7, 40, 48, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.rent-nav button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #5a7270;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.4rem 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.rent-nav button .material-symbols-outlined {
+  font-size: 1.35rem;
+}
+
+.rent-nav button.is-active {
+  color: var(--rent-deep);
+  background: rgba(26, 122, 109, 0.12);
+}
+
+.rent-panel {
+  background: #fff;
+  border-radius: 1.35rem;
+  padding: 1.1rem 1.15rem;
+  border: 1px solid rgba(7, 40, 48, 0.06);
+  box-shadow: 0 8px 28px rgba(7, 40, 48, 0.04);
+  animation: rent-rise 420ms ease-out both;
+}
+
+.rent-panel h2 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.35rem;
+  margin: 0 0 0.35rem;
+  color: var(--rent-deep);
+}
+
+.rent-panel-lead {
+  margin: 0 0 1rem;
+  color: #5a7270;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.rent-btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  min-height: 2.85rem;
+  padding: 0.7rem 1.15rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.rent-btn-primary {
+  background: var(--rent-deep);
+  color: #fff;
+}
+
+.rent-btn-ghost {
+  background: transparent;
+  color: var(--rent-deep);
+  border: 1px solid rgba(11, 61, 74, 0.2);
+}
+
+.rent-btn-danger {
+  background: #fde8e8;
+  color: #9b2c2c;
+}
+
+.rent-btn-block {
+  width: 100%;
+}
+
+.rent-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rent-install {
+  margin: 0.75rem 0 0;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(26, 122, 109, 0.12), rgba(232, 165, 75, 0.14));
+  border: 1px solid rgba(11, 61, 74, 0.1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  animation: rent-rise 500ms 120ms ease-out both;
+}
+
+.rent-install-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--rent-deep);
+}
+
+.rent-install-text {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: #5a7270;
+  max-width: 28ch;
+}
+
+.rent-gate {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem 1.25rem;
+  text-align: center;
+  background:
+    radial-gradient(80% 60% at 50% 0%, rgba(26, 122, 109, 0.35), transparent 60%),
+    var(--rent-deep);
+  color: var(--rent-foam);
+}
+
+.rent-gate h1 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: clamp(2rem, 8vw, 2.8rem);
+  margin: 0;
+  max-width: 12ch;
+  line-height: 1;
+}
+
+.rent-gate p {
+  margin: 0;
+  color: var(--rent-mist);
+  max-width: 28ch;
+  line-height: 1.45;
+}
+
+@keyframes rent-hero-in {
+  from {
+    opacity: 0.6;
+    filter: saturate(0.85);
+  }
+  to {
+    opacity: 1;
+    filter: saturate(1);
+  }
+}
+
+@keyframes rent-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 720px) {
+  .rent-hero {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+}

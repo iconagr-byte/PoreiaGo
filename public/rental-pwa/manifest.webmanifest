@@ -1,0 +1,27 @@
+{
+  "name": "Ενοικίαση — PoreiaGo",
+  "short_name": "Ενοικίαση",
+  "description": "Κράτηση οχήματος από το κινητό — Cars, Vans, Minibuses",
+  "lang": "el",
+  "dir": "ltr",
+  "start_url": "/rent",
+  "scope": "/rent",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b3d4a",
+  "theme_color": "#0b3d4a",
+  "icons": [
+    {
+      "src": "/icons/rental-pwa.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/rental-pwa.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
