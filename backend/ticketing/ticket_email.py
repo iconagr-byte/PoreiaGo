@@ -13,7 +13,22 @@ def _qr_img_url(pnr: str, size: int = 180) -> str:
     return f"https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data={quote(str(pnr))}"
 
 
-def _public_base_url() -> str:
+def _public_base_url(payload: dict | None = None) -> str:
+    """Prefer office public origin (custom domain) over global PUBLIC_APP_URL."""
+    data = payload or {}
+    explicit = str(data.get("public_base_url") or data.get("publicBaseUrl") or "").strip().rstrip("/")
+    if explicit:
+        return explicit
+
+    domain = str(data.get("custom_domain") or data.get("office_domain") or "").strip().lower()
+    domain = domain.replace("https://", "").replace("http://", "").split("/")[0]
+    if domain and domain not in {"localhost", "127.0.0.1"}:
+        if not domain.startswith("www.") and "." in domain and not domain.endswith("poreiago.com"):
+            # Tenant apex custom domains are served on www.* in Traefik.
+            domain = f"www.{domain}"
+        scheme = "http" if domain.startswith("localhost") else "https"
+        return f"{scheme}://{domain}"
+
     return (os.getenv("PUBLIC_APP_URL") or os.getenv("VITE_APP_URL") or "http://localhost:5173").rstrip("/")
 
 
@@ -127,7 +142,7 @@ async def send_ticket_confirmation_email(payload: dict) -> dict:
                 name=payload.get("customer_name"),
                 phone=payload.get("phone"),
             )
-            magic_url = f"{_public_base_url()}/wallet/magic?token={token}"
+            magic_url = f"{_public_base_url(payload)}/wallet/magic?token={token}"
             payload["magic_url"] = magic_url
         except Exception:
             payload.pop("magic_url", None)

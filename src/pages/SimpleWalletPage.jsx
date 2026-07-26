@@ -9,6 +9,7 @@ import {
   getAuthProvider,
   isCustomer,
   isDriver,
+  isAdmin,
   logoutCustomer,
 } from '../lib/auth.js';
 import {
@@ -90,10 +91,75 @@ function pickFeaturedBooking(bookings, highlightId) {
   )[0];
 }
 
+function WalletAuthGate() {
+  if (isCustomer() && !getCustomerToken()) {
+    logoutCustomer();
+  }
+
+  if (isCustomer() && getCustomerToken()) {
+    return <WalletAuthenticatedApp />;
+  }
+
+  if (isDriver()) {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <p className="text-on-surface-variant">
+          Συνδεδεμένοι ως οδηγός — το Wallet είναι για πελάτες.
+        </p>
+        <Link
+          to="/driver"
+          className="px-6 py-3 rounded-full bg-emerald-600 text-white font-bold text-sm"
+        >
+          Driver Portal
+        </Link>
+      </div>
+    );
+  }
+
+  if (isAdmin()) {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <p className="text-on-surface-variant">
+          Συνδεδεμένοι ως γραφείο — το My Wallet είναι για επιβάτες.
+        </p>
+        <div className="flex flex-wrap gap-3 justify-center">
+          <Link
+            to="/admin"
+            className="px-6 py-3 rounded-full bg-slate-900 text-white font-bold text-sm"
+          >
+            Πίσω στο Dashboard
+          </Link>
+          <Link
+            to="/login"
+            className="px-6 py-3 rounded-full border border-slate-300 text-slate-800 font-bold text-sm"
+            state={{ from: '/wallet', walletClaim: true }}
+          >
+            Σύνδεση πελάτη
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const claim = getWalletClaim();
+  if (claim) {
+    return (
+      <Navigate
+        to={walletClaimAuthPath({ preferLogin: false })}
+        replace
+        state={walletClaimNavState(claim)}
+      />
+    );
+  }
+
+  return <Navigate to="/login" replace state={{ from: '/wallet', walletClaim: true }} />;
+}
+
 /**
- * My Wallet — step 1: boarding-pass home.
+ * My Wallet — boarding-pass home (authenticated shell).
+ * Split from auth gate so hooks always run in a stable component tree.
  */
-export default function SimpleWalletPage() {
+function WalletAuthenticatedApp() {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('home');
@@ -111,38 +177,6 @@ export default function SimpleWalletPage() {
     () => typeof navigator !== 'undefined' && navigator.onLine === false,
   );
   const [offlineSnap, setOfflineSnap] = useState(() => loadLastPass());
-
-  if (!isCustomer() || !getCustomerToken()) {
-    if (isCustomer() && !getCustomerToken()) {
-      logoutCustomer();
-    }
-    if (isDriver()) {
-      return (
-        <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
-          <p className="text-on-surface-variant">
-            Συνδεδεμένοι ως οδηγός — το Wallet είναι για πελάτες.
-          </p>
-          <Link
-            to="/driver"
-            className="px-6 py-3 rounded-full bg-emerald-600 text-white font-bold text-sm"
-          >
-            Driver Portal
-          </Link>
-        </div>
-      );
-    }
-    const claim = getWalletClaim();
-    if (claim) {
-      return (
-        <Navigate
-          to={walletClaimAuthPath({ preferLogin: false })}
-          replace
-          state={walletClaimNavState(claim)}
-        />
-      );
-    }
-    return <Navigate to="/login" replace state={{ from: '/wallet', walletClaim: true }} />;
-  }
 
   const profile = useMemo(() => resolveCustomerProfile(), []);
   const email = profile.email;
@@ -184,7 +218,6 @@ export default function SimpleWalletPage() {
           (a, b) =>
             new Date(b.paymentDate || b.date || 0) - new Date(a.paymentDate || a.date || 0),
         );
-        // Include locally stored focus booking even if sync is slow.
         const focus = focusId || peekWalletFocusBooking();
         if (focus && !sorted.some((b) => b.id === focus)) {
           const local = getBookingById(focus);
@@ -241,9 +274,7 @@ export default function SimpleWalletPage() {
       _offlineQrDataUrl: offlineSnap.qrDataUrl || '',
     };
   }, [featured, offlineSnap]);
-  const displayCover = featured
-    ? featuredCover
-    : offlineSnap?.coverImage || '';
+  const displayCover = featured ? featuredCover : offlineSnap?.coverImage || '';
   const displayBrand = featured ? brandLabel : offlineSnap?.brandLabel || brandLabel;
   const displayPassenger = featured
     ? profile.name
@@ -272,7 +303,6 @@ export default function SimpleWalletPage() {
 
   useEffect(() => {
     if (featured?.id && focusId && featured.id === focusId) {
-      // Keep focus for refresh, but drop welcome after first successful paint window.
       const t = window.setTimeout(() => setShowWelcome(false), 8000);
       return () => window.clearTimeout(t);
     }
@@ -505,9 +535,7 @@ export default function SimpleWalletPage() {
           </div>
         )}
 
-        {activeTab === 'lost_found' && (
-          <LostFoundPanel profile={profile} bookings={bookings} />
-        )}
+        {activeTab === 'lost_found' && <LostFoundPanel bookings={bookings} />}
 
         {activeTab === 'account' && (
           <div className="wallet-stack">
@@ -565,4 +593,11 @@ export default function SimpleWalletPage() {
       </main>
     </div>
   );
+}
+
+/**
+ * My Wallet — step 1: boarding-pass home.
+ */
+export default function SimpleWalletPage() {
+  return <WalletAuthGate />;
 }
