@@ -37,12 +37,12 @@ function isRentAuthPath(pathname) {
   );
 }
 
-export default function LoginPage() {
+export default function LoginPage({ rentEntrance = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { enabled: googleEnabled } = useGoogleAuthConfig();
-  // Path wins over shared /login — rent entrance must never look like bus My Wallet.
-  const pathRent = isRentAuthPath(location.pathname);
+  // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
+  const pathRent = rentEntrance || isRentAuthPath(location.pathname);
   const redirectTo = pathRent
     ? isRentReturn(location.state?.from)
       ? location.state.from
@@ -78,12 +78,12 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    // Old deep-links used /login?state.from=/rent — send them to the rent entrance URL.
+    // Old deep-links used /login?state.from=/rent — stay on /rent (share URL), not /rent/login.
     if (
       location.pathname === '/login' &&
       isRentReturn(location.state?.from)
     ) {
-      navigate('/rent/login', { replace: true, state: location.state });
+      navigate('/rent', { replace: true, state: location.state });
     }
   }, [location.pathname, location.state, navigate]);
 
@@ -112,13 +112,18 @@ export default function LoginPage() {
       highlightBooking,
       fromClaim: hadClaim,
     });
+    // Rent: always bump location state so /rent gate remounts into the app.
+    const nextState =
+      redirectTo === '/wallet' || redirectTo.startsWith('/wallet')
+        ? homeState
+        : rentIntent
+          ? { rentAuthedAt: Date.now(), ...(highlightBooking ? homeState : {}) }
+          : highlightBooking
+            ? homeState
+            : undefined;
     navigate(redirectTo, {
       replace: true,
-      state: redirectTo === '/wallet' || redirectTo.startsWith('/wallet')
-        ? homeState
-        : highlightBooking
-          ? homeState
-          : undefined,
+      state: nextState,
     });
   };
 
@@ -320,7 +325,7 @@ export default function LoginPage() {
         Δεν έχετε λογαριασμό;{' '}
         <Link
           to={rentIntent ? '/rent/register' : '/register'}
-          state={registerState}
+          state={rentIntent ? { from: '/rent' } : registerState}
           className={linkClass}
         >
           {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
