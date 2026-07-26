@@ -4,6 +4,7 @@
 import { Link } from 'react-router-dom';
 import TicketQrCode from '../TicketQrCode.jsx';
 import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
+import WalletDeviceSave from './WalletDeviceSave.jsx';
 import { isPaid, statusStyle } from '../../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
 
@@ -109,6 +110,7 @@ export default function WalletBoardingPass({
         </div>
 
         <div className="wallet-pass-actions">
+          <WalletDeviceSave booking={booking} />
           {paid && booking.tripId ? (
             <PassengerTrackCTA booking={booking} showEta={false} />
           ) : (
