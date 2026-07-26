@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
+  cancelCustomerRentalBooking,
   createCustomerRentalBooking,
   fetchCustomerRentalAvailability,
   fetchMyRentalBookings,
@@ -120,6 +121,20 @@ export default function RentalCatalogPanel() {
   };
 
   const selected = suggestions.find((v) => v.id === selectedId);
+
+  const cancelBooking = async (bookingId) => {
+    if (!window.confirm('Ακύρωση κράτησης ενοικίασης;')) return;
+    setBusy(true);
+    try {
+      await cancelCustomerRentalBooking(bookingId);
+      toast.success('Η κράτηση ακυρώθηκε');
+      await loadMine();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="wallet-stack">
@@ -315,17 +330,29 @@ export default function RentalCatalogPanel() {
                       : ''}
                     {` · ${euro(b.total_cost)} · ${b.rental_status}`}
                   </p>
-                  <span
-                    className={`wallet-chip ${
-                      b.rental_status === 'ACTIVE'
-                        ? 'wallet-chip-ok'
-                        : b.rental_status === 'CANCELLED'
-                          ? 'wallet-chip-muted'
-                          : 'wallet-chip-warn'
-                    }`}
-                  >
-                    {b.driver_mode === 'WITH_DRIVER' ? 'Με οδηγό' : 'Self-drive'}
-                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <span
+                      className={`wallet-chip ${
+                        b.rental_status === 'ACTIVE'
+                          ? 'wallet-chip-ok'
+                          : b.rental_status === 'CANCELLED'
+                            ? 'wallet-chip-muted'
+                            : 'wallet-chip-warn'
+                      }`}
+                    >
+                      {b.driver_mode === 'WITH_DRIVER' ? 'Με οδηγό' : 'Self-drive'}
+                    </span>
+                    {b.rental_status === 'CONFIRMED' ? (
+                      <button
+                        type="button"
+                        className="wallet-btn wallet-btn-danger"
+                        disabled={busy}
+                        onClick={() => cancelBooking(b.id)}
+                      >
+                        Ακύρωση
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </article>
             ))}
