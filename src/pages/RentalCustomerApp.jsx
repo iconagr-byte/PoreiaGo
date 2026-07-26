@@ -135,7 +135,8 @@ function RentalAuthGate() {
 }
 
 function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {}) {
-  const [tab, setTab] = useState('home');
+  // Land in Rent Wallet after login/register — separate from bus My Wallet.
+  const [tab, setTab] = useState('wallet');
   const [brandName, setBrandName] = useState('Ενοικίαση');
   const [calKey, setCalKey] = useState(0);
   const [walletKey, setWalletKey] = useState(0);
