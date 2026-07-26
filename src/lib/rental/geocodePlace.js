@@ -84,6 +84,31 @@ async function nominatim(place) {
   }
 }
 
+/** Sync resolve for known aliases / cities — never returns null. */
+export function resolvePlaceSync(place) {
+  const raw = String(place || '').trim() || 'Γραφείο';
+  const cacheKey = normalize(raw) || 'γραφειο';
+  if (memoryCache.has(cacheKey)) return memoryCache.get(cacheKey);
+  const local = matchLocal(raw);
+  if (local) {
+    memoryCache.set(cacheKey, local);
+    return local;
+  }
+  return { ...OFFICE_DEFAULT, label: raw, source: 'fallback' };
+}
+
+/** Normalize booking locations so empty pickup becomes Γραφείο. */
+export function placesFromBookings(bookings) {
+  const places = new Set();
+  for (const b of bookings || []) {
+    places.add(String(b?.pickup_location || '').trim() || 'Γραφείο');
+    const drop = String(b?.dropoff_location || '').trim();
+    if (drop) places.add(drop);
+  }
+  if (!places.size && (bookings || []).length) places.add('Γραφείο');
+  return [...places];
+}
+
 /** @returns {Promise<{ lat: number, lng: number, label: string, source: string }>} */
 export async function geocodePlace(place) {
   const raw = String(place || '').trim() || 'Γραφείο';
@@ -104,7 +129,9 @@ export async function geocodePlace(place) {
 
 /** Geocode unique places with light concurrency. */
 export async function geocodePlaces(places) {
-  const unique = [...new Set((places || []).map((p) => String(p || '').trim()).filter(Boolean))];
+  const unique = [
+    ...new Set((places || []).map((p) => String(p || '').trim() || 'Γραφείο').filter(Boolean)),
+  ];
   const out = new Map();
   for (const place of unique) {
     // Sequential to respect Nominatim rate limits.
@@ -112,4 +139,15 @@ export async function geocodePlaces(places) {
     out.set(place, resolved);
   }
   return out;
+}
+
+/** Slight offset so overlapping bookings at the same place remain clickable. */
+export function jitterLatLng(lat, lng, index, total = 1) {
+  if (!total || total < 2) return { lat, lng };
+  const angle = (index / total) * Math.PI * 2;
+  const radius = 0.0022; // ~200m
+  return {
+    lat: lat + Math.sin(angle) * radius,
+    lng: lng + Math.cos(angle) * radius,
+  };
 }

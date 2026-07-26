@@ -6,7 +6,12 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchMyRentalBookings, cancelCustomerRentalBooking } from '../../services/customerRentalApi.js';
-import { geocodePlaces } from '../../lib/rental/geocodePlace.js';
+import {
+  geocodePlaces,
+  jitterLatLng,
+  placesFromBookings,
+  resolvePlaceSync,
+} from '../../lib/rental/geocodePlace.js';
 import toast from 'react-hot-toast';
 
 const WEEKDAYS = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
@@ -154,17 +159,10 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
 
   const list = dayBookings.length ? dayBookings : monthBookings;
 
-  const placesKey = useMemo(() => {
-    const places = [
-      ...new Set(
-        monthBookings
-          .flatMap((b) => [b.pickup_location, b.dropoff_location])
-          .map((p) => String(p || '').trim())
-          .filter(Boolean),
-      ),
-    ].sort();
-    return places.join('\n');
-  }, [monthBookings]);
+  const placesKey = useMemo(
+    () => placesFromBookings(monthBookings).sort().join('\n'),
+    [monthBookings],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -173,6 +171,7 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
       setGeoByPlace(new Map());
       return undefined;
     }
+    setGeoByPlace(new Map(places.map((p) => [p, resolvePlaceSync(p)])));
     geocodePlaces(places).then((map) => {
       if (!cancelled) setGeoByPlace(map);
     });
@@ -183,14 +182,12 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
 
   const pins = useMemo(() => {
     const source = dayBookings.length ? dayBookings : monthBookings;
-    return source
-      .map((b) => {
-        const place = String(b.pickup_location || '').trim() || 'Γραφείο';
-        const geo = geoByPlace.get(place);
-        if (!geo) return null;
-        return { id: b.id, lat: geo.lat, lng: geo.lng, booking: b, place };
-      })
-      .filter(Boolean);
+    return source.map((b, index) => {
+      const place = String(b.pickup_location || '').trim() || 'Γραφείο';
+      const geo = geoByPlace.get(place) || resolvePlaceSync(place);
+      const jittered = jitterLatLng(geo.lat, geo.lng, index, source.length);
+      return { id: b.id, lat: jittered.lat, lng: jittered.lng, booking: b, place };
+    });
   }, [dayBookings, monthBookings, geoByPlace]);
 
   const cancelBooking = async (id) => {
