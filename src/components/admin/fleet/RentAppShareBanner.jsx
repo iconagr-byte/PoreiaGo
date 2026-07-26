@@ -1,5 +1,5 @@
 /**
- * Admin card: QR + link for the customer rental PWA (/rent).
+ * Admin card: QR + link for the customer rental PWA (/rent) of the *current office*.
  */
 import { useEffect, useRef, useState } from 'react';
 import { QRCode } from 'react-qr-code';
@@ -8,19 +8,25 @@ import { fetchTenantBrandingSettings } from '../../../services/growthApi.js';
 import { getOfficeRentUrl } from '../../../lib/platform/officePublicUrl.js';
 
 export default function RentAppShareBanner() {
-  // Prefer current host immediately (e.g. www.poreiago.com/rent) — branding is optional enrich.
-  const [rentUrl, setRentUrl] = useState(() => getOfficeRentUrl({}));
+  const [rentUrl, setRentUrl] = useState('');
+  const [officeName, setOfficeName] = useState('');
   const [loading, setLoading] = useState(true);
   const qrRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
+    // 1) Resolve current office (JWT tenant branding), 2) then emit link + QR.
     fetchTenantBrandingSettings()
       .then((branding) => {
-        if (!cancelled) setRentUrl(getOfficeRentUrl(branding || {}));
+        if (cancelled) return;
+        const office = branding || {};
+        setOfficeName(office.display_name || office.slug || office.subdomain || 'Γραφείο');
+        setRentUrl(getOfficeRentUrl(office));
       })
       .catch(() => {
-        if (!cancelled) setRentUrl(getOfficeRentUrl({}));
+        if (cancelled) return;
+        setOfficeName('Γραφείο');
+        setRentUrl(getOfficeRentUrl({}));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -47,12 +53,13 @@ export default function RentAppShareBanner() {
       toast.error('Επιτρέψτε pop-up για εκτύπωση');
       return;
     }
+    const title = officeName ? `Ενοικίαση — ${officeName}` : 'Ενοικίαση — /rent';
     const svg = qrRef.current?.querySelector('svg');
     const qrHtml = svg
       ? new XMLSerializer().serializeToString(svg)
       : `<p style="font-family:monospace;font-size:12px;word-break:break-all">${rentUrl}</p>`;
     w.document.write(`<!DOCTYPE html><html lang="el"><head><meta charset="utf-8"/>
-      <title>Ενοικίαση — /rent</title>
+      <title>${String(title).replace(/</g, '')}</title>
       <style>
         body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:32px;max-width:640px;margin:0 auto;color:#1d1d1f}
         h1{font-size:1.45rem;letter-spacing:-.03em;margin:0 0 8px}
@@ -61,7 +68,7 @@ export default function RentAppShareBanner() {
         .qr{margin:28px auto;width:220px;height:220px;display:flex;align-items:center;justify-content:center}
         .qr svg{width:200px;height:200px}
       </style></head><body>
-      <h1>Εφαρμογή ενοικίασης</h1>
+      <h1>${String(title).replace(/</g, '')}</h1>
       <p>Σκανάρετε για κράτηση οχήματος και εγκατάσταση στην αρχική οθόνη.</p>
       <div class="qr">${qrHtml}</div>
       <p class="url">${String(rentUrl).replace(/</g, '')}</p>
@@ -88,15 +95,22 @@ export default function RentAppShareBanner() {
             </span>
           </div>
           <div className="min-w-0">
-            <p className="font-bold tracking-tight">Εφαρμογή πελατών · /rent</p>
+            <p className="font-bold tracking-tight">
+              Εφαρμογή πελατών · /rent
+              {officeName ? (
+                <span className="ml-1.5 font-semibold text-[#6e6e73]">· {officeName}</span>
+              ) : null}
+            </p>
             <p className="mt-0.5 text-[#6e6e73] text-[13px] leading-snug">
               Σκανάρετε το QR για κράτηση, ημερολόγιο και εγκατάσταση στην αρχική οθόνη. Νέα
               κράτηση → push στο γραφείο.
             </p>
             <div className="mt-2 rounded-xl bg-[#f5f5f7] border border-black/[0.04] px-3 py-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#6e6e73]">Σύνδεσμος</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#6e6e73]">
+                Σύνδεσμος γραφείου
+              </p>
               <code className="text-[11px] break-all text-[#1d1d1f] leading-snug">
-                {loading ? '…' : rentUrl || '—'}
+                {loading ? 'Φόρτωση γραφείου…' : rentUrl || '—'}
               </code>
             </div>
             <div className="mt-2.5 flex flex-wrap gap-2">
@@ -112,7 +126,7 @@ export default function RentAppShareBanner() {
               <button
                 type="button"
                 onClick={copyLink}
-                disabled={!rentUrl}
+                disabled={!rentUrl || loading}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border border-black/[0.08] text-[#1d1d1f] text-xs font-bold disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[16px]">content_copy</span>
@@ -121,7 +135,7 @@ export default function RentAppShareBanner() {
               <button
                 type="button"
                 onClick={printSheet}
-                disabled={!rentUrl}
+                disabled={!rentUrl || loading}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border border-black/[0.08] text-[#1d1d1f] text-xs font-bold disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[16px]">print</span>
