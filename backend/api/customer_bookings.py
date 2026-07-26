@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +16,22 @@ from ticketing.customer_bookings import (
     upsert_booking,
     upsert_many_for_customer,
 )
+
+
+def _apple_wallet_configured() -> bool:
+    return bool(
+        (os.getenv("APPLE_PASS_TYPE_ID") or "").strip()
+        and (os.getenv("APPLE_TEAM_ID") or "").strip()
+        and (os.getenv("APPLE_PASS_CERT_PEM") or os.getenv("APPLE_PASS_CERT_PATH") or "").strip()
+        and (os.getenv("APPLE_PASS_KEY_PEM") or os.getenv("APPLE_PASS_KEY_PATH") or "").strip()
+    )
+
+
+def _google_wallet_configured() -> bool:
+    return bool(
+        (os.getenv("GOOGLE_WALLET_ISSUER_ID") or "").strip()
+        and (os.getenv("GOOGLE_WALLET_SERVICE_ACCOUNT_JSON") or "").strip()
+    )
 
 router = APIRouter(tags=["Customer Bookings"])
 
@@ -159,6 +176,49 @@ async def get_my_booking_fiscal(
             customer_id=account.get("customer_id"),
         )
     return fiscal
+
+
+@router.get("/api/customer/wallet-pass/status")
+async def wallet_pass_status(account: dict = Depends(get_current_customer)):
+    """Whether Apple/Google Wallet pass issuance is configured on this server."""
+    _ = account
+    return {
+        "apple": _apple_wallet_configured(),
+        "google": _google_wallet_configured(),
+        "hint": (
+            "Set APPLE_PASS_TYPE_ID, APPLE_TEAM_ID, APPLE_PASS_CERT_PEM/PATH, "
+            "APPLE_PASS_KEY_PEM/PATH to enable .pkpass download."
+        ),
+    }
+
+
+@router.get("/api/customer/wallet-pass/apple/{booking_id}")
+async def download_apple_pass(
+    booking_id: str,
+    account: dict = Depends(get_current_customer),
+):
+    """
+    Download a signed Apple Wallet .pkpass when certificates are configured.
+
+    Until certs are set, clients should use calendar/PDF fallbacks.
+    """
+    if not _apple_wallet_configured():
+        raise HTTPException(
+            status_code=501,
+            detail="Apple Wallet δεν είναι ρυθμισμένο ακόμα (λείπουν certificates)",
+        )
+
+    booking = await get_booking(booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if str(booking.get("email", "")).lower() != account["email"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Placeholder for signed pass builder — wire when certs are provisioned.
+    raise HTTPException(
+        status_code=501,
+        detail="Apple Wallet builder θα ενεργοποιηθεί μόλις φορτωθούν τα certificates",
+    )
 
 
 @router.get("/api/bookings")

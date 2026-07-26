@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TicketQrCode from '../TicketQrCode.jsx';
 import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
+import WalletDeviceSave from './WalletDeviceSave.jsx';
 import { useCustomerFiscalPoll } from '../../lib/fiscal/useCustomerFiscalPoll.js';
 import { isPaid, statusStyle, parsePaymentMethod, hasDepositBalance } from '../../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
@@ -217,6 +218,7 @@ export default function WalletTicketDetail({
       </section>
 
       <div className="wallet-ticket-actions">
+        <WalletDeviceSave booking={booking} />
         <Link to={ticketPrintPath(booking.id, { autoPrint: true })} className="wallet-pass-cta">
           <span className="material-symbols-outlined" aria-hidden>
             print
