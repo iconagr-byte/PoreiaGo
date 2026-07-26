@@ -42,7 +42,31 @@ self.addEventListener('push', (event) => {
     badge: '/icons/driver-pwa-192.png',
   };
 
-  event.waitUntil(self.registration.showNotification(payload.title || 'PoreiaGo', options));
+  event.waitUntil(
+    (async () => {
+      const clientsList = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      });
+      for (const client of clientsList) {
+        try {
+          client.postMessage({
+            type: 'ADMIN_PUSH_RECEIVED',
+            payload: {
+              title: payload.title,
+              body: payload.body,
+              tag: payload.tag || options.tag,
+              url: options.data?.url || payload.url,
+              data: options.data || {},
+            },
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+      await self.registration.showNotification(payload.title || 'PoreiaGo', options);
+    })(),
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {

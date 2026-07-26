@@ -16,6 +16,7 @@ import FleetKpisDashboard from '../components/admin/FleetKpisDashboard.jsx';
 import HybridSlaDashboard from '../components/admin/HybridSlaDashboard.jsx';
 import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
 import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
+import AdminNotificationBell from '../components/admin/AdminNotificationBell.jsx';
 import OfficeWalletShareCard from '../components/admin/OfficeWalletShareCard.jsx';
 import { FleetTelemetryProvider } from '../context/FleetTelemetryContext.jsx';
 import ImpersonationBanner from '../components/admin/ImpersonationBanner.jsx';
@@ -2054,10 +2055,12 @@ export default function BackOffice() {
             </div>
           </div>
           <div className="flex items-center gap-3 sm:gap-6 shrink-0">
-            <button className="relative p-2 text-on-surface-variant hover:text-primary transition-colors">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
-            </button>
+            <AdminNotificationBell
+              onNavigate={(tab, extra = {}) => {
+                if (tab) setActiveTab(tab);
+                if (extra.driverId) setChatFocusDriverId(extra.driverId);
+              }}
+            />
             <div className="flex items-center gap-3 pl-3 sm:pl-4 border-l border-black/[0.05]">
               <div className="hidden sm:block">
                 <p className="font-label-md text-label-md text-on-surface cursor-pointer hover:text-primary" onClick={() => {
