@@ -100,6 +100,7 @@ export function registerRentalServiceWorker() {
     navigator.serviceWorker
       .register(SW_HREF, { updateViaCache: 'none', scope: '/rent' })
       .then((reg) => {
+        // Always pull the newest SW — stuck v4/v5 workers were trapping guests on offline.html.
         reg.update().catch(() => {});
         const askWaiting = () => {
           if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -112,6 +113,8 @@ export function registerRentalServiceWorker() {
             if (worker.state === 'installed') askWaiting();
           });
         });
+        // If a controller is already active, nudge a one-time reload after activation of a new worker.
+        if (reg.waiting) askWaiting();
         window.dispatchEvent(new CustomEvent('rental-pwa-sw-ready'));
       })
       .catch((err) => {
