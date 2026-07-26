@@ -133,6 +133,25 @@ $COMPOSE --profile bundled-db up -d --force-recreate --no-deps worker celery-bea
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps traefik
 # Recreate frontend so nginx picks up same-origin /api + /ws proxy config.
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps frontend
+# Frontend + API must share the edge network — otherwise /api → Failed to fetch (drivers list).
+FE_CID="$($COMPOSE ps -q frontend)"
+if [[ -n "$FE_CID" ]]; then
+  docker network connect aerostride-prod_edge "$FE_CID" 2>/dev/null || true
+fi
+if [[ -n "$FE_CID" && -n "${API_CID:-}" ]]; then
+  echo "==> Verify frontend → api-blue (nginx proxy)"
+  if ! docker exec "$FE_CID" wget -qO- --timeout=5 http://api-blue:8000/health >/dev/null 2>&1; then
+    echo "  WARNING: frontend cannot reach api-blue — reconnecting networks"
+    docker network connect aerostride-prod_edge "$API_CID" 2>/dev/null || true
+    docker network connect aerostride-prod_edge "$FE_CID" 2>/dev/null || true
+    sleep 2
+    docker exec "$FE_CID" wget -qO- --timeout=5 http://api-blue:8000/health >/dev/null 2>&1 \
+      && echo "  frontend → api-blue OK after reconnect" \
+      || echo "  WARNING: frontend → api-blue still failing"
+  else
+    echo "  frontend → api-blue OK"
+  fi
+fi
 
 echo "==> DB migrations (alembic → hybrid flights/meta, trip_coordinates / PostGIS GPS)"
 # Entrypoint also runs this on uvicorn start; explicit step makes deploy logs clear.
