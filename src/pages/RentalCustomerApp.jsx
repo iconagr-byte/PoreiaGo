@@ -135,7 +135,7 @@ function RentalAuthenticatedApp() {
           <div className="rent-panel">
             <h2>Κράτηση</h2>
             <p className="rent-panel-lead">Επιλέξτε ημερομηνίες και όχημα — η κράτηση περνάει αμέσως στο γραφείο.</p>
-            <RentalCatalogPanel mode="book" />
+            <RentalCatalogPanel mode="book" onBooked={() => setTab('mine')} />
           </div>
         ) : null}
 

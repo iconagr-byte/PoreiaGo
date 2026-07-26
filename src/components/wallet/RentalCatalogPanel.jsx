@@ -45,7 +45,7 @@ const EMPTY = {
   client_phone: '',
 };
 
-export default function RentalCatalogPanel({ mode = 'full' } = {}) {
+export default function RentalCatalogPanel({ mode = 'full', onBooked } = {}) {
   const showBook = mode === 'full' || mode === 'book';
   const showMine = mode === 'full' || mode === 'mine';
   const bare = mode !== 'full';
@@ -71,12 +71,27 @@ export default function RentalCatalogPanel({ mode = 'full' } = {}) {
     loadMine();
   }, [loadMine]);
 
-  const search = async (e) => {
-    e.preventDefault();
+  const validateDates = () => {
     if (!form.start_time || !form.end_time) {
       toast.error('Επιλέξτε ημερομηνίες');
-      return;
+      return false;
     }
+    const start = new Date(form.start_time);
+    const end = new Date(form.end_time);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      toast.error('Μη έγκυρες ημερομηνίες');
+      return false;
+    }
+    if (end <= start) {
+      toast.error('Η λήξη πρέπει να είναι μετά την έναρξη');
+      return false;
+    }
+    return true;
+  };
+
+  const search = async (e) => {
+    e.preventDefault();
+    if (!validateDates()) return;
     setBusy(true);
     try {
       const rows = await fetchCustomerRentalAvailability({
@@ -103,6 +118,7 @@ export default function RentalCatalogPanel({ mode = 'full' } = {}) {
       toast.error('Επιλέξτε όχημα');
       return;
     }
+    if (!validateDates()) return;
     setBusy(true);
     try {
       const created = await createCustomerRentalBooking({
@@ -125,6 +141,7 @@ export default function RentalCatalogPanel({ mode = 'full' } = {}) {
       setSuggestions([]);
       setSelectedId('');
       await loadMine();
+      if (typeof onBooked === 'function') onBooked(created);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -288,6 +305,25 @@ export default function RentalCatalogPanel({ mode = 'full' } = {}) {
                       onChange={() => setSelectedId(v.id)}
                       style={{ marginTop: '0.35rem' }}
                     />
+                    {v.photo_url ? (
+                      <img
+                        className="wallet-vehicle-thumb"
+                        src={v.photo_url}
+                        alt=""
+                        loading="lazy"
+                        style={
+                          bare
+                            ? undefined
+                            : {
+                                width: '3.4rem',
+                                height: '3.4rem',
+                                borderRadius: '0.85rem',
+                                objectFit: 'cover',
+                                flexShrink: 0,
+                              }
+                        }
+                      />
+                    ) : null}
                     <div className="min-w-0">
                       <h3 style={{ margin: 0 }}>
                         {v.model} · {v.category}

@@ -5,7 +5,11 @@
 const MANIFEST_HREF = '/rental-pwa/manifest.webmanifest';
 const SW_HREF = '/rental-pwa/sw.js';
 const THEME = '#0b3d4a';
-const APPLE_ICON = '/icons/rental-pwa.svg';
+const APPLE_ICON = '/icons/rental-pwa-192.png';
+
+/** Captured early so React install UI can still fire the prompt. */
+let deferredInstallPrompt = null;
+let bipListening = false;
 
 function upsertLink(rel, href, attrs = {}) {
   let el = document.querySelector(`link[rel="${rel}"][data-rental-pwa="1"]`);
@@ -35,6 +39,24 @@ function upsertMeta(name, content) {
   return el;
 }
 
+export function captureRentalInstallPrompt() {
+  if (typeof window === 'undefined' || bipListening) return;
+  bipListening = true;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    window.dispatchEvent(new CustomEvent('rental-pwa-install-available'));
+  });
+}
+
+export function getRentalDeferredInstallPrompt() {
+  return deferredInstallPrompt;
+}
+
+export function clearRentalDeferredInstallPrompt() {
+  deferredInstallPrompt = null;
+}
+
 export function injectRentalPwaHead() {
   if (typeof document === 'undefined') return;
   upsertLink('manifest', MANIFEST_HREF);
@@ -43,6 +65,7 @@ export function injectRentalPwaHead() {
   upsertMeta('apple-mobile-web-app-capable', 'yes');
   upsertMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
   upsertMeta('apple-mobile-web-app-title', 'Ενοικίαση');
+  captureRentalInstallPrompt();
 }
 
 export function registerRentalServiceWorker() {
