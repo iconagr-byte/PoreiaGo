@@ -137,6 +137,39 @@ class FleetRentalStoreTests(unittest.TestCase):
         mine = store.list_bookings_for_email(self.tid, "giorgos@example.com")
         self.assertEqual(len(mine), 1)
 
+    def test_list_clients_aggregates_wallet_and_desk(self) -> None:
+        v = self._vehicle(plate_number="ΡΕΝΤ-CL")
+        store.create_booking(
+            self.tid,
+            {
+                "vehicle_id": v["id"],
+                "client_name": "Μαρία Wallet",
+                "client_email": "maria@example.com",
+                "channel": "WALLET",
+                "start_time": "2026-12-10T10:00:00+00:00",
+                "end_time": "2026-12-11T10:00:00+00:00",
+                "pickup_location": "Γραφείο",
+            },
+        )
+        store.create_booking(
+            self.tid,
+            {
+                "vehicle_id": v["id"],
+                "client_name": "Νίκος Desk",
+                "client_phone": "6900000000",
+                "channel": "DESK",
+                "start_time": "2026-12-20T10:00:00+00:00",
+                "end_time": "2026-12-21T10:00:00+00:00",
+                "pickup_location": "Αεροδρόμιο",
+            },
+        )
+        clients = store.list_clients(self.tid)
+        self.assertEqual(len(clients), 2)
+        emails = {c.get("client_email") for c in clients}
+        self.assertIn("maria@example.com", emails)
+        maria = next(c for c in clients if c.get("client_email") == "maria@example.com")
+        self.assertIn("WALLET", maria["channels"])
+
     def test_customer_cancel_confirmed_only(self) -> None:
         v = self._vehicle(plate_number="ΡΕΝΤ-CXL")
         booking = store.create_booking(

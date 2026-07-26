@@ -12,6 +12,7 @@ import {
   fetchRentalBookings,
   fetchRentalCalendar,
   fetchRentalInspections,
+  fetchRentalClients,
   fetchRentalLiveOverlays,
   fetchRentalSummary,
   fetchRentalVehicles,
@@ -29,17 +30,20 @@ const CATEGORIES = [
 ];
 
 const TABS = [
+  { id: 'clients', label: 'Πελάτες', icon: 'groups' },
+  { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard' },
   { id: 'vehicles', label: 'Στόλος', icon: 'directions_car' },
   { id: 'wizard', label: 'Νέα κράτηση', icon: 'add_circle' },
-  { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
   { id: 'inspections', label: 'Check-in / out', icon: 'fact_check' },
   { id: 'live_gps', label: 'Ζωντανά GPS', icon: 'my_location' },
 ];
 
 function bookingSource(b) {
-  // Wallet/PWA bookings always carry client_email from customer auth.
+  const channel = String(b?.channel || '').toUpperCase();
+  if (channel === 'WALLET') return 'Wallet';
+  if (channel === 'DESK') return 'Γραφείο';
   if (b?.client_email) return 'Wallet';
   return 'Γραφείο';
 }
@@ -92,14 +96,16 @@ function statusChip(status) {
 }
 
 export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState('clients');
   const [summary, setSummary] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [clients, setClients] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [overlays, setOverlays] = useState([]);
   const [bookingFilter, setBookingFilter] = useState('ALL');
+  const [clientQuery, setClientQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [vehicleForm, setVehicleForm] = useState(EMPTY_VEHICLE);
   const [editingId, setEditingId] = useState(null);
@@ -140,10 +146,11 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, v, b, c, i, o] = await Promise.all([
+      const [s, v, b, clientsRows, c, i, o] = await Promise.all([
         fetchRentalSummary(),
         fetchRentalVehicles(),
         fetchRentalBookings(),
+        fetchRentalClients().catch(() => []),
         fetchRentalCalendar(45),
         fetchRentalInspections(),
         fetchRentalLiveOverlays().catch(() => []),
@@ -151,6 +158,7 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
       setSummary(s);
       setVehicles(v);
       setBookings(b);
+      setClients(clientsRows);
       setBlocks(c);
       setInspections(i);
       setOverlays(o);
@@ -184,6 +192,23 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
     () => bookings.filter((b) => bookingSource(b) === 'Wallet').length,
     [bookings],
   );
+
+  const filteredClients = useMemo(() => {
+    const q = clientQuery.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter((c) => {
+      const hay = [c.client_name, c.client_email, c.client_phone, c.last_vehicle]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [clients, clientQuery]);
+
+  const openClientBookings = (client) => {
+    setBookingFilter(client.client_email ? 'WALLET' : 'ALL');
+    setTab('bookings');
+  };
 
   const saveVehicle = async (e) => {
     e.preventDefault();
@@ -369,6 +394,100 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
         ))}
       </div>
 
+      {tab === 'clients' && (
+        <div className="space-y-3">
+          <div className="bg-white rounded-2xl border border-black/[0.06] p-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-gray-900">Πελάτες ενοικιάσεων</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Όλοι όσοι έχουν κάνει κράτηση από γραφείο ή Wallet ({clients.length}).
+              </p>
+            </div>
+            <label className="block text-xs font-bold text-gray-500 min-w-[12rem] flex-1 max-w-sm">
+              Αναζήτηση
+              <input
+                className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
+                placeholder="Όνομα, email, τηλέφωνο…"
+                value={clientQuery}
+                onChange={(e) => setClientQuery(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className="bg-white rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05]">
+            {loading ? (
+              <p className="p-6 text-sm text-gray-500">Φόρτωση…</p>
+            ) : filteredClients.length === 0 ? (
+              <div className="p-6 space-y-2">
+                <p className="text-sm font-bold text-gray-800">Δεν υπάρχουν πελάτες ακόμα</p>
+                <p className="text-sm text-gray-500">
+                  Δημιουργήστε κράτηση από «Νέα κράτηση» ή αφήστε πελάτη να κλείσει από My Wallet →
+                  Ενοικίαση.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-xl bg-primary text-white text-xs font-bold"
+                    onClick={() => setTab('wizard')}
+                  >
+                    Νέα κράτηση γραφείου
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-xl border text-xs font-bold"
+                    onClick={() => setTab('bookings')}
+                  >
+                    Δες κρατήσεις
+                  </button>
+                </div>
+              </div>
+            ) : (
+              filteredClients.map((c) => (
+                <article
+                  key={c.id}
+                  className="px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-gray-900">{c.client_name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {c.client_email || 'χωρίς email'}
+                      {c.client_phone ? ` · ${c.client_phone}` : ''}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {c.booking_count} κρατήσεις
+                      {c.active_count ? ` · ${c.active_count} ενεργές` : ''}
+                      {` · ${euro(c.total_spent_eur)}`}
+                      {c.last_vehicle ? ` · τελευταίο ${c.last_vehicle}` : ''}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {(c.channels || []).map((ch) => (
+                        <span
+                          key={ch}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                        >
+                          {ch === 'WALLET' ? 'Wallet' : 'Γραφείο'}
+                        </span>
+                      ))}
+                      {c.last_status ? (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusChip(c.last_status)}`}>
+                          {c.last_status}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-xs font-bold text-primary"
+                    onClick={() => openClientBookings(c)}
+                  >
+                    Κρατήσεις
+                  </button>
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {tab === 'overview' && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
@@ -391,12 +510,12 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
 
           <div className="sm:col-span-2 lg:col-span-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {[
+              { id: 'clients', label: 'Πελάτες ενοικίασης', copy: `${clients.length} πελάτες · γραφείο + Wallet`, icon: 'groups' },
+              { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
               { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
-              { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
               { id: 'live_gps', label: 'Ζωντανά GPS', copy: `${overlays.length} ενεργά για χάρτη`, icon: 'my_location' },
-              { id: 'calendar', label: 'Ημερολόγιο', copy: 'Αξιοποίηση στόλου', icon: 'calendar_month' },
             ].map((hub) => (
               <button
                 key={hub.id}

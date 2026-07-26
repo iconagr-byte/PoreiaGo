@@ -190,6 +190,16 @@ async def list_bookings(
     }
 
 
+@router.get("/clients")
+async def list_rental_clients(
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Unique rental customers (desk + Wallet) for the Ενοικιάσεις → Πελάτες tab."""
+    clients = store.list_clients(_tid(tenant_id))
+    return {"clients": clients, "total": len(clients)}
+
+
 @router.post("/bookings")
 async def create_booking(
     body: BookingBody,

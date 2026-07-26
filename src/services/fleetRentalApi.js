@@ -109,6 +109,11 @@ export async function fetchRentalBookings({ vehicleId, status } = {}) {
   return data.bookings || [];
 }
 
+export async function fetchRentalClients() {
+  const data = await rentalFetch('/clients');
+  return data.clients || [];
+}
+
 export async function createRentalBooking(body) {
   return rentalFetch('/bookings', { method: 'POST', body: JSON.stringify(body) });
 }
