@@ -383,7 +383,7 @@ export default function DriverDetailPage() {
           <form onSubmit={saveAppAccount} className="p-6 space-y-4">
             <p className="text-sm text-on-surface-variant leading-relaxed">
               Ο οδηγός μπαίνει στην εφαρμογή στο{' '}
-              <a href="/driver/login" target="_blank" rel="noreferrer" className="text-primary font-bold underline">
+              <a href="/driver" target="_blank" rel="noreferrer" className="text-primary font-bold underline">
                 /driver
               </a>{' '}
               με email, αριθμό άδειας ή πινακίδα και τον κωδικό που ορίζετε εδώ.
@@ -439,7 +439,7 @@ export default function DriverDetailPage() {
                 {savingAccount ? 'Αποθήκευση…' : 'Αποθήκευση λογαριασμού'}
               </button>
               <a
-                href="/driver/login"
+                href="/driver"
                 target="_blank"
                 rel="noreferrer"
                 className="px-5 py-2.5 rounded-full border border-black/[0.08] text-sm font-bold text-on-surface hover:bg-surface-container-low inline-flex items-center gap-2"

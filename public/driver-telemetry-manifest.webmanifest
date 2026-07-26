@@ -4,7 +4,7 @@
   "description": "Εφαρμογή ζωντανής θέσης οδηγού — PoreiaGo",
   "lang": "el",
   "dir": "ltr",
-  "start_url": "/driver/login",
+  "start_url": "/driver?tab=gps",
   "scope": "/driver",
   "display": "standalone",
   "orientation": "portrait",

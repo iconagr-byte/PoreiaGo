@@ -56,7 +56,7 @@ export default function DriverAuthPage() {
           <p className="text-sm" style={{ color: 'var(--driver-muted)' }}>
             Please scan the QR code in your bus to start.
           </p>
-          <a href="/driver/login" className="inline-block font-bold underline" style={{ color: 'var(--driver-accent)' }}>
+          <a href="/driver" className="inline-block font-bold underline" style={{ color: 'var(--driver-accent)' }}>
             Είσοδος οδηγού
           </a>
         </div>

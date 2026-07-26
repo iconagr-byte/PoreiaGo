@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
     if (email === DEV_DRIVER) {
       localStorage.setItem('userRole', 'driver');
       localStorage.setItem('driverApiKey', 'dev-driver-key');
-      navigate('/driver/login');
+      navigate('/driver');
       setLoading(false);
       return;
     }
