@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { loginAsCustomer } from '../lib/auth.js';
 import { registerCustomer, isCustomerAuthBackendAvailable } from '../services/customerAuthApi.js';
+import PasswordField from '../components/PasswordField.jsx';
 import {
   clearWalletClaim,
   getWalletClaim,
@@ -193,33 +194,23 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-bold" htmlFor="password">
-              Κωδικός
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              minLength={6}
-              required
-              className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
-            />
-          </div>
+          <PasswordField
+            id="password"
+            name="password"
+            label="Κωδικός"
+            minLength={6}
+            required
+            autoComplete="new-password"
+          />
 
-          <div className="space-y-2">
-            <label className="block text-sm font-bold" htmlFor="confirm">
-              Επιβεβαίωση κωδικού
-            </label>
-            <input
-              id="confirm"
-              name="confirm"
-              type="password"
-              minLength={6}
-              required
-              className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
-            />
-          </div>
+          <PasswordField
+            id="confirm"
+            name="confirm"
+            label="Επιβεβαίωση κωδικού"
+            minLength={6}
+            required
+            autoComplete="new-password"
+          />
 
           <button
             type="submit"
