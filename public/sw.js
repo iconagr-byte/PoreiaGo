@@ -18,16 +18,24 @@ self.addEventListener('push', (event) => {
   }
 
   const isShift = payload.data?.type === 'driver_shift';
+  const isChat = payload.data?.type === 'driver_office_chat';
   const options = {
     body: payload.body,
     tag: payload.tag || 'aerostride',
-    renotify: Boolean(isShift),
-    requireInteraction: payload.requireInteraction === true || Boolean(isShift),
+    renotify: Boolean(isShift || isChat || payload.renotify),
+    requireInteraction:
+      payload.requireInteraction === true || Boolean(isShift || isChat),
     data: {
-      url: payload.url || (isShift ? '/admin?tab=fleet_live_map' : '/wallet'),
+      url:
+        payload.url ||
+        (isChat
+          ? '/admin?tab=driver_chat'
+          : isShift
+            ? '/admin?tab=fleet_live_map'
+            : '/wallet'),
       ...(payload.data || {}),
     },
-    icon: isShift ? '/icons/driver-pwa-192.png' : '/vite.svg',
+    icon: isShift || isChat ? '/icons/driver-pwa-192.png' : '/vite.svg',
     badge: '/icons/driver-pwa-192.png',
   };
 
@@ -40,6 +48,10 @@ self.addEventListener('notificationclick', (event) => {
   let target = data.url || '/wallet';
   if (data.type === 'driver_shift' && data.tab) {
     target = `/admin?tab=${encodeURIComponent(data.tab)}`;
+  }
+  if (data.type === 'driver_office_chat') {
+    const driverId = data.driver_id ? `&driverId=${encodeURIComponent(data.driver_id)}` : '';
+    target = data.url || `/admin?tab=driver_chat${driverId}`;
   }
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {

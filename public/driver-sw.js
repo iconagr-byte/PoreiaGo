@@ -90,14 +90,15 @@ self.addEventListener('push', (event) => {
   }
 
   const createdAt = Date.now();
+  const isChat = payload.data?.type === 'driver_office_chat';
   const options = {
     body: payload.body,
     tag: payload.tag || 'driver-pwa',
-    renotify: false,
-    requireInteraction: false,
+    renotify: Boolean(isChat || payload.renotify),
+    requireInteraction: payload.requireInteraction === true || Boolean(isChat),
     silent: false,
     data: {
-      url: payload.url || '/driver',
+      url: payload.url || (isChat ? '/driver?tab=chat' : '/driver'),
       createdAt,
       ...(payload.data || {}),
     },
@@ -129,6 +130,9 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification?.data || {};
   let target = data.url || data.auth_url || '/driver';
+  if (data.type === 'driver_office_chat') {
+    target = data.url || '/driver?tab=chat';
+  }
   if (target.startsWith('/')) {
     target = `${self.location.origin}${target}`;
   }

@@ -107,20 +107,22 @@ export default function BackOffice() {
   const [lostItemsLoading, setLostItemsLoading] = useState(false);
   const [bookings, setBookings] = useState(() => loadBookings());
   const [bookingsLoading, setBookingsLoading] = useState(false);
-  const [chatFocusDriverId, setChatFocusDriverId] = useState(
-    () => location.state?.driverId || null,
-  );
+  const [chatFocusDriverId, setChatFocusDriverId] = useState(() => {
+    const fromQuery = new URLSearchParams(window.location.search).get('driverId');
+    return fromQuery || location.state?.driverId || null;
+  });
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customers, setCustomers] = useState(() => loadAllCustomers());
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
-    const tab = new URLSearchParams(location.search).get('tab');
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
     if (tab) setActiveTab(tab);
-    const sub =
-      new URLSearchParams(location.search).get('sub') ||
-      new URLSearchParams(location.search).get('settingsSubTab');
+    const driverId = params.get('driverId');
+    if (driverId) setChatFocusDriverId(driverId);
+    const sub = params.get('sub') || params.get('settingsSubTab');
     if (sub) {
       setActiveTab('settings');
       setSettingsSubTab(sanitizeSettingsSubTab(sub, isSaasSuperAdmin()));
