@@ -27,6 +27,7 @@ import {
   syncCustomersFromRentalBookings,
 } from '../../../lib/customers/customerStore.js';
 import RentalSignaturePad from './RentalSignaturePad.jsx';
+import RentalCalendarBoard from './RentalCalendarBoard.jsx';
 
 const CATEGORIES = [
   { value: 'CAR', label: 'Αυτοκίνητο' },
@@ -156,7 +157,7 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
         fetchRentalSummary(),
         fetchRentalVehicles(),
         fetchRentalBookings(),
-        fetchRentalCalendar(45),
+        fetchRentalCalendar(120),
         fetchRentalInspections(),
         fetchRentalLiveOverlays().catch(() => []),
       ]);
@@ -1293,55 +1294,20 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
       )}
 
       {tab === 'calendar' && (
-        <div className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden">
-          <div className="px-4 py-3 border-b border-black/[0.05] flex items-center justify-between">
-            <h3 className="font-bold">Ημερολόγιο αξιοποίησης</h3>
-            <span className="text-xs text-gray-500">{blocks.length} εγγραφές</span>
-          </div>
-          <div className="divide-y divide-black/[0.05] max-h-[32rem] overflow-y-auto">
-            {blocks.length === 0 ? (
-              <p className="p-6 text-sm text-gray-500">Δεν υπάρχουν slots ακόμα.</p>
-            ) : (
-              blocks.map((b) => (
-                <div key={b.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm text-gray-900">
-                      {b.plate_number || '—'} · {b.title}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {b.kind === 'rental'
-                        ? `${formatWhen(b.start_time)} → ${formatWhen(b.end_time)} · ${b.pickup_location || ''}`
-                        : b.title}
-                      {b.total_cost != null && b.kind === 'rental' ? ` · ${euro(b.total_cost)}` : ''}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(b.status)}`}>
-                      {b.status}
-                    </span>
-                    {b.kind === 'rental' && b.status === 'CONFIRMED' ? (
-                      <button
-                        type="button"
-                        className="text-xs font-bold text-rose-600"
-                        onClick={async () => {
-                          try {
-                            await updateRentalBookingStatus(b.id, 'CANCELLED');
-                            toast.success('Ακυρώθηκε');
-                            await reload();
-                          } catch (err) {
-                            toast.error(err.message);
-                          }
-                        }}
-                      >
-                        Ακύρωση
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <RentalCalendarBoard
+          bookings={bookings}
+          blocks={blocks}
+          loading={loading}
+          onCancelBooking={async (bookingId) => {
+            try {
+              await updateRentalBookingStatus(bookingId, 'CANCELLED');
+              toast.success('Ακυρώθηκε');
+              await reload();
+            } catch (err) {
+              toast.error(err.message);
+            }
+          }}
+        />
       )}
 
       {tab === 'inspections' && (
