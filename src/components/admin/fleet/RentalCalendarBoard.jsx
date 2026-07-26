@@ -329,13 +329,13 @@ export default function RentalCalendarBoard({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[28px] border border-teal-100/80 bg-gradient-to-br from-teal-50/80 via-white to-sky-50/50 p-4 sm:p-5 shadow-sm">
+      <div className="rounded-[26px] border border-black/[0.06] bg-white/80 backdrop-blur-xl p-4 sm:p-5 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-teal-700/80">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6e6e73]">
               Ημερολόγιο ενοικιάσεων
             </p>
-            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 capitalize mt-0.5">
+            <h3 className="text-xl sm:text-2xl font-bold text-[#1d1d1f] tracking-tight capitalize mt-0.5">
               {monthLabel}
             </h3>
           </div>
@@ -563,11 +563,11 @@ export default function RentalCalendarBoard({
       </div>
 
       {/* Map */}
-      <div className="rounded-[28px] border border-slate-200/80 bg-white overflow-hidden shadow-sm">
-        <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+      <div className="rounded-[26px] border border-black/[0.06] bg-white/85 backdrop-blur-xl overflow-hidden shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+        <div className="px-4 py-3 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-bold text-slate-900 inline-flex items-center gap-2">
-              <span className="material-symbols-outlined text-teal-700 text-[22px]">map</span>
+            <h3 className="font-bold text-[#1d1d1f] tracking-tight inline-flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#0a7a6c] text-[22px]">map</span>
               Χάρτης κρατήσεων
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
