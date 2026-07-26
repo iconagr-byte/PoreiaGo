@@ -134,13 +134,13 @@ export default function DriversManagementPanel() {
             <option value="inactive">Ανενεργοί</option>
           </select>
           <a
-            href="/driver"
+            href="/driver/login"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-[12px] bg-zinc-100 text-zinc-800 text-[13px] font-semibold hover:bg-zinc-200/80 transition-colors"
           >
             <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-            /driver
+            /driver/login
           </a>
         </div>
 

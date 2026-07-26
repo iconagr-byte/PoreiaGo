@@ -41,10 +41,10 @@ export default function CustomerRoute({ children, allowGuest = false }) {
           Είστε συνδεδεμένοι ως <strong>οδηγός</strong>. Το My Wallet είναι για πελάτες.
         </p>
         <Link
-          to="/driver"
+          to="/driver/login"
           className="px-6 py-3 rounded-full bg-emerald-600 text-white font-bold text-sm"
         >
-          Driver Portal
+          Είσοδος οδηγού
         </Link>
       </div>
     );
