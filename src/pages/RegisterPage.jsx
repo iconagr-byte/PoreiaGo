@@ -9,6 +9,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import '../styles/wallet-pass.css';
 
 function isRentReturn(path) {
   return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
@@ -120,32 +121,49 @@ export default function RegisterPage() {
         }
       : { from: redirectTo };
 
+  const shellClass = rentIntent
+    ? 'min-h-screen bg-surface flex flex-col items-center justify-center px-4'
+    : 'wallet-auth-stage';
+  const cardClass = rentIntent
+    ? 'bg-surface-container-lowest p-10 md:p-14 rounded-[32px] shadow-level-2 w-full max-w-md'
+    : 'wallet-auth-shell';
+
   return (
-    <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4">
-      <div className="bg-surface-container-lowest p-10 md:p-14 rounded-[32px] shadow-level-2 w-full max-w-md">
+    <div className={shellClass}>
+      <div className={cardClass}>
+        <div className={rentIntent ? undefined : 'wallet-auth-scroll'}>
+          <div className={rentIntent ? undefined : 'wallet-auth-card'}>
         <div className="text-center mb-8">
-          <span className="material-symbols-outlined text-4xl text-primary mb-3">
+          <span
+            className={
+              rentIntent
+                ? 'material-symbols-outlined text-4xl text-primary mb-3'
+                : 'material-symbols-outlined wallet-auth-icon'
+            }
+          >
             {rentIntent ? 'directions_car' : 'account_balance_wallet'}
           </span>
-          <h1 className="text-2xl font-bold text-on-surface">
+          <h1 className={rentIntent ? 'text-2xl font-bold text-on-surface' : undefined}>
             {rentIntent
               ? 'Λογαριασμός ενοικίασης'
               : claim
                 ? 'Αποθήκευση στο My Wallet'
-                : 'Εγγραφή πελάτη'}
+                : 'Εγγραφή My Wallet'}
           </h1>
-          <p className="text-sm text-on-surface-variant mt-2">
+          <p className={rentIntent ? 'text-sm text-on-surface-variant mt-2' : 'wallet-auth-lead'}>
             {rentIntent
               ? 'Δημιουργήστε λογαριασμό για να κλείσετε όχημα. Μετά την εγγραφή μπαίνετε στην εφαρμογή ενοικίασης.'
               : claim
                 ? 'Δημιουργήστε λογαριασμό για να δείτε το εισιτήριο και το QR επιβίβασης'
-                : 'Δημιουργήστε λογαριασμό My Wallet'}
+                : 'Δημιουργήστε λογαριασμό για ταξίδια με λεωφορείο'}
           </p>
           {rentIntent ? (
             <p className="text-xs text-on-surface-variant mt-2">
               Τα λεωφορεία / εισιτήρια είναι στο My Wallet — εδώ είναι μόνο η ενοικίαση.
             </p>
-          ) : null}
+          ) : (
+            <p className="wallet-auth-hint">Η ενοικίαση οχήματος είναι στην εφαρμογή Rent (teal).</p>
+          )}
         </div>
 
         {claim && !rentIntent ? (
@@ -240,7 +258,11 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 rounded-full bg-primary-container text-white font-bold disabled:opacity-60"
+            className={
+              rentIntent
+                ? 'w-full py-4 rounded-full bg-primary-container text-white font-bold disabled:opacity-60'
+                : 'wallet-auth-submit'
+            }
           >
             {loading
               ? 'Δημιουργία…'
@@ -252,19 +274,25 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        <p className="text-sm text-center mt-6 text-gray-600">
+        <p className={`text-sm text-center mt-6 ${rentIntent ? 'text-gray-600' : 'text-[#6e6e73]'}`}>
           Έχετε ήδη λογαριασμό;{' '}
-          <Link to="/login" state={loginState} className="text-primary font-bold hover:underline">
+          <Link
+            to="/login"
+            state={loginState}
+            className={rentIntent ? 'text-primary font-bold hover:underline' : 'wallet-auth-link'}
+          >
             Σύνδεση
           </Link>
         </p>
         {!rentIntent ? (
-          <p className="text-xs text-center text-gray-500 mt-4">
-            <Link to="/my-booking" className="text-primary font-semibold hover:underline">
+          <p className="text-xs text-center mt-4">
+            <Link to="/my-booking" className="wallet-auth-link">
               Εύρεση κράτησης χωρίς λογαριασμό
             </Link>
           </p>
         ) : null}
+          </div>
+        </div>
       </div>
     </div>
   );

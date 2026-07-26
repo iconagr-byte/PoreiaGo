@@ -42,9 +42,9 @@ import '../styles/wallet-pass.css';
 const TABS = [
   { id: 'home', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
-  { id: 'rentals', label: 'Ενοικίαση', icon: 'directions_car' },
-  { id: 'lost_found', label: 'Απωλεσθέντα', icon: 'support_agent' },
-  { id: 'account', label: 'Λογαριασμός', icon: 'person' },
+  { id: 'rentals', label: 'Rent', icon: 'directions_car' },
+  { id: 'lost_found', label: 'Απωλ.', icon: 'support_agent' },
+  { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
 function resolveCustomerProfile() {
@@ -335,54 +335,34 @@ function WalletAuthenticatedApp() {
   );
 
   return (
-    <div className="wallet-app">
-      <header className="wallet-topbar">
-        <button type="button" className="wallet-topbar-btn" onClick={() => navigate('/')}>
-          <span className="material-symbols-outlined text-[20px]" aria-hidden>
-            arrow_back
-          </span>
-          Αρχική
-        </button>
-        <div className="wallet-topbar-brand">
-          <OfficeBrandMark className="h-8" variant="light" fallbackLabel="My Wallet" asLink={false} />
-        </div>
-        <button
-          type="button"
-          className="wallet-topbar-btn"
-          onClick={() => {
-            logoutCustomer();
-            navigate('/login', { replace: true, state: { from: '/wallet' } });
-          }}
-        >
-          <span className="material-symbols-outlined text-[20px]" aria-hidden>
-            logout
-          </span>
-          Έξοδος
-        </button>
-      </header>
+    <div className="wallet-phone-stage">
+      <div className="wallet-app">
+        <header className="wallet-topbar">
+          <button type="button" className="wallet-topbar-btn" onClick={() => navigate('/')}>
+            <span className="material-symbols-outlined text-[20px]" aria-hidden>
+              arrow_back
+            </span>
+            Αρχική
+          </button>
+          <div className="wallet-topbar-brand">
+            <OfficeBrandMark className="h-8" variant="light" fallbackLabel="My Wallet" asLink={false} />
+          </div>
+          <button
+            type="button"
+            className="wallet-topbar-btn"
+            onClick={() => {
+              logoutCustomer();
+              navigate('/login', { replace: true, state: { from: '/wallet' } });
+            }}
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden>
+              logout
+            </span>
+            Έξοδος
+          </button>
+        </header>
 
-      {!isTicketView ? (
-        <nav className="wallet-nav" aria-label="My Wallet">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={activeTab === tab.id ? 'active' : ''}
-              onClick={() => {
-                setActiveTab(tab.id);
-                setSelectedBookingId(null);
-              }}
-            >
-              <span className="material-symbols-outlined" aria-hidden>
-                {tab.icon}
-              </span>
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      ) : null}
-
-      <main className="wallet-main">
+        <main className="wallet-main">
         {activeTab === 'home' && !isTicketView ? (
           <>
             {showWelcome && featured ? (
@@ -616,7 +596,29 @@ function WalletAuthenticatedApp() {
             }}
           />
         )}
-      </main>
+        </main>
+
+        {!isTicketView ? (
+          <nav className="wallet-nav" aria-label="My Wallet">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={activeTab === tab.id ? 'is-active' : ''}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setSelectedBookingId(null);
+                }}
+              >
+                <span className="material-symbols-outlined" aria-hidden>
+                  {tab.icon}
+                </span>
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        ) : null}
+      </div>
     </div>
   );
 }
