@@ -426,7 +426,10 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
             </div>
           </div>
           <button type="button" onClick={reload} className="rental-apple-refresh">
-            <span className="material-symbols-outlined" aria-hidden>
+            <span
+              className={`material-symbols-outlined${loading ? ' animate-spin' : ''}`}
+              aria-hidden
+            >
               {loading ? 'progress_activity' : 'refresh'}
             </span>
             {loading ? 'Φόρτωση…' : 'Ανανέωση'}
