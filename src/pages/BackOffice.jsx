@@ -55,6 +55,7 @@ import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
 import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
 import FleetCalendarPanel from '../components/admin/fleet/FleetCalendarPanel.jsx';
+import FleetRentalPanel from '../components/admin/fleet/FleetRentalPanel.jsx';
 import FleetAvailabilityPanel from '../components/admin/fleet/FleetAvailabilityPanel.jsx';
 import FleetDocumentsPanel from '../components/admin/fleet/FleetDocumentsPanel.jsx';
 import FleetExpensesPanel from '../components/admin/fleet/FleetExpensesPanel.jsx';
@@ -2138,6 +2139,11 @@ export default function BackOffice() {
             {activeTab === 'fleet_route_playback' && (
               <div className="pb-stack-lg animate-in fade-in duration-300">
                 <FleetRouteHistory />
+              </div>
+            )}
+            {activeTab === 'fleet_rental' && (
+              <div className="pb-stack-lg">
+                <FleetRentalPanel />
               </div>
             )}
             {activeTab === 'fleet_calendar' && (

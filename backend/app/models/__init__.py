@@ -4,6 +4,7 @@ from app.models.audit import AuditAction, AuditLog
 from app.models.base import Base
 from app.models.booking import Booking, BookingStatus, PaymentStatus
 from app.models.fiscal_invoice import FiscalInvoice, FiscalInvoiceKind, FiscalInvoiceStatus
+from app.models.fleet_rental import RentalBooking, RentalVehicle, VehicleInspection
 from app.models.hybrid import Flight, FlightStatusEvent, LuggageCheckin, PassengerFlightSeat, TripSegment
 from app.models.stop import Stop
 from app.models.provisioning import ProvisioningJobStatus, TenantProvisioningJob
@@ -26,6 +27,9 @@ __all__ = [
     "FiscalInvoice",
     "FiscalInvoiceKind",
     "FiscalInvoiceStatus",
+    "RentalBooking",
+    "RentalVehicle",
+    "VehicleInspection",
     "Flight",
     "FlightStatusEvent",
     "LuggageCheckin",
