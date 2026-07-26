@@ -28,12 +28,27 @@ function isRentReturn(path) {
   return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
 }
 
+function isRentAuthPath(pathname) {
+  return (
+    pathname === '/rent' ||
+    pathname === '/rent/login' ||
+    pathname === '/rent/register' ||
+    (typeof pathname === 'string' && pathname.startsWith('/rent/'))
+  );
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { enabled: googleEnabled } = useGoogleAuthConfig();
-  const redirectTo = location.state?.from || '/wallet';
-  const rentIntent = isRentReturn(redirectTo);
+  // Path wins over shared /login — rent entrance must never look like bus My Wallet.
+  const pathRent = isRentAuthPath(location.pathname);
+  const redirectTo = pathRent
+    ? isRentReturn(location.state?.from)
+      ? location.state.from
+      : '/rent'
+    : location.state?.from || '/wallet';
+  const rentIntent = pathRent || isRentReturn(redirectTo);
   const walletIntent =
     !rentIntent && (location.state?.from === '/wallet' || Boolean(location.state?.walletClaim));
   const [error, setError] = useState('');
@@ -61,6 +76,16 @@ export default function LoginPage() {
   useEffect(() => {
     isCustomerAuthBackendAvailable().then(setBackendOk);
   }, []);
+
+  useEffect(() => {
+    // Old deep-links used /login?state.from=/rent — send them to the rent entrance URL.
+    if (
+      location.pathname === '/login' &&
+      isRentReturn(location.state?.from)
+    ) {
+      navigate('/rent/login', { replace: true, state: location.state });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     if (walletIntent) return;
@@ -293,7 +318,11 @@ export default function LoginPage() {
 
       <p className="text-sm text-center text-[#6e6e73] mt-5">
         Δεν έχετε λογαριασμό;{' '}
-        <Link to="/register" state={registerState} className={linkClass}>
+        <Link
+          to={rentIntent ? '/rent/register' : '/register'}
+          state={registerState}
+          className={linkClass}
+        >
           {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
         </Link>
       </p>

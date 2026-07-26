@@ -76,7 +76,7 @@ function RentalAuthGate() {
         <Link to="/driver" className="rent-gate-btn-primary">
           Driver Portal
         </Link>
-        <Link to="/login" state={{ from: '/rent' }} className="rent-gate-btn-ghost">
+        <Link to="/rent/login" className="rent-gate-btn-ghost">
           Σύνδεση πελάτη
         </Link>
       </RentalGateCard>
@@ -120,7 +120,7 @@ function RentalAuthGate() {
         >
           Προβολή εφαρμογής
         </button>
-        <Link to="/login" state={{ from: '/rent' }} className="rent-gate-btn-secondary">
+        <Link to="/rent/login" className="rent-gate-btn-secondary">
           Σύνδεση πελάτη
         </Link>
         <Link to="/admin" className="rent-gate-btn-ghost">
@@ -130,8 +130,8 @@ function RentalAuthGate() {
     );
   }
 
-  // Guests open the rent app at login; register returns to /rent to book a vehicle.
-  return <Navigate to="/login" replace state={{ from: '/rent' }} />;
+  // Guest share link /rent → rent entrance (/rent/login). Never bus My Wallet /login.
+  return <Navigate to="/rent/login" replace />;
 }
 
 function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {}) {
