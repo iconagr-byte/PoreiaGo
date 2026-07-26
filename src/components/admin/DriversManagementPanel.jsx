@@ -253,6 +253,24 @@ export default function DriversManagementPanel() {
                         tabIndex={0}
                         onClick={(e) => {
                           e.stopPropagation();
+                          navigate(`/admin/drivers/${d.id}#driver-qr`);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.stopPropagation();
+                            navigate(`/admin/drivers/${d.id}#driver-qr`);
+                          }
+                        }}
+                        className="w-9 h-9 rounded-[10px] flex items-center justify-center text-zinc-500 hover:bg-sky-50 hover:text-sky-700"
+                        title="QR εφαρμογής"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
                           navigate(`/admin/drivers/${d.id}/edit`);
                         }}
                         onKeyDown={(e) => {
