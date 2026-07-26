@@ -19,6 +19,7 @@ import {
   uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
+import RentalSignaturePad from './RentalSignaturePad.jsx';
 
 const CATEGORIES = [
   { value: 'CAR', label: 'Αυτοκίνητο' },
@@ -119,8 +120,11 @@ export default function FleetRentalPanel() {
     damage_notes: '',
     inspector_name: '',
     photo_urls: [],
+    signature_url: '',
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingSignature, setUploadingSignature] = useState(false);
+  const [signaturePadKey, setSignaturePadKey] = useState(0);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -258,6 +262,19 @@ export default function FleetRentalPanel() {
     }
   };
 
+  const onSignatureCommit = async (file) => {
+    setUploadingSignature(true);
+    try {
+      const uploaded = await uploadRentalInspectionPhoto(file);
+      setInsp((s) => ({ ...s, signature_url: uploaded.url }));
+      toast.success('Η υπογραφή αποθηκεύτηκε');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUploadingSignature(false);
+    }
+  };
+
   const submitInspection = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -267,9 +284,17 @@ export default function FleetRentalPanel() {
         fuel_level: Number(insp.fuel_level),
         mileage: Number(insp.mileage),
         photo_urls: insp.photo_urls || [],
+        signature_url: insp.signature_url || null,
       });
       toast.success('Η επιθεώρηση καταχωρήθηκε');
-      setInsp((s) => ({ ...s, damage_notes: '', mileage: 0, photo_urls: [] }));
+      setInsp((s) => ({
+        ...s,
+        damage_notes: '',
+        mileage: 0,
+        photo_urls: [],
+        signature_url: '',
+      }));
+      setSignaturePadKey((k) => k + 1);
       await reload();
     } catch (err) {
       toast.error(err.message);
@@ -970,6 +995,14 @@ export default function FleetRentalPanel() {
                 ))}
               </div>
             ) : null}
+            <RentalSignaturePad
+              key={signaturePadKey}
+              previewUrl={insp.signature_url ? resolveSiteAssetUrl(insp.signature_url) : null}
+              onCommit={onSignatureCommit}
+              onClear={() => setInsp((s) => ({ ...s, signature_url: '' }))}
+              disabled={busy}
+              busy={uploadingSignature}
+            />
             <label className="block text-xs font-bold text-gray-500">
               Υπεύθυνος
               <input
@@ -980,7 +1013,7 @@ export default function FleetRentalPanel() {
             </label>
             <button
               type="submit"
-              disabled={busy || uploadingPhoto}
+              disabled={busy || uploadingPhoto || uploadingSignature}
               className="w-full py-2.5 rounded-xl bg-primary text-white font-bold"
             >
               Καταχώρηση επιθεώρησης
@@ -1026,6 +1059,18 @@ export default function FleetRentalPanel() {
                           />
                         </a>
                       ))}
+                    </div>
+                  ) : null}
+                  {i.signature_url ? (
+                    <div className="mt-2 rounded-lg border bg-slate-50 px-2 py-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                        Υπογραφή
+                      </p>
+                      <img
+                        src={resolveSiteAssetUrl(i.signature_url)}
+                        alt="Υπογραφή"
+                        className="mt-1 h-12 w-full object-contain"
+                      />
                     </div>
                   ) : null}
                 </article>

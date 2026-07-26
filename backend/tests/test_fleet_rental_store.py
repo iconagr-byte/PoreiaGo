@@ -211,15 +211,19 @@ class FleetRentalStoreTests(unittest.TestCase):
                 "pickup_location": "Γραφείο",
             },
         )
-        store.create_inspection(
+        pickup = store.create_inspection(
             self.tid,
             {
                 "rental_booking_id": booking["id"],
                 "inspection_type": "PICKUP_CHECK",
                 "fuel_level": 90,
                 "mileage": 12000,
+                "signature_url": "/api/site/rental-photos/sig-in.png",
+                "photo_urls": ["/api/site/rental-photos/dmg-1.jpg"],
             },
         )
+        self.assertEqual(pickup["signature_url"], "/api/site/rental-photos/sig-in.png")
+        self.assertEqual(pickup["photo_urls"], ["/api/site/rental-photos/dmg-1.jpg"])
         store.create_inspection(
             self.tid,
             {
@@ -227,6 +231,7 @@ class FleetRentalStoreTests(unittest.TestCase):
                 "inspection_type": "RETURN_CHECK",
                 "fuel_level": 40,
                 "mileage": 12450,
+                "signature_url": "/api/site/rental-photos/sig-out.png",
             },
         )
         bookings = store.list_bookings(self.tid)
@@ -234,6 +239,9 @@ class FleetRentalStoreTests(unittest.TestCase):
         vehicle = store.get_vehicle(self.tid, v["id"])
         self.assertEqual(vehicle["current_status"], "AVAILABLE")
         self.assertEqual(vehicle["current_mileage"], 12450)
+        inspections = store.list_inspections(self.tid, booking_id=booking["id"])
+        self.assertEqual(len(inspections), 2)
+        self.assertTrue(any(i.get("signature_url") for i in inspections))
 
 
 if __name__ == "__main__":
