@@ -2,13 +2,15 @@
  * Rental customer PWA — offline shell (scope /rent).
  * Assets under /rental-pwa/ so /rent SPA route is not a static directory.
  */
-const CACHE = 'poreiago-rental-v1';
+const CACHE = 'poreiago-rental-v2';
 const OFFLINE_URL = '/rental-pwa/offline.html';
 
 const PRECACHE_URLS = [
   OFFLINE_URL,
   '/rental-pwa/manifest.webmanifest',
   '/icons/rental-pwa.svg',
+  '/icons/rental-pwa-192.png',
+  '/icons/rental-pwa-512.png',
 ];
 
 function offlineHtmlResponse() {
