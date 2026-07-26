@@ -6,6 +6,7 @@ import AdminLayout from '../../components/AdminLayout.jsx';
 import { loadTrips } from '../../lib/trips/tripStore.js';
 import { fetchFleetDriver, updateFleetDriver, uploadDriverPhoto } from '../../services/platformApi.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
+import DriverLoginQrPanel from '../../components/admin/DriverLoginQrPanel.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 const STATUS_LABELS = {
@@ -426,6 +427,13 @@ export default function DriverDetailPage() {
               </a>
             </div>
           </form>
+          <div className="px-6 pb-6">
+            <DriverLoginQrPanel
+              driverId={driver.id}
+              driverName={driver.name}
+              assignedTrips={assignedTrips}
+            />
+          </div>
         </section>
 
         {fleetVehicle && (
