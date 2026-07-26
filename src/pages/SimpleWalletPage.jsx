@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { getCustomerByEmail } from '../lib/customers/customerStore.js';
 import {
@@ -19,6 +19,8 @@ import {
   walletClaimAuthPath,
   walletClaimNavState,
 } from '../lib/wallet/walletClaim.js';
+import { loadLastPass, patchLastPassQr, saveLastPass } from '../lib/wallet/lastPassSnapshot.js';
+import { setupWalletPwa } from '../lib/wallet/registerWalletPwa.js';
 import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookingStore.js';
 import { loadTrips } from '../lib/trips/tripStore.js';
 import { isPaid, statusStyle } from '../lib/bookingDisplay.js';
@@ -28,6 +30,7 @@ import CustomerSecurityPanel from '../components/wallet/CustomerSecurityPanel.js
 import PushNotificationsPanel from '../components/wallet/PushNotificationsPanel.jsx';
 import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
+import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
@@ -104,6 +107,10 @@ export default function SimpleWalletPage() {
   const [focusId, setFocusId] = useState(
     () => location.state?.highlightBooking || peekWalletFocusBooking() || null,
   );
+  const [networkOffline, setNetworkOffline] = useState(
+    () => typeof navigator !== 'undefined' && navigator.onLine === false,
+  );
+  const [offlineSnap, setOfflineSnap] = useState(() => loadLastPass());
 
   if (!isCustomer() || !getCustomerToken()) {
     if (isCustomer() && !getCustomerToken()) {
@@ -140,6 +147,22 @@ export default function SimpleWalletPage() {
   const profile = useMemo(() => resolveCustomerProfile(), []);
   const email = profile.email;
 
+  useEffect(() => setupWalletPwa(), []);
+
+  useEffect(() => {
+    const onOnline = () => setNetworkOffline(false);
+    const onOffline = () => {
+      setNetworkOffline(true);
+      setOfflineSnap(loadLastPass());
+    };
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
+
   useEffect(() => {
     const fromNav = location.state?.highlightBooking;
     if (fromNav) {
@@ -170,6 +193,15 @@ export default function SimpleWalletPage() {
           }
         }
         setBookings(sorted);
+        if (!sorted.length) {
+          setOfflineSnap(loadLastPass());
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBookings([]);
+          setOfflineSnap(loadLastPass());
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingBookings(false);
@@ -198,6 +230,45 @@ export default function SimpleWalletPage() {
     () => pickFeaturedBooking(bookings, focusId || peekWalletFocusBooking()),
     [bookings, focusId],
   );
+
+  const featuredCover = featured ? tripImageFor(featured) : '';
+  const usingOfflinePass = !featured && Boolean(offlineSnap?.booking);
+  const displayBooking = useMemo(() => {
+    if (featured) return featured;
+    if (!offlineSnap?.booking) return null;
+    return {
+      ...offlineSnap.booking,
+      _offlineQrDataUrl: offlineSnap.qrDataUrl || '',
+    };
+  }, [featured, offlineSnap]);
+  const displayCover = featured
+    ? featuredCover
+    : offlineSnap?.coverImage || '';
+  const displayBrand = featured ? brandLabel : offlineSnap?.brandLabel || brandLabel;
+  const displayPassenger = featured
+    ? profile.name
+    : offlineSnap?.passengerName || profile.name;
+
+  useEffect(() => {
+    if (!featured) return;
+    saveLastPass({
+      booking: featured,
+      coverImage: featuredCover,
+      brandLabel,
+      passengerName: profile.name,
+    });
+    setOfflineSnap(loadLastPass());
+  }, [featured, featuredCover, brandLabel, profile.name]);
+
+  const handleQrChange = useCallback((payload) => {
+    if (!payload?.qrValue && !payload?.qrDataUrl) return;
+    patchLastPassQr({
+      bookingId: payload.bookingId,
+      qrValue: payload.qrValue,
+      qrDataUrl: payload.qrDataUrl,
+    });
+    setOfflineSnap(loadLastPass());
+  }, []);
 
   useEffect(() => {
     if (featured?.id && focusId && featured.id === focusId) {
@@ -307,7 +378,16 @@ export default function SimpleWalletPage() {
               </div>
             ) : null}
 
-            {loadingBookings && !featured ? (
+            {(networkOffline || usingOfflinePass) && displayBooking ? (
+              <div className="wallet-offline-banner" role="status">
+                <span className="material-symbols-outlined" aria-hidden>
+                  wifi_off
+                </span>
+                <p>Χωρίς σύνδεση — εμφανίζεται το τελευταίο αποθηκευμένο εισιτήριο.</p>
+              </div>
+            ) : null}
+
+            {loadingBookings && !displayBooking ? (
               <div className="wallet-pass-empty">
                 <div className="wallet-pass-empty-inner">
                   <p className="wallet-pass-empty-copy">Φόρτωση εισιτηρίου…</p>
@@ -315,14 +395,19 @@ export default function SimpleWalletPage() {
               </div>
             ) : (
               <WalletBoardingPass
-                booking={featured}
-                coverImage={featured ? tripImageFor(featured) : ''}
-                brandLabel={brandLabel}
-                passengerName={profile.name}
+                booking={displayBooking}
+                coverImage={displayCover}
+                brandLabel={displayBrand}
+                passengerName={displayPassenger}
                 onOpenDetails={openTicket}
                 onBrowseTrips={() => navigate('/')}
+                onQrChange={handleQrChange}
+                offline={usingOfflinePass}
               />
             )}
+
+            {featured ? <WalletInstallPrompt /> : null}
+
             {otherUpcoming.length > 0 || bookings.length > 1 ? (
               <div className="wallet-home-more">
                 {otherUpcoming.slice(0, 2).map((b) => (

@@ -21,6 +21,8 @@ export default function WalletBoardingPass({
   passengerName = '',
   onOpenDetails,
   onBrowseTrips,
+  onQrChange,
+  offline = false,
 }) {
   if (!booking) {
     return (
@@ -99,12 +101,30 @@ export default function WalletBoardingPass({
           <span />
         </div>
 
-        <div className={`wallet-pass-qr-wrap${paid ? ' is-live' : ''}`}>
-          <TicketQrCode booking={booking} size={168} className="wallet-pass-qr" />
+        <div className={`wallet-pass-qr-wrap${paid && !offline ? ' is-live' : ''}`}>
+          {offline && booking._offlineQrDataUrl ? (
+            <div className="bg-white p-3 rounded-2xl wallet-pass-qr">
+              <img
+                src={booking._offlineQrDataUrl}
+                alt="QR εισιτηρίου"
+                width={168}
+                height={168}
+              />
+            </div>
+          ) : (
+            <TicketQrCode
+              booking={booking}
+              size={168}
+              className="wallet-pass-qr"
+              onQrChange={onQrChange}
+            />
+          )}
           <p className="wallet-pass-qr-hint">
-            {paid
-              ? 'Δείξτε το QR στον οδηγό κατά την επιβίβαση'
-              : 'Το QR ενεργοποιείται μετά την πληρωμή'}
+            {offline
+              ? 'Χωρίς σύνδεση · τελευταίο αποθηκευμένο QR'
+              : paid
+                ? 'Δείξτε το QR στον οδηγό κατά την επιβίβαση'
+                : 'Το QR ενεργοποιείται μετά την πληρωμή'}
           </p>
           {mark ? <p className="wallet-pass-mark">MARK {mark}</p> : null}
         </div>
