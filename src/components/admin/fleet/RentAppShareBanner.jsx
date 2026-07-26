@@ -8,7 +8,8 @@ import { fetchTenantBrandingSettings } from '../../../services/growthApi.js';
 import { getOfficeRentUrl } from '../../../lib/platform/officePublicUrl.js';
 
 export default function RentAppShareBanner() {
-  const [rentUrl, setRentUrl] = useState('');
+  // Prefer current host immediately (e.g. www.poreiago.com/rent) — branding is optional enrich.
+  const [rentUrl, setRentUrl] = useState(() => getOfficeRentUrl({}));
   const [loading, setLoading] = useState(true);
   const qrRef = useRef(null);
 

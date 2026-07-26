@@ -8,7 +8,7 @@ import { getOfficeWalletUrl } from '../../lib/platform/officePublicUrl.js';
  * Dashboard card: per-office My Wallet QR + public link for customers.
  */
 export default function OfficeWalletShareCard() {
-  const [walletUrl, setWalletUrl] = useState('');
+  const [walletUrl, setWalletUrl] = useState(() => getOfficeWalletUrl({}));
   const [officeName, setOfficeName] = useState('');
   const [loading, setLoading] = useState(true);
   const qrRef = useRef(null);
@@ -18,7 +18,7 @@ export default function OfficeWalletShareCard() {
     fetchTenantBrandingSettings()
       .then((branding) => {
         if (cancelled) return;
-        setWalletUrl(getOfficeWalletUrl(branding));
+        setWalletUrl(getOfficeWalletUrl(branding || {}));
         setOfficeName(branding.display_name || branding.slug || 'Γραφείο');
       })
       .catch(() => {
