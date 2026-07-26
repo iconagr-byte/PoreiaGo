@@ -83,4 +83,13 @@ async def report_lost_item(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        from travel_platform.notifications.lost_item_push import notify_lost_item_to_office
+
+        await notify_lost_item_to_office(created)
+    except Exception:
+        # Report must succeed even if office push fails.
+        pass
+
     return created

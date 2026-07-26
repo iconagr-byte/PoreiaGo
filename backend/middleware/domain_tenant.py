@@ -59,6 +59,7 @@ JWT_SCOPED_PREFIXES = (
     "/api/driver/",
     "/api/auth/",
     "/api/customer/",
+    "/api/lost-items",
     "/api/bookings",
     "/api/push/",
     "/api/expenses/",

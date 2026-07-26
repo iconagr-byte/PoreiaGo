@@ -17,6 +17,7 @@ from middleware.tenant import TenantContextMiddleware
 from ticketing.db import init_ticketing_db, close_ticketing_db
 from ticketing.seed import seed_if_empty
 from ticketing.customer_bookings import seed_customer_bookings_if_empty
+from ticketing.lost_items import seed_lost_items_if_empty
 
 
 # Explicit origins required when allow_credentials=True (browsers reject "*").
@@ -128,6 +129,12 @@ async def lifespan(app: FastAPI):
     await seed_if_empty()
     await seed_customer_bookings_if_empty()
     try:
+        await seed_lost_items_if_empty()
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Lost-items seed skipped: %s", exc
+        )
+    try:
         from travel_platform.notifications.web_push_service import ensure_web_push_keys
 
         if ensure_web_push_keys():
@@ -232,6 +239,12 @@ app.include_router(admin_bookings_router)
 app.include_router(site_appearance_router)
 app.include_router(customer_auth_router)
 app.include_router(customer_bookings_router)
+try:
+    from api.lost_items_router import router as lost_items_router
+except ImportError:
+    lost_items_router = None
+if lost_items_router:
+    app.include_router(lost_items_router)
 try:
     from api.customer_push_router import router as customer_push_router
 except ImportError:

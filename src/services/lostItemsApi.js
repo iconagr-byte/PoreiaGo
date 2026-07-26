@@ -25,17 +25,30 @@ export async function fetchMyLostItems() {
 }
 
 export async function reportLostItem(body) {
-  const res = await fetch(`${API_BASE}/api/customer/lost-items`, {
-    method: 'POST',
-    headers: customerAuthHeaders(),
-    body: JSON.stringify({
-      item_category: body.itemCategory,
-      description: body.description,
-      last_seen_location: body.lastSeenLocation,
-    }),
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/customer/lost-items`, {
+      method: 'POST',
+      headers: customerAuthHeaders(),
+      body: JSON.stringify({
+        item_category: body.itemCategory,
+        description: body.description,
+        last_seen_location: body.lastSeenLocation,
+      }),
+    });
+  } catch {
+    throw new Error('Δεν υπάρχει σύνδεση με τον server — δοκιμάστε ξανά σε λίγο.');
+  }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseError(data));
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Η συνεδρία έληξε — συνδεθείτε ξανά στο Wallet');
+    }
+    if (res.status === 404) {
+      throw new Error('Η υπηρεσία Απωλεσθέντων δεν είναι διαθέσιμη ακόμα — δοκιμάστε μετά το update.');
+    }
+    throw new Error(parseError(data));
+  }
   return data;
 }
 

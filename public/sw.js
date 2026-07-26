@@ -19,23 +19,26 @@ self.addEventListener('push', (event) => {
 
   const isShift = payload.data?.type === 'driver_shift';
   const isChat = payload.data?.type === 'driver_office_chat';
+  const isLost = payload.data?.type === 'lost_item_report';
   const options = {
     body: payload.body,
     tag: payload.tag || 'aerostride',
-    renotify: Boolean(isShift || isChat || payload.renotify),
+    renotify: Boolean(isShift || isChat || isLost || payload.renotify),
     requireInteraction:
-      payload.requireInteraction === true || Boolean(isShift || isChat),
+      payload.requireInteraction === true || Boolean(isShift || isChat || isLost),
     data: {
       url:
         payload.url ||
-        (isChat
-          ? '/admin?tab=driver_chat'
-          : isShift
-            ? '/admin?tab=fleet_live_map'
-            : '/wallet'),
+        (isLost
+          ? '/admin?tab=lost_found'
+          : isChat
+            ? '/admin?tab=driver_chat'
+            : isShift
+              ? '/admin?tab=fleet_live_map'
+              : '/wallet'),
       ...(payload.data || {}),
     },
-    icon: isShift || isChat ? '/icons/driver-pwa-192.png' : '/vite.svg',
+    icon: isShift || isChat || isLost ? '/icons/driver-pwa-192.png' : '/vite.svg',
     badge: '/icons/driver-pwa-192.png',
   };
 
@@ -52,6 +55,9 @@ self.addEventListener('notificationclick', (event) => {
   if (data.type === 'driver_office_chat') {
     const driverId = data.driver_id ? `&driverId=${encodeURIComponent(data.driver_id)}` : '';
     target = data.url || `/admin?tab=driver_chat${driverId}`;
+  }
+  if (data.type === 'lost_item_report') {
+    target = data.url || '/admin?tab=lost_found';
   }
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
