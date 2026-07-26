@@ -15,14 +15,16 @@ import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
+import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
 const TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
   { id: 'book', label: 'Κράτηση', icon: 'directions_car' },
-  { id: 'mine', label: 'Οι δικές μου', icon: 'event_available' },
-  { id: 'account', label: 'Λογαριασμός', icon: 'person' },
+  { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
+  { id: 'mine', label: 'Κρατήσεις', icon: 'event_available' },
+  { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
 function RentalAuthGate() {
@@ -52,7 +54,11 @@ function RentalAuthGate() {
         <h1>Ενοικίαση</h1>
         <p>Συνδεδεμένοι ως γραφείο. Συνδεθείτε ως πελάτης για δοκιμή κράτησης.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', justifyContent: 'center' }}>
-          <Link to="/admin" className="rent-btn rent-btn-ghost" style={{ color: '#f7fbfa', borderColor: 'rgba(247,251,250,.35)' }}>
+          <Link
+            to="/admin"
+            className="rent-btn rent-btn-ghost"
+            style={{ color: '#f5f5f7', borderColor: 'rgba(245,245,247,.35)' }}
+          >
             Dashboard
           </Link>
           <Link to="/login" state={{ from: '/rent' }} className="rent-btn rent-btn-primary">
@@ -68,7 +74,9 @@ function RentalAuthGate() {
 
 function RentalAuthenticatedApp() {
   const [tab, setTab] = useState('home');
+  const [mineView, setMineView] = useState('list');
   const [brandName, setBrandName] = useState('Ενοικίαση');
+  const [calKey, setCalKey] = useState(0);
 
   useEffect(() => setupRentalPwa(), []);
 
@@ -116,7 +124,7 @@ function RentalAuthenticatedApp() {
               <p className="rent-hero-brand">{brandName}</p>
               <h1 className="rent-hero-title">Το όχημά σας, σε λίγα βήματα</h1>
               <p className="rent-hero-copy">
-                Cars, vans και μινιμπάς — διαθεσιμότητα σε πραγματικό χρόνο από το κινητό.
+                Κράτηση, ημερολόγιο και χάρτης παραλαβής — εγκαταστήστε την εφαρμογή στο κινητό.
               </p>
               <button type="button" className="rent-hero-cta" onClick={() => setTab('book')}>
                 <span className="material-symbols-outlined" aria-hidden>
@@ -125,8 +133,24 @@ function RentalAuthenticatedApp() {
                 Βρες όχημα
               </button>
             </section>
-            <div className="rent-main" style={{ paddingTop: '1rem' }}>
-              <RentalInstallPrompt />
+            <div className="rent-main rent-home-stack">
+              <RentalInstallPrompt force />
+              <div className="rent-quick">
+                <button type="button" onClick={() => setTab('calendar')}>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    calendar_month
+                  </span>
+                  <span className="rent-quick-label">Ημερολόγιο</span>
+                  <span className="rent-quick-meta">Μέρες & χάρτης</span>
+                </button>
+                <button type="button" onClick={() => setTab('mine')}>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    event_available
+                  </span>
+                  <span className="rent-quick-label">Οι κρατήσεις μου</span>
+                  <span className="rent-quick-meta">Ιστορικό & ακύρωση</span>
+                </button>
+              </div>
             </div>
           </>
         ) : null}
@@ -134,34 +158,80 @@ function RentalAuthenticatedApp() {
         {tab === 'book' ? (
           <div className="rent-panel">
             <h2>Κράτηση</h2>
-            <p className="rent-panel-lead">Επιλέξτε ημερομηνίες και όχημα — η κράτηση περνάει αμέσως στο γραφείο.</p>
-            <RentalCatalogPanel mode="book" onBooked={() => setTab('mine')} />
+            <p className="rent-panel-lead">
+              Επιλέξτε ημερομηνίες και όχημα — η κράτηση περνάει αμέσως στο γραφείο.
+            </p>
+            <RentalCatalogPanel
+              mode="book"
+              onBooked={() => {
+                setCalKey((k) => k + 1);
+                setTab('calendar');
+              }}
+            />
+          </div>
+        ) : null}
+
+        {tab === 'calendar' ? (
+          <div className="rent-panel">
+            <h2>Ημερολόγιο</h2>
+            <p className="rent-panel-lead">
+              Οι κρατήσεις σας ανά μέρα — επιλέξτε ημερομηνία και δείτε την παραλαβή στον χάρτη.
+            </p>
+            <RentalCustomerCalendar refreshKey={calKey} />
           </div>
         ) : null}
 
         {tab === 'mine' ? (
           <div className="rent-panel">
-            <h2>Οι ενοικιάσεις μου</h2>
-            <p className="rent-panel-lead">Ενεργές και προηγούμενες κρατήσεις σας.</p>
-            <RentalCatalogPanel mode="mine" />
+            <h2>Κρατήσεις</h2>
+            <p className="rent-panel-lead">Ενεργές και προηγούμενες ενοικιάσεις σας.</p>
+            <div className="rent-segment" role="tablist" aria-label="Προβολή κρατήσεων">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mineView === 'list'}
+                className={mineView === 'list' ? 'is-active' : ''}
+                onClick={() => setMineView('list')}
+              >
+                Λίστα
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mineView === 'calendar'}
+                className={mineView === 'calendar' ? 'is-active' : ''}
+                onClick={() => setMineView('calendar')}
+              >
+                Ημερολόγιο
+              </button>
+            </div>
+            {mineView === 'list' ? (
+              <RentalCatalogPanel mode="mine" />
+            ) : (
+              <RentalCustomerCalendar refreshKey={calKey} />
+            )}
           </div>
         ) : null}
 
         {tab === 'account' ? (
           <div className="rent-panel">
             <h2>Λογαριασμός</h2>
-            <p className="rent-panel-lead">Στοιχεία σύνδεσης για την εφαρμογή ενοικίασης.</p>
-            <dl style={{ margin: 0, display: 'grid', gap: '0.75rem' }}>
-              <div>
-                <dt style={{ fontSize: '0.75rem', color: '#5a7270', fontWeight: 700 }}>Όνομα</dt>
-                <dd style={{ margin: '0.15rem 0 0', fontWeight: 700 }}>{profile.name}</dd>
+            <p className="rent-panel-lead">Στοιχεία σύνδεσης και εγκατάσταση εφαρμογής.</p>
+            <dl style={{ margin: 0 }}>
+              <div className="rent-account-row">
+                <div>
+                  <dt>Όνομα</dt>
+                  <dd>{profile.name}</dd>
+                </div>
               </div>
-              <div>
-                <dt style={{ fontSize: '0.75rem', color: '#5a7270', fontWeight: 700 }}>Email</dt>
-                <dd style={{ margin: '0.15rem 0 0', fontWeight: 700 }}>{profile.email}</dd>
+              <div className="rent-account-row">
+                <div>
+                  <dt>Email</dt>
+                  <dd>{profile.email}</dd>
+                </div>
               </div>
             </dl>
-            <RentalInstallPrompt />
+            <RentalInstallPrompt force />
             <div style={{ display: 'grid', gap: '0.6rem', marginTop: '1.25rem' }}>
               <Link to="/wallet" className="rent-btn rent-btn-ghost rent-btn-block">
                 My Wallet (εισιτήρια)
