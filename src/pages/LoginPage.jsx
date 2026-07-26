@@ -302,10 +302,6 @@ export default function LoginPage() {
           <Link to="/my-booking" className="text-primary font-semibold hover:underline">
             Εύρεση κράτησης
           </Link>
-          {' · '}
-          <Link to="/admin/login" className="text-primary font-semibold hover:underline">
-            Admin Login
-          </Link>
         </p>
       </div>
 
