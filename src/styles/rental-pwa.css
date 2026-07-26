@@ -8,6 +8,21 @@
   --rent-sand: #f3efe6;
   --rent-foam: #f7fbfa;
   --rent-accent: #e8a54b;
+  /* Bridge wallet-pass form/list tokens into the rent shell */
+  --wallet-font: 'DM Sans', system-ui, sans-serif;
+  --wallet-display: 'Fraunces', Georgia, serif;
+  --wallet-ink: var(--rent-ink);
+  --wallet-muted: #5a7270;
+  --wallet-accent: var(--rent-teal);
+  --wallet-accent-deep: var(--rent-deep);
+  --wallet-accent-soft: rgba(26, 122, 109, 0.14);
+  --wallet-mint: var(--rent-teal);
+  --wallet-mint-soft: rgba(26, 122, 109, 0.14);
+  --wallet-sunset: var(--rent-accent);
+  --wallet-sunset-soft: rgba(232, 165, 75, 0.18);
+  --wallet-paper: #ffffff;
+  --wallet-sand: #e8f4f1;
+  --wallet-danger: #9b2c2c;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -119,11 +134,18 @@
 }
 
 .rent-topbar-brand {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
   font-family: 'Fraunces', Georgia, serif;
   font-weight: 700;
   font-size: 1.15rem;
   color: var(--rent-deep);
   text-decoration: none;
+  cursor: pointer;
+  text-align: left;
 }
 
 .rent-main {
@@ -226,6 +248,50 @@
 .rent-btn-danger {
   background: #fde8e8;
   color: #9b2c2c;
+}
+
+/* Catalog embedded from Wallet panel — teal CTAs, spacing */
+.rent-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.rent-catalog .wallet-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-catalog .wallet-btn-primary {
+  background: linear-gradient(180deg, #249688 0%, var(--rent-deep) 100%);
+  box-shadow: 0 8px 18px rgba(11, 61, 74, 0.22);
+}
+
+.rent-catalog .wallet-input:focus,
+.rent-catalog .wallet-select:focus,
+.rent-catalog .wallet-textarea:focus {
+  border-color: rgba(26, 122, 109, 0.55);
+}
+
+.rent-catalog .wallet-booking-card {
+  background: var(--rent-foam);
+}
+
+.rent-catalog .wallet-vehicle-thumb {
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 0.85rem;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--wallet-sand);
+  border: 1px solid rgba(7, 40, 48, 0.08);
+}
+
+.rent-catalog h2 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.15rem;
+  margin: 0 0 0.25rem;
+  color: var(--rent-deep);
 }
 
 .rent-btn-block {

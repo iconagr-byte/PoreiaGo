@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import {
+  clearRentalDeferredInstallPrompt,
+  getRentalDeferredInstallPrompt,
+} from '../../lib/rental/registerRentalPwa.js';
 
 function isIosSafari() {
   if (typeof navigator === 'undefined') return false;
@@ -20,7 +24,7 @@ function isStandalone() {
 const DISMISS_KEY = 'rental_install_dismissed_v1';
 
 export default function RentalInstallPrompt() {
-  const [deferred, setDeferred] = useState(null);
+  const [deferred, setDeferred] = useState(() => getRentalDeferredInstallPrompt());
   const [showIos, setShowIos] = useState(false);
   const [hidden, setHidden] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -29,15 +33,19 @@ export default function RentalInstallPrompt() {
 
   useEffect(() => {
     if (hidden) return undefined;
-    const onBip = (e) => {
-      e.preventDefault();
-      setDeferred(e);
-      setShowIos(false);
+    const sync = () => {
+      const evt = getRentalDeferredInstallPrompt();
+      if (evt) {
+        setDeferred(evt);
+        setShowIos(false);
+      } else if (isIosSafari() && !isStandalone()) {
+        setShowIos(true);
+      }
     };
-    window.addEventListener('beforeinstallprompt', onBip);
-    if (!deferred && isIosSafari() && !isStandalone()) setShowIos(true);
-    return () => window.removeEventListener('beforeinstallprompt', onBip);
-  }, [hidden, deferred]);
+    sync();
+    window.addEventListener('rental-pwa-install-available', sync);
+    return () => window.removeEventListener('rental-pwa-install-available', sync);
+  }, [hidden]);
 
   if (hidden || (!deferred && !showIos)) return null;
 
@@ -47,13 +55,15 @@ export default function RentalInstallPrompt() {
   };
 
   const install = async () => {
-    if (!deferred) return;
-    deferred.prompt();
+    const promptEvent = deferred || getRentalDeferredInstallPrompt();
+    if (!promptEvent) return;
+    promptEvent.prompt();
     try {
-      await deferred.userChoice;
+      await promptEvent.userChoice;
     } catch {
       /* ignore */
     }
+    clearRentalDeferredInstallPrompt();
     setDeferred(null);
     dismiss();
   };
