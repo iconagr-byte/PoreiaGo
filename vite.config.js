@@ -9,6 +9,20 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      name: 'pwa-service-worker-allowed',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const url = req.url?.split('?')[0] || ''
+          if (url === '/rental-pwa/sw.js') {
+            res.setHeader('Service-Worker-Allowed', '/rent')
+          } else if (url === '/wallet-pwa/sw.js') {
+            res.setHeader('Service-Worker-Allowed', '/wallet')
+          }
+          next()
+        })
+      },
+    },
   ],
   server: {
     // Μόνο API endpoints — ΟΧΙ /admin/login ή /admin (React routes)

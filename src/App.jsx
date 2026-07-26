@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { Toaster } from 'react-hot-toast';
-import { captureRentalInstallPrompt, injectRentalPwaHead } from './lib/rental/registerRentalPwa.js';
+import { captureRentalInstallPrompt, setupRentalPwa } from './lib/rental/registerRentalPwa.js';
 import HomePage from './pages/HomePage.jsx';
 import StorefrontDemoPage from './pages/StorefrontDemoPage';
 import BackOffice from './pages/BackOffice';
@@ -47,12 +47,10 @@ function RentalPwaBoot() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const path = window.location.pathname || '';
+    // Capture BIP as early as possible; register SW only on /rent so guests can install.
+    captureRentalInstallPrompt();
     if (path === '/rent' || path.startsWith('/rent/')) {
-      injectRentalPwaHead();
-      captureRentalInstallPrompt();
-    } else {
-      // Still capture early if the user lands elsewhere then navigates to /rent.
-      captureRentalInstallPrompt();
+      setupRentalPwa();
     }
   }, []);
   return null;

@@ -366,6 +366,31 @@
   animation: rent-rise 500ms 100ms ease-out both;
 }
 
+.rent-install--compact {
+  margin: 1rem 0 0;
+  padding: 0.85rem 0.9rem;
+  box-shadow: none;
+}
+
+.rent-gate-card .rent-install {
+  background: rgba(245, 245, 247, 0.95);
+}
+
+.rent-guest-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--rent-secondary);
+}
+
+.rent-hero-cta {
+  text-decoration: none;
+}
+
+.rent-app--guest .rent-nav {
+  display: none;
+}
+
 .rent-install-title {
   margin: 0;
   font-weight: 700;
