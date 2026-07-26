@@ -23,6 +23,9 @@ class WalletClaimFlowContractTests(unittest.TestCase):
         self.assertIn("magic link", lowered)
         self.assertIn("saveWalletClaim", text)
         self.assertIn("walletClaimNavState", text)
+        self.assertIn("setWalletFocusBooking", text)
+        self.assertIn("walletHomeNavState", text)
+        self.assertIn("wallet_focus_booking_v1", text)
 
 
 if __name__ == "__main__":
