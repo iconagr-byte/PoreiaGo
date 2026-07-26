@@ -22,6 +22,7 @@ import FleetVehicleDetail from './pages/FleetVehicleDetail';
 import TripEditorPage from './pages/admin/TripEditorPage';
 import DriverDetailPage from './pages/admin/DriverDetailPage';
 import DriverFormPage from './pages/admin/DriverFormPage.jsx';
+import RentalVehicleFormPage from './pages/admin/RentalVehicleFormPage.jsx';
 import PlatformAdminRedirect from './pages/admin/PlatformAdminRedirect';
 import TourLeaderLuggagePage from './pages/tour/TourLeaderLuggagePage.jsx';
 import SharedItineraryPage from './pages/tour/SharedItineraryPage.jsx';
@@ -88,6 +89,11 @@ function App() {
             <Route path="/admin" element={<BackOffice />} />
             <Route path="/admin/platform" element={<PlatformAdminRedirect />} />
             <Route path="/admin/fleet/:vehicleId" element={<FleetVehicleDetail />} />
+            <Route path="/admin/fleet-rental/vehicles/new" element={<RentalVehicleFormPage />} />
+            <Route
+              path="/admin/fleet-rental/vehicles/:vehicleId/edit"
+              element={<RentalVehicleFormPage />}
+            />
             <Route path="/admin/trips/:tripId" element={<TripEditorPage />} />
             <Route path="/tour-leader/:tripId" element={<TourLeaderLuggagePage />} />
             <Route path="/itinerary/share" element={<SharedItineraryPage />} />
