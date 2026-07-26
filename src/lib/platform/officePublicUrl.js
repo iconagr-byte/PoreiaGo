@@ -80,6 +80,13 @@ export function getOfficeWalletUrl(branding = {}) {
   return `${origin}/wallet`;
 }
 
+/** Customer rental PWA — absolute URL for QR / share. */
+export function getOfficeRentUrl(branding = {}) {
+  const origin = getOfficePublicOrigin(branding).replace(/\/$/, '');
+  if (!origin) return '/rent';
+  return `${origin}/rent`;
+}
+
 export function getOfficeStorefrontUrl(branding = {}) {
   const origin = getOfficePublicOrigin(branding).replace(/\/$/, '');
   return origin || '/';
