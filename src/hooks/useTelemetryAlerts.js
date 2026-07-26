@@ -18,12 +18,8 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
       return [row, ...prev].slice(0, limit);
     });
     const type = String(row.alert_type || '').toUpperCase();
-    const playClick = () => {
-      unlockNotificationAudio();
-      playNotificationClick();
-    };
+    // Click sound + inbox are handled by AdminNotificationBell (BackOffice header).
     if (type === 'SOS') {
-      playClick();
       toast.error(row.message || 'SOS από οδηγό!', {
         duration: 12000,
         icon: '🚨',
@@ -36,7 +32,6 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
         });
       }
     } else if (type === 'DRIVER_ONLINE') {
-      playClick();
       toast.success(row.message || 'Οδηγός ξεκίνησε βάρδια', {
         duration: 5000,
         id: `driver-online-${row.id}`,
@@ -53,7 +48,6 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
         }
       }
     } else if (type === 'DRIVER_OFFLINE') {
-      playClick();
       toast(row.message || 'Οδηγός έκλεισε βάρδια', {
         duration: 5000,
         icon: '🛑',
