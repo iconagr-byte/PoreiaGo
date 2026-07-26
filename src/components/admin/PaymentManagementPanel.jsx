@@ -14,7 +14,14 @@ import {
   normalizePaymentSettings,
 } from '../../lib/payments/paymentSettings.js';
 import { fetchAdminBookings, retryFiscalInvoice, issueFiscalReceipt } from '../../services/adminBookingsApi.js';
-import { fetchFiscalQueue, fetchFiscalStats, downloadFiscalInvoicesCsv, fetchFiscalReconciliation, downloadFiscalReconciliationCsv } from '../../services/fiscalQueueApi.js';
+import {
+  fetchFiscalQueue,
+  fetchFiscalStats,
+  downloadFiscalInvoicesCsv,
+  fetchFiscalReconciliation,
+  downloadFiscalReconciliationCsv,
+  abandonFiscalInvoice,
+} from '../../services/fiscalQueueApi.js';
 import FiscalPipelineHelp from './FiscalPipelineHelp.jsx';
 import {
   createBankAccount,
@@ -662,6 +669,20 @@ export default function PaymentManagementPanel() {
       toast.success('Ορισμός προεπιλογής');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία');
+    }
+  };
+
+  const onAbandonFiscal = async (invoiceId) => {
+    if (!window.confirm('Κλείσιμο αυτής της εκκρεμούς απόδειξης; Δεν θα εκδοθεί MARK.')) return;
+    setRetryingFiscalId(invoiceId);
+    try {
+      await abandonFiscalInvoice(invoiceId, 'Abandoned by admin from payments panel');
+      toast.success('Η εκκρεμότητα έκλεισε');
+      await refreshFiscalPanels();
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία κλεισίματος');
+    } finally {
+      setRetryingFiscalId(null);
     }
   };
 
@@ -1761,6 +1782,14 @@ export default function PaymentManagementPanel() {
                   ) : (
                     <span className="text-xs text-violet-700 font-medium text-center">Σε επεξεργασία…</span>
                   )}
+                  <button
+                    type="button"
+                    disabled={retryingFiscalId === item.invoice_id}
+                    onClick={() => onAbandonFiscal(item.invoice_id)}
+                    className="px-4 py-2 rounded-full border border-slate-200 text-slate-700 text-sm font-bold disabled:opacity-60"
+                  >
+                    Κλείσιμο
+                  </button>
                   <span className="text-[10px] font-mono text-gray-400 text-center">{item.booking_id}</span>
                 </div>
               </div>

@@ -8,7 +8,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -54,12 +54,22 @@ async def fiscal_pipeline_snapshot(session: AsyncSession) -> dict[str, Any]:
     from app.services.fiscal_auto_retry_service import fiscal_auto_retry_settings
     from app.services.fiscal_stuck_recovery_service import fiscal_stuck_recovery_settings
 
+    # Admin-abandoned rows stay FAILED in DB but must not keep the platform degraded.
+    # JSONB NULL @> … is NULL in SQL — treat missing metadata as not abandoned.
+    not_abandoned = or_(
+        FiscalInvoice.metadata_json.is_(None),
+        ~FiscalInvoice.metadata_json.contains({"abandoned": True}),
+    )
+
     counts: dict[str, int] = {}
     for status in FiscalInvoiceStatus:
         result = await session.execute(
             select(func.count())
             .select_from(FiscalInvoice)
-            .where(FiscalInvoice.status == status),
+            .where(
+                FiscalInvoice.status == status,
+                not_abandoned,
+            ),
         )
         counts[status.value] = int(result.scalar() or 0)
 
@@ -75,6 +85,7 @@ async def fiscal_pipeline_snapshot(session: AsyncSession) -> dict[str, Any]:
                 (FiscalInvoiceStatus.PENDING, FiscalInvoiceStatus.QUEUED),
             ),
             FiscalInvoice.updated_at <= cutoff,
+            not_abandoned,
         ),
     )
     stuck_candidates = int(stuck_result.scalar() or 0)

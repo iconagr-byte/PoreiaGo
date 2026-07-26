@@ -298,6 +298,45 @@ async def retry_fiscal_invoice(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@router.post("/api/admin/platform/fiscal-invoices/{invoice_id}/abandon")
+async def abandon_fiscal_invoice(
+    invoice_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    reason: str = Query(default="Abandoned by admin — seed/cancelled/stuck"),
+):
+    """Close a non-issued fiscal invoice so stuck seed rows stop degrading /health."""
+    from app.core.auth_deps import apply_tenant_rls
+    from app.core.database import AsyncSessionLocal
+    from app.services.fiscal_retry_service import FiscalRetryService
+
+    try:
+        inv_uuid = UUID(invoice_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid invoice id") from exc
+
+    try:
+        async with AsyncSessionLocal() as db:
+            await apply_tenant_rls(db, tenant_id)
+            invoice = await FiscalRetryService(db).abandon_invoice(
+                tenant_id=tenant_id,
+                invoice_id=inv_uuid,
+                reason=reason,
+            )
+            await db.commit()
+            return {
+                "ok": True,
+                "invoice_id": str(invoice.id),
+                "status": invoice.status.value,
+                "error_message": invoice.error_message,
+            }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @router.get("/api/admin/platform/fiscal-queue")
 async def list_fiscal_queue(
     tenant_id: Annotated[UUID, Depends(get_tenant_id)],
