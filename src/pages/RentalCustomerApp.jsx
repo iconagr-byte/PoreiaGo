@@ -159,6 +159,19 @@ function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {
 
   return (
     <div className="rent-app">
+      {adminPreview ? (
+        <div className="rent-preview-banner" role="status">
+          <span>Προβολή γραφείου — για πραγματική κράτηση χρειάζεται σύνδεση πελάτη.</span>
+          <button
+            type="button"
+            className="rent-btn rent-btn-ghost"
+            style={{ minHeight: '2rem', padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}
+            onClick={onExitAdminPreview}
+          >
+            Κλείσιμο
+          </button>
+        </div>
+      ) : null}
       {tab !== 'home' ? (
         <header className="rent-topbar">
           <button type="button" className="rent-topbar-brand" onClick={() => setTab('home')}>
