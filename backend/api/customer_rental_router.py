@@ -140,4 +140,35 @@ async def book_rental(
         row = store.create_booking(_tenant_id(request), payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        from travel_platform.notifications.rental_booking_push import notify_rental_booking_to_office
+
+        await notify_rental_booking_to_office(row)
+    except Exception:
+        # Booking must succeed even if office push fails.
+        pass
+
+    return _public_booking(row)
+
+
+@router.post("/bookings/{booking_id}/cancel")
+async def cancel_my_rental(
+    booking_id: str,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    try:
+        row = store.cancel_booking_for_customer(
+            _tenant_id(request),
+            booking_id,
+            email=account["email"],
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "δεν βρέθηκε" in msg:
+            raise HTTPException(status_code=404, detail=msg) from exc
+        if "δικαίωμα" in msg:
+            raise HTTPException(status_code=403, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
     return _public_booking(row)

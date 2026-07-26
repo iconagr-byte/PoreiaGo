@@ -137,6 +137,51 @@ class FleetRentalStoreTests(unittest.TestCase):
         mine = store.list_bookings_for_email(self.tid, "giorgos@example.com")
         self.assertEqual(len(mine), 1)
 
+    def test_customer_cancel_confirmed_only(self) -> None:
+        v = self._vehicle(plate_number="ΡΕΝΤ-CXL")
+        booking = store.create_booking(
+            self.tid,
+            {
+                "vehicle_id": v["id"],
+                "client_name": "Κώστας",
+                "client_email": "kostas@example.com",
+                "start_time": "2026-12-01T10:00:00+00:00",
+                "end_time": "2026-12-02T10:00:00+00:00",
+                "pickup_location": "Γραφείο",
+            },
+        )
+        with self.assertRaises(ValueError):
+            store.cancel_booking_for_customer(self.tid, booking["id"], email="other@example.com")
+        cancelled = store.cancel_booking_for_customer(
+            self.tid, booking["id"], email="kostas@example.com"
+        )
+        self.assertEqual(cancelled["rental_status"], "CANCELLED")
+        vehicle = store.get_vehicle(self.tid, v["id"])
+        self.assertEqual(vehicle["current_status"], "AVAILABLE")
+
+        again = store.create_booking(
+            self.tid,
+            {
+                "vehicle_id": v["id"],
+                "client_name": "Κώστας",
+                "client_email": "kostas@example.com",
+                "start_time": "2026-12-05T10:00:00+00:00",
+                "end_time": "2026-12-06T10:00:00+00:00",
+                "pickup_location": "Γραφείο",
+            },
+        )
+        store.create_inspection(
+            self.tid,
+            {
+                "rental_booking_id": again["id"],
+                "inspection_type": "PICKUP_CHECK",
+                "fuel_level": 80,
+                "mileage": 1000,
+            },
+        )
+        with self.assertRaises(ValueError):
+            store.cancel_booking_for_customer(self.tid, again["id"], email="kostas@example.com")
+
     def test_active_rental_overlays(self) -> None:
         v = self._vehicle(gps_device_id="GPS-99", plate_number="ΡΕΝΤ-GPS")
         store.create_booking(

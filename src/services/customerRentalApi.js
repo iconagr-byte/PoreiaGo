@@ -63,3 +63,9 @@ export async function createCustomerRentalBooking(body) {
     body: JSON.stringify(body),
   });
 }
+
+export async function cancelCustomerRentalBooking(bookingId) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+    method: 'POST',
+  });
+}

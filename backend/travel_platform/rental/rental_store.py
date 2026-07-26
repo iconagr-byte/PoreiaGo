@@ -610,6 +610,37 @@ def list_bookings_for_email(tenant_id: str | None, email: str) -> list[dict[str,
     return rows
 
 
+def cancel_booking_for_customer(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    email: str,
+) -> dict[str, Any]:
+    """Customer self-cancel — only CONFIRMED bookings owned by this email."""
+    tid = _normalize_tenant(tenant_id)
+    needle = str(email or "").strip().lower()
+    bid = str(booking_id or "").strip()
+    if not needle or not bid:
+        raise ValueError("Απαιτείται κράτηση και email")
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        owner = str(booking.get("client_email") or "").strip().lower()
+        if owner != needle:
+            raise ValueError("Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+        status = str(booking.get("rental_status") or "").upper()
+        if status == "CANCELLED":
+            return deepcopy(booking)
+        if status != "CONFIRMED":
+            raise ValueError("Μπορείτε να ακυρώσετε μόνο επιβεβαιωμένες κρατήσεις (όχι ενεργές)")
+    return update_booking_status(tid, bid, "CANCELLED")
+
+
 def public_catalog(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
     """Customer-facing vehicle cards (no internal notes)."""
     rows = list_vehicles(tenant_id, category=category)
