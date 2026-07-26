@@ -42,6 +42,8 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         self.assertIn("setupWalletPwa", page)
         self.assertIn("WalletInstallPrompt", page)
         self.assertIn("saveLastPass", page)
+        self.assertIn("WalletAuthGate", page)
+        self.assertIn("WalletAuthenticatedApp", page)
         reg = (ROOT / "src" / "lib" / "wallet" / "registerWalletPwa.js").read_text(
             encoding="utf-8"
         )
