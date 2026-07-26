@@ -202,15 +202,20 @@ export async function saasLogin({ email, password, tenantSlug, tenantId, mfaCode
 
 /** POST /api/v1/auth/dev-login — local dev fallback when Postgres/seed unavailable. */
 export async function saasDevLogin({ email, password, tenantSlug }) {
-  const res = await fetch(`${API_BASE}/api/v1/auth/dev-login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password,
-      tenant_slug: tenantSlug || undefined,
-    }),
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/v1/auth/dev-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        tenant_slug: tenantSlug || undefined,
+      }),
+    });
+  } catch (err) {
+    throw networkLoginError(err);
+  }
   if (!res.ok) await parseError(res);
   const data = await res.json();
   const resolvedTenantId =
