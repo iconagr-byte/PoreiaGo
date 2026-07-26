@@ -6,6 +6,7 @@ import {
   saveWalletClaim,
   walletClaimAuthPath,
   walletClaimNavState,
+  walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 import { createBookingFromCheckout } from '../lib/ticketing/bookingStore.js';
 import {
@@ -258,7 +259,12 @@ export default function CheckoutPage() {
               ? 'Προκαταβολή OK — η κράτηση είναι στο My Wallet'
               : 'Πληρωμή OK — ανοίγει το My Wallet με το εισιτήριό σας',
         );
-        navigate('/wallet', { state: { highlightBooking: booking.id } });
+        navigate('/wallet', {
+          state: walletHomeNavState({
+            highlightBooking: booking.id,
+            fromClaim: true,
+          }),
+        });
         return;
       }
 
