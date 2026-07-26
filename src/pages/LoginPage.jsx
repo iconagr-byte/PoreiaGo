@@ -22,6 +22,7 @@ import {
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 import '../styles/wallet-pass.css';
+import '../styles/rental-pwa.css';
 
 function isRentReturn(path) {
   return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
@@ -181,42 +182,34 @@ export default function LoginPage() {
         }
       : { from: redirectTo };
 
+  const iconClass = rentIntent
+    ? 'material-symbols-outlined rent-auth-icon'
+    : 'material-symbols-outlined wallet-auth-icon';
+  const leadClass = rentIntent ? 'rent-auth-lead' : 'wallet-auth-lead';
+  const hintClass = rentIntent ? 'rent-auth-hint' : 'wallet-auth-hint';
+  const linkClass = rentIntent ? 'rent-auth-link' : 'wallet-auth-link';
+  const submitClass = rentIntent ? 'rent-auth-submit' : 'wallet-auth-submit';
+  const dividerClass = rentIntent ? 'rent-auth-divider' : 'wallet-auth-divider';
+
   const formBody = (
     <>
-      <div className={rentIntent ? 'text-center mb-10' : 'text-center mb-6'}>
-        <span
-          className={
-            rentIntent
-              ? 'material-symbols-outlined text-4xl text-primary mb-3'
-              : 'material-symbols-outlined wallet-auth-icon'
-          }
-          aria-hidden
-        >
+      <div className="text-center mb-6">
+        <span className={iconClass} aria-hidden>
           {rentIntent ? 'directions_car' : 'account_balance_wallet'}
         </span>
-        <h1
-          className={
-            rentIntent
-              ? 'font-headline-md text-headline-md font-bold text-on-surface tracking-tight mb-2'
-              : undefined
-          }
-        >
-          {rentIntent ? 'Ενοικίαση' : 'My Wallet'}
-        </h1>
-        <p className={rentIntent ? 'font-body-md text-body-md text-on-surface-variant' : 'wallet-auth-lead'}>
+        <h1>{rentIntent ? 'Ενοικίαση' : 'My Wallet'}</h1>
+        <p className={leadClass}>
           {rentIntent
             ? 'Σύνδεση για κράτηση οχήματος. Νέος πελάτης; Δημιουργήστε λογαριασμό πρώτα.'
             : claim
               ? 'Συνδεθείτε για να δείτε το εισιτήριο της κράτησής σας'
               : 'Σύνδεση για ταξίδια με λεωφορείο — ο λογαριασμός αποθηκεύεται στον server'}
         </p>
-        {!rentIntent ? (
-          <p className="wallet-auth-hint">Η ενοικίαση οχήματος είναι στην εφαρμογή Rent (teal).</p>
-        ) : (
-          <p className="text-xs text-on-surface-variant mt-2">
-            Τα ταξίδια με λεωφορείο είναι στο My Wallet — εδώ είναι η ενοικίαση οχήματος.
-          </p>
-        )}
+        <p className={hintClass}>
+          {rentIntent
+            ? 'Τα ταξίδια με λεωφορείο είναι στο My Wallet (μπλε) — εδώ είναι η ενοικίαση.'
+            : 'Η ενοικίαση οχήματος είναι στην εφαρμογή Rent (πράσινο).'}
+        </p>
       </div>
 
       {claim && !rentIntent ? (
@@ -239,17 +232,7 @@ export default function LoginPage() {
         {googleLoading ? <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p> : null}
       </div>
 
-      {rentIntent ? (
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-xs text-gray-400 font-bold uppercase">
-            {googleEnabled ? 'ή με email' : 'με email / κωδικό'}
-          </span>
-          <div className="flex-1 h-px bg-gray-200" />
-        </div>
-      ) : (
-        <div className="wallet-auth-divider">{googleEnabled ? 'ή με email' : 'με email / κωδικό'}</div>
-      )}
+      <div className={dividerClass}>{googleEnabled ? 'ή με email' : 'με email / κωδικό'}</div>
 
       <form onSubmit={handleLogin} className="space-y-4">
         {backendOk === false ? (
@@ -271,12 +254,7 @@ export default function LoginPage() {
         ) : null}
 
         <div className="space-y-2">
-          <label
-            className={rentIntent ? 'block font-label-md text-label-md text-on-surface' : undefined}
-            htmlFor="email"
-          >
-            Email
-          </label>
+          <label htmlFor="email">Email</label>
           <div className="relative">
             <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg">
               mail
@@ -286,11 +264,6 @@ export default function LoginPage() {
               name="email"
               type="email"
               defaultValue={prefillEmail}
-              className={
-                rentIntent
-                  ? 'w-full pl-12 pr-4 py-4 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container'
-                  : undefined
-              }
               placeholder="email@example.com"
               required
             />
@@ -299,16 +272,8 @@ export default function LoginPage() {
 
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <label
-              className={rentIntent ? 'block font-label-md text-label-md text-on-surface' : undefined}
-              htmlFor="password"
-            >
-              Κωδικός
-            </label>
-            <Link
-              to="/forgot-password"
-              className={rentIntent ? 'text-xs text-primary font-semibold hover:underline' : 'wallet-auth-link text-xs'}
-            >
+            <label htmlFor="password">Κωδικός</label>
+            <Link to="/forgot-password" className={`${linkClass} text-xs`}>
               Ξέχασα τον κωδικό
             </Link>
           </div>
@@ -316,48 +281,25 @@ export default function LoginPage() {
             <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93] text-lg">
               lock
             </span>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              className={
-                rentIntent
-                  ? 'w-full pl-12 pr-4 py-4 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container'
-                  : undefined
-              }
-              placeholder="••••••••"
-              required
-            />
+            <input id="password" name="password" type="password" placeholder="••••••••" required />
           </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={loading || googleLoading}
-          className={
-            rentIntent
-              ? 'w-full mt-4 bg-primary-container text-white py-4 rounded-full font-label-md hover:scale-[0.98] transition-transform shadow-md flex items-center justify-center gap-2 disabled:opacity-60'
-              : 'wallet-auth-submit'
-          }
-        >
+        <button type="submit" disabled={loading || googleLoading} className={submitClass}>
           {loading ? 'Σύνδεση…' : 'Είσοδος'}
           <span className="material-symbols-outlined text-sm">arrow_forward</span>
         </button>
       </form>
 
-      <p className={`text-sm text-center mt-5 ${rentIntent ? 'text-gray-600' : 'text-[#6e6e73]'}`}>
+      <p className="text-sm text-center text-[#6e6e73] mt-5">
         Δεν έχετε λογαριασμό;{' '}
-        <Link
-          to="/register"
-          state={registerState}
-          className={rentIntent ? 'text-primary font-bold hover:underline' : 'wallet-auth-link'}
-        >
+        <Link to="/register" state={registerState} className={linkClass}>
           {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
         </Link>
       </p>
       {!rentIntent ? (
         <p className="text-xs text-center mt-3">
-          <Link to="/my-booking" className="wallet-auth-link">
+          <Link to="/my-booking" className={linkClass}>
             Εύρεση κράτησης
           </Link>
         </p>
@@ -365,13 +307,13 @@ export default function LoginPage() {
     </>
   );
 
-  if (!rentIntent) {
+  if (rentIntent) {
     return (
-      <div className="wallet-auth-stage">
-        <div className="wallet-auth-shell">
-          <div className="wallet-auth-scroll">
-            <div className="wallet-auth-card">{formBody}</div>
-            <Link to="/" className="wallet-auth-back">
+      <div className="rent-auth-stage">
+        <div className="rent-auth-shell">
+          <div className="rent-auth-scroll">
+            <div className="rent-auth-card">{formBody}</div>
+            <Link to="/" className="rent-auth-back">
               <span className="material-symbols-outlined text-[18px]">arrow_back</span>
               Επιστροφή στην Αρχική
             </Link>
@@ -382,19 +324,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary-fixed rounded-full blur-[120px] opacity-40" />
-      <div className="bg-surface-container-lowest p-10 md:p-14 rounded-[32px] shadow-level-2 card-inner-border w-full max-w-md relative z-10">
-        {formBody}
-      </div>
-      <div className="mt-8 text-center relative z-10">
-        <Link
-          to="/"
-          className="font-label-md text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 justify-center"
-        >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          Επιστροφή στην Αρχική
-        </Link>
+    <div className="wallet-auth-stage">
+      <div className="wallet-auth-shell">
+        <div className="wallet-auth-scroll">
+          <div className="wallet-auth-card">{formBody}</div>
+          <Link to="/" className="wallet-auth-back">
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            Επιστροφή στην Αρχική
+          </Link>
+        </div>
       </div>
     </div>
   );
