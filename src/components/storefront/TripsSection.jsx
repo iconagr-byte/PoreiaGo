@@ -24,23 +24,29 @@ export default function TripsSection({
   return (
     <section
       id={id}
-      className={`${solo ? 'py-14 md:py-16' : 'py-24'} px-margin-desktop max-w-container-max mx-auto bg-surface`}
+      className={`${solo ? 'py-10 md:py-12' : 'py-24'} px-margin-desktop max-w-container-max mx-auto bg-surface`}
     >
-      <div className={`text-center ${solo ? 'mb-8' : 'mb-16'}`}>
+      <div className={`text-center ${solo ? 'mb-6' : 'mb-16'}`}>
         {eyebrow && (
           <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
             {eyebrow}
           </span>
         )}
         <h2
-          className={`font-headline-lg font-bold text-on-surface tracking-tight ${
-            solo ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl'
+          className={`font-bold text-on-surface tracking-tight ${
+            solo ? 'text-2xl md:text-3xl' : 'font-headline-lg text-4xl md:text-5xl'
           }`}
         >
           {title}
         </h2>
         {subtitle && (
-          <p className="text-on-surface-variant font-body-md mt-3 max-w-xl mx-auto">{subtitle}</p>
+          <p
+            className={`text-on-surface-variant font-body-md mt-3 mx-auto ${
+              solo ? 'max-w-md text-sm sm:text-base' : 'max-w-xl'
+            }`}
+          >
+            {subtitle}
+          </p>
         )}
       </div>
 

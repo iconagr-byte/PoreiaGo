@@ -259,18 +259,23 @@ export function getTemplateById(list, id) {
 }
 
 export function tripsGridClass(layoutId, tripCount = 0) {
-  // One trip in a full-bleed grid looks oversized — constrain and center.
+  // One trip (typical new office) — keep the card narrow/centered, not full-bleed.
   if (tripCount === 1) {
     switch (layoutId) {
       case 'compact_list':
-        return 'flex flex-col gap-3 max-w-xl mx-auto w-full';
+        return 'flex flex-col gap-3 max-w-sm sm:max-w-md mx-auto w-full';
       case 'horizontal_scroll':
         return 'flex justify-center gap-6';
       case 'alternating_rows':
-        return 'flex flex-col gap-10 max-w-3xl mx-auto w-full';
+        return 'flex flex-col gap-8 max-w-lg sm:max-w-xl mx-auto w-full';
       default:
-        return 'grid grid-cols-1 max-w-md sm:max-w-lg md:max-w-xl mx-auto gap-8 w-full';
+        return 'grid grid-cols-1 max-w-[300px] sm:max-w-[340px] md:max-w-[380px] mx-auto gap-6 w-full';
     }
+  }
+
+  // Two trips: avoid ultra-wide 50/50 stretch on large screens.
+  if (tripCount === 2 && (layoutId === 'grid_two_large' || layoutId === 'grid_three' || layoutId === 'masonry_two')) {
+    return 'grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto w-full';
   }
 
   switch (layoutId) {
@@ -293,9 +298,9 @@ export function tripsGridClass(layoutId, tripCount = 0) {
 export function tripCardWrapperClass(layoutId, tripCount = 0) {
   if (layoutId === 'horizontal_scroll') {
     if (tripCount === 1) {
-      return 'w-full max-w-md';
+      return 'w-full max-w-[320px] sm:max-w-[360px]';
     }
-    return 'snap-start shrink-0 w-[min(88vw,340px)]';
+    return 'snap-start shrink-0 w-[min(88vw,300px)]';
   }
   if (layoutId === 'masonry_two') {
     return 'break-inside-avoid mb-6';
