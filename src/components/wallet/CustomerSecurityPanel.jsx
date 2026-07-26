@@ -50,82 +50,71 @@ export default function CustomerSecurityPanel({ email, authProvider }) {
   const passwordSet = hasPassword === true;
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <section className="bg-surface-container-lowest rounded-[28px] border border-black/[0.05] shadow-level-2 p-6 md:p-8">
-        <h2 className="text-xl font-bold text-on-surface flex items-center gap-2">
-          <span className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+    <>
+      <section className="wallet-panel">
+        <div className="wallet-panel-head">
+          <span className="wallet-panel-head-icon" aria-hidden>
             <span className="material-symbols-outlined">shield</span>
           </span>
-          Ασφάλεια λογαριασμού
-        </h2>
-        <p className="text-sm text-on-surface-variant mt-3 leading-relaxed">
-          Ο κωδικός αποθηκεύεται στον server — λειτουργεί από οποιαδήποτε συσκευή.
-        </p>
+          <div>
+            <h2>Ασφάλεια λογαριασμού</h2>
+            <p>Ο κωδικός αποθηκεύεται στον server — λειτουργεί από οποιαδήποτε συσκευή.</p>
+          </div>
+        </div>
 
-        {isGoogle && (
-          <div className="mt-5 flex gap-3 rounded-2xl bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-900">
-            <span className="material-symbols-outlined text-[20px] shrink-0">info</span>
+        {isGoogle ? (
+          <div className="wallet-notice wallet-notice-info" style={{ marginBottom: '1rem' }}>
+            <span className="material-symbols-outlined">info</span>
             <p>
-              Συνδέεστε με <strong>Google</strong>. Μπορείτε να ορίσετε επιπλέον κωδικό email &amp; κωδικό.
+              Συνδέεστε με <strong>Google</strong>. Μπορείτε να ορίσετε επιπλέον κωδικό email &amp;
+              κωδικό.
             </p>
           </div>
-        )}
+        ) : null}
 
-        <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="rounded-2xl bg-surface-container-low px-4 py-3">
-            <dt className="text-[10px] uppercase tracking-wider text-on-surface-variant font-bold">Email</dt>
-            <dd className="font-bold text-on-surface mt-1 break-all">{email}</dd>
+        <dl className="wallet-meta-grid">
+          <div className="wallet-meta-tile">
+            <dt>Email</dt>
+            <dd>{email}</dd>
           </div>
-          <div className="rounded-2xl bg-surface-container-low px-4 py-3">
-            <dt className="text-[10px] uppercase tracking-wider text-on-surface-variant font-bold">Κωδικός email</dt>
-            <dd className="font-bold text-on-surface mt-1">
-              {hasPassword === null ? '…' : passwordSet ? 'Ορισμένος' : 'Δεν έχει οριστεί'}
-            </dd>
+          <div className="wallet-meta-tile">
+            <dt>Κωδικός email</dt>
+            <dd>{hasPassword === null ? '…' : passwordSet ? 'Ορισμένος' : 'Δεν έχει οριστεί'}</dd>
           </div>
         </dl>
       </section>
 
-      <section className="bg-surface-container-lowest rounded-[28px] border border-black/[0.05] shadow-level-2 p-6 md:p-8">
-        <h3 className="text-lg font-bold text-on-surface mb-1">
-          {passwordSet ? 'Αλλαγή κωδικού' : 'Ορισμός κωδικού'}
-        </h3>
-        <p className="text-sm text-on-surface-variant mb-6">
+      <section className="wallet-panel">
+        <h2>{passwordSet ? 'Αλλαγή κωδικού' : 'Ορισμός κωδικού'}</h2>
+        <p className="wallet-panel-lead">
           {passwordSet
             ? 'Εισάγετε τον τρέχοντα κωδικό και τον νέο.'
             : 'Ορίστε κωδικό για σύνδεση με email.'}
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {passwordSet && (
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-on-surface" htmlFor="sec-current">
-                Τρέχων κωδικός
-              </label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-lg">
-                  lock
-                </span>
+        <form onSubmit={handleSubmit} className="wallet-form">
+          {passwordSet ? (
+            <div className="wallet-field">
+              <label htmlFor="sec-current">Τρέχων κωδικός</label>
+              <div className="wallet-input-icon-wrap">
+                <span className="material-symbols-outlined">lock</span>
                 <input
                   id="sec-current"
                   type="password"
                   autoComplete="current-password"
                   value={form.current}
                   onChange={handleChange('current')}
-                  className="w-full pl-12 pr-4 py-3.5 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container"
+                  className="wallet-input"
                   required={passwordSet}
                 />
               </div>
             </div>
-          )}
+          ) : null}
 
-          <div className="space-y-2">
-            <label className="block text-sm font-bold text-on-surface" htmlFor="sec-next">
-              {passwordSet ? 'Νέος κωδικός' : 'Κωδικός'}
-            </label>
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-lg">
-                key
-              </span>
+          <div className="wallet-field">
+            <label htmlFor="sec-next">{passwordSet ? 'Νέος κωδικός' : 'Κωδικός'}</label>
+            <div className="wallet-input-icon-wrap">
+              <span className="material-symbols-outlined">key</span>
               <input
                 id="sec-next"
                 type="password"
@@ -133,21 +122,17 @@ export default function CustomerSecurityPanel({ email, authProvider }) {
                 minLength={6}
                 value={form.next}
                 onChange={handleChange('next')}
-                className="w-full pl-12 pr-4 py-3.5 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container"
+                className="wallet-input"
                 required
               />
             </div>
-            <p className="text-xs text-on-surface-variant">Τουλάχιστον 6 χαρακτήρες</p>
+            <p className="wallet-field-hint">Τουλάχιστον 6 χαρακτήρες</p>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-bold text-on-surface" htmlFor="sec-confirm">
-              Επιβεβαίωση κωδικού
-            </label>
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-lg">
-                key
-              </span>
+          <div className="wallet-field">
+            <label htmlFor="sec-confirm">Επιβεβαίωση κωδικού</label>
+            <div className="wallet-input-icon-wrap">
+              <span className="material-symbols-outlined">key</span>
               <input
                 id="sec-confirm"
                 type="password"
@@ -155,7 +140,7 @@ export default function CustomerSecurityPanel({ email, authProvider }) {
                 minLength={6}
                 value={form.confirm}
                 onChange={handleChange('confirm')}
-                className="w-full pl-12 pr-4 py-3.5 bg-surface-container-low border-0 rounded-2xl focus:ring-2 focus:ring-primary-container"
+                className="wallet-input"
                 required
               />
             </div>
@@ -164,7 +149,7 @@ export default function CustomerSecurityPanel({ email, authProvider }) {
           <button
             type="submit"
             disabled={saving || hasPassword === null}
-            className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-primary-container text-white font-bold text-sm hover:scale-[0.98] transition-transform disabled:opacity-60 flex items-center justify-center gap-2"
+            className="wallet-btn wallet-btn-primary wallet-btn-block"
           >
             <span className="material-symbols-outlined text-[18px]">
               {saving ? 'hourglass_empty' : 'save'}
@@ -173,6 +158,6 @@ export default function CustomerSecurityPanel({ email, authProvider }) {
           </button>
         </form>
       </section>
-    </div>
+    </>
   );
 }

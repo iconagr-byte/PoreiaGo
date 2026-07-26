@@ -73,38 +73,49 @@ export default function PushNotificationsPanel({ email }) {
   };
 
   return (
-    <section className="bg-surface-container-lowest rounded-[28px] border border-black/[0.05] shadow-level-2 p-6 md:p-8">
-      <h3 className="text-lg font-bold text-on-surface flex items-center gap-2">
-        <span className="material-symbols-outlined text-primary">notifications_active</span>
-        Push ειδοποιήσεις (MARK)
-      </h3>
-      <p className="text-sm text-on-surface-variant mt-2 leading-relaxed">
-        Λάβετε browser ειδοποίηση όταν εκδοθεί φορολογική απόδειξη (myDATA MARK) για κράτηση με email{' '}
-        <strong>{email}</strong>.
-      </p>
+    <section className="wallet-panel">
+      <div className="wallet-panel-head">
+        <span className="wallet-panel-head-icon" aria-hidden>
+          <span className="material-symbols-outlined">notifications_active</span>
+        </span>
+        <div>
+          <h3>Push ειδοποιήσεις (MARK)</h3>
+          <p>
+            Λάβετε browser ειδοποίηση όταν εκδοθεί φορολογική απόδειξη (myDATA MARK) για κράτηση με
+            email <strong>{email}</strong>.
+          </p>
+        </div>
+      </div>
 
       {loading ? (
-        <p className="text-sm text-on-surface-variant mt-4">Φόρτωση…</p>
+        <p className="wallet-empty-copy">Φόρτωση…</p>
       ) : !supported ? (
-        <div className="mt-4 rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-900">
-          Το browser σας δεν υποστηρίζει Web Push ή τρέχετε σε μη ασφαλές περιβάλλον (χρειάζεται HTTPS ή localhost).
+        <div className="wallet-notice wallet-notice-warn">
+          <span className="material-symbols-outlined">warning</span>
+          <p>
+            Το browser σας δεν υποστηρίζει Web Push ή τρέχετε σε μη ασφαλές περιβάλλον (χρειάζεται
+            HTTPS ή localhost).
+          </p>
         </div>
       ) : !serverEnabled ? (
-        <div className="mt-4 rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-700">
-          Ο server δεν έχει ρυθμιστεί ακόμα (WEB_PUSH_VAPID_*). Ζητήστε από τον διαχειριστή να ενεργοποιήσει Web Push.
+        <div className="wallet-notice wallet-notice-muted">
+          <span className="material-symbols-outlined">settings</span>
+          <p>
+            Ο server δεν έχει ρυθμιστεί ακόμα (WEB_PUSH_VAPID_*). Ζητήστε από τον διαχειριστή να
+            ενεργοποιήσει Web Push.
+          </p>
         </div>
       ) : (
-        <div className="mt-5 space-y-4">
-          <div className="rounded-2xl bg-surface-container-low px-4 py-3 text-sm">
-            <p className="font-bold text-on-surface">
-              Κατάσταση: {subscribed ? 'Ενεργές' : 'Ανενεργές'}
-            </p>
+        <div className="wallet-form">
+          <div className="wallet-meta-tile">
+            <p className="wallet-pass-kicker">Κατάσταση</p>
+            <p className="wallet-pass-meta-value">{subscribed ? 'Ενεργές' : 'Ανενεργές'}</p>
             {subscribed ? (
-              <p className="text-on-surface-variant mt-1">
+              <p className="wallet-field-hint" style={{ marginTop: '0.35rem' }}>
                 Συνδεδεμένες συσκευές: <strong>{devices}</strong>
               </p>
             ) : (
-              <p className="text-on-surface-variant mt-1">
+              <p className="wallet-field-hint" style={{ marginTop: '0.35rem' }}>
                 Ενεργοποιήστε για άμεση ειδοποίηση μετά την έκδοση MARK — χωρίς SMS κόστος.
               </p>
             )}
@@ -115,7 +126,7 @@ export default function PushNotificationsPanel({ email }) {
               type="button"
               disabled={busy}
               onClick={handleDisable}
-              className="px-6 py-3 rounded-full border border-rose-200 text-rose-700 font-bold text-sm hover:bg-rose-50 disabled:opacity-60"
+              className="wallet-btn wallet-btn-danger"
             >
               Απενεργοποίηση push
             </button>
@@ -124,7 +135,7 @@ export default function PushNotificationsPanel({ email }) {
               type="button"
               disabled={busy}
               onClick={handleEnable}
-              className="px-6 py-3 rounded-full bg-primary-container text-white font-bold text-sm hover:scale-[0.98] transition-transform disabled:opacity-60 flex items-center gap-2"
+              className="wallet-btn wallet-btn-primary"
             >
               <span className="material-symbols-outlined text-[18px]">notifications</span>
               {busy ? 'Ενεργοποίηση…' : 'Ενεργοποίηση push'}
