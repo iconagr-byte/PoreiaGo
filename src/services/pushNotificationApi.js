@@ -1,16 +1,12 @@
 import { API_BASE } from '../config/api.js';
+import {
+  ensurePushSubscription,
+  ensureServiceWorkerRegistration,
+  getRegistrationByScript,
+} from '../lib/push/webPushHelpers.js';
 import { customerAuthHeaders } from './customerAuthApi.js';
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = window.atob(base64);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) {
-    output[i] = raw.charCodeAt(i);
-  }
-  return output;
-}
+const CUSTOMER_SW = '/sw.js';
 
 export function isPushSupported() {
   return (
@@ -40,9 +36,7 @@ export async function fetchPushStatus() {
 }
 
 async function registerServiceWorker() {
-  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-  await navigator.serviceWorker.ready;
-  return registration;
+  return ensureServiceWorkerRegistration(CUSTOMER_SW, { scope: '/' });
 }
 
 export async function subscribePushNotifications() {
@@ -61,13 +55,7 @@ export async function subscribePushNotifications() {
   }
 
   const registration = await registerServiceWorker();
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(config.public_key),
-    });
-  }
+  const subscription = await ensurePushSubscription(registration, config.public_key);
 
   const json = subscription.toJSON();
   const res = await fetch(`${API_BASE}/api/push/subscribe`, {
@@ -91,7 +79,9 @@ export async function unsubscribePushNotifications() {
     return { ok: true };
   }
 
-  const registration = await navigator.serviceWorker.getRegistration('/');
+  const registration =
+    (await getRegistrationByScript(CUSTOMER_SW)) ||
+    (await navigator.serviceWorker.getRegistration('/'));
   const subscription = registration ? await registration.pushManager.getSubscription() : null;
   if (!subscription) {
     return { ok: true };

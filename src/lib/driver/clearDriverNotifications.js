@@ -9,10 +9,12 @@ export async function clearDriverNotifications({ onlyStale = false } = {}) {
   }
 
   try {
+    const { getRegistrationByScript } = await import('../push/webPushHelpers.js');
     const reg =
-      (await navigator.serviceWorker.getRegistration('/driver-sw.js')) ||
-      (await navigator.serviceWorker.getRegistration()) ||
-      (await navigator.serviceWorker.ready.catch(() => null));
+      (await getRegistrationByScript('/driver-sw.js')) ||
+      (await navigator.serviceWorker.getRegistration('/driver/')) ||
+      (await navigator.serviceWorker.getRegistration('/driver')) ||
+      null;
 
     if (!reg?.getNotifications) return 0;
 

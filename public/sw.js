@@ -17,14 +17,17 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  const isShift = payload.data?.type === 'driver_shift';
   const options = {
     body: payload.body,
     tag: payload.tag || 'aerostride',
+    renotify: Boolean(isShift),
+    requireInteraction: payload.requireInteraction === true || Boolean(isShift),
     data: {
-      url: payload.url || (payload.data?.type === 'driver_shift' ? '/admin' : '/wallet'),
+      url: payload.url || (isShift ? '/admin?tab=fleet_live_map' : '/wallet'),
       ...(payload.data || {}),
     },
-    icon: payload.data?.type === 'driver_shift' ? '/icons/driver-pwa-192.png' : '/vite.svg',
+    icon: isShift ? '/icons/driver-pwa-192.png' : '/vite.svg',
     badge: '/icons/driver-pwa-192.png',
   };
 
