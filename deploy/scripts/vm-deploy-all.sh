@@ -113,6 +113,9 @@ if [[ -n "$API_CID" && -f "$DEPLOY_DIR/.vapid_private.pem" && -f "$DEPLOY_DIR/.v
   docker cp "$DEPLOY_DIR/.vapid_public.key" "$API_CID:/app/data/vapid_public.key" || true
   docker exec "$API_CID" chmod 600 /app/data/vapid_private.pem 2>/dev/null || true
 fi
+# Fiscal MARK pipeline — worker + beat (stuck recovery / auto-retry).
+echo "==> Starting Celery worker + beat"
+$COMPOSE --profile bundled-db up -d --force-recreate --no-deps worker celery-beat
 # Recreate Traefik so docker provider reloads API router labels cleanly.
 $COMPOSE --profile bundled-db up -d --force-recreate --no-deps traefik
 # Recreate frontend so nginx picks up same-origin /api + /ws proxy config.
