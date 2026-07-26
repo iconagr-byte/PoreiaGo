@@ -10,6 +10,7 @@ import {
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 import '../styles/wallet-pass.css';
+import '../styles/rental-pwa.css';
 
 function isRentReturn(path) {
   return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
@@ -121,49 +122,46 @@ export default function RegisterPage() {
         }
       : { from: redirectTo };
 
-  const shellClass = rentIntent
-    ? 'min-h-screen bg-surface flex flex-col items-center justify-center px-4'
-    : 'wallet-auth-stage';
-  const cardClass = rentIntent
-    ? 'bg-surface-container-lowest p-10 md:p-14 rounded-[32px] shadow-level-2 w-full max-w-md'
-    : 'wallet-auth-shell';
+  const shellClass = rentIntent ? 'rent-auth-stage' : 'wallet-auth-stage';
+  const cardClass = rentIntent ? 'rent-auth-shell' : 'wallet-auth-shell';
+  const scrollClass = rentIntent ? 'rent-auth-scroll' : 'wallet-auth-scroll';
+  const panelClass = rentIntent ? 'rent-auth-card' : 'wallet-auth-card';
+  const iconClass = rentIntent
+    ? 'material-symbols-outlined rent-auth-icon'
+    : 'material-symbols-outlined wallet-auth-icon';
+  const leadClass = rentIntent ? 'rent-auth-lead' : 'wallet-auth-lead';
+  const hintClass = rentIntent ? 'rent-auth-hint' : 'wallet-auth-hint';
+  const linkClass = rentIntent ? 'rent-auth-link' : 'wallet-auth-link';
+  const submitClass = rentIntent ? 'rent-auth-submit' : 'wallet-auth-submit';
 
   return (
     <div className={shellClass}>
       <div className={cardClass}>
-        <div className={rentIntent ? undefined : 'wallet-auth-scroll'}>
-          <div className={rentIntent ? undefined : 'wallet-auth-card'}>
+        <div className={scrollClass}>
+          <div className={panelClass}>
         <div className="text-center mb-8">
-          <span
-            className={
-              rentIntent
-                ? 'material-symbols-outlined text-4xl text-primary mb-3'
-                : 'material-symbols-outlined wallet-auth-icon'
-            }
-          >
+          <span className={iconClass}>
             {rentIntent ? 'directions_car' : 'account_balance_wallet'}
           </span>
-          <h1 className={rentIntent ? 'text-2xl font-bold text-on-surface' : undefined}>
+          <h1>
             {rentIntent
               ? 'Λογαριασμός ενοικίασης'
               : claim
                 ? 'Αποθήκευση στο My Wallet'
                 : 'Εγγραφή My Wallet'}
           </h1>
-          <p className={rentIntent ? 'text-sm text-on-surface-variant mt-2' : 'wallet-auth-lead'}>
+          <p className={leadClass}>
             {rentIntent
               ? 'Δημιουργήστε λογαριασμό για να κλείσετε όχημα. Μετά την εγγραφή μπαίνετε στην εφαρμογή ενοικίασης.'
               : claim
                 ? 'Δημιουργήστε λογαριασμό για να δείτε το εισιτήριο και το QR επιβίβασης'
                 : 'Δημιουργήστε λογαριασμό για ταξίδια με λεωφορείο'}
           </p>
-          {rentIntent ? (
-            <p className="text-xs text-on-surface-variant mt-2">
-              Τα λεωφορεία / εισιτήρια είναι στο My Wallet — εδώ είναι μόνο η ενοικίαση.
-            </p>
-          ) : (
-            <p className="wallet-auth-hint">Η ενοικίαση οχήματος είναι στην εφαρμογή Rent (teal).</p>
-          )}
+          <p className={hintClass}>
+            {rentIntent
+              ? 'Τα λεωφορεία είναι στο My Wallet (μπλε) — εδώ είναι μόνο η ενοικίαση.'
+              : 'Η ενοικίαση οχήματος είναι στην εφαρμογή Rent (πράσινο).'}
+          </p>
         </div>
 
         {claim && !rentIntent ? (
@@ -255,15 +253,7 @@ export default function RegisterPage() {
             autoComplete="new-password"
           />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className={
-              rentIntent
-                ? 'w-full py-4 rounded-full bg-primary-container text-white font-bold disabled:opacity-60'
-                : 'wallet-auth-submit'
-            }
-          >
+          <button type="submit" disabled={loading} className={submitClass}>
             {loading
               ? 'Δημιουργία…'
               : rentIntent
@@ -274,19 +264,15 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        <p className={`text-sm text-center mt-6 ${rentIntent ? 'text-gray-600' : 'text-[#6e6e73]'}`}>
+        <p className="text-sm text-center mt-6 text-[#6e6e73]">
           Έχετε ήδη λογαριασμό;{' '}
-          <Link
-            to="/login"
-            state={loginState}
-            className={rentIntent ? 'text-primary font-bold hover:underline' : 'wallet-auth-link'}
-          >
+          <Link to="/login" state={loginState} className={linkClass}>
             Σύνδεση
           </Link>
         </p>
         {!rentIntent ? (
           <p className="text-xs text-center mt-4">
-            <Link to="/my-booking" className="wallet-auth-link">
+            <Link to="/my-booking" className={linkClass}>
               Εύρεση κράτησης χωρίς λογαριασμό
             </Link>
           </p>
