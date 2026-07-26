@@ -16,6 +16,7 @@ import FleetKpisDashboard from '../components/admin/FleetKpisDashboard.jsx';
 import HybridSlaDashboard from '../components/admin/HybridSlaDashboard.jsx';
 import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
 import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
+import OfficeWalletShareCard from '../components/admin/OfficeWalletShareCard.jsx';
 import { FleetTelemetryProvider } from '../context/FleetTelemetryContext.jsx';
 import ImpersonationBanner from '../components/admin/ImpersonationBanner.jsx';
 import SettingsHub from '../components/admin/SettingsHub.jsx';
@@ -510,10 +511,13 @@ export default function BackOffice() {
         />
       </div>
 
-      <DriverChatDashboardWidget
-        onOpenInbox={() => setActiveTab('driver_chat')}
-        onOpenLiveMap={() => setActiveTab('fleet_live_map')}
-      />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-5 items-stretch">
+        <OfficeWalletShareCard />
+        <DriverChatDashboardWidget
+          onOpenInbox={() => setActiveTab('driver_chat')}
+          onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+        />
+      </div>
 
       <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-violet-100/60 flex flex-col min-w-0 overflow-hidden">
         <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
