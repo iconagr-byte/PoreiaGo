@@ -8,22 +8,25 @@ import { getOfficeWalletUrl } from '../../lib/platform/officePublicUrl.js';
  * Dashboard card: per-office My Wallet QR + public link for customers.
  */
 export default function OfficeWalletShareCard() {
-  const [walletUrl, setWalletUrl] = useState(() => getOfficeWalletUrl({}));
+  const [walletUrl, setWalletUrl] = useState('');
   const [officeName, setOfficeName] = useState('');
   const [loading, setLoading] = useState(true);
   const qrRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
+    // Resolve current office first, then emit wallet link + QR for that office only.
     fetchTenantBrandingSettings()
       .then((branding) => {
         if (cancelled) return;
-        setWalletUrl(getOfficeWalletUrl(branding || {}));
-        setOfficeName(branding.display_name || branding.slug || 'Γραφείο');
+        const office = branding || {};
+        setWalletUrl(getOfficeWalletUrl(office));
+        setOfficeName(office.display_name || office.slug || office.subdomain || 'Γραφείο');
       })
       .catch(() => {
         if (!cancelled) {
           setWalletUrl(getOfficeWalletUrl({}));
+          setOfficeName('Γραφείο');
         }
       })
       .finally(() => {

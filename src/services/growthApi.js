@@ -26,20 +26,25 @@ async function parseError(res) {
 }
 
 function normalizeBrandingResponse(data, source = 'postgres') {
-  const subdomain = data.subdomain || data.slug || 'achillio';
+  // Never invent another office's slug (old default "achillio" poisoned share URLs).
+  const subdomain = String(data.subdomain || data.slug || '')
+    .trim()
+    .toLowerCase();
   const platformDomain = data.platform_domain || BASE_DOMAIN;
   return {
     display_name: data.display_name || '',
-    slug: data.slug || subdomain,
+    slug: data.slug || subdomain || '',
     subdomain,
     platform_domain: platformDomain,
-    subdomain_fqdn: data.subdomain_fqdn || tenantSubdomainFqdn(subdomain, platformDomain),
+    subdomain_fqdn:
+      data.subdomain_fqdn ||
+      (subdomain ? tenantSubdomainFqdn(subdomain, platformDomain) : ''),
     custom_domain: data.custom_domain || '',
     primary_color: data.primary_color || '#0040df',
     logo_url: data.logo_url || '',
     css_injection_url: data.css_injection_url || '',
     css_injection_inline: data.css_injection_inline || '',
-    checkout_base_url: data.checkout_base_url || 'http://localhost:5173',
+    checkout_base_url: data.checkout_base_url || '',
     dns_instructions: data.dns_instructions || DEFAULT_DNS,
     storage_source: source,
   };

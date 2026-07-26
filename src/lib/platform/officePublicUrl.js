@@ -1,12 +1,13 @@
 /**
- * Build the public storefront origin / My Wallet / Rent URL for the current office.
+ * Build public storefront / My Wallet / Rent URLs for the *current office* (tenant).
  *
- * Prefer the host where the office app is actually open (window.location), so admin
- * QR/share links match the live site (e.g. www.poreiago.com) instead of a stale
- * custom_domain from another brand.
+ * Order: resolve office branding first → then emit absolute customer links.
+ * window.location is only a last resort (never overrides a known office host).
  */
 
 import { getPlatformBaseDomain, tenantSubdomainFqdn } from './domain.js';
+
+const RESERVED_SUBDOMAINS = new Set(['www', 'api', 'admin', 'app', 'mail', 'static', 'cdn']);
 
 function stripToHost(value) {
   let raw = String(value || '').trim().toLowerCase();
@@ -38,6 +39,13 @@ export function normalizePublicHost(host) {
   return `www.${h}`;
 }
 
+function originFromHost(host) {
+  const h = stripToHost(host);
+  if (!h) return '';
+  const proto = isLocalHost(h) ? 'http' : 'https';
+  return `${proto}://${h}`;
+}
+
 /**
  * @param {{
  *   custom_domain?: string,
@@ -46,47 +54,54 @@ export function normalizePublicHost(host) {
  *   slug?: string,
  *   platform_domain?: string,
  *   checkout_base_url?: string,
- * }} branding
+ *   display_name?: string,
+ * }} branding — settings for the JWT / current office tenant
  */
 export function getOfficePublicOrigin(branding = {}) {
-  // 1) Where the office is open right now (production / custom domain host).
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    const host = stripToHost(window.location.host);
-    if (!isLocalHost(host)) {
-      return window.location.origin;
+  const platform = stripToHost(branding.platform_domain || getPlatformBaseDomain()).replace(
+    /^www\./,
+    '',
+  );
+
+  // 1) Office custom domain from tenant branding (this office only).
+  const custom = normalizePublicHost(branding.custom_domain);
+  if (custom && !isLocalHost(custom)) {
+    return originFromHost(custom);
+  }
+
+  // 2) Office platform subdomain: {slug}.poreiago.com
+  const sub = String(branding.subdomain || branding.slug || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '');
+  if (sub && !RESERVED_SUBDOMAINS.has(sub)) {
+    const fqdn = stripToHost(
+      branding.subdomain_fqdn || tenantSubdomainFqdn(sub, platform || getPlatformBaseDomain()),
+    );
+    if (fqdn && !isLocalHost(fqdn)) {
+      return originFromHost(fqdn);
     }
   }
 
-  // 2) Branding custom domain (useful on localhost / offline tooling).
-  const custom = normalizePublicHost(branding.custom_domain);
-  if (custom) {
-    const proto = isLocalHost(custom) ? 'http' : 'https';
-    return `${proto}://${custom}`;
-  }
-
-  const fqdn = stripToHost(
-    branding.subdomain_fqdn ||
-      (branding.subdomain || branding.slug
-        ? tenantSubdomainFqdn(
-            branding.subdomain || branding.slug,
-            branding.platform_domain || getPlatformBaseDomain(),
-          )
-        : ''),
-  );
-  if (fqdn) {
-    return `https://${fqdn}`;
-  }
-
+  // 3) Explicit checkout / public base from branding (skip localhost placeholders).
   const checkout = String(branding.checkout_base_url || '').trim();
   if (checkout) {
     try {
       const u = new URL(checkout.includes('://') ? checkout : `https://${checkout}`);
-      return u.origin;
+      if (!isLocalHost(u.hostname)) {
+        return u.origin;
+      }
     } catch {
       /* ignore */
     }
   }
 
+  // 4) Platform ingress for offices without a dedicated public host.
+  if (platform) {
+    return `https://www.${platform}`;
+  }
+
+  // 5) Last resort: current browser origin (local dev).
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;
   }
@@ -99,7 +114,7 @@ export function getOfficeWalletUrl(branding = {}) {
   return `${origin}/wallet`;
 }
 
-/** Customer rental PWA — absolute URL for QR / share. */
+/** Customer rental PWA — absolute URL for QR / share (current office). */
 export function getOfficeRentUrl(branding = {}) {
   const origin = getOfficePublicOrigin(branding).replace(/\/$/, '');
   if (!origin) return '/rent';
