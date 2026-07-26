@@ -322,11 +322,14 @@ export async function syncTicketForBoarding(booking) {
   const dep = booking.date
     ? `${booking.date}T${booking.time || '08:00'}:00`
     : new Date().toISOString();
+  const { localIdFromReference } = await import('../lib/ticketing/bookingIds.js');
+  const canonicalId =
+    localIdFromReference(booking.pnr || booking.id) || booking.id;
   const res = await fetch(`${API_BASE}/api/tickets/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      id: booking.id,
+      id: canonicalId,
       trip_id: trip,
       customer_name: booking.customerName,
       seat_number: booking.seat || booking.seats?.join(', ') || '—',

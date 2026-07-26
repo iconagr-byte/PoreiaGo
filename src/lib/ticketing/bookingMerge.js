@@ -4,6 +4,7 @@ import { getSaasToken, fetchSaasBookings } from '../../services/saasApi.js';
 import { loadAllBookingsAsync, loadBookings, mergeBookingsIntoStore } from './bookingStore.js';
 import { CHECK_IN } from './constants.js';
 import { formatDepositPaymentStatus } from '../payments/depositPayment.js';
+import { localIdFromReference } from './bookingIds.js';
 
 /** Map SaaS API row → wallet/admin booking shape. */
 export function mapSaasBookingToLocal(row) {
@@ -20,7 +21,7 @@ export function mapSaasBookingToLocal(row) {
   const depositPercent = Number(meta.deposit_percent) || (balanceDue > 0 ? 30 : 0);
 
   return {
-    id: `B-${row.reference_code}`,
+    id: localIdFromReference(row.reference_code || meta.local_id || ''),
     saasBookingId: row.id,
     syncedToSaas: true,
     customerName: row.passenger_name,

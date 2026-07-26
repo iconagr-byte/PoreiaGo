@@ -82,7 +82,9 @@ async def get_rotating_qr(booking_id: str):
         raise HTTPException(status_code=404, detail="Booking not found")
     if "CANCELLED" in booking["payment_status"].upper():
         raise HTTPException(status_code=410, detail="Booking cancelled")
-    if "PAID" not in booking["payment_status"].upper():
+    from ticketing.scan_service import is_paid
+
+    if not is_paid(booking["payment_status"]):
         raise HTTPException(status_code=402, detail="Booking not paid")
     data = issue_rotating_jwt(booking["ticket_ref"], booking["trip_id"])
     return RotatingQrResponse(**data)

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { API_BASE } from '../config/api.js';
 import { isBookingPaid } from '../lib/ticketing/bookingStore.js';
+import { bookingIdAliases, localIdFromReference } from '../lib/ticketing/bookingIds.js';
 import { issueSignedQrToken } from '../lib/ticketing/qrToken.js';
 
 /**
@@ -31,19 +32,36 @@ export function useRotatingTicketQr(booking) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${API_BASE}/api/tickets/${booking.id}/qr`);
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || 'QR fetch failed');
+        const ids = bookingIdAliases(booking.id);
+        if (booking.pnr) {
+          const fromPnr = localIdFromReference(booking.pnr);
+          if (fromPnr && !ids.includes(fromPnr)) ids.unshift(fromPnr);
+          if (!ids.includes(booking.pnr)) ids.push(booking.pnr);
         }
-        const data = await res.json();
+        let data = null;
+        let lastDetail = 'QR fetch failed';
+        const responses = await Promise.all(
+          ids.map((id) => fetch(`${API_BASE}/api/tickets/${encodeURIComponent(id)}/qr`)),
+        );
+        for (const res of responses) {
+          if (res.ok) {
+            data = await res.json();
+            break;
+          }
+          const err = await res.json().catch(() => ({}));
+          lastDetail = err.detail || lastDetail;
+        }
+        if (!data) throw new Error(lastDetail);
         if (!cancelled) {
           setQrValue(data.token);
           setExpiresIn(data.expires_in ?? 30);
         }
       } catch {
         try {
-          const token = await issueSignedQrToken(booking);
+          const token = await issueSignedQrToken({
+            ...booking,
+            id: localIdFromReference(booking.pnr || booking.id) || booking.id,
+          });
           if (!cancelled) {
             setQrValue(token);
             setExpiresIn(30);
