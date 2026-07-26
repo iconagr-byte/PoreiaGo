@@ -1010,6 +1010,21 @@ async def admin_chat_send(driver_id: str, body: DriverChatSendBody):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        from travel_platform.notifications.driver_chat_push import notify_office_message_to_driver
+
+        await notify_office_message_to_driver(
+            tenant_id=tenant_id,
+            driver_id=driver_id,
+            body=str(row.get("body") or body.body),
+            message_id=str(row.get("id") or "") or None,
+            sender_name=body.sender_name or "Γραφείο",
+        )
+    except Exception:
+        # Chat send must succeed even if push delivery fails.
+        pass
+
     return {"ok": True, "message": row}
 
 
