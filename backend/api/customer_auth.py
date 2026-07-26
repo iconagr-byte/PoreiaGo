@@ -191,6 +191,22 @@ async def reset_password(body: ResetPasswordRequest):
     return _profile_response(account, token)
 
 
+@router.get("/google/config")
+async def google_auth_config():
+    """
+    Public GIS client id for My Wallet Sign-In.
+
+    The OAuth Web Client ID is not a secret — Google embeds it in the browser.
+    Frontend loads this at runtime so ops only need GOOGLE_CLIENT_ID in .env.prod
+    (no Vite rebuild required when rotating the id).
+    """
+    client_id = _google_client_id()
+    return {
+        "enabled": bool(client_id),
+        "client_id": client_id or None,
+    }
+
+
 @router.post("/google")
 async def verify_google_token(body: GoogleTokenRequest):
     """Verify Google ID token, upsert account, return JWT."""

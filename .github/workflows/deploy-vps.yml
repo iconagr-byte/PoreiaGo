@@ -2,6 +2,7 @@ name: Deploy VPS (Hetzner — cheap)
 
 # Push main → SSH deploy to poreiago VM
 # REQUIRED repo secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY
+# OPTIONAL: GOOGLE_CLIENT_ID — My Wallet Google Sign-In (see deploy/GOOGLE-SIGNIN.md)
 # Setup: deploy/VM-DEPLOY.md § GitHub Actions
 
 on:
@@ -56,4 +57,17 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             git clean -fd -e deploy/.env.prod -e deploy/.vapid_private.pem
+            # Optional: inject Google OAuth Web Client ID from Actions secret.
+            GOOGLE_CID='${{ secrets.GOOGLE_CLIENT_ID }}'
+            ENVF=/opt/poreiago/deploy/.env.prod
+            if [ -n "$GOOGLE_CID" ] && [ -f "$ENVF" ]; then
+              for KEY in GOOGLE_CLIENT_ID VITE_GOOGLE_CLIENT_ID; do
+                if grep -q "^${KEY}=" "$ENVF"; then
+                  sed -i.bak "s|^${KEY}=.*|${KEY}=${GOOGLE_CID}|" "$ENVF"
+                else
+                  echo "${KEY}=${GOOGLE_CID}" >> "$ENVF"
+                fi
+              done
+              echo "  ~ wrote GOOGLE_CLIENT_ID from GitHub Actions secret"
+            fi
             bash deploy/scripts/vm-deploy-all.sh

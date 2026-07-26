@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
-import { isGoogleAuthConfigured } from '../services/customerAuthApi.js';
+import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
 
 function GoogleLogo() {
   return (
@@ -110,20 +110,47 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled }) {
   );
 }
 
+function GoogleUnavailable({ disabled }) {
+  return (
+    <button
+      type="button"
+      disabled
+      title="Ορίστε GOOGLE_CLIENT_ID στο deploy/.env.prod — βλ. deploy/GOOGLE-SIGNIN.md"
+      className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-full border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed disabled:opacity-70"
+      aria-disabled="true"
+    >
+      <GoogleLogo />
+      <span className="text-sm font-semibold">
+        {disabled ? 'Σύνδεση με Google…' : 'Σύνδεση με Google (μη διαθέσιμη)'}
+      </span>
+    </button>
+  );
+}
+
 export default function GoogleSignInButton({
   onSuccess,
   onDemoProfile,
   onError,
   disabled = false,
 }) {
-  if (!isGoogleAuthConfigured()) {
-    return (
-      <DemoGoogleSignIn onDemoProfile={onDemoProfile} onError={onError} disabled={disabled} />
-    );
+  const { loading, enabled } = useGoogleAuthConfig();
+
+  if (loading) {
+    return <GoogleUnavailable disabled />;
+  }
+
+  if (!enabled) {
+    // Local demo only — production must use a real OAuth Web Client ID.
+    if (import.meta.env.DEV) {
+      return (
+        <DemoGoogleSignIn onDemoProfile={onDemoProfile} onError={onError} disabled={disabled} />
+      );
+    }
+    return <GoogleUnavailable />;
   }
 
   return (
-    <div className={`flex justify-center ${disabled ? 'pointer-events-none opacity-50' : ''}`}>
+    <div className={`flex justify-center w-full ${disabled ? 'pointer-events-none opacity-50' : ''}`}>
       <GoogleLogin
         onSuccess={(response) => {
           if (!response.credential) {
@@ -138,6 +165,7 @@ export default function GoogleSignInButton({
         text="signin_with"
         shape="pill"
         locale="el"
+        width="360"
         useOneTap={false}
       />
     </div>

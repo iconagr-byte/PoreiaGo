@@ -9,9 +9,9 @@ import {
   isDriver,
 } from '../lib/auth.js';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
+import { useGoogleAuthConfig } from '../components/GoogleAuthRoot.jsx';
 import {
   verifyGoogleLogin,
-  isGoogleAuthConfigured,
   loginCustomer,
   isCustomerAuthBackendAvailable,
 } from '../services/customerAuthApi.js';
@@ -25,6 +25,7 @@ import {
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { enabled: googleEnabled } = useGoogleAuthConfig();
   const redirectTo = location.state?.from || '/wallet';
   const walletIntent = location.state?.from === '/wallet' || Boolean(location.state?.walletClaim);
   const [error, setError] = useState('');
@@ -197,7 +198,7 @@ export default function LoginPage() {
         <div className="flex items-center gap-3 mb-6">
           <div className="flex-1 h-px bg-gray-200" />
           <span className="text-xs text-gray-400 font-bold uppercase">
-            {isGoogleAuthConfigured() ? 'ή με email' : 'με email / κωδικό'}
+            {googleEnabled ? 'ή με email' : 'με email / κωδικό'}
           </span>
           <div className="flex-1 h-px bg-gray-200" />
         </div>
