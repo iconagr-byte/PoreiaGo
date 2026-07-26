@@ -55,6 +55,8 @@ class VehicleBody(BaseModel):
     with_driver_daily_eur: float = Field(default=0, ge=0)
     gps_device_id: str | None = None
     photo_url: str | None = None
+    photo_urls: list[str] = Field(default_factory=list)
+    description: str | None = Field(default=None, max_length=2000)
     notes: str | None = None
 
 

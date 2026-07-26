@@ -131,7 +131,11 @@ async def rental_availability(
                 "daily_rate_eur": r.get("daily_rate_eur"),
                 "one_way_surcharge_eur": r.get("one_way_surcharge_eur"),
                 "with_driver_daily_eur": r.get("with_driver_daily_eur"),
-                "photo_url": r.get("photo_url"),
+                "photo_url": r.get("photo_url") or ((r.get("photo_urls") or [None])[0]),
+                "photo_urls": list(
+                    r.get("photo_urls") or ([] if not r.get("photo_url") else [r.get("photo_url")])
+                ),
+                "description": r.get("description"),
                 "suggested_days": r.get("suggested_days"),
                 "base_total": r.get("base_total"),
                 "driver_surcharge": r.get("driver_surcharge"),

@@ -67,6 +67,9 @@ const EMPTY_VEHICLE = {
   one_way_surcharge_eur: 0,
   with_driver_daily_eur: 0,
   gps_device_id: '',
+  photo_url: '',
+  photo_urls: [],
+  description: '',
   notes: '',
 };
 
@@ -252,6 +255,9 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
         one_way_surcharge_eur: Number(vehicleForm.one_way_surcharge_eur || 0),
         with_driver_daily_eur: Number(vehicleForm.with_driver_daily_eur || 0),
         gps_device_id: vehicleForm.gps_device_id || null,
+        photo_url: vehicleForm.photo_url || vehicleForm.photo_urls?.[0] || null,
+        photo_urls: vehicleForm.photo_urls || [],
+        description: vehicleForm.description || null,
         notes: vehicleForm.notes || null,
       };
       if (editingId) await updateRentalVehicle(editingId, body);
@@ -798,6 +804,83 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
                 onChange={(e) => setVehicleForm((f) => ({ ...f, gps_device_id: e.target.value }))}
               />
             </label>
+            <label className="block text-xs font-bold text-gray-500">
+              Περιγραφή για πελάτες
+              <textarea
+                rows={3}
+                className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
+                placeholder="π.χ. Αυτόματο, A/C, Bluetooth, ιδανικό για οικογένεια…"
+                value={vehicleForm.description}
+                onChange={(e) => setVehicleForm((f) => ({ ...f, description: e.target.value }))}
+              />
+            </label>
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-gray-500">Φωτογραφίες οχήματος</p>
+              {(vehicleForm.photo_urls || []).length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {vehicleForm.photo_urls.map((url) => (
+                    <div key={url} className="relative">
+                      <img
+                        src={url}
+                        alt=""
+                        className="w-16 h-16 rounded-xl object-cover border border-black/[0.08]"
+                      />
+                      <button
+                        type="button"
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] font-bold"
+                        onClick={() =>
+                          setVehicleForm((f) => {
+                            const next = (f.photo_urls || []).filter((u) => u !== url);
+                            return {
+                              ...f,
+                              photo_urls: next,
+                              photo_url: f.photo_url === url ? next[0] || '' : f.photo_url,
+                            };
+                          })
+                        }
+                        aria-label="Αφαίρεση φωτογραφίας"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">Καμία φωτογραφία ακόμα.</p>
+              )}
+              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-black/15 text-xs font-bold text-primary cursor-pointer">
+                <span className="material-symbols-outlined text-base">add_a_photo</span>
+                {uploadingPhoto ? 'Ανέβασμα…' : 'Προσθήκη φωτογραφίας'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingPhoto || busy}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    setUploadingPhoto(true);
+                    try {
+                      const uploaded = await uploadRentalInspectionPhoto(file);
+                      setVehicleForm((f) => {
+                        const next = [...(f.photo_urls || []), uploaded.url].slice(0, 12);
+                        return {
+                          ...f,
+                          photo_urls: next,
+                          photo_url: f.photo_url || next[0] || '',
+                        };
+                      });
+                      toast.success('Η φωτογραφία ανέβηκε');
+                    } catch (err) {
+                      toast.error(err.message);
+                    } finally {
+                      setUploadingPhoto(false);
+                    }
+                  }}
+                />
+              </label>
+            </div>
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -846,7 +929,16 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
                         ? ` · οδηγός ${euro(v.with_driver_daily_eur)}/ημ`
                         : ''}
                       {` · ${v.current_mileage} km`}
+                      {v.description ? ' · έχει περιγραφή' : ''}
+                      {(v.photo_urls?.length || v.photo_url) ? ' · φωτο' : ''}
                     </p>
+                    {(v.photo_url || v.photo_urls?.[0]) ? (
+                      <img
+                        src={v.photo_url || v.photo_urls[0]}
+                        alt=""
+                        className="mt-2 w-full h-28 rounded-xl object-cover border border-black/[0.06]"
+                      />
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(v.current_status)}`}>
@@ -868,6 +960,14 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
                           one_way_surcharge_eur: v.one_way_surcharge_eur || 0,
                           with_driver_daily_eur: v.with_driver_daily_eur || 0,
                           gps_device_id: v.gps_device_id || '',
+                          photo_url: v.photo_url || '',
+                          photo_urls:
+                            v.photo_urls?.length
+                              ? v.photo_urls
+                              : v.photo_url
+                                ? [v.photo_url]
+                                : [],
+                          description: v.description || '',
                           notes: v.notes || '',
                         });
                       }}
