@@ -537,7 +537,28 @@ function WalletAuthenticatedApp() {
           </div>
         )}
 
-        {activeTab === 'rentals' && <RentalCatalogPanel />}
+        {activeTab === 'rentals' && (
+          <div className="wallet-stack">
+            <section className="wallet-panel">
+              <div className="wallet-panel-head">
+                <span className="wallet-panel-head-icon" aria-hidden>
+                  <span className="material-symbols-outlined">directions_car</span>
+                </span>
+                <div>
+                  <h2>Εφαρμογή ενοικίασης</h2>
+                  <p>
+                    Η κράτηση οχήματος γίνεται πλέον στη dedicated εφαρμογή — εγκαταστήσιμη στην
+                    αρχική οθόνη του κινητού.
+                  </p>
+                </div>
+              </div>
+              <Link to="/rent" className="wallet-btn wallet-btn-primary wallet-btn-block">
+                Άνοιγμα /rent
+              </Link>
+            </section>
+            <RentalCatalogPanel />
+          </div>
+        )}
 
         {activeTab === 'lost_found' && <LostFoundPanel bookings={bookings} />}
 
