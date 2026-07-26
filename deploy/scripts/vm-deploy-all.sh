@@ -138,20 +138,6 @@ FE_CID="$($COMPOSE ps -q frontend)"
 if [[ -n "$FE_CID" ]]; then
   docker network connect aerostride-prod_edge "$FE_CID" 2>/dev/null || true
 fi
-if [[ -n "$FE_CID" && -n "${API_CID:-}" ]]; then
-  echo "==> Verify frontend → api-blue (nginx proxy)"
-  if ! docker exec "$FE_CID" wget -qO- --timeout=5 http://api-blue:8000/health >/dev/null 2>&1; then
-    echo "  WARNING: frontend cannot reach api-blue — reconnecting networks"
-    docker network connect aerostride-prod_edge "$API_CID" 2>/dev/null || true
-    docker network connect aerostride-prod_edge "$FE_CID" 2>/dev/null || true
-    sleep 2
-    docker exec "$FE_CID" wget -qO- --timeout=5 http://api-blue:8000/health >/dev/null 2>&1 \
-      && echo "  frontend → api-blue OK after reconnect" \
-      || echo "  WARNING: frontend → api-blue still failing"
-  else
-    echo "  frontend → api-blue OK"
-  fi
-fi
 
 echo "==> DB migrations (alembic → hybrid flights/meta, trip_coordinates / PostGIS GPS)"
 # Entrypoint also runs this on uvicorn start; explicit step makes deploy logs clear.
@@ -161,21 +147,53 @@ $COMPOSE exec -T api-blue alembic upgrade head \
 
 echo "==> Waiting for API health"
 api_ok=0
+www_ok=0
 APP_ORIGIN_HEALTH="${APP_ORIGIN:-https://www.poreiago.com}"
 for i in $(seq 1 40); do
   # Prefer same-origin www /health (nginx → api-blue). Fall back to api.* host.
-  if curl -sf "$APP_ORIGIN_HEALTH/health" >/dev/null 2>&1 || curl -sf "$API_BASE/health" >/dev/null 2>&1; then
-    echo "  API healthy (public)"
+  if curl -sf "$APP_ORIGIN_HEALTH/health" >/dev/null 2>&1; then
+    echo "  API healthy via www (nginx → api-blue)"
     api_ok=1
+    www_ok=1
     break
   fi
-  if $COMPOSE exec -T api-blue python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" >/dev/null 2>&1; then
+  if curl -sf "$API_BASE/health" >/dev/null 2>&1; then
+    echo "  API healthy via api.* (www proxy still catching up… try $i)"
+    api_ok=1
+  elif $COMPOSE exec -T api-blue python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" >/dev/null 2>&1; then
     echo "  API process up (Traefik/nginx catching up… try $i)"
   else
     echo "  waiting for api-blue… try $i"
   fi
   sleep 3
 done
+
+# After API is up, prove the path offices use (www/nginx → api-blue). Reload nginx if stale.
+if [[ -n "${FE_CID:-}" ]]; then
+  echo "==> Verify www nginx → api-blue (/health)"
+  if docker exec "$FE_CID" wget -qO- --timeout=5 http://127.0.0.1/health >/dev/null 2>&1; then
+    echo "  frontend /health → api-blue OK"
+    www_ok=1
+  else
+    echo "  WARNING: frontend /health proxy failed — reconnect + nginx reload"
+    docker network connect aerostride-prod_edge "${API_CID:-}" 2>/dev/null || true
+    docker network connect aerostride-prod_edge "$FE_CID" 2>/dev/null || true
+    docker exec "$FE_CID" nginx -s reload 2>/dev/null || true
+    sleep 2
+    if docker exec "$FE_CID" wget -qO- --timeout=5 http://127.0.0.1/health >/dev/null 2>&1; then
+      echo "  frontend /health → api-blue OK after reload"
+      www_ok=1
+    else
+      echo "  WARNING: frontend /health still failing — recreating frontend"
+      $COMPOSE --profile bundled-db up -d --force-recreate --no-deps frontend
+      FE_CID="$($COMPOSE ps -q frontend)"
+      sleep 2
+      docker exec "$FE_CID" wget -qO- --timeout=5 http://127.0.0.1/health >/dev/null 2>&1 \
+        && echo "  frontend /health OK after recreate" \
+        || echo "  ERROR: frontend /health still down"
+    fi
+  fi
+fi
 
 if [[ "$api_ok" -ne 1 ]]; then
   echo "ERROR: Public API health failed for $APP_ORIGIN_HEALTH/health and $API_BASE/health"
