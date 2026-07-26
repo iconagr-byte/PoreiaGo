@@ -9,7 +9,7 @@ import {
   unsubscribeAdminFleetPush,
 } from '../../services/adminPushNotificationApi.js';
 
-/** Ενεργοποίηση push ειδοποιήσεων όταν οδηγός πατάει Έναρξη/Τέλος βάρδιας. */
+/** Ενεργοποίηση / δοκιμή Web Push για το γραφείο. */
 export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
   const [supported, setSupported] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -26,10 +26,9 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
       isThisBrowserAdminPushSubscribed().catch(() => false),
     ]);
     setEnabled(Boolean(status.enabled));
-    // Prefer this browser's subscription — tenant-wide "subscribed" can lie.
     setSubscribed(Boolean(localSub));
     if (status.enabled && !localSub) {
-      setHint('Πατήστε «Ενεργοποίηση push» σε αυτόν τον υπολογιστή για ειδοποιήσεις βάρδιας.');
+      setHint('Πατήστε «Ενεργοποίηση push» σε αυτόν τον υπολογιστή.');
     } else {
       setHint('');
     }
@@ -44,12 +43,11 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
     const key = 'admin_fleet_push_prompted_v1';
     if (sessionStorage.getItem(key) === '1') return undefined;
     sessionStorage.setItem(key, '1');
-    // Soft prompt once per session — required for OS push on Έναρξη βάρδιας.
     const t = window.setTimeout(() => {
       toast(
         (tId) => (
           <span className="text-sm">
-            Ενεργοποιήστε push για έναρξη/τέλος βάρδιας.{' '}
+            Ενεργοποιήστε τις ειδοποιήσεις.{' '}
             <button
               type="button"
               className="font-bold underline"
@@ -60,7 +58,7 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
                   await subscribeAdminFleetPush();
                   setSubscribed(true);
                   setHint('');
-                  toast.success('Push ενεργό — θα ειδοποιείστε στην Έναρξη βάρδιας');
+                  toast.success('Οι ειδοποιήσεις ενεργοποιήθηκαν');
                 } catch (err) {
                   toast.error(err.message || 'Αποτυχία ενεργοποίησης');
                 } finally {
@@ -84,7 +82,7 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
       await subscribeAdminFleetPush();
       setSubscribed(true);
       setHint('');
-      toast.success('Ειδοποιήσεις στόλου ενεργές — Έναρξη/Τέλος βάρδιας');
+      toast.success('Οι ειδοποιήσεις ενεργοποιήθηκαν');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία ενεργοποίησης');
     } finally {
@@ -97,7 +95,7 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
     try {
       await unsubscribeAdminFleetPush();
       setSubscribed(false);
-      toast.success('Οι ειδοποιήσεις στόλου απενεργοποιήθηκαν');
+      toast.success('Οι ειδοποιήσεις απενεργοποιήθηκαν');
       await refresh();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία απενεργοποίησης');
@@ -109,7 +107,6 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
   const onTest = async () => {
     setBusy(true);
     try {
-      // Re-register first so durable store + current VAPID key are in sync.
       await subscribeAdminFleetPush();
       setSubscribed(true);
       const result = await sendAdminPushTest();
@@ -130,10 +127,7 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
   return (
     <div className="rounded-2xl border border-black/[0.06] bg-white px-4 py-3 flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-sm font-bold text-gray-900">Ειδοποιήσεις οδηγών</p>
-        <p className="text-xs text-gray-500 mt-0.5">
-          Push όταν οδηγός πατάει Έναρξη ή Τέλος βάρδιας
-        </p>
+        <p className="text-sm font-bold text-gray-900">Ειδοποιήσεις</p>
         {hint ? <p className="text-[11px] text-amber-700 mt-1">{hint}</p> : null}
       </div>
       {!enabled ? (
