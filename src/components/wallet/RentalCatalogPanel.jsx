@@ -6,6 +6,8 @@ import {
   fetchCustomerRentalAvailability,
   fetchMyRentalBookings,
 } from '../../services/customerRentalApi.js';
+import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
+import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
 
 const CATEGORIES = [
   { value: '', label: 'Όλες' },
@@ -100,7 +102,7 @@ export default function RentalCatalogPanel() {
     }
     setBusy(true);
     try {
-      await createCustomerRentalBooking({
+      const created = await createCustomerRentalBooking({
         vehicle_id: selectedId,
         start_time: new Date(form.start_time).toISOString(),
         end_time: new Date(form.end_time).toISOString(),
@@ -108,6 +110,13 @@ export default function RentalCatalogPanel() {
         dropoff_location: form.dropoff_location || form.pickup_location,
         driver_mode: form.driver_mode,
         client_phone: form.client_phone || null,
+      });
+      // Mirror into office CRM as a real person (same as trip checkout).
+      ensureCustomerForRental({
+        id: created?.client_id || undefined,
+        name: getCustomerName() || '',
+        email: getCustomerEmail() || '',
+        phone: form.client_phone || '',
       });
       toast.success('Η κράτηση ενοικίασης καταχωρήθηκε');
       setSuggestions([]);

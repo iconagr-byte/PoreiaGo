@@ -12,7 +12,6 @@ import {
   fetchRentalBookings,
   fetchRentalCalendar,
   fetchRentalInspections,
-  fetchRentalClients,
   fetchRentalLiveOverlays,
   fetchRentalSummary,
   fetchRentalVehicles,
@@ -21,6 +20,12 @@ import {
   uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
+import {
+  ensureCustomerForRental,
+  getCustomerByEmail,
+  getCustomerById,
+  syncCustomersFromRentalBookings,
+} from '../../../lib/customers/customerStore.js';
 import RentalSignaturePad from './RentalSignaturePad.jsx';
 
 const CATEGORIES = [
@@ -95,11 +100,12 @@ function statusChip(status) {
   return map[status] || 'bg-gray-100 text-gray-700';
 }
 
-export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
+export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {}) {
   const [tab, setTab] = useState('clients');
   const [summary, setSummary] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [bookings, setBookings] = useState([]);
+  /** Real CRM people (CUST-*) linked to rental bookings — not booking aggregates. */
   const [clients, setClients] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [inspections, setInspections] = useState([]);
@@ -146,11 +152,10 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, v, b, clientsRows, c, i, o] = await Promise.all([
+      const [s, v, b, c, i, o] = await Promise.all([
         fetchRentalSummary(),
         fetchRentalVehicles(),
         fetchRentalBookings(),
-        fetchRentalClients().catch(() => []),
         fetchRentalCalendar(45),
         fetchRentalInspections(),
         fetchRentalLiveOverlays().catch(() => []),
@@ -158,7 +163,9 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
       setSummary(s);
       setVehicles(v);
       setBookings(b);
-      setClients(clientsRows);
+      // Upsert CRM people from bookings — Πελάτες = φυσικά πρόσωπα, όχι μόνο κρατήσεις.
+      const synced = syncCustomersFromRentalBookings(b);
+      setClients(synced.people);
       setBlocks(c);
       setInspections(i);
       setOverlays(o);
@@ -197,7 +204,7 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
     const q = clientQuery.trim().toLowerCase();
     if (!q) return clients;
     return clients.filter((c) => {
-      const hay = [c.client_name, c.client_email, c.client_phone, c.last_vehicle]
+      const hay = [c.name, c.email, c.phone, c.id, c.last_rental_vehicle]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
@@ -206,8 +213,28 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
   }, [clients, clientQuery]);
 
   const openClientBookings = (client) => {
-    setBookingFilter(client.client_email ? 'WALLET' : 'ALL');
+    setBookingFilter('ALL');
     setTab('bookings');
+    // Keep filter soft — bookings list still shows all; user sees person via CRM card.
+    if (client?.email) {
+      toast.success(`Πελάτης: ${client.name || client.email}`);
+    }
+  };
+
+  const openCrmProfile = (client) => {
+    const person =
+      (client?.id && getCustomerById(client.id)) ||
+      (client?.email && getCustomerByEmail(client.email)) ||
+      client;
+    if (!person) {
+      toast.error('Δεν βρέθηκε καρτέλα πελάτη');
+      return;
+    }
+    if (onOpenCustomer) {
+      onOpenCustomer(person);
+      return;
+    }
+    openClientBookings(person);
   };
 
   const saveVehicle = async (e) => {
@@ -272,22 +299,46 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
       toast.error('Επιλέξτε όχημα και πελάτη');
       return;
     }
+    const email = String(wiz.client_email || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      toast.error('Απαιτείται email πελάτη — δημιουργείται καρτέλα φυσικού προσώπου');
+      return;
+    }
     setBusy(true);
     try {
+      const person = ensureCustomerForRental({
+        name: wiz.client_name.trim(),
+        email,
+        phone: wiz.client_phone || '',
+      });
       await createRentalBooking({
         vehicle_id: wiz.vehicle_id,
+        client_id: person?.id || null,
         client_name: wiz.client_name.trim(),
         client_phone: wiz.client_phone || null,
-        client_email: wiz.client_email || null,
+        client_email: email,
+        channel: 'DESK',
         start_time: new Date(wiz.start_time).toISOString(),
         end_time: new Date(wiz.end_time).toISOString(),
         pickup_location: wiz.pickup_location,
         dropoff_location: wiz.dropoff_location || wiz.pickup_location,
         driver_mode: wiz.driver_mode,
       });
-      toast.success('Η κράτηση ενοικίασης καταχωρήθηκε');
-      setWiz((w) => ({ ...w, step: 1, client_name: '', suggestions: [], vehicle_id: '' }));
-      setTab('calendar');
+      toast.success(
+        person
+          ? `Κράτηση + πελάτης ${person.id}`
+          : 'Η κράτηση ενοικίασης καταχωρήθηκε',
+      );
+      setWiz((w) => ({
+        ...w,
+        step: 1,
+        client_name: '',
+        client_email: '',
+        client_phone: '',
+        suggestions: [],
+        vehicle_id: '',
+      }));
+      setTab('clients');
       await reload();
     } catch (err) {
       toast.error(err.message);
@@ -398,16 +449,16 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
         <div className="space-y-3">
           <div className="bg-white rounded-2xl border border-black/[0.06] p-4 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 className="font-bold text-gray-900">Πελάτες ενοικιάσεων</h3>
+              <h3 className="font-bold text-gray-900">Πελάτες (φυσικά πρόσωπα)</h3>
               <p className="text-sm text-gray-500 mt-1">
-                Όλοι όσοι έχουν κάνει κράτηση από γραφείο ή Wallet ({clients.length}).
+                Καρτέλες CRM με κωδικό CUST — χωριστά από τις κρατήσεις ({clients.length}).
               </p>
             </div>
             <label className="block text-xs font-bold text-gray-500 min-w-[12rem] flex-1 max-w-sm">
               Αναζήτηση
               <input
                 className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                placeholder="Όνομα, email, τηλέφωνο…"
+                placeholder="Όνομα, email, CUST-…"
                 value={clientQuery}
                 onChange={(e) => setClientQuery(e.target.value)}
               />
@@ -420,8 +471,8 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
               <div className="p-6 space-y-2">
                 <p className="text-sm font-bold text-gray-800">Δεν υπάρχουν πελάτες ακόμα</p>
                 <p className="text-sm text-gray-500">
-                  Δημιουργήστε κράτηση από «Νέα κράτηση» ή αφήστε πελάτη να κλείσει από My Wallet →
-                  Ενοικίαση.
+                  Με κάθε κράτηση (γραφείο ή Wallet) δημιουργείται καρτέλα προσώπου στο πελατολόγιο.
+                  Απαιτείται email.
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   <button
@@ -446,41 +497,58 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
                   key={c.id}
                   className="px-4 py-3 flex flex-wrap items-center justify-between gap-3"
                 >
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm text-gray-900">{c.client_name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {c.client_email || 'χωρίς email'}
-                      {c.client_phone ? ` · ${c.client_phone}` : ''}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {c.booking_count} κρατήσεις
-                      {c.active_count ? ` · ${c.active_count} ενεργές` : ''}
-                      {` · ${euro(c.total_spent_eur)}`}
-                      {c.last_vehicle ? ` · τελευταίο ${c.last_vehicle}` : ''}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {(c.channels || []).map((ch) => (
-                        <span
-                          key={ch}
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
-                        >
-                          {ch === 'WALLET' ? 'Wallet' : 'Γραφείο'}
-                        </span>
-                      ))}
-                      {c.last_status ? (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusChip(c.last_status)}`}>
-                          {c.last_status}
-                        </span>
-                      ) : null}
+                  <div className="min-w-0 flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                      {String(c.name || '?').substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm text-gray-900">{c.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {c.email}
+                        {c.phone ? ` · ${c.phone}` : ''}
+                      </p>
+                      <p className="text-[11px] font-mono text-gray-400 mt-0.5">{c.id}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {c.rental_booking_count} ενοικιάσεις
+                        {c.rental_active_count ? ` · ${c.rental_active_count} ενεργές` : ''}
+                        {` · ${euro(c.rental_spent_eur)}`}
+                        {c.last_rental_vehicle ? ` · ${c.last_rental_vehicle}` : ''}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {(c.rental_channels || []).map((ch) => (
+                          <span
+                            key={ch}
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                          >
+                            {ch === 'WALLET' ? 'Wallet' : 'Γραφείο'}
+                          </span>
+                        ))}
+                        {c.last_rental_status ? (
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusChip(c.last_rental_status)}`}
+                          >
+                            {c.last_rental_status}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="text-xs font-bold text-primary"
-                    onClick={() => openClientBookings(c)}
-                  >
-                    Κρατήσεις
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-primary"
+                      onClick={() => openCrmProfile(c)}
+                    >
+                      Καρτέλα
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-gray-600"
+                      onClick={() => openClientBookings(c)}
+                    >
+                      Κρατήσεις
+                    </button>
+                  </div>
                 </article>
               ))
             )}
@@ -992,10 +1060,12 @@ export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
                 />
               </label>
               <label className="block text-xs font-bold text-gray-500">
-                Email
+                Email πελάτη *
                 <input
                   type="email"
+                  required
                   className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
+                  placeholder="για καρτέλα φυσικού προσώπου"
                   value={wiz.client_email}
                   onChange={(e) => setWiz((w) => ({ ...w, client_email: e.target.value }))}
                 />
