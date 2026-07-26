@@ -12,13 +12,15 @@ import {
   logoutCustomer,
 } from '../lib/auth.js';
 import {
+  clearWalletFocusBooking,
   getWalletClaim,
+  peekWalletFocusBooking,
+  setWalletFocusBooking,
   walletClaimAuthPath,
   walletClaimNavState,
 } from '../lib/wallet/walletClaim.js';
 import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookingStore.js';
 import { loadTrips } from '../lib/trips/tripStore.js';
-import { ticketPrintPath } from '../lib/ticketing/printTicket.js';
 import { isPaid, statusStyle } from '../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../lib/fiscal/fiscalDisplay.js';
 import PassengerTrackCTA from '../components/passenger/PassengerTrackCTA.jsx';
@@ -95,6 +97,13 @@ export default function SimpleWalletPage() {
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [brandLabel, setBrandLabel] = useState('My Wallet');
+  const [loadingBookings, setLoadingBookings] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(
+    () => Boolean(location.state?.fromClaim || location.state?.highlightBooking),
+  );
+  const [focusId, setFocusId] = useState(
+    () => location.state?.highlightBooking || peekWalletFocusBooking() || null,
+  );
 
   if (!isCustomer() || !getCustomerToken()) {
     if (isCustomer() && !getCustomerToken()) {
@@ -130,24 +139,45 @@ export default function SimpleWalletPage() {
 
   const profile = useMemo(() => resolveCustomerProfile(), []);
   const email = profile.email;
-  const highlightId = location.state?.highlightBooking || null;
+
+  useEffect(() => {
+    const fromNav = location.state?.highlightBooking;
+    if (fromNav) {
+      setWalletFocusBooking(fromNav);
+      setFocusId(fromNav);
+      setShowWelcome(true);
+      setSelectedBookingId(null);
+      setActiveTab('home');
+    }
+  }, [location.state?.highlightBooking, location.state?.fromClaim]);
 
   useEffect(() => {
     let cancelled = false;
-    loadMyBookings(email).then((list) => {
-      if (!cancelled) {
-        setBookings(
-          [...list].sort(
-            (a, b) =>
-              new Date(b.paymentDate || b.date || 0) - new Date(a.paymentDate || a.date || 0),
-          ),
+    setLoadingBookings(true);
+    loadMyBookings(email)
+      .then((list) => {
+        if (cancelled) return;
+        const sorted = [...list].sort(
+          (a, b) =>
+            new Date(b.paymentDate || b.date || 0) - new Date(a.paymentDate || a.date || 0),
         );
-      }
-    });
+        // Include locally stored focus booking even if sync is slow.
+        const focus = focusId || peekWalletFocusBooking();
+        if (focus && !sorted.some((b) => b.id === focus)) {
+          const local = getBookingById(focus);
+          if (local && String(local.email || '').toLowerCase() === email) {
+            sorted.unshift(local);
+          }
+        }
+        setBookings(sorted);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingBookings(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, [email]);
+  }, [email, focusId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,19 +194,19 @@ export default function SimpleWalletPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!highlightId) return;
-    const b = getBookingById(highlightId);
-    if (b && String(b.email || '').toLowerCase() === email) {
-      setSelectedBookingId(null);
-      setActiveTab('home');
-    }
-  }, [highlightId, email]);
-
   const featured = useMemo(
-    () => pickFeaturedBooking(bookings, highlightId),
-    [bookings, highlightId],
+    () => pickFeaturedBooking(bookings, focusId || peekWalletFocusBooking()),
+    [bookings, focusId],
   );
+
+  useEffect(() => {
+    if (featured?.id && focusId && featured.id === focusId) {
+      // Keep focus for refresh, but drop welcome after first successful paint window.
+      const t = window.setTimeout(() => setShowWelcome(false), 8000);
+      return () => window.clearTimeout(t);
+    }
+    return undefined;
+  }, [featured?.id, focusId]);
 
   const selectedBooking =
     bookings.find((b) => b.id === selectedBookingId) ||
@@ -252,14 +282,47 @@ export default function SimpleWalletPage() {
       <main className="wallet-main">
         {activeTab === 'home' && !isTicketView ? (
           <>
-            <WalletBoardingPass
-              booking={featured}
-              coverImage={featured ? tripImageFor(featured) : ''}
-              brandLabel={brandLabel}
-              passengerName={profile.name}
-              onOpenDetails={openTicket}
-              onBrowseTrips={() => navigate('/')}
-            />
+            {showWelcome && featured ? (
+              <div className="wallet-welcome" role="status">
+                <span className="material-symbols-outlined" aria-hidden>
+                  check_circle
+                </span>
+                <div>
+                  <p className="wallet-welcome-title">Το εισιτήριό σας είναι έτοιμο</p>
+                  <p className="wallet-welcome-copy">Δείξτε το QR στον οδηγό κατά την επιβίβαση.</p>
+                </div>
+                <button
+                  type="button"
+                  className="wallet-welcome-dismiss"
+                  onClick={() => {
+                    setShowWelcome(false);
+                    clearWalletFocusBooking();
+                  }}
+                  aria-label="Κλείσιμο"
+                >
+                  <span className="material-symbols-outlined" aria-hidden>
+                    close
+                  </span>
+                </button>
+              </div>
+            ) : null}
+
+            {loadingBookings && !featured ? (
+              <div className="wallet-pass-empty">
+                <div className="wallet-pass-empty-inner">
+                  <p className="wallet-pass-empty-copy">Φόρτωση εισιτηρίου…</p>
+                </div>
+              </div>
+            ) : (
+              <WalletBoardingPass
+                booking={featured}
+                coverImage={featured ? tripImageFor(featured) : ''}
+                brandLabel={brandLabel}
+                passengerName={profile.name}
+                onOpenDetails={openTicket}
+                onBrowseTrips={() => navigate('/')}
+              />
+            )}
             {otherUpcoming.length > 0 || bookings.length > 1 ? (
               <div className="wallet-home-more">
                 {otherUpcoming.slice(0, 2).map((b) => (

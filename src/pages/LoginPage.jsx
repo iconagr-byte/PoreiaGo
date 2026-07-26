@@ -19,6 +19,7 @@ import {
   clearWalletClaim,
   getWalletClaim,
   walletClaimNavState,
+  walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 
 export default function LoginPage() {
@@ -69,10 +70,19 @@ export default function LoginPage() {
 
   const finishLogin = (email, profile = {}, accessToken = null) => {
     loginAsCustomer(email, profile, accessToken);
+    const hadClaim = Boolean(claim);
     clearWalletClaim();
+    const homeState = walletHomeNavState({
+      highlightBooking,
+      fromClaim: hadClaim,
+    });
     navigate(redirectTo, {
       replace: true,
-      state: highlightBooking ? { highlightBooking } : undefined,
+      state: redirectTo === '/wallet' || redirectTo.startsWith('/wallet')
+        ? homeState
+        : highlightBooking
+          ? homeState
+          : undefined,
     });
   };
 

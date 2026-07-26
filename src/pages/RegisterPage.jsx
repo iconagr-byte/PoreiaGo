@@ -6,6 +6,7 @@ import {
   clearWalletClaim,
   getWalletClaim,
   walletClaimNavState,
+  walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 
 export default function RegisterPage() {
@@ -68,10 +69,14 @@ export default function RegisterPage() {
         },
         result.access_token,
       );
+      const hadClaim = Boolean(claim);
       clearWalletClaim();
       navigate('/wallet', {
         replace: true,
-        state: highlightBooking ? { highlightBooking } : undefined,
+        state: walletHomeNavState({
+          highlightBooking,
+          fromClaim: hadClaim,
+        }),
       });
     } catch (err) {
       const msg = err.message || 'Αποτυχία εγγραφής';

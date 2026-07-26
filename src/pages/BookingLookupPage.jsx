@@ -6,6 +6,7 @@ import { lookupGuestBooking, openBookingInWallet, referenceVariants } from '../l
 import {
   walletClaimAuthPath,
   walletClaimNavState,
+  walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import '../styles/booking-lookup.css';
@@ -120,7 +121,10 @@ export default function BookingLookupPage() {
         toast.success('Η κράτησή σας βρέθηκε');
         navigate('/wallet', {
           replace: true,
-          state: { highlightBooking: booking.id },
+          state: walletHomeNavState({
+            highlightBooking: booking.id,
+            fromClaim: true,
+          }),
         });
         return;
       }
