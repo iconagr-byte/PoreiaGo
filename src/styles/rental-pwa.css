@@ -868,6 +868,10 @@
     padding-top: max(1.35rem, env(safe-area-inset-top, 0px));
   }
 
+  .rent-topbar {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  }
+
   .rent-nav {
     bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
   }
