@@ -32,6 +32,7 @@ export default defineConfig({
       '/api/auth': { target: API_TARGET, changeOrigin: true },
       '/api/push': { target: API_TARGET, changeOrigin: true },
       '/api/customer': { target: API_TARGET, changeOrigin: true },
+      '/api/lost-items': { target: API_TARGET, changeOrigin: true },
       '/api/bookings': { target: API_TARGET, changeOrigin: true },
       '/api/campaigns': { target: API_TARGET, changeOrigin: true },
       '/api/email': { target: API_TARGET, changeOrigin: true },
