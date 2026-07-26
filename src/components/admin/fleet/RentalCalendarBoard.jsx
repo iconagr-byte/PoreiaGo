@@ -5,7 +5,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { geocodePlaces } from '../../../lib/rental/geocodePlace.js';
+import {
+  geocodePlaces,
+  jitterLatLng,
+  placesFromBookings,
+  resolvePlaceSync,
+} from '../../../lib/rental/geocodePlace.js';
 
 const WEEKDAYS = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
 
@@ -229,17 +234,10 @@ export default function RentalCalendarBoard({
 
   const sidebarList = dayRentals.length ? dayRentals : monthRentals;
 
-  const placesKey = useMemo(() => {
-    const places = [
-      ...new Set(
-        monthRentals
-          .flatMap((b) => [b.pickup_location, b.dropoff_location])
-          .map((p) => String(p || '').trim())
-          .filter(Boolean),
-      ),
-    ].sort();
-    return places.join('\n');
-  }, [monthRentals]);
+  const placesKey = useMemo(
+    () => placesFromBookings(monthRentals).sort().join('\n'),
+    [monthRentals],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -248,6 +246,9 @@ export default function RentalCalendarBoard({
       setGeoByPlace(new Map());
       return undefined;
     }
+    // Immediate sync pins (Γραφείο / πόλεις) — don't wait for Nominatim.
+    const syncMap = new Map(places.map((p) => [p, resolvePlaceSync(p)]));
+    setGeoByPlace(syncMap);
     setGeoBusy(true);
     geocodePlaces(places)
       .then((map) => {
@@ -264,34 +265,31 @@ export default function RentalCalendarBoard({
   const mapPins = useMemo(() => {
     const source = dayRentals.length ? dayRentals : monthRentals;
     const pins = [];
-    source.forEach((b) => {
+    source.forEach((b, index) => {
       const pickup = String(b.pickup_location || '').trim() || 'Γραφείο';
       const drop = String(b.dropoff_location || '').trim();
-      const pickupGeo = geoByPlace.get(pickup);
-      if (pickupGeo) {
-        pins.push({
-          id: `${b.id}-pickup`,
-          bookingId: b.id,
-          lat: pickupGeo.lat,
-          lng: pickupGeo.lng,
-          kind: 'pickup',
-          booking: b,
-          place: pickup,
-        });
-      }
+      const pickupGeo = geoByPlace.get(pickup) || resolvePlaceSync(pickup);
+      const jittered = jitterLatLng(pickupGeo.lat, pickupGeo.lng, index, source.length);
+      pins.push({
+        id: `${b.id}-pickup`,
+        bookingId: b.id,
+        lat: jittered.lat,
+        lng: jittered.lng,
+        kind: 'pickup',
+        booking: b,
+        place: pickup,
+      });
       if (drop && drop.toLowerCase() !== pickup.toLowerCase()) {
-        const dropGeo = geoByPlace.get(drop);
-        if (dropGeo) {
-          pins.push({
-            id: `${b.id}-drop`,
-            bookingId: b.id,
-            lat: dropGeo.lat,
-            lng: dropGeo.lng,
-            kind: 'dropoff',
-            booking: b,
-            place: drop,
-          });
-        }
+        const dropGeo = geoByPlace.get(drop) || resolvePlaceSync(drop);
+        pins.push({
+          id: `${b.id}-drop`,
+          bookingId: b.id,
+          lat: dropGeo.lat,
+          lng: dropGeo.lng,
+          kind: 'dropoff',
+          booking: b,
+          place: drop,
+        });
       }
     });
     return pins;
@@ -571,9 +569,11 @@ export default function RentalCalendarBoard({
               Χάρτης κρατήσεων
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              {dayRentals.length
-                ? `Pins για ${selectedDayLabel}`
-                : `Pins για όλες τις κρατήσεις του ${monthLabel}`}
+              {monthRentals.length === 0
+                ? `Καμία κράτηση τον ${monthLabel} — ο χάρτης γεμίζει όταν υπάρχουν κρατήσεις.`
+                : dayRentals.length
+                  ? `Pins για ${selectedDayLabel}`
+                  : `Pins για όλες τις κρατήσεις του ${monthLabel}`}
               {geoBusy ? ' · γεωκωδικοποίηση…' : ''}
             </p>
           </div>
@@ -585,7 +585,9 @@ export default function RentalCalendarBoard({
           {mapPins.length === 0 ? (
             <div className="absolute inset-0 z-[2] flex items-center justify-center pointer-events-none">
               <div className="rounded-2xl bg-white/90 border border-slate-200 px-4 py-3 text-sm text-slate-600 shadow-sm">
-                Δεν υπάρχουν τοποθεσίες για εμφάνιση ακόμα.
+                {monthRentals.length === 0
+                  ? 'Δημιουργήστε κράτηση για να εμφανιστεί pin στον χάρτη.'
+                  : 'Φόρτωση τοποθεσιών…'}
               </div>
             </div>
           ) : null}
