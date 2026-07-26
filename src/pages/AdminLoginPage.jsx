@@ -72,10 +72,9 @@ export default function AdminLoginPage() {
     } catch (apiErr) {
       const raw = String(apiErr?.message || '').trim();
       const msg =
-        raw ||
-        (apiErr?.name === 'TypeError'
-          ? 'Δεν υπάρχει σύνδεση με τον server — ελέγξτε δίκτυο / δοκιμάστε ξανά σε λίγο.'
-          : 'Αποτυχία σύνδεσης');
+        !raw || /failed to fetch|networkerror|load failed/i.test(raw)
+          ? 'Δεν υπάρχει σύνδεση με τον server (πιθανό deploy). Περιμένετε ~1 λεπτό και δοκιμάστε ξανά.'
+          : raw;
       if (msg.includes('πολλές εταιρείες')) {
         setShowAgency(true);
       }

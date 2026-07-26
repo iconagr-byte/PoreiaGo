@@ -151,19 +151,37 @@ export async function saasFetch(path, options = {}) {
   return res.json();
 }
 
+function networkLoginError(err) {
+  const raw = String(err?.message || err || '').trim();
+  if (
+    err?.name === 'TypeError' ||
+    /failed to fetch|networkerror|load failed|network request failed/i.test(raw)
+  ) {
+    return new Error(
+      'Δεν υπάρχει σύνδεση με τον server (πιθανό deploy). Περιμένετε ~1 λεπτό και δοκιμάστε ξανά.',
+    );
+  }
+  return err instanceof Error ? err : new Error(raw || 'Αποτυχία σύνδεσης');
+}
+
 /** POST /api/v1/auth/login — email + password; tenant resolved by backend. */
 export async function saasLogin({ email, password, tenantSlug, tenantId, mfaCode }) {
-  const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password,
-      tenant_slug: tenantSlug || undefined,
-      tenant_id: tenantId || undefined,
-      mfa_code: mfaCode || undefined,
-    }),
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        tenant_slug: tenantSlug || undefined,
+        tenant_id: tenantId || undefined,
+        mfa_code: mfaCode || undefined,
+      }),
+    });
+  } catch (err) {
+    throw networkLoginError(err);
+  }
   if (!res.ok) await parseError(res);
   const data = await res.json();
   const resolvedTenantId =
