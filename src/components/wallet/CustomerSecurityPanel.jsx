@@ -50,7 +50,7 @@ export default function CustomerSecurityPanel({ email, authProvider }) {
   const passwordSet = hasPassword === true;
 
   return (
-    <div className="wallet-stack">
+    <>
       <section className="wallet-panel">
         <div className="wallet-panel-head">
           <span className="wallet-panel-head-icon" aria-hidden>
@@ -158,6 +158,6 @@ export default function CustomerSecurityPanel({ email, authProvider }) {
           </button>
         </form>
       </section>
-    </div>
+    </>
   );
 }

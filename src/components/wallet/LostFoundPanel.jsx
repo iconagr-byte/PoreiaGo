@@ -15,7 +15,7 @@ function statusChipClass(status) {
   return 'wallet-chip wallet-chip-warn';
 }
 
-export default function LostFoundPanel({ profile, bookings = [] }) {
+export default function LostFoundPanel({ bookings = [] }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
