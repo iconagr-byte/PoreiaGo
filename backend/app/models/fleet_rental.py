@@ -30,6 +30,8 @@ class RentalVehicle(Base, TenantScopedMixin, TimestampMixin):
     with_driver_daily_eur: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     gps_device_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     photo_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    photo_urls: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 

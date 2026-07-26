@@ -284,66 +284,75 @@ export default function RentalCatalogPanel({ mode = 'full', onBooked } = {}) {
 
       {showBook && suggestions.length > 0 ? (
         <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>
-          <h2>Διαθέσιμα</h2>
-          <p className="wallet-panel-lead">{suggestions.length} οχήματα</p>
-          <div className="wallet-list">
-            {suggestions.map((v) => (
-              <label
-                key={v.id}
-                className="wallet-booking-card"
-                style={{
-                  cursor: 'pointer',
-                  outline: selectedId === v.id ? '2px solid var(--wallet-accent, #0a84ff)' : undefined,
-                }}
-              >
-                <div className="wallet-booking-body">
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <input
-                      type="radio"
-                      name="rent-vehicle"
-                      checked={selectedId === v.id}
-                      onChange={() => setSelectedId(v.id)}
-                      style={{ marginTop: '0.35rem' }}
-                    />
-                    {v.photo_url ? (
-                      <img
-                        className="wallet-vehicle-thumb"
-                        src={v.photo_url}
-                        alt=""
-                        loading="lazy"
-                        style={
-                          bare
-                            ? undefined
-                            : {
-                                width: '3.4rem',
-                                height: '3.4rem',
-                                borderRadius: '0.85rem',
-                                objectFit: 'cover',
-                                flexShrink: 0,
-                              }
-                        }
-                      />
-                    ) : null}
-                    <div className="min-w-0">
-                      <h3 style={{ margin: 0 }}>
-                        {v.model} · {v.category}
-                      </h3>
-                      <p>
-                        {v.seating_capacity} θέσεις · {v.suggested_days} ημέρες ·{' '}
-                        <strong>{euro(v.suggested_total)}</strong>
-                      </p>
-                      {(v.one_way_surcharge > 0 || v.driver_surcharge > 0) && (
-                        <p className="wallet-booking-mono">
-                          Βάση {euro(v.base_total)}
-                          {v.driver_surcharge > 0 ? ` · οδηγός ${euro(v.driver_surcharge)}` : ''}
-                          {v.one_way_surcharge > 0 ? ` · one-way ${euro(v.one_way_surcharge)}` : ''}
-                        </p>
-                      )}
-                    </div>
+          <h2>Επιλέξτε όχημα</h2>
+          <p className="wallet-panel-lead">
+            {suggestions.length} διαθέσιμα — δείτε φωτογραφίες και περιγραφή πριν την κράτηση.
+          </p>
+          <div className="rent-vehicle-list">
+            {suggestions.map((v) => {
+              const photos = (
+                v.photo_urls?.length
+                  ? v.photo_urls
+                  : v.photo_url
+                    ? [v.photo_url]
+                    : []
+              ).filter(Boolean);
+              const isSelected = selectedId === v.id;
+              return (
+                <label
+                  key={v.id}
+                  className={`rent-vehicle-card${isSelected ? ' is-selected' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="rent-vehicle"
+                    className="rent-vehicle-radio"
+                    checked={isSelected}
+                    onChange={() => setSelectedId(v.id)}
+                  />
+                  <div className="rent-vehicle-media">
+                    {photos.length ? (
+                      <div className="rent-vehicle-gallery" aria-label="Φωτογραφίες οχήματος">
+                        {photos.slice(0, 4).map((url) => (
+                          <img key={url} src={url} alt="" loading="lazy" />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rent-vehicle-placeholder" aria-hidden>
+                        <span className="material-symbols-outlined">directions_car</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </label>
-            ))}
+                  <div className="rent-vehicle-body">
+                    <div className="rent-vehicle-title-row">
+                      <h3>
+                        {v.model}
+                        <span className="rent-vehicle-cat">{v.category}</span>
+                      </h3>
+                      <p className="rent-vehicle-price">{euro(v.suggested_total)}</p>
+                    </div>
+                    <p className="rent-vehicle-meta">
+                      {v.seating_capacity} θέσεις · {v.suggested_days} ημέρες · από{' '}
+                      {euro(v.daily_rate_eur)}/ημέρα
+                    </p>
+                    {v.description ? (
+                      <p className="rent-vehicle-desc">{v.description}</p>
+                    ) : (
+                      <p className="rent-vehicle-desc is-muted">
+                        Χωρίς αναλυτική περιγραφή — επικοινωνήστε με το γραφείο για λεπτομέρειες.
+                      </p>
+                    )}
+                    {(v.one_way_surcharge > 0 || v.driver_surcharge > 0) && (
+                      <p className="wallet-booking-mono">
+                        Βάση {euro(v.base_total)}
+                        {v.driver_surcharge > 0 ? ` · οδηγός ${euro(v.driver_surcharge)}` : ''}
+                        {v.one_way_surcharge > 0 ? ` · one-way ${euro(v.one_way_surcharge)}` : ''}
+                      </p>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
           </div>
           {selected ? (
             <button

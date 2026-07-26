@@ -153,10 +153,19 @@ def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: s
                 "with_driver_daily_eur": round(with_driver, 2),
                 "gps_device_id": (str(body.get("gps_device_id") or "").strip() or None),
                 "photo_url": (str(body.get("photo_url") or "").strip() or None),
+                "photo_urls": [
+                    str(u).strip()
+                    for u in (body.get("photo_urls") or [])
+                    if str(u or "").strip()
+                ][:12],
+                "description": (str(body.get("description") or "").strip() or None),
                 "notes": (str(body.get("notes") or "").strip() or None),
                 "updated_at": now,
             }
         )
+        # Cover photo: explicit photo_url, else first gallery image.
+        if not row.get("photo_url") and row.get("photo_urls"):
+            row["photo_url"] = row["photo_urls"][0]
         if not existing:
             data["vehicles"].append(row)
         _write(data)
@@ -723,7 +732,9 @@ def public_catalog(tenant_id: str | None, *, category: str | None = None) -> lis
                 "daily_rate_eur": v.get("daily_rate_eur"),
                 "one_way_surcharge_eur": float(v.get("one_way_surcharge_eur") or 0),
                 "with_driver_daily_eur": float(v.get("with_driver_daily_eur") or 0),
-                "photo_url": v.get("photo_url"),
+                "photo_url": v.get("photo_url") or ((v.get("photo_urls") or [None])[0]),
+                "photo_urls": list(v.get("photo_urls") or ([] if not v.get("photo_url") else [v.get("photo_url")])),
+                "description": v.get("description"),
             }
         )
     return out
