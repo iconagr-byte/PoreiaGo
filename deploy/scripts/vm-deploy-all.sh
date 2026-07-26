@@ -57,6 +57,7 @@ if [[ ! -d node_modules ]] || [[ package-lock.json -nt node_modules ]]; then
 fi
 PLATFORM_DOMAIN="${PLATFORM_DOMAIN:-poreiago.com}"
 INGRESS_CNAME="${INGRESS_CNAME:-www.poreiago.com}"
+GOOGLE_CLIENT_ID_VAL=""
 if [[ -f "$ENV_FILE" ]]; then
   if grep -q "^OLYMPUS_BASE_DOMAIN=" "$ENV_FILE" 2>/dev/null; then
     PLATFORM_DOMAIN="$(grep "^OLYMPUS_BASE_DOMAIN=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
@@ -64,11 +65,23 @@ if [[ -f "$ENV_FILE" ]]; then
   if grep -q "^OLYMPUS_INGRESS_CNAME=" "$ENV_FILE" 2>/dev/null; then
     INGRESS_CNAME="$(grep "^OLYMPUS_INGRESS_CNAME=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
   fi
+  # My Wallet Google Sign-In — bake client id into Vite (runtime API config is primary).
+  if grep -q "^GOOGLE_CLIENT_ID=.\+" "$ENV_FILE" 2>/dev/null; then
+    GOOGLE_CLIENT_ID_VAL="$(grep "^GOOGLE_CLIENT_ID=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
+  elif grep -q "^VITE_GOOGLE_CLIENT_ID=.\+" "$ENV_FILE" 2>/dev/null; then
+    GOOGLE_CLIENT_ID_VAL="$(grep "^VITE_GOOGLE_CLIENT_ID=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
+  fi
+fi
+if [[ -n "$GOOGLE_CLIENT_ID_VAL" ]]; then
+  echo "  Google Sign-In: client id present (frontend build + API)"
+else
+  echo "  Google Sign-In: not configured (set GOOGLE_CLIENT_ID in $ENV_FILE — see deploy/GOOGLE-SIGNIN.md)"
 fi
 # Empty VITE_API_BASE → browser uses same-origin www + nginx /api proxy (avoids flaky api.* Traefik).
 VITE_API_BASE="${VITE_API_BASE:-}" \
 VITE_OLYMPUS_BASE_DOMAIN="$PLATFORM_DOMAIN" \
 VITE_OLYMPUS_INGRESS_CNAME="$INGRESS_CNAME" \
+VITE_GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID_VAL" \
 npm run build
 
 echo "==> API Docker image"

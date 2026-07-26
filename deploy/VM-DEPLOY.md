@@ -102,3 +102,10 @@ custom domain στο Super Admin — το Traefik θα εκδώσει πιστο
 
 - `deploy/.env.prod` — δεν ανεβαίνει στο GitHub
 - `deploy/.vapid_private.pem` — δημιουργείται αυτόματα στο VM
+
+## Google Sign-In (My Wallet)
+
+Βλ. **[deploy/GOOGLE-SIGNIN.md](./GOOGLE-SIGNIN.md)**.
+
+Χωρίς `GOOGLE_CLIENT_ID` στο `.env.prod` (ή Actions secret `GOOGLE_CLIENT_ID`)
+το κουμπί Google στο login παραμένει ανενεργό.

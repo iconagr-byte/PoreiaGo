@@ -108,10 +108,33 @@ export async function verifyGoogleLogin(idToken) {
   return persistCustomerSession(data);
 }
 
+/** Build-time fallback — prefer runtime `/api/auth/google/config`. */
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
+/** @deprecated Prefer useGoogleAuthConfig() — build-time only. */
 export function isGoogleAuthConfigured() {
   return Boolean(GOOGLE_CLIENT_ID);
+}
+
+/**
+ * Public Google GIS config from the API (enabled + client_id).
+ * Safe to call from the browser — client id is not a secret.
+ */
+export async function fetchGoogleAuthConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/google/config`, { method: 'GET' });
+    if (!res.ok) {
+      return { enabled: Boolean(GOOGLE_CLIENT_ID), client_id: GOOGLE_CLIENT_ID || null };
+    }
+    const data = await res.json().catch(() => ({}));
+    const clientId = String(data.client_id || '').trim();
+    return {
+      enabled: Boolean(data.enabled && clientId),
+      client_id: clientId || null,
+    };
+  } catch {
+    return { enabled: Boolean(GOOGLE_CLIENT_ID), client_id: GOOGLE_CLIENT_ID || null };
+  }
 }
 
 export async function isCustomerAuthBackendAvailable() {

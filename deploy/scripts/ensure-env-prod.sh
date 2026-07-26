@@ -148,4 +148,19 @@ set_kv "TWILIO_AUTH_TOKEN" ""
 set_kv "TWILIO_FROM_NUMBER" ""
 set_kv "TWILIO_WHATSAPP_FROM" ""
 
+# My Wallet Google Sign-In — see deploy/GOOGLE-SIGNIN.md
+echo "==> Ensuring Google Sign-In env keys"
+set_kv "GOOGLE_CLIENT_ID" ""
+set_kv "VITE_GOOGLE_CLIENT_ID" ""
+# Keep API + Vite keys in sync when only one side is filled.
+_g_api="$(grep "^GOOGLE_CLIENT_ID=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+_g_vite="$(grep "^VITE_GOOGLE_CLIENT_ID=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+if [[ -n "$_g_api" && -z "$_g_vite" ]]; then
+  replace_kv "VITE_GOOGLE_CLIENT_ID" "$_g_api"
+  echo "  ~ synced VITE_GOOGLE_CLIENT_ID from GOOGLE_CLIENT_ID"
+elif [[ -n "$_g_vite" && -z "$_g_api" ]]; then
+  replace_kv "GOOGLE_CLIENT_ID" "$_g_vite"
+  echo "  ~ synced GOOGLE_CLIENT_ID from VITE_GOOGLE_CLIENT_ID"
+fi
+
 echo "==> .env.prod ready"
