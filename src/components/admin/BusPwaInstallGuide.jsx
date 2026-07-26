@@ -65,8 +65,8 @@ export default function BusPwaInstallGuide() {
           Κινητό λεωφορείου
         </h3>
         <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-500 tracking-tight">
-          Σκανάρετε το QR στο τηλέφωνο του λεωφορείου. Ανοίγει μόνο το{' '}
-          <span className="font-medium text-zinc-700">/driver</span>.
+          Σκανάρετε το QR στο τηλέφωνο του λεωφορείου. Ανοίγει την είσοδο{' '}
+          <span className="font-medium text-zinc-700">/driver/login</span>.
         </p>
       </div>
 

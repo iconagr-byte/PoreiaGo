@@ -376,7 +376,7 @@ export const ADMIN_NAV_ITEMS = {
     icon: 'qr_code_scanner',
     filled: false,
     type: 'navigate',
-    path: '/driver',
+    path: '/driver/login',
     variant: 'driver',
     navGroup: 'main',
     accent: 'teal',

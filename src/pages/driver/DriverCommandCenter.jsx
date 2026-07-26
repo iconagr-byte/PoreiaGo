@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import '../../styles/driver-app.css';
 import { clearDriverSession, getDriverSession, isSessionValid } from '../../lib/driver/driverSession.js';
 import { flushOfflineScanQueue } from '../../services/ticketingApi.js';
 import { fetchDriverMe } from '../../services/driverPortalApi.js';
-import MasterQrGate from '../../components/driver/MasterQrGate.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import DailyManifest from '../../components/driver/DailyManifest.jsx';
 import Scanner from '../../components/driver/enterprise/Scanner.jsx';
@@ -314,28 +313,14 @@ export default function DriverCommandCenter() {
     }
     clearDriverSession();
     setAuthenticated(false);
-    navigate('/driver');
+    navigate('/driver/login', { replace: true });
   };
 
-  let body = null;
   if (!authenticated) {
-    body = (
-      <MasterQrGate
-        onAuthenticated={() => {
-          resetDriverEntryAlerts().catch(() => {});
-          setAuthenticated(true);
-          setProfileTick((n) => n + 1);
-          window.setTimeout(() => {
-            toast.success('Σύνδεση για τη σημερινή βάρδια', {
-              id: 'driver-shift-login',
-              duration: 2800,
-            });
-          }, 80);
-        }}
-      />
-    );
-  } else {
-    body = (
+    return <Navigate to="/driver/login" replace />;
+  }
+
+  const body = (
       <div className="driver-app">
         <DriverHeader
           session={session}
@@ -466,8 +451,7 @@ export default function DriverCommandCenter() {
           </div>
         </nav>
       </div>
-    );
-  }
+  );
 
   return (
     <>

@@ -9,8 +9,11 @@ export function getDriverAppOrigin() {
   return 'http://localhost:5173';
 }
 
-export function getDriverPwaStartUrl(tab = 'gps') {
-  const base = getDriverAppOrigin();
-  const qs = tab ? `?tab=${encodeURIComponent(tab)}` : '';
-  return `${base}/driver${qs}`;
+/** Share / install QR — always the driver login entrance. */
+export function getDriverPwaLoginUrl() {
+  return `${getDriverAppOrigin()}/driver/login`;
+}
+
+export function getDriverPwaStartUrl(_tab = 'gps') {
+  return getDriverPwaLoginUrl();
 }

@@ -100,7 +100,7 @@ export default function LoginPage() {
       return;
     }
     if (isDriver()) {
-      navigate('/driver', { replace: true });
+      navigate('/driver/login', { replace: true });
     }
   }, [navigate, redirectTo, walletIntent, rentIntent]);
 

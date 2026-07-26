@@ -102,45 +102,13 @@ function WalletAuthGate() {
     return <WalletAuthenticatedApp />;
   }
 
+  // No office/driver chooser — go straight to the right entrance.
   if (isDriver()) {
-    return (
-      <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
-        <p className="text-on-surface-variant">
-          Συνδεδεμένοι ως οδηγός — το Wallet είναι για πελάτες.
-        </p>
-        <Link
-          to="/driver"
-          className="px-6 py-3 rounded-full bg-emerald-600 text-white font-bold text-sm"
-        >
-          Driver Portal
-        </Link>
-      </div>
-    );
+    return <Navigate to="/driver/login" replace />;
   }
 
   if (isAdmin()) {
-    return (
-      <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
-        <p className="text-on-surface-variant">
-          Συνδεδεμένοι ως γραφείο — το My Wallet είναι για επιβάτες.
-        </p>
-        <div className="flex flex-wrap gap-3 justify-center">
-          <Link
-            to="/admin"
-            className="px-6 py-3 rounded-full bg-slate-900 text-white font-bold text-sm"
-          >
-            Πίσω στο Dashboard
-          </Link>
-          <Link
-            to="/login"
-            className="px-6 py-3 rounded-full border border-slate-300 text-slate-800 font-bold text-sm"
-            state={{ from: '/wallet', walletClaim: true }}
-          >
-            Σύνδεση πελάτη
-          </Link>
-        </div>
-      </div>
-    );
+    return <Navigate to="/login" replace state={{ from: '/wallet', walletClaim: true }} />;
   }
 
   const claim = getWalletClaim();
