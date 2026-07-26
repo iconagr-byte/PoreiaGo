@@ -223,7 +223,7 @@ export default function RegisterPage() {
               {error}{' '}
               {error.includes('σύνδεση') ? (
                 <Link
-                  to={rentIntent ? '/rent/login' : '/login'}
+                  to={rentIntent ? '/rent' : '/login'}
                   state={loginState}
                   className="font-bold underline"
                 >
@@ -293,7 +293,7 @@ export default function RegisterPage() {
 
         <p className="text-sm text-center mt-6 text-[#6e6e73]">
           Έχετε ήδη λογαριασμό;{' '}
-          <Link to={rentIntent ? '/rent/login' : '/login'} state={loginState} className={linkClass}>
+          <Link to={rentIntent ? '/rent' : '/login'} state={loginState} className={linkClass}>
             Σύνδεση
           </Link>
         </p>

@@ -2,11 +2,13 @@
  * Rental customer PWA — offline shell (scope /rent).
  * Assets under /rental-pwa/ so /rent SPA route is not a static directory.
  */
-const CACHE = 'poreiago-rental-v4';
+const CACHE = 'poreiago-rental-v5';
 const OFFLINE_URL = '/rental-pwa/offline.html';
+const APP_SHELL = '/index.html';
 
 const PRECACHE_URLS = [
   OFFLINE_URL,
+  APP_SHELL,
   '/rental-pwa/manifest.webmanifest',
   '/icons/rental-pwa.svg',
   '/icons/rental-pwa-192.png',
@@ -60,7 +62,11 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate' && url.pathname.startsWith('/rent')) {
     event.respondWith(
       fetch(request)
-        .then((res) => res)
+        .then((res) => {
+          // Deep links must get the SPA shell — never pass through bare 404 HTML.
+          if (res && res.ok) return res;
+          return fetch(APP_SHELL).then((shell) => (shell && shell.ok ? shell : offlineHtmlResponse()));
+        })
         .catch(() => offlineHtmlResponse()),
     );
     return;

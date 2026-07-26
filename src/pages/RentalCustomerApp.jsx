@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   getCustomerEmail,
   getCustomerName,
@@ -15,6 +15,7 @@ import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
 import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
+import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -27,6 +28,8 @@ const TABS = [
 ];
 
 function RentalAuthGate() {
+  // Re-check auth after in-place login (same URL /rent).
+  const location = useLocation();
   useEffect(() => setupRentalPwa(), []);
 
   if (isCustomer() && !getCustomerToken()) {
@@ -34,11 +37,11 @@ function RentalAuthGate() {
   }
 
   if (isCustomer() && getCustomerToken()) {
-    return <RentalAuthenticatedApp />;
+    return <RentalAuthenticatedApp key={location.key} />;
   }
 
-  // Share link /rent → customer login only (no office/driver chooser).
-  return <Navigate to="/rent/login" replace />;
+  // Share link /rent → customer login in-place (URL stays /rent, never Traefik deep-link 404).
+  return <LoginPage rentEntrance />;
 }
 
 function RentalAuthenticatedApp() {
