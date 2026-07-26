@@ -15,6 +15,7 @@ import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
+import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
 const TABS = [
