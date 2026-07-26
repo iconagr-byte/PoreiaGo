@@ -226,10 +226,14 @@ export default function TripCard({
     );
   }
 
-  // premium (default)
+  // premium (default) — solo = narrower card for new offices with one trip
   return (
-    <article className="relative group bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden">
-      <div className={`relative w-full overflow-hidden shrink-0 ${solo ? 'h-40' : 'h-48'}`}>
+    <article
+      className={`relative group bg-gradient-to-b from-white to-[#f8f9fa] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden ${
+        solo ? 'rounded-[22px]' : 'rounded-[32px]'
+      }`}
+    >
+      <div className={`relative w-full overflow-hidden shrink-0 ${solo ? 'h-32 sm:h-36' : 'h-48'}`}>
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
         <img
           src={img}
@@ -237,28 +241,53 @@ export default function TripCard({
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         />
         {trip.badge ? (
-          <span className="absolute top-4 left-4 z-20 rounded-full bg-white/95 text-slate-900 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 shadow-sm">
+          <span
+            className={`absolute z-20 rounded-full bg-white/95 text-slate-900 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 shadow-sm ${
+              solo ? 'top-3 left-3' : 'top-4 left-4'
+            }`}
+          >
             {trip.badge}
           </span>
         ) : null}
         {(trip.hook || trip.title) && (
-          <div className="absolute bottom-4 left-6 right-6 z-20">
-            <p className="text-white font-headline-sm font-bold leading-tight drop-shadow-md">
+          <div className={`absolute z-20 ${solo ? 'bottom-3 left-4 right-4' : 'bottom-4 left-6 right-6'}`}>
+            <p
+              className={`text-white font-bold leading-tight drop-shadow-md ${
+                solo ? 'text-base sm:text-lg' : 'font-headline-sm'
+              }`}
+            >
               {trip.hook || trip.title}
             </p>
           </div>
         )}
       </div>
-      <div className="p-8 flex flex-col flex-1 relative">
-        <h3 className="font-headline-md text-on-surface font-bold tracking-tight mb-4">{trip.title}</h3>
-        <div className="mb-8 flex-1">
-          <TripMeta trip={trip} />
+      <div className={`flex flex-col flex-1 relative ${solo ? 'p-4 sm:p-5' : 'p-8'}`}>
+        <h3
+          className={`text-on-surface font-bold tracking-tight ${
+            solo ? 'text-lg mb-2.5' : 'font-headline-md mb-4'
+          }`}
+        >
+          {trip.title}
+        </h3>
+        <div className={solo ? 'mb-4 flex-1' : 'mb-8 flex-1'}>
+          <TripMeta trip={trip} compact={solo} />
         </div>
-        <div className="flex items-end justify-between pt-6 border-t border-black/[0.04]">
-          <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="lg" />
+        <div
+          className={`flex items-end justify-between border-t border-black/[0.04] ${
+            solo ? 'pt-3.5 gap-2' : 'pt-6'
+          }`}
+        >
+          <TripPriceDisplay
+            trip={trip}
+            quote={priceQuote}
+            fetchServer={false}
+            size={solo ? 'md' : 'lg'}
+          />
           <BookButton
             onClick={go}
-            className="px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full text-sm hover:scale-[1.02] hover:shadow-lg"
+            className={`bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full text-sm hover:scale-[1.02] hover:shadow-lg shrink-0 ${
+              solo ? 'px-4 py-2.5' : 'px-6 py-3.5'
+            }`}
           />
         </div>
       </div>
