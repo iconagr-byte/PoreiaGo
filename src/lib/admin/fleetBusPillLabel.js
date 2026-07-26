@@ -26,9 +26,18 @@ export function resolveVehicleTripTitle(vehicle) {
 }
 
 export function formatFleetBusPillLabel(vehicle, { shortDriver = true } = {}) {
+  const speed = Math.round(Number(vehicle?.speed) || Number(vehicle?.speed_kmh) || 0);
+  if (vehicle?.is_rental || vehicle?.rental_overlay) {
+    const client =
+      vehicle.rental_client_name ||
+      vehicle.rentalClientName ||
+      String(vehicle.trip_title || '').replace(/^Ενοικίαση\s*·\s*/i, '') ||
+      'Ενοικίαση';
+    const plate = vehicle.bus_plate || vehicle.vehicle_code || '';
+    return plate ? `Ενοικίαση · ${client} · ${plate}` : `Ενοικίαση · ${client} · ${speed} km/h`;
+  }
   const rawName = String(vehicle?.driver_name || vehicle?.driverName || 'Οδηγός').trim() || 'Οδηγός';
   const driver = shortDriver ? rawName.split(/\s+/)[0] : rawName;
-  const speed = Math.round(Number(vehicle?.speed) || Number(vehicle?.speed_kmh) || 0);
   const trip = resolveVehicleTripTitle(vehicle);
   if (trip) return `${driver} · ${trip} · ${speed} km/h`;
   return `${driver} · ${speed} km/h`;

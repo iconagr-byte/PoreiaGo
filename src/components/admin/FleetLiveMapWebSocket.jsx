@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFleetTelemetryEgress } from '../../context/FleetTelemetryContext.jsx';
 import { isMapboxEnabled } from '../../lib/maps/mapboxConfig.js';
 import { useTelemetryAlerts } from '../../hooks/useTelemetryAlerts.js';
@@ -9,7 +9,9 @@ import {
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
 import { resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
+import { mergeRentalOverlays } from '../../lib/admin/mergeRentalOverlays.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import { fetchRentalLiveOverlays } from '../../services/fleetRentalApi.js';
 import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
 import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
 import AdminFleetPushPanel from './AdminFleetPushPanel.jsx';
@@ -27,6 +29,30 @@ export default function FleetLiveMapWebSocket() {
   const [historyVehicle, setHistoryVehicle] = useState(null);
   const [showPlaces, setShowPlaces] = useState(true);
   const [showTrails, setShowTrails] = useState(true);
+  const [rentalOverlays, setRentalOverlays] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const rows = await fetchRentalLiveOverlays();
+        if (!cancelled) setRentalOverlays(rows);
+      } catch {
+        if (!cancelled) setRentalOverlays([]);
+      }
+    };
+    load();
+    const timer = setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [tenantId]);
+
+  const mapVehicles = useMemo(
+    () => mergeRentalOverlays(vehicles, rentalOverlays),
+    [vehicles, rentalOverlays],
+  );
 
   // SOS pins always on (χωρίς toggle UI) — κρίσιμο για ασφάλεια.
   const { alerts } = useTelemetryAlerts({ tenantId, limit: 80, enabled: true });
@@ -34,13 +60,18 @@ export default function FleetLiveMapWebSocket() {
   const focusSosAlert = sosAlerts[0] ?? null;
 
   const center = useMemo(() => {
-    if (vehicles.length) return [vehicles[0].lat, vehicles[0].lng];
+    if (mapVehicles.length) return [mapVehicles[0].lat, mapVehicles[0].lng];
     return [38.5, 23.0];
-  }, [vehicles]);
+  }, [mapVehicles]);
 
   const selected = useMemo(
-    () => vehicles.find((v) => v.id === selectedId) || vehicles[0] || null,
-    [vehicles, selectedId],
+    () => mapVehicles.find((v) => v.id === selectedId) || mapVehicles[0] || null,
+    [mapVehicles, selectedId],
+  );
+
+  const rentalLiveCount = useMemo(
+    () => mapVehicles.filter((v) => v.is_rental).length,
+    [mapVehicles],
   );
 
   return (
@@ -49,7 +80,8 @@ export default function FleetLiveMapWebSocket() {
         <div className="min-w-0">
           <h2 className="fleet-apple-title">Ζωντανός χάρτης</h2>
           <p className="fleet-apple-subtitle">
-            {vehicles.length} ενεργά · {connected ? 'ζωντανά' : 'εκτός'}
+            {mapVehicles.length} ενεργά · {connected ? 'ζωντανά' : 'εκτός'}
+            {rentalLiveCount ? ` · ${rentalLiveCount} ενοικιάσεις` : ''}
             {transport === 'poll' ? ' · ενημέρωση 5s' : ''}
           </p>
         </div>
@@ -89,7 +121,7 @@ export default function FleetLiveMapWebSocket() {
 
       {pollError ? <p className="fleet-apple-banner is-error">{pollError}</p> : null}
 
-      {!vehicles.length && connected ? (
+      {!mapVehicles.length && connected ? (
         <p className="fleet-apple-banner">
           Δεν υπάρχουν ενεργοί οδηγοί. Στην PWA πατήστε «Έναρξη βάρδιας», επιτρέψτε τοποθεσία και
           περιμένετε μήνυμα επιβεβαίωσης θέσης — μετά hard-refresh αυτόν τον χάρτη.
@@ -100,7 +132,7 @@ export default function FleetLiveMapWebSocket() {
         <div className="fleet-apple-map-frame">
           {mapbox ? (
             <FleetLiveMapMapbox
-              vehicles={vehicles}
+              vehicles={mapVehicles}
               heatmap={[]}
               showHeat={false}
               geofenceLayers={null}
@@ -116,7 +148,7 @@ export default function FleetLiveMapWebSocket() {
             />
           ) : (
             <FleetLiveMapLeaflet
-              vehicles={vehicles}
+              vehicles={mapVehicles}
               center={center}
               heatmap={[]}
               showHeat={false}
@@ -147,9 +179,9 @@ export default function FleetLiveMapWebSocket() {
             <p className="mb-3 text-[11px] text-[var(--fleet-secondary)]">
               Διπλό κλικ για ιστορικό &amp; check-in
             </p>
-            {vehicles.length ? (
+            {mapVehicles.length ? (
               <ul className="max-h-[min(52vh,480px)] space-y-2 overflow-y-auto pr-1">
-                {vehicles.map((v) => {
+                {mapVehicles.map((v) => {
                   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(v));
                   const active = (selected?.id || selectedId) === v.id;
                   return (
@@ -175,7 +207,9 @@ export default function FleetLiveMapWebSocket() {
                             className="h-12 w-12 rounded-[14px] object-cover ring-2 ring-white shadow bg-slate-100"
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-bold tracking-tight">{v.driver_name}</div>
+                            <div className="truncate text-sm font-bold tracking-tight">
+                              {v.is_rental ? `Ενοικίαση · ${v.rental_client_name || v.driver_name}` : v.driver_name}
+                            </div>
                             <div className="truncate text-xs text-[var(--fleet-secondary)]">
                               {(() => {
                                 const trip = resolveVehicleTripTitle(v);
@@ -218,7 +252,7 @@ export default function FleetLiveMapWebSocket() {
           </div>
 
           <div className="fleet-apple-side-card">
-            <FleetEtaPanel activeTripCount={vehicles.length} />
+            <FleetEtaPanel activeTripCount={mapVehicles.length} />
           </div>
         </div>
       </div>

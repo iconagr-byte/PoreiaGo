@@ -1,5 +1,5 @@
 import { API_BASE } from '../config/api.js';
-import { saasAuthHeaders } from './saasApi.js';
+import { getSaasToken, saasAuthHeaders } from './saasApi.js';
 
 async function rentalFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}/api/admin/platform/fleet-rental${path}`, {
@@ -56,15 +56,48 @@ export async function deleteRentalVehicle(id) {
   }
 }
 
-export async function fetchRentalAvailability({ startTime, endTime, category, minSeats }) {
+export async function fetchRentalAvailability({
+  startTime,
+  endTime,
+  category,
+  minSeats,
+  pickupLocation,
+  dropoffLocation,
+  driverMode,
+}) {
   const params = new URLSearchParams({
     start_time: startTime,
     end_time: endTime,
   });
   if (category) params.set('category', category);
   if (minSeats) params.set('min_seats', String(minSeats));
+  if (pickupLocation) params.set('pickup_location', pickupLocation);
+  if (dropoffLocation) params.set('dropoff_location', dropoffLocation);
+  if (driverMode) params.set('driver_mode', driverMode);
   const data = await rentalFetch(`/availability?${params}`);
   return data.vehicles || [];
+}
+
+export async function fetchRentalLiveOverlays() {
+  const data = await rentalFetch('/live-overlays');
+  return data.overlays || [];
+}
+
+export async function uploadRentalInspectionPhoto(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getSaasToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`${API_BASE}/api/admin/platform/fleet-rental/inspections/photo-upload`, {
+    method: 'POST',
+    headers,
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Αποτυχία ανεβάσματος φωτογραφίας');
+  }
+  return data;
 }
 
 export async function fetchRentalBookings({ vehicleId, status } = {}) {

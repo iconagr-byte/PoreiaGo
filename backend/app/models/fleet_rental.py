@@ -26,6 +26,8 @@ class RentalVehicle(Base, TenantScopedMixin, TimestampMixin):
     current_status: Mapped[str] = mapped_column(String(32), nullable=False, default="AVAILABLE")
     current_mileage: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     daily_rate_eur: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    one_way_surcharge_eur: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    with_driver_daily_eur: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     gps_device_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     photo_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

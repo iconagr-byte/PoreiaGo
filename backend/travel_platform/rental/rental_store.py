@@ -113,6 +113,10 @@ def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: s
     rate = float(body.get("daily_rate_eur") or 0)
     if rate < 0:
         raise ValueError("Μη έγκυρη ημερήσια τιμή")
+    one_way = float(body.get("one_way_surcharge_eur") or 0)
+    with_driver = float(body.get("with_driver_daily_eur") or 0)
+    if one_way < 0 or with_driver < 0:
+        raise ValueError("Μη έγκυρη επιπλέον χρέωση")
 
     with _LOCK:
         data = _read()
@@ -145,6 +149,8 @@ def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: s
                 "current_status": status,
                 "current_mileage": mileage,
                 "daily_rate_eur": round(rate, 2),
+                "one_way_surcharge_eur": round(one_way, 2),
+                "with_driver_daily_eur": round(with_driver, 2),
                 "gps_device_id": (str(body.get("gps_device_id") or "").strip() or None),
                 "photo_url": (str(body.get("photo_url") or "").strip() or None),
                 "notes": (str(body.get("notes") or "").strip() or None),
@@ -219,6 +225,42 @@ def _vehicle_conflicts(
     return hits
 
 
+def _norm_place(value: str | None) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def quote_vehicle(
+    vehicle: dict[str, Any],
+    *,
+    start: datetime,
+    end: datetime,
+    pickup_location: str | None = None,
+    dropoff_location: str | None = None,
+    driver_mode: str | None = None,
+) -> dict[str, Any]:
+    """Compute rental quote: base days + optional one-way + with-driver."""
+    days = max(1, math.ceil((end - start).total_seconds() / 86400))
+    rate = float(vehicle.get("daily_rate_eur") or 0)
+    one_way_fee = float(vehicle.get("one_way_surcharge_eur") or 0)
+    with_driver_daily = float(vehicle.get("with_driver_daily_eur") or 0)
+    mode = str(driver_mode or "SELF_DRIVE").strip().upper() or "SELF_DRIVE"
+    pickup = _norm_place(pickup_location)
+    dropoff = _norm_place(dropoff_location) or pickup
+    is_one_way = bool(pickup and dropoff and pickup != dropoff)
+    base_total = round(rate * days, 2)
+    driver_surcharge = round(with_driver_daily * days, 2) if mode == "WITH_DRIVER" else 0.0
+    one_way_surcharge = round(one_way_fee, 2) if is_one_way else 0.0
+    return {
+        "suggested_days": days,
+        "base_total": base_total,
+        "driver_surcharge": driver_surcharge,
+        "one_way_surcharge": one_way_surcharge,
+        "suggested_total": round(base_total + driver_surcharge + one_way_surcharge, 2),
+        "is_one_way": is_one_way,
+        "driver_mode": mode,
+    }
+
+
 def check_availability(
     tenant_id: str | None,
     *,
@@ -226,6 +268,9 @@ def check_availability(
     end_time: str,
     category: str | None = None,
     min_seats: int | None = None,
+    pickup_location: str | None = None,
+    dropoff_location: str | None = None,
+    driver_mode: str | None = None,
 ) -> list[dict[str, Any]]:
     tid = _normalize_tenant(tenant_id)
     start = _parse_dt(start_time)
@@ -254,13 +299,18 @@ def check_availability(
             )
             if conflicts:
                 continue
-            days = max(1, math.ceil((end - start).total_seconds() / 86400))
-            rate = float(v.get("daily_rate_eur") or 0)
+            quote = quote_vehicle(
+                v,
+                start=start,
+                end=end,
+                pickup_location=pickup_location,
+                dropoff_location=dropoff_location,
+                driver_mode=driver_mode,
+            )
             out.append(
                 {
                     **deepcopy(v),
-                    "suggested_days": days,
-                    "suggested_total": round(rate * days, 2),
+                    **quote,
                     "fit_score": int(v.get("seating_capacity") or 0) - seats_need,
                 }
             )
@@ -302,11 +352,18 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         if conflicts:
             raise ValueError("Το όχημα δεν είναι διαθέσιμο για αυτές τις ημερομηνίες")
 
-        days = max(1, math.ceil((end - start).total_seconds() / 86400))
-        rate = float(vehicle.get("daily_rate_eur") or 0)
+        driver_mode = str(body.get("driver_mode") or "SELF_DRIVE").strip().upper() or "SELF_DRIVE"
+        quote = quote_vehicle(
+            vehicle,
+            start=start,
+            end=end,
+            pickup_location=pickup,
+            dropoff_location=dropoff,
+            driver_mode=driver_mode,
+        )
         total = body.get("total_cost")
         if total is None:
-            total = round(rate * days, 2)
+            total = quote["suggested_total"]
         else:
             total = round(float(total), 2)
 
@@ -324,8 +381,15 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "pickup_location": pickup,
             "dropoff_location": dropoff,
             "total_cost": total,
+            "pricing": {
+                "days": quote["suggested_days"],
+                "base_total": quote["base_total"],
+                "driver_surcharge": quote["driver_surcharge"],
+                "one_way_surcharge": quote["one_way_surcharge"],
+                "is_one_way": quote["is_one_way"],
+            },
             "rental_status": "CONFIRMED",
-            "driver_mode": str(body.get("driver_mode") or "SELF_DRIVE").strip().upper(),
+            "driver_mode": driver_mode,
             "assigned_driver_id": (str(body.get("assigned_driver_id") or "").strip() or None),
             "notes": (str(body.get("notes") or "").strip() or None),
             "created_at": now,
@@ -531,6 +595,79 @@ def list_inspections(tenant_id: str | None, *, booking_id: str | None = None) ->
     if booking_id:
         rows = [i for i in rows if i.get("rental_booking_id") == booking_id]
     return sorted(rows, key=lambda i: i.get("created_at") or "", reverse=True)
+
+
+def list_bookings_for_email(tenant_id: str | None, email: str) -> list[dict[str, Any]]:
+    tid = _normalize_tenant(tenant_id)
+    needle = str(email or "").strip().lower()
+    if not needle:
+        return []
+    rows = [
+        b
+        for b in list_bookings(tid)
+        if str(b.get("client_email") or "").strip().lower() == needle
+    ]
+    return rows
+
+
+def public_catalog(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
+    """Customer-facing vehicle cards (no internal notes)."""
+    rows = list_vehicles(tenant_id, category=category)
+    out = []
+    for v in rows:
+        if str(v.get("current_status") or "") == "MAINTENANCE":
+            continue
+        out.append(
+            {
+                "id": v["id"],
+                "plate_number": v.get("plate_number"),
+                "category": v.get("category"),
+                "model": v.get("model"),
+                "seating_capacity": v.get("seating_capacity"),
+                "current_status": v.get("current_status"),
+                "daily_rate_eur": v.get("daily_rate_eur"),
+                "one_way_surcharge_eur": float(v.get("one_way_surcharge_eur") or 0),
+                "with_driver_daily_eur": float(v.get("with_driver_daily_eur") or 0),
+                "photo_url": v.get("photo_url"),
+            }
+        )
+    return out
+
+
+def active_rental_overlays(tenant_id: str | None) -> list[dict[str, Any]]:
+    """Active rentals with GPS identity for live-map overlay."""
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        vehicles = {v["id"]: v for v in data["vehicles"] if v.get("tenant_id") == tid}
+        out = []
+        for b in data["bookings"]:
+            if b.get("tenant_id") != tid:
+                continue
+            if b.get("rental_status") not in ACTIVE_BOOKING_STATUSES:
+                continue
+            v = vehicles.get(b.get("vehicle_id") or "") or {}
+            plate = (v.get("plate_number") or b.get("vehicle_plate") or "").strip().upper()
+            gps_id = (v.get("gps_device_id") or "").strip()
+            out.append(
+                {
+                    "booking_id": b["id"],
+                    "client_name": b.get("client_name"),
+                    "rental_status": b.get("rental_status"),
+                    "driver_mode": b.get("driver_mode"),
+                    "vehicle_id": b.get("vehicle_id"),
+                    "plate_number": plate or None,
+                    "gps_device_id": gps_id or None,
+                    "model": v.get("model") or b.get("vehicle_model"),
+                    "category": v.get("category") or b.get("vehicle_category"),
+                    "start_time": b.get("start_time"),
+                    "end_time": b.get("end_time"),
+                    "pickup_location": b.get("pickup_location"),
+                    "dropoff_location": b.get("dropoff_location"),
+                    "label": f"Ενοικίαση · {b.get('client_name') or plate or '—'}",
+                }
+            )
+    return out
 
 
 def dashboard_summary(tenant_id: str | None) -> dict[str, Any]:
