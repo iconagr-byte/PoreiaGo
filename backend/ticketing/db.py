@@ -70,6 +70,17 @@ CREATE TABLE IF NOT EXISTS lost_items (
 );
 CREATE INDEX IF NOT EXISTS idx_lost_email ON lost_items(customer_email);
 CREATE INDEX IF NOT EXISTS idx_lost_status ON lost_items(status);
+
+CREATE TABLE IF NOT EXISTS wallet_magic_tokens (
+    token TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    booking_id TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_wmt_email ON wallet_magic_tokens(email);
+CREATE INDEX IF NOT EXISTS idx_wmt_booking ON wallet_magic_tokens(booking_id);
 """
 
 _db: aiosqlite.Connection | None = None

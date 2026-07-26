@@ -3,7 +3,7 @@
  * Guest can buy / look up a booking without a JWT, then create or sign in
  * to a real customer account to open /wallet.
  *
- * Phase B (later): email magic link that lands with a short-lived token.
+ * Phase B: email magic link at `/wallet/magic?token=…` (see wallet_magic.py).
  *
  * Step 3: persist which booking should open as the home pass after auth
  * (`wallet_focus_booking_v1`), separate from the claim form payload.

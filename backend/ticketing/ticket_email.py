@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from urllib.parse import quote
 
 from ticketing.email_dispatch import send_email
@@ -12,24 +13,40 @@ def _qr_img_url(pnr: str, size: int = 180) -> str:
     return f"https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data={quote(str(pnr))}"
 
 
+def _public_base_url() -> str:
+    return (os.getenv("PUBLIC_APP_URL") or os.getenv("VITE_APP_URL") or "http://localhost:5173").rstrip("/")
+
+
+def _magic_cta_block(magic_url: str | None) -> str:
+    if not magic_url:
+        return ""
+    return f"""
+            <div style="text-align:center;margin:0 0 24px;">
+              <a href="{magic_url}" style="display:inline-block;padding:14px 28px;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:999px;font-weight:bold;font-size:15px;">
+                Άνοιγμα στο My Wallet
+              </a>
+              <p style="margin:10px 0 0;font-size:12px;color:#94a3b8;">Χωρίς κωδικό · ο σύνδεσμος λήγει σε 15 λεπτά</p>
+            </div>
+    """
+
+
 def build_ticket_email_html(payload: dict) -> str:
     pnr = payload.get("pnr") or payload.get("booking_id") or "—"
     price = payload.get("price")
     price_str = f"€{float(price):.2f}" if price is not None else "—"
-    base = payload.get("base_price")
-    taxes = payload.get("taxes")
     payment = payload.get("payment_method") or payload.get("payment_status") or "—"
+    magic_url = payload.get("magic_url") or ""
 
     return f"""<!DOCTYPE html>
 <html lang="el">
-<head><meta charset="utf-8"><title>Εισιτήριο PoreiaGo</title></head>
-<body style="margin:0;padding:0;background:#f4f6fb;font-family:Inter,Arial,sans-serif;">
+<head><meta charset="utf-8"><title>Εισιτήριο</title></head>
+<body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:32px 16px;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.08);">
         <tr>
-          <td style="background:linear-gradient(135deg,#0040df,#001d66);padding:28px 32px;color:#fff;">
-            <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;opacity:.85;">PoreiaGo Travel</div>
+          <td style="background:linear-gradient(135deg,#0f4c81,#16324f);padding:28px 32px;color:#fff;">
+            <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;opacity:.85;">My Wallet</div>
             <h1 style="margin:12px 0 4px;font-size:22px;">Το εισιτήριό σας</h1>
             <p style="margin:0;opacity:.9;font-size:14px;">{payload.get("trip_title") or "Εκδρομή"}</p>
           </td>
@@ -38,8 +55,9 @@ def build_ticket_email_html(payload: dict) -> str:
           <td style="padding:32px;">
             <p style="margin:0 0 8px;color:#64748b;font-size:13px;">Αγαπητέ/ή <strong style="color:#0f172a;">{payload.get("customer_name") or "επιβάτη"}</strong>,</p>
             <p style="margin:0 0 24px;color:#64748b;font-size:14px;line-height:1.6;">
-              Η κράτησή σας επιβεβαιώθηκε. Παρακάτω τα στοιχεία εισιτηρίου — σκανάρετε το QR κατά την επιβίβαση.
+              Η κράτησή σας επιβεβαιώθηκε. Ανοίξτε το My Wallet για το QR επιβίβασης.
             </p>
+            {_magic_cta_block(magic_url)}
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
               <tr>
                 <td width="50%" style="padding:8px 8px 8px 0;vertical-align:top;">
@@ -48,7 +66,7 @@ def build_ticket_email_html(payload: dict) -> str:
                 </td>
                 <td width="50%" style="padding:8px 0 8px 8px;vertical-align:top;">
                   <div style="font-size:10px;text-transform:uppercase;color:#94a3b8;font-weight:bold;">Θέση</div>
-                  <div style="font-size:22px;font-weight:bold;color:#0040df;">{payload.get("seat") or "—"}</div>
+                  <div style="font-size:22px;font-weight:bold;color:#0f4c81;">{payload.get("seat") or "—"}</div>
                 </td>
               </tr>
               <tr>
@@ -77,7 +95,7 @@ def build_ticket_email_html(payload: dict) -> str:
         </tr>
         <tr>
           <td style="padding:20px 32px;background:#f8fafc;text-align:center;font-size:12px;color:#94a3b8;">
-            PoreiaGo Travel · Μην απαντάτε σε αυτό το email
+            Μην απαντάτε σε αυτό το email
           </td>
         </tr>
       </table>
@@ -89,6 +107,7 @@ def build_ticket_email_html(payload: dict) -> str:
 
 async def send_ticket_confirmation_email(payload: dict) -> dict:
     from travel_platform.telemetry.passenger_track_links import enrich_booking_passenger_track
+    from ticketing.wallet_magic import create_wallet_magic_token
 
     payload = enrich_booking_passenger_track(dict(payload))
     if not payload.get("passenger_track_url"):
@@ -98,8 +117,29 @@ async def send_ticket_confirmation_email(payload: dict) -> dict:
     if not email or "@" not in email:
         raise ValueError("Δεν υπάρχει έγκυρο email πελάτη")
 
+    booking_id = str(payload.get("booking_id") or payload.get("pnr") or "").strip()
+    magic_url = None
+    if booking_id:
+        try:
+            token = await create_wallet_magic_token(
+                email=email,
+                booking_id=booking_id,
+                name=payload.get("customer_name"),
+                phone=payload.get("phone"),
+            )
+            magic_url = f"{_public_base_url()}/wallet/magic?token={token}"
+            payload["magic_url"] = magic_url
+        except Exception:
+            payload.pop("magic_url", None)
+
     pnr = payload.get("pnr") or payload.get("booking_id") or "TICKET"
-    subject = f"PoreiaGo — Εισιτήριο {pnr} · {payload.get('trip_title') or 'Εκδρομή'}"
+    subject = f"Εισιτήριο {pnr} · {payload.get('trip_title') or 'Εκδρομή'}"
     html = build_ticket_email_html(payload)
     ref = await send_email(email, subject, html)
-    return {"ok": True, "email": email, "reference": ref, "logged_only": ref.startswith("email-log-")}
+    return {
+        "ok": True,
+        "email": email,
+        "reference": ref,
+        "logged_only": ref.startswith("email-log-"),
+        "magic_link": bool(magic_url),
+    }
