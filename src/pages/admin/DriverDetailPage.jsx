@@ -4,7 +4,12 @@ import toast from 'react-hot-toast';
 import { mockFleet } from '../../data/mockData.js';
 import AdminLayout from '../../components/AdminLayout.jsx';
 import { loadTrips } from '../../lib/trips/tripStore.js';
-import { fetchFleetDriver, updateFleetDriver, uploadDriverPhoto } from '../../services/platformApi.js';
+import {
+  fetchFleetDriver,
+  peekCachedFleetDriver,
+  updateFleetDriver,
+  uploadDriverPhoto,
+} from '../../services/platformApi.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
 import DriverLoginQrPanel from '../../components/admin/DriverLoginQrPanel.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
@@ -64,11 +69,12 @@ function InfoTile({ icon, label, value, sub, highlight }) {
 export default function DriverDetailPage() {
   const { driverId } = useParams();
   const navigate = useNavigate();
-  const [driver, setDriver] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const initialCached = peekCachedFleetDriver(driverId);
+  const [driver, setDriver] = useState(initialCached);
+  const [loading, setLoading] = useState(!initialCached);
   const [appPassword, setAppPassword] = useState('');
   const [appPasswordConfirm, setAppPasswordConfirm] = useState('');
-  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoUrl, setPhotoUrl] = useState(initialCached?.photo_url || '');
   const [savingAccount, setSavingAccount] = useState(false);
 
   const reloadDriver = async () => {
@@ -85,13 +91,27 @@ export default function DriverDetailPage() {
       return;
     }
     let cancelled = false;
-    (async () => {
+    const cached = peekCachedFleetDriver(driverId);
+    if (cached) {
+      setDriver(cached);
+      setPhotoUrl(cached.photo_url || '');
+      setLoading(false);
+    } else {
       setLoading(true);
-      const d = await fetchFleetDriver(driverId);
-      if (!cancelled) {
-        setDriver(d);
-        setPhotoUrl(d?.photo_url || '');
-        setLoading(false);
+    }
+    (async () => {
+      try {
+        const d = await fetchFleetDriver(driverId);
+        if (!cancelled) {
+          setDriver(d);
+          setPhotoUrl(d?.photo_url || '');
+        }
+      } catch (err) {
+        if (!cancelled && !cached) {
+          toast.error(err?.message || 'Αποτυχία φόρτωσης προφίλ');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -179,7 +199,7 @@ export default function DriverDetailPage() {
     </div>
   );
 
-  if (loading) {
+  if (loading && !driver) {
     return (
       <AdminLayout activeTab="settings" title={header}>
         <p className="text-on-surface-variant">Φόρτωση προφίλ…</p>
@@ -219,6 +239,8 @@ export default function DriverDetailPage() {
                 <img
                   src={resolveSiteAssetUrl(driver.photo_url)}
                   alt=""
+                  decoding="async"
+                  fetchPriority="low"
                   className="w-24 h-24 rounded-3xl object-cover shadow-inner border border-primary/10"
                 />
               ) : (

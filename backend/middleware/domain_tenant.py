@@ -3,12 +3,19 @@ Host-based tenant resolution + white-label theme binding.
 
 Runs early in middleware stack — before JWT for public storefront routes.
 Returns 404 for unmapped custom domains (no tenant leakage).
+
+Performance:
+- Host→tenant lookups are cached (TTL) so custom-domain admin pages do not
+  open Postgres on every /api/admin/* request.
+- When Authorization: Bearer is present on JWT-scoped APIs, tenant_id is taken
+  from the token and the Host DB lookup is skipped entirely.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Callable
 
 from fastapi import Request, Response
@@ -18,7 +25,7 @@ from starlette.responses import JSONResponse
 from app.core.database import AsyncSessionLocal
 from olympus.config import get_olympus_settings
 from olympus.security.ip_whitelist import enforce_admin_ip_whitelist
-from olympus.tenant.domain_resolver import DomainResolver, normalize_host
+from olympus.tenant.domain_resolver import DomainResolver, ResolvedTenant, normalize_host
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +66,15 @@ JWT_SCOPED_PREFIXES = (
     "/ws/",  # driver GPS ingress, office egress, passenger ETA (JWT / trip scoped)
 )
 
+# Host → (monotonic_ts, ResolvedTenant | None)
+_HOST_RESOLVE_CACHE: dict[str, tuple[float, ResolvedTenant | None]] = {}
+_HOST_RESOLVE_TTL_SEC = float(os.getenv("DOMAIN_RESOLVE_CACHE_TTL_SEC", "300") or "300")
+
+
+def clear_host_resolve_cache() -> None:
+    """Test / ops helper — drop cached Host→tenant mappings."""
+    _HOST_RESOLVE_CACHE.clear()
+
 
 def _request_host(request: Request) -> str:
     """Prefer public hostname (X-Forwarded-Host) when nginx/Traefik proxies to the API."""
@@ -89,6 +105,38 @@ def _is_platform_host(host: str) -> bool:
     return False
 
 
+def _try_attach_bearer_tenant(request: Request) -> bool:
+    """
+    Decode Authorization Bearer and set request.state.tenant_id when present.
+    Returns True when tenant_id was attached (Host DB lookup can be skipped).
+    """
+    auth = request.headers.get("Authorization") or ""
+    if not auth.startswith("Bearer "):
+        return False
+    try:
+        from middleware.tenant import _attach_bearer_tenant_context, _jwt_settings
+
+        secret, algorithm, _ = _jwt_settings()
+        if not secret:
+            return False
+        _attach_bearer_tenant_context(request, secret, algorithm)
+    except Exception as exc:
+        logger.debug("Bearer tenant attach skipped: %s", exc)
+        return False
+    return getattr(request.state, "tenant_id", None) is not None
+
+
+async def _resolve_host_cached(host: str) -> ResolvedTenant | None:
+    now = time.monotonic()
+    hit = _HOST_RESOLVE_CACHE.get(host)
+    if hit is not None and (now - hit[0]) < _HOST_RESOLVE_TTL_SEC:
+        return hit[1]
+    async with AsyncSessionLocal() as session:
+        resolved = await DomainResolver(session).resolve(host)
+    _HOST_RESOLVE_CACHE[host] = (now, resolved)
+    return resolved
+
+
 class DomainTenantMiddleware(BaseHTTPMiddleware):
     async def __call__(self, scope, receive, send):
         # WebSocket upgrades must bypass BaseHTTPMiddleware request wrapping.
@@ -105,12 +153,15 @@ class DomainTenantMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(p) for p in PUBLIC_HOST_PATHS):
             return await call_next(request)
         if any(path.startswith(p) for p in JWT_SCOPED_PREFIXES):
-            # Still attach tenant when Host maps to an office (best-effort).
+            # Prefer JWT tenant — avoids a Postgres round-trip on every admin API
+            # hit from custom domains (e.g. driver profile on achilliotravel.com).
+            if _try_attach_bearer_tenant(request):
+                return await call_next(request)
+            # Still attach tenant when Host maps to an office (best-effort, cached).
             host = _request_host(request)
             if host and not _is_platform_host(host):
                 try:
-                    async with AsyncSessionLocal() as session:
-                        resolved = await DomainResolver(session).resolve(host)
+                    resolved = await _resolve_host_cached(host)
                     if resolved:
                         request.state.tenant_id = resolved.tenant_id
                         request.state.tenant_slug = resolved.slug
@@ -124,9 +175,7 @@ class DomainTenantMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            async with AsyncSessionLocal() as session:
-                resolver = DomainResolver(session)
-                resolved = await resolver.resolve(host)
+            resolved = await _resolve_host_cached(host)
         except Exception as exc:
             logger.warning("Domain resolution unavailable for %s: %s", host, exc)
             return await call_next(request)

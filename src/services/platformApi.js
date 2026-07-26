@@ -311,10 +311,30 @@ export function invalidateFleetDriversCache() {
   _driversListCache.rows = null;
 }
 
+/** Sync peek from the recent drivers list cache — used to paint driver profile instantly. */
+export function peekCachedFleetDriver(driverId) {
+  if (!driverId || !_driversListCache.rows) return null;
+  return _driversListCache.rows.find((d) => d?.id === driverId) || null;
+}
+
 export async function fetchFleetDriver(driverId) {
   try {
     const res = await adminFetch(`/api/admin/platform/drivers/${driverId}`);
-    if (res.ok) return res.json();
+    if (res.ok) {
+      const row = await res.json();
+      // Keep list cache in sync so revisits stay instant.
+      if (_driversListCache.rows && row?.id) {
+        const idx = _driversListCache.rows.findIndex((d) => d?.id === row.id);
+        if (idx >= 0) {
+          _driversListCache.rows = [
+            ..._driversListCache.rows.slice(0, idx),
+            { ..._driversListCache.rows[idx], ...row },
+            ..._driversListCache.rows.slice(idx + 1),
+          ];
+        }
+      }
+      return row;
+    }
     if (res.status === 404) return null;
     if (getSaasToken()) {
       const err = await res.json().catch(() => ({}));
