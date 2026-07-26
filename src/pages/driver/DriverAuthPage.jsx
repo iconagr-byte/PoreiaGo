@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { exchangeMasterQr } from '../../services/driverPortalApi.js';
-import { requestDriverGpsAutostart } from '../../lib/driver/useDriverShiftSession.js';
+import { clearDriverShiftLaunchState } from '../../lib/driver/useDriverShiftSession.js';
 import '../../styles/driver-app.css';
 
 /**
@@ -29,7 +29,8 @@ export default function DriverAuthPage() {
     const timer = window.setTimeout(async () => {
       try {
         await exchangeMasterQr(token);
-        requestDriverGpsAutostart();
+        // Do not auto-start GPS/tachograph — driver must tap «Έναρξη βάρδιας».
+        clearDriverShiftLaunchState();
         if (!cancelled) {
           navigate('/driver', { replace: true });
         }
@@ -68,10 +69,10 @@ export default function DriverAuthPage() {
             progress_activity
           </span>
           <p className="text-xl font-bold" style={{ color: 'var(--driver-text)' }}>
-            Σύνδεση στη βάρδια…
+            Σύνδεση…
           </p>
           <p className="text-sm" style={{ color: 'var(--driver-muted)' }}>
-            Θα μεταφερθείτε αυτόματα στην εφαρμογή οδηγού
+            Θα ανοίξει η εφαρμογή — πατήστε «Έναρξη βάρδιας» για GPS
           </p>
         </div>
       )}

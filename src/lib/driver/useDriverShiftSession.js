@@ -37,21 +37,32 @@ export function isDriverShiftOnline() {
   return localStorage.getItem(SHIFT_KEY) === '1';
 }
 
-/** Call after Master QR / password login so GPS starts without a second tap. */
+/**
+ * @deprecated Autostart after login was removed — GPS/tachograph must start only
+ * when the driver taps «Έναρξη βάρδιας». Kept as no-op for older call sites.
+ */
 export function requestDriverGpsAutostart() {
+  clearDriverShiftLaunchState();
+}
+
+/** Clear stale shift / autostart flags on fresh login (no silent GPS). */
+export function clearDriverShiftLaunchState() {
   try {
-    sessionStorage.setItem(AUTOSTART_GPS_KEY, '1');
+    sessionStorage.removeItem(AUTOSTART_GPS_KEY);
   } catch {
     /* ignore */
   }
+  try {
+    localStorage.setItem(SHIFT_KEY, '0');
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent('driver-shift-online', { detail: { online: false } }));
 }
 
 function peekDriverGpsAutostart() {
-  try {
-    return sessionStorage.getItem(AUTOSTART_GPS_KEY) === '1';
-  } catch {
-    return false;
-  }
+  // Intentionally always false — shift starts only via explicit «Έναρξη βάρδιας».
+  return false;
 }
 
 function clearDriverGpsAutostart() {
@@ -342,11 +353,12 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     }
 
     const ensureRunning = () => {
-      const wantAutostart = peekDriverGpsAutostart();
-      if (!isDriverShiftOnline() && !wantAutostart) return;
+      // Resume only an already-started shift (flag set by explicit «Έναρξη βάρδιας»).
+      // Never autostart from login — peekDriverGpsAutostart is always false.
+      if (!isDriverShiftOnline() && !peekDriverGpsAutostart()) return;
       setOnline(true);
       if (!runningRef.current && !startingRef.current) {
-        void goOnline({ resume: isDriverShiftOnline() && !wantAutostart });
+        void goOnline({ resume: true });
       }
     };
 
