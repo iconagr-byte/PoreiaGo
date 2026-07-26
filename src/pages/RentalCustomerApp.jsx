@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import {
   getCustomerEmail,
   getCustomerName,
   getCustomerPicture,
   getCustomerToken,
-  isAdmin,
   isCustomer,
-  isDriver,
   logoutCustomer,
 } from '../lib/auth.js';
 import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
@@ -28,34 +26,7 @@ const TABS = [
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
-const ADMIN_PREVIEW_KEY = 'rent_admin_preview_v1';
-
-function readAdminPreview() {
-  try {
-    return sessionStorage.getItem(ADMIN_PREVIEW_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function RentalGateCard({ title, body, children, showInstall = false }) {
-  return (
-    <div className="rent-phone-stage">
-      <div className="rent-gate">
-        <div className="rent-gate-card">
-          <h1>{title}</h1>
-          <p>{body}</p>
-          {showInstall ? <RentalInstallPrompt force compact /> : null}
-          <div className="rent-gate-actions">{children}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function RentalAuthGate() {
-  const [adminPreview, setAdminPreview] = useState(readAdminPreview);
-
   useEffect(() => setupRentalPwa(), []);
 
   if (isCustomer() && !getCustomerToken()) {
@@ -66,75 +37,11 @@ function RentalAuthGate() {
     return <RentalAuthenticatedApp />;
   }
 
-  if (isDriver()) {
-    return (
-      <RentalGateCard
-        title="Ενοικίαση"
-        body="Συνδεδεμένοι ως οδηγός — η εφαρμογή ενοικίασης είναι για πελάτες οχημάτων."
-        showInstall
-      >
-        <Link to="/driver" className="rent-gate-btn-primary">
-          Driver Portal
-        </Link>
-        <Link to="/rent/login" className="rent-gate-btn-ghost">
-          Σύνδεση πελάτη
-        </Link>
-      </RentalGateCard>
-    );
-  }
-
-  if (isAdmin() && adminPreview) {
-    return (
-      <RentalAuthenticatedApp
-        adminPreview
-        onExitAdminPreview={() => {
-          try {
-            sessionStorage.removeItem(ADMIN_PREVIEW_KEY);
-          } catch {
-            /* ignore */
-          }
-          setAdminPreview(false);
-        }}
-      />
-    );
-  }
-
-  if (isAdmin()) {
-    return (
-      <RentalGateCard
-        title="Ενοικίαση"
-        body="Είστε συνδεδεμένοι ως γραφείο. Δείτε την εφαρμογή πελατών ενοικίασης ή συνδεθείτε ως πελάτης."
-        showInstall
-      >
-        <button
-          type="button"
-          className="rent-gate-btn-primary"
-          onClick={() => {
-            try {
-              sessionStorage.setItem(ADMIN_PREVIEW_KEY, '1');
-            } catch {
-              /* ignore */
-            }
-            setAdminPreview(true);
-          }}
-        >
-          Προβολή εφαρμογής
-        </button>
-        <Link to="/rent/login" className="rent-gate-btn-secondary">
-          Σύνδεση πελάτη
-        </Link>
-        <Link to="/admin" className="rent-gate-btn-ghost">
-          Πίσω στο γραφείο
-        </Link>
-      </RentalGateCard>
-    );
-  }
-
-  // Guest share link /rent → rent entrance (/rent/login). Never bus My Wallet /login.
+  // Share link /rent → customer login only (no office/driver chooser).
   return <Navigate to="/rent/login" replace />;
 }
 
-function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {}) {
+function RentalAuthenticatedApp() {
   // Land in Rent Wallet after login/register — separate from bus My Wallet.
   const [tab, setTab] = useState('wallet');
   const [brandName, setBrandName] = useState('Ενοικίαση');
@@ -170,19 +77,6 @@ function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {
   return (
     <div className="rent-phone-stage">
       <div className="rent-app">
-        {adminPreview ? (
-          <div className="rent-preview-banner" role="status">
-            <span>Προβολή γραφείου — για πραγματική κράτηση χρειάζεται σύνδεση πελάτη.</span>
-            <button
-              type="button"
-              className="rent-btn rent-btn-ghost"
-              style={{ minHeight: '2rem', padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}
-              onClick={onExitAdminPreview}
-            >
-              Κλείσιμο
-            </button>
-          </div>
-        ) : null}
         {tab !== 'home' ? (
           <header className="rent-topbar">
             <button type="button" className="rent-topbar-brand" onClick={() => setTab('home')}>
@@ -308,15 +202,7 @@ function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {
                   type="button"
                   className="rent-btn rent-btn-danger rent-btn-block"
                   onClick={() => {
-                    if (adminPreview) {
-                      try {
-                        sessionStorage.removeItem(ADMIN_PREVIEW_KEY);
-                      } catch {
-                        /* ignore */
-                      }
-                    } else {
-                      logoutCustomer();
-                    }
+                    logoutCustomer();
                     // Office public homepage — not the admin dashboard.
                     window.location.assign('/');
                   }}
