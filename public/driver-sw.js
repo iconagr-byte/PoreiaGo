@@ -1,12 +1,14 @@
 /**
  * Driver Command Center — cache manifest, offline σελίδα, PWA assets.
  */
-const CACHE = 'aerostride-driver-v6';
+const CACHE = 'aerostride-driver-v7';
 const MANIFEST_PREFIX = '/driver-cache/manifest/';
 const OFFLINE_URL = '/driver-offline.html';
+const APP_SHELL = '/index.html';
 
 const PRECACHE_URLS = [
   OFFLINE_URL,
+  APP_SHELL,
   '/driver-telemetry-manifest.webmanifest',
   '/icons/driver-pwa.svg',
   '/icons/driver-pwa-192.png',
@@ -162,7 +164,15 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate' && url.pathname.startsWith('/driver')) {
     event.respondWith(
       fetch(request)
-        .then((res) => res)
+        .then((res) => {
+          // Deep links must get the SPA shell — never pass through bare Traefik 404.
+          if (res && res.ok) return res;
+          return fetch(APP_SHELL).then((shell) =>
+            shell && shell.ok
+              ? shell
+              : caches.match(OFFLINE_URL).then((cached) => cached || offlineHtmlResponse()),
+          );
+        })
         .catch(() =>
           caches.match(OFFLINE_URL).then((cached) => cached || offlineHtmlResponse()),
         ),

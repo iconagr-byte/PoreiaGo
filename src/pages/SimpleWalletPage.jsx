@@ -104,7 +104,7 @@ function WalletAuthGate() {
 
   // No office/driver chooser — go straight to the right entrance.
   if (isDriver()) {
-    return <Navigate to="/driver/login" replace />;
+    return <Navigate to="/driver" replace />;
   }
 
   if (isAdmin()) {

@@ -250,7 +250,7 @@ export default function DriverFormPage() {
               </h2>
               <p className="text-sm text-sky-900/75 mt-0.5 leading-snug">
                 Με αυτά μπαίνει ο οδηγός στο{' '}
-                <a href="/driver/login" target="_blank" rel="noreferrer" className="font-bold underline">
+                <a href="/driver" target="_blank" rel="noreferrer" className="font-bold underline">
                   /driver
                 </a>
                 . Όνομα χρήστη = email. Κατάσταση: Ενεργός.
