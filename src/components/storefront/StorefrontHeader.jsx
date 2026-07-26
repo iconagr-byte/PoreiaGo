@@ -120,10 +120,6 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
     ? 'hidden lg:inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 hover:text-white transition-colors'
     : 'hidden lg:inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors';
 
-  const officeLink = isDark
-    ? 'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-white/45 hover:text-white/75 transition-colors'
-    : 'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-600 transition-colors';
-
   const menuBtn = isDark
     ? 'md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white'
     : 'md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.08] bg-black/[0.03] text-slate-800';
@@ -174,12 +170,6 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
               account_balance_wallet
             </span>
             My Wallet
-          </Link>
-          <Link to="/admin/login" className={officeLink} title="Σύνδεση για το γραφείο">
-            <span className="material-symbols-outlined text-[14px]" aria-hidden>
-              admin_panel_settings
-            </span>
-            Γραφείο
           </Link>
         </nav>
 
@@ -254,13 +244,6 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
               className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5"
             >
               Η κράτησή μου
-            </Link>
-            <Link
-              to="/admin/login"
-              onClick={closeMenu}
-              className={`rounded-xl px-3 py-3 text-xs font-medium ${isDark ? 'text-white/50' : 'text-slate-400'}`}
-            >
-              Σύνδεση γραφείου
             </Link>
           </nav>
         </div>
