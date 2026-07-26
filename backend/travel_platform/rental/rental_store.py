@@ -496,6 +496,7 @@ def calendar_blocks(tenant_id: str | None, *, days: int = 30) -> list[dict[str, 
                     "end_time": b.get("end_time"),
                     "status": b.get("rental_status"),
                     "pickup_location": b.get("pickup_location"),
+                    "dropoff_location": b.get("dropoff_location"),
                     "total_cost": b.get("total_cost"),
                 }
             )
