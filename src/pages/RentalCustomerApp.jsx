@@ -314,10 +314,10 @@ function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {
                       } catch {
                         /* ignore */
                       }
-                      window.location.assign('/admin');
-                      return;
+                    } else {
+                      logoutCustomer();
                     }
-                    logoutCustomer();
+                    // Office public homepage — not the admin dashboard.
                     window.location.assign('/');
                   }}
                 >
