@@ -367,6 +367,10 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         else:
             total = round(float(total), 2)
 
+        channel = str(body.get("channel") or "DESK").strip().upper() or "DESK"
+        if channel not in ("DESK", "WALLET"):
+            channel = "DESK"
+
         now = _now()
         row = {
             "id": str(uuid4()),
@@ -376,6 +380,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "client_name": client_name,
             "client_email": (str(body.get("client_email") or "").strip().lower() or None),
             "client_phone": (str(body.get("client_phone") or "").strip() or None),
+            "channel": channel,
             "start_time": start.isoformat(),
             "end_time": end.isoformat(),
             "pickup_location": pickup,
@@ -608,6 +613,64 @@ def list_bookings_for_email(tenant_id: str | None, email: str) -> list[dict[str,
         if str(b.get("client_email") or "").strip().lower() == needle
     ]
     return rows
+
+
+def list_clients(tenant_id: str | None) -> list[dict[str, Any]]:
+    """Unique rental clients (desk + Wallet) with booking counts."""
+    bookings = list_bookings(tenant_id)
+    by_key: dict[str, dict[str, Any]] = {}
+    for b in bookings:
+        email = str(b.get("client_email") or "").strip().lower()
+        phone = str(b.get("client_phone") or "").strip()
+        name = str(b.get("client_name") or "").strip()
+        key = email or phone or name or b.get("id")
+        if not key:
+            continue
+        row = by_key.get(key)
+        if not row:
+            row = {
+                "id": key,
+                "client_name": name or "—",
+                "client_email": email or None,
+                "client_phone": phone or None,
+                "channels": set(),
+                "booking_count": 0,
+                "active_count": 0,
+                "total_spent_eur": 0.0,
+                "last_booking_at": None,
+                "last_status": None,
+                "last_vehicle": None,
+            }
+            by_key[key] = row
+        if name and (row["client_name"] == "—" or len(name) > len(row["client_name"])):
+            row["client_name"] = name
+        if email:
+            row["client_email"] = email
+        if phone and not row["client_phone"]:
+            row["client_phone"] = phone
+        channel = str(b.get("channel") or ("WALLET" if email else "DESK")).upper()
+        row["channels"].add(channel)
+        row["booking_count"] += 1
+        if b.get("rental_status") in ACTIVE_BOOKING_STATUSES:
+            row["active_count"] += 1
+        if b.get("rental_status") != "CANCELLED":
+            row["total_spent_eur"] += float(b.get("total_cost") or 0)
+        created = b.get("created_at") or b.get("start_time")
+        if created and (not row["last_booking_at"] or str(created) > str(row["last_booking_at"])):
+            row["last_booking_at"] = created
+            row["last_status"] = b.get("rental_status")
+            row["last_vehicle"] = b.get("vehicle_plate") or b.get("vehicle_model")
+    out = []
+    for row in by_key.values():
+        out.append(
+            {
+                **row,
+                "channels": sorted(row["channels"]),
+                "total_spent_eur": round(row["total_spent_eur"], 2),
+            }
+        )
+    out.sort(key=lambda r: r.get("last_booking_at") or "", reverse=True)
+    return out
 
 
 def cancel_booking_for_customer(

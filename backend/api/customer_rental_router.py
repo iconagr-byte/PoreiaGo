@@ -12,9 +12,43 @@ from travel_platform.settings.drivers_store import DEMO_TENANT_ID
 router = APIRouter(prefix="/api/customer/rentals", tags=["Customer Rentals"])
 
 
-def _tenant_id(request: Request) -> str:
+async def _tenant_id(request: Request) -> str:
+    """Office scope for Wallet rentals — Host/middleware first, Origin fallback."""
     tid = getattr(request.state, "tenant_id", None)
-    return str(tid) if tid else DEMO_TENANT_ID
+    if tid:
+        return str(tid)
+
+    hosts: list[str] = []
+    for header in ("x-forwarded-host", "host", "origin", "referer"):
+        raw = (request.headers.get(header) or "").strip()
+        if not raw:
+            continue
+        value = raw.split(",")[0].strip()
+        if "://" in value:
+            try:
+                from urllib.parse import urlparse
+
+                value = urlparse(value).hostname or ""
+            except Exception:
+                value = ""
+        value = value.split(":")[0].strip().lower()
+        if value and value not in hosts:
+            hosts.append(value)
+
+    try:
+        from middleware.domain_tenant import _is_platform_host, _resolve_host_cached
+
+        for host in hosts:
+            if not host or _is_platform_host(host):
+                continue
+            resolved = await _resolve_host_cached(host)
+            if resolved:
+                request.state.tenant_id = resolved.tenant_id
+                return str(resolved.tenant_id)
+    except Exception:
+        pass
+
+    return DEMO_TENANT_ID
 
 
 class CustomerBookingBody(BaseModel):
@@ -53,7 +87,7 @@ async def rental_catalog(
     category: str | None = None,
     _: dict = Depends(get_current_customer),
 ):
-    vehicles = store.public_catalog(_tenant_id(request), category=category)
+    vehicles = store.public_catalog(await _tenant_id(request), category=category)
     return {"vehicles": vehicles, "count": len(vehicles)}
 
 
@@ -71,7 +105,7 @@ async def rental_availability(
 ):
     try:
         rows = store.check_availability(
-            _tenant_id(request),
+            await _tenant_id(request),
             start_time=start_time,
             end_time=end_time,
             category=category,
@@ -113,7 +147,7 @@ async def my_rental_bookings(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
-    rows = store.list_bookings_for_email(_tenant_id(request), account["email"])
+    rows = store.list_bookings_for_email(await _tenant_id(request), account["email"])
     return {"bookings": [_public_booking(b) for b in rows], "total": len(rows)}
 
 
@@ -135,9 +169,10 @@ async def book_rental(
         "dropoff_location": (body.dropoff_location or body.pickup_location).strip(),
         "driver_mode": body.driver_mode,
         "notes": body.notes,
+        "channel": "WALLET",
     }
     try:
-        row = store.create_booking(_tenant_id(request), payload)
+        row = store.create_booking(await _tenant_id(request), payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -160,7 +195,7 @@ async def cancel_my_rental(
 ):
     try:
         row = store.cancel_booking_for_customer(
-            _tenant_id(request),
+            await _tenant_id(request),
             booking_id,
             email=account["email"],
         )

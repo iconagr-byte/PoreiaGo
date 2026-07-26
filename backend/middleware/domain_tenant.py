@@ -156,19 +156,20 @@ class DomainTenantMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(p) for p in JWT_SCOPED_PREFIXES):
             # Prefer JWT tenant — avoids a Postgres round-trip on every admin API
             # hit from custom domains (e.g. driver profile on achilliotravel.com).
-            if _try_attach_bearer_tenant(request):
-                return await call_next(request)
-            # Still attach tenant when Host maps to an office (best-effort, cached).
-            host = _request_host(request)
-            if host and not _is_platform_host(host):
-                try:
-                    resolved = await _resolve_host_cached(host)
-                    if resolved:
-                        request.state.tenant_id = resolved.tenant_id
-                        request.state.tenant_slug = resolved.slug
-                        request.state.tenant_theme = resolved.theme
-                except Exception as exc:
-                    logger.debug("Optional domain resolve skipped for %s: %s", path, exc)
+            _try_attach_bearer_tenant(request)
+            # Customer Wallet JWTs have no tenant_id — still map Host → office so
+            # rentals/lost-items land in the correct tenant store.
+            if getattr(request.state, "tenant_id", None) is None:
+                host = _request_host(request)
+                if host and not _is_platform_host(host):
+                    try:
+                        resolved = await _resolve_host_cached(host)
+                        if resolved:
+                            request.state.tenant_id = resolved.tenant_id
+                            request.state.tenant_slug = resolved.slug
+                            request.state.tenant_theme = resolved.theme
+                    except Exception as exc:
+                        logger.debug("Optional domain resolve skipped for %s: %s", path, exc)
             return await call_next(request)
 
         host = _request_host(request)
