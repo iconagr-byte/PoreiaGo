@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+import os
+import re
+import uuid
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from travel_platform.rental import rental_store as store
@@ -24,6 +27,9 @@ except ImportError:
 router = APIRouter(prefix="/api/admin/platform/fleet-rental", tags=["Fleet Rental"])
 
 _ADMIN_ROLES = {"tenant_admin", "dispatcher", "superadmin"}
+_DATA_ROOT = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data")
+_RENTAL_PHOTO_DIR = _DATA_ROOT / "uploads" / "rental_damage"
+_MAX_PHOTO_BYTES = 4 * 1024 * 1024
 
 
 async def _require_admin(payload: dict = Depends(get_token_payload)) -> dict:
@@ -45,6 +51,8 @@ class VehicleBody(BaseModel):
     current_status: str = "AVAILABLE"
     current_mileage: int = Field(default=0, ge=0)
     daily_rate_eur: float = Field(default=0, ge=0)
+    one_way_surcharge_eur: float = Field(default=0, ge=0)
+    with_driver_daily_eur: float = Field(default=0, ge=0)
     gps_device_id: str | None = None
     photo_url: str | None = None
     notes: str | None = None
@@ -148,6 +156,9 @@ async def availability(
     end_time: str = Query(...),
     category: str | None = None,
     min_seats: int | None = Query(default=None, ge=1, le=80),
+    pickup_location: str | None = None,
+    dropoff_location: str | None = None,
+    driver_mode: str | None = None,
     tenant_id: UUID = Depends(get_current_tenant_id),
     _: dict = Depends(_require_admin),
 ):
@@ -158,6 +169,9 @@ async def availability(
             end_time=end_time,
             category=category,
             min_seats=min_seats,
+            pickup_location=pickup_location,
+            dropoff_location=dropoff_location,
+            driver_mode=driver_mode,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -214,6 +228,16 @@ async def rental_calendar(
     return {"blocks": store.calendar_blocks(_tid(tenant_id), days=days)}
 
 
+@router.get("/live-overlays")
+async def rental_live_overlays(
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Active rentals for live-map GPS overlay (match by plate / gps_device_id)."""
+    overlays = store.active_rental_overlays(_tid(tenant_id))
+    return {"overlays": overlays, "count": len(overlays)}
+
+
 @router.get("/inspections")
 async def list_inspections(
     booking_id: str | None = None,
@@ -234,3 +258,38 @@ async def create_inspection(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return row
+
+
+@router.post("/inspections/photo-upload")
+async def upload_inspection_photo(
+    file: UploadFile = File(...),
+    _: dict = Depends(_require_admin),
+):
+    """Damage selfie / check-in photo — returns public URL for photo_urls."""
+    from travel_platform.media.image_optimize import optimize_driver_photo
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    if len(content) > _MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 4 MB)")
+
+    optimized = optimize_driver_photo(content, max_side=1600, quality=84)
+    if optimized.ext == ".bin":
+        raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
+    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "damage").stem)[:40] or "damage"
+    filename = f"{safe_stem}-{uuid.uuid4().hex[:10]}{optimized.ext}"
+
+    _RENTAL_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _RENTAL_PHOTO_DIR / filename
+    out_path.write_bytes(optimized.content)
+    url = f"/api/site/rental-photos/{filename}"
+    return {
+        "ok": True,
+        "url": url,
+        "filename": filename,
+        "bytes": len(optimized.content),
+        "content_type": optimized.content_type,
+    }

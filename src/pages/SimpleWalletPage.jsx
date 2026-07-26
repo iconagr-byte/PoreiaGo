@@ -30,6 +30,7 @@ import PassengerTrackCTA from '../components/passenger/PassengerTrackCTA.jsx';
 import CustomerSecurityPanel from '../components/wallet/CustomerSecurityPanel.jsx';
 import PushNotificationsPanel from '../components/wallet/PushNotificationsPanel.jsx';
 import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
+import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
 import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
@@ -41,6 +42,7 @@ import '../styles/wallet-pass.css';
 const TABS = [
   { id: 'home', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
+  { id: 'rentals', label: 'Ενοικίαση', icon: 'directions_car' },
   { id: 'lost_found', label: 'Απωλεσθέντα', icon: 'support_agent' },
   { id: 'account', label: 'Λογαριασμός', icon: 'person' },
 ];
@@ -534,6 +536,8 @@ function WalletAuthenticatedApp() {
             </div>
           </div>
         )}
+
+        {activeTab === 'rentals' && <RentalCatalogPanel />}
 
         {activeTab === 'lost_found' && <LostFoundPanel bookings={bookings} />}
 

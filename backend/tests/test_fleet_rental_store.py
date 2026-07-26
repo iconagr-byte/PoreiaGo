@@ -98,6 +98,62 @@ class FleetRentalStoreTests(unittest.TestCase):
         self.assertGreaterEqual(len(rows), 2)
         self.assertEqual(rows[0]["plate_number"], "VAN-1")
 
+    def test_one_way_and_with_driver_pricing(self) -> None:
+        v = self._vehicle(
+            one_way_surcharge_eur=25,
+            with_driver_daily_eur=40,
+            daily_rate_eur=90,
+        )
+        rows = store.check_availability(
+            self.tid,
+            start_time="2026-10-01T10:00:00+00:00",
+            end_time="2026-10-03T10:00:00+00:00",
+            pickup_location="Αθήνα",
+            dropoff_location="Θεσσαλονίκη",
+            driver_mode="WITH_DRIVER",
+        )
+        hit = next(r for r in rows if r["id"] == v["id"])
+        self.assertEqual(hit["suggested_days"], 2)
+        self.assertEqual(hit["base_total"], 180.0)
+        self.assertEqual(hit["driver_surcharge"], 80.0)
+        self.assertEqual(hit["one_way_surcharge"], 25.0)
+        self.assertEqual(hit["suggested_total"], 285.0)
+        self.assertTrue(hit["is_one_way"])
+
+        booking = store.create_booking(
+            self.tid,
+            {
+                "vehicle_id": v["id"],
+                "client_name": "Γιώργος",
+                "client_email": "giorgos@example.com",
+                "start_time": "2026-10-01T10:00:00+00:00",
+                "end_time": "2026-10-03T10:00:00+00:00",
+                "pickup_location": "Αθήνα",
+                "dropoff_location": "Θεσσαλονίκη",
+                "driver_mode": "WITH_DRIVER",
+            },
+        )
+        self.assertEqual(booking["total_cost"], 285.0)
+        mine = store.list_bookings_for_email(self.tid, "giorgos@example.com")
+        self.assertEqual(len(mine), 1)
+
+    def test_active_rental_overlays(self) -> None:
+        v = self._vehicle(gps_device_id="GPS-99", plate_number="ΡΕΝΤ-GPS")
+        store.create_booking(
+            self.tid,
+            {
+                "vehicle_id": v["id"],
+                "client_name": "Ελένη",
+                "start_time": "2026-11-01T10:00:00+00:00",
+                "end_time": "2026-11-02T10:00:00+00:00",
+                "pickup_location": "Γραφείο",
+            },
+        )
+        overlays = store.active_rental_overlays(self.tid)
+        self.assertEqual(len(overlays), 1)
+        self.assertEqual(overlays[0]["gps_device_id"], "GPS-99")
+        self.assertIn("Ελένη", overlays[0]["label"])
+
     def test_inspection_completes_booking(self) -> None:
         v = self._vehicle()
         booking = store.create_booking(

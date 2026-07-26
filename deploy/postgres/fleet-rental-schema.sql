@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS rental_vehicles (
   current_status VARCHAR(32) NOT NULL DEFAULT 'AVAILABLE',
   current_mileage INTEGER NOT NULL DEFAULT 0,
   daily_rate_eur NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  one_way_surcharge_eur NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  with_driver_daily_eur NUMERIC(10, 2) NOT NULL DEFAULT 0,
   gps_device_id VARCHAR(64),
   photo_url TEXT,
   notes TEXT,
@@ -70,3 +72,9 @@ CREATE INDEX IF NOT EXISTS ix_vehicle_inspections_booking ON vehicle_inspections
 ALTER TABLE rental_vehicles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rental_bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vehicle_inspections ENABLE ROW LEVEL SECURITY;
+
+-- Pricing surcharges (safe re-apply on existing offices)
+ALTER TABLE rental_vehicles
+  ADD COLUMN IF NOT EXISTS one_way_surcharge_eur NUMERIC(10, 2) NOT NULL DEFAULT 0;
+ALTER TABLE rental_vehicles
+  ADD COLUMN IF NOT EXISTS with_driver_daily_eur NUMERIC(10, 2) NOT NULL DEFAULT 0;

@@ -246,6 +246,12 @@ except ImportError:
 if lost_items_router:
     app.include_router(lost_items_router)
 try:
+    from api.customer_rental_router import router as customer_rental_router
+except ImportError:
+    customer_rental_router = None
+if customer_rental_router:
+    app.include_router(customer_rental_router)
+try:
     from api.customer_push_router import router as customer_push_router
 except ImportError:
     customer_push_router = None

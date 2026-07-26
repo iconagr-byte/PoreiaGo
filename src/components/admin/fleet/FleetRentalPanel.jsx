@@ -16,7 +16,9 @@ import {
   fetchRentalVehicles,
   updateRentalBookingStatus,
   updateRentalVehicle,
+  uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';
+import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
 
 const CATEGORIES = [
   { value: 'CAR', label: 'Αυτοκίνητο' },
@@ -40,6 +42,8 @@ const EMPTY_VEHICLE = {
   current_status: 'AVAILABLE',
   current_mileage: 0,
   daily_rate_eur: 80,
+  one_way_surcharge_eur: 0,
+  with_driver_daily_eur: 0,
   gps_device_id: '',
   notes: '',
 };
@@ -114,7 +118,9 @@ export default function FleetRentalPanel() {
     mileage: 0,
     damage_notes: '',
     inspector_name: '',
+    photo_urls: [],
   });
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -156,6 +162,8 @@ export default function FleetRentalPanel() {
         seating_capacity: Number(vehicleForm.seating_capacity),
         current_mileage: Number(vehicleForm.current_mileage),
         daily_rate_eur: Number(vehicleForm.daily_rate_eur),
+        one_way_surcharge_eur: Number(vehicleForm.one_way_surcharge_eur || 0),
+        with_driver_daily_eur: Number(vehicleForm.with_driver_daily_eur || 0),
         gps_device_id: vehicleForm.gps_device_id || null,
         notes: vehicleForm.notes || null,
       };
@@ -184,6 +192,9 @@ export default function FleetRentalPanel() {
         endTime: new Date(wiz.end_time).toISOString(),
         category: wiz.category || undefined,
         minSeats: wiz.min_seats || undefined,
+        pickupLocation: wiz.pickup_location,
+        dropoffLocation: wiz.dropoff_location || wiz.pickup_location,
+        driverMode: wiz.driver_mode,
       });
       setWiz((w) => ({
         ...w,
@@ -228,6 +239,25 @@ export default function FleetRentalPanel() {
     }
   };
 
+  const onDamagePhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const uploaded = await uploadRentalInspectionPhoto(file);
+      setInsp((s) => ({
+        ...s,
+        photo_urls: [...(s.photo_urls || []), uploaded.url],
+      }));
+      toast.success('Η φωτογραφία ανέβηκε');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const submitInspection = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -236,9 +266,10 @@ export default function FleetRentalPanel() {
         ...insp,
         fuel_level: Number(insp.fuel_level),
         mileage: Number(insp.mileage),
+        photo_urls: insp.photo_urls || [],
       });
       toast.success('Η επιθεώρηση καταχωρήθηκε');
-      setInsp((s) => ({ ...s, damage_notes: '', mileage: 0 }));
+      setInsp((s) => ({ ...s, damage_notes: '', mileage: 0, photo_urls: [] }));
       await reload();
     } catch (err) {
       toast.error(err.message);
@@ -414,6 +445,34 @@ export default function FleetRentalPanel() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <label className="block text-xs font-bold text-gray-500">
+                One-way €
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
+                  value={vehicleForm.one_way_surcharge_eur}
+                  onChange={(e) =>
+                    setVehicleForm((f) => ({ ...f, one_way_surcharge_eur: e.target.value }))
+                  }
+                />
+              </label>
+              <label className="block text-xs font-bold text-gray-500">
+                Με οδηγό €/ημέρα
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
+                  value={vehicleForm.with_driver_daily_eur}
+                  onChange={(e) =>
+                    setVehicleForm((f) => ({ ...f, with_driver_daily_eur: e.target.value }))
+                  }
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-xs font-bold text-gray-500">
                 Χιλιόμετρα
                 <input
                   type="number"
@@ -438,6 +497,15 @@ export default function FleetRentalPanel() {
                 </select>
               </label>
             </div>
+            <label className="block text-xs font-bold text-gray-500">
+              GPS device / πινακίδα tracker
+              <input
+                className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
+                placeholder="π.χ. ίδια με πινακίδα στον ζωντανό χάρτη"
+                value={vehicleForm.gps_device_id}
+                onChange={(e) => setVehicleForm((f) => ({ ...f, gps_device_id: e.target.value }))}
+              />
+            </label>
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -478,8 +546,14 @@ export default function FleetRentalPanel() {
                       <span className="text-gray-400 font-semibold">· {v.model}</span>
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {v.category} · {v.seating_capacity} θέσεις · {euro(v.daily_rate_eur)}/ημέρα ·{' '}
-                      {v.current_mileage} km
+                      {v.category} · {v.seating_capacity} θέσεις · {euro(v.daily_rate_eur)}/ημέρα
+                      {Number(v.one_way_surcharge_eur) > 0
+                        ? ` · one-way ${euro(v.one_way_surcharge_eur)}`
+                        : ''}
+                      {Number(v.with_driver_daily_eur) > 0
+                        ? ` · οδηγός ${euro(v.with_driver_daily_eur)}/ημ`
+                        : ''}
+                      {` · ${v.current_mileage} km`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -499,6 +573,8 @@ export default function FleetRentalPanel() {
                           current_status: v.current_status,
                           current_mileage: v.current_mileage,
                           daily_rate_eur: v.daily_rate_eur,
+                          one_way_surcharge_eur: v.one_way_surcharge_eur || 0,
+                          with_driver_daily_eur: v.with_driver_daily_eur || 0,
                           gps_device_id: v.gps_device_id || '',
                           notes: v.notes || '',
                         });
@@ -588,13 +664,32 @@ export default function FleetRentalPanel() {
                   onChange={(e) => setWiz((w) => ({ ...w, min_seats: Number(e.target.value) }))}
                 />
               </label>
-              <label className="block text-xs font-bold text-gray-500 sm:col-span-2">
+              <label className="block text-xs font-bold text-gray-500">
                 Σημείο παραλαβής
                 <input
                   className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
                   value={wiz.pickup_location}
                   onChange={(e) => setWiz((w) => ({ ...w, pickup_location: e.target.value }))}
                 />
+              </label>
+              <label className="block text-xs font-bold text-gray-500">
+                Σημείο επιστροφής
+                <input
+                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
+                  value={wiz.dropoff_location}
+                  onChange={(e) => setWiz((w) => ({ ...w, dropoff_location: e.target.value }))}
+                />
+              </label>
+              <label className="block text-xs font-bold text-gray-500 sm:col-span-2">
+                Οδηγός
+                <select
+                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
+                  value={wiz.driver_mode}
+                  onChange={(e) => setWiz((w) => ({ ...w, driver_mode: e.target.value }))}
+                >
+                  <option value="SELF_DRIVE">Self-drive</option>
+                  <option value="WITH_DRIVER">Με οδηγό PoreiaGo</option>
+                </select>
               </label>
               <button
                 type="button"
@@ -632,6 +727,13 @@ export default function FleetRentalPanel() {
                     <p className="text-xs text-gray-500">
                       {v.category} · {v.seating_capacity} θέσεις · {v.suggested_days} ημέρες ·{' '}
                       {euro(v.suggested_total)}
+                      {v.one_way_surcharge > 0 || v.driver_surcharge > 0
+                        ? ` (βάση ${euro(v.base_total)}${
+                            v.driver_surcharge > 0 ? ` + οδηγός ${euro(v.driver_surcharge)}` : ''
+                          }${
+                            v.one_way_surcharge > 0 ? ` + one-way ${euro(v.one_way_surcharge)}` : ''
+                          })`
+                        : ''}
                     </p>
                   </div>
                 </label>
@@ -839,6 +941,36 @@ export default function FleetRentalPanel() {
               />
             </label>
             <label className="block text-xs font-bold text-gray-500">
+              Damage selfie (πριν/μετά)
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="mt-1 w-full text-sm"
+                onChange={onDamagePhoto}
+                disabled={uploadingPhoto || busy}
+              />
+            </label>
+            {(insp.photo_urls || []).length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {insp.photo_urls.map((url) => (
+                  <a
+                    key={url}
+                    href={resolveSiteAssetUrl(url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-16 h-16 rounded-lg overflow-hidden border"
+                  >
+                    <img
+                      src={resolveSiteAssetUrl(url)}
+                      alt="Damage"
+                      className="w-full h-full object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : null}
+            <label className="block text-xs font-bold text-gray-500">
               Υπεύθυνος
               <input
                 className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
@@ -848,7 +980,7 @@ export default function FleetRentalPanel() {
             </label>
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || uploadingPhoto}
               className="w-full py-2.5 rounded-xl bg-primary text-white font-bold"
             >
               Καταχώρηση επιθεώρησης
@@ -876,6 +1008,25 @@ export default function FleetRentalPanel() {
                     <p className="text-xs text-amber-800 mt-1 bg-amber-50 rounded-lg px-2 py-1">
                       {i.damage_notes}
                     </p>
+                  ) : null}
+                  {(i.photo_urls || []).length > 0 ? (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {i.photo_urls.map((url) => (
+                        <a
+                          key={url}
+                          href={resolveSiteAssetUrl(url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block w-14 h-14 rounded-lg overflow-hidden border"
+                        >
+                          <img
+                            src={resolveSiteAssetUrl(url)}
+                            alt="Damage"
+                            className="w-full h-full object-cover"
+                          />
+                        </a>
+                      ))}
+                    </div>
                   ) : null}
                 </article>
               ))
