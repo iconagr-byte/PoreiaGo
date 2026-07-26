@@ -21,12 +21,12 @@ import { loadTrips } from '../lib/trips/tripStore.js';
 import { ticketPrintPath } from '../lib/ticketing/printTicket.js';
 import { isPaid, statusStyle } from '../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../lib/fiscal/fiscalDisplay.js';
-import BookingDetailPanel from '../components/booking/BookingDetailPanel.jsx';
 import PassengerTrackCTA from '../components/passenger/PassengerTrackCTA.jsx';
 import CustomerSecurityPanel from '../components/wallet/CustomerSecurityPanel.jsx';
 import PushNotificationsPanel from '../components/wallet/PushNotificationsPanel.jsx';
 import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
+import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
@@ -404,16 +404,16 @@ export default function SimpleWalletPage() {
         )}
 
         {isTicketView && (
-          <BookingDetailPanel
+          <WalletTicketDetail
             booking={selectedBooking}
-            mode="customer"
-            fullPage
+            coverImage={tripImageFor(selectedBooking)}
+            brandLabel={brandLabel}
+            passengerName={profile.name}
             onBookingUpdated={handleBookingUpdated}
             onBack={() => {
               setActiveTab('home');
               setSelectedBookingId(null);
             }}
-            onPrint={(b) => navigate(ticketPrintPath(b.id))}
           />
         )}
       </main>
