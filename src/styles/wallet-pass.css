@@ -96,7 +96,7 @@
   position: absolute;
   left: 0.65rem;
   right: 0.65rem;
-  bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
+  bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
   z-index: 20;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1347,10 +1347,6 @@
 .wallet-install-actions .wallet-btn {
   flex: 1 1 auto;
   min-width: 7rem;
-}
-
-.wallet-nav {
-  bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
 }
 
 /* Blue Apple auth (login/register) — edge-to-edge blue, no black bezel */
