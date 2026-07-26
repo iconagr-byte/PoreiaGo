@@ -2,11 +2,11 @@
  * Fleet Rental desk — inventory, availability wizard, calendar, inspections.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   createRentalBooking,
   createRentalInspection,
-  createRentalVehicle,
   deleteRentalVehicle,
   fetchRentalAvailability,
   fetchRentalBookings,
@@ -16,7 +16,6 @@ import {
   fetchRentalSummary,
   fetchRentalVehicles,
   updateRentalBookingStatus,
-  updateRentalVehicle,
   uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
@@ -56,23 +55,6 @@ function bookingSource(b) {
   return 'Γραφείο';
 }
 
-const EMPTY_VEHICLE = {
-  plate_number: '',
-  category: 'VAN',
-  model: '',
-  seating_capacity: 9,
-  current_status: 'AVAILABLE',
-  current_mileage: 0,
-  daily_rate_eur: 80,
-  one_way_surcharge_eur: 0,
-  with_driver_daily_eur: 0,
-  gps_device_id: '',
-  photo_url: '',
-  photo_urls: [],
-  description: '',
-  notes: '',
-};
-
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
 }
@@ -106,8 +88,17 @@ function statusChip(status) {
   return map[status] || 'bg-gray-100 text-gray-700';
 }
 
-export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {}) {
-  const [tab, setTab] = useState('clients');
+export default function FleetRentalPanel({
+  onOpenLiveMap,
+  onOpenCustomer,
+  initialTab,
+} = {}) {
+  const navigate = useNavigate();
+  const [tab, setTab] = useState(() =>
+    typeof initialTab === 'string' && TABS.some((t) => t.id === initialTab)
+      ? initialTab
+      : 'clients',
+  );
   const [summary, setSummary] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -119,9 +110,13 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
   const [bookingFilter, setBookingFilter] = useState('ALL');
   const [clientQuery, setClientQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [vehicleForm, setVehicleForm] = useState(EMPTY_VEHICLE);
-  const [editingId, setEditingId] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (typeof initialTab === 'string' && TABS.some((t) => t.id === initialTab)) {
+      setTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Wizard state
   const [wiz, setWiz] = useState({
@@ -241,36 +236,6 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
       return;
     }
     openClientBookings(person);
-  };
-
-  const saveVehicle = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      const body = {
-        ...vehicleForm,
-        seating_capacity: Number(vehicleForm.seating_capacity),
-        current_mileage: Number(vehicleForm.current_mileage),
-        daily_rate_eur: Number(vehicleForm.daily_rate_eur),
-        one_way_surcharge_eur: Number(vehicleForm.one_way_surcharge_eur || 0),
-        with_driver_daily_eur: Number(vehicleForm.with_driver_daily_eur || 0),
-        gps_device_id: vehicleForm.gps_device_id || null,
-        photo_url: vehicleForm.photo_url || vehicleForm.photo_urls?.[0] || null,
-        photo_urls: vehicleForm.photo_urls || [],
-        description: vehicleForm.description || null,
-        notes: vehicleForm.notes || null,
-      };
-      if (editingId) await updateRentalVehicle(editingId, body);
-      else await createRentalVehicle(body);
-      toast.success(editingId ? 'Το όχημα ενημερώθηκε' : 'Το όχημα προστέθηκε');
-      setVehicleForm(EMPTY_VEHICLE);
-      setEditingId(null);
-      await reload();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setBusy(false);
-    }
   };
 
   const runAvailability = async () => {
@@ -676,325 +641,118 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
       )}
 
       {tab === 'vehicles' && (
-        <div className="grid lg:grid-cols-5 gap-4">
-          <form
-            onSubmit={saveVehicle}
-            className="lg:col-span-2 bg-white rounded-2xl border border-black/[0.06] p-4 space-y-3"
-          >
-            <h3 className="font-bold text-gray-900">
-              {editingId ? 'Επεξεργασία οχήματος' : 'Νέο όχημα ενοικίασης'}
-            </h3>
-            <label className="block text-xs font-bold text-gray-500">
-              Πινακίδα
-              <input
-                required
-                className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                value={vehicleForm.plate_number}
-                onChange={(e) => setVehicleForm((f) => ({ ...f, plate_number: e.target.value }))}
-              />
-            </label>
-            <label className="block text-xs font-bold text-gray-500">
-              Κατηγορία
-              <select
-                className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                value={vehicleForm.category}
-                onChange={(e) => setVehicleForm((f) => ({ ...f, category: e.target.value }))}
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-xs font-bold text-gray-500">
-              Μοντέλο
-              <input
-                required
-                className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                placeholder="π.χ. Mercedes Sprinter"
-                value={vehicleForm.model}
-                onChange={(e) => setVehicleForm((f) => ({ ...f, model: e.target.value }))}
-              />
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-xs font-bold text-gray-500">
-                Θέσεις
-                <input
-                  type="number"
-                  min={2}
-                  max={80}
-                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                  value={vehicleForm.seating_capacity}
-                  onChange={(e) => setVehicleForm((f) => ({ ...f, seating_capacity: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                € / ημέρα
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                  value={vehicleForm.daily_rate_eur}
-                  onChange={(e) => setVehicleForm((f) => ({ ...f, daily_rate_eur: e.target.value }))}
-                />
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-xs font-bold text-gray-500">
-                One-way €
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                  value={vehicleForm.one_way_surcharge_eur}
-                  onChange={(e) =>
-                    setVehicleForm((f) => ({ ...f, one_way_surcharge_eur: e.target.value }))
-                  }
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                Με οδηγό €/ημέρα
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                  value={vehicleForm.with_driver_daily_eur}
-                  onChange={(e) =>
-                    setVehicleForm((f) => ({ ...f, with_driver_daily_eur: e.target.value }))
-                  }
-                />
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-xs font-bold text-gray-500">
-                Χιλιόμετρα
-                <input
-                  type="number"
-                  min={0}
-                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                  value={vehicleForm.current_mileage}
-                  onChange={(e) => setVehicleForm((f) => ({ ...f, current_mileage: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                Κατάσταση
-                <select
-                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                  value={vehicleForm.current_status}
-                  onChange={(e) => setVehicleForm((f) => ({ ...f, current_status: e.target.value }))}
-                >
-                  {['AVAILABLE', 'RENTED', 'MAINTENANCE', 'IN_TRANSIT'].map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="block text-xs font-bold text-gray-500">
-              GPS device / πινακίδα tracker
-              <input
-                className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                placeholder="π.χ. ίδια με πινακίδα στον ζωντανό χάρτη"
-                value={vehicleForm.gps_device_id}
-                onChange={(e) => setVehicleForm((f) => ({ ...f, gps_device_id: e.target.value }))}
-              />
-            </label>
-            <label className="block text-xs font-bold text-gray-500">
-              Περιγραφή για πελάτες
-              <textarea
-                rows={3}
-                className="mt-1 w-full rounded-xl border border-black/[0.08] px-3 py-2.5 text-sm font-semibold"
-                placeholder="π.χ. Αυτόματο, A/C, Bluetooth, ιδανικό για οικογένεια…"
-                value={vehicleForm.description}
-                onChange={(e) => setVehicleForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </label>
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-gray-500">Φωτογραφίες οχήματος</p>
-              {(vehicleForm.photo_urls || []).length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {vehicleForm.photo_urls.map((url) => (
-                    <div key={url} className="relative">
-                      <img
-                        src={url}
-                        alt=""
-                        className="w-16 h-16 rounded-xl object-cover border border-black/[0.08]"
-                      />
-                      <button
-                        type="button"
-                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] font-bold"
-                        onClick={() =>
-                          setVehicleForm((f) => {
-                            const next = (f.photo_urls || []).filter((u) => u !== url);
-                            return {
-                              ...f,
-                              photo_urls: next,
-                              photo_url: f.photo_url === url ? next[0] || '' : f.photo_url,
-                            };
-                          })
-                        }
-                        aria-label="Αφαίρεση φωτογραφίας"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-gray-400">Καμία φωτογραφία ακόμα.</p>
-              )}
-              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-black/15 text-xs font-bold text-primary cursor-pointer">
-                <span className="material-symbols-outlined text-base">add_a_photo</span>
-                {uploadingPhoto ? 'Ανέβασμα…' : 'Προσθήκη φωτογραφίας'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploadingPhoto || busy}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = '';
-                    if (!file) return;
-                    setUploadingPhoto(true);
-                    try {
-                      const uploaded = await uploadRentalInspectionPhoto(file);
-                      setVehicleForm((f) => {
-                        const next = [...(f.photo_urls || []), uploaded.url].slice(0, 12);
-                        return {
-                          ...f,
-                          photo_urls: next,
-                          photo_url: f.photo_url || next[0] || '',
-                        };
-                      });
-                      toast.success('Η φωτογραφία ανέβηκε');
-                    } catch (err) {
-                      toast.error(err.message);
-                    } finally {
-                      setUploadingPhoto(false);
-                    }
-                  }}
-                />
-              </label>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={busy}
-                className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-bold"
-              >
-                {editingId ? 'Αποθήκευση' : 'Προσθήκη'}
-              </button>
-              {editingId ? (
-                <button
-                  type="button"
-                  className="px-3 py-2.5 rounded-xl border text-sm font-bold"
-                  onClick={() => {
-                    setEditingId(null);
-                    setVehicleForm(EMPTY_VEHICLE);
-                  }}
-                >
-                  Άκυρο
-                </button>
-              ) : null}
-            </div>
-          </form>
-
-          <div className="lg:col-span-3 space-y-2">
-            {vehicles.length === 0 ? (
-              <p className="text-sm text-gray-500 bg-white rounded-2xl border p-6">
-                Δεν υπάρχουν οχήματα ενοικίασης ακόμα.
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-black/[0.06] px-4 py-3">
+            <div className="min-w-0">
+              <h3 className="font-bold text-gray-900">Στόλος ενοικίασης</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Ανοίξτε κανονική σελίδα για όλα τα στοιχεία, περιγραφή και φωτογραφίες.
               </p>
-            ) : (
-              vehicles.map((v) => (
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/fleet-rental/vehicles/new')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold shadow-sm hover:opacity-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              Νέο όχημα
+            </button>
+          </div>
+
+          {vehicles.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-black/[0.06] p-8 text-center space-y-3">
+              <p className="text-sm text-gray-500">Δεν υπάρχουν οχήματα ενοικίασης ακόμα.</p>
+              <button
+                type="button"
+                onClick={() => navigate('/admin/fleet-rental/vehicles/new')}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold"
+              >
+                <span className="material-symbols-outlined text-[18px]">directions_car</span>
+                Προσθήκη πρώτου οχήματος
+              </button>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {vehicles.map((v) => (
                 <article
                   key={v.id}
-                  className="bg-white rounded-2xl border border-black/[0.06] px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+                  className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden flex flex-col"
                 >
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-900">
-                      {v.plate_number}{' '}
-                      <span className="text-gray-400 font-semibold">· {v.model}</span>
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {v.category} · {v.seating_capacity} θέσεις · {euro(v.daily_rate_eur)}/ημέρα
-                      {Number(v.one_way_surcharge_eur) > 0
-                        ? ` · one-way ${euro(v.one_way_surcharge_eur)}`
-                        : ''}
-                      {Number(v.with_driver_daily_eur) > 0
-                        ? ` · οδηγός ${euro(v.with_driver_daily_eur)}/ημ`
-                        : ''}
-                      {` · ${v.current_mileage} km`}
-                      {v.description ? ' · έχει περιγραφή' : ''}
-                      {(v.photo_urls?.length || v.photo_url) ? ' · φωτο' : ''}
-                    </p>
-                    {(v.photo_url || v.photo_urls?.[0]) ? (
-                      <img
-                        src={v.photo_url || v.photo_urls[0]}
-                        alt=""
-                        className="mt-2 w-full h-28 rounded-xl object-cover border border-black/[0.06]"
-                      />
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(v.current_status)}`}>
-                      {v.current_status}
-                    </span>
-                    <button
-                      type="button"
-                      className="text-xs font-bold text-primary"
-                      onClick={() => {
-                        setEditingId(v.id);
-                        setVehicleForm({
-                          plate_number: v.plate_number,
-                          category: v.category,
-                          model: v.model,
-                          seating_capacity: v.seating_capacity,
-                          current_status: v.current_status,
-                          current_mileage: v.current_mileage,
-                          daily_rate_eur: v.daily_rate_eur,
-                          one_way_surcharge_eur: v.one_way_surcharge_eur || 0,
-                          with_driver_daily_eur: v.with_driver_daily_eur || 0,
-                          gps_device_id: v.gps_device_id || '',
-                          photo_url: v.photo_url || '',
-                          photo_urls:
-                            v.photo_urls?.length
-                              ? v.photo_urls
-                              : v.photo_url
-                                ? [v.photo_url]
-                                : [],
-                          description: v.description || '',
-                          notes: v.notes || '',
-                        });
-                      }}
-                    >
-                      Επεξεργασία
-                    </button>
-                    <button
-                      type="button"
-                      className="text-xs font-bold text-rose-600"
-                      onClick={async () => {
-                        if (!window.confirm('Διαγραφή οχήματος;')) return;
-                        try {
-                          await deleteRentalVehicle(v.id);
-                          toast.success('Διαγράφηκε');
-                          await reload();
-                        } catch (err) {
-                          toast.error(err.message);
+                  {(v.photo_url || v.photo_urls?.[0]) ? (
+                    <img
+                      src={v.photo_url || v.photo_urls[0]}
+                      alt=""
+                      className="w-full h-36 object-cover bg-gray-50"
+                    />
+                  ) : (
+                    <div className="w-full h-36 bg-slate-50 flex items-center justify-center text-slate-300">
+                      <span className="material-symbols-outlined text-4xl">directions_car</span>
+                    </div>
+                  )}
+                  <div className="p-4 flex flex-col gap-3 flex-1">
+                    <div className="min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-bold text-gray-900 truncate">
+                          {v.plate_number}{' '}
+                          <span className="text-gray-400 font-semibold">· {v.model}</span>
+                        </p>
+                        <span
+                          className={`shrink-0 text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(v.current_status)}`}
+                        >
+                          {v.current_status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                        {v.category} · {v.seating_capacity} θέσεις · {euro(v.daily_rate_eur)}/ημέρα
+                        {Number(v.one_way_surcharge_eur) > 0
+                          ? ` · one-way ${euro(v.one_way_surcharge_eur)}`
+                          : ''}
+                        {Number(v.with_driver_daily_eur) > 0
+                          ? ` · οδηγός ${euro(v.with_driver_daily_eur)}/ημ`
+                          : ''}
+                        {` · ${v.current_mileage} km`}
+                      </p>
+                      {v.description ? (
+                        <p className="text-xs text-gray-600 mt-2 line-clamp-2">{v.description}</p>
+                      ) : (
+                        <p className="text-xs text-amber-700/80 mt-2">Χωρίς περιγραφή για πελάτες</p>
+                      )}
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {v.photo_urls?.length || (v.photo_url ? 1 : 0)} φωτογραφίες
+                      </p>
+                    </div>
+                    <div className="mt-auto flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="flex-1 min-w-[7rem] text-xs font-bold text-white bg-primary rounded-xl px-3 py-2.5"
+                        onClick={() =>
+                          navigate(`/admin/fleet-rental/vehicles/${encodeURIComponent(v.id)}/edit`)
                         }
-                      }}
-                    >
-                      Διαγραφή
-                    </button>
+                      >
+                        Επεξεργασία
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs font-bold text-rose-600 border border-rose-100 rounded-xl px-3 py-2.5"
+                        onClick={async () => {
+                          if (!window.confirm('Διαγραφή οχήματος;')) return;
+                          try {
+                            await deleteRentalVehicle(v.id);
+                            toast.success('Διαγράφηκε');
+                            await reload();
+                          } catch (err) {
+                            toast.error(err.message);
+                          }
+                        }}
+                      >
+                        Διαγραφή
+                      </button>
+                    </div>
                   </div>
                 </article>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

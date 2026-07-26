@@ -2228,6 +2228,7 @@ export default function BackOffice() {
             {activeTab === 'fleet_rental' && (
               <div className="pb-stack-lg">
                 <FleetRentalPanel
+                  initialTab={location.state?.fleetRentalTab}
                   onOpenLiveMap={() => setActiveTab('fleet_live_map')}
                   onOpenCustomer={(person) => {
                     setSelectedCustomer(person);
