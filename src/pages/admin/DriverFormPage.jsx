@@ -130,18 +130,20 @@ export default function DriverFormPage() {
     if (saving) return;
     if (!validate()) return;
 
+    const salaryKm = Number(form.salary_per_km);
+    const salaryTrip = Number(form.salary_per_trip);
     const body = {
       name: form.name.trim(),
       license_no: form.license_no.trim(),
       phone: form.phone.trim(),
-      email: form.email.trim(),
+      email: form.email.trim().toLowerCase(),
       status: form.status,
       vehicle_code: form.vehicle_code.trim() || null,
       license_plate: form.license_plate.trim() || null,
       license_expires_at: form.license_expires_at || null,
       photo_url: form.photo_url.trim() || null,
-      salary_per_km: Number(form.salary_per_km),
-      salary_per_trip: Number(form.salary_per_trip),
+      salary_per_km: Number.isFinite(salaryKm) ? salaryKm : 0.45,
+      salary_per_trip: Number.isFinite(salaryTrip) ? salaryTrip : 25,
       hiring_date: form.hiring_date || null,
     };
     if (form.password) body.password = form.password;
@@ -154,13 +156,19 @@ export default function DriverFormPage() {
         navigate(`/admin/drivers/${driverId}`);
       } else {
         const created = await createFleetDriver(body);
+        if (!created?.id) {
+          throw new Error('Ο λογαριασμός δεν δημιουργήθηκε — δοκιμάστε ξανά');
+        }
         toast.success('Ο λογαριασμός δημιουργήθηκε');
-        navigate(created?.id ? `/admin/drivers/${created.id}` : '/admin', {
-          state: { activeTab: 'drivers' },
-        });
+        navigate(`/admin/drivers/${created.id}`);
       }
     } catch (err) {
-      toast.error(err.message || 'Αποτυχία αποθήκευσης');
+      const raw = String(err?.message || '').trim();
+      const msg =
+        !raw || /failed to fetch|networkerror|load failed/i.test(raw)
+          ? 'Αποτυχία αποθήκευσης — ελέγξτε σύνδεση / συνδεθείτε ξανά στο γραφείο'
+          : raw;
+      toast.error(msg, { duration: 6000 });
     } finally {
       setSaving(false);
     }
@@ -168,7 +176,7 @@ export default function DriverFormPage() {
 
   const onSubmit = (e) => {
     e.preventDefault();
-    save();
+    void save();
   };
 
   const header = (
@@ -205,8 +213,8 @@ export default function DriverFormPage() {
   const actions = (
     <div className="flex gap-3">
       <button
-        type="button"
-        onClick={save}
+        type="submit"
+        form="driver-account-form"
         disabled={saving}
         className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-primary text-white font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 disabled:opacity-60"
       >
