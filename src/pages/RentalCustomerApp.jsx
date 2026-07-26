@@ -361,8 +361,17 @@ function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {
                   type="button"
                   className="rent-btn rent-btn-danger rent-btn-block"
                   onClick={() => {
+                    if (adminPreview) {
+                      try {
+                        sessionStorage.removeItem(ADMIN_PREVIEW_KEY);
+                      } catch {
+                        /* ignore */
+                      }
+                      window.location.assign('/admin');
+                      return;
+                    }
                     logoutCustomer();
-                    window.location.assign('/login');
+                    window.location.assign('/');
                   }}
                 >
                   Αποσύνδεση
