@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import {
@@ -12,15 +11,6 @@ import {
 import { PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
 
 export default function FrontPage() {
-  const [role, setRole] = useState(null);
-
-  useEffect(() => {
-    const refresh = () => setRole(localStorage.getItem('userRole'));
-    refresh();
-    window.addEventListener('focus', refresh);
-    return () => window.removeEventListener('focus', refresh);
-  }, []);
-
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <header className="fixed top-0 w-full z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
@@ -34,11 +24,6 @@ export default function FrontPage() {
             <a href="#pricing" className="hover:text-white transition-colors">
               Τιμές
             </a>
-            {role === 'admin' && (
-              <Link to="/admin" className="hover:text-white transition-colors">
-                Panel
-              </Link>
-            )}
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
