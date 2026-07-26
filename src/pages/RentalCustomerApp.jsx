@@ -16,6 +16,7 @@ import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
+import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -23,7 +24,7 @@ const TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
   { id: 'book', label: 'Κράτηση', icon: 'directions_car' },
   { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
-  { id: 'mine', label: 'Κρατήσεις', icon: 'event_available' },
+  { id: 'wallet', label: 'Wallet', icon: 'account_balance_wallet' },
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
@@ -135,9 +136,9 @@ function RentalAuthGate() {
 
 function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {}) {
   const [tab, setTab] = useState('home');
-  const [mineView, setMineView] = useState('list');
   const [brandName, setBrandName] = useState('Ενοικίαση');
   const [calKey, setCalKey] = useState(0);
+  const [walletKey, setWalletKey] = useState(0);
 
   useEffect(() => setupRentalPwa(), []);
 
@@ -218,12 +219,12 @@ function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {
                     <span className="rent-quick-label">Ημερολόγιο</span>
                     <span className="rent-quick-meta">Μέρες & χάρτης</span>
                   </button>
-                  <button type="button" onClick={() => setTab('mine')}>
+                  <button type="button" onClick={() => setTab('wallet')}>
                     <span className="material-symbols-outlined" aria-hidden>
-                      event_available
+                      account_balance_wallet
                     </span>
-                    <span className="rent-quick-label">Οι κρατήσεις μου</span>
-                    <span className="rent-quick-meta">Ιστορικό & ακύρωση</span>
+                    <span className="rent-quick-label">Rent Wallet</span>
+                    <span className="rent-quick-meta">Κάρτες ενοικίασης</span>
                   </button>
                 </div>
               </div>
@@ -240,7 +241,8 @@ function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {
                 mode="book"
                 onBooked={() => {
                   setCalKey((k) => k + 1);
-                  setTab('calendar');
+                  setWalletKey((k) => k + 1);
+                  setTab('wallet');
                 }}
               />
             </div>
@@ -256,42 +258,28 @@ function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {
             </div>
           ) : null}
 
-          {tab === 'mine' ? (
-            <div className="rent-panel">
-              <h2>Κρατήσεις</h2>
-              <p className="rent-panel-lead">Ενεργές και προηγούμενες ενοικιάσεις σας.</p>
-              <div className="rent-segment" role="tablist" aria-label="Προβολή κρατήσεων">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mineView === 'list'}
-                  className={mineView === 'list' ? 'is-active' : ''}
-                  onClick={() => setMineView('list')}
-                >
-                  Λίστα
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mineView === 'calendar'}
-                  className={mineView === 'calendar' ? 'is-active' : ''}
-                  onClick={() => setMineView('calendar')}
-                >
-                  Ημερολόγιο
-                </button>
-              </div>
-              {mineView === 'list' ? (
-                <RentalCatalogPanel mode="mine" />
-              ) : (
-                <RentalCustomerCalendar refreshKey={calKey} />
-              )}
+          {tab === 'wallet' ? (
+            <div className="rent-panel rent-panel--wallet">
+              <h2>Rent Wallet</h2>
+              <p className="rent-panel-lead">
+                Οι κάρτες ενοικίασής σας — χωριστά από το My Wallet των λεωφορείων.
+              </p>
+              <RentalWalletPanel
+                brandLabel={`${brandName}`}
+                passengerName={profile.name}
+                refreshKey={walletKey}
+                onBookVehicle={() => setTab('book')}
+              />
             </div>
           ) : null}
 
           {tab === 'account' ? (
             <div className="rent-panel">
               <h2>Λογαριασμός</h2>
-              <p className="rent-panel-lead">Στοιχεία σύνδεσης και εγκατάσταση εφαρμογής.</p>
+              <p className="rent-panel-lead">
+                Στοιχεία σύνδεσης για την εφαρμογή ενοικίασης. Τα εισιτήρια λεωφορείου είναι στο My
+                Wallet.
+              </p>
               <dl style={{ margin: 0 }}>
                 <div className="rent-account-row">
                   <div>
@@ -308,9 +296,13 @@ function RentalAuthenticatedApp({ adminPreview = false, onExitAdminPreview } = {
               </dl>
               <RentalInstallPrompt force />
               <div style={{ display: 'grid', gap: '0.6rem', marginTop: '1.25rem' }}>
-                <Link to="/wallet" className="rent-btn rent-btn-ghost rent-btn-block">
-                  My Wallet (εισιτήρια)
-                </Link>
+                <button
+                  type="button"
+                  className="rent-btn rent-btn-ghost rent-btn-block"
+                  onClick={() => setTab('wallet')}
+                >
+                  Άνοιγμα Rent Wallet
+                </button>
                 <button
                   type="button"
                   className="rent-btn rent-btn-danger rent-btn-block"
