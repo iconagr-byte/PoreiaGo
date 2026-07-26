@@ -567,28 +567,101 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  padding: 2rem 1.25rem;
+  padding: 1.5rem 1.15rem;
   text-align: center;
   background:
-    radial-gradient(80% 60% at 50% 0%, rgba(10, 122, 108, 0.35), transparent 60%),
-    #0b3d4a;
-  color: #f5f5f7;
+    radial-gradient(80% 60% at 50% 0%, rgba(10, 122, 108, 0.28), transparent 60%),
+    #0b3d4a !important;
+  color: #f5f5f7 !important;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
 }
 
-.rent-gate h1 {
-  margin: 0;
-  font-size: clamp(2rem, 8vw, 2.8rem);
-  letter-spacing: -0.04em;
-  max-width: 12ch;
-  line-height: 1;
+.rent-gate-card {
+  width: min(100%, 22.5rem);
+  border-radius: 28px;
+  padding: 1.5rem 1.25rem 1.35rem;
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 24px 48px rgba(0, 0, 0, 0.28);
+  text-align: left;
 }
 
-.rent-gate p {
+.rent-gate-card h1 {
   margin: 0;
-  color: rgba(245, 245, 247, 0.78);
-  max-width: 28ch;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  color: #1d1d1f !important;
+}
+
+.rent-gate-card p {
+  margin: 0.55rem 0 0;
+  color: #6e6e73 !important;
+  font-size: 0.9rem;
   line-height: 1.45;
+  max-width: none;
+}
+
+.rent-gate-actions {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1.25rem;
+}
+
+.rent-gate-actions a,
+.rent-gate-actions button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.95rem;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-decoration: none !important;
+  cursor: pointer;
+  border: 0;
+}
+
+.rent-gate-btn-primary {
+  background: #0b3d4a !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(11, 61, 74, 0.28);
+}
+
+.rent-gate-btn-secondary {
+  background: rgba(120, 120, 128, 0.12) !important;
+  color: #1d1d1f !important;
+}
+
+.rent-gate-btn-ghost {
+  background: transparent !important;
+  color: #0b3d4a !important;
+  border: 1px solid rgba(11, 61, 74, 0.2) !important;
+}
+
+.rent-preview-banner {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  background: #fff3cd;
+  color: #6b4f00;
+  border-bottom: 1px solid rgba(180, 140, 20, 0.25);
+  font-size: 0.78rem;
+  font-weight: 650;
 }
 
 .rent-catalog {
