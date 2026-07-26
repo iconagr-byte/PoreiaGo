@@ -17,10 +17,11 @@ function qrImageUrl(data, size = 200) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&margin=8`;
 }
 
-/** Same-tab print page (no popup). */
-export function ticketPrintPath(bookingId) {
+/** Same-tab print page (no popup). Pass `{ autoPrint: true }` to open print dialog. */
+export function ticketPrintPath(bookingId, { autoPrint = false } = {}) {
   const id = bookingId || 'demo';
-  return `/ticket/print/${encodeURIComponent(id)}`;
+  const base = `/ticket/print/${encodeURIComponent(id)}`;
+  return autoPrint ? `${base}?print=1` : base;
 }
 
 /**

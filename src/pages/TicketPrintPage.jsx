@@ -1,32 +1,41 @@
+/**
+ * Printable boarding pass — matches My Wallet pass look.
+ * Browser Print → Save as PDF.
+ */
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { formatMoney } from '../lib/currency/multiCurrency.js';
+import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
+import '../styles/wallet-pass.css';
+import '../styles/ticket-print.css';
 
 function Field({ label, children }) {
   return (
-    <div>
-      <div className="text-[9px] uppercase tracking-wider text-gray-500 font-bold mb-1">{label}</div>
-      <div>{children}</div>
+    <div className="ticket-print-field">
+      <div className="ticket-print-kicker">{label}</div>
+      <div className="ticket-print-value">{children}</div>
     </div>
   );
 }
 
-/** QR as img — avoids react-qr-code edge cases on some browsers. */
 function TicketQr({ value }) {
-  const src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(value)}&margin=10`;
+  const src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(value)}&margin=10`;
   return (
     <img
       src={src}
-      width={180}
-      height={180}
+      width={200}
+      height={200}
       alt="QR εισιτηρίου"
-      className="rounded-lg bg-white"
+      className="ticket-print-qr-img"
     />
   );
 }
 
-function TicketCard({ booking, tripTitle }) {
+function TicketPassCard({ booking, tripTitle, brandLabel, coverImage }) {
   const pnr = booking.pnr || booking.ticketRef || booking.id;
+  const passenger =
+    booking.customerName || booking.passengerName || booking.name || '—';
   const dateStr = booking.date
     ? new Date(`${booking.date}T12:00:00`).toLocaleDateString('el-GR', {
         weekday: 'long',
@@ -35,91 +44,120 @@ function TicketCard({ booking, tripTitle }) {
         year: 'numeric',
       })
     : '—';
+  const qrValue = booking._printQr || String(pnr);
 
   return (
-    <div className="max-w-[420px] mx-auto bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-200 print:shadow-none">
-      <div className="bg-gradient-to-br from-[#0040df] to-[#002a96] text-white px-6 py-5">
-        <div className="text-[11px] uppercase tracking-widest opacity-90 mb-1">PoreiaGo Travel</div>
-        <h2 className="text-xl font-bold leading-tight m-0">{tripTitle}</h2>
-        <p className="text-sm opacity-90 mt-2 mb-0">
-          {dateStr} · Αναχώρηση {booking.time || '—'}
-        </p>
+    <article className="ticket-print-pass" aria-label="Εισιτήριο για εκτύπωση">
+      <div
+        className="ticket-print-hero"
+        style={coverImage ? { backgroundImage: `url(${coverImage})` } : undefined}
+      >
+        <div className="ticket-print-hero-shade" aria-hidden />
+        <div className="ticket-print-hero-copy">
+          <p className="ticket-print-brand">{brandLabel}</p>
+          <h1 className="ticket-print-title">{tripTitle}</h1>
+          <p className="ticket-print-when">
+            {dateStr}
+            {booking.time ? ` · ${booking.time}` : ''}
+          </p>
+        </div>
       </div>
 
-      <div className="relative h-5 bg-white">
-        <div className="mx-6 border-t-2 border-dashed border-gray-200 absolute left-0 right-0 top-1/2" />
-      </div>
-
-      <div className="px-6 pb-6 pt-4">
-        <div className="grid grid-cols-2 gap-4 mb-5">
+      <div className="ticket-print-body">
+        <div className="ticket-print-grid">
           <Field label="Επιβάτης">
-            <span className="font-bold text-gray-900">{booking.customerName}</span>
+            <strong>{passenger}</strong>
           </Field>
           <Field label="Θέση">
-            <span className="font-bold text-2xl text-[#0040df]">{booking.seat || '—'}</span>
+            <strong className="ticket-print-seat">{booking.seat || '—'}</strong>
           </Field>
-          <Field label="PNR">
-            <span className="font-mono text-sm font-bold">{pnr}</span>
+          <Field label="Κωδικός">
+            <span className="ticket-print-mono">{pnr}</span>
           </Field>
-          <Field label="Τιμή">
-            <span className="font-bold">
+          <Field label="Ποσό">
+            <strong>
               {booking.price != null
                 ? formatMoney(booking.price, booking.currency || 'EUR')
                 : '—'}
-            </span>
-          </Field>
-          <Field label="Τηλέφωνο">
-            <span className="text-sm">{booking.phone || '—'}</span>
-          </Field>
-          <Field label="Τιμολόγιο">
-            <span className="text-xs">{booking.invoiceNumber || '—'}</span>
+            </strong>
           </Field>
         </div>
 
-        <div className="border-t border-gray-100 pt-5 text-center">
-          <div className="inline-block p-3 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
-            <TicketQr value={String(pnr)} />
+        <div className="ticket-print-perforation" aria-hidden />
+
+        <div className="ticket-print-qr-block">
+          <div className="ticket-print-qr-frame">
+            <TicketQr value={qrValue} />
           </div>
-          <p className="font-mono font-extrabold text-lg tracking-widest mt-3">{pnr}</p>
-          <p className="text-[10px] text-gray-400">Σκανάρετε κατά την επιβίβαση</p>
+          <p className="ticket-print-mono ticket-print-pnr-lg">{pnr}</p>
+          <p className="ticket-print-hint">Δείξτε το QR στον οδηγό κατά την επιβίβαση</p>
         </div>
 
-        <p className="text-[10px] text-gray-500 mt-4 pt-3 border-t border-gray-100">
+        <p className="ticket-print-footer">
           Κράτηση #{booking.id}
           {booking.email ? ` · ${booking.email}` : ''}
+          {booking.phone ? ` · ${booking.phone}` : ''}
         </p>
       </div>
-    </div>
+    </article>
   );
 }
 
 export default function TicketPrintPage() {
   const { bookingId: rawId } = useParams();
+  const [searchParams] = useSearchParams();
   const bookingId = decodeURIComponent(rawId || '').trim();
+  const autoPrint = searchParams.get('print') === '1';
   const [resolved, setResolved] = useState(null);
   const [loadError, setLoadError] = useState('');
+  const [brandLabel, setBrandLabel] = useState('My Wallet');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSiteAppearance()
+      .then((data) => {
+        if (cancelled) return;
+        const brand = resolveOfficeBrand(data || {});
+        const name = brand.displayName || brand.name;
+        if (name) setBrandLabel(name);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!bookingId || bookingId === 'demo') return undefined;
     let cancelled = false;
     (async () => {
       try {
-        const [{ getBookingById }, { getTripById }, { mockBookings }] = await Promise.all([
-          import('../lib/ticketing/bookingStore.js'),
-          import('../lib/trips/tripStore.js'),
-          import('../data/mockData.js'),
-        ]);
+        const mod = await import('../lib/ticketing/bookingStore.js');
+        const { getTripById, loadTrips } = await import('../lib/trips/tripStore.js');
+        const { mockBookings } = await import('../data/mockData.js');
+        const { issueSignedQrToken } = await import('../lib/ticketing/qrToken.js');
+
         const booking =
-          getBookingById(bookingId) || mockBookings.find((b) => b.id === bookingId);
+          mod.getBookingById(bookingId) || mockBookings.find((b) => b.id === bookingId);
         if (!booking) {
           if (!cancelled) setLoadError('notfound');
           return;
         }
+        loadTrips();
         const trip = getTripById(booking.tripId);
+        let printQr = booking.pnr || booking.id;
+        if (mod.isBookingPaid(booking)) {
+          try {
+            printQr = await issueSignedQrToken(booking);
+          } catch {
+            /* keep PNR */
+          }
+        }
         if (!cancelled) {
           setResolved({
-            booking,
+            booking: { ...booking, _printQr: printQr },
             tripTitle: trip?.title || booking.tripTitle || 'Εκδρομή',
+            coverImage: trip?.image || '/images/hero-bus-achillio.png',
           });
         }
       } catch (err) {
@@ -133,24 +171,30 @@ export default function TicketPrintPage() {
     };
   }, [bookingId]);
 
+  useEffect(() => {
+    if (!autoPrint || !resolved) return undefined;
+    const t = window.setTimeout(() => window.print(), 450);
+    return () => window.clearTimeout(t);
+  }, [autoPrint, resolved]);
+
   if (!bookingId || bookingId === 'demo') {
     return <Navigate to="/my-booking" replace />;
   }
 
   if (!resolved && !loadError) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-500">Φόρτωση εισιτηρίου…</p>
+      <div className="wallet-app ticket-print-shell">
+        <p className="ticket-print-status">Φόρτωση εισιτηρίου…</p>
       </div>
     );
   }
 
   if (loadError === 'notfound') {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-8 text-center">
-        <div>
-          <p className="text-red-600 font-bold">Η κράτηση «{bookingId}» δεν βρέθηκε.</p>
-          <Link to="/my-booking" className="text-[#0040df] font-bold text-sm mt-4 inline-block">
+      <div className="wallet-app ticket-print-shell">
+        <div className="ticket-print-status">
+          <p className="font-bold text-rose-700">Η κράτηση «{bookingId}» δεν βρέθηκε.</p>
+          <Link to="/my-booking" className="ticket-print-link">
             Ανάκτηση κράτησης
           </Link>
         </div>
@@ -160,44 +204,43 @@ export default function TicketPrintPage() {
 
   if (loadError === 'crash' || !resolved) {
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-8 text-center gap-4">
-        <p className="text-red-600 font-bold">Σφάλμα φόρτωσης.</p>
-        <Link to="/my-booking" className="text-[#0040df] font-bold">
-          Ανάκτηση κράτησης
-        </Link>
+      <div className="wallet-app ticket-print-shell">
+        <div className="ticket-print-status">
+          <p className="font-bold text-rose-700">Σφάλμα φόρτωσης.</p>
+          <Link to="/my-booking" className="ticket-print-link">
+            Ανάκτηση κράτησης
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-10 px-4 print:bg-white print:py-0">
-      <style>{`
-        @media print {
-          .no-print-ticket { display: none !important; }
-        }
-      `}</style>
-
-      <div className="max-w-lg mx-auto space-y-6">
-        <div className="no-print-ticket text-center space-y-3">
-          <h1 className="text-xl font-bold text-gray-900">Εισιτήριο εκδρομής</h1>
-          <p className="text-sm text-gray-500">Ctrl+P → Αποθήκευση ως PDF</p>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#0040df] text-white font-bold text-sm"
-          >
-            Εκτύπωση
-          </button>
+    <div className="wallet-app ticket-print-shell">
+      <div className="ticket-print-toolbar no-print-ticket">
+        <div>
+          <h1 className="ticket-print-toolbar-title">Εισιτήριο</h1>
+          <p className="ticket-print-toolbar-copy">Εκτύπωση ή Αποθήκευση ως PDF</p>
         </div>
-
-        <TicketCard booking={resolved.booking} tripTitle={resolved.tripTitle} />
-
-        <p className="no-print-ticket text-center text-sm">
-          <Link to="/" className="text-[#0040df] font-bold hover:underline">
-            Αρχική
+        <div className="ticket-print-toolbar-actions">
+          <button type="button" className="wallet-pass-cta" onClick={() => window.print()}>
+            <span className="material-symbols-outlined" aria-hidden>
+              print
+            </span>
+            Εκτύπωση / PDF
+          </button>
+          <Link to="/wallet" className="wallet-pass-secondary wallet-ticket-email">
+            Πίσω στο My Wallet
           </Link>
-        </p>
+        </div>
       </div>
+
+      <TicketPassCard
+        booking={resolved.booking}
+        tripTitle={resolved.tripTitle}
+        brandLabel={brandLabel}
+        coverImage={resolved.coverImage}
+      />
     </div>
   );
 }

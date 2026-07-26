@@ -217,11 +217,11 @@ export default function WalletTicketDetail({
       </section>
 
       <div className="wallet-ticket-actions">
-        <Link to={ticketPrintPath(booking.id)} className="wallet-pass-cta">
+        <Link to={ticketPrintPath(booking.id, { autoPrint: true })} className="wallet-pass-cta">
           <span className="material-symbols-outlined" aria-hidden>
             print
           </span>
-          Εκτύπωση εισιτηρίου
+          Εκτύπωση / PDF
         </Link>
         <button
           type="button"
