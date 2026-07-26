@@ -126,8 +126,33 @@ def _driver_response(d, *, enrich_safety: bool = False) -> FleetDriverResponse:
 
 
 def _request_tenant_id(request: Request) -> str:
+    """
+    Office scope for file-backed drivers/fleet.
+
+    Prefer request.state.tenant_id (set by DomainTenant + JWT middleware).
+    Fall back to Bearer JWT tenant_id so creates never silently land in the
+    demo office when Host is the platform domain.
+    """
     tid = getattr(request.state, "tenant_id", None)
-    return str(tid) if tid else DEMO_TENANT_ID
+    if tid:
+        return str(tid)
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[7:].strip()
+        if token:
+            try:
+                import jwt
+                from middleware.tenant import _jwt_settings
+
+                secret, algorithm, _ = _jwt_settings()
+                if secret:
+                    payload = jwt.decode(token, secret, algorithms=[algorithm])
+                    raw = payload.get("tenant_id")
+                    if raw:
+                        return str(raw)
+            except Exception:
+                pass
+    return DEMO_TENANT_ID
 
 
 def _driver_for_tenant(driver_id: str, tenant_id: str):

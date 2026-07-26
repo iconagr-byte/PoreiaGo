@@ -88,9 +88,10 @@ ADMIN_PUBLIC_GET_PREFIXES = (
     "/api/admin/platform/site-appearance",
 )
 
-# JSON file-store admin routes — no Postgres tenant gate (local dev / single-tenant file).
+# JSON file-store admin routes — skip Postgres RLS / suspended-tenant gate.
 # Drivers stay file-backed (fleet_drivers.json). JWT is still sent by the admin UI;
-# keeping this prefix avoids empty lists when SaaS role/tenant checks would block.
+# we MUST still attach tenant_id from the Bearer token so multi-office creates
+# are not forced into the demo tenant when Host is www/api.poreiago.com.
 FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/site-appearance",
     "/api/admin/platform/settings",
@@ -98,6 +99,43 @@ FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/seat-pricing",
     "/api/admin/platform/drivers",
 )
+
+
+def _attach_bearer_tenant_context(
+    request: Request,
+    jwt_secret: str,
+    jwt_algorithm: str,
+) -> None:
+    """
+    Best-effort: decode Bearer JWT and set request.state.tenant_id / roles.
+
+    Used for file-store admin routes that skip the hard JWT gate. Prefer JWT
+    tenant over any Host-derived tenant so impersonation and platform-host
+    logins scope drivers/settings to the correct office.
+    """
+    if not jwt_secret:
+        return
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return
+    token = auth[7:].strip()
+    if not token:
+        return
+    try:
+        payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
+    except jwt.PyJWTError:
+        return
+    raw_tid = payload.get("tenant_id")
+    if raw_tid:
+        try:
+            request.state.tenant_id = UUID(str(raw_tid))
+        except ValueError:
+            pass
+    if payload.get("sub"):
+        request.state.user_id = payload.get("sub")
+    roles = list(payload.get("roles") or [])
+    if roles:
+        request.state.roles = roles
 
 
 def _requires_jwt(path: str) -> bool:
@@ -194,6 +232,9 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
             if _admin_public_get(path, request.method):
                 return await call_next(request)
             if _is_file_store_admin(path):
+                # Keep file-store open (no role/Postgres gate) but bind the office
+                # from the admin JWT so driver create/list is multi-tenant safe.
+                _attach_bearer_tenant_context(request, jwt_secret, jwt_algorithm)
                 return await call_next(request)
             if admin_auth_disabled:
                 await _apply_dev_admin_context(request)

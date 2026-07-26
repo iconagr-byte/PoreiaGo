@@ -327,13 +327,24 @@ export async function fetchFleetDriver(driverId) {
 }
 
 export async function createFleetDriver(body) {
-  const res = await adminFetch('/api/admin/platform/drivers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await adminFetch('/api/admin/platform/drivers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    const raw = String(err?.message || '');
+    if (/failed to fetch|networkerror|load failed/i.test(raw) || err?.name === 'TypeError') {
+      throw new Error(
+        'Δεν υπάρχει σύνδεση με τον server — δοκιμάστε ξανά ή συνδεθείτε στο γραφείο.',
+      );
+    }
+    throw err;
+  }
   if (res.status === 401 || res.status === 403) {
-    throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά');
+    throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά στο γραφείο');
   }
   if (!res.ok) await parseError(res);
   invalidateFleetDriversCache();
