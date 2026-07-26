@@ -1,14 +1,14 @@
 {
   "name": "Ενοικίαση — PoreiaGo",
   "short_name": "Ενοικίαση",
-  "description": "Κράτηση οχήματος από το κινητό — Cars, Vans, Minibuses",
+  "description": "Κράτηση οχήματος, ημερολόγιο και χάρτης παραλαβής — PoreiaGo",
   "lang": "el",
   "dir": "ltr",
   "start_url": "/rent",
   "scope": "/rent",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0b3d4a",
+  "background_color": "#f5f5f7",
   "theme_color": "#0b3d4a",
   "icons": [
     {
@@ -35,5 +35,7 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
-  ]
+  ],
+  "categories": ["travel", "business"],
+  "prefer_related_applications": false
 }

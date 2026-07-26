@@ -614,19 +614,27 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
             ))}
           </div>
 
-          <div className="sm:col-span-2 lg:col-span-4 rounded-2xl border border-teal-100 bg-teal-50/80 px-4 py-3 text-sm text-teal-950 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-bold">Εφαρμογή πελατών · /rent</p>
-              <p className="mt-0.5 text-teal-900/80">
-                Οι πελάτες κλείνουν από την dedicated PWA ενοικίασης. Νέα κράτηση στέλνει push στο
-                γραφείο· φαίνεται στα tabs Πελάτες / Κρατήσεις.
-              </p>
+          <div className="sm:col-span-2 lg:col-span-4 relative overflow-hidden rounded-[26px] border border-black/[0.06] bg-white/80 backdrop-blur-xl px-4 py-4 text-sm text-[#1d1d1f] flex flex-wrap items-center justify-between gap-3 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+            <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-teal-400/15 blur-2xl" aria-hidden />
+            <div className="relative flex items-start gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-500 to-[#0b3d4a] text-white shadow-lg shadow-teal-700/20 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  smartphone
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold tracking-tight">Εφαρμογή πελατών · /rent</p>
+                <p className="mt-0.5 text-[#6e6e73] text-[13px] leading-snug">
+                  Apple-style PWA: κράτηση, ημερολόγιο, χάρτης παραλαβής και εγκατάσταση στην αρχική
+                  οθόνη. Νέα κράτηση → push στο γραφείο.
+                </p>
+              </div>
             </div>
             <a
               href="/rent"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-teal-700 text-white text-xs font-bold"
+              className="relative inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#0b3d4a] text-white text-xs font-bold shadow-md shadow-teal-900/20"
             >
               Άνοιγμα /rent
               <span className="material-symbols-outlined text-[16px]">open_in_new</span>

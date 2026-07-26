@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { Toaster } from 'react-hot-toast';
+import { captureRentalInstallPrompt, injectRentalPwaHead } from './lib/rental/registerRentalPwa.js';
 import HomePage from './pages/HomePage.jsx';
 import StorefrontDemoPage from './pages/StorefrontDemoPage';
 import BackOffice from './pages/BackOffice';
@@ -41,11 +43,27 @@ import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import BrandingBoot from './components/BrandingBoot.jsx';
 import MaintenanceGate from './components/MaintenanceGate.jsx';
 
+function RentalPwaBoot() {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const path = window.location.pathname || '';
+    if (path === '/rent' || path.startsWith('/rent/')) {
+      injectRentalPwaHead();
+      captureRentalInstallPrompt();
+    } else {
+      // Still capture early if the user lands elsewhere then navigates to /rent.
+      captureRentalInstallPrompt();
+    }
+  }, []);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <Router>
         <BrandingBoot />
+        <RentalPwaBoot />
         <MaintenanceGate>
           <Toaster position="top-center" />
           <Routes>
