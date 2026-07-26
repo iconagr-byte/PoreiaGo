@@ -83,6 +83,23 @@ export async function resetCustomerPassword({ token, newPassword }) {
   return persistCustomerSession(data);
 }
 
+/** Phase B — exchange email magic-link token for My Wallet JWT. */
+export async function consumeWalletMagic(token) {
+  const data = await postJson('/api/auth/wallet-magic/consume', { token });
+  return persistCustomerSession(data);
+}
+
+/** Optional: email a fresh magic link (always returns ok). */
+export async function issueWalletMagic({ email, bookingId, name, phone, sendEmail = true }) {
+  return postJson('/api/auth/wallet-magic/issue', {
+    email,
+    booking_id: bookingId,
+    name: name || '',
+    phone: phone || '',
+    send_email: sendEmail,
+  });
+}
+
 /**
  * @param {string} idToken — Google credential JWT
  */

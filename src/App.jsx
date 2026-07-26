@@ -9,6 +9,7 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import SeatSelection from './pages/SeatSelection';
 import TripDetails from './pages/TripDetails';
 import SimpleWalletPage from './pages/SimpleWalletPage.jsx';
+import WalletMagicPage from './pages/WalletMagicPage.jsx';
 import InBusPortal from './pages/InBusPortal';
 import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
@@ -49,6 +50,7 @@ function App() {
           <Routes>
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
+            <Route path="/wallet/magic" element={<WalletMagicPage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
             <Route path="/" element={<HomePage />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />

@@ -19,6 +19,11 @@ from ticketing.customer_accounts import (
     upsert_google_account,
 )
 from ticketing.customer_jwt import create_customer_token, decode_customer_token
+from ticketing.wallet_magic import (
+    MAGIC_TTL_MINUTES,
+    consume_wallet_magic_token,
+    create_wallet_magic_token,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["Customer Auth"])
 
@@ -52,6 +57,18 @@ class ResetPasswordRequest(BaseModel):
 
 class GoogleTokenRequest(BaseModel):
     id_token: str = Field(min_length=10)
+
+
+class WalletMagicIssueRequest(BaseModel):
+    email: EmailStr
+    booking_id: str = Field(min_length=1, max_length=80)
+    name: str = Field(default="", max_length=120)
+    phone: str = Field(default="", max_length=40)
+    send_email: bool = True
+
+
+class WalletMagicConsumeRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
 
 
 def _google_client_id() -> str:
@@ -212,3 +229,65 @@ async def verify_google_token(body: GoogleTokenRequest):
     account = await upsert_google_account(email, data.get("name"), data.get("picture"))
     token = create_customer_token(email, extra={"provider": "google"})
     return _profile_response(account, token)
+
+
+@router.post("/wallet-magic/issue")
+async def issue_wallet_magic(body: WalletMagicIssueRequest):
+    """
+    Issue a short-lived magic link for My Wallet (phase B).
+
+    Always returns ok when inputs look valid — avoids email enumeration.
+    Optionally emails the link (ticket confirmation embeds it directly).
+    """
+    email = body.email.strip().lower()
+    booking_id = body.booking_id.strip()
+    if email in STAFF_EMAILS:
+        return {"ok": True, "sent": False}
+
+    magic_url = None
+    try:
+        token = await create_wallet_magic_token(
+            email=email,
+            booking_id=booking_id,
+            name=body.name,
+            phone=body.phone,
+        )
+        magic_url = f"{_public_base_url()}/wallet/magic?token={token}"
+        if body.send_email:
+            subject = "My Wallet — Άνοιγμα εισιτηρίου"
+            html = f"""<!DOCTYPE html><html lang="el"><body style="font-family:Arial,sans-serif;padding:24px;background:#f4f7fb;">
+              <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:20px;padding:28px;border:1px solid #e2e8f0;">
+                <p style="margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#64748b;font-weight:bold;">My Wallet</p>
+                <h2 style="margin:0 0 12px;color:#0f172a;">Άνοιγμα εισιτηρίου</h2>
+                <p style="margin:0 0 20px;color:#64748b;line-height:1.55;">Πατήστε για να ανοίξετε το My Wallet χωρίς κωδικό. Ο σύνδεσμος ισχύει για {MAGIC_TTL_MINUTES} λεπτά.</p>
+                <p><a href="{magic_url}" style="display:inline-block;padding:14px 28px;background:#0f172a;color:#fff;text-decoration:none;border-radius:999px;font-weight:bold;">Άνοιγμα My Wallet</a></p>
+                <p style="margin:20px 0 0;font-size:11px;color:#94a3b8;word-break:break-all;">{magic_url}</p>
+              </div>
+            </body></html>"""
+            await send_email(email, subject, html)
+    except Exception:
+        magic_url = None
+
+    return {
+        "ok": True,
+        "sent": bool(magic_url and body.send_email),
+        "expires_minutes": MAGIC_TTL_MINUTES,
+        # When send_email=false, caller (ticket email) embeds the URL itself.
+        "magic_url": magic_url if not body.send_email else None,
+    }
+
+
+@router.post("/wallet-magic/consume")
+async def consume_wallet_magic(body: WalletMagicConsumeRequest):
+    """Exchange a magic-link token for a customer JWT + focused booking."""
+    try:
+        result = await consume_wallet_magic_token(body.token)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    account = result["account"]
+    access = create_customer_token(account["email"], extra={"provider": "magic"})
+    profile = _profile_response(account, access)
+    profile["provider"] = "magic"
+    profile["highlight_booking"] = result["booking_id"]
+    return profile
