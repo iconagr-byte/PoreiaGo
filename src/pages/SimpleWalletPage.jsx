@@ -353,43 +353,35 @@ export default function SimpleWalletPage() {
         ) : null}
 
         {activeTab === 'bookings' && (
-          <div className="space-y-4">
+          <div className="wallet-stack">
             <div className="wallet-panel">
               <h2>Οι κρατήσεις μου</h2>
-              <p className="text-sm text-slate-500 mb-4">
+              <p className="wallet-panel-lead">
                 {bookings.length
                   ? `${bookings.length} κρατήσεις στο λογαριασμό σας`
                   : 'Δεν υπάρχουν κρατήσεις ακόμα'}
               </p>
 
               {bookings.length === 0 ? (
-                <div className="text-center py-8">
-                  <Link
-                    to="/"
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 text-white font-bold text-sm"
-                  >
+                <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
+                  <Link to="/" className="wallet-btn wallet-btn-primary">
                     Κράτηση εκδρομής
                   </Link>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="wallet-list">
                   {bookings.map((b) => {
                     const st = statusStyle(b);
                     const paid = isPaid(b);
                     return (
-                      <article
-                        key={b.id}
-                        className="rounded-2xl border border-black/[0.06] overflow-hidden bg-slate-50/80"
-                      >
+                      <article key={b.id} className="wallet-booking-card">
                         <div
-                          className="h-28 bg-cover bg-center relative"
+                          className="wallet-booking-cover"
                           style={{ backgroundImage: `url(${tripImageFor(b)})` }}
                         >
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                          <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
-                            <h3 className="text-white font-bold text-sm leading-snug">
-                              {b.tripTitle}
-                            </h3>
+                          <div className="wallet-booking-cover-shade" />
+                          <div className="wallet-booking-cover-copy">
+                            <h3>{b.tripTitle}</h3>
                             <span
                               className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${st.className}`}
                             >
@@ -397,24 +389,24 @@ export default function SimpleWalletPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="p-3.5">
-                          <p className="text-xs text-slate-500">
-                            {b.date} · {b.time || '—'} · θέση{' '}
-                            <strong className="text-slate-900">{b.seat}</strong>
+                        <div className="wallet-booking-body">
+                          <p>
+                            {b.date} · {b.time || '—'} · θέση <strong>{b.seat}</strong>
                           </p>
-                          <p className="text-[11px] font-mono text-slate-400 mt-1">
+                          <p className="wallet-booking-mono">
                             {b.pnr || b.id}
                             {bookingFiscalMark(b) ? ` · MARK ${bookingFiscalMark(b)}` : ''}
                           </p>
                           {b.tripId && paid ? (
-                            <div className="mt-2">
+                            <div style={{ marginTop: '0.5rem' }}>
                               <PassengerTrackCTA booking={b} compact showEta={false} />
                             </div>
                           ) : null}
                           <button
                             type="button"
                             onClick={() => openTicket(b)}
-                            className="mt-3 w-full py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold"
+                            className="wallet-btn wallet-btn-primary wallet-btn-block"
+                            style={{ marginTop: '0.75rem' }}
                           >
                             Προβολή εισιτηρίου
                           </button>
@@ -433,12 +425,20 @@ export default function SimpleWalletPage() {
         )}
 
         {activeTab === 'account' && (
-          <div className="space-y-4">
+          <div className="wallet-stack">
             <section className="wallet-panel">
-              <h2>Λογαριασμός</h2>
-              <dl className="mt-2 space-y-4">
+              <div className="wallet-panel-head">
+                <span className="wallet-panel-head-icon" aria-hidden>
+                  <span className="material-symbols-outlined">person</span>
+                </span>
+                <div>
+                  <h2>Λογαριασμός</h2>
+                  <p>Στοιχεία σύνδεσης και προφίλ επιβάτη.</p>
+                </div>
+              </div>
+              <dl className="wallet-account-rows">
                 {[
-                  { icon: 'person', label: 'Ονοματεπώνυμο', value: profile.name },
+                  { icon: 'badge', label: 'Ονοματεπώνυμο', value: profile.name },
                   { icon: 'mail', label: 'Email', value: profile.email },
                   { icon: 'call', label: 'Τηλέφωνο', value: profile.phone || '—' },
                   {
@@ -447,15 +447,13 @@ export default function SimpleWalletPage() {
                     value: profile.provider === 'google' ? 'Google' : 'Email & κωδικός',
                   },
                 ].map((row) => (
-                  <div key={row.label} className="flex gap-3">
-                    <span className="material-symbols-outlined text-slate-500 text-[20px] mt-0.5">
+                  <div key={row.label} className="wallet-account-row">
+                    <span className="material-symbols-outlined" aria-hidden>
                       {row.icon}
                     </span>
                     <div>
-                      <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-                        {row.label}
-                      </dt>
-                      <dd className="font-bold text-slate-900 mt-0.5">{row.value}</dd>
+                      <dt>{row.label}</dt>
+                      <dd>{row.value}</dd>
                     </div>
                   </div>
                 ))}
