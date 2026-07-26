@@ -201,6 +201,23 @@ export async function fetchPlatformUsers() {
   return getMockUsers();
 }
 
+/** Login history (admin / customer / driver): χρόνος, IP, συσκευή. */
+export async function fetchLoginAudits({
+  limit = 100,
+  actorType,
+  success,
+  q,
+} = {}) {
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  if (actorType) params.set('actor_type', actorType);
+  if (success === true || success === false) params.set('success', String(success));
+  if (q) params.set('q', q);
+  const res = await adminFetch(`/api/admin/platform/login-audits?${params}`);
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function createPlatformUser(body) {
   const res = await adminFetch('/api/admin/platform/users', {
     method: 'POST',
