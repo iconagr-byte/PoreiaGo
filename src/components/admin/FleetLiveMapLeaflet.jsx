@@ -15,6 +15,7 @@ import {
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
 import { formatFleetBusPillLabel } from '../../lib/admin/fleetBusPillLabel.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
 import FleetMapFlyTo from './FleetMapFlyTo.jsx';
@@ -30,22 +31,37 @@ function escapeAttr(value) {
     .replace(/>/g, '&gt;');
 }
 
+/** Avoid recreating L.divIcon every animation frame (reloads the photo). */
+const BUS_ICON_CACHE = new Map();
+const BUS_ICON_CACHE_MAX = 80;
+
 const busIcon = (vehicle) => {
-  const heading = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
-  const img = escapeAttr(resolveFleetMarkerImage(vehicle));
-  const label = escapeAttr(formatFleetBusPillLabel(vehicle));
-  return L.divIcon({
+  const headingRaw = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
+  const heading = Math.round(headingRaw / 15) * 15;
+  const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
+  const label = formatFleetBusPillLabel(vehicle);
+  const key = `${vehicle?.id || ''}|${img}|${heading}|${label}`;
+  const cached = BUS_ICON_CACHE.get(key);
+  if (cached) return cached;
+
+  const icon = L.divIcon({
     className: 'fleet-bus-marker-ws',
     html: `<div class="fleet-apple-bus-pin">
-      <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${label}</div>
+      <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${escapeAttr(label)}</div>
       <div class="fleet-apple-bus-pin__ring">
-        <div class="fleet-apple-bus-pin__avatar"><img src="${img}" alt="" /></div>
+        <div class="fleet-apple-bus-pin__avatar"><img src="${escapeAttr(img)}" alt="" decoding="async" loading="eager" /></div>
         <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
     </div>`,
     iconSize: [52, 72],
     iconAnchor: [26, 40],
   });
+  BUS_ICON_CACHE.set(key, icon);
+  if (BUS_ICON_CACHE.size > BUS_ICON_CACHE_MAX) {
+    const first = BUS_ICON_CACHE.keys().next().value;
+    BUS_ICON_CACHE.delete(first);
+  }
+  return icon;
 };
 
 function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
@@ -68,8 +84,9 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
         <div className="fleet-apple-popup">
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
             <img
-              src={resolveFleetMarkerImage(v)}
+              src={resolveSiteAssetUrl(resolveFleetMarkerImage(v))}
               alt=""
+              decoding="async"
               style={{ width: 48, height: 48, borderRadius: 14, objectFit: 'cover' }}
             />
             <div>

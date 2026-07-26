@@ -168,7 +168,11 @@ export default function FleetLiveMapWebSocket() {
                           <img
                             src={img}
                             alt=""
-                            className="h-12 w-12 rounded-[14px] object-cover ring-2 ring-white shadow"
+                            width={48}
+                            height={48}
+                            decoding="async"
+                            loading="lazy"
+                            className="h-12 w-12 rounded-[14px] object-cover ring-2 ring-white shadow bg-slate-100"
                           />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-bold tracking-tight">{v.driver_name}</div>
