@@ -124,8 +124,11 @@ export default function WalletBoardingPass({
             >
               Λεπτομέρειες
             </button>
-            <Link to={`/ticket/print/${encodeURIComponent(booking.id)}`} className="wallet-pass-secondary">
-              Εκτύπωση
+            <Link
+              to={`/ticket/print/${encodeURIComponent(booking.id)}?print=1`}
+              className="wallet-pass-secondary"
+            >
+              PDF
             </Link>
           </div>
         </div>
