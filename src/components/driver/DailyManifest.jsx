@@ -102,6 +102,19 @@ export default function DailyManifest() {
         <div className="driver-boarding-bar">
           <div className="driver-boarding-fill" style={{ width: `${pct}%` }} />
         </div>
+        {(manifest?.boarded_passengers || []).length > 0 ? (
+          <ul className="mt-3 pt-3 border-t border-[var(--driver-border)] space-y-2">
+            {manifest.boarded_passengers.map((p) => (
+              <li key={`${p.booking_id}-${p.passenger_name}`} className="text-sm">
+                <p className="font-bold truncate">{p.passenger_name || 'Επιβάτης'}</p>
+                <p className="text-xs text-[var(--driver-muted)] mt-0.5">
+                  Κράτηση {p.booking_ref || p.booking_id || '—'}
+                  {p.seat_number ? ` · Θέση ${p.seat_number}` : ''}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       <div className="driver-card">

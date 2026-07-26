@@ -20,7 +20,11 @@ class DriverCheckinResponse(BaseModel):
     result: Literal["SUCCESS", "FAILURE"]
     passenger_name: str | None = None
     seat_number: str | None = None
+    seat_count: int | None = None
     booking_id: str | None = None
+    booking_ref: str | None = None
+    boarded_count: int | None = None
+    boarded_passengers: list[dict[str, Any]] | None = None
     message: str | None = None
     reason: str | None = None
     elapsed_ms: float | None = None

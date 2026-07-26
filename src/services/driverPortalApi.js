@@ -484,11 +484,15 @@ export async function submitSafetyChecklist(verificationId, items) {
 }
 
 export function getDaySummaryStats(manifest) {
-  const boarded = manifest?.boarded_passengers?.length ?? 0;
+  const boardedList = Array.isArray(manifest?.boarded_passengers)
+    ? manifest.boarded_passengers
+    : [];
+  const boarded = manifest?.boarded_count ?? boardedList.length;
   const session = getDriverSession();
   return {
     totalKm: session?.totalKm ?? 142,
     passengersBoarded: boarded,
+    boardedPassengers: boardedList,
     dailyEarnings: session?.dailyEarnings ?? boarded * 12.5,
     tripId: session?.tripId,
   };
