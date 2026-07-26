@@ -1,8 +1,10 @@
 /**
  * Rental customer PWA — offline shell (scope /rent).
  * Assets under /rental-pwa/ so /rent SPA route is not a static directory.
+ *
+ * Navigations always prefer the live SPA shell. The offline page is last resort only.
  */
-const CACHE = 'poreiago-rental-v5';
+const CACHE = 'poreiago-rental-v6';
 const OFFLINE_URL = '/rental-pwa/offline.html';
 const APP_SHELL = '/index.html';
 
@@ -27,10 +29,55 @@ function offlineHtmlResponse() {
   });
 }
 
+async function putShell(res) {
+  try {
+    const cache = await caches.open(CACHE);
+    await cache.put(APP_SHELL, res.clone());
+  } catch {
+    /* ignore quota / abort */
+  }
+}
+
+/** Network → cached SPA shell → network shell → offline HTML. */
+async function handleRentNavigate(request) {
+  try {
+    const res = await fetch(request, { cache: 'no-store' });
+    if (res && res.ok) {
+      // Successful SPA navigations are the app shell (index.html via nginx).
+      await putShell(res);
+      return res;
+    }
+  } catch {
+    /* network error — fall through */
+  }
+
+  const cachedShell = await caches.match(APP_SHELL);
+  if (cachedShell) return cachedShell;
+
+  try {
+    const shell = await fetch(APP_SHELL, { cache: 'no-store' });
+    if (shell && shell.ok) {
+      await putShell(shell);
+      return shell;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return offlineHtmlResponse();
+}
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE_URLS).catch(() => undefined)),
+    caches.open(CACHE).then((cache) =>
+      // Prefer shell; don't fail the whole install if one asset 404s mid-deploy.
+      Promise.all(
+        PRECACHE_URLS.map((url) =>
+          cache.add(url).catch(() => undefined),
+        ),
+      ),
+    ),
   );
 });
 
@@ -53,6 +100,15 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+  if (event.data?.type === 'CLEAR_RENTAL_CACHE') {
+    event.waitUntil(
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys.filter((key) => key.startsWith('poreiago-rental-')).map((key) => caches.delete(key)),
+        ),
+      ),
+    );
+  }
 });
 
 self.addEventListener('fetch', (event) => {
@@ -60,15 +116,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (request.mode === 'navigate' && url.pathname.startsWith('/rent')) {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          // Deep links must get the SPA shell — never pass through bare 404 HTML.
-          if (res && res.ok) return res;
-          return fetch(APP_SHELL).then((shell) => (shell && shell.ok ? shell : offlineHtmlResponse()));
-        })
-        .catch(() => offlineHtmlResponse()),
-    );
+    event.respondWith(handleRentNavigate(request));
     return;
   }
 
@@ -78,8 +126,10 @@ self.addEventListener('fetch', (event) => {
         (cached) =>
           cached ||
           fetch(request).then((res) => {
-            const clone = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, clone));
+            if (res && res.ok) {
+              const clone = res.clone();
+              caches.open(CACHE).then((cache) => cache.put(request, clone));
+            }
             return res;
           }),
       ),

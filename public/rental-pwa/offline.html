@@ -31,6 +31,7 @@
         font-size: 1rem;
         width: 100%;
         max-width: 280px;
+        cursor: pointer;
       }
     </style>
   </head>
@@ -38,7 +39,29 @@
     <div>
       <h1>Χωρίς σύνδεση</h1>
       <p>Η κράτηση ενοικίασης χρειάζεται δίκτυο. Δοκιμάστε ξανά σε λίγο.</p>
-      <button type="button" onclick="location.reload()">Δοκιμή ξανά</button>
+      <button type="button" id="retry">Δοκιμή ξανά</button>
     </div>
+    <script>
+      document.getElementById('retry').addEventListener('click', async () => {
+        try {
+          if (navigator.serviceWorker) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((r) => r.unregister()));
+          }
+          if (window.caches) {
+            const keys = await caches.keys();
+            await Promise.all(
+              keys
+                .filter((k) => k.indexOf('rental') !== -1 || k.indexOf('poreiago-rental') !== -1)
+                .map((k) => caches.delete(k)),
+            );
+          }
+        } catch (e) {
+          /* ignore */
+        }
+        // Hard reload of the stable share URL (bypass stuck SW).
+        location.href = '/rent?fresh=' + Date.now();
+      });
+    </script>
   </body>
 </html>
