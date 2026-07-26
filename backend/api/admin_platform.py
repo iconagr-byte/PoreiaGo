@@ -253,7 +253,7 @@ _ALLOWED_PHOTO_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 @router.post("/drivers/photo-upload")
 async def upload_driver_photo(file: UploadFile = File(...)):
     """Admin upload — returns a public URL for photo_url on create/update."""
-    import mimetypes
+    from travel_platform.media.image_optimize import optimize_driver_photo
 
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
@@ -263,18 +263,23 @@ async def upload_driver_photo(file: UploadFile = File(...)):
     if len(content) > _MAX_DRIVER_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 4 MB)")
 
-    ext = Path(file.filename or "photo.jpg").suffix.lower()
-    if ext not in _ALLOWED_PHOTO_EXT:
-        guessed = mimetypes.guess_extension(file.content_type or "") or ".jpg"
-        ext = guessed if guessed in _ALLOWED_PHOTO_EXT else ".jpg"
+    optimized = optimize_driver_photo(content)
+    if optimized.ext == ".bin":
+        raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
     safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "photo").stem)[:40] or "photo"
-    filename = f"{safe_stem}-{uuid.uuid4().hex[:10]}{ext}"
+    filename = f"{safe_stem}-{uuid.uuid4().hex[:10]}{optimized.ext}"
 
     _DRIVER_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
     out_path = _DRIVER_PHOTO_DIR / filename
-    out_path.write_bytes(content)
+    out_path.write_bytes(optimized.content)
     url = f"/api/site/driver-photos/{filename}"
-    return {"ok": True, "url": url, "filename": filename}
+    return {
+        "ok": True,
+        "url": url,
+        "filename": filename,
+        "bytes": len(optimized.content),
+        "content_type": optimized.content_type,
+    }
 
 
 @router.post("/drivers", response_model=FleetDriverResponse, status_code=201)

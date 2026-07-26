@@ -1,15 +1,20 @@
 /** Shared labels for live fleet vehicle popups / cards. */
 
-export const DEFAULT_FLEET_BUS_IMAGE = '/images/hero-bus-achillio.png';
+// ~5KB square thumb — NEVER use the 2MB hero PNG as a map avatar.
+export const DEFAULT_FLEET_BUS_IMAGE = '/images/fleet-bus-thumb.jpg';
 
 export function resolveFleetMarkerImage(vehicle) {
-  return (
+  const raw =
     vehicle?.vehicle_image_url ||
     vehicle?.vehicleImageUrl ||
     vehicle?.photo_url ||
     vehicle?.photoUrl ||
-    DEFAULT_FLEET_BUS_IMAGE
-  );
+    '';
+  // Guard against accidentally pointing markers at the huge hero asset.
+  if (!raw || String(raw).includes('hero-bus-achillio')) {
+    return DEFAULT_FLEET_BUS_IMAGE;
+  }
+  return raw;
 }
 
 export function formatUpdatedAgo(timestamp) {

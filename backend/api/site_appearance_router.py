@@ -387,7 +387,14 @@ async def get_driver_photo(filename: str):
     if not str(path).startswith(str(allowed_root)) or not path.is_file():
         raise HTTPException(status_code=404, detail="Photo not found")
     media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    return FileResponse(path, media_type=media_type)
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={
+            # Tiny map avatars are fetched often — let browsers keep them warm.
+            "Cache-Control": "public, max-age=604800, immutable",
+        },
+    )
 
 
 @router.get("/api/admin/platform/site-appearance", response_model=SiteAppearanceResponse)

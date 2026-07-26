@@ -20,6 +20,7 @@ import {
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
 import { formatFleetBusPillLabel, resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 function HeatmapDots({ points = [], visible = true }) {
   if (!visible || !points.length) return null;
@@ -43,7 +44,7 @@ function HeatmapDots({ points = [], visible = true }) {
 
 function BusMarker({ vehicle, onVehicleHistory }) {
   const [open, setOpen] = useState(false);
-  const img = resolveFleetMarkerImage(vehicle);
+  const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
   const pillLabel = formatFleetBusPillLabel(vehicle);
   const tripTitle = resolveVehicleTripTitle(vehicle);
   const openHistory = (e) => {
@@ -65,7 +66,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
           </div>
           <div className="fleet-apple-bus-pin__ring">
             <div className="fleet-apple-bus-pin__avatar">
-              <img src={img} alt="" />
+              <img src={img} alt="" decoding="async" width={40} height={40} />
             </div>
             <div
               className="fleet-apple-bus-pin__heading"
@@ -87,7 +88,12 @@ function BusMarker({ vehicle, onVehicleHistory }) {
         >
           <div className="fleet-apple-popup text-sm">
             <div className="mb-2 flex items-center gap-2.5">
-              <img src={img} alt="" className="h-12 w-12 rounded-[14px] object-cover" />
+              <img
+                src={img}
+                alt=""
+                decoding="async"
+                className="h-12 w-12 rounded-[14px] object-cover bg-slate-100"
+              />
               <div>
                 <div className="fleet-apple-popup__title">{vehicle.driver_name}</div>
                 <div className="fleet-apple-popup__meta">
