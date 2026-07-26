@@ -12,6 +12,7 @@ import {
   fetchRentalBookings,
   fetchRentalCalendar,
   fetchRentalInspections,
+  fetchRentalLiveOverlays,
   fetchRentalSummary,
   fetchRentalVehicles,
   updateRentalBookingStatus,
@@ -29,11 +30,19 @@ const CATEGORIES = [
 
 const TABS = [
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard' },
-  { id: 'vehicles', label: 'Στόλος ενοικίασης', icon: 'directions_car' },
+  { id: 'vehicles', label: 'Στόλος', icon: 'directions_car' },
   { id: 'wizard', label: 'Νέα κράτηση', icon: 'add_circle' },
+  { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
   { id: 'inspections', label: 'Check-in / out', icon: 'fact_check' },
+  { id: 'live_gps', label: 'Ζωντανά GPS', icon: 'my_location' },
 ];
+
+function bookingSource(b) {
+  // Wallet/PWA bookings always carry client_email from customer auth.
+  if (b?.client_email) return 'Wallet';
+  return 'Γραφείο';
+}
 
 const EMPTY_VEHICLE = {
   plate_number: '',
@@ -82,13 +91,15 @@ function statusChip(status) {
   return map[status] || 'bg-gray-100 text-gray-700';
 }
 
-export default function FleetRentalPanel() {
+export default function FleetRentalPanel({ onOpenLiveMap } = {}) {
   const [tab, setTab] = useState('overview');
   const [summary, setSummary] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [inspections, setInspections] = useState([]);
+  const [overlays, setOverlays] = useState([]);
+  const [bookingFilter, setBookingFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [vehicleForm, setVehicleForm] = useState(EMPTY_VEHICLE);
   const [editingId, setEditingId] = useState(null);
@@ -129,18 +140,20 @@ export default function FleetRentalPanel() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, v, b, c, i] = await Promise.all([
+      const [s, v, b, c, i, o] = await Promise.all([
         fetchRentalSummary(),
         fetchRentalVehicles(),
         fetchRentalBookings(),
         fetchRentalCalendar(45),
         fetchRentalInspections(),
+        fetchRentalLiveOverlays().catch(() => []),
       ]);
       setSummary(s);
       setVehicles(v);
       setBookings(b);
       setBlocks(c);
       setInspections(i);
+      setOverlays(o);
     } catch (err) {
       toast.error(err.message || 'Αποτυχία φόρτωσης ενοικιάσεων');
     } finally {
@@ -154,6 +167,21 @@ export default function FleetRentalPanel() {
 
   const activeBookings = useMemo(
     () => bookings.filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.rental_status)),
+    [bookings],
+  );
+
+  const filteredBookings = useMemo(() => {
+    if (bookingFilter === 'ALL') return bookings;
+    if (bookingFilter === 'WALLET') return bookings.filter((b) => bookingSource(b) === 'Wallet');
+    if (bookingFilter === 'DESK') return bookings.filter((b) => bookingSource(b) === 'Γραφείο');
+    if (bookingFilter === 'ACTIVE') {
+      return bookings.filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.rental_status));
+    }
+    return bookings.filter((b) => b.rental_status === bookingFilter);
+  }, [bookings, bookingFilter]);
+
+  const walletBookingCount = useMemo(
+    () => bookings.filter((b) => bookingSource(b) === 'Wallet').length,
     [bookings],
   );
 
@@ -308,10 +336,10 @@ export default function FleetRentalPanel() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-headline-lg text-2xl font-bold tracking-tight text-on-surface">
-            Ενοικιάσεις στόλου
+            Ενοικιάσεις
           </h2>
           <p className="text-on-surface-variant mt-1 max-w-2xl">
-            Cars · Vans · Minibuses — διαθεσιμότητα, κράτηση, check-in/out σε ένα μενού.
+            Στόλος, κρατήσεις (γραφείο + Wallet), τιμές, check-in/out με selfie &amp; υπογραφή, GPS.
           </p>
         </div>
         <button
@@ -360,6 +388,38 @@ export default function FleetRentalPanel() {
               <p className="text-2xl font-bold mt-2 text-gray-900">{card.value}</p>
             </div>
           ))}
+
+          <div className="sm:col-span-2 lg:col-span-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {[
+              { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
+              { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
+              { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
+              { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
+              { id: 'live_gps', label: 'Ζωντανά GPS', copy: `${overlays.length} ενεργά για χάρτη`, icon: 'my_location' },
+              { id: 'calendar', label: 'Ημερολόγιο', copy: 'Αξιοποίηση στόλου', icon: 'calendar_month' },
+            ].map((hub) => (
+              <button
+                key={hub.id}
+                type="button"
+                onClick={() => setTab(hub.id)}
+                className="text-left bg-white rounded-2xl border border-black/[0.06] px-4 py-3 hover:border-primary/40 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[20px]">{hub.icon}</span>
+                  <p className="font-bold text-sm text-gray-900">{hub.label}</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{hub.copy}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="sm:col-span-2 lg:col-span-4 rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-3 text-sm text-sky-950">
+            <p className="font-bold">Wallet πελατών</p>
+            <p className="mt-0.5 text-sky-900/80">
+              Οι πελάτες κλείνουν από My Wallet → «Ενοικίαση». Νέα κράτηση στέλνει push στο γραφείο· εμφανίζεται εδώ στο tab «Κρατήσεις».
+            </p>
+          </div>
+
           {(summary?.service_alerts || []).length > 0 ? (
             <div className="sm:col-span-2 lg:col-span-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
               <p className="text-sm font-bold text-amber-900">Service alerts (χιλιόμετρα)</p>
@@ -373,9 +433,18 @@ export default function FleetRentalPanel() {
             </div>
           ) : null}
           <div className="sm:col-span-2 lg:col-span-4 bg-white rounded-2xl border border-black/[0.06] p-4">
-            <h3 className="font-bold text-gray-900 mb-3">Επόμενες κρατήσεις</h3>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h3 className="font-bold text-gray-900">Επόμενες κρατήσεις</h3>
+              <button
+                type="button"
+                className="text-xs font-bold text-primary"
+                onClick={() => setTab('bookings')}
+              >
+                Όλες
+              </button>
+            </div>
             {activeBookings.length === 0 ? (
-              <p className="text-sm text-gray-500">Καμία ενεργή κράτηση — ξεκινήστε από «Νέα κράτηση».</p>
+              <p className="text-sm text-gray-500">Καμία ενεργή κράτηση — ξεκινήστε από «Νέα κράτηση» ή το Wallet.</p>
             ) : (
               <div className="space-y-2">
                 {activeBookings.slice(0, 6).map((b) => (
@@ -389,6 +458,7 @@ export default function FleetRentalPanel() {
                       </p>
                       <p className="text-xs text-gray-500">
                         {formatWhen(b.start_time)} → {formatWhen(b.end_time)} · {b.pickup_location}
+                        {` · ${bookingSource(b)}`}
                       </p>
                     </div>
                     <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(b.rental_status)}`}>
@@ -841,6 +911,183 @@ export default function FleetRentalPanel() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'bookings' && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'ALL', label: `Όλες (${bookings.length})` },
+              { id: 'ACTIVE', label: `Ενεργές (${activeBookings.length})` },
+              { id: 'WALLET', label: `Wallet (${walletBookingCount})` },
+              { id: 'DESK', label: 'Γραφείο' },
+              { id: 'COMPLETED', label: 'Ολοκληρωμένες' },
+              { id: 'CANCELLED', label: 'Ακυρωμένες' },
+            ].map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setBookingFilter(f.id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold border ${
+                  bookingFilter === f.id
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-gray-600 border-black/[0.08]'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="bg-white rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05]">
+            {filteredBookings.length === 0 ? (
+              <p className="p-6 text-sm text-gray-500">Καμία κράτηση σε αυτό το φίλτρο.</p>
+            ) : (
+              filteredBookings.map((b) => (
+                <article key={b.id} className="px-4 py-3 flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-bold text-sm text-gray-900">
+                      {b.client_name} · {b.vehicle_plate || b.vehicle_model || '—'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
+                      {b.pickup_location
+                        ? ` · ${b.pickup_location}${
+                            b.dropoff_location && b.dropoff_location !== b.pickup_location
+                              ? ` → ${b.dropoff_location}`
+                              : ''
+                          }`
+                        : ''}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {euro(b.total_cost)}
+                      {b.driver_mode === 'WITH_DRIVER' ? ' · με οδηγό' : ' · self-drive'}
+                      {b.client_email ? ` · ${b.client_email}` : ''}
+                      {b.client_phone ? ` · ${b.client_phone}` : ''}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                        {bookingSource(b)}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusChip(b.rental_status)}`}>
+                        {b.rental_status}
+                      </span>
+                      {b.pricing?.is_one_way ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          One-way
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {b.rental_status === 'CONFIRMED' ? (
+                      <>
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-primary"
+                          onClick={() => {
+                            setInsp((s) => ({ ...s, rental_booking_id: b.id, inspection_type: 'PICKUP_CHECK' }));
+                            setTab('inspections');
+                          }}
+                        >
+                          Check-in
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-rose-600"
+                          disabled={busy}
+                          onClick={async () => {
+                            if (!window.confirm('Ακύρωση κράτησης;')) return;
+                            setBusy(true);
+                            try {
+                              await updateRentalBookingStatus(b.id, 'CANCELLED');
+                              toast.success('Ακυρώθηκε');
+                              await reload();
+                            } catch (err) {
+                              toast.error(err.message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Ακύρωση
+                        </button>
+                      </>
+                    ) : null}
+                    {b.rental_status === 'ACTIVE' ? (
+                      <button
+                        type="button"
+                        className="text-xs font-bold text-primary"
+                        onClick={() => {
+                          setInsp((s) => ({ ...s, rental_booking_id: b.id, inspection_type: 'RETURN_CHECK' }));
+                          setTab('inspections');
+                        }}
+                      >
+                        Check-out
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'live_gps' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-black/[0.06] p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-gray-900">Ζωντανά GPS ενοικιάσεων</h3>
+              <p className="text-sm text-gray-500 mt-1 max-w-xl">
+                Ενεργές κρατήσεις με πινακίδα / GPS device εμφανίζονται στον ζωντανό χάρτη ως
+                «Ενοικίαση · πελάτης».
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenLiveMap?.()}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold"
+            >
+              <span className="material-symbols-outlined text-[18px]">map</span>
+              Άνοιγμα ζωντανού χάρτη
+            </button>
+          </div>
+          <div className="bg-white rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05]">
+            {overlays.length === 0 ? (
+              <p className="p-6 text-sm text-gray-500">
+                Καμία ενεργή ενοικίαση για overlay. Ορίστε GPS device ή πινακίδα στο όχημα και κάντε
+                κράτηση.
+              </p>
+            ) : (
+              overlays.map((o) => (
+                <div key={o.booking_id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-gray-900">{o.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {o.plate_number || '—'}
+                      {o.gps_device_id ? ` · device ${o.gps_device_id}` : ' · χωρίς gps_device_id'}
+                      {` · ${o.rental_status}`}
+                      {o.driver_mode === 'WITH_DRIVER' ? ' · με οδηγό' : ''}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {formatWhen(o.start_time)} → {formatWhen(o.end_time)}
+                      {o.pickup_location ? ` · ${o.pickup_location}` : ''}
+                    </p>
+                  </div>
+                  <span
+                    className={`text-[11px] font-bold px-2 py-1 rounded-full ${
+                      o.gps_device_id || o.plate_number
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {o.gps_device_id || o.plate_number ? 'Έτοιμο για χάρτη' : 'Χωρίς GPS'}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 

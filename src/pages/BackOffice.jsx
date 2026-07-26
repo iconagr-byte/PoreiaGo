@@ -2143,7 +2143,7 @@ export default function BackOffice() {
             )}
             {activeTab === 'fleet_rental' && (
               <div className="pb-stack-lg">
-                <FleetRentalPanel />
+                <FleetRentalPanel onOpenLiveMap={() => setActiveTab('fleet_live_map')} />
               </div>
             )}
             {activeTab === 'fleet_calendar' && (
