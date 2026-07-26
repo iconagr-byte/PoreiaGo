@@ -4,6 +4,7 @@
 import { API_BASE } from '../config/api.js';
 import { clearSaasRoles, decodeJwtPayload, getSaasRoles, storeSaasRoles, storeSaasRolesFromToken } from '../lib/saasJwt.js';
 import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
+import { localIdFromReference } from '../lib/ticketing/bookingIds.js';
 
 const TOKEN_KEY = 'saas_access_token';
 const TENANT_KEY = 'saas_tenant_id';
@@ -322,11 +323,12 @@ export async function syncTicketForBoarding(booking) {
   const dep = booking.date
     ? `${booking.date}T${booking.time || '08:00'}:00`
     : new Date().toISOString();
+  const canonicalId = localIdFromReference(booking.pnr || booking.id) || booking.id;
   const res = await fetch(`${API_BASE}/api/tickets/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      id: booking.id,
+      id: canonicalId,
       trip_id: trip,
       customer_name: booking.customerName,
       seat_number: booking.seat || booking.seats?.join(', ') || '—',

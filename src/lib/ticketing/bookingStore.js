@@ -24,6 +24,7 @@ import {
   upsertBookingOnServer,
 } from '../../services/customerBookingsApi.js';
 import { CHECK_IN } from './constants.js';
+import { localIdFromReference } from './bookingIds.js';
 import {
   buildPaymentMethodLabel,
   buildPaymentStatusLabel,
@@ -265,7 +266,11 @@ function buildLocalBooking({
       : '';
 
   return {
-    id: saasMeta?.saasBookingId ? `B-${saasMeta.referenceCode}` : `B-${Date.now()}`,
+    id: saasMeta?.referenceCode
+      ? localIdFromReference(saasMeta.referenceCode)
+      : saasMeta?.saasBookingId
+        ? `B-${String(saasMeta.saasBookingId).slice(0, 8)}`
+        : `B-${Date.now()}`,
     saasBookingId: saasMeta?.saasBookingId || null,
     customerId: customer.id,
     customerName: passenger.name.trim(),

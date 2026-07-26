@@ -102,7 +102,16 @@ async def sync_trip_passengers_to_ticketing(
                     or (", ".join(str(s) for s in seats if s) if seats else "—")
                 )
                 saas_id = str(b.id)
-                local_id = str(meta.get("local_id") or b.reference_code or saas_id)
+                try:
+                    from api.admin_booking_mapper import local_id_from_reference
+
+                    local_id = str(
+                        meta.get("local_id")
+                        or local_id_from_reference(b.reference_code or "")
+                        or saas_id
+                    )
+                except Exception:
+                    local_id = str(meta.get("local_id") or b.reference_code or saas_id)
                 try:
                     await upsert_ticket_booking(
                         local_id=local_id,

@@ -2,13 +2,18 @@
 
 from datetime import datetime, timezone
 
+from api.admin_booking_mapper import booking_id_aliases
 from .db import get_db, row_to_booking, transaction
 from .bt1_token import verify_bt1_token
 from .qr_rotating import verify_rotating_jwt
 
 
 def is_paid(payment_status: str) -> bool:
-    return "PAID" in (payment_status or "").upper()
+    """Boardable when fully paid or accepted deposit/partial (wallet shows QR for these)."""
+    ps = (payment_status or "").upper()
+    if "CANCELLED" in ps or "REFUND" in ps:
+        return False
+    return "PAID" in ps or "DEPOSIT" in ps or "PARTIAL" in ps
 
 
 def is_cancelled(booking: dict) -> bool:
@@ -28,13 +33,43 @@ async def get_booking_by_ref(ticket_ref: str) -> dict | None:
 
 
 async def get_booking_by_id(booking_id: str) -> dict | None:
+    """Resolve wallet/office id variants (B-HEX, BK-HEX, B-BK-HEX, saas uuid)."""
+    aliases = booking_id_aliases(booking_id)
+    if not aliases and booking_id:
+        aliases = [booking_id]
+    if not aliases:
+        return None
+
     db = get_db()
+    placeholders = ", ".join("?" for _ in aliases)
     cur = await db.execute(
-        "SELECT * FROM ticket_bookings WHERE id = ? OR saas_booking_id = ? LIMIT 1",
-        (booking_id, booking_id),
+        f"""
+        SELECT * FROM ticket_bookings
+        WHERE id IN ({placeholders})
+           OR saas_booking_id IN ({placeholders})
+        LIMIT 1
+        """,
+        (*aliases, *aliases),
     )
     row = await cur.fetchone()
-    return row_to_booking(row) if row else None
+    if row:
+        return row_to_booking(row)
+
+    # Office sync stores PNR inside special_requirements JSON.
+    for alias in aliases:
+        like = f'%"{alias}"%'
+        cur = await db.execute(
+            """
+            SELECT * FROM ticket_bookings
+            WHERE special_requirements LIKE ?
+            LIMIT 1
+            """,
+            (like,),
+        )
+        row = await cur.fetchone()
+        if row:
+            return row_to_booking(row)
+    return None
 
 
 def scan_response_success(booking: dict) -> dict:
@@ -214,10 +249,14 @@ async def _process_bt1_scan(token: str, trip_id: int) -> dict:
     if int(payload.get("tripId", trip_id)) != int(trip_id):
         return scan_response_failure("TRIP_MISMATCH", _msg("TRIP_MISMATCH"))
 
+    booking = await get_booking_by_id(booking_id)
+    if not booking:
+        return scan_response_failure("NOT_FOUND", "Δεν βρέθηκε κράτηση.")
+
     async with transaction() as db:
         cur = await db.execute(
-            "SELECT * FROM ticket_bookings WHERE id = ? OR saas_booking_id = ? LIMIT 1",
-            (booking_id, booking_id),
+            "SELECT * FROM ticket_bookings WHERE id = ? LIMIT 1",
+            (booking["id"],),
         )
         row = await cur.fetchone()
         if not row:

@@ -54,12 +54,35 @@ def normalize_reference(code: str) -> str:
 
 
 def local_id_from_reference(reference_code: str) -> str:
-    ref = (reference_code or "").strip().upper()
+    """Canonical ticketing/wallet id: BK-B95F8658 → B-B95F8658 (never B-BK-…)."""
+    ref = (reference_code or "").strip().upper().replace(" ", "")
+    # Peel accidental B- prefixes so B-BK-HEX and B-B-HEX collapse correctly.
+    while ref.startswith("B-") and not ref.startswith("BK-"):
+        ref = ref[2:]
     if ref.startswith("BK-"):
         return f"B-{ref[3:]}"
-    if ref.startswith("B-"):
-        return ref
-    return f"B-{ref}"
+    return f"B-{ref}" if ref else ""
+
+
+def booking_id_aliases(booking_id: str) -> list[str]:
+    """All id forms that may appear in wallet QR, checkout sync, or office sync."""
+    raw = (booking_id or "").strip()
+    if not raw:
+        return []
+    upper = raw.upper().replace(" ", "")
+    canon = local_id_from_reference(upper)
+    pnr = normalize_reference(upper)
+    candidates = [raw, upper, canon, pnr]
+    if pnr.startswith("BK-"):
+        candidates.append(f"B-{pnr}")  # legacy B-BK-HEX
+    out: list[str] = []
+    seen: set[str] = set()
+    for c in candidates:
+        if not c or c in seen:
+            continue
+        seen.add(c)
+        out.append(c)
+    return out
 
 
 def build_fiscal_admin_fields(
