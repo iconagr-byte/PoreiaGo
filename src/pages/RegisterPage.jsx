@@ -16,11 +16,25 @@ function isRentReturn(path) {
   return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
 }
 
+function isRentAuthPath(pathname) {
+  return (
+    pathname === '/rent' ||
+    pathname === '/rent/login' ||
+    pathname === '/rent/register' ||
+    (typeof pathname === 'string' && pathname.startsWith('/rent/'))
+  );
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectTo = location.state?.from || '/wallet';
-  const rentIntent = isRentReturn(redirectTo);
+  const pathRent = isRentAuthPath(location.pathname);
+  const redirectTo = pathRent
+    ? isRentReturn(location.state?.from)
+      ? location.state.from
+      : '/rent'
+    : location.state?.from || '/wallet';
+  const rentIntent = pathRent || isRentReturn(redirectTo);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
@@ -46,6 +60,15 @@ export default function RegisterPage() {
   useEffect(() => {
     isCustomerAuthBackendAvailable().then(setBackendOk);
   }, []);
+
+  useEffect(() => {
+    if (
+      location.pathname === '/register' &&
+      isRentReturn(location.state?.from)
+    ) {
+      navigate('/rent/register', { replace: true, state: location.state });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -199,7 +222,11 @@ export default function RegisterPage() {
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
               {error}{' '}
               {error.includes('σύνδεση') ? (
-                <Link to="/login" state={loginState} className="font-bold underline">
+                <Link
+                  to={rentIntent ? '/rent/login' : '/login'}
+                  state={loginState}
+                  className="font-bold underline"
+                >
                   Σύνδεση
                 </Link>
               ) : null}
@@ -266,7 +293,7 @@ export default function RegisterPage() {
 
         <p className="text-sm text-center mt-6 text-[#6e6e73]">
           Έχετε ήδη λογαριασμό;{' '}
-          <Link to="/login" state={loginState} className={linkClass}>
+          <Link to={rentIntent ? '/rent/login' : '/login'} state={loginState} className={linkClass}>
             Σύνδεση
           </Link>
         </p>

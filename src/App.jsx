@@ -69,6 +69,9 @@ function App() {
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
             <Route path="/wallet/magic" element={<WalletMagicPage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
+            {/* Rent auth stays under /rent — never the bus My Wallet /login. */}
+            <Route path="/rent/login" element={<LoginPage />} />
+            <Route path="/rent/register" element={<RegisterPage />} />
             <Route path="/rent" element={<RentalCustomerApp />} />
             <Route path="/rent/*" element={<RentalCustomerApp />} />
             <Route path="/" element={<HomePage />} />
