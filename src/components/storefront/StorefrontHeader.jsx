@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getCustomerToken, isCustomer } from '../../lib/auth.js';
 import StorefrontBrand from './StorefrontBrand.jsx';
 
 const HEADER_STYLES = {
@@ -63,11 +64,18 @@ function phoneHref(phone) {
   return digits ? `tel:${digits}` : '';
 }
 
+function hasWalletSession() {
+  return Boolean(isCustomer() && getCustomerToken());
+}
+
 export default function StorefrontHeader({ siteAppearance, templateId = 'glass_dark' }) {
   const style = HEADER_STYLES[templateId] || HEADER_STYLES.glass_dark;
   const isDark = style.variant === 'dark';
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [walletReady, setWalletReady] = useState(() =>
+    typeof window !== 'undefined' ? hasWalletSession() : false,
+  );
 
   const phone = String(siteAppearance?.footer_contact_phone || '').trim();
   const showFleet = siteAppearance?.show_fleet_section !== false;
@@ -78,6 +86,17 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setWalletReady(hasWalletSession());
+    sync();
+    window.addEventListener('storage', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('focus', sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -93,7 +112,7 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
     ? 'text-sm font-semibold text-white/80 hover:text-white transition-colors'
     : 'text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors';
 
-  const bookingCta = isDark
+  const walletCta = isDark
     ? 'inline-flex items-center gap-1.5 rounded-full bg-white text-slate-900 px-4 py-2 text-sm font-bold shadow-sm hover:bg-white/90 transition-colors'
     : 'inline-flex items-center gap-1.5 rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-slate-800 transition-colors';
 
@@ -113,6 +132,10 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
 
   const closeMenu = () => setMenuOpen(false);
 
+  const walletLink = walletReady
+    ? { to: '/wallet' }
+    : { to: '/login', state: { from: '/wallet', walletClaim: true } };
+
   return (
     <header className={wrapClass}>
       <div className={style.inner}>
@@ -130,6 +153,9 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
           <a href="#contact" className={navLink}>
             Επικοινωνία
           </a>
+          <Link to="/my-booking" className={navLink}>
+            Η κράτησή μου
+          </Link>
           {tel ? (
             <a href={tel} className={phoneLink} aria-label={`Τηλέφωνο ${phone}`}>
               <span className="material-symbols-outlined text-[18px]" aria-hidden>
@@ -138,8 +164,16 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
               <span className="tabular-nums tracking-tight">{phone}</span>
             </a>
           ) : null}
-          <Link to="/my-booking" className={bookingCta}>
-            Η κράτησή μου
+          <Link
+            to={walletLink.to}
+            state={walletLink.state}
+            className={walletCta}
+            title={walletReady ? 'Άνοιγμα My Wallet' : 'Σύνδεση στο My Wallet'}
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden>
+              account_balance_wallet
+            </span>
+            My Wallet
           </Link>
           <Link to="/admin/login" className={officeLink} title="Σύνδεση για το γραφείο">
             <span className="material-symbols-outlined text-[14px]" aria-hidden>
@@ -150,8 +184,16 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
         </nav>
 
         <div className="flex md:hidden items-center gap-2">
-          <Link to="/my-booking" className={`${bookingCta} !px-3 !py-1.5 !text-xs`}>
-            Κράτηση
+          <Link
+            to={walletLink.to}
+            state={walletLink.state}
+            className={`${walletCta} !px-3 !py-1.5 !text-xs`}
+            aria-label="My Wallet"
+          >
+            <span className="material-symbols-outlined text-[16px]" aria-hidden>
+              account_balance_wallet
+            </span>
+            Wallet
           </Link>
           <button
             type="button"
@@ -196,9 +238,20 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
               </a>
             ) : null}
             <Link
+              to={walletLink.to}
+              state={walletLink.state}
+              onClick={closeMenu}
+              className="rounded-xl px-3 py-3 text-sm font-bold hover:bg-black/5 inline-flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                account_balance_wallet
+              </span>
+              My Wallet
+            </Link>
+            <Link
               to="/my-booking"
               onClick={closeMenu}
-              className="rounded-xl px-3 py-3 text-sm font-bold hover:bg-black/5"
+              className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5"
             >
               Η κράτησή μου
             </Link>
