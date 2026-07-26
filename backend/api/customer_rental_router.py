@@ -66,6 +66,7 @@ def _public_booking(row: dict) -> dict:
     return {
         "id": row["id"],
         "vehicle_id": row.get("vehicle_id"),
+        "client_id": row.get("client_id"),
         "vehicle_plate": row.get("vehicle_plate"),
         "vehicle_model": row.get("vehicle_model"),
         "vehicle_category": row.get("vehicle_category"),
@@ -77,6 +78,7 @@ def _public_booking(row: dict) -> dict:
         "pricing": row.get("pricing"),
         "rental_status": row.get("rental_status"),
         "driver_mode": row.get("driver_mode"),
+        "channel": row.get("channel"),
         "created_at": row.get("created_at"),
     }
 

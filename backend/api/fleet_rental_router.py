@@ -64,6 +64,7 @@ class BookingBody(BaseModel):
     client_email: str | None = None
     client_phone: str | None = None
     client_id: str | None = None
+    channel: str = "DESK"
     start_time: str
     end_time: str
     pickup_location: str = Field(min_length=1, max_length=240)

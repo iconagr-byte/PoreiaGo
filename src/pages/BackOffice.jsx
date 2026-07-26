@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchAllLostItems, updateLostItemStatus } from '../services/lostItemsApi.js';
-import { loadAllCustomers, getCustomerByEmail, syncCustomersFromBookings } from '../lib/customers/customerStore.js';
+import {
+  loadAllCustomers,
+  getCustomerByEmail,
+  syncCustomersFromBookings,
+  syncCustomersFromRentalBookings,
+} from '../lib/customers/customerStore.js';
+import { fetchRentalBookings } from '../services/fleetRentalApi.js';
 import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
@@ -115,6 +121,7 @@ export default function BackOffice() {
   });
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customers, setCustomers] = useState(() => loadAllCustomers());
+  const [rentalBookings, setRentalBookings] = useState([]);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -205,9 +212,9 @@ export default function BackOffice() {
     };
   }, [activeTab, location.key]);
 
-  // Πελατολόγιο: hydrate from SaaS/local bookings + refresh list.
+  // Πελατολόγιο: hydrate from trip + rental bookings into CRM people.
   useEffect(() => {
-    if (activeTab !== 'customers') return;
+    if (activeTab !== 'customers' && activeTab !== 'fleet_rental') return;
     let cancelled = false;
     loadMergedBookings()
       .then((merged) => {
@@ -218,6 +225,16 @@ export default function BackOffice() {
       })
       .catch(() => {
         if (!cancelled) setCustomers(loadAllCustomers());
+      });
+    fetchRentalBookings()
+      .then((rows) => {
+        if (cancelled) return;
+        setRentalBookings(rows);
+        syncCustomersFromRentalBookings(rows);
+        setCustomers(loadAllCustomers());
+      })
+      .catch(() => {
+        if (!cancelled) setRentalBookings([]);
       });
     return () => {
       cancelled = true;
@@ -911,7 +928,18 @@ export default function BackOffice() {
           b.customerName === customer.name ||
           b.email === customer.email,
       );
+      const customerRentals = rentalBookings.filter(
+        (b) =>
+          b.client_id === customer.id ||
+          (customer.email &&
+            String(b.client_email || '')
+              .trim()
+              .toLowerCase() === String(customer.email).trim().toLowerCase()),
+      );
       const totalSpent = customerBookings.reduce((sum, b) => sum + (b.price || 0), 0);
+      const rentalSpent = customerRentals
+        .filter((b) => b.rental_status !== 'CANCELLED')
+        .reduce((sum, b) => sum + Number(b.total_cost || 0), 0);
       const paidTotal = customerBookings.filter(isPaid).reduce((sum, b) => sum + (b.price || 0), 0);
       const confirmedCount = customerBookings.filter(isConfirmed).length;
       const pendingCount = customerBookings.length - confirmedCount;
@@ -1035,11 +1063,11 @@ export default function BackOffice() {
               <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-sky-500 text-white shadow-md shadow-primary/20 flex items-center justify-center">
                 <span className="material-symbols-outlined text-[20px]">receipt_long</span>
               </span>
-              Ιστορικό κρατήσεων & οικονομικά
+              Ιστορικό εκδρομών & οικονομικά
             </h3>
             {customerBookings.length === 0 ? (
               <p className="p-8 text-center text-slate-500 bg-gradient-to-br from-slate-50 to-sky-50/40 rounded-3xl border border-sky-100">
-                Δεν υπάρχουν καταγεγραμμένες κρατήσεις.
+                Δεν υπάρχουν καταγεγραμμένες κρατήσεις εκδρομών.
               </p>
             ) : (
               customerBookings.map((b) => (
@@ -1049,6 +1077,62 @@ export default function BackOffice() {
                   onOpenDetail={openBookingTicket}
                   onViewTicket={openBookingTicket}
                 />
+              ))
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="font-bold text-lg flex items-center gap-2.5 px-1">
+              <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 text-white shadow-md shadow-teal-500/20 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[20px]">car_rental</span>
+              </span>
+              Ενοικιάσεις
+              {customerRentals.length ? (
+                <span className="text-sm font-semibold text-slate-400">
+                  · {customerRentals.length} · €{rentalSpent.toFixed(2)}
+                </span>
+              ) : null}
+            </h3>
+            {customerRentals.length === 0 ? (
+              <p className="p-6 text-center text-slate-500 bg-gradient-to-br from-slate-50 to-teal-50/40 rounded-3xl border border-teal-100">
+                Καμία ενοικίαση για αυτό το πρόσωπο.
+              </p>
+            ) : (
+              customerRentals.map((r) => (
+                <article
+                  key={r.id}
+                  className="rounded-2xl border border-teal-100 bg-white px-4 py-3 flex flex-wrap items-center justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-slate-900">
+                      {r.vehicle_model || 'Όχημα'} · {r.vehicle_plate || '—'}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {r.start_time
+                        ? new Date(r.start_time).toLocaleString('el-GR', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '—'}
+                      {' → '}
+                      {r.end_time
+                        ? new Date(r.end_time).toLocaleString('el-GR', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '—'}
+                      {r.pickup_location ? ` · ${r.pickup_location}` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-teal-700">€{Number(r.total_cost || 0).toFixed(2)}</p>
+                    <p className="text-[11px] font-bold text-slate-500">{r.rental_status}</p>
+                  </div>
+                </article>
               ))
             )}
           </div>
@@ -2143,7 +2227,14 @@ export default function BackOffice() {
             )}
             {activeTab === 'fleet_rental' && (
               <div className="pb-stack-lg">
-                <FleetRentalPanel onOpenLiveMap={() => setActiveTab('fleet_live_map')} />
+                <FleetRentalPanel
+                  onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+                  onOpenCustomer={(person) => {
+                    setSelectedCustomer(person);
+                    setCustomers(loadAllCustomers());
+                    setActiveTab('customers');
+                  }}
+                />
               </div>
             )}
             {activeTab === 'fleet_calendar' && (
