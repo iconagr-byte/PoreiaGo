@@ -2,8 +2,8 @@
  * Register My Wallet service worker + manifest (scope /wallet).
  */
 
-const MANIFEST_HREF = '/wallet/manifest.webmanifest';
-const SW_HREF = '/wallet/sw.js';
+const MANIFEST_HREF = '/wallet-pwa/manifest.webmanifest';
+const SW_HREF = '/wallet-pwa/sw.js';
 const THEME = '#0f4c81';
 const APPLE_ICON = '/icons/wallet-pwa-192.png';
 
@@ -58,6 +58,7 @@ export function registerWalletServiceWorker() {
   };
   navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
+  // SW file is outside /wallet; nginx sends Service-Worker-Allowed: /wallet
   navigator.serviceWorker
     .register(SW_HREF, { updateViaCache: 'none', scope: '/wallet' })
     .then((reg) => {

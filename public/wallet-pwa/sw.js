@@ -1,13 +1,13 @@
 /**
  * My Wallet — offline last pass shell (scope /wallet).
- * Does not claim root `/` so push `/sw.js` can coexist.
+ * Assets live under /wallet-pwa/ so /wallet SPA route is not a static directory (nginx 403).
  */
-const CACHE = 'poreiago-wallet-v1';
-const OFFLINE_URL = '/wallet/offline.html';
+const CACHE = 'poreiago-wallet-v2';
+const OFFLINE_URL = '/wallet-pwa/offline.html';
 
 const PRECACHE_URLS = [
   OFFLINE_URL,
-  '/wallet/manifest.webmanifest',
+  '/wallet-pwa/manifest.webmanifest',
   '/icons/wallet-pwa.svg',
   '/icons/wallet-pwa-192.png',
   '/icons/wallet-pwa-512.png',
