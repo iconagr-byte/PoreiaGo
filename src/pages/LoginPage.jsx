@@ -22,12 +22,18 @@ import {
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 
+function isRentReturn(path) {
+  return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { enabled: googleEnabled } = useGoogleAuthConfig();
   const redirectTo = location.state?.from || '/wallet';
-  const walletIntent = location.state?.from === '/wallet' || Boolean(location.state?.walletClaim);
+  const rentIntent = isRentReturn(redirectTo);
+  const walletIntent =
+    !rentIntent && (location.state?.from === '/wallet' || Boolean(location.state?.walletClaim));
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -60,6 +66,8 @@ export default function LoginPage() {
       navigate(redirectTo, { replace: true });
       return;
     }
+    // Rent login is for vehicle customers — keep admins/drivers on this page only for wallet.
+    if (rentIntent) return;
     if (isAdmin()) {
       navigate('/admin', { replace: true });
       return;
@@ -67,7 +75,7 @@ export default function LoginPage() {
     if (isDriver()) {
       navigate('/driver', { replace: true });
     }
-  }, [navigate, redirectTo, walletIntent]);
+  }, [navigate, redirectTo, walletIntent, rentIntent]);
 
   const finishLogin = (email, profile = {}, accessToken = null) => {
     loginAsCustomer(email, profile, accessToken);
@@ -162,18 +170,27 @@ export default function LoginPage() {
 
       <div className="bg-surface-container-lowest p-10 md:p-14 rounded-[32px] shadow-level-2 card-inner-border w-full max-w-md relative z-10">
         <div className="text-center mb-10">
-          <span className="material-symbols-outlined text-4xl text-primary mb-3">account_balance_wallet</span>
+          <span className="material-symbols-outlined text-4xl text-primary mb-3">
+            {rentIntent ? 'directions_car' : 'account_balance_wallet'}
+          </span>
           <h1 className="font-headline-md text-headline-md font-bold text-on-surface tracking-tight mb-2">
-            My Wallet
+            {rentIntent ? 'Ενοικίαση' : 'My Wallet'}
           </h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            {claim
-              ? 'Συνδεθείτε για να δείτε το εισιτήριο της κράτησής σας'
-              : 'Σύνδεση πελάτη — ο λογαριασμός σας αποθηκεύεται στον server'}
+            {rentIntent
+              ? 'Σύνδεση για κράτηση οχήματος. Νέος πελάτης; Δημιουργήστε λογαριασμό πρώτα.'
+              : claim
+                ? 'Συνδεθείτε για να δείτε το εισιτήριο της κράτησής σας'
+                : 'Σύνδεση πελάτη — ο λογαριασμός σας αποθηκεύεται στον server'}
           </p>
+          {rentIntent ? (
+            <p className="text-xs text-on-surface-variant mt-2">
+              Τα ταξίδια με λεωφορείο είναι στο My Wallet — εδώ είναι η ενοικίαση οχήματος.
+            </p>
+          ) : null}
         </div>
 
-        {claim ? (
+        {claim && !rentIntent ? (
           <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-on-surface">
             <p className="font-bold text-primary mb-1">Κράτηση έτοιμη για το Wallet</p>
             <p className="text-on-surface-variant">
@@ -280,29 +297,34 @@ export default function LoginPage() {
           Δεν έχετε λογαριασμό;{' '}
           <Link
             to="/register"
-            state={walletClaimNavState(
-              claim
+            state={
+              claim && !rentIntent
                 ? {
-                    email: prefillEmail,
-                    name: claim.name,
-                    phone: claim.phone,
-                    bookingId: highlightBooking,
-                    reference: claim.reference,
-                    source: claim.source || 'manual',
-                    createdAt: Date.now(),
+                    ...walletClaimNavState({
+                      email: prefillEmail,
+                      name: claim.name,
+                      phone: claim.phone,
+                      bookingId: highlightBooking,
+                      reference: claim.reference,
+                      source: claim.source || 'manual',
+                      createdAt: Date.now(),
+                    }),
+                    from: redirectTo,
                   }
-                : null,
-            )}
+                : { from: redirectTo }
+            }
             className="text-primary font-bold hover:underline"
           >
-            Εγγραφή
+            {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
           </Link>
         </p>
-        <p className="text-xs text-center text-gray-500 mt-4">
-          <Link to="/my-booking" className="text-primary font-semibold hover:underline">
-            Εύρεση κράτησης
-          </Link>
-        </p>
+        {!rentIntent ? (
+          <p className="text-xs text-center text-gray-500 mt-4">
+            <Link to="/my-booking" className="text-primary font-semibold hover:underline">
+              Εύρεση κράτησης
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-8 text-center relative z-10">

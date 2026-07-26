@@ -10,9 +10,15 @@ import {
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 
+function isRentReturn(path) {
+  return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const redirectTo = location.state?.from || '/wallet';
+  const rentIntent = isRentReturn(redirectTo);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
@@ -72,13 +78,17 @@ export default function RegisterPage() {
       );
       const hadClaim = Boolean(claim);
       clearWalletClaim();
-      navigate('/wallet', {
-        replace: true,
-        state: walletHomeNavState({
-          highlightBooking,
-          fromClaim: hadClaim,
-        }),
-      });
+      if (rentIntent) {
+        navigate(redirectTo, { replace: true });
+      } else {
+        navigate(redirectTo === '/wallet' || redirectTo.startsWith('/wallet') ? redirectTo : '/wallet', {
+          replace: true,
+          state: walletHomeNavState({
+            highlightBooking,
+            fromClaim: hadClaim,
+          }),
+        });
+      }
     } catch (err) {
       const msg = err.message || 'Αποτυχία εγγραφής';
       if (msg.toLowerCase().includes('υπάρχει') || msg.toLowerCase().includes('already')) {
@@ -91,39 +101,54 @@ export default function RegisterPage() {
     }
   };
 
-  const loginState = walletClaimNavState(
-    claim
+  const loginState =
+    claim && !rentIntent
       ? {
-          email: prefillEmail,
-          name: prefillName,
-          phone: claim.phone,
-          bookingId: highlightBooking,
-          reference: claim.reference,
-          source: claim.source || 'manual',
-          createdAt: Date.now(),
+          ...walletClaimNavState(
+            {
+              email: prefillEmail,
+              name: prefillName,
+              phone: claim.phone,
+              bookingId: highlightBooking,
+              reference: claim.reference,
+              source: claim.source || 'manual',
+              createdAt: Date.now(),
+            },
+            { preferLogin: true },
+          ),
+          from: redirectTo,
         }
-      : null,
-    { preferLogin: true },
-  );
+      : { from: redirectTo };
 
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4">
       <div className="bg-surface-container-lowest p-10 md:p-14 rounded-[32px] shadow-level-2 w-full max-w-md">
         <div className="text-center mb-8">
           <span className="material-symbols-outlined text-4xl text-primary mb-3">
-            account_balance_wallet
+            {rentIntent ? 'directions_car' : 'account_balance_wallet'}
           </span>
           <h1 className="text-2xl font-bold text-on-surface">
-            {claim ? 'Αποθήκευση στο My Wallet' : 'Εγγραφή πελάτη'}
+            {rentIntent
+              ? 'Λογαριασμός ενοικίασης'
+              : claim
+                ? 'Αποθήκευση στο My Wallet'
+                : 'Εγγραφή πελάτη'}
           </h1>
           <p className="text-sm text-on-surface-variant mt-2">
-            {claim
-              ? 'Δημιουργήστε λογαριασμό για να δείτε το εισιτήριο και το QR επιβίβασης'
-              : 'Δημιουργήστε λογαριασμό My Wallet'}
+            {rentIntent
+              ? 'Δημιουργήστε λογαριασμό για να κλείσετε όχημα. Μετά την εγγραφή μπαίνετε στην εφαρμογή ενοικίασης.'
+              : claim
+                ? 'Δημιουργήστε λογαριασμό για να δείτε το εισιτήριο και το QR επιβίβασης'
+                : 'Δημιουργήστε λογαριασμό My Wallet'}
           </p>
+          {rentIntent ? (
+            <p className="text-xs text-on-surface-variant mt-2">
+              Τα λεωφορεία / εισιτήρια είναι στο My Wallet — εδώ είναι μόνο η ενοικίαση.
+            </p>
+          ) : null}
         </div>
 
-        {claim ? (
+        {claim && !rentIntent ? (
           <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-on-surface">
             <p className="font-bold text-primary mb-1">Η κράτησή σας είναι έτοιμη</p>
             <p className="text-on-surface-variant">
@@ -217,7 +242,13 @@ export default function RegisterPage() {
             disabled={loading}
             className="w-full py-4 rounded-full bg-primary-container text-white font-bold disabled:opacity-60"
           >
-            {loading ? 'Δημιουργία…' : claim ? 'Δημιουργία & άνοιγμα Wallet' : 'Δημιουργία λογαριασμού'}
+            {loading
+              ? 'Δημιουργία…'
+              : rentIntent
+                ? 'Δημιουργία & είσοδος στην Ενοικίαση'
+                : claim
+                  ? 'Δημιουργία & άνοιγμα Wallet'
+                  : 'Δημιουργία λογαριασμού'}
           </button>
         </form>
 
@@ -227,11 +258,13 @@ export default function RegisterPage() {
             Σύνδεση
           </Link>
         </p>
-        <p className="text-xs text-center text-gray-500 mt-4">
-          <Link to="/my-booking" className="text-primary font-semibold hover:underline">
-            Εύρεση κράτησης χωρίς λογαριασμό
-          </Link>
-        </p>
+        {!rentIntent ? (
+          <p className="text-xs text-center text-gray-500 mt-4">
+            <Link to="/my-booking" className="text-primary font-semibold hover:underline">
+              Εύρεση κράτησης χωρίς λογαριασμό
+            </Link>
+          </p>
+        ) : null}
       </div>
     </div>
   );
