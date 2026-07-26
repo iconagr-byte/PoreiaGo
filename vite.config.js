@@ -23,6 +23,7 @@ export default defineConfig({
       '/api/admin/telemetry': { target: API_TARGET, changeOrigin: true },
       '/api/admin/platform': { target: API_TARGET, changeOrigin: true },
       '/api/admin/push': { target: API_TARGET, changeOrigin: true },
+      '/api/admin/platform/fleet-rental': { target: API_TARGET, changeOrigin: true },
       '/api/passenger': { target: API_TARGET, changeOrigin: true },
       '/api/tickets': { target: API_TARGET, changeOrigin: true },
       '/api/abandoned': { target: API_TARGET, changeOrigin: true },

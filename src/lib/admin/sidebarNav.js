@@ -6,7 +6,7 @@ import {
 } from './settingsTabs.js';
 import { settingsTabToNavItem } from './settingsSidebar.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v8';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v9';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
@@ -33,6 +33,7 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'routes',
   'customers',
   'fleet',
+  'fleet_rental',
   'drivers',
   'lost_found',
   'email',
@@ -208,6 +209,16 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'fleet',
     navGroup: 'main',
     accent: 'sky',
+  },
+  fleet_rental: {
+    id: 'fleet_rental',
+    label: 'Ενοικιάσεις',
+    icon: 'car_rental',
+    filled: true,
+    type: 'tab',
+    tab: 'fleet_rental',
+    navGroup: 'main',
+    accent: 'teal',
   },
   drivers: {
     id: 'drivers',

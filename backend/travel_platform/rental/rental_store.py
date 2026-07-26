@@ -1,0 +1,562 @@
+"""Tenant-scoped fleet rental store (JSON) — availability + bookings + inspections."""
+
+from __future__ import annotations
+
+import json
+import math
+import threading
+from copy import deepcopy
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+from uuid import uuid4
+
+from travel_platform.settings.drivers_store import DEMO_TENANT_ID
+
+DATA_DIR = Path(__file__).resolve().parent
+STORE_FILE = DATA_DIR / "rental_store.json"
+_LOCK = threading.RLock()
+
+VEHICLE_CATEGORIES = ("CAR", "VAN", "MINIBUS")
+VEHICLE_STATUSES = ("AVAILABLE", "RENTED", "MAINTENANCE", "IN_TRANSIT")
+BOOKING_STATUSES = ("CONFIRMED", "ACTIVE", "COMPLETED", "CANCELLED")
+ACTIVE_BOOKING_STATUSES = frozenset({"CONFIRMED", "ACTIVE"})
+INSPECTION_TYPES = ("PICKUP_CHECK", "RETURN_CHECK")
+SERVICE_MILEAGE_EVERY = 15_000
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _normalize_tenant(value: str | None) -> str:
+    tid = str(value or "").strip()
+    return tid or DEMO_TENANT_ID
+
+
+def _parse_dt(value: str | datetime) -> datetime:
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        raw = str(value or "").strip().replace("Z", "+00:00")
+        dt = datetime.fromisoformat(raw)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _empty() -> dict[str, Any]:
+    return {"vehicles": [], "bookings": [], "inspections": []}
+
+
+def _read() -> dict[str, Any]:
+    if not STORE_FILE.is_file():
+        return _empty()
+    try:
+        data = json.loads(STORE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return _empty()
+    if not isinstance(data, dict):
+        return _empty()
+    for key in ("vehicles", "bookings", "inspections"):
+        if not isinstance(data.get(key), list):
+            data[key] = []
+    return data
+
+
+def _write(data: dict[str, Any]) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = STORE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(STORE_FILE)
+
+
+def _ranges_overlap(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
+    return a_start < b_end and b_start < a_end
+
+
+def list_vehicles(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        rows = [v for v in _read()["vehicles"] if v.get("tenant_id") == tid]
+    if category:
+        cat = category.strip().upper()
+        rows = [v for v in rows if str(v.get("category") or "").upper() == cat]
+    return sorted(rows, key=lambda v: (v.get("category") or "", v.get("plate_number") or ""))
+
+
+def get_vehicle(tenant_id: str | None, vehicle_id: str) -> dict[str, Any] | None:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        for v in _read()["vehicles"]:
+            if v.get("tenant_id") == tid and v.get("id") == vehicle_id:
+                return deepcopy(v)
+    return None
+
+
+def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: str | None = None) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    plate = str(body.get("plate_number") or "").strip().upper()
+    category = str(body.get("category") or "CAR").strip().upper()
+    model = str(body.get("model") or "").strip()
+    if not plate or not model:
+        raise ValueError("Απαιτούνται πινακίδα και μοντέλο")
+    if category not in VEHICLE_CATEGORIES:
+        raise ValueError("Μη έγκυρη κατηγορία")
+    seats = int(body.get("seating_capacity") or 5)
+    if seats < 2 or seats > 80:
+        raise ValueError("Μη έγκυρη χωρητικότητα")
+    status = str(body.get("current_status") or "AVAILABLE").strip().upper()
+    if status not in VEHICLE_STATUSES:
+        raise ValueError("Μη έγκυρη κατάσταση οχήματος")
+    mileage = max(0, int(body.get("current_mileage") or 0))
+    rate = float(body.get("daily_rate_eur") or 0)
+    if rate < 0:
+        raise ValueError("Μη έγκυρη ημερήσια τιμή")
+
+    with _LOCK:
+        data = _read()
+        existing = None
+        if vehicle_id:
+            for v in data["vehicles"]:
+                if v.get("tenant_id") == tid and v.get("id") == vehicle_id:
+                    existing = v
+                    break
+            if not existing:
+                raise ValueError("Το όχημα δεν βρέθηκε")
+        for v in data["vehicles"]:
+            if v.get("tenant_id") != tid:
+                continue
+            if str(v.get("plate_number") or "").upper() == plate and (not existing or v.get("id") != existing.get("id")):
+                raise ValueError("Η πινακίδα υπάρχει ήδη")
+
+        now = _now()
+        row = existing or {
+            "id": str(uuid4()),
+            "tenant_id": tid,
+            "created_at": now,
+        }
+        row.update(
+            {
+                "plate_number": plate,
+                "category": category,
+                "model": model,
+                "seating_capacity": seats,
+                "current_status": status,
+                "current_mileage": mileage,
+                "daily_rate_eur": round(rate, 2),
+                "gps_device_id": (str(body.get("gps_device_id") or "").strip() or None),
+                "photo_url": (str(body.get("photo_url") or "").strip() or None),
+                "notes": (str(body.get("notes") or "").strip() or None),
+                "updated_at": now,
+            }
+        )
+        if not existing:
+            data["vehicles"].append(row)
+        _write(data)
+        return deepcopy(row)
+
+
+def delete_vehicle(tenant_id: str | None, vehicle_id: str) -> bool:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        for b in data["bookings"]:
+            if (
+                b.get("tenant_id") == tid
+                and b.get("vehicle_id") == vehicle_id
+                and b.get("rental_status") in ACTIVE_BOOKING_STATUSES
+            ):
+                raise ValueError("Υπάρχει ενεργή κράτηση — ακυρώστε την πρώτα")
+        before = len(data["vehicles"])
+        data["vehicles"] = [
+            v for v in data["vehicles"] if not (v.get("tenant_id") == tid and v.get("id") == vehicle_id)
+        ]
+        if len(data["vehicles"]) == before:
+            return False
+        _write(data)
+        return True
+
+
+def list_bookings(
+    tenant_id: str | None,
+    *,
+    vehicle_id: str | None = None,
+    status: str | None = None,
+) -> list[dict[str, Any]]:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        rows = [b for b in _read()["bookings"] if b.get("tenant_id") == tid]
+    if vehicle_id:
+        rows = [b for b in rows if b.get("vehicle_id") == vehicle_id]
+    if status:
+        st = status.strip().upper()
+        rows = [b for b in rows if str(b.get("rental_status") or "").upper() == st]
+    return sorted(rows, key=lambda b: b.get("start_time") or "", reverse=True)
+
+
+def _vehicle_conflicts(
+    data: dict[str, Any],
+    *,
+    tenant_id: str,
+    vehicle_id: str,
+    start: datetime,
+    end: datetime,
+    exclude_booking_id: str | None = None,
+) -> list[dict[str, Any]]:
+    hits = []
+    for b in data["bookings"]:
+        if b.get("tenant_id") != tenant_id or b.get("vehicle_id") != vehicle_id:
+            continue
+        if b.get("rental_status") not in ACTIVE_BOOKING_STATUSES:
+            continue
+        if exclude_booking_id and b.get("id") == exclude_booking_id:
+            continue
+        b_start = _parse_dt(b["start_time"])
+        b_end = _parse_dt(b["end_time"])
+        if _ranges_overlap(start, end, b_start, b_end):
+            hits.append(b)
+    return hits
+
+
+def check_availability(
+    tenant_id: str | None,
+    *,
+    start_time: str,
+    end_time: str,
+    category: str | None = None,
+    min_seats: int | None = None,
+) -> list[dict[str, Any]]:
+    tid = _normalize_tenant(tenant_id)
+    start = _parse_dt(start_time)
+    end = _parse_dt(end_time)
+    if end <= start:
+        raise ValueError("Η λήξη πρέπει να είναι μετά την έναρξη")
+    seats_need = int(min_seats or 0)
+    with _LOCK:
+        data = _read()
+        out = []
+        for v in data["vehicles"]:
+            if v.get("tenant_id") != tid:
+                continue
+            if str(v.get("current_status") or "") == "MAINTENANCE":
+                continue
+            if category and str(v.get("category") or "").upper() != category.strip().upper():
+                continue
+            if seats_need and int(v.get("seating_capacity") or 0) < seats_need:
+                continue
+            conflicts = _vehicle_conflicts(
+                data,
+                tenant_id=tid,
+                vehicle_id=v["id"],
+                start=start,
+                end=end,
+            )
+            if conflicts:
+                continue
+            days = max(1, math.ceil((end - start).total_seconds() / 86400))
+            rate = float(v.get("daily_rate_eur") or 0)
+            out.append(
+                {
+                    **deepcopy(v),
+                    "suggested_days": days,
+                    "suggested_total": round(rate * days, 2),
+                    "fit_score": int(v.get("seating_capacity") or 0) - seats_need,
+                }
+            )
+    # Prefer closest seating fit, then lower price.
+    out.sort(key=lambda r: (abs(int(r.get("fit_score") or 0)), float(r.get("suggested_total") or 0)))
+    return out
+
+
+def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    vehicle_id = str(body.get("vehicle_id") or "").strip()
+    client_name = str(body.get("client_name") or "").strip()
+    start = _parse_dt(body.get("start_time"))
+    end = _parse_dt(body.get("end_time"))
+    pickup = str(body.get("pickup_location") or "").strip()
+    dropoff = str(body.get("dropoff_location") or "").strip() or pickup
+    if not vehicle_id or not client_name or not pickup:
+        raise ValueError("Συμπληρώστε όχημα, πελάτη και σημείο παραλαβής")
+    if end <= start:
+        raise ValueError("Η λήξη πρέπει να είναι μετά την έναρξη")
+
+    with _LOCK:
+        data = _read()
+        vehicle = next(
+            (v for v in data["vehicles"] if v.get("tenant_id") == tid and v.get("id") == vehicle_id),
+            None,
+        )
+        if not vehicle:
+            raise ValueError("Το όχημα δεν βρέθηκε")
+        if str(vehicle.get("current_status") or "") == "MAINTENANCE":
+            raise ValueError("Το όχημα είναι σε συντήρηση")
+        conflicts = _vehicle_conflicts(
+            data,
+            tenant_id=tid,
+            vehicle_id=vehicle_id,
+            start=start,
+            end=end,
+        )
+        if conflicts:
+            raise ValueError("Το όχημα δεν είναι διαθέσιμο για αυτές τις ημερομηνίες")
+
+        days = max(1, math.ceil((end - start).total_seconds() / 86400))
+        rate = float(vehicle.get("daily_rate_eur") or 0)
+        total = body.get("total_cost")
+        if total is None:
+            total = round(rate * days, 2)
+        else:
+            total = round(float(total), 2)
+
+        now = _now()
+        row = {
+            "id": str(uuid4()),
+            "tenant_id": tid,
+            "vehicle_id": vehicle_id,
+            "client_id": (str(body.get("client_id") or "").strip() or None),
+            "client_name": client_name,
+            "client_email": (str(body.get("client_email") or "").strip().lower() or None),
+            "client_phone": (str(body.get("client_phone") or "").strip() or None),
+            "start_time": start.isoformat(),
+            "end_time": end.isoformat(),
+            "pickup_location": pickup,
+            "dropoff_location": dropoff,
+            "total_cost": total,
+            "rental_status": "CONFIRMED",
+            "driver_mode": str(body.get("driver_mode") or "SELF_DRIVE").strip().upper(),
+            "assigned_driver_id": (str(body.get("assigned_driver_id") or "").strip() or None),
+            "notes": (str(body.get("notes") or "").strip() or None),
+            "created_at": now,
+            "updated_at": now,
+            "vehicle_plate": vehicle.get("plate_number"),
+            "vehicle_model": vehicle.get("model"),
+            "vehicle_category": vehicle.get("category"),
+        }
+        data["bookings"].append(row)
+        vehicle["current_status"] = "RENTED"
+        vehicle["updated_at"] = now
+        _write(data)
+        return deepcopy(row)
+
+
+def update_booking_status(tenant_id: str | None, booking_id: str, status: str) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    st = status.strip().upper()
+    if st not in BOOKING_STATUSES:
+        raise ValueError("Μη έγκυρη κατάσταση κράτησης")
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == booking_id),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        booking["rental_status"] = st
+        booking["updated_at"] = _now()
+        vehicle = next(
+            (
+                v
+                for v in data["vehicles"]
+                if v.get("tenant_id") == tid and v.get("id") == booking.get("vehicle_id")
+            ),
+            None,
+        )
+        if vehicle:
+            if st in ("CANCELLED", "COMPLETED"):
+                # Free vehicle unless another active booking remains.
+                still = _vehicle_conflicts(
+                    data,
+                    tenant_id=tid,
+                    vehicle_id=vehicle["id"],
+                    start=_parse_dt("2000-01-01T00:00:00+00:00"),
+                    end=_parse_dt("2100-01-01T00:00:00+00:00"),
+                    exclude_booking_id=booking_id if st == "CANCELLED" else None,
+                )
+                # For COMPLETED, exclude this booking from conflict check.
+                if st == "COMPLETED":
+                    still = [
+                        b
+                        for b in data["bookings"]
+                        if b.get("tenant_id") == tid
+                        and b.get("vehicle_id") == vehicle["id"]
+                        and b.get("id") != booking_id
+                        and b.get("rental_status") in ACTIVE_BOOKING_STATUSES
+                    ]
+                if st == "CANCELLED":
+                    still = [
+                        b
+                        for b in data["bookings"]
+                        if b.get("tenant_id") == tid
+                        and b.get("vehicle_id") == vehicle["id"]
+                        and b.get("id") != booking_id
+                        and b.get("rental_status") in ACTIVE_BOOKING_STATUSES
+                    ]
+                vehicle["current_status"] = "RENTED" if still else "AVAILABLE"
+            elif st == "ACTIVE":
+                vehicle["current_status"] = "RENTED"
+            vehicle["updated_at"] = _now()
+        _write(data)
+        return deepcopy(booking)
+
+
+def calendar_blocks(tenant_id: str | None, *, days: int = 30) -> list[dict[str, Any]]:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        vehicles = {v["id"]: v for v in data["vehicles"] if v.get("tenant_id") == tid}
+        blocks = []
+        for b in data["bookings"]:
+            if b.get("tenant_id") != tid:
+                continue
+            if b.get("rental_status") == "CANCELLED":
+                continue
+            v = vehicles.get(b.get("vehicle_id") or "")
+            blocks.append(
+                {
+                    "id": b["id"],
+                    "kind": "rental",
+                    "vehicle_id": b.get("vehicle_id"),
+                    "plate_number": (v or {}).get("plate_number") or b.get("vehicle_plate"),
+                    "model": (v or {}).get("model") or b.get("vehicle_model"),
+                    "category": (v or {}).get("category") or b.get("vehicle_category"),
+                    "title": b.get("client_name"),
+                    "start_time": b.get("start_time"),
+                    "end_time": b.get("end_time"),
+                    "status": b.get("rental_status"),
+                    "pickup_location": b.get("pickup_location"),
+                    "total_cost": b.get("total_cost"),
+                }
+            )
+        for v in vehicles.values():
+            if str(v.get("current_status") or "") == "MAINTENANCE":
+                blocks.append(
+                    {
+                        "id": f"maint-{v['id']}",
+                        "kind": "maintenance",
+                        "vehicle_id": v["id"],
+                        "plate_number": v.get("plate_number"),
+                        "model": v.get("model"),
+                        "category": v.get("category"),
+                        "title": "Συντήρηση",
+                        "start_time": None,
+                        "end_time": None,
+                        "status": "MAINTENANCE",
+                    }
+                )
+            mileage = int(v.get("current_mileage") or 0)
+            if mileage and mileage % SERVICE_MILEAGE_EVERY >= SERVICE_MILEAGE_EVERY - 500:
+                blocks.append(
+                    {
+                        "id": f"service-due-{v['id']}",
+                        "kind": "service_due",
+                        "vehicle_id": v["id"],
+                        "plate_number": v.get("plate_number"),
+                        "model": v.get("model"),
+                        "category": v.get("category"),
+                        "title": f"Service κοντά ({mileage} km)",
+                        "start_time": None,
+                        "end_time": None,
+                        "status": "SERVICE_DUE",
+                    }
+                )
+    return blocks
+
+
+def create_inspection(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    booking_id = str(body.get("rental_booking_id") or "").strip()
+    itype = str(body.get("inspection_type") or "").strip().upper()
+    if itype not in INSPECTION_TYPES:
+        raise ValueError("Μη έγκυρος τύπος επιθεώρησης")
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == booking_id),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        mileage = max(0, int(body.get("mileage") or 0))
+        fuel = float(body.get("fuel_level") or 100)
+        fuel = max(0.0, min(100.0, fuel))
+        now = _now()
+        row = {
+            "id": str(uuid4()),
+            "tenant_id": tid,
+            "rental_booking_id": booking_id,
+            "inspection_type": itype,
+            "fuel_level": round(fuel, 2),
+            "mileage": mileage,
+            "damage_notes": (str(body.get("damage_notes") or "").strip() or None),
+            "photo_urls": list(body.get("photo_urls") or []),
+            "signature_url": (str(body.get("signature_url") or "").strip() or None),
+            "inspector_name": (str(body.get("inspector_name") or "").strip() or None),
+            "created_at": now,
+            "updated_at": now,
+        }
+        data["inspections"].append(row)
+        vehicle = next(
+            (
+                v
+                for v in data["vehicles"]
+                if v.get("tenant_id") == tid and v.get("id") == booking.get("vehicle_id")
+            ),
+            None,
+        )
+        if vehicle and mileage:
+            vehicle["current_mileage"] = max(int(vehicle.get("current_mileage") or 0), mileage)
+            vehicle["updated_at"] = now
+        if itype == "PICKUP_CHECK" and booking.get("rental_status") == "CONFIRMED":
+            booking["rental_status"] = "ACTIVE"
+            booking["updated_at"] = now
+            if vehicle:
+                vehicle["current_status"] = "RENTED"
+        if itype == "RETURN_CHECK":
+            booking["rental_status"] = "COMPLETED"
+            booking["updated_at"] = now
+            if vehicle:
+                vehicle["current_status"] = "AVAILABLE"
+                vehicle["updated_at"] = now
+        _write(data)
+        return deepcopy(row)
+
+
+def list_inspections(tenant_id: str | None, *, booking_id: str | None = None) -> list[dict[str, Any]]:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        rows = [i for i in _read()["inspections"] if i.get("tenant_id") == tid]
+    if booking_id:
+        rows = [i for i in rows if i.get("rental_booking_id") == booking_id]
+    return sorted(rows, key=lambda i: i.get("created_at") or "", reverse=True)
+
+
+def dashboard_summary(tenant_id: str | None) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    vehicles = list_vehicles(tid)
+    bookings = list_bookings(tid)
+    available = sum(1 for v in vehicles if v.get("current_status") == "AVAILABLE")
+    rented = sum(1 for v in vehicles if v.get("current_status") == "RENTED")
+    maintenance = sum(1 for v in vehicles if v.get("current_status") == "MAINTENANCE")
+    active = sum(1 for b in bookings if b.get("rental_status") in ACTIVE_BOOKING_STATUSES)
+    revenue = sum(float(b.get("total_cost") or 0) for b in bookings if b.get("rental_status") != "CANCELLED")
+    return {
+        "vehicles_total": len(vehicles),
+        "available": available,
+        "rented": rented,
+        "maintenance": maintenance,
+        "active_bookings": active,
+        "revenue_eur": round(revenue, 2),
+        "service_alerts": [
+            {
+                "vehicle_id": v["id"],
+                "plate_number": v.get("plate_number"),
+                "mileage": v.get("current_mileage"),
+            }
+            for v in vehicles
+            if int(v.get("current_mileage") or 0) % SERVICE_MILEAGE_EVERY
+            >= SERVICE_MILEAGE_EVERY - 500
+        ],
+    }

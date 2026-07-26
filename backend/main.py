@@ -291,6 +291,12 @@ if ws_telemetry_router:
     app.include_router(ws_telemetry_router)
 if seat_pricing_router:
     app.include_router(seat_pricing_router)
+try:
+    from api.fleet_rental_router import router as fleet_rental_router
+except ImportError:
+    fleet_rental_router = None
+if fleet_rental_router:
+    app.include_router(fleet_rental_router)
 
 
 class ConnectionManager:
