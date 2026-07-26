@@ -551,18 +551,19 @@ function WalletAuthenticatedApp() {
               </div>
               <dl className="wallet-account-rows">
                 {[
-                  { icon: 'badge', label: 'Ονοματεπώνυμο', value: profile.name },
-                  { icon: 'mail', label: 'Email', value: profile.email },
-                  { icon: 'call', label: 'Τηλέφωνο', value: profile.phone || '—' },
+                  { icon: 'badge', label: 'Ονοματεπώνυμο', value: profile.name, tone: '' },
+                  { icon: 'mail', label: 'Email', value: profile.email, tone: '' },
+                  { icon: 'call', label: 'Τηλέφωνο', value: profile.phone || '—', tone: 'is-mint' },
                   {
                     icon: 'key',
                     label: 'Σύνδεση',
                     value: profile.provider === 'google' ? 'Google' : 'Email & κωδικός',
+                    tone: 'is-sunset',
                   },
                 ].map((row) => (
                   <div key={row.label} className="wallet-account-row">
-                    <span className="material-symbols-outlined" aria-hidden>
-                      {row.icon}
+                    <span className={`wallet-account-row-icon ${row.tone}`.trim()} aria-hidden>
+                      <span className="material-symbols-outlined">{row.icon}</span>
                     </span>
                     <div>
                       <dt>{row.label}</dt>

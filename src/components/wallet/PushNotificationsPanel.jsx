@@ -75,7 +75,7 @@ export default function PushNotificationsPanel({ email }) {
   return (
     <section className="wallet-panel">
       <div className="wallet-panel-head">
-        <span className="wallet-panel-head-icon" aria-hidden>
+        <span className="wallet-panel-head-icon is-sunset" aria-hidden>
           <span className="material-symbols-outlined">notifications_active</span>
         </span>
         <div>
@@ -107,7 +107,7 @@ export default function PushNotificationsPanel({ email }) {
         </div>
       ) : (
         <div className="wallet-form">
-          <div className="wallet-meta-tile">
+          <div className={`wallet-meta-tile ${subscribed ? 'is-active' : 'is-idle'}`}>
             <p className="wallet-pass-kicker">Κατάσταση</p>
             <p className="wallet-pass-meta-value">{subscribed ? 'Ενεργές' : 'Ανενεργές'}</p>
             {subscribed ? (

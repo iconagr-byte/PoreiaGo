@@ -53,7 +53,7 @@ export default function CustomerSecurityPanel({ email, authProvider }) {
     <>
       <section className="wallet-panel">
         <div className="wallet-panel-head">
-          <span className="wallet-panel-head-icon" aria-hidden>
+          <span className="wallet-panel-head-icon is-mint" aria-hidden>
             <span className="material-symbols-outlined">shield</span>
           </span>
           <div>
