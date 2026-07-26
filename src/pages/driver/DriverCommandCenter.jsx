@@ -185,8 +185,8 @@ export default function DriverCommandCenter() {
       };
       navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
-      navigator.serviceWorker
-        .register('/driver-sw.js', { updateViaCache: 'none' })
+      import('../../services/driverPushNotificationApi.js')
+        .then(({ registerDriverServiceWorker }) => registerDriverServiceWorker())
         .then((reg) => {
           reg.update().catch(() => {});
           const askWaitingToActivate = () => {

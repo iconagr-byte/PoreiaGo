@@ -4,6 +4,7 @@ import {
   fetchDriverPushConfig,
   fetchDriverPushStatus,
   isDriverPushSupported,
+  isThisBrowserDriverPushSubscribed,
   subscribeDriverPush,
   unsubscribeDriverPush,
 } from '../../services/driverPushNotificationApi.js';
@@ -25,15 +26,22 @@ export default function DriverPushPanel() {
     (async () => {
       try {
         // /config auto-provisions VAPID and does not require a session.
-        const config = await fetchDriverPushConfig();
+        const [config, localSub] = await Promise.all([
+          fetchDriverPushConfig(),
+          isThisBrowserDriverPushSubscribed().catch(() => false),
+        ]);
         if (cancelled) return;
         setEnabled(Boolean(config.enabled && config.public_key));
+        setSubscribed(Boolean(localSub));
         try {
           const status = await fetchDriverPushStatus();
           if (cancelled) return;
-          setSubscribed(Boolean(status.subscribed));
           if (status.enabled != null) {
             setEnabled(Boolean(status.enabled));
+          }
+          // Prefer this browser — tenant-wide "subscribed" can lie across devices.
+          if (!localSub && status.subscribed) {
+            setSubscribed(false);
           }
         } catch {
           // Session may be cold; still show enable if VAPID is ready.
