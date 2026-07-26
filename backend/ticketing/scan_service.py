@@ -74,15 +74,21 @@ async def get_booking_by_id(booking_id: str) -> dict | None:
 
 def scan_response_success(booking: dict) -> dict:
     spec = booking.get("special_requirements") or {}
+    seats = str(booking.get("seat_number") or "").strip()
+    seat_count = len([s for s in seats.replace(";", ",").split(",") if s.strip()]) or 1
+    booking_ref = str(spec.get("pnr") or booking.get("ticket_ref") or booking["id"] or "").strip()
     return {
         "result": "SUCCESS",
         "booking_id": booking["id"],
+        "booking_ref": booking_ref,
         "passenger_name": booking["customer_name"],
         "seat_number": booking["seat_number"],
+        "seat_count": seat_count,
         "special_requirements": {
             "needs_assistance": bool(spec.get("needs_assistance")),
             "allergies": spec.get("allergies") or [],
             "notes": spec.get("notes") or "",
+            "pnr": spec.get("pnr"),
         },
         "message": "Επιτυχής επιβίβαση",
     }

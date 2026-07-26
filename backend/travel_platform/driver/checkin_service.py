@@ -38,6 +38,15 @@ async def driver_checkin(
     elapsed_ms = (time.perf_counter() - start) * 1000
     result["elapsed_ms"] = round(elapsed_ms, 2)
     result["ok"] = result.get("result") == "SUCCESS"
+    if result.get("ok"):
+        try:
+            from ticketing.boarding_service import get_boarding_manifest
+
+            man = await get_boarding_manifest(int(trip_id))
+            result["boarded_count"] = man.get("boarded_count")
+            result["boarded_passengers"] = man.get("boarded_passengers") or []
+        except Exception:
+            pass
     return result
 
 
