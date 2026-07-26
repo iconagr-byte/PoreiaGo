@@ -56,7 +56,7 @@ export default function DriversManagementPanel() {
     });
   }, [drivers, query]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ quiet } = {}) => {
     setLoading(true);
     setLoadError('');
     try {
@@ -64,16 +64,52 @@ export default function DriversManagementPanel() {
       setDrivers(Array.isArray(rows) ? rows : []);
     } catch (err) {
       setDrivers([]);
-      setLoadError(err.message || 'Αποτυχία φόρτωσης οδηγών');
-      toast.error(err.message || 'Αποτυχία φόρτωσης οδηγών');
+      const msg = err.message || 'Αποτυχία φόρτωσης οδηγών';
+      setLoadError(msg);
+      if (!quiet) toast.error(msg);
     } finally {
       setLoading(false);
     }
   }, [filter]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    let retryTimer;
+    (async () => {
+      setLoading(true);
+      setLoadError('');
+      try {
+        const rows = await fetchFleetDrivers(filter || undefined);
+        if (cancelled) return;
+        setDrivers(Array.isArray(rows) ? rows : []);
+        setLoading(false);
+      } catch (err) {
+        if (cancelled) return;
+        // Quiet first failure — often mid-deploy. Retry once before showing error.
+        retryTimer = window.setTimeout(async () => {
+          if (cancelled) return;
+          try {
+            const rows = await fetchFleetDrivers(filter || undefined);
+            if (cancelled) return;
+            setDrivers(Array.isArray(rows) ? rows : []);
+            setLoadError('');
+          } catch (retryErr) {
+            if (cancelled) return;
+            setDrivers([]);
+            const msg = retryErr.message || 'Αποτυχία φόρτωσης οδηγών';
+            setLoadError(msg);
+            toast.error(msg);
+          } finally {
+            if (!cancelled) setLoading(false);
+          }
+        }, 1600);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [filter]);
 
   const onDelete = async (d) => {
     if (!window.confirm(`Διαγραφή οδηγού ${d.name};`)) return;

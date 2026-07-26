@@ -18,9 +18,48 @@ export function adminBearerHeaders(extra = {}) {
   return headers;
 }
 
+function isNetworkError(err) {
+  const raw = String(err?.message || err || '').trim();
+  return (
+    err?.name === 'TypeError' ||
+    /failed to fetch|networkerror|load failed|network request failed/i.test(raw)
+  );
+}
+
+function networkAdminError() {
+  return new Error(
+    'Δεν υπάρχει σύνδεση με τον server (πιθανό deploy). Περιμένετε λίγο και πατήστε Δοκιμή ξανά.',
+  );
+}
+
+/**
+ * fetch() with short retries — deploy bounces often surface as "Failed to fetch"
+ * or 502/503 while Traefik/nginx reattach api-blue.
+ */
 export async function adminFetch(path, options = {}) {
-  return fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { ...adminAuthHeaders(), ...(options.headers || {}) },
-  });
+  const attempts = Math.max(1, Number(options.retries) || 3);
+  const { retries: _ignored, ...fetchOpts } = options;
+  let lastErr;
+
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...fetchOpts,
+        headers: { ...adminAuthHeaders(), ...(fetchOpts.headers || {}) },
+      });
+      if ([502, 503, 504].includes(res.status) && i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 450 * (i + 1)));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (!isNetworkError(err) || i === attempts - 1) {
+        throw isNetworkError(err) ? networkAdminError() : err;
+      }
+      await new Promise((r) => setTimeout(r, 450 * (i + 1)));
+    }
+  }
+
+  throw isNetworkError(lastErr) ? networkAdminError() : lastErr;
 }
