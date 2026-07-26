@@ -1,0 +1,270 @@
+/* Apple-inspired chrome for admin Ενοικιάσεις */
+
+.rental-apple-shell {
+  --rapple-ink: #1d1d1f;
+  --rapple-secondary: #6e6e73;
+  --rapple-fill: #f5f5f7;
+  --rapple-card: rgba(255, 255, 255, 0.78);
+  --rapple-stroke: rgba(0, 0, 0, 0.08);
+  --rapple-accent: #0a7a6c;
+  --rapple-accent-soft: rgba(10, 122, 108, 0.12);
+  --rapple-blue: #0071e3;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI',
+    system-ui, sans-serif;
+  color: var(--rapple-ink);
+  margin: -0.15rem -0.1rem 0;
+  padding: 0.55rem 0.35rem 1rem;
+  border-radius: 24px;
+  background:
+    radial-gradient(1100px 420px at 8% -12%, rgba(10, 122, 108, 0.1), transparent 55%),
+    radial-gradient(900px 380px at 92% 0%, rgba(0, 113, 227, 0.07), transparent 52%),
+    linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+}
+
+.rental-apple-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  border: 1px solid var(--rapple-stroke);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(245, 245, 247, 0.88) 100%);
+  backdrop-filter: blur(22px) saturate(1.45);
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 18px 44px rgba(15, 23, 42, 0.07);
+  padding: 1.15rem 1.25rem 1.2rem;
+}
+
+.rental-apple-hero::before {
+  content: '';
+  position: absolute;
+  right: -3rem;
+  top: -4rem;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 999px;
+  background: rgba(10, 122, 108, 0.12);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.rental-apple-hero::after {
+  content: '';
+  position: absolute;
+  left: 28%;
+  bottom: -5rem;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 999px;
+  background: rgba(0, 113, 227, 0.08);
+  filter: blur(36px);
+  pointer-events: none;
+}
+
+.rental-apple-hero-inner {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rental-apple-icon {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 1.05rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(160deg, #1aa392 0%, #0b3d4a 100%);
+  box-shadow: 0 10px 24px rgba(11, 61, 74, 0.28);
+  flex-shrink: 0;
+}
+
+.rental-apple-icon .material-symbols-outlined {
+  font-size: 1.65rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rental-apple-title {
+  margin: 0;
+  font-size: clamp(1.55rem, 2.6vw, 1.95rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--rapple-ink);
+}
+
+.rental-apple-subtitle {
+  margin: 0.35rem 0 0;
+  max-width: 36rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--rapple-secondary);
+  letter-spacing: -0.01em;
+}
+
+.rental-apple-refresh {
+  appearance: none;
+  border: 1px solid var(--rapple-stroke);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  color: var(--rapple-ink);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.rental-apple-refresh:hover {
+  background: #fff;
+}
+
+.rental-apple-refresh:active {
+  transform: scale(0.98);
+}
+
+.rental-apple-refresh .material-symbols-outlined {
+  font-size: 1.1rem;
+}
+
+/* Segmented tab menu */
+.rental-apple-nav-wrap {
+  position: relative;
+}
+
+.rental-apple-nav {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.4rem;
+  border-radius: 22px;
+  border: 1px solid var(--rapple-stroke);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 10px 28px rgba(15, 23, 42, 0.05);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.rental-apple-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.rental-apple-nav-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rapple-secondary);
+  border-radius: 16px;
+  padding: 0.55rem 0.85rem;
+  min-height: 2.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.rental-apple-nav-btn .material-symbols-outlined {
+  font-size: 1.2rem;
+  opacity: 0.85;
+}
+
+.rental-apple-nav-btn:hover {
+  color: var(--rapple-ink);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.rental-apple-nav-btn.is-active {
+  color: #fff;
+  background: linear-gradient(180deg, #1b8f80 0%, #0b3d4a 100%);
+  box-shadow:
+    0 8px 18px rgba(11, 61, 74, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.rental-apple-nav-btn.is-active .material-symbols-outlined {
+  opacity: 1;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rental-apple-nav-btn:active {
+  transform: scale(0.985);
+}
+
+.rental-apple-nav-fade {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2.25rem;
+  z-index: 1;
+}
+
+.rental-apple-nav-fade.is-left {
+  left: 0;
+  border-radius: 22px 0 0 22px;
+  background: linear-gradient(90deg, rgba(245, 245, 247, 0.95), transparent);
+}
+
+.rental-apple-nav-fade.is-right {
+  right: 0;
+  border-radius: 0 22px 22px 0;
+  background: linear-gradient(270deg, rgba(245, 245, 247, 0.95), transparent);
+}
+
+/* Soften nested white cards inside the shell */
+.rental-apple-shell .bg-white.rounded-2xl,
+.rental-apple-shell .rounded-2xl.bg-white {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  backdrop-filter: blur(16px) saturate(1.25);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  border-radius: 22px !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 14px 36px rgba(15, 23, 42, 0.06);
+}
+
+.rental-apple-shell input,
+.rental-apple-shell select,
+.rental-apple-shell textarea {
+  border-radius: 14px !important;
+}
+
+.rental-apple-shell .rounded-full {
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 640px) {
+  .rental-apple-hero {
+    padding: 1rem;
+    border-radius: 22px;
+  }
+
+  .rental-apple-nav-btn {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.78rem;
+  }
+}

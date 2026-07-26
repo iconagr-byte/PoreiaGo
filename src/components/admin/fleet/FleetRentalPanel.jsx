@@ -28,6 +28,7 @@ import {
 } from '../../../lib/customers/customerStore.js';
 import RentalSignaturePad from './RentalSignaturePad.jsx';
 import RentalCalendarBoard from './RentalCalendarBoard.jsx';
+import '../../../styles/rental-admin-apple.css';
 
 const CATEGORIES = [
   { value: 'CAR', label: 'Αυτοκίνητο' },
@@ -409,42 +410,51 @@ export default function FleetRentalPanel({ onOpenLiveMap, onOpenCustomer } = {})
   };
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-300">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="font-headline-lg text-2xl font-bold tracking-tight text-on-surface">
-            Ενοικιάσεις
-          </h2>
-          <p className="text-on-surface-variant mt-1 max-w-2xl">
-            Στόλος, κρατήσεις (γραφείο + Wallet), τιμές, check-in/out με selfie &amp; υπογραφή, GPS.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={reload}
-          className="px-4 py-2 rounded-xl border border-black/[0.08] text-sm font-bold hover:bg-white"
-        >
-          {loading ? 'Φόρτωση…' : 'Ανανέωση'}
-        </button>
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-bold whitespace-nowrap border transition-colors ${
-              tab === t.id
-                ? 'bg-primary text-white border-primary shadow-sm'
-                : 'bg-white text-gray-600 border-black/[0.08] hover:border-primary/30'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">{t.icon}</span>
-            {t.label}
+    <div className="rental-apple-shell space-y-4 animate-in fade-in duration-300">
+      <header className="rental-apple-hero">
+        <div className="rental-apple-hero-inner">
+          <div className="flex items-start gap-3.5 min-w-0">
+            <div className="rental-apple-icon" aria-hidden>
+              <span className="material-symbols-outlined">car_rental</span>
+            </div>
+            <div className="min-w-0">
+              <h2 className="rental-apple-title">Ενοικιάσεις</h2>
+              <p className="rental-apple-subtitle">
+                Στόλος, κρατήσεις γραφείου &amp; Wallet, check-in/out, υπογραφή και ζωντανό GPS —
+                όλα σε μία οθόνη.
+              </p>
+            </div>
+          </div>
+          <button type="button" onClick={reload} className="rental-apple-refresh">
+            <span className="material-symbols-outlined" aria-hidden>
+              {loading ? 'progress_activity' : 'refresh'}
+            </span>
+            {loading ? 'Φόρτωση…' : 'Ανανέωση'}
           </button>
-        ))}
-      </div>
+        </div>
+      </header>
+
+      <nav className="rental-apple-nav-wrap" aria-label="Μενού ενοικιάσεων">
+        <div className="rental-apple-nav-fade is-left" aria-hidden />
+        <div className="rental-apple-nav-fade is-right" aria-hidden />
+        <div className="rental-apple-nav" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`rental-apple-nav-btn${tab === t.id ? ' is-active' : ''}`}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                {t.icon}
+              </span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {tab === 'clients' && (
         <div className="space-y-3">
