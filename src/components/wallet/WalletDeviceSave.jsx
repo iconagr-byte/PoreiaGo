@@ -179,15 +179,20 @@ export default function WalletDeviceSave({ booking, compact = false }) {
                 </span>
               </button>
 
-              <button type="button" className="wallet-device-row" onClick={onApple}>
+              <button
+                type="button"
+                className="wallet-device-row"
+                onClick={onApple}
+                disabled
+                aria-disabled="true"
+                title="Το Apple Wallet .pkpass θα ενεργοποιηθεί με PassKit certificates"
+              >
                 <span className="material-symbols-outlined" aria-hidden>
                   wallet
                 </span>
                 <span>
                   <strong>Apple Wallet</strong>
-                  <small>
-                    {passStatus.apple ? 'Λήψη .pkpass' : 'Χρειάζεται ρύθμιση certificates'}
-                  </small>
+                  <small>Σύντομα — προς το παρόν PDF / ημερολόγιο</small>
                 </span>
               </button>
             </div>

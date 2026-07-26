@@ -1,6 +1,6 @@
 import time
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from ticketing.config import settings
@@ -89,12 +89,20 @@ async def get_rotating_qr(booking_id: str):
 
 
 @router.post("/api/tickets/{booking_id}/email")
-async def email_ticket(booking_id: str, body: TicketEmailRequest):
+async def email_ticket(booking_id: str, body: TicketEmailRequest, request: Request):
     """Send ticket confirmation to the customer's declared email."""
     payload = body.model_dump()
     payload["booking_id"] = payload.get("booking_id") or booking_id
     if not payload.get("pnr"):
         payload["pnr"] = booking_id
+    # Prefer the public Host that the passenger used (custom domain / www).
+    host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or ""
+    ).split(",")[0].strip().split(":")[0].lower()
+    if host and not payload.get("custom_domain") and not payload.get("public_base_url"):
+        payload["custom_domain"] = host
     try:
         return await send_ticket_confirmation_email(payload)
     except ValueError as exc:
