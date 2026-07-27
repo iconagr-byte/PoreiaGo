@@ -563,7 +563,7 @@ export default function BackOffice() {
               label="Οχήματα"
               value={rentSummary?.vehicles_total ?? '—'}
               icon="directions_car"
-              tone="teal"
+              tone="emerald"
             />
             <DashboardKpiCard
               label="Διαθέσιμα"
