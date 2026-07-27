@@ -17,6 +17,7 @@ import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
 import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
 import LoginPage from './LoginPage.jsx';
+import { getRentLang, setRentLang, t } from '../lib/rental/rentI18n.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -250,6 +251,7 @@ function RentalAuthenticatedApp() {
     }
   });
   const [brandName, setBrandName] = useState('Ενοικίαση');
+  const [lang, setLang] = useState(() => getRentLang());
   const [calKey, setCalKey] = useState(0);
   const [walletKey, setWalletKey] = useState(0);
   const [homeFleet, setHomeFleet] = useState([]);
@@ -349,9 +351,23 @@ function RentalAuthenticatedApp() {
             <button type="button" className="rent-topbar-brand" onClick={() => setTab('home')}>
               {brandName}
             </button>
-            <button type="button" className="rent-btn rent-btn-ghost" onClick={() => setTab('book')}>
-              Νέα κράτηση
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rent-btn rent-btn-ghost"
+                onClick={() => {
+                  const next = getRentLang() === 'en' ? 'el' : 'en';
+                  setRentLang(next);
+                  setLang(next);
+                }}
+                aria-label={t('language', lang)}
+              >
+                {lang === 'en' ? 'EL' : 'EN'}
+              </button>
+              <button type="button" className="rent-btn rent-btn-ghost" onClick={() => setTab('book')}>
+                {t('new_booking', lang)}
+              </button>
+            </div>
           </header>
         ) : null}
 

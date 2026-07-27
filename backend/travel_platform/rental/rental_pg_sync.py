@@ -1,14 +1,75 @@
-"""Best-effort Postgres dual-write for rental JSON store entities."""
+"""Best-effort Postgres dual-write / optional read fallback for rental JSON store.
+
+Env RENTAL_READ_FROM_PG=1 → try PG first for get_booking / list_bookings / list_vehicles,
+then fall back to JSON on miss or error.
+"""
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
+
+_META_SEP = "||RENTAL_META||"
+_DEFAULT_BRANCH = "Κύριο γραφείο"
+
+
+def read_from_pg_enabled() -> bool:
+    return (os.getenv("RENTAL_READ_FROM_PG") or "").strip() in ("1", "true", "yes", "on")
+
+
+def _pack_booking_notes(booking: dict[str, Any]) -> str | None:
+    """Embed payment_status / amount_paid / client_afm in notes when PG columns are missing."""
+    base = str(booking.get("notes") or "").strip()
+    if _META_SEP in base:
+        base = base.split(_META_SEP, 1)[0].rstrip()
+    extras = {
+        "payment_status": booking.get("payment_status"),
+        "amount_paid": booking.get("amount_paid"),
+        "client_afm": booking.get("client_afm"),
+        "payment_intent_id": booking.get("payment_intent_id"),
+        "damage_deposit_eur": booking.get("damage_deposit_eur"),
+        "damage_deposit_status": booking.get("damage_deposit_status"),
+        "branch_id": booking.get("branch_id"),
+        "branch_name": booking.get("branch_name"),
+    }
+    packed = f"{base}{_META_SEP}{json.dumps(extras, ensure_ascii=False)}" if any(
+        v is not None and v != "" for v in extras.values()
+    ) else (base or None)
+    return packed
+
+
+def _unpack_booking_notes(notes: str | None) -> tuple[str | None, dict[str, Any]]:
+    raw = str(notes or "")
+    if _META_SEP not in raw:
+        return (raw or None), {}
+    base, meta_raw = raw.split(_META_SEP, 1)
+    try:
+        meta = json.loads(meta_raw)
+        if not isinstance(meta, dict):
+            meta = {}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        meta = {}
+    return (base.strip() or None), meta
+
+
+def _pack_vehicle_notes(vehicle: dict[str, Any]) -> str | None:
+    base = str(vehicle.get("notes") or "").strip()
+    if _META_SEP in base:
+        base = base.split(_META_SEP, 1)[0].rstrip()
+    extras = {
+        "branch_id": vehicle.get("branch_id"),
+        "branch_name": vehicle.get("branch_name") or _DEFAULT_BRANCH,
+    }
+    if any(v is not None and v != "" for v in extras.values()):
+        return f"{base}{_META_SEP}{json.dumps(extras, ensure_ascii=False)}" if base else f"{_META_SEP}{json.dumps(extras, ensure_ascii=False)}"
+    return base or None
 
 
 def _as_uuid(value: Any) -> UUID | None:
@@ -84,7 +145,7 @@ async def _upsert_vehicle_async(vehicle: dict[str, Any]) -> None:
                 photo_url=vehicle.get("photo_url"),
                 photo_urls=list(vehicle.get("photo_urls") or []),
                 description=vehicle.get("description"),
-                notes=vehicle.get("notes"),
+                notes=_pack_vehicle_notes(vehicle),
             )
             session.add(row)
         else:
@@ -101,7 +162,7 @@ async def _upsert_vehicle_async(vehicle: dict[str, Any]) -> None:
             existing.photo_url = vehicle.get("photo_url")
             existing.photo_urls = list(vehicle.get("photo_urls") or [])
             existing.description = vehicle.get("description")
-            existing.notes = vehicle.get("notes")
+            existing.notes = _pack_vehicle_notes(vehicle)
         await session.commit()
 
 
@@ -141,7 +202,7 @@ async def _upsert_booking_async(booking: dict[str, Any]) -> None:
                     rental_status=str(booking.get("rental_status") or "CONFIRMED")[:32],
                     driver_mode=str(booking.get("driver_mode") or "SELF_DRIVE")[:32],
                     assigned_driver_id=(str(booking.get("assigned_driver_id") or "").strip() or None),
-                    notes=booking.get("notes"),
+                    notes=_pack_booking_notes(booking),
                 )
             )
         else:
@@ -160,8 +221,177 @@ async def _upsert_booking_async(booking: dict[str, Any]) -> None:
             existing.rental_status = str(booking.get("rental_status") or existing.rental_status)[:32]
             existing.driver_mode = str(booking.get("driver_mode") or existing.driver_mode)[:32]
             existing.assigned_driver_id = str(booking.get("assigned_driver_id") or "").strip() or None
-            existing.notes = booking.get("notes")
+            existing.notes = _pack_booking_notes(booking)
         await session.commit()
+
+
+def _vehicle_to_dict(row) -> dict[str, Any]:
+    notes = row.notes
+    branch_name = _DEFAULT_BRANCH
+    branch_id = None
+    if isinstance(notes, str) and _META_SEP in notes:
+        _, meta = _unpack_booking_notes(notes)
+        branch_name = meta.get("branch_name") or branch_name
+        branch_id = meta.get("branch_id")
+    return {
+        "id": str(row.id),
+        "tenant_id": str(row.tenant_id),
+        "plate_number": row.plate_number,
+        "category": row.category,
+        "model": row.model,
+        "seating_capacity": row.seating_capacity,
+        "current_status": row.current_status,
+        "current_mileage": row.current_mileage,
+        "daily_rate_eur": float(row.daily_rate_eur or 0),
+        "one_way_surcharge_eur": float(row.one_way_surcharge_eur or 0),
+        "with_driver_daily_eur": float(row.with_driver_daily_eur or 0),
+        "gps_device_id": row.gps_device_id,
+        "photo_url": row.photo_url,
+        "photo_urls": list(row.photo_urls or []),
+        "description": row.description,
+        "notes": notes,
+        "branch_id": branch_id,
+        "branch_name": branch_name,
+    }
+
+
+def _booking_to_dict(row) -> dict[str, Any]:
+    notes, meta = _unpack_booking_notes(row.notes)
+    return {
+        "id": str(row.id),
+        "tenant_id": str(row.tenant_id),
+        "vehicle_id": str(row.vehicle_id),
+        "client_id": str(row.client_id) if row.client_id else None,
+        "client_name": row.client_name,
+        "client_email": row.client_email,
+        "client_phone": row.client_phone,
+        "client_afm": meta.get("client_afm"),
+        "start_time": row.start_time.isoformat() if row.start_time else None,
+        "end_time": row.end_time.isoformat() if row.end_time else None,
+        "pickup_location": row.pickup_location,
+        "dropoff_location": row.dropoff_location,
+        "total_cost": float(row.total_cost or 0),
+        "rental_status": row.rental_status,
+        "driver_mode": row.driver_mode,
+        "assigned_driver_id": row.assigned_driver_id,
+        "notes": notes,
+        "payment_status": meta.get("payment_status"),
+        "amount_paid": meta.get("amount_paid"),
+        "payment_intent_id": meta.get("payment_intent_id"),
+        "damage_deposit_eur": meta.get("damage_deposit_eur"),
+        "damage_deposit_status": meta.get("damage_deposit_status"),
+        "branch_id": meta.get("branch_id"),
+        "branch_name": meta.get("branch_name"),
+    }
+
+
+async def _get_booking_async(tenant_id: str, booking_id: str) -> dict[str, Any] | None:
+    from app.core.database import AsyncSessionLocal
+    from app.models.fleet_rental import RentalBooking
+
+    bid = _as_uuid(booking_id)
+    tid = _as_uuid(tenant_id)
+    if not bid or not tid:
+        return None
+    async with AsyncSessionLocal() as session:
+        row = await session.get(RentalBooking, bid)
+        if not row or row.tenant_id != tid:
+            return None
+        return _booking_to_dict(row)
+
+
+async def _list_bookings_async(
+    tenant_id: str,
+    *,
+    vehicle_id: str | None = None,
+    status: str | None = None,
+) -> list[dict[str, Any]]:
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.fleet_rental import RentalBooking
+
+    tid = _as_uuid(tenant_id)
+    if not tid:
+        return []
+    async with AsyncSessionLocal() as session:
+        q = select(RentalBooking).where(RentalBooking.tenant_id == tid)
+        if vehicle_id:
+            vid = _as_uuid(vehicle_id)
+            if vid:
+                q = q.where(RentalBooking.vehicle_id == vid)
+        if status:
+            q = q.where(RentalBooking.rental_status == status.strip().upper())
+        result = await session.execute(q)
+        return [_booking_to_dict(r) for r in result.scalars().all()]
+
+
+async def _list_vehicles_async(
+    tenant_id: str,
+    *,
+    category: str | None = None,
+) -> list[dict[str, Any]]:
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.fleet_rental import RentalVehicle
+
+    tid = _as_uuid(tenant_id)
+    if not tid:
+        return []
+    async with AsyncSessionLocal() as session:
+        q = select(RentalVehicle).where(RentalVehicle.tenant_id == tid)
+        if category:
+            q = q.where(RentalVehicle.category == category.strip().upper())
+        result = await session.execute(q)
+        return [_vehicle_to_dict(r) for r in result.scalars().all()]
+
+
+def try_get_booking_from_pg(tenant_id: str, booking_id: str) -> dict[str, Any] | None:
+    if not read_from_pg_enabled():
+        return None
+    try:
+        return asyncio_run(lambda: _get_booking_async(tenant_id, booking_id))
+    except Exception:
+        logger.debug("rental pg read get_booking failed", exc_info=True)
+        return None
+
+
+def try_list_bookings_from_pg(
+    tenant_id: str,
+    *,
+    vehicle_id: str | None = None,
+    status: str | None = None,
+) -> list[dict[str, Any]] | None:
+    if not read_from_pg_enabled():
+        return None
+    try:
+        return asyncio_run(
+            lambda: _list_bookings_async(tenant_id, vehicle_id=vehicle_id, status=status)
+        )
+    except Exception:
+        logger.debug("rental pg read list_bookings failed", exc_info=True)
+        return None
+
+
+def try_list_vehicles_from_pg(
+    tenant_id: str,
+    *,
+    category: str | None = None,
+) -> list[dict[str, Any]] | None:
+    if not read_from_pg_enabled():
+        return None
+    try:
+        return asyncio_run(lambda: _list_vehicles_async(tenant_id, category=category))
+    except Exception:
+        logger.debug("rental pg read list_vehicles failed", exc_info=True)
+        return None
+
+
+def asyncio_run(coro_factory):
+    import asyncio
+
+    return asyncio.run(coro_factory())
 
 
 async def _upsert_inspection_async(inspection: dict[str, Any]) -> None:

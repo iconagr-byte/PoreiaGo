@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import {
   createRentalBooking,
   createRentalInspection,
+  confirmRentalBankDeposit,
   deleteRentalVehicle,
   fetchRentalAvailability,
   fetchRentalBookings,
@@ -17,6 +18,7 @@ import {
   fetchRentalVehicles,
   issueRentalReceipt,
   updateRentalBookingStatus,
+  updateRentalDamageDeposit,
   updateRentalIdVerification,
   uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';
@@ -1253,6 +1255,80 @@ export default function FleetRentalPanel({
                       >
                         Έκδοση απόδειξης
                       </button>
+                    ) : null}
+                    {String(b.payment_status || '').toLowerCase() === 'pending' &&
+                    String(b.payment_method || '').toLowerCase() === 'bank_transfer' ? (
+                      <button
+                        type="button"
+                        className="text-xs font-bold text-emerald-700"
+                        disabled={busy}
+                        onClick={async () => {
+                          const amount = window.prompt(
+                            'Ποσό κατάθεσης (€)',
+                            String(b.amount_due_now || b.total_cost || ''),
+                          );
+                          if (amount == null) return;
+                          const reference = window.prompt('Αναφορά / κωδικός', String(b.id).slice(0, 8));
+                          if (reference == null) return;
+                          setBusy(true);
+                          try {
+                            await confirmRentalBankDeposit(b.id, {
+                              confirmed_amount: Number(amount),
+                              reference_code: reference,
+                            });
+                            toast.success('Κατάθεση επιβεβαιώθηκε');
+                            await reload();
+                          } catch (err) {
+                            toast.error(err.message);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Επιβεβαίωση κατάθεσης
+                      </button>
+                    ) : null}
+                    {['pending_hold', 'held'].includes(String(b.damage_deposit_status || '')) ? (
+                      <>
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-amber-700"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await updateRentalDamageDeposit(b.id, 'release');
+                              toast.success('Εγγύηση απελευθερώθηκε');
+                              await reload();
+                            } catch (err) {
+                              toast.error(err.message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Release εγγύηση
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-rose-700"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await updateRentalDamageDeposit(b.id, 'capture');
+                              toast.success('Εγγύηση κατακρατήθηκε');
+                              await reload();
+                            } catch (err) {
+                              toast.error(err.message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Capture εγγύηση
+                        </button>
+                      </>
                     ) : null}
                   </div>
                 </article>

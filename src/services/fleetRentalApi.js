@@ -165,6 +165,20 @@ export async function issueRentalReceipt(bookingId, body = {}) {
   });
 }
 
+export async function confirmRentalBankDeposit(bookingId, body = {}) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/confirm-bank-deposit`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateRentalDamageDeposit(bookingId, action) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/damage-deposit`, {
+    method: 'POST',
+    body: JSON.stringify({ action }),
+  });
+}
+
 export async function scanRentalReminders(withinHours = 24) {
   return rentalFetch(`/reminders/scan?within_hours=${encodeURIComponent(withinHours)}`, {
     method: 'POST',

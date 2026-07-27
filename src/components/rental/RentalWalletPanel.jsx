@@ -11,6 +11,7 @@ import {
   fetchMyRentalBookings,
   modifyCustomerRentalBooking,
   remindCustomerRentalBooking,
+  submitCustomerRentalReview,
   uploadCustomerRentalPhoto,
   uploadCustomerRentalSignature,
 } from '../../services/customerRentalApi.js';
@@ -22,6 +23,7 @@ import {
   FREE_CANCEL_HOURS,
   isFreeCancelEligible,
 } from '../../lib/rental/rentalCancel.js';
+import { getRentLang, t } from '../../lib/rental/rentI18n.js';
 
 const STATUS_LABEL = {
   CONFIRMED: 'Επιβεβαιωμένη',
@@ -166,11 +168,40 @@ export default function RentalWalletPanel({
     }
     setBusyId(booking.id);
     try {
-      await cancelCustomerRentalBooking(booking.id);
-      toast.success('Η κράτηση ακυρώθηκε');
+      const cancelled = await cancelCustomerRentalBooking(booking.id);
+      const lang = getRentLang();
+      if (cancelled?.payment_status === 'refunded') {
+        toast.success(t('cancel_refunded', lang));
+      } else if (cancelled?.payment_status === 'refund_pending') {
+        toast.success(t('cancel_refund_pending', lang));
+      } else {
+        toast.success(t('cancel_ok', lang));
+      }
       await load();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία ακύρωσης');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const submitReview = async (booking) => {
+    if (!booking?.id) return;
+    const ratingRaw = window.prompt('Βαθμολογία 1–5', '5');
+    if (ratingRaw == null) return;
+    const rating = Number(ratingRaw);
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+      toast.error('Η βαθμολογία πρέπει να είναι 1–5');
+      return;
+    }
+    const comment = window.prompt('Σχόλιο (προαιρετικό)', '') || '';
+    setBusyId(booking.id);
+    try {
+      await submitCustomerRentalReview(booking.id, { rating, comment: comment || null });
+      toast.success(t('review_thanks', getRentLang()));
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία αξιολόγησης');
     } finally {
       setBusyId('');
     }
@@ -283,6 +314,10 @@ export default function RentalWalletPanel({
         onContract={featured ? () => openContract(featured) : null}
         onCheckIn={canCheckIn ? () => openInspect(featured, 'PICKUP_CHECK') : null}
         onCheckOut={canCheckOut ? () => openInspect(featured, 'RETURN_CHECK') : null}
+        onReview={
+          featured?.rental_status === 'COMPLETED' ? () => submitReview(featured) : null
+        }
+        reviewBusy={busyId === featured?.id}
       />
 
       {modifyOpen ? (

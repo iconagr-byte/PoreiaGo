@@ -60,6 +60,7 @@ export async function fetchCustomerRentalAvailability({
   pickupLocation,
   dropoffLocation,
   driverMode,
+  branch,
 }) {
   const params = new URLSearchParams({
     start_time: startTime,
@@ -70,6 +71,7 @@ export async function fetchCustomerRentalAvailability({
   if (pickupLocation) params.set('pickup_location', pickupLocation);
   if (dropoffLocation) params.set('dropoff_location', dropoffLocation);
   if (driverMode) params.set('driver_mode', driverMode);
+  if (branch) params.set('branch', branch);
   const data = await customerRentalFetch(`/availability?${params}`);
   return data.vehicles || [];
 }
@@ -161,6 +163,24 @@ export async function createCustomerRentalPaymentIntent(bookingId) {
   return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/payment-intent`, {
     method: 'POST',
   });
+}
+
+export async function confirmCustomerRentalPayment(bookingId) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/confirm-payment`, {
+    method: 'POST',
+  });
+}
+
+export async function submitCustomerRentalReview(bookingId, body) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/review`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchCustomerRentalBranches() {
+  const data = await customerRentalFetch('/branches');
+  return data.branches || [];
 }
 
 export async function createCustomerRentalInspection(bookingId, body) {

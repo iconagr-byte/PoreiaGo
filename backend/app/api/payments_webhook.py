@@ -53,6 +53,39 @@ async def stripe_checkout_webhook(request: Request, background_tasks: Background
 
     payment_intent = event["data"]["object"]
     fiscal_invoice_id: str | None = None
+    meta = payment_intent.get("metadata") or {}
+    rental_booking_id = str(meta.get("rental_booking_id") or "").strip()
+
+    # Rental JSON bookings: patch payment from PI when metadata has rental_booking_id.
+    if rental_booking_id and meta.get("purpose") != "damage_deposit":
+        try:
+            from travel_platform.rental import rental_store as rental_store
+
+            tid = str(meta.get("tenant_id") or "").strip() or None
+            rental_store.confirm_payment_from_intent(tid, rental_booking_id)
+            return {
+                "received": True,
+                "handled": True,
+                "status": "rental_payment_confirmed",
+                "rental_booking_id": rental_booking_id,
+            }
+        except Exception:
+            logger.debug("rental webhook confirm skipped", exc_info=True)
+
+    if rental_booking_id and meta.get("purpose") == "damage_deposit":
+        try:
+            from travel_platform.rental import rental_store as rental_store
+
+            tid = str(meta.get("tenant_id") or "").strip() or None
+            rental_store.set_damage_deposit_status(tid, rental_booking_id, action="hold")
+            return {
+                "received": True,
+                "handled": True,
+                "status": "rental_damage_deposit_held",
+                "rental_booking_id": rental_booking_id,
+            }
+        except Exception:
+            logger.debug("rental damage deposit webhook skipped", exc_info=True)
 
     async with AsyncSessionLocal() as db:
         try:

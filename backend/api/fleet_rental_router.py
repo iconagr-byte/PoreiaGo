@@ -58,6 +58,8 @@ class VehicleBody(BaseModel):
     photo_urls: list[str] = Field(default_factory=list)
     description: str | None = Field(default=None, max_length=2000)
     notes: str | None = None
+    branch_id: str | None = None
+    branch_name: str | None = None
 
 
 class BookingBody(BaseModel):
@@ -83,8 +85,18 @@ class BookingStatusBody(BaseModel):
 
 
 class IssueReceiptBody(BaseModel):
-    kind: str = "local_receipt"
+    kind: str = "aade_receipt"
     amount: float | None = None
+
+
+class BankDepositConfirmBody(BaseModel):
+    confirmed_amount: float | None = None
+    reference_code: str | None = None
+    note: str | None = None
+
+
+class DamageDepositBody(BaseModel):
+    action: str = Field(description="release | capture | hold")
 
 
 class IdVerificationBody(BaseModel):
@@ -176,6 +188,7 @@ async def availability(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
+    branch: str | None = None,
     tenant_id: UUID = Depends(get_current_tenant_id),
     _: dict = Depends(_require_admin),
 ):
@@ -189,6 +202,7 @@ async def availability(
             pickup_location=pickup_location,
             dropoff_location=dropoff_location,
             driver_mode=driver_mode,
+            branch=branch,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -253,7 +267,10 @@ async def issue_booking_receipt(
     tenant_id: UUID = Depends(get_current_tenant_id),
     _: dict = Depends(_require_admin),
 ):
-    """Issue a lightweight fiscal receipt mark (local / AADE when available)."""
+    """Issue fiscal receipt — tries AADE/myDATA first; LOCAL-* on failure.
+
+    AADE_MODE=stub returns MARK-STUB marks from the gateway.
+    """
     from travel_platform.rental.rental_fiscal import issue_receipt_for_booking
 
     payload = body or IssueReceiptBody()
@@ -261,8 +278,53 @@ async def issue_booking_receipt(
         row = issue_receipt_for_booking(
             _tid(tenant_id),
             booking_id,
-            kind=payload.kind,
+            kind=payload.kind or "aade_receipt",
             amount=payload.amount,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/bookings/{booking_id}/confirm-bank-deposit")
+async def confirm_rental_bank_deposit(
+    booking_id: str,
+    body: BankDepositConfirmBody | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    payload: dict = Depends(_require_admin),
+):
+    """Admin confirm bank transfer for a pending rental booking."""
+    data = body or BankDepositConfirmBody()
+    try:
+        row = store.confirm_bank_deposit_for_rental(
+            _tid(tenant_id),
+            booking_id,
+            confirmed_amount=data.confirmed_amount,
+            reference_code=data.reference_code,
+            note=data.note,
+            actor_id=str(payload.get("sub") or payload.get("user_id") or "") or None,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/bookings/{booking_id}/damage-deposit")
+async def rental_damage_deposit_action(
+    booking_id: str,
+    body: DamageDepositBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        row = store.set_damage_deposit_status(
+            _tid(tenant_id),
+            booking_id,
+            action=body.action,
         )
     except ValueError as exc:
         msg = str(exc)

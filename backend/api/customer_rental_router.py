@@ -104,6 +104,11 @@ class ModifyBookingBody(BaseModel):
     dropoff_location: str | None = None
 
 
+class ReviewBody(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=2000)
+
+
 class CustomerInspectionBody(BaseModel):
     inspection_type: str
     fuel_level: float = Field(default=100, ge=0, le=100)
@@ -166,6 +171,13 @@ def _public_booking(row: dict) -> dict:
         "fiscal_kind": row.get("fiscal_kind"),
         "fiscal_amount": row.get("fiscal_amount"),
         "fiscal_issued_at": row.get("fiscal_issued_at"),
+        "damage_deposit_eur": row.get("damage_deposit_eur"),
+        "damage_deposit_status": row.get("damage_deposit_status"),
+        "refund_id": row.get("refund_id"),
+        "refunded_at": row.get("refunded_at"),
+        "branch_id": row.get("branch_id"),
+        "branch_name": row.get("branch_name"),
+        "has_review": False,
         "created_at": row.get("created_at"),
         "modified_at": row.get("modified_at"),
     }
@@ -424,6 +436,7 @@ async def rental_availability(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
+    branch: str | None = None,
     _: dict = Depends(get_current_customer),
 ):
     try:
@@ -436,6 +449,7 @@ async def rental_availability(
             pickup_location=pickup_location,
             dropoff_location=dropoff_location,
             driver_mode=driver_mode,
+            branch=branch,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -456,6 +470,9 @@ async def rental_availability(
                     r.get("photo_urls") or ([] if not r.get("photo_url") else [r.get("photo_url")])
                 ),
                 "description": r.get("description"),
+                "branch_id": r.get("branch_id"),
+                "branch_name": r.get("branch_name"),
+                "min_driver_age": store.min_driver_age_for_category(r.get("category")),
                 "suggested_days": r.get("suggested_days"),
                 "base_total": r.get("base_total"),
                 "driver_surcharge": r.get("driver_surcharge"),
@@ -657,6 +674,58 @@ async def rental_payment_intent(
     from travel_platform.rental.rental_stripe import create_rental_payment_intent
 
     return create_rental_payment_intent(row, tenant_id=tid)
+
+
+@router.post("/bookings/{booking_id}/confirm-payment")
+async def rental_confirm_payment(
+    booking_id: str,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    """Mark rental paid/partial from Stripe PaymentIntent.retrieve (metadata rental_booking_id)."""
+    tid = await _tenant_id(request)
+    row = store.get_booking(tid, booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
+    owner = str(row.get("client_email") or "").strip().lower()
+    if owner != str(account.get("email") or "").strip().lower():
+        raise HTTPException(status_code=403, detail="Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+    try:
+        updated = store.confirm_payment_from_intent(tid, booking_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _public_booking(updated)
+
+
+@router.post("/bookings/{booking_id}/review")
+async def rental_submit_review(
+    booking_id: str,
+    body: ReviewBody,
+    request: Request,
+    account: dict = Depends(get_current_customer),
+):
+    try:
+        row = store.create_review(
+            await _tenant_id(request),
+            booking_id,
+            email=account["email"],
+            rating=body.rating,
+            comment=body.comment,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.get("/branches")
+async def rental_branches(
+    request: Request,
+    _: dict = Depends(get_current_customer),
+):
+    branches = store.list_branches(await _tenant_id(request))
+    return {"branches": branches, "count": len(branches)}
 
 
 @router.post("/bookings/{booking_id}/inspections")

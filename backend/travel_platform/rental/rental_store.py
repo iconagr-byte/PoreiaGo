@@ -30,8 +30,20 @@ SERVICE_MILEAGE_EVERY = 15_000
 
 PAYMENT_PLANS = ("full", "deposit")
 PAYMENT_METHODS = ("card", "paypal", "apple", "bank_transfer", "cash_office")
-PAYMENT_STATUSES = ("pending", "partial", "paid")
+PAYMENT_STATUSES = ("pending", "partial", "paid", "refunded", "refund_pending")
 DEFAULT_DEPOSIT_PERCENT = 30
+
+# Min self-drive age by vehicle category (CAR=21, VAN=23, MINIBUS=25).
+MIN_DRIVER_AGE_YEARS = 21
+MIN_DRIVER_AGE_BY_CATEGORY = {
+    "CAR": 21,
+    "VAN": 23,
+    "MINIBUS": 25,
+}
+
+DEFAULT_DAMAGE_DEPOSIT_EUR = 300.0
+DAMAGE_DEPOSIT_STATUSES = ("none", "held", "released", "captured", "pending_hold")
+DEFAULT_BRANCH_NAME = "Κύριο γραφείο"
 
 # Daily extras (EUR) — must match customer PWA labels.
 EXTRA_DAILY_RATES = {
@@ -57,7 +69,6 @@ EXTRA_LABELS = {
 _AIRPORT_TOKENS = ("αεροδρ", "airport", "ath", "skb")
 
 ID_VERIFICATION_STATUSES = ("pending", "verified", "rejected", "not_required")
-MIN_DRIVER_AGE_YEARS = 21
 ID_DOC_URL_PREFIX = "/api/site/rental-id/"
 
 FREE_CANCEL_HOURS = 24
@@ -87,7 +98,7 @@ def _parse_dt(value: str | datetime) -> datetime:
 
 
 def _empty() -> dict[str, Any]:
-    return {"vehicles": [], "bookings": [], "inspections": []}
+    return {"vehicles": [], "bookings": [], "inspections": [], "reviews": []}
 
 
 def _read() -> dict[str, Any]:
@@ -99,7 +110,7 @@ def _read() -> dict[str, Any]:
         return _empty()
     if not isinstance(data, dict):
         return _empty()
-    for key in ("vehicles", "bookings", "inspections"):
+    for key in ("vehicles", "bookings", "inspections", "reviews"):
         if not isinstance(data.get(key), list):
             data[key] = []
     return data
@@ -116,8 +127,34 @@ def _ranges_overlap(a_start: datetime, a_end: datetime, b_start: datetime, b_end
     return a_start < b_end and b_start < a_end
 
 
+def min_driver_age_for_category(category: str | None) -> int:
+    cat = str(category or "CAR").strip().upper() or "CAR"
+    return int(MIN_DRIVER_AGE_BY_CATEGORY.get(cat, MIN_DRIVER_AGE_YEARS))
+
+
+def default_damage_deposit_eur() -> float:
+    try:
+        from travel_platform.settings.payment_settings_store import read_payment_settings
+
+        settings = read_payment_settings() or {}
+        raw = (settings.get("rental") or settings.get("damage_deposit") or {}).get("amount_eur")
+        if raw is not None:
+            return max(0.0, float(raw))
+    except Exception:
+        pass
+    return float(DEFAULT_DAMAGE_DEPOSIT_EUR)
+
+
 def list_vehicles(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
     tid = _normalize_tenant(tenant_id)
+    try:
+        from travel_platform.rental.rental_pg_sync import try_list_vehicles_from_pg
+
+        pg_rows = try_list_vehicles_from_pg(tid, category=category)
+        if pg_rows is not None and len(pg_rows) > 0:
+            return sorted(pg_rows, key=lambda v: (v.get("category") or "", v.get("plate_number") or ""))
+    except Exception:
+        logger.debug("rental pg list_vehicles fallback", exc_info=True)
     with _LOCK:
         rows = [v for v in _read()["vehicles"] if v.get("tenant_id") == tid]
     if category:
@@ -201,6 +238,12 @@ def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: s
                 ][:12],
                 "description": (str(body.get("description") or "").strip() or None),
                 "notes": (str(body.get("notes") or "").strip() or None),
+                "branch_id": (str(body.get("branch_id") or "").strip() or None),
+                "branch_name": (
+                    str(body.get("branch_name") or "").strip()
+                    or (existing.get("branch_name") if existing else None)
+                    or DEFAULT_BRANCH_NAME
+                ),
                 "updated_at": now,
             }
         )
@@ -249,6 +292,14 @@ def list_bookings(
     status: str | None = None,
 ) -> list[dict[str, Any]]:
     tid = _normalize_tenant(tenant_id)
+    try:
+        from travel_platform.rental.rental_pg_sync import try_list_bookings_from_pg
+
+        pg_rows = try_list_bookings_from_pg(tid, vehicle_id=vehicle_id, status=status)
+        if pg_rows is not None and len(pg_rows) > 0:
+            return sorted(pg_rows, key=lambda b: b.get("start_time") or "", reverse=True)
+    except Exception:
+        logger.debug("rental pg list_bookings fallback", exc_info=True)
     with _LOCK:
         rows = [b for b in _read()["bookings"] if b.get("tenant_id") == tid]
     if vehicle_id:
@@ -264,6 +315,14 @@ def get_booking(tenant_id: str | None, booking_id: str) -> dict[str, Any] | None
     bid = str(booking_id or "").strip()
     if not bid:
         return None
+    try:
+        from travel_platform.rental.rental_pg_sync import try_get_booking_from_pg
+
+        pg_row = try_get_booking_from_pg(tid, bid)
+        if pg_row:
+            return pg_row
+    except Exception:
+        logger.debug("rental pg get_booking fallback", exc_info=True)
     with _LOCK:
         for b in _read()["bookings"]:
             if b.get("tenant_id") == tid and b.get("id") == bid:
@@ -502,11 +561,13 @@ def validate_renter_identity(
     driver_mode: str,
     channel: str,
     rental_end: datetime,
+    vehicle_category: str | None = None,
 ) -> dict[str, Any]:
     """Validate ID/license for wallet self-drive (and optional desk docs)."""
     mode = str(driver_mode or "SELF_DRIVE").upper()
     ch = str(channel or "DESK").upper()
     require_docs = ch == "WALLET" and mode == "SELF_DRIVE"
+    min_age = min_driver_age_for_category(vehicle_category)
 
     id_url = None
     license_url = None
@@ -538,8 +599,8 @@ def validate_renter_identity(
 
     if dob is not None:
         age = _age_years(dob)
-        if age < MIN_DRIVER_AGE_YEARS and mode == "SELF_DRIVE":
-            raise ValueError(f"Ελάχιστη ηλικία οδηγού: {MIN_DRIVER_AGE_YEARS} ετών")
+        if age < min_age and mode == "SELF_DRIVE":
+            raise ValueError(f"Ελάχιστη ηλικία οδηγού: {min_age} ετών ({str(vehicle_category or 'CAR').upper()})")
 
     if license_expires is not None and license_expires.date() < rental_end.date():
         raise ValueError("Το δίπλωμα λήγει πριν το τέλος της ενοικίασης")
@@ -560,6 +621,7 @@ def validate_renter_identity(
         "license_number": license_number,
         "license_expires_at": license_expires.date().isoformat() if license_expires else None,
         "id_verification_status": status,
+        "min_driver_age": min_age,
     }
 
 
@@ -710,6 +772,7 @@ def check_availability(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
+    branch: str | None = None,
 ) -> list[dict[str, Any]]:
     tid = _normalize_tenant(tenant_id)
     start = _parse_dt(start_time)
@@ -717,6 +780,7 @@ def check_availability(
     if end <= start:
         raise ValueError("Η λήξη πρέπει να είναι μετά την έναρξη")
     seats_need = int(min_seats or 0)
+    branch_needle = str(branch or "").strip()
     with _LOCK:
         data = _read()
         out = []
@@ -727,6 +791,10 @@ def check_availability(
                 continue
             if category and str(v.get("category") or "").upper() != category.strip().upper():
                 continue
+            if branch_needle:
+                v_branch = str(v.get("branch_name") or v.get("branch_id") or DEFAULT_BRANCH_NAME)
+                if branch_needle.lower() not in v_branch.lower() and branch_needle != str(v.get("branch_id") or ""):
+                    continue
             if seats_need and int(v.get("seating_capacity") or 0) < seats_need:
                 continue
             conflicts = _vehicle_conflicts(
@@ -826,6 +894,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             driver_mode=driver_mode,
             channel=channel,
             rental_end=end,
+            vehicle_category=vehicle.get("category"),
         )
 
         contract = validate_contract_acceptance(
@@ -873,6 +942,17 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         notes = str(body.get("notes") or "").strip() or None
         if quote["extras_lines"] and not notes:
             notes = f"Extras: {', '.join(quote['extras_lines'])}"
+
+        damage_deposit = body.get("damage_deposit_eur")
+        if damage_deposit is None:
+            damage_deposit = default_damage_deposit_eur()
+        else:
+            damage_deposit = max(0.0, round(float(damage_deposit), 2))
+        damage_status = "none"
+        method = str(pay.get("payment_method") or "")
+        if method in ("card", "paypal", "apple") and damage_deposit > 0:
+            # Pending hold until card PI / desk confirms — v1 stores intent in JSON.
+            damage_status = "pending_hold"
 
         now = _now()
         row = {
@@ -924,6 +1004,11 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "contract_accepted_at": contract["contract_accepted_at"],
             "contract_signature_url": contract["contract_signature_url"],
             "contract_signer_name": contract["contract_signer_name"],
+            "damage_deposit_eur": damage_deposit,
+            "damage_deposit_status": damage_status,
+            "damage_deposit_intent_id": None,
+            "branch_id": vehicle.get("branch_id"),
+            "branch_name": vehicle.get("branch_name") or DEFAULT_BRANCH_NAME,
             "created_at": now,
             "updated_at": now,
             "vehicle_plate": vehicle.get("plate_number"),
@@ -945,14 +1030,14 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
     except Exception:
         logger.debug("rental pg sync after create_booking skipped", exc_info=True)
 
-    # Auto fiscal mark for instant card-like payments.
+    # Auto fiscal mark for instant card-like payments — prefer AADE, LOCAL-* fallback.
     try:
         method = str(created.get("payment_method") or "")
         paid = float(created.get("amount_paid") or 0)
         if method in ("card", "paypal", "apple") and paid > 0:
             from travel_platform.rental.rental_fiscal import mark_rental_receipt
 
-            created = mark_rental_receipt(created, kind="local_receipt", amount=paid)
+            created = mark_rental_receipt(created, kind="aade_receipt", amount=paid)
     except Exception:
         logger.debug("auto fiscal mark skipped", exc_info=True)
 
@@ -1135,6 +1220,17 @@ def patch_booking_fields(
         "payment_status",
         "payment_label",
         "client_afm",
+        "refunded_at",
+        "refund_id",
+        "refund_note",
+        "damage_deposit_eur",
+        "damage_deposit_status",
+        "damage_deposit_intent_id",
+        "damage_deposit_captured_at",
+        "damage_deposit_released_at",
+        "bank_deposit_confirmed_at",
+        "amount_due_now",
+        "notes",
     }
     with _LOCK:
         data = _read()
@@ -1435,7 +1531,13 @@ def cancel_booking_for_customer(
     email: str,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Customer self-cancel — CONFIRMED only, free within FREE_CANCEL_HOURS before pickup."""
+    """Customer self-cancel — CONFIRMED only, free within FREE_CANCEL_HOURS before pickup.
+
+    When amount_paid>0 and payment_intent_id + STRIPE_SECRET_KEY: create Stripe refund.
+    Without Stripe: payment_status=refund_pending and desk note.
+    """
+    import os
+
     tid = _normalize_tenant(tenant_id)
     needle = str(email or "").strip().lower()
     bid = str(booking_id or "").strip()
@@ -1462,11 +1564,327 @@ def cancel_booking_for_customer(
                 f"Η δωρεάν ακύρωση ισχύει έως {FREE_CANCEL_HOURS} ώρες πριν την παραλαβή. "
                 "Επικοινωνήστε με το γραφείο."
             )
-        booking["cancelled_at"] = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat()
+        stamp = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat()
+        booking["cancelled_at"] = stamp
         booking["cancel_reason"] = "customer_free_cancel"
         booking["updated_at"] = _now()
+
+        paid = float(booking.get("amount_paid") or 0)
+        pi_id = str(booking.get("payment_intent_id") or "").strip()
+        secret = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
+        if paid > 0 and pi_id and secret:
+            try:
+                import stripe
+
+                stripe.api_key = secret
+                refund = stripe.Refund.create(payment_intent=pi_id)
+                refund_id = getattr(refund, "id", None) or (
+                    refund.get("id") if isinstance(refund, dict) else None
+                )
+                booking["payment_status"] = "refunded"
+                booking["refunded_at"] = stamp
+                booking["refund_id"] = refund_id
+                booking["amount_paid"] = 0.0
+                booking["balance_due"] = round(float(booking.get("total_cost") or 0), 2)
+                booking["payment_label"] = "REFUNDED"
+            except Exception as exc:
+                logger.warning("stripe refund failed booking=%s: %s", bid, exc)
+                booking["payment_status"] = "refund_pending"
+                booking["refund_note"] = f"Stripe refund failed — desk: {exc}"
+                note = str(booking.get("notes") or "").strip()
+                booking["notes"] = f"{note} [refund_pending desk]".strip()
+        elif paid > 0:
+            booking["payment_status"] = "refund_pending"
+            booking["refund_note"] = "No Stripe — desk refund required"
+            note = str(booking.get("notes") or "").strip()
+            booking["notes"] = f"{note} [refund_pending desk]".strip()
+
         _write(data)
     return update_booking_status(tid, bid, "CANCELLED")
+
+
+def list_branches(tenant_id: str | None) -> list[dict[str, Any]]:
+    """Unique branch names from fleet vehicles (hide filter when only default / empty)."""
+    vehicles = list_vehicles(tenant_id)
+    seen: dict[str, dict[str, Any]] = {}
+    for v in vehicles:
+        name = str(v.get("branch_name") or DEFAULT_BRANCH_NAME).strip() or DEFAULT_BRANCH_NAME
+        bid = str(v.get("branch_id") or name).strip()
+        if name not in seen:
+            seen[name] = {"branch_id": bid, "branch_name": name}
+    return sorted(seen.values(), key=lambda r: r["branch_name"])
+
+
+def vehicle_rating_aggregate(tenant_id: str | None, vehicle_id: str) -> dict[str, Any] | None:
+    tid = _normalize_tenant(tenant_id)
+    vid = str(vehicle_id or "").strip()
+    with _LOCK:
+        reviews = [
+            r
+            for r in _read().get("reviews") or []
+            if r.get("tenant_id") == tid and r.get("vehicle_id") == vid
+        ]
+    if not reviews:
+        return None
+    ratings = [float(r.get("rating") or 0) for r in reviews]
+    avg = round(sum(ratings) / len(ratings), 1)
+    return {"rating": avg, "count": len(reviews), "booked": len(reviews)}
+
+
+def create_review(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    email: str,
+    rating: int,
+    comment: str | None = None,
+) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    needle = str(email or "").strip().lower()
+    stars = int(rating or 0)
+    if stars < 1 or stars > 5:
+        raise ValueError("Η βαθμολογία πρέπει να είναι 1–5")
+    booking = get_booking(tid, bid)
+    if not booking:
+        raise ValueError("Η κράτηση δεν βρέθηκε")
+    if str(booking.get("client_email") or "").strip().lower() != needle:
+        raise ValueError("Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+    if str(booking.get("rental_status") or "").upper() != "COMPLETED":
+        raise ValueError("Μπορείτε να αξιολογήσετε μόνο ολοκληρωμένες ενοικιάσεις")
+    with _LOCK:
+        data = _read()
+        existing = next(
+            (
+                r
+                for r in data.get("reviews") or []
+                if r.get("tenant_id") == tid and r.get("booking_id") == bid
+            ),
+            None,
+        )
+        if existing:
+            raise ValueError("Έχετε ήδη αξιολογήσει αυτή την κράτηση")
+        row = {
+            "id": str(uuid4()),
+            "tenant_id": tid,
+            "booking_id": bid,
+            "vehicle_id": booking.get("vehicle_id"),
+            "client_email": needle,
+            "rating": stars,
+            "comment": (str(comment or "").strip() or None),
+            "created_at": _now(),
+        }
+        data.setdefault("reviews", []).append(row)
+        # Also mirror aggregate hint onto vehicle for quick catalog reads.
+        vehicle = next(
+            (
+                v
+                for v in data["vehicles"]
+                if v.get("tenant_id") == tid and v.get("id") == booking.get("vehicle_id")
+            ),
+            None,
+        )
+        if vehicle is not None:
+            reviews_for_v = [
+                r
+                for r in data["reviews"]
+                if r.get("tenant_id") == tid and r.get("vehicle_id") == vehicle.get("id")
+            ]
+            ratings = [float(r.get("rating") or 0) for r in reviews_for_v]
+            vehicle["reviews"] = reviews_for_v[-20:]
+            vehicle["rating_avg"] = round(sum(ratings) / len(ratings), 1) if ratings else None
+            vehicle["rating_count"] = len(ratings)
+        _write(data)
+        return deepcopy(row)
+
+
+def confirm_bank_deposit_for_rental(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    confirmed_amount: float | None = None,
+    reference_code: str | None = None,
+    note: str | None = None,
+    actor_id: str | None = None,
+) -> dict[str, Any]:
+    """Admin confirm bank transfer for a rental booking — reuse ticket bank helpers where possible."""
+    from travel_platform.payments.bank_deposit_confirm import record_confirm_audit
+    from travel_platform.payments.payment_security import amounts_match
+    from travel_platform.rental.rental_fiscal import mark_rental_receipt
+    from travel_platform.settings.payment_settings_store import read_payment_settings
+
+    booking = get_booking(tenant_id, booking_id)
+    if not booking:
+        raise ValueError("Η κράτηση δεν βρέθηκε")
+    method = str(booking.get("payment_method") or "").lower()
+    status = str(booking.get("payment_status") or "").lower()
+    if method != "bank_transfer":
+        raise ValueError("Η κράτηση δεν είναι τραπεζική κατάθεση")
+    if status not in ("pending", "partial", ""):
+        raise ValueError("Η πληρωμή δεν είναι σε εκκρεμότητα")
+
+    settings = read_payment_settings()
+    security = settings.get("security") or {}
+    due = float(booking.get("amount_due_now") or booking.get("balance_due") or booking.get("total_cost") or 0)
+    if security.get("require_amount_on_confirm", True):
+        if confirmed_amount is None:
+            raise ValueError("confirmed_amount required")
+        if not amounts_match(due, float(confirmed_amount)):
+            raise ValueError(f"Amount mismatch — expected €{due:.2f}")
+    else:
+        confirmed_amount = confirmed_amount if confirmed_amount is not None else due
+
+    if security.get("require_reference_on_confirm", True):
+        ref = str(reference_code or "").strip()
+        if not ref:
+            raise ValueError("reference_code required")
+        # Rental PNR ≈ booking id prefix / full id.
+        bid = str(booking.get("id") or "")
+        if ref.upper() not in (bid.upper(), bid[:8].upper()) and ref.upper() not in bid.upper():
+            # Soft: accept any non-empty reference for rentals (desk often uses transfer ref).
+            pass
+
+    paid_now = round(float(confirmed_amount), 2)
+    total = round(float(booking.get("total_cost") or 0), 2)
+    prev_paid = round(float(booking.get("amount_paid") or 0), 2)
+    new_paid = round(prev_paid + paid_now, 2)
+    if new_paid > total:
+        new_paid = total
+    balance = round(max(0.0, total - new_paid), 2)
+    pay_status = "paid" if balance <= 0 else "partial"
+    label = "PAID (Bank Transfer)" if pay_status == "paid" else f"PARTIAL (Bank Transfer) · υπόλοιπο €{balance:.2f}"
+    stamp = _now()
+    note_bit = str(note or "").strip()
+    notes = str(booking.get("notes") or "").strip()
+    notes = f"{notes} Κατάθεση επιβεβαιώθηκε {stamp}."
+    if note_bit:
+        notes = f"{notes} ({note_bit})"
+
+    updated = patch_booking_fields(
+        tenant_id,
+        booking_id,
+        {
+            "amount_paid": new_paid,
+            "balance_due": balance,
+            "payment_status": pay_status,
+            "payment_label": label,
+            "bank_deposit_confirmed_at": stamp,
+            "notes": notes.strip(),
+        },
+    )
+    try:
+        record_confirm_audit(
+            booking_id=str(booking_id),
+            amount_eur=paid_now,
+            reference=reference_code,
+            actor_id=actor_id,
+            detail="rental_bank_deposit",
+        )
+    except Exception:
+        logger.debug("rental bank audit skipped", exc_info=True)
+
+    try:
+        updated = mark_rental_receipt(updated, kind="aade_receipt", amount=paid_now)
+    except Exception:
+        logger.debug("rental bank fiscal mark skipped", exc_info=True)
+
+    try:
+        from travel_platform.rental.rental_pg_sync import sync_booking_to_pg
+
+        sync_booking_to_pg(updated)
+    except Exception:
+        pass
+    return updated
+
+
+def confirm_payment_from_intent(
+    tenant_id: str | None,
+    booking_id: str,
+) -> dict[str, Any]:
+    """Patch rental payment from Stripe PaymentIntent status (metadata rental_booking_id)."""
+    import os
+
+    booking = get_booking(tenant_id, booking_id)
+    if not booking:
+        raise ValueError("Η κράτηση δεν βρέθηκε")
+    pi_id = str(booking.get("payment_intent_id") or "").strip()
+    secret = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
+    if not pi_id or not secret:
+        raise ValueError("Δεν υπάρχει PaymentIntent / Stripe")
+
+    import stripe
+
+    stripe.api_key = secret
+    intent = stripe.PaymentIntent.retrieve(pi_id)
+    status = getattr(intent, "status", None) or (intent.get("status") if isinstance(intent, dict) else None)
+    amount_cents = getattr(intent, "amount_received", None)
+    if amount_cents is None:
+        amount_cents = getattr(intent, "amount", None) or (
+            intent.get("amount_received") if isinstance(intent, dict) else None
+        ) or (intent.get("amount") if isinstance(intent, dict) else 0)
+    amount = round(float(amount_cents or 0) / 100.0, 2)
+    if status != "succeeded":
+        raise ValueError(f"PaymentIntent status={status}")
+
+    total = round(float(booking.get("total_cost") or 0), 2)
+    paid = amount
+    balance = round(max(0.0, total - paid), 2)
+    pay_status = "paid" if balance <= 0 else "partial"
+    fields: dict[str, Any] = {
+        "amount_paid": paid,
+        "balance_due": balance,
+        "payment_status": pay_status,
+        "payment_label": "PAID (Card)" if pay_status == "paid" else f"PARTIAL (Card) · υπόλοιπο €{balance:.2f}",
+    }
+    if str(booking.get("damage_deposit_status") or "") == "pending_hold":
+        fields["damage_deposit_status"] = "held"
+    updated = patch_booking_fields(tenant_id, booking_id, fields)
+    try:
+        from travel_platform.rental.rental_fiscal import mark_rental_receipt
+
+        updated = mark_rental_receipt(updated, kind="aade_receipt", amount=paid)
+    except Exception:
+        logger.debug("confirm-payment fiscal skipped", exc_info=True)
+    try:
+        from travel_platform.rental.rental_pg_sync import sync_booking_to_pg
+
+        sync_booking_to_pg(updated)
+    except Exception:
+        pass
+    return updated
+
+
+def set_damage_deposit_status(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    action: str,
+) -> dict[str, Any]:
+    """Admin release / capture / mark-held damage deposit."""
+    act = str(action or "").strip().lower()
+    if act not in ("release", "capture", "hold"):
+        raise ValueError("action must be release|capture|hold")
+    booking = get_booking(tenant_id, booking_id)
+    if not booking:
+        raise ValueError("Η κράτηση δεν βρέθηκε")
+    stamp = _now()
+    fields: dict[str, Any] = {}
+    if act == "hold":
+        fields["damage_deposit_status"] = "held"
+    elif act == "release":
+        fields["damage_deposit_status"] = "released"
+        fields["damage_deposit_released_at"] = stamp
+    else:
+        fields["damage_deposit_status"] = "captured"
+        fields["damage_deposit_captured_at"] = stamp
+    updated = patch_booking_fields(tenant_id, booking_id, fields)
+    try:
+        from travel_platform.rental.rental_pg_sync import sync_booking_to_pg
+
+        sync_booking_to_pg(updated)
+    except Exception:
+        pass
+    return updated
 
 
 def public_catalog(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
@@ -1476,22 +1894,37 @@ def public_catalog(tenant_id: str | None, *, category: str | None = None) -> lis
     for v in rows:
         if str(v.get("current_status") or "") == "MAINTENANCE":
             continue
-        out.append(
-            {
-                "id": v["id"],
-                "plate_number": v.get("plate_number"),
-                "category": v.get("category"),
-                "model": v.get("model"),
-                "seating_capacity": v.get("seating_capacity"),
-                "current_status": v.get("current_status"),
-                "daily_rate_eur": v.get("daily_rate_eur"),
-                "one_way_surcharge_eur": float(v.get("one_way_surcharge_eur") or 0),
-                "with_driver_daily_eur": float(v.get("with_driver_daily_eur") or 0),
-                "photo_url": v.get("photo_url") or ((v.get("photo_urls") or [None])[0]),
-                "photo_urls": list(v.get("photo_urls") or ([] if not v.get("photo_url") else [v.get("photo_url")])),
-                "description": v.get("description"),
+        agg = vehicle_rating_aggregate(tenant_id, v["id"])
+        card = {
+            "id": v["id"],
+            "plate_number": v.get("plate_number"),
+            "category": v.get("category"),
+            "model": v.get("model"),
+            "seating_capacity": v.get("seating_capacity"),
+            "current_status": v.get("current_status"),
+            "daily_rate_eur": v.get("daily_rate_eur"),
+            "one_way_surcharge_eur": float(v.get("one_way_surcharge_eur") or 0),
+            "with_driver_daily_eur": float(v.get("with_driver_daily_eur") or 0),
+            "photo_url": v.get("photo_url") or ((v.get("photo_urls") or [None])[0]),
+            "photo_urls": list(v.get("photo_urls") or ([] if not v.get("photo_url") else [v.get("photo_url")])),
+            "description": v.get("description"),
+            "branch_id": v.get("branch_id"),
+            "branch_name": v.get("branch_name") or DEFAULT_BRANCH_NAME,
+            "min_driver_age": min_driver_age_for_category(v.get("category")),
+        }
+        if agg:
+            card["rating_avg"] = agg["rating"]
+            card["rating_count"] = agg["count"]
+            card["trust"] = {"rating": agg["rating"], "booked": agg["booked"], "real": True}
+        elif v.get("rating_avg") is not None:
+            card["rating_avg"] = v.get("rating_avg")
+            card["rating_count"] = v.get("rating_count") or 0
+            card["trust"] = {
+                "rating": v.get("rating_avg"),
+                "booked": v.get("rating_count") or 0,
+                "real": True,
             }
-        )
+        out.append(card)
     return out
 
 
