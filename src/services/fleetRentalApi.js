@@ -157,3 +157,16 @@ export async function fetchRentalInspections(bookingId) {
 export async function createRentalInspection(body) {
   return rentalFetch('/inspections', { method: 'POST', body: JSON.stringify(body) });
 }
+
+export async function issueRentalReceipt(bookingId, body = {}) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/issue-receipt`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function scanRentalReminders(withinHours = 24) {
+  return rentalFetch(`/reminders/scan?within_hours=${encodeURIComponent(withinHours)}`, {
+    method: 'POST',
+  });
+}

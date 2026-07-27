@@ -2014,3 +2014,65 @@
     bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
   }
 }
+
+.rent-wallet-fiscal {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.55rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.75rem;
+  background: rgba(14, 165, 233, 0.1);
+  color: #0369a1;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rent-wallet-fiscal .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.rent-wallet-afm {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: var(--rent-secondary);
+}
+
+.rent-wallet-sheet {
+  margin: 0.85rem 0 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--rent-stroke);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rent-wallet-sheet h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.rent-wallet-sheet label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--rent-secondary);
+}
+
+.rent-wallet-sheet-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.rent-wallet-photo input[type='file'] {
+  font-size: 0.75rem;
+}
+
+.rent-wallet-sig {
+  margin-top: 0.25rem;
+}

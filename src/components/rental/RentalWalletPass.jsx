@@ -42,6 +42,10 @@ export default function RentalWalletPass({
   onBookVehicle,
   onCancel,
   cancelling = false,
+  onModify,
+  onContract,
+  onCheckIn,
+  onCheckOut,
 }) {
   if (!booking) {
     return (
@@ -125,6 +129,22 @@ export default function RentalWalletPass({
           </div>
         ) : null}
 
+        {booking.fiscal_mark ? (
+          <div className="rent-wallet-fiscal">
+            <span className="material-symbols-outlined" aria-hidden>
+              receipt_long
+            </span>
+            <span>
+              Απόδειξη {booking.fiscal_mark}
+              {booking.fiscal_amount != null ? ` · €${Number(booking.fiscal_amount).toFixed(2)}` : ''}
+            </span>
+          </div>
+        ) : null}
+
+        {booking.client_afm ? (
+          <p className="rent-wallet-afm">ΑΦΜ {booking.client_afm}</p>
+        ) : null}
+
         {booking.id_verification_status && booking.id_verification_status !== 'not_required' ? (
           <div
             className={`rent-wallet-id ${
@@ -188,6 +208,26 @@ export default function RentalWalletPass({
             <p className="rent-wallet-cancel-locked">
               Online ακύρωση κλειστή — λιγότερο από 24 ώρες πριν την παραλαβή. Επικοινωνήστε με το γραφείο.
             </p>
+          ) : null}
+          {onModify ? (
+            <button type="button" className="wallet-btn wallet-btn-block" onClick={onModify}>
+              Αλλαγή ημερομηνιών
+            </button>
+          ) : null}
+          {onCheckIn ? (
+            <button type="button" className="wallet-btn wallet-btn-block" onClick={onCheckIn}>
+              Check-in
+            </button>
+          ) : null}
+          {onCheckOut ? (
+            <button type="button" className="wallet-btn wallet-btn-block" onClick={onCheckOut}>
+              Check-out
+            </button>
+          ) : null}
+          {onContract ? (
+            <button type="button" className="wallet-btn wallet-btn-block" onClick={onContract}>
+              Λήψη σύμβασης
+            </button>
           ) : null}
           {booking.contract_accepted ? (
             <p className="rent-wallet-contract-ok">

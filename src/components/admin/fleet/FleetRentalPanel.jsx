@@ -15,6 +15,7 @@ import {
   fetchRentalLiveOverlays,
   fetchRentalSummary,
   fetchRentalVehicles,
+  issueRentalReceipt,
   updateRentalBookingStatus,
   updateRentalIdVerification,
   uploadRentalInspectionPhoto,
@@ -1052,6 +1053,7 @@ export default function FleetRentalPanel({
                       {b.driver_mode === 'WITH_DRIVER' ? ' · με οδηγό' : ' · self-drive'}
                       {b.client_email ? ` · ${b.client_email}` : ''}
                       {b.client_phone ? ` · ${b.client_phone}` : ''}
+                      {b.client_afm ? ` · ΑΦΜ ${b.client_afm}` : ''}
                     </p>
                     {b.contract_accepted ? (
                       <div className="flex flex-wrap items-center gap-2 pt-0.5">
@@ -1080,6 +1082,11 @@ export default function FleetRentalPanel({
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusChip(b.rental_status)}`}>
                         {b.rental_status}
                       </span>
+                      {b.fiscal_mark ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">
+                          Απόδειξη · {b.fiscal_mark}
+                        </span>
+                      ) : null}
                       {b.pricing?.is_one_way ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
                           One-way
@@ -1222,6 +1229,29 @@ export default function FleetRentalPanel({
                         }}
                       >
                         Check-out
+                      </button>
+                    ) : null}
+                    {!b.fiscal_mark && b.rental_status !== 'CANCELLED' ? (
+                      <button
+                        type="button"
+                        className="text-xs font-bold text-sky-700"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            await issueRentalReceipt(b.id, {
+                              amount: b.amount_paid || b.total_cost,
+                            });
+                            toast.success('Εκδόθηκε απόδειξη');
+                            await reload();
+                          } catch (err) {
+                            toast.error(err.message);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Έκδοση απόδειξης
                       </button>
                     ) : null}
                   </div>
