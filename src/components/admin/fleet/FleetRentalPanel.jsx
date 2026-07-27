@@ -29,6 +29,7 @@ import {
 import RentalSignaturePad from './RentalSignaturePad.jsx';
 import RentalCalendarBoard from './RentalCalendarBoard.jsx';
 import RentAppShareBanner from './RentAppShareBanner.jsx';
+import RentalDeskQrScan from './RentalDeskQrScan.jsx';
 import '../../../styles/rental-admin-apple.css';
 
 const CATEGORIES = [
@@ -40,6 +41,7 @@ const CATEGORIES = [
 const TABS = [
   { id: 'clients', label: 'Πελάτες', icon: 'groups' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
+  { id: 'scan', label: 'Σάρωση QR', icon: 'qr_code_scanner' },
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard' },
   { id: 'vehicles', label: 'Στόλος', icon: 'directions_car' },
   { id: 'wizard', label: 'Νέα κράτηση', icon: 'add_circle' },
@@ -567,6 +569,7 @@ export default function FleetRentalPanel({
             {[
               { id: 'clients', label: 'Πελάτες ενοικίασης', copy: `${clients.length} πελάτες · γραφείο + Wallet`, icon: 'groups' },
               { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
+              { id: 'scan', label: 'Σάρωση QR', copy: 'Επαλήθευση Rent Wallet · check-in', icon: 'qr_code_scanner' },
               { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
@@ -970,6 +973,33 @@ export default function FleetRentalPanel({
             </div>
           )}
         </div>
+      )}
+
+      {tab === 'scan' && (
+        <RentalDeskQrScan
+          onCheckIn={(booking) => {
+            setInsp((s) => ({
+              ...s,
+              rental_booking_id: booking.id,
+              inspection_type: 'PICKUP_CHECK',
+            }));
+            setTab('inspections');
+            toast.success('Ανοίγει check-in για αυτή την κράτηση');
+          }}
+          onCheckOut={(booking) => {
+            setInsp((s) => ({
+              ...s,
+              rental_booking_id: booking.id,
+              inspection_type: 'RETURN_CHECK',
+            }));
+            setTab('inspections');
+            toast.success('Ανοίγει check-out για αυτή την κράτηση');
+          }}
+          onOpenBooking={() => {
+            setBookingFilter('ALL');
+            setTab('bookings');
+          }}
+        />
       )}
 
       {tab === 'bookings' && (
