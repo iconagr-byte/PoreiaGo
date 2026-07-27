@@ -111,6 +111,20 @@ export default function RentalWalletPass({
           </div>
         </div>
 
+        {booking.payment_status || booking.payment_label ? (
+          <div className="rent-wallet-pay">
+            <span className="material-symbols-outlined" aria-hidden>
+              payments
+            </span>
+            <span>
+              {booking.payment_label || booking.payment_status}
+              {Number(booking.balance_due) > 0
+                ? ` · υπόλοιπο €${Number(booking.balance_due).toFixed(2)}`
+                : ''}
+            </span>
+          </div>
+        ) : null}
+
         <div className="rent-wallet-route">
           <span className="material-symbols-outlined" aria-hidden>
             trip_origin

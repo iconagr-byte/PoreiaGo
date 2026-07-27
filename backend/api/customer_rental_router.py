@@ -1,4 +1,4 @@
-"""Customer PWA fleet rental — catalog, availability, instant booking."""
+"""Customer PWA fleet rental — catalog, availability, booking + payment."""
 
 from __future__ import annotations
 
@@ -51,6 +51,12 @@ async def _tenant_id(request: Request) -> str:
     return DEMO_TENANT_ID
 
 
+class CustomerBookingExtras(BaseModel):
+    extra_insurance: bool = False
+    child_seat: bool = False
+    gps_pack: bool = False
+
+
 class CustomerBookingBody(BaseModel):
     vehicle_id: str
     start_time: str
@@ -60,6 +66,10 @@ class CustomerBookingBody(BaseModel):
     driver_mode: str = "SELF_DRIVE"
     client_phone: str | None = None
     notes: str | None = None
+    extras: CustomerBookingExtras | None = None
+    payment_plan: str = "full"
+    payment_method: str = "card"
+    deposit_percent: int | None = Field(default=None, ge=5, le=90)
 
 
 def _public_booking(row: dict) -> dict:
@@ -79,6 +89,14 @@ def _public_booking(row: dict) -> dict:
         "rental_status": row.get("rental_status"),
         "driver_mode": row.get("driver_mode"),
         "channel": row.get("channel"),
+        "payment_plan": row.get("payment_plan"),
+        "payment_method": row.get("payment_method"),
+        "deposit_percent": row.get("deposit_percent"),
+        "amount_due_now": row.get("amount_due_now"),
+        "amount_paid": row.get("amount_paid"),
+        "balance_due": row.get("balance_due"),
+        "payment_status": row.get("payment_status"),
+        "payment_label": row.get("payment_label"),
         "created_at": row.get("created_at"),
     }
 
@@ -192,6 +210,7 @@ async def book_rental(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
+    extras = body.extras.model_dump() if body.extras else {}
     payload = {
         "vehicle_id": body.vehicle_id,
         "client_name": (account.get("name") or account["email"].split("@")[0]).strip(),
@@ -204,6 +223,10 @@ async def book_rental(
         "dropoff_location": (body.dropoff_location or body.pickup_location).strip(),
         "driver_mode": body.driver_mode,
         "notes": body.notes,
+        "extras": extras,
+        "payment_plan": body.payment_plan,
+        "payment_method": body.payment_method,
+        "deposit_percent": body.deposit_percent,
         "channel": "WALLET",
     }
     try:
@@ -217,6 +240,14 @@ async def book_rental(
         await notify_rental_booking_to_office(row)
     except Exception:
         # Booking must succeed even if office push fails.
+        pass
+
+    try:
+        from ticketing.rental_confirmation_email import send_rental_confirmation_email
+
+        await send_rental_confirmation_email(row)
+    except Exception:
+        # Booking must succeed even if confirmation email fails.
         pass
 
     return _public_booking(row)
