@@ -48,10 +48,19 @@ export function HeroSection() {
 
       <div className="relative z-10 w-full max-w-6xl mx-auto px-4 md:px-8 py-28 md:py-32">
         <div className="max-w-2xl">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-bold uppercase tracking-wider text-sky-200 mb-6">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            {HERO.badge}
-          </span>
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-bold uppercase tracking-wider text-sky-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              {HERO.badge}
+            </span>
+            <Link
+              to="/rent/services"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-teal-500/20 border border-teal-300/35 text-xs font-bold uppercase tracking-wider text-teal-100 hover:bg-teal-400/25 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[14px]">car_rental</span>
+              Νέο · Ενοικιάσεις
+            </Link>
+          </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-bold text-white leading-[1.08] tracking-tight mb-6">
             {HERO.title}{' '}
@@ -73,6 +82,13 @@ export function HeroSection() {
               <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
             <Link
+              to="/rent/services"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-teal-300/50 bg-teal-500/15 text-teal-50 hover:bg-teal-400/25 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">car_rental</span>
+              Ενοικιάσεις
+            </Link>
+            <Link
               to="/admin/login"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-white/25 text-white hover:bg-white/10 transition-colors"
             >
@@ -87,7 +103,11 @@ export function HeroSection() {
           {STATS.map((s) => (
             <div
               key={s.label}
-              className="rounded-2xl bg-white/5 border border-white/10 px-4 py-4 backdrop-blur-sm"
+              className={`rounded-2xl border px-4 py-4 backdrop-blur-sm ${
+                s.value === 'Rent'
+                  ? 'bg-teal-500/15 border-teal-300/30'
+                  : 'bg-white/5 border-white/10'
+              }`}
             >
               <p className="text-xl md:text-2xl font-bold text-white">{s.value}</p>
               <p className="text-xs text-white/55 mt-1">{s.label}</p>
@@ -279,6 +299,101 @@ export function PricingTeaserSection() {
   return (
     <section id="pricing" className="py-20 md:py-24 px-4 md:px-8 max-w-6xl mx-auto">
       <AgencyPlansHook />
+    </section>
+  );
+}
+
+export function RentProductSection() {
+  return (
+    <section
+      id="rent"
+      className="relative py-20 md:py-28 overflow-hidden border-y border-teal-900/20 bg-gradient-to-b from-[#062a30] via-[#0b3d4a] to-slate-950"
+    >
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40"
+        aria-hidden
+        style={{
+          backgroundImage:
+            'radial-gradient(ellipse 70% 50% at 15% 20%, rgba(45,212,191,0.25), transparent), radial-gradient(ellipse 50% 40% at 90% 80%, rgba(56,189,248,0.12), transparent)',
+        }}
+      />
+      <div className="relative max-w-6xl mx-auto px-4 md:px-8">
+        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-14 items-center">
+          <div>
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-400/15 border border-teal-300/25 text-xs font-bold uppercase tracking-wider text-teal-200 mb-5">
+              <span className="material-symbols-outlined text-[16px]">car_rental</span>
+              Νέα υπηρεσία · Rent
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight">
+              Ενοικιάσεις οχημάτων με SOS, οδική βοήθεια και καθαρή ασφάλεια
+            </h2>
+            <p className="mt-4 text-base md:text-lg text-teal-50/75 leading-relaxed max-w-xl">
+              Ξεχωριστό συμβόλαιο μόνο για Rent, ή add-on πάνω στο πλάνο λεωφορείων. Ο πελάτης
+              βλέπει τις υπηρεσίες στο <span className="text-white font-semibold">/rent/services</span>{' '}
+              — χωρίς σύνδεση.
+            </p>
+            <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-teal-50/90">
+              {[
+                'SOS + live τοποθεσία',
+                'Οδική βοήθεια 24/7',
+                'CDW / SCDW πριν την υπογραφή',
+                'Share trip στην οικογένεια',
+                'Checklist πριν την αναχώρηση',
+                'Desk Ενοικιάσεις στο panel',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="material-symbols-outlined text-teal-300 text-[18px] mt-0.5">
+                    check_circle
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                to="/rent/services"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white text-teal-950 font-bold hover:bg-teal-50"
+              >
+                Δες την υπηρεσία
+                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </Link>
+              <Link
+                to="/grafeia"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
+              >
+                Συμβόλαια Rent
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <article className="rounded-[24px] border border-white/15 bg-white/10 backdrop-blur-md p-6 text-white">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-teal-200">
+                Αυτόνομο συμβόλαιο
+              </p>
+              <h3 className="mt-2 text-xl font-bold">Rent μόνο</h3>
+              <p className="mt-1 text-sm text-white/65">
+                Για γραφεία ενοικίασης χωρίς λεωφορεία — πλήρες /rent stack.
+              </p>
+              <p className="mt-4 text-2xl font-bold tabular-nums">
+                από €149<span className="text-sm font-semibold text-white/55">/μήνα</span>
+              </p>
+            </article>
+            <article className="rounded-[24px] border border-white/15 bg-white/10 backdrop-blur-md p-6 text-white">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-sky-200">
+                Add-on
+              </p>
+              <h3 className="mt-2 text-xl font-bold">Πάνω σε λεωφορεία</h3>
+              <p className="mt-1 text-sm text-white/65">
+                Starter / Professional / Enterprise + module Ενοικιάσεις.
+              </p>
+              <p className="mt-4 text-2xl font-bold tabular-nums">
+                +€79<span className="text-sm font-semibold text-white/55">/μήνα</span>
+              </p>
+            </article>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

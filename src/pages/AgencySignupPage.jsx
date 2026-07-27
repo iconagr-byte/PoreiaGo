@@ -3,10 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import {
-  AGENCY_PLANS,
   BILLING_INTERVALS,
   displayPrice,
   getPlanById,
+  selectableAgencyPlans,
 } from '../lib/billing/planCatalog.js';
 import { createSignupCheckout, fetchBillingConfig } from '../services/billingApi.js';
 import { getPlatformBaseDomain } from '../lib/platform/domain.js';
