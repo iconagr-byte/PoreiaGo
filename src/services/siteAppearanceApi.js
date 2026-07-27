@@ -7,7 +7,8 @@ import { scrubSiteAppearancePlaceholders } from '../lib/branding/officeBrand.js'
 import { fileToLogoDataUrl } from '../lib/branding/logoImage.js';
 import { fileToTripCoverDataUrl } from '../lib/trips/tripImage.js';
 
-const STORAGE_KEY = 'aerostride_site_appearance_v1';
+// v2: drop cached Achillion Travel logo that was incorrectly served on PoreiaGo.
+const STORAGE_KEY = 'aerostride_site_appearance_v2';
 
 export const DEFAULT_SITE_APPEARANCE = {
   logo_url: '',
