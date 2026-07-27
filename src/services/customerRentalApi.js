@@ -86,6 +86,27 @@ export async function createCustomerRentalBooking(body) {
   });
 }
 
+export async function fetchRentalContractTerms() {
+  return customerRentalFetch('/contract');
+}
+
+export async function uploadCustomerRentalSignature(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/api/customer/rentals/signature-upload`, {
+    method: 'POST',
+    headers: {
+      ...customerAuthHeaders(),
+    },
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || `Αποτυχία υπογραφής (${res.status})`);
+  }
+  return data;
+}
+
 export async function cancelCustomerRentalBooking(bookingId) {
   return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
     method: 'POST',

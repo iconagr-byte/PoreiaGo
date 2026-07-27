@@ -1114,6 +1114,68 @@
   gap: 0.5rem;
 }
 
+.rent-contract-panel {
+  margin-top: 1rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 122, 108, 0.2);
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.07), #fff);
+}
+
+.rent-contract-panel h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--rent-deep);
+}
+
+.rent-contract-clauses {
+  margin: 0.55rem 0 0.75rem;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--rent-secondary);
+  line-height: 1.4;
+}
+
+.rent-contract-accept {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--rent-deep);
+  margin-bottom: 0.65rem;
+}
+
+.rent-contract-sign {
+  padding: 0.55rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(15, 61, 74, 0.1);
+}
+
+.rent-wallet-cancel-locked {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #8e8e93;
+  line-height: 1.4;
+}
+
+.rent-wallet-contract-ok {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #0f766e;
+}
+
+.rent-wallet-contract-ok .material-symbols-outlined {
+  font-size: 1rem;
+}
+
 .rent-picked-vehicle {
   display: grid;
   grid-template-columns: auto 1fr auto;
