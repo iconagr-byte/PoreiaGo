@@ -97,6 +97,7 @@ function statusChip(status) {
 export default function FleetRentalPanel({
   onOpenLiveMap,
   onOpenCustomer,
+  onBackToOffice,
   initialTab,
 } = {}) {
   const navigate = useNavigate();
@@ -396,6 +397,16 @@ export default function FleetRentalPanel({
               <span className="material-symbols-outlined">car_rental</span>
             </div>
             <div className="min-w-0">
+              {typeof onBackToOffice === 'function' ? (
+                <button
+                  type="button"
+                  onClick={onBackToOffice}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800 mb-1.5 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                  Πίσω στο γραφείο
+                </button>
+              ) : null}
               <h2 className="rental-apple-title">Ενοικιάσεις</h2>
               <p className="rental-apple-subtitle">
                 Στόλος, κρατήσεις γραφείου &amp; Wallet, check-in/out, υπογραφή και ζωντανό GPS —

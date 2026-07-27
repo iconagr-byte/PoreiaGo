@@ -2061,9 +2061,17 @@ export default function BackOffice() {
     );
   };
 
+  const rentDeskMode = activeTab === 'fleet_rental';
+
+  useEffect(() => {
+    if (rentDeskMode && mobileNavOpen) setMobileNavOpen(false);
+  }, [rentDeskMode, mobileNavOpen]);
+
   return (
     <FleetTelemetryProvider>
     <div className="bg-surface text-on-surface h-screen flex overflow-hidden relative">
+      {/* Rent desk: only the Ενοικιάσεις horizontal tabs — hide PoreiaGo left nav. */}
+      {!rentDeskMode ? (
       <aside className="w-[17.5rem] xl:w-80 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0 relative z-20">
         <div className="px-4 pt-4 pb-2">
           <button
@@ -2089,7 +2097,9 @@ export default function BackOffice() {
           onNavigate={(path) => navigate(path)}
         />
       </aside>
+      ) : null}
 
+      {!rentDeskMode ? (
       <AdminMobileNavDrawer
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
@@ -2100,6 +2110,7 @@ export default function BackOffice() {
         onEmailClick={goToEmailMailbox}
         onNavigate={(path) => navigate(path)}
       />
+      ) : null}
 
       <AddCustomerModal
         open={addCustomerOpen}
@@ -2113,6 +2124,7 @@ export default function BackOffice() {
       <main className="flex-1 flex flex-col relative h-full overflow-hidden">
         <header className="h-20 glass-overlay border-b border-black/[0.05] flex items-center justify-between px-4 sm:px-margin-desktop shrink-0 z-10 sticky top-0 gap-3">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+            {!rentDeskMode ? (
             <button
               type="button"
               className="md:hidden w-11 h-11 rounded-full bg-white border border-black/[0.08] shadow-sm flex items-center justify-center shrink-0"
@@ -2121,6 +2133,17 @@ export default function BackOffice() {
             >
               <span className="material-symbols-outlined">menu</span>
             </button>
+            ) : (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 h-11 px-3 rounded-full bg-white border border-black/[0.08] shadow-sm text-sm font-bold text-slate-700 hover:bg-slate-50 shrink-0"
+              onClick={() => setActiveTab('dashboard')}
+              aria-label="Πίσω στο γραφείο"
+            >
+              <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+              <span className="hidden sm:inline">Γραφείο</span>
+            </button>
+            )}
             <div className="flex items-center gap-4 w-full max-w-sm min-w-0">
               <TemplateSearch onUseTemplate={useEmailTemplate} />
             </div>
@@ -2215,6 +2238,7 @@ export default function BackOffice() {
               <div className="pb-stack-lg">
                 <FleetRentalPanel
                   initialTab={location.state?.fleetRentalTab}
+                  onBackToOffice={() => setActiveTab('dashboard')}
                   onOpenLiveMap={() => setActiveTab('fleet_live_map')}
                   onOpenCustomer={(person) => {
                     setSelectedCustomer(person);
