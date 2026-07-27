@@ -1,4 +1,4 @@
-"""Ανάκτηση ιστορικών GPS σημείων από trip_coordinates (PostGIS)."""
+"""Ανάκτηση ιστορικών GPS σημείων από trip_coordinates (PostGIS) + live buffer."""
 
 from __future__ import annotations
 
@@ -15,6 +15,16 @@ logger = logging.getLogger(__name__)
 MAX_ROUTE_POINTS = 10_000
 
 
+def _is_uuid(value: str | None) -> bool:
+    if not value:
+        return False
+    try:
+        UUID(str(value))
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
 async def fetch_trip_route(
     session: AsyncSession,
     *,
@@ -22,17 +32,24 @@ async def fetch_trip_route(
     trip_id: int,
     from_time: datetime | None = None,
     to_time: datetime | None = None,
-    driver_id: UUID | None = None,
+    driver_id: UUID | str | None = None,
     limit: int = 5000,
 ) -> dict[str, Any]:
-    """Επιστρέφει διατεταγμένα σημεία διαδρομής για playback."""
+    """Επιστρέφει διατεταγμένα σημεία διαδρομής για playback.
+
+    Combines PostGIS history with in-memory points still waiting to flush so
+    Route History can show GPS as soon as the driver app sends it (live map path).
+    """
     cap = min(max(1, limit), MAX_ROUTE_POINTS)
+    driver_key = str(driver_id).strip() if driver_id else None
+    driver_uuid = driver_key if _is_uuid(driver_key) else None
     params: dict[str, Any] = {
         "tenant_id": str(tenant_id),
         "trip_id": trip_id,
         "from_time": from_time,
         "to_time": to_time,
-        "driver_id": str(driver_id) if driver_id else None,
+        "driver_uuid": driver_uuid,
+        "driver_key": driver_key,
         "limit": cap,
     }
 
@@ -52,26 +69,68 @@ async def fetch_trip_route(
           AND trip_id = :trip_id
           AND (:from_time IS NULL OR recorded_at >= :from_time)
           AND (:to_time IS NULL OR recorded_at <= :to_time)
-          AND (:driver_id IS NULL OR driver_id = CAST(:driver_id AS uuid))
+          AND (
+            :driver_key IS NULL
+            OR (:driver_uuid IS NOT NULL AND driver_id = CAST(:driver_uuid AS uuid))
+            OR raw_payload->>'driver_id' = :driver_key
+          )
         ORDER BY recorded_at ASC
         LIMIT :limit
     """
 
+    points: list[dict[str, Any]] = []
+    db_error = None
     try:
         result = await session.execute(text(sql), params)
         rows = result.mappings().all()
+        points = [_row_to_point(row) for row in rows]
     except Exception as exc:
         logger.warning("trip_coordinates query failed: %s", exc)
-        return {
-            "trip_id": trip_id,
-            "tenant_id": str(tenant_id),
-            "point_count": 0,
-            "points": [],
-            "error": "database_unavailable",
-        }
+        db_error = "database_unavailable"
 
-    points = [_row_to_point(row) for row in rows]
-    return {
+    # Near-real-time: include GPS still in the live ingest buffer (pre-flush).
+    try:
+        from travel_platform.telemetry.coordinate_buffer import peek_matching
+
+        pending = peek_matching(
+            tenant_id=str(tenant_id),
+            trip_id=trip_id,
+            driver_id=driver_key,
+            from_time=from_time,
+            to_time=to_time,
+            limit=cap,
+        )
+        if pending:
+            existing_keys = {
+                (p["recorded_at"], round(p["lat"], 6), round(p["lng"], 6)) for p in points
+            }
+            for idx, row in enumerate(pending):
+                recorded = row.recorded_at
+                recorded_at = recorded.isoformat() if isinstance(recorded, datetime) else str(recorded)
+                key = (recorded_at, round(row.lat, 6), round(row.lng, 6))
+                if key in existing_keys:
+                    continue
+                points.append(
+                    {
+                        "id": -(idx + 1),
+                        "trip_id": row.trip_id,
+                        "driver_id": str(row.driver_id) if row.driver_id else None,
+                        "vehicle_id": str(row.vehicle_id) if row.vehicle_id else None,
+                        "lat": float(row.lat),
+                        "lng": float(row.lng),
+                        "speed_kmh": float(row.speed_kmh or 0),
+                        "heading_deg": float(row.heading_deg) if row.heading_deg is not None else None,
+                        "recorded_at": recorded_at,
+                        "source": "live_buffer",
+                    },
+                )
+            points.sort(key=lambda p: p.get("recorded_at") or "")
+            if len(points) > cap:
+                points = points[-cap:]
+    except Exception as exc:
+        logger.debug("live buffer merge skipped: %s", exc)
+
+    payload: dict[str, Any] = {
         "trip_id": trip_id,
         "tenant_id": str(tenant_id),
         "point_count": len(points),
@@ -79,6 +138,9 @@ async def fetch_trip_route(
         "to_time": points[-1]["recorded_at"] if points else None,
         "points": points,
     }
+    if db_error and not points:
+        payload["error"] = db_error
+    return payload
 
 
 def _row_to_point(row: Any) -> dict[str, Any]:
@@ -98,4 +160,5 @@ def _row_to_point(row: Any) -> dict[str, Any]:
         "speed_kmh": float(row.get("speed_kmh") or 0),
         "heading_deg": float(heading) if heading is not None else None,
         "recorded_at": recorded_at,
+        "source": "postgis",
     }
