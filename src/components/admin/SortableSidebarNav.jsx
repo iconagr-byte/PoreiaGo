@@ -22,6 +22,7 @@ export default function SortableSidebarNav({
   onSettingsSubTabChange,
   onEmailClick,
   onNavigate,
+  hiddenTabIds = [],
 }) {
   const superAdmin = isSaasSuperAdmin();
   const [layout, setLayout] = useState(() => loadNavLayout(superAdmin));
@@ -36,16 +37,19 @@ export default function SortableSidebarNav({
     setLayout(loadNavLayout(superAdmin));
   }, [superAdmin]);
 
+  const hidden = useMemo(() => new Set(hiddenTabIds || []), [hiddenTabIds]);
+
   const sections = useMemo(() => {
     const visible = SECTIONS.filter((s) => !s.superOnly || superAdmin);
     return visible.map((section) => ({
       ...section,
       order: layout[section.id] || [],
       items: navItemsFromIds(layout[section.id] || [], superAdmin).filter(
-        (item) => superAdmin || item.settingsSection !== 'platform',
+        (item) =>
+          (superAdmin || item.settingsSection !== 'platform') && !hidden.has(item.id),
       ),
     }));
-  }, [layout, superAdmin]);
+  }, [layout, superAdmin, hidden]);
 
   const persistLayout = useCallback(
     (next) => {

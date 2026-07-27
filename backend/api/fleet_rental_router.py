@@ -497,3 +497,32 @@ async def patch_rental_safety_settings(
     patch = {k: v for k, v in body.model_dump().items() if v is not None}
     update_safety_settings(patch)
     return resolve_safety_contacts()
+
+
+class RentModuleBody(BaseModel):
+    rent_enabled: bool | None = None
+    rent_addon_monthly_eur: float | None = Field(default=None, ge=0)
+    note: str | None = None
+
+
+@router.get("/module")
+async def get_rent_module(_: dict = Depends(_require_admin)):
+    """Rent SaaS add-on entitlement (separate from bus/core plan)."""
+    from travel_platform.rental.rental_module_entitlement import read_rent_module
+
+    return read_rent_module()
+
+
+@router.patch("/module")
+async def patch_rent_module(
+    body: RentModuleBody,
+    _: dict = Depends(_require_admin),
+):
+    from travel_platform.rental.rental_module_entitlement import (
+        read_rent_module,
+        update_rent_module,
+    )
+
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    update_rent_module(patch)
+    return read_rent_module()

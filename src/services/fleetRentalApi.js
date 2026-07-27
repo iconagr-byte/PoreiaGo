@@ -184,3 +184,11 @@ export async function scanRentalReminders(withinHours = 24) {
     method: 'POST',
   });
 }
+
+export async function fetchRentModule() {
+  return rentalFetch('/module');
+}
+
+export async function updateRentModule(body) {
+  return rentalFetch('/module', { method: 'PATCH', body: JSON.stringify(body) });
+}

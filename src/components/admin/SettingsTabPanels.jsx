@@ -61,6 +61,7 @@ export default function SettingsTabPanels({
       <ContractsPanel
         initialPlan={contractPrefs?.plan}
         initialInterval={contractPrefs?.interval}
+        focusRentModule={Boolean(contractPrefs?.focusRentModule)}
       />
     );
   }

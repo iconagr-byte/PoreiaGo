@@ -102,8 +102,8 @@ export default function RentAppShareBanner() {
               ) : null}
             </p>
             <p className="mt-0.5 text-[#6e6e73] text-[13px] leading-snug">
-              Σκανάρετε το QR για κράτηση, ημερολόγιο και εγκατάσταση στην αρχική οθόνη. Νέα
-              κράτηση → push στο γραφείο.
+              Σκανάρετε το QR για κράτηση, ημερολόγιο και εγκατάσταση. Για διαφήμιση υπηρεσιών
+              (SOS, οδική, ασφάλεια) μοιραστείτε και το /rent/services.
             </p>
             <div className="mt-2 rounded-xl bg-[#f5f5f7] border border-black/[0.04] px-3 py-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#6e6e73]">
@@ -122,6 +122,19 @@ export default function RentAppShareBanner() {
               >
                 Άνοιγμα /rent
                 <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+              </a>
+              <a
+                href={
+                  rentUrl
+                    ? `${String(rentUrl).replace(/\/$/, '')}/services`
+                    : '/rent/services'
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-teal-600 text-white text-xs font-bold"
+              >
+                Υπηρεσίες
+                <span className="material-symbols-outlined text-[16px]">campaign</span>
               </a>
               <button
                 type="button"

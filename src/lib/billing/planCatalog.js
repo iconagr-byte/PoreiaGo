@@ -79,3 +79,21 @@ export function displayPrice(plan, interval) {
     suffix: BILLING_INTERVALS.month.short,
   };
 }
+
+/** Optional Rent module — billed separately from core bus/trips plan. */
+export const RENT_ADDON = {
+  id: 'rent',
+  name: 'Ενοικιάσεις (Rent)',
+  tagline: 'Ξεχωριστή υπηρεσία — πληρώνετε μόνο αν τη θέλετε',
+  monthlyEur: 79,
+  features: [
+    'Customer app /rent + Rent Wallet',
+    'SOS, οδική 24/7, CDW/SCDW, share trip, checklist',
+    'Desk Ενοικιάσεις: στόλος, κρατήσεις, QR, check-in',
+    'Δημόσια σελίδα υπηρεσιών για διαφήμιση (/rent/services)',
+  ],
+};
+
+export function rentAddonDisplayPrice(interval = 'month') {
+  return displayPrice(RENT_ADDON, interval);
+}

@@ -70,6 +70,17 @@ const DICTS = {
     checklist_documents: 'Έγγραφα ΟΚ',
     checklist_spare: 'Ρεζέρβα ΟΚ',
     checklist_damages: 'Καταγράφηκαν ζημιές',
+    services_kicker: 'Υπηρεσίες',
+    services_title: 'Τι περιλαμβάνει η ενοικίαση',
+    services_lead:
+      'Ασφάλεια στο ταξίδι — SOS, οδική 24/7, καθαρή ασφάλεια, share στην οικογένεια και checklist πριν φύγετε.',
+    services_cta: 'Δες τον στόλο',
+    services_cta_fleet: 'Δες στόλο & κλείσε',
+    services_hero_title: 'Ενοικίαση με υποστήριξη στο δρόμο',
+    services_hero_copy:
+      'Μοιραστείτε αυτή τη σελίδα — χωρίς σύνδεση. Οι υπηρεσίες ενεργοποιούνται στο Rent Wallet όταν νοικιάζετε.',
+    services_help: 'Βοήθεια & υπηρεσίες',
+    services_unavailable: 'Η υπηρεσία ενοικίασης δεν είναι ενεργή για αυτό το γραφείο.',
   },
   en: {
     book: 'Book',
@@ -138,6 +149,17 @@ const DICTS = {
     checklist_documents: 'Documents OK',
     checklist_spare: 'Spare wheel OK',
     checklist_damages: 'Damages noted',
+    services_kicker: 'Services',
+    services_title: 'What’s included with rental',
+    services_lead:
+      'Trip safety — SOS, 24/7 roadside, clear insurance, family share, and a pre-departure checklist.',
+    services_cta: 'Browse fleet',
+    services_cta_fleet: 'Browse fleet & book',
+    services_hero_title: 'Rental with roadside support',
+    services_hero_copy:
+      'Share this page — no login needed. Features unlock in Rent Wallet when you rent.',
+    services_help: 'Help & services',
+    services_unavailable: 'Vehicle rental is not enabled for this office.',
   },
 };
 

@@ -7,7 +7,7 @@ import {
   syncCustomersFromBookings,
   syncCustomersFromRentalBookings,
 } from '../lib/customers/customerStore.js';
-import { fetchRentalBookings } from '../services/fleetRentalApi.js';
+import { fetchRentalBookings, fetchRentModule } from '../services/fleetRentalApi.js';
 import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
@@ -126,6 +126,7 @@ export default function BackOffice() {
   const [rentalBookings, setRentalBookings] = useState([]);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [rentModuleEnabled, setRentModuleEnabled] = useState(true);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -155,6 +156,26 @@ export default function BackOffice() {
     }
     ensureDriverSession();
   }, [navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRentModule()
+      .then((mod) => {
+        if (!cancelled) setRentModuleEnabled(mod?.rent_enabled !== false);
+      })
+      .catch(() => {
+        if (!cancelled) setRentModuleEnabled(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!rentModuleEnabled && activeTab === 'fleet_rental') {
+      setActiveTab('dashboard');
+    }
+  }, [rentModuleEnabled, activeTab]);
 
   // Legacy debug tab removed — send any leftover state to the live map.
   useEffect(() => {
@@ -2095,6 +2116,7 @@ export default function BackOffice() {
           onSettingsSubTabChange={setSettingsSubTab}
           onEmailClick={goToEmailMailbox}
           onNavigate={(path) => navigate(path)}
+          hiddenTabIds={rentModuleEnabled ? [] : ['fleet_rental']}
         />
       </aside>
       ) : null}
@@ -2109,6 +2131,7 @@ export default function BackOffice() {
         onSettingsSubTabChange={setSettingsSubTab}
         onEmailClick={goToEmailMailbox}
         onNavigate={(path) => navigate(path)}
+        hiddenTabIds={rentModuleEnabled ? [] : ['fleet_rental']}
       />
       ) : null}
 
@@ -2202,6 +2225,7 @@ export default function BackOffice() {
                   contractPrefs={{
                     plan: location.state?.plan,
                     interval: location.state?.interval,
+                    focusRentModule: location.state?.focusRentModule,
                   }}
                 />
               </div>

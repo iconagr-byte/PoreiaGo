@@ -469,6 +469,19 @@ async def rental_safety_contacts(request: Request):
     return resolve_safety_contacts()
 
 
+@router.get("/public/module")
+async def rental_public_module(request: Request):
+    """Whether this office has the Rent add-on enabled (public)."""
+    from travel_platform.rental.rental_module_entitlement import read_rent_module
+
+    _ = await _tenant_id(request)
+    mod = read_rent_module()
+    return {
+        "rent_enabled": bool(mod.get("rent_enabled", True)),
+        "rent_addon_monthly_eur": mod.get("rent_addon_monthly_eur"),
+    }
+
+
 @router.get("/availability")
 async def rental_availability(
     request: Request,

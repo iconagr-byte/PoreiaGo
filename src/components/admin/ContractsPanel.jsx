@@ -4,7 +4,9 @@ import toast from 'react-hot-toast';
 import {
   AGENCY_PLANS,
   BILLING_INTERVALS,
+  RENT_ADDON,
   displayPrice,
+  rentAddonDisplayPrice,
 } from '../../lib/billing/planCatalog.js';
 import {
   createBillingCheckout,
@@ -14,6 +16,7 @@ import {
   startBillingTrial,
 } from '../../services/billingApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
+import { fetchRentModule, updateRentModule } from '../../services/fleetRentalApi.js';
 
 const PLAN_ICONS = {
   starter: 'storefront',
@@ -68,13 +71,15 @@ function planDisplayName(planId) {
   return AGENCY_PLANS.find((p) => p.id === planId)?.name || planId || '—';
 }
 
-export default function ContractsPanel({ initialPlan, initialInterval = 'month' }) {
+export default function ContractsPanel({ initialPlan, initialInterval = 'month', focusRentModule = false }) {
   const [sub, setSub] = useState(null);
   const [billingConfig, setBillingConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [interval, setInterval] = useState(initialInterval);
   const [selectedPlan, setSelectedPlan] = useState(initialPlan || 'professional');
+  const [rentModule, setRentModule] = useState(null);
+  const [rentBusy, setRentBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!getSaasToken()) {
@@ -84,12 +89,14 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     }
     setLoading(true);
     try {
-      const [subscription, config] = await Promise.all([
+      const [subscription, config, module] = await Promise.all([
         fetchBillingSubscription(),
         fetchBillingConfig().catch(() => null),
+        fetchRentModule().catch(() => ({ rent_enabled: true, rent_addon_monthly_eur: RENT_ADDON.monthlyEur })),
       ]);
       setSub(subscription);
       setBillingConfig(config);
+      setRentModule(module);
       if (subscription?.plan) setSelectedPlan(subscription.plan);
       if (subscription?.interval === 'year' || subscription?.interval === 'month') {
         setInterval(subscription.interval);
@@ -159,8 +166,22 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     }
   };
 
+  const toggleRentModule = async (enabled) => {
+    setRentBusy(true);
+    try {
+      const next = await updateRentModule({ rent_enabled: enabled });
+      setRentModule(next);
+      toast.success(enabled ? 'Το module Ενοικιάσεις ενεργοποιήθηκε' : 'Το module Ενοικιάσεις απενεργοποιήθηκε');
+    } catch (e) {
+      toast.error(e.message || 'Αποτυχία ενημέρωσης module');
+    } finally {
+      setRentBusy(false);
+    }
+  };
+
   const catalogPlan = AGENCY_PLANS.find((p) => p.id === selectedPlan) || AGENCY_PLANS[1];
   const quote = displayPrice(catalogPlan, interval);
+  const rentQuote = rentAddonDisplayPrice(interval);
   const checkoutReady = billingConfig?.checkout_ready === true;
   const demoMode = billingConfig?.demo_mode === true;
   const trialDays = billingConfig?.trial_days || 14;
@@ -178,6 +199,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     onTrial && remaining != null && trialDays > 0
       ? Math.max(0, Math.min(100, Math.round(((trialDays - Math.max(remaining, 0)) / trialDays) * 100)))
       : null;
+  const rentOn = rentModule?.rent_enabled !== false;
 
   if (!hasToken) {
     return (
@@ -395,6 +417,57 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   </button>
                 );
               })}
+            </div>
+
+            <div
+              id="rent-module-addon"
+              className={`rounded-[22px] border p-5 space-y-3 ${
+                focusRentModule || rentOn
+                  ? 'border-teal-200 bg-gradient-to-br from-teal-50/90 to-white'
+                  : 'border-slate-200 bg-slate-50/60'
+              }`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-teal-700">Add-on</p>
+                  <h4 className="font-bold text-slate-900 text-lg mt-0.5">{RENT_ADDON.name}</h4>
+                  <p className="text-sm text-slate-500 mt-0.5">{RENT_ADDON.tagline}</p>
+                  <p className="text-xl font-bold text-slate-900 mt-2 tabular-nums">
+                    {rentQuote.label}
+                    <span className="text-sm font-semibold text-slate-500">{rentQuote.suffix}</span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={rentBusy || loading}
+                  onClick={() => toggleRentModule(!rentOn)}
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold disabled:opacity-50 ${
+                    rentOn
+                      ? 'bg-teal-700 text-white hover:bg-teal-800'
+                      : 'bg-white border border-teal-300 text-teal-800 hover:bg-teal-50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {rentOn ? 'toggle_on' : 'toggle_off'}
+                  </span>
+                  {rentBusy ? 'Αποθήκευση…' : rentOn ? 'Ενεργό' : 'Ανενεργό — ενεργοποίηση'}
+                </button>
+              </div>
+              <ul className="grid sm:grid-cols-2 gap-1.5">
+                {RENT_ADDON.features.map((f) => (
+                  <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
+                    <span className="material-symbols-outlined text-[14px] text-teal-700 mt-0.5">check</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-slate-500">
+                Διαφήμιση πελατών:{' '}
+                <Link to="/rent/services" className="font-bold text-teal-800 hover:underline">
+                  /rent/services
+                </Link>
+                {' · '}χωρίς αυτό το add-on κρύβεται το μενού Ενοικιάσεις και το /rent.
+              </p>
             </div>
 
             <div className="sticky bottom-3 z-10 rounded-[22px] border border-primary/15 bg-gradient-to-r from-primary/[0.06] to-white backdrop-blur shadow-lg px-4 py-3.5 flex flex-wrap items-center justify-between gap-4">

@@ -4,7 +4,9 @@ import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import {
   AGENCY_PLANS,
   BILLING_INTERVALS,
+  RENT_ADDON,
   displayPrice,
+  rentAddonDisplayPrice,
 } from '../lib/billing/planCatalog.js';
 import { CAMPAIGN_TEMPLATE_COUNT } from '../lib/marketing/platformCopy.js';
 import { getSaasToken } from '../services/saasApi.js';
@@ -13,6 +15,7 @@ export default function AgencyPlansPage() {
   const navigate = useNavigate();
   const [interval, setInterval] = useState('month');
   const loggedIn = Boolean(getSaasToken());
+  const rentPrice = rentAddonDisplayPrice(interval);
 
   const choosePlan = (planId) => {
     if (planId === 'enterprise') {
@@ -26,6 +29,21 @@ export default function AgencyPlansPage() {
       return;
     }
     navigate(`/grafeia/signup?plan=${planId}&interval=${interval}`);
+  };
+
+  const openRentAddon = () => {
+    if (loggedIn) {
+      navigate('/admin', {
+        state: {
+          activeTab: 'settings',
+          settingsSubTab: 'contracts',
+          interval,
+          focusRentModule: true,
+        },
+      });
+      return;
+    }
+    navigate(`/grafeia/signup?plan=professional&interval=${interval}&addon=rent`);
   };
 
   return (
@@ -57,7 +75,7 @@ export default function AgencyPlansPage() {
             Επιλέξτε το συμβόλαιο του ταξιδιωτικού σας γραφείου
           </h1>
           <p className="text-on-surface-variant text-sm md:text-base">
-            Μηνιαία ή ετήσια χρέωση · 14 ημέρες δοκιμή στο Professional · ακύρωση από το Stripe portal
+            Core πλάνο για λεωφορεία · η ενοικίαση οχημάτων είναι ξεχωριστό add-on
           </p>
 
           <div className="inline-flex p-1 rounded-full bg-surface-container-low border border-black/[0.06] mt-6">
@@ -133,6 +151,12 @@ export default function AgencyPlansPage() {
                       {f}
                     </li>
                   ))}
+                  <li className="flex gap-2 text-teal-800 font-semibold">
+                    <span className="material-symbols-outlined text-teal-700 text-[18px] shrink-0">
+                      car_rental
+                    </span>
+                    Ενοικιάσεις: ξεχωριστό add-on (όχι στο core)
+                  </li>
                 </ul>
                 <button
                   type="button"
@@ -143,12 +167,58 @@ export default function AgencyPlansPage() {
                       : 'border border-primary/30 text-primary hover:bg-primary/5'
                   }`}
                 >
-                  {plan.contactSales ? 'Επικοινωνία πωλήσεων' : loggedIn ? 'Επιλογή συμβολαίου' : 'Ξεκινήστε εγγραφή'}
+                  {plan.contactSales
+                    ? 'Επικοινωνία πωλήσεων'
+                    : loggedIn
+                      ? 'Επιλογή συμβολαίου'
+                      : 'Ξεκινήστε εγγραφή'}
                 </button>
               </article>
             );
           })}
         </div>
+
+        <article className="rounded-[28px] border border-teal-200/80 bg-gradient-to-br from-teal-50 via-white to-sky-50 p-6 md:p-8 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="max-w-2xl space-y-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-600 text-white text-[11px] font-bold uppercase tracking-wider">
+                <span className="material-symbols-outlined text-[14px]">add_circle</span>
+                Add-on
+              </span>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">{RENT_ADDON.name}</h2>
+              <p className="text-sm text-slate-600">{RENT_ADDON.tagline}</p>
+              <ul className="grid sm:grid-cols-2 gap-2 text-sm text-slate-700 pt-1">
+                {RENT_ADDON.features.map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <span className="material-symbols-outlined text-teal-700 text-[18px] shrink-0">
+                      check_circle
+                    </span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-slate-500 pt-1">
+                Δημόσια σελίδα για διαφήμιση πελατών:{' '}
+                <Link to="/rent/services" className="font-bold text-teal-800 underline-offset-2 hover:underline">
+                  /rent/services
+                </Link>
+              </p>
+            </div>
+            <div className="min-w-[12rem] text-left sm:text-right space-y-3">
+              <p className="text-3xl font-bold tracking-tight text-slate-900">
+                {rentPrice.label}
+                <span className="text-base font-medium text-gray-500">{rentPrice.suffix}</span>
+              </p>
+              <button
+                type="button"
+                onClick={openRentAddon}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-full font-bold text-sm bg-teal-700 text-white hover:bg-teal-800"
+              >
+                {loggedIn ? 'Διαχείριση στο συμβόλαιο' : 'Θέλω και Rent'}
+              </button>
+            </div>
+          </div>
+        </article>
 
         <div className="rounded-[24px] border border-black/[0.06] bg-surface-container-low p-6 md:p-8 text-sm text-on-surface-variant space-y-3">
           <h3 className="font-bold text-on-surface flex items-center gap-2">
@@ -157,8 +227,14 @@ export default function AgencyPlansPage() {
           </h3>
           <ul className="list-disc list-inside space-y-1">
             <li>Πρόσβαση στο Control Panel για το γραφείο σας (όχι platform console)</li>
-            <li>Email Hub με {CAMPAIGN_TEMPLATE_COUNT}+ έτοιμα πρότυπα καμπάνιας (προσφορές, εκδρομές, lifecycle)</li>
+            <li>
+              Email Hub με {CAMPAIGN_TEMPLATE_COUNT}+ έτοιμα πρότυπα καμπάνιας (προσφορές, εκδρομές,
+              lifecycle)
+            </li>
             <li>Metered χρέωση για ενεργά λεωφορεία & εκδρομές μετά τη βασική συνδρομή</li>
+            <li>
+              Module Ενοικιάσεις προαιρετικά — όποιος δεν το θέλει πληρώνει μόνο το core πλάνο
+            </li>
             <li>GDPR εργαλεία για τους πελάτες σας · διαχείριση από Ρυθμίσεις → Συμβόλαιο</li>
             <li>Η πλατφόρμα (super admin, backups, SaaS infra) είναι μόνο για τον διαχειριστή συστήματος</li>
           </ul>

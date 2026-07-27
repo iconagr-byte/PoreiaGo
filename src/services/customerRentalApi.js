@@ -127,6 +127,14 @@ export async function fetchRentalSafetyContacts() {
   return publicRentalFetch('/safety-contacts');
 }
 
+export async function fetchPublicRentModule() {
+  try {
+    return await publicRentalFetch('/public/module');
+  } catch {
+    return { rent_enabled: true };
+  }
+}
+
 export async function sendRentalSos(bookingId, body) {
   return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/sos`, {
     method: 'POST',
