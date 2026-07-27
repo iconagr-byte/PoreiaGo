@@ -9,6 +9,11 @@ import {
   fetchMyRentalBookings,
 } from '../../services/customerRentalApi.js';
 import RentalWalletPass from './RentalWalletPass.jsx';
+import {
+  cancelBlockedMessage,
+  FREE_CANCEL_HOURS,
+  isFreeCancelEligible,
+} from '../../lib/rental/rentalCancel.js';
 
 const STATUS_LABEL = {
   CONFIRMED: 'Επιβεβαιωμένη',
@@ -114,7 +119,17 @@ export default function RentalWalletPanel({
 
   const cancelBooking = async (booking) => {
     if (!booking?.id) return;
-    if (!window.confirm('Να ακυρωθεί αυτή η κράτηση;')) return;
+    if (!isFreeCancelEligible(booking)) {
+      toast.error(cancelBlockedMessage(booking));
+      return;
+    }
+    if (
+      !window.confirm(
+        `Δωρεάν ακύρωση (έως ${FREE_CANCEL_HOURS} ώρες πριν). Να ακυρωθεί αυτή η κράτηση;`,
+      )
+    ) {
+      return;
+    }
     setBusyId(booking.id);
     try {
       await cancelCustomerRentalBooking(booking.id);
@@ -138,7 +153,7 @@ export default function RentalWalletPanel({
         brandLabel={brandLabel}
         passengerName={passengerName}
         onBookVehicle={onBookVehicle}
-        onCancel={cancelBooking}
+        onCancel={isFreeCancelEligible(featured) ? cancelBooking : null}
         cancelling={busyId === featured?.id}
       />
 

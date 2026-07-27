@@ -149,6 +149,9 @@ class FleetRentalStoreTests(unittest.TestCase):
                 "start_time": "2026-12-10T10:00:00+00:00",
                 "end_time": "2026-12-11T10:00:00+00:00",
                 "pickup_location": "Γραφείο",
+                "contract_accepted": True,
+                "contract_signature_url": "/api/site/rental-photos/contract-maria.png",
+                "contract_signer_name": "Μαρία Wallet",
             },
         )
         store.create_booking(
