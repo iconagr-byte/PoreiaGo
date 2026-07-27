@@ -8,7 +8,7 @@ export const HERO = {
   title: 'Μία πλατφόρμα για',
   titleAccent: 'όλο το ταξιδιωτικό σας γραφείο',
   subtitle:
-    'Κρατήσεις, QR εισιτήρια, live GPS, email καμπάνιες, billing και Control Panel — χωρίς Excel, χωρίς 5 διαφορετικά εργαλεία. ' +
+    'Κρατήσεις, QR εισιτήρια, live GPS, ενοικιάσεις οχημάτων, email καμπάνιες, billing και Control Panel — χωρίς Excel, χωρίς 5 διαφορετικά εργαλεία. ' +
     'Το γραφείο σας με δικό του brand, δικό του site και δικό του συμβόλαιο.',
 };
 
@@ -57,6 +57,13 @@ export const FEATURES = [
     hook: 'Η ομάδα σας δουλεύει από ένα σημείο',
   },
   {
+    icon: 'car_rental',
+    accent: 'emerald',
+    title: 'Ενοικιάσεις οχημάτων (Rent)',
+    body: 'Ξεχωριστό συμβόλαιο ή add-on: /rent app, SOS, οδική 24/7, CDW/SCDW, share trip και checklist — για πελάτες που νοικιάζουν.',
+    hook: 'Ίδια πλατφόρμα · ξεχωριστή υπηρεσία & τιμολόγηση',
+  },
+  {
     icon: 'payments',
     accent: 'amber',
     title: 'Συμβόλαιο μηνιαίο ή ετήσιο',
@@ -76,7 +83,7 @@ export const STEPS = [
   {
     step: '01',
     title: 'Επιλέγετε συμβόλαιο',
-    body: 'Μηνιαίο ή ετήσιο · Starter, Professional ή Enterprise.',
+    body: 'Μηνιαίο ή ετήσιο · Starter, Professional, Enterprise ή Rent μόνο.',
   },
   {
     step: '02',
@@ -115,5 +122,10 @@ export const AUDIENCE_HOOKS = [
     text: 'Χρειάζεστε GDPR-ready εργαλεία για B2C πελάτες;',
     icon: 'verified_user',
     accent: 'indigo',
+  },
+  {
+    text: 'Θέλετε και ενοικιάσεις οχημάτων δίπλα στα λεωφορεία;',
+    icon: 'car_rental',
+    accent: 'emerald',
   },
 ];

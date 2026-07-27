@@ -17,6 +17,7 @@ class TenantPlan(str, enum.Enum):
     STARTER = "starter"
     PROFESSIONAL = "professional"
     ENTERPRISE = "enterprise"
+    RENT = "rent"
 
 
 class Tenant(Base, TimestampMixin):

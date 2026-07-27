@@ -7,6 +7,7 @@ import {
   HowItWorksSection,
   PainPointsSection,
   PricingTeaserSection,
+  RentProductSection,
 } from '../components/marketing/PlatformLandingSections.jsx';
 import { PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
 
@@ -20,6 +21,9 @@ export default function FrontPage() {
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-white/75">
             <a href="#features" className="hover:text-white transition-colors">
               Λειτουργίες
+            </a>
+            <a href="#rent" className="hover:text-white transition-colors">
+              Ενοικιάσεις
             </a>
             <a href="#pricing" className="hover:text-white transition-colors">
               Τιμές
@@ -48,6 +52,7 @@ export default function FrontPage() {
         <HeroSection />
         <PainPointsSection />
         <FeaturesSection />
+        <RentProductSection />
         <HowItWorksSection />
         <PricingTeaserSection />
         <FinalCtaSection />
@@ -58,10 +63,13 @@ export default function FrontPage() {
           <div>
             <PlatformBrand variant="dark" asLink={false} />
             <p className="text-sm text-white/45 mt-4 max-w-xs">
-              Cloud πλατφόρμα για ταξιδιωτικά γραφεία — κρατήσεις, στόλος, GPS, billing.
+              Cloud πλατφόρμα για ταξιδιωτικά γραφεία — κρατήσεις, στόλος, GPS, ενοικιάσεις, billing.
             </p>
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/55">
+            <Link to="/rent/services" className="hover:text-white">
+              Υπηρεσία Rent
+            </Link>
             <Link to="/grafeia" className="hover:text-white">
               Συμβόλαια
             </Link>
