@@ -41,6 +41,34 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'bookings',
 ];
 
+/** Rent-only office — no bus trips / coach fleet / driver ops. */
+export const RENT_ONLY_MAIN_NAV_ORDER = [
+  'dashboard',
+  'fleet_rental',
+  'customers',
+  'fleet_live_map',
+  'email',
+  'email_templates',
+];
+
+export const RENT_ONLY_SETTINGS_NAV_ORDER = [
+  'settings_platform',
+  'settings_homepage',
+  'settings_domain',
+  'settings_payments',
+  'settings_fiscal',
+  'settings_contracts',
+  'settings_compliance',
+  'settings_users',
+  'settings_telematics',
+];
+
+export const RENT_ONLY_TAB_IDS = new Set([
+  ...RENT_ONLY_MAIN_NAV_ORDER,
+  'settings',
+  'fleet_rental',
+]);
+
 export const LEGACY_NAV_IDS = new Set(['settings', 'payments', 'fleet_active_drivers']);
 
 const PLATFORM_IDS = PLATFORM_NAV_IDS;
@@ -485,6 +513,50 @@ export function saveNavOrder(order) {
 }
 
 export const DEFAULT_ADMIN_NAV_ORDER = DEFAULT_MAIN_NAV_ORDER;
+
+export function getRentOnlyNavLayout(isSuperAdmin) {
+  return {
+    main: [...RENT_ONLY_MAIN_NAV_ORDER],
+    fleet_ops: [],
+    platform: isSuperAdmin ? [...PLATFORM_IDS] : [],
+    settings: [...RENT_ONLY_SETTINGS_NAV_ORDER],
+  };
+}
+
+/**
+ * Shape sidebar for office product mode.
+ * - rent_only → fixed Rent desk menu (no buses)
+ * - both / trips_only → stored layout as today
+ */
+export function navLayoutForOfficeMode(layout, officeMode, isSuperAdmin) {
+  if (officeMode === 'rent_only') {
+    return getRentOnlyNavLayout(isSuperAdmin);
+  }
+  return layout || getDefaultNavLayout(isSuperAdmin);
+}
+
+/** Tabs that bus-only / shared offices use but Rent-only must not open. */
+const BUS_ONLY_TABS = new Set([
+  'routes',
+  'fleet',
+  'drivers',
+  'lost_found',
+  'bookings',
+  'driver_scan',
+  ...FLEET_OPS_ONLY_IDS,
+]);
+
+export function isAdminTabAllowedForOfficeMode(tabId, officeMode) {
+  if (officeMode !== 'rent_only') return true;
+  if (!tabId) return true;
+  if (tabId === 'settings') return true;
+  if (BUS_ONLY_TABS.has(tabId)) return false;
+  return RENT_ONLY_MAIN_NAV_ORDER.includes(tabId) || tabId === 'fleet_rental';
+}
+
+export function defaultAdminTabForOfficeMode(officeMode) {
+  return officeMode === 'rent_only' ? 'fleet_rental' : 'dashboard';
+}
 
 export function navItemsInOrder(order, isSuperAdmin) {
   return navItemsFromIds(order, isSuperAdmin);

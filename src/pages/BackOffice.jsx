@@ -7,7 +7,7 @@ import {
   syncCustomersFromBookings,
   syncCustomersFromRentalBookings,
 } from '../lib/customers/customerStore.js';
-import { fetchRentalBookings } from '../services/fleetRentalApi.js';
+import { fetchRentalBookings, fetchRentalSummary } from '../services/fleetRentalApi.js';
 import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
@@ -77,6 +77,15 @@ import DashboardKpiCard from '../components/admin/DashboardKpiCard.jsx';
 import TemplateSearch from '../components/admin/TemplateSearch.jsx';
 import { avatarColorClass } from '../lib/admin/avatarColors.js';
 import { computeDashboardKpis } from '../lib/admin/dashboardKpis.js';
+import {
+  defaultAdminTabForOfficeMode,
+  isAdminTabAllowedForOfficeMode,
+} from '../lib/admin/sidebarNav.js';
+import {
+  DEFAULT_OFFICE_MODULES,
+  fetchAdminOfficeModules,
+  officeModeFromModules,
+} from '../services/officeModulesApi.js';
 
 function bookingStatusBadgeClass(status) {
   const s = String(status || '').toLowerCase();
@@ -126,6 +135,42 @@ export default function BackOffice() {
   const [rentalBookings, setRentalBookings] = useState([]);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
+  const [rentSummary, setRentSummary] = useState(null);
+  const officeMode = officeModeFromModules(officeModules);
+  const rentOnly = officeMode === 'rent_only';
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAdminOfficeModules().then((mods) => {
+      if (!cancelled) setOfficeModules(mods);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.key]);
+
+  useEffect(() => {
+    if (!rentOnly) return;
+    if (!isAdminTabAllowedForOfficeMode(activeTab, officeMode)) {
+      setActiveTab(defaultAdminTabForOfficeMode(officeMode));
+    }
+  }, [rentOnly, officeMode, activeTab]);
+
+  useEffect(() => {
+    if (!rentOnly || activeTab !== 'dashboard') return undefined;
+    let cancelled = false;
+    fetchRentalSummary()
+      .then((data) => {
+        if (!cancelled) setRentSummary(data || null);
+      })
+      .catch(() => {
+        if (!cancelled) setRentSummary(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rentOnly, activeTab, location.key]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -499,7 +544,84 @@ export default function BackOffice() {
     [bookings, trips, fleetVehicles],
   );
 
-  const renderDashboard = () => (
+  const renderDashboard = () => {
+    if (rentOnly) {
+      return (
+        <div className="space-y-stack-lg pb-stack-lg">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-700 mb-2">Rent</p>
+            <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
+              Dashboard ενοικιάσεων
+            </h2>
+            <p className="text-sm text-on-surface-variant mt-1">
+              Στόλος, κρατήσεις και check-in — χωρίς εκδρομές λεωφορείου.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+            <DashboardKpiCard
+              label="Οχήματα"
+              value={rentSummary?.vehicles_total ?? '—'}
+              icon="directions_car"
+              tone="teal"
+            />
+            <DashboardKpiCard
+              label="Διαθέσιμα"
+              value={rentSummary?.available ?? '—'}
+              icon="check_circle"
+              tone="emerald"
+            />
+            <DashboardKpiCard
+              label="Σε ενοικίαση"
+              value={rentSummary?.rented ?? '—'}
+              icon="key"
+              tone="sky"
+            />
+            <DashboardKpiCard
+              label="Ενεργές κρατήσεις"
+              value={rentSummary?.active_bookings ?? '—'}
+              icon="event"
+              tone="violet"
+            />
+          </div>
+
+          <div className="bg-white rounded-[24px] border border-teal-100/80 shadow-level-2 p-6 md:p-8">
+            <h3 className="font-headline-md text-lg font-bold text-on-surface mb-2">Γρήγορες ενέργειες</h3>
+            <p className="text-sm text-on-surface-variant mb-5">
+              Άνοιξε το desk Ενοικιάσεις για στόλο, ημερολόγιο και check-in/out.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveTab('fleet_rental')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-teal-700 text-white text-sm font-bold hover:bg-teal-800"
+              >
+                <span className="material-symbols-outlined text-[18px]">car_rental</span>
+                Desk ενοικιάσεων
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('fleet_live_map')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-slate-800 hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">map</span>
+                Ζωντανός χάρτης
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('customers')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-slate-800 hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">group</span>
+                Πελάτες
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="space-y-stack-lg pb-stack-lg">
       <div>
         <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
@@ -761,6 +883,7 @@ export default function BackOffice() {
         </div>
     </div>
   );
+  };
 
   const renderRoutes = () => {
     const filteredTrips = trips.filter((t) => getTripMarket(t) === routesMarket);
@@ -2087,6 +2210,7 @@ export default function BackOffice() {
           onSettingsSubTabChange={setSettingsSubTab}
           onEmailClick={goToEmailMailbox}
           onNavigate={(path) => navigate(path)}
+          officeMode={officeMode}
         />
       </aside>
 
@@ -2099,6 +2223,7 @@ export default function BackOffice() {
         onSettingsSubTabChange={setSettingsSubTab}
         onEmailClick={goToEmailMailbox}
         onNavigate={(path) => navigate(path)}
+        officeMode={officeMode}
       />
 
       <AddCustomerModal
@@ -2176,6 +2301,7 @@ export default function BackOffice() {
                 <SettingsHub
                   initialTab={settingsSubTab}
                   onSubTabChange={setSettingsSubTab}
+                  officeMode={officeMode}
                   contractPrefs={{
                     plan: location.state?.plan,
                     interval: location.state?.interval,

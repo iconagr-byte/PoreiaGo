@@ -12,24 +12,24 @@ import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 const DEFAULT_TENANT_TAB = DEFAULT_TENANT_SETTINGS_TAB;
 
 /** Περιεχόμενο ρυθμίσεων — η πλοήγηση είναι στο αριστερό sidebar. */
-export default function SettingsHub({ initialTab, onSubTabChange, contractPrefs }) {
+export default function SettingsHub({ initialTab, onSubTabChange, contractPrefs, officeMode = 'trips_only' }) {
   const superAdmin = isSaasSuperAdmin();
-  const tabs = settingsTabsForRole(superAdmin);
+  const tabs = settingsTabsForRole(superAdmin, officeMode);
   const defaultTab = superAdmin ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_TAB;
   const tabIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
 
-  const [tab, setTab] = useState(() => sanitizeSettingsSubTab(initialTab, superAdmin));
+  const [tab, setTab] = useState(() => sanitizeSettingsSubTab(initialTab, superAdmin, officeMode));
 
   useEffect(() => {
     if (initialTab) {
-      setTab(sanitizeSettingsSubTab(initialTab, superAdmin));
+      setTab(sanitizeSettingsSubTab(initialTab, superAdmin, officeMode));
     }
-  }, [initialTab, superAdmin]);
+  }, [initialTab, superAdmin, officeMode]);
 
   const activeTab = tabs.find((t) => t.id === tab);
 
   const selectTab = (id) => {
-    const next = sanitizeSettingsSubTab(id, superAdmin);
+    const next = sanitizeSettingsSubTab(id, superAdmin, officeMode);
     setTab(next);
     onSubTabChange?.(next);
   };

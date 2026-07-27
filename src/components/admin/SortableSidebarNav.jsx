@@ -3,6 +3,7 @@ import {
   loadNavLayout,
   moveNavItem,
   navItemsFromIds,
+  navLayoutForOfficeMode,
   saveNavLayout,
 } from '../../lib/admin/sidebarNav.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, sanitizeSettingsSubTab } from '../../lib/admin/settingsTabs.js';
@@ -22,8 +23,10 @@ export default function SortableSidebarNav({
   onSettingsSubTabChange,
   onEmailClick,
   onNavigate,
+  officeMode = 'trips_only',
 }) {
   const superAdmin = isSaasSuperAdmin();
+  const rentOnly = officeMode === 'rent_only';
   const [layout, setLayout] = useState(() => loadNavLayout(superAdmin));
   const [dragState, setDragState] = useState({
     section: null,
@@ -36,34 +39,52 @@ export default function SortableSidebarNav({
     setLayout(loadNavLayout(superAdmin));
   }, [superAdmin]);
 
+  const displayLayout = useMemo(
+    () => navLayoutForOfficeMode(layout, officeMode, superAdmin),
+    [layout, officeMode, superAdmin],
+  );
+
   const sections = useMemo(() => {
-    const visible = SECTIONS.filter((s) => !s.superOnly || superAdmin);
-    return visible.map((section) => ({
-      ...section,
-      order: layout[section.id] || [],
-      items: navItemsFromIds(layout[section.id] || [], superAdmin).filter(
-        (item) => superAdmin || item.settingsSection !== 'platform',
-      ),
-    }));
-  }, [layout, superAdmin]);
+    const visible = SECTIONS.filter((s) => {
+      if (s.superOnly && !superAdmin) return false;
+      if (rentOnly && s.id === 'fleet_ops') return false;
+      return true;
+    });
+    return visible
+      .map((section) => ({
+        ...section,
+        label: rentOnly && section.id === 'main' ? 'Rent' : section.label,
+        order: displayLayout[section.id] || [],
+        items: navItemsFromIds(displayLayout[section.id] || [], superAdmin).filter(
+          (item) => superAdmin || item.settingsSection !== 'platform',
+        ),
+      }))
+      .filter((section) => section.items.length > 0 || (!rentOnly && section.id !== 'fleet_ops'));
+  }, [displayLayout, superAdmin, rentOnly]);
 
   const persistLayout = useCallback(
     (next) => {
+      // Rent-only menu is fixed by contract — don't overwrite the full-office layout.
+      if (rentOnly) return;
       setLayout(next);
       saveNavLayout(superAdmin, next);
     },
-    [superAdmin],
+    [superAdmin, rentOnly],
   );
 
   const handleDrop = (sectionId, dropIndex) => {
     const { draggingId } = dragState;
     setDragState({ section: null, fromSection: null, overIndex: null, draggingId: null });
-    if (!draggingId) return;
+    if (!draggingId || rentOnly) return;
     if (sectionId === 'platform' && !superAdmin) return;
     persistLayout(moveNavItem(layout, draggingId, sectionId, dropIndex));
   };
 
   const onDragStart = (sectionId, id, e) => {
+    if (rentOnly) {
+      e.preventDefault();
+      return;
+    }
     try {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', id);
@@ -78,6 +99,7 @@ export default function SortableSidebarNav({
   };
 
   const markDropTarget = (sectionId, overIndex) => {
+    if (rentOnly) return;
     setDragState((prev) => {
       if (!prev.draggingId) return prev;
       if (prev.section === sectionId && prev.overIndex === overIndex) return prev;
@@ -86,7 +108,7 @@ export default function SortableSidebarNav({
   };
 
   const openSettings = (subTab) => {
-    onSettingsSubTabChange?.(sanitizeSettingsSubTab(subTab, superAdmin));
+    onSettingsSubTabChange?.(sanitizeSettingsSubTab(subTab, superAdmin, officeMode));
     onTabChange?.('settings');
   };
 
@@ -130,16 +152,20 @@ export default function SortableSidebarNav({
     const dragging = dragState.draggingId === item.id;
     return (
       <div className={`admin-nav-row ${dragging ? 'admin-nav-row-dragging' : ''} ${nested ? 'admin-nav-row-nested' : ''}`}>
-        <span
-          className="admin-nav-grip"
-          draggable
-          onDragStart={(e) => onDragStart(sectionId, item.id, e)}
-          onDragEnd={clearDrag}
-          title="Σύρετε σε οποιαδήποτε ενότητα"
-          aria-label="Σύρετε μενού"
-        >
-          <span className="material-symbols-outlined">drag_indicator</span>
-        </span>
+        {!rentOnly ? (
+          <span
+            className="admin-nav-grip"
+            draggable
+            onDragStart={(e) => onDragStart(sectionId, item.id, e)}
+            onDragEnd={clearDrag}
+            title="Σύρετε σε οποιαδήποτε ενότητα"
+            aria-label="Σύρετε μενού"
+          >
+            <span className="material-symbols-outlined">drag_indicator</span>
+          </span>
+        ) : (
+          <span className="admin-nav-grip admin-nav-grip-static" aria-hidden />
+        )}
         <button
           type="button"
           onClick={() => handleClick(item)}
@@ -165,7 +191,7 @@ export default function SortableSidebarNav({
     const isSettingsSection = section.id === 'settings';
     const isFleetOpsSection = section.id === 'fleet_ops';
     const isPlatformSection = section.id === 'platform';
-    const isDropTarget = dragState.draggingId && dragState.section === section.id;
+    const isDropTarget = !rentOnly && dragState.draggingId && dragState.section === section.id;
 
     return (
       <div
@@ -176,13 +202,14 @@ export default function SortableSidebarNav({
           isDropTarget ? 'admin-nav-section-drop-target' : ''
         }`}
         onDragOver={(e) => {
-          if (!dragState.draggingId) return;
+          if (rentOnly || !dragState.draggingId) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
           if (section.items.length === 0) markDropTarget(section.id, 0);
         }}
         onDrop={(e) => {
           e.preventDefault();
+          if (rentOnly) return;
           if (section.items.length === 0) handleDrop(section.id, 0);
         }}
       >
@@ -195,7 +222,7 @@ export default function SortableSidebarNav({
         </p>
 
         <ul className="admin-nav-list">
-          {section.items.length === 0 && (
+          {section.items.length === 0 && !rentOnly && (
             <li
               className={`admin-nav-item admin-nav-empty-drop ${
                 isDropTarget && dragState.overIndex === 0 ? 'admin-nav-drop-end-active' : ''
@@ -223,6 +250,7 @@ export default function SortableSidebarNav({
               )}
               <div
                 onDragOver={(e) => {
+                  if (rentOnly) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
                   markDropTarget(section.id, idx);
@@ -236,7 +264,7 @@ export default function SortableSidebarNav({
               </div>
             </li>
           ))}
-          {section.items.length > 0 && (
+          {section.items.length > 0 && !rentOnly && (
             <li
               className={`admin-nav-item ${
                 isDropTarget && dragState.overIndex === section.items.length
@@ -273,7 +301,11 @@ export default function SortableSidebarNav({
       }}
     >
       <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-2.5 py-2 space-y-3 admin-nav-scroll">
-        <p className="admin-nav-hint">Σύρετε ⋮⋮ σε οποιαδήποτε ενότητα</p>
+        {rentOnly ? (
+          <p className="admin-nav-hint">Μενού Rent — χωρίς εκδρομές / λεωφορεία</p>
+        ) : (
+          <p className="admin-nav-hint">Σύρετε ⋮⋮ σε οποιαδήποτε ενότητα</p>
+        )}
         {sections.map((section) => renderSection(section))}
       </div>
     </nav>

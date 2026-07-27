@@ -19,12 +19,14 @@ from app.api.schemas import (
     BillingSubscriptionResponse,
     BillingTrialRequest,
     BillingUsageReportResponse,
+    OfficeModulesResponse,
 )
 from app.core.auth_deps import get_current_tenant_id, get_tenant_db, require_roles
 from app.core.database import AsyncSessionLocal
 from app.models.tenant import Tenant, TenantPlan
 from app.models.user import UserRole
 from app.services.billing_service import BillingService, stripe_readiness
+from app.services.tenant_modules import modules_for_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +68,16 @@ async def get_subscription(
         cancel_at_period_end=sub.cancel_at_period_end,
         base_amount_cents=sub.base_amount_cents,
     )
+
+
+@router.get("/modules", response_model=OfficeModulesResponse)
+async def get_office_modules(
+    db: Annotated[AsyncSession, Depends(get_tenant_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+):
+    """Authenticated office product modules — drives Back Office nav for Rent-only."""
+    tenant = await _load_tenant(db, tenant_id)
+    return OfficeModulesResponse(**modules_for_tenant(tenant))
 
 
 @router.post("/checkout-session", response_model=BillingCheckoutResponse)

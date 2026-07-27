@@ -14,6 +14,7 @@ export default function AdminMobileNavDrawer({
   onSettingsSubTabChange,
   onEmailClick,
   onNavigate,
+  officeMode = 'trips_only',
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -63,6 +64,7 @@ export default function AdminMobileNavDrawer({
           onSettingsSubTabChange={onSettingsSubTabChange}
           onEmailClick={go(onEmailClick)}
           onNavigate={go(onNavigate)}
+          officeMode={officeMode}
         />
       </aside>
     </div>

@@ -173,6 +173,13 @@ class BillingSubscriptionResponse(BaseModel):
     base_amount_cents: int = 0
 
 
+class OfficeModulesResponse(BaseModel):
+    trips_enabled: bool = True
+    rent_enabled: bool = False
+    plan: str = "starter"
+    mode: str = "trips_only"
+
+
 class BillingConfigResponse(BaseModel):
     checkout_ready: bool
     portal_ready: bool
