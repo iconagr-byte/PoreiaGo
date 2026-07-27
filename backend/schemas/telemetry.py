@@ -140,6 +140,7 @@ class TripRoutePointResponse(BaseModel):
     speed_kmh: float = 0
     heading_deg: float | None = None
     recorded_at: str
+    source: str | None = None
 
 
 class TripRouteResponse(BaseModel):

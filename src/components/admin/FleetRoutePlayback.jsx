@@ -49,7 +49,11 @@ function resolveDateRange(dateKey, customDate) {
   return resolvePlaybackDateRange(dateKey, customDate);
 }
 
-/** Ιστορικό playback διαδρομής από PostGIS trip_coordinates. */
+function liveVehicleKey(v) {
+  return String(v?.vehicle_id || v?.id || v?.driver_id || v?.bus_plate || '');
+}
+
+/** Ιστορικό playback — GPS από εφαρμογή οδηγού (live ingest → buffer + PostGIS). */
 export default function FleetRoutePlayback() {
   const location = useLocation();
   const { vehicles } = useFleetTelemetryEgress();
@@ -59,14 +63,14 @@ export default function FleetRoutePlayback() {
   );
   const autoLoadedRef = useRef(false);
 
-  const [tripId, setTripId] = useState(urlFilters.tripId || '1');
+  const [tripId, setTripId] = useState(urlFilters.tripId || '');
   const [driverId, setDriverId] = useState(urlFilters.driverId || '');
   const [dateFilter, setDateFilter] = useState(
     urlFilters.dateKey === 'today' || urlFilters.dateKey === '7d' || urlFilters.dateKey === 'all'
-      ? urlFilters.dateKey || 'all'
+      ? urlFilters.dateKey || 'today'
       : /^\d{4}-\d{2}-\d{2}$/.test(urlFilters.dateKey)
         ? 'custom'
-        : 'all',
+        : 'today',
   );
   const [customDate, setCustomDate] = useState(
     /^\d{4}-\d{2}-\d{2}$/.test(urlFilters.dateKey) && urlFilters.dateKey !== 'today'
@@ -86,19 +90,33 @@ export default function FleetRoutePlayback() {
   const positions = useMemo(() => points.map((p) => [p.lat, p.lng]), [points]);
   const { index, position, setIndex } = useRoutePlayback(points, { playing, speed });
 
+  const liveVehicles = useMemo(() => {
+    return (vehicles || [])
+      .filter((v) => Number.isFinite(Number(v.lat)) && Number.isFinite(Number(v.lng)))
+      .map((v) => ({
+        key: liveVehicleKey(v),
+        trip_id: v.trip_id ?? v.tripId ?? null,
+        driver_id: v.driver_id || '',
+        name: v.driver_name || v.bus_plate || v.vehicle_code || 'Όχημα',
+        plate: v.bus_plate || v.vehicle_code || '',
+        title: v.trip_title || '',
+      }))
+      .filter((v) => v.trip_id != null && Number(v.trip_id) > 0);
+  }, [vehicles]);
+
   const driverOptions = useMemo(() => {
     const map = new Map();
-    for (const v of vehicles) {
+    for (const v of liveVehicles) {
       if (!v.driver_id) continue;
       map.set(v.driver_id, {
         id: v.driver_id,
-        name: v.driver_name || v.driver_id,
+        name: v.name,
         trip_id: v.trip_id,
-        plate: v.bus_plate,
+        plate: v.plate,
       });
     }
     return [...map.values()];
-  }, [vehicles]);
+  }, [liveVehicles]);
 
   useEffect(() => {
     if (urlFilters.tripId) setTripId(urlFilters.tripId);
@@ -119,10 +137,22 @@ export default function FleetRoutePlayback() {
     location.search,
   ]);
 
+  // Prefer a live trip when the form still has the legacy default empty/#1.
+  useEffect(() => {
+    if (urlFilters.tripId || tripId) return;
+    const first = liveVehicles[0];
+    if (!first) return;
+    setTripId(String(first.trip_id));
+    if (first.driver_id) {
+      setDriverId(first.driver_id);
+      setDriverLabel(first.name);
+    }
+  }, [liveVehicles, tripId, urlFilters.tripId]);
+
   const loadRoute = useCallback(async () => {
     const tid = parseInt(tripId, 10);
     if (!Number.isFinite(tid) || tid < 1) {
-      setError('Εισάγετε έγκυρο αριθμό δρομολογίου');
+      setError('Επιλέξτε δρομολόγιο από τον live χάρτη ή εισάγετε αριθμό δρομολογίου');
       return;
     }
     const { from, to } = resolveDateRange(dateFilter, customDate);
@@ -137,6 +167,10 @@ export default function FleetRoutePlayback() {
       });
       setRoute(data);
       if (!data.point_count) {
+        const liveHint =
+          liveVehicles.length > 0
+            ? ' Επιλέξτε ενεργό όχημα από τον live χάρτη παρακάτω.'
+            : ' Βεβαιωθείτε ότι ο οδηγός έχει ανοιχτή βάρδια και στέλνει GPS.';
         const scope =
           dateFilter === 'today'
             ? 'σήμερα'
@@ -147,7 +181,7 @@ export default function FleetRoutePlayback() {
                 : dateFilter !== 'all'
                   ? `την ${dateFilter}`
                   : 'την επιλεγμένη περίοδο';
-        setError(`Δεν βρέθηκαν GPS σημεία ${scope} — ο οδηγός πρέπει να ήταν online.`);
+        setError(`Δεν βρέθηκαν GPS σημεία ${scope}.${liveHint}`);
       }
     } catch (err) {
       setError(err.message || 'Αποτυχία φόρτωσης διαδρομής');
@@ -155,7 +189,45 @@ export default function FleetRoutePlayback() {
     } finally {
       setLoading(false);
     }
-  }, [tripId, driverId, dateFilter, customDate]);
+  }, [tripId, driverId, dateFilter, customDate, liveVehicles.length]);
+
+  const loadFromLiveVehicle = useCallback(
+    (vehicle) => {
+      if (!vehicle?.trip_id) return;
+      setTripId(String(vehicle.trip_id));
+      setDriverId(vehicle.driver_id || '');
+      setDriverLabel(vehicle.name || '');
+      setDateFilter('today');
+      autoLoadedRef.current = false;
+      // load after state settles via effect below
+      window.setTimeout(() => {
+        const tid = Number(vehicle.trip_id);
+        const { from, to } = resolveDateRange('today', customDate);
+        setLoading(true);
+        setError('');
+        setPlaying(false);
+        fetchTripRoute(tid, {
+          from,
+          to,
+          driverId: vehicle.driver_id || undefined,
+        })
+          .then((data) => {
+            setRoute(data);
+            if (!data.point_count) {
+              setError(
+                'Δεν υπάρχουν ακόμα αποθηκευμένα σημεία για αυτό το όχημα — μόλις ο οδηγός στείλει GPS θα εμφανιστούν εδώ.',
+              );
+            }
+          })
+          .catch((err) => {
+            setError(err.message || 'Αποτυχία φόρτωσης διαδρομής');
+            setRoute(null);
+          })
+          .finally(() => setLoading(false));
+      }, 0);
+    },
+    [customDate],
+  );
 
   useEffect(() => {
     if (!urlFilters.autoLoad || !urlFilters.tripId || autoLoadedRef.current) return;
@@ -192,6 +264,7 @@ export default function FleetRoutePlayback() {
           : dateFilter !== 'all'
             ? dateFilter
             : null;
+  const liveBufferCount = points.filter((p) => p.source === 'live_buffer').length;
 
   return (
     <div className="space-y-4">
@@ -221,7 +294,7 @@ export default function FleetRoutePlayback() {
         <div>
           <h2 className="font-headline-md font-bold">Ιστορικό Διαδρομής</h2>
           <p className="text-sm text-on-surface-variant">
-            Playback από <code className="text-xs bg-gray-100 px-1 rounded">trip_coordinates</code> (PostGIS)
+            GPS από την εφαρμογή οδηγού (live χάρτης → αποθήκευση διαδρομής)
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -232,6 +305,7 @@ export default function FleetRoutePlayback() {
               min={1}
               value={tripId}
               onChange={(e) => setTripId(e.target.value)}
+              placeholder="από live"
               className="w-28 rounded-xl border border-gray-200 px-3 py-2 font-mono"
             />
           </label>
@@ -244,6 +318,7 @@ export default function FleetRoutePlayback() {
                 setDriverId(id);
                 const match = driverOptions.find((d) => d.id === id);
                 setDriverLabel(match?.name || '');
+                if (match?.trip_id) setTripId(String(match.trip_id));
               }}
               className="max-w-[200px] rounded-xl border border-gray-200 px-3 py-2 text-sm font-bold truncate"
             >
@@ -275,10 +350,10 @@ export default function FleetRoutePlayback() {
               onChange={(e) => setDateFilter(e.target.value)}
               className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-bold"
             >
-              <option value="all">Όλες</option>
               <option value="today">Σήμερα</option>
               <option value="7d">7 ημέρες</option>
               <option value="custom">Συγκεκριμένη</option>
+              <option value="all">Όλες</option>
             </select>
           </label>
           {dateFilter === 'custom' ? (
@@ -302,6 +377,41 @@ export default function FleetRoutePlayback() {
           </button>
         </div>
       </div>
+
+      {liveVehicles.length > 0 ? (
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
+            Ενεργά από live χάρτη ({liveVehicles.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {liveVehicles.map((v) => {
+              const active =
+                String(tripId) === String(v.trip_id) &&
+                (!driverId || String(driverId) === String(v.driver_id));
+              return (
+                <button
+                  key={v.key}
+                  type="button"
+                  onClick={() => loadFromLiveVehicle(v)}
+                  className={`rounded-full px-3 py-1.5 text-sm font-bold border transition ${
+                    active
+                      ? 'bg-emerald-700 text-white border-emerald-700'
+                      : 'bg-white text-emerald-900 border-emerald-200 hover:border-emerald-400'
+                  }`}
+                >
+                  {v.plate || v.name} · #{v.trip_id}
+                  {v.title ? ` · ${v.title}` : ''}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-slate-600 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
+          Δεν υπάρχει ενεργό όχημα στον live χάρτη αυτή τη στιγμή. Μόλις ο οδηγός ανοίξει βάρδια και
+          στείλει GPS, εμφανίζεται εδώ για φόρτωση διαδρομής.
+        </p>
+      )}
 
       {error ? <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">{error}</p> : null}
 
@@ -373,6 +483,7 @@ export default function FleetRoutePlayback() {
 
           <p className="text-xs text-gray-500 font-mono">
             Σημείο {index + 1} / {points.length}
+            {liveBufferCount ? ` · ${liveBufferCount} live` : ''}
             {position ? (
               <>
                 {' '}

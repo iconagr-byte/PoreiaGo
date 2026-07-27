@@ -71,7 +71,7 @@ export function navigateToDriverTodayPlayback(navigate, vehicle, { replace = fal
 }
 
 export function parsePlaybackFilters(searchParams) {
-  const dateKey = searchParams.get('date') || 'all';
+  const dateKey = searchParams.get('date') || 'today';
   let from;
   let to;
   if (dateKey === 'today') {

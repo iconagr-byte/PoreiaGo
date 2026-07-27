@@ -233,17 +233,17 @@ async def admin_trip_route_playback(
     session: Annotated[AsyncSession, Depends(get_tenant_db)],
     from_time: datetime | None = Query(default=None, alias="from"),
     to_time: datetime | None = Query(default=None, alias="to"),
-    driver_id: UUID | None = None,
+    driver_id: str | None = Query(default=None),
     limit: int = Query(5000, ge=1, le=10000),
 ):
-    """Ιστορική διαδρομή δρομολογίου από trip_coordinates (PostGIS)."""
+    """Ιστορική διαδρομή δρομολογίου από live GPS οδηγού (buffer + PostGIS)."""
     payload = await fetch_trip_route(
         session,
         tenant_id=tenant_id,
         trip_id=trip_id,
         from_time=from_time,
         to_time=to_time,
-        driver_id=driver_id,
+        driver_id=driver_id.strip() if driver_id else None,
         limit=limit,
     )
     return TripRouteResponse(**payload)
@@ -257,7 +257,7 @@ async def admin_trip_route_export(
     fmt: str = Query("gpx", alias="format", pattern="^(gpx|kml)$"),
     from_time: datetime | None = Query(default=None, alias="from"),
     to_time: datetime | None = Query(default=None, alias="to"),
-    driver_id: UUID | None = None,
+    driver_id: str | None = Query(default=None),
     limit: int = Query(5000, ge=1, le=10000),
 ):
     """Λήψη διαδρομής ως GPX ή KML."""
@@ -267,7 +267,7 @@ async def admin_trip_route_export(
         trip_id=trip_id,
         from_time=from_time,
         to_time=to_time,
-        driver_id=driver_id,
+        driver_id=driver_id.strip() if driver_id else None,
         limit=limit,
     )
     points = payload.get("points") or []
