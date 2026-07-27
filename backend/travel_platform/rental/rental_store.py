@@ -36,6 +36,10 @@ EXTRA_DAILY_RATES = {
     "gps_pack": 5.0,
 }
 
+ID_VERIFICATION_STATUSES = ("pending", "verified", "rejected", "not_required")
+MIN_DRIVER_AGE_YEARS = 21
+ID_DOC_URL_PREFIX = "/api/site/rental-id/"
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -338,6 +342,125 @@ def compute_payment_split(
         "payment_label": payment_label,
     }
 
+def _parse_date_only(value: str | None) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        if "T" in raw:
+            return _parse_dt(raw)
+        return datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise ValueError("Μη έγκυρη ημερομηνία") from exc
+
+
+def _age_years(dob: datetime, *, on: datetime | None = None) -> int:
+    ref = on or datetime.now(timezone.utc)
+    years = ref.year - dob.year
+    if (ref.month, ref.day) < (dob.month, dob.day):
+        years -= 1
+    return years
+
+
+def _safe_doc_url(value: Any) -> str | None:
+    url = str(value or "").strip()
+    if not url:
+        return None
+    if url.startswith(ID_DOC_URL_PREFIX) and ".." not in url and " " not in url:
+        return url
+    raise ValueError("Μη έγκυρο αρχείο ταυτότητας/διπλώματος")
+
+
+def validate_renter_identity(
+    body: dict[str, Any],
+    *,
+    driver_mode: str,
+    channel: str,
+    rental_end: datetime,
+) -> dict[str, Any]:
+    """Validate ID/license for wallet self-drive (and optional desk docs)."""
+    mode = str(driver_mode or "SELF_DRIVE").upper()
+    ch = str(channel or "DESK").upper()
+    require_docs = ch == "WALLET" and mode == "SELF_DRIVE"
+
+    id_url = None
+    license_url = None
+    raw_id = body.get("id_document_url")
+    raw_lic = body.get("driving_license_url")
+    if raw_id:
+        id_url = _safe_doc_url(raw_id)
+    if raw_lic:
+        license_url = _safe_doc_url(raw_lic)
+
+    dob_raw = str(body.get("date_of_birth") or "").strip() or None
+    license_number = str(body.get("license_number") or "").strip() or None
+    license_expires_raw = str(body.get("license_expires_at") or "").strip() or None
+
+    if require_docs:
+        if not id_url:
+            raise ValueError("Απαιτείται φωτογραφία ταυτότητας ή διαβατηρίου")
+        if not license_url:
+            raise ValueError("Απαιτείται φωτογραφία διπλώματος οδήγησης")
+        if not dob_raw:
+            raise ValueError("Απαιτείται ημερομηνία γέννησης")
+        if not license_number:
+            raise ValueError("Απαιτείται αριθμός διπλώματος")
+        if not license_expires_raw:
+            raise ValueError("Απαιτείται ημερομηνία λήξης διπλώματος")
+
+    dob = _parse_date_only(dob_raw) if dob_raw else None
+    license_expires = _parse_date_only(license_expires_raw) if license_expires_raw else None
+
+    if dob is not None:
+        age = _age_years(dob)
+        if age < MIN_DRIVER_AGE_YEARS and mode == "SELF_DRIVE":
+            raise ValueError(f"Ελάχιστη ηλικία οδηγού: {MIN_DRIVER_AGE_YEARS} ετών")
+
+    if license_expires is not None and license_expires.date() < rental_end.date():
+        raise ValueError("Το δίπλωμα λήγει πριν το τέλος της ενοικίασης")
+
+    if id_url or license_url:
+        status = "pending"
+    elif require_docs:
+        status = "pending"
+    elif mode == "WITH_DRIVER":
+        status = "not_required"
+    else:
+        status = "not_required"
+
+    return {
+        "id_document_url": id_url,
+        "driving_license_url": license_url,
+        "date_of_birth": dob.date().isoformat() if dob else None,
+        "license_number": license_number,
+        "license_expires_at": license_expires.date().isoformat() if license_expires else None,
+        "id_verification_status": status,
+    }
+
+
+def update_id_verification(
+    tenant_id: str | None,
+    booking_id: str,
+    status: str,
+) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    st = str(status or "").strip().lower()
+    if st not in ("pending", "verified", "rejected"):
+        raise ValueError("Μη έγκυρη κατάσταση επαλήθευσης")
+    bid = str(booking_id or "").strip()
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        booking["id_verification_status"] = st
+        booking["updated_at"] = _now()
+        _write(data)
+        return deepcopy(booking)
+
 
 def quote_vehicle(
     vehicle: dict[str, Any],
@@ -489,6 +612,13 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         if channel not in ("DESK", "WALLET"):
             channel = "DESK"
 
+        identity = validate_renter_identity(
+            body,
+            driver_mode=driver_mode,
+            channel=channel,
+            rental_end=end,
+        )
+
         has_payment_input = (
             body.get("payment_plan") is not None
             or body.get("payment_method") is not None
@@ -565,6 +695,12 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "driver_mode": driver_mode,
             "assigned_driver_id": (str(body.get("assigned_driver_id") or "").strip() or None),
             "notes": notes,
+            "id_document_url": identity["id_document_url"],
+            "driving_license_url": identity["driving_license_url"],
+            "date_of_birth": identity["date_of_birth"],
+            "license_number": identity["license_number"],
+            "license_expires_at": identity["license_expires_at"],
+            "id_verification_status": identity["id_verification_status"],
             "created_at": now,
             "updated_at": now,
             "vehicle_plate": vehicle.get("plate_number"),

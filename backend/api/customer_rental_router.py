@@ -1,8 +1,13 @@
-"""Customer PWA fleet rental — catalog, availability, booking + payment."""
+"""Customer PWA fleet rental — catalog, availability, booking + payment + ID docs."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+import os
+import re
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from api.customer_auth import get_current_customer
@@ -10,6 +15,11 @@ from travel_platform.rental import rental_store as store
 from travel_platform.settings.drivers_store import DEMO_TENANT_ID
 
 router = APIRouter(prefix="/api/customer/rentals", tags=["Customer Rentals"])
+
+_DATA_ROOT = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data")
+_RENTAL_ID_DIR = _DATA_ROOT / "uploads" / "rental_id"
+_MAX_DOC_BYTES = 4 * 1024 * 1024
+_ID_KINDS = frozenset({"id_card", "driving_license"})
 
 
 async def _tenant_id(request: Request) -> str:
@@ -70,6 +80,11 @@ class CustomerBookingBody(BaseModel):
     payment_plan: str = "full"
     payment_method: str = "card"
     deposit_percent: int | None = Field(default=None, ge=5, le=90)
+    id_document_url: str | None = None
+    driving_license_url: str | None = None
+    date_of_birth: str | None = None
+    license_number: str | None = Field(default=None, max_length=64)
+    license_expires_at: str | None = None
 
 
 def _public_booking(row: dict) -> dict:
@@ -97,6 +112,12 @@ def _public_booking(row: dict) -> dict:
         "balance_due": row.get("balance_due"),
         "payment_status": row.get("payment_status"),
         "payment_label": row.get("payment_label"),
+        "id_verification_status": row.get("id_verification_status"),
+        "has_id_document": bool(row.get("id_document_url")),
+        "has_driving_license": bool(row.get("driving_license_url")),
+        "date_of_birth": row.get("date_of_birth"),
+        "license_number": row.get("license_number"),
+        "license_expires_at": row.get("license_expires_at"),
         "created_at": row.get("created_at"),
     }
 
@@ -138,6 +159,48 @@ async def rental_public_catalog(
             }
         )
     return {"vehicles": public, "count": len(public)}
+
+
+@router.post("/id-docs/upload")
+async def upload_rental_id_doc(
+    kind: str = Query(..., description="id_card or driving_license"),
+    file: UploadFile = File(...),
+    _: dict = Depends(get_current_customer),
+):
+    """Customer ID / driving license photo for self-drive wallet bookings."""
+    from travel_platform.media.image_optimize import optimize_driver_photo
+
+    kind_norm = str(kind or "").strip().lower()
+    if kind_norm not in _ID_KINDS:
+        raise HTTPException(status_code=400, detail="Μη έγκυρος τύπος εγγράφου")
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    if len(content) > _MAX_DOC_BYTES:
+        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 4 MB)")
+
+    optimized = optimize_driver_photo(content, max_side=1600, quality=84)
+    if optimized.ext == ".bin":
+        raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
+
+    prefix = "id" if kind_norm == "id_card" else "license"
+    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or prefix).stem)[:40] or prefix
+    filename = f"{prefix}-{safe_stem}-{uuid.uuid4().hex[:10]}{optimized.ext}"
+
+    _RENTAL_ID_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _RENTAL_ID_DIR / filename
+    out_path.write_bytes(optimized.content)
+    url = f"/api/site/rental-id/{filename}"
+    return {
+        "ok": True,
+        "kind": kind_norm,
+        "url": url,
+        "filename": filename,
+        "bytes": len(optimized.content),
+        "content_type": optimized.content_type,
+    }
 
 
 @router.get("/availability")
@@ -227,6 +290,11 @@ async def book_rental(
         "payment_plan": body.payment_plan,
         "payment_method": body.payment_method,
         "deposit_percent": body.deposit_percent,
+        "id_document_url": body.id_document_url,
+        "driving_license_url": body.driving_license_url,
+        "date_of_birth": body.date_of_birth,
+        "license_number": body.license_number,
+        "license_expires_at": body.license_expires_at,
         "channel": "WALLET",
     }
     try:

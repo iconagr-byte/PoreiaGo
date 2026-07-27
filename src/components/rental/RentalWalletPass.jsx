@@ -125,6 +125,29 @@ export default function RentalWalletPass({
           </div>
         ) : null}
 
+        {booking.id_verification_status && booking.id_verification_status !== 'not_required' ? (
+          <div
+            className={`rent-wallet-id ${
+              booking.id_verification_status === 'verified'
+                ? 'is-ok'
+                : booking.id_verification_status === 'rejected'
+                  ? 'is-bad'
+                  : 'is-pending'
+            }`}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              {booking.id_verification_status === 'verified' ? 'verified_user' : 'badge'}
+            </span>
+            <span>
+              {booking.id_verification_status === 'verified'
+                ? 'Ταυτότητα επαληθεύτηκε'
+                : booking.id_verification_status === 'rejected'
+                  ? 'Έγγραφα απορρίφθηκαν — επικοινωνήστε με το γραφείο'
+                  : 'Έλεγχος ταυτότητας · εκκρεμεί από το γραφείο'}
+            </span>
+          </div>
+        ) : null}
+
         <div className="rent-wallet-route">
           <span className="material-symbols-outlined" aria-hidden>
             trip_origin

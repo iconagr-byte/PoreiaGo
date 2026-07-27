@@ -149,6 +149,11 @@ class FleetRentalStoreTests(unittest.TestCase):
                 "start_time": "2026-12-10T10:00:00+00:00",
                 "end_time": "2026-12-11T10:00:00+00:00",
                 "pickup_location": "Γραφείο",
+                "id_document_url": "/api/site/rental-id/id-maria.jpg",
+                "driving_license_url": "/api/site/rental-id/lic-maria.jpg",
+                "date_of_birth": "1992-01-01",
+                "license_number": "ML-1",
+                "license_expires_at": "2030-01-01",
             },
         )
         store.create_booking(
