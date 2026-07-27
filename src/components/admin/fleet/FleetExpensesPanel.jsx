@@ -79,13 +79,13 @@ export default function FleetExpensesPanel() {
   const total = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-8">
+    <div className="space-y-5 pb-4">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Έξοδα στόλου</h2>
+          <h2 className="text-xl font-bold text-gray-900 tracking-tight">Έξοδα στόλου</h2>
           <p className="text-sm text-gray-500 mt-1">Καύσιμα, διόδια και άλλα ανά όχημα.</p>
         </div>
-        <div className="bg-white rounded-2xl border px-5 py-3">
+        <div className="bg-white rounded-2xl border border-black/[0.06] px-5 py-3 shadow-sm">
           <div className="text-[10px] font-bold uppercase text-gray-500">Σύνολο</div>
           <div className="text-2xl font-bold text-primary">€{total.toLocaleString('el-GR')}</div>
         </div>

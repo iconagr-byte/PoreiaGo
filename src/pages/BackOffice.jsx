@@ -62,6 +62,8 @@ import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
 import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
 import FleetCalendarPanel from '../components/admin/fleet/FleetCalendarPanel.jsx';
 import FleetRentalPanel from '../components/admin/fleet/FleetRentalPanel.jsx';
+import FleetOpsHubNav from '../components/admin/fleet/FleetOpsHubNav.jsx';
+import FleetOpsPageShell from '../components/admin/fleet/FleetOpsPageShell.jsx';
 import FleetAvailabilityPanel from '../components/admin/fleet/FleetAvailabilityPanel.jsx';
 import FleetDocumentsPanel from '../components/admin/fleet/FleetDocumentsPanel.jsx';
 import FleetExpensesPanel from '../components/admin/fleet/FleetExpensesPanel.jsx';
@@ -1292,24 +1294,8 @@ export default function BackOffice() {
             <p className="font-body-md text-body-md text-on-surface-variant mt-1">
               Παρακολούθηση οχημάτων, κατάσταση συντήρησης και οικονομικά στοιχεία.
             </p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {[
-                ['fleet_calendar', 'Ημερολόγιο', 'calendar_month'],
-                ['fleet_availability', 'Διαθεσιμότητα', 'event_available'],
-                ['fleet_documents', 'Έγγραφα', 'folder_managed'],
-                ['fleet_expenses', 'Έξοδα', 'local_gas_station'],
-                ['fleet_digest', 'Ειδοποιήσεις', 'notifications_active'],
-              ].map(([tab, label, icon]) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-white border border-black/[0.08] text-gray-700 hover:bg-gray-50"
-                >
-                  <span className="material-symbols-outlined text-[16px]">{icon}</span>
-                  {label}
-                </button>
-              ))}
+            <div className="mt-5">
+              <FleetOpsHubNav activeTab="fleet" onNavigate={setActiveTab} />
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -2239,30 +2225,30 @@ export default function BackOffice() {
               </div>
             )}
             {activeTab === 'fleet_calendar' && (
-              <div className="pb-stack-lg">
+              <FleetOpsPageShell activeTab="fleet_calendar" onNavigate={setActiveTab}>
                 <FleetCalendarPanel
                   onOpenDocuments={() => setActiveTab('fleet_documents')}
                   onOpenFleet={() => setActiveTab('fleet')}
                 />
-              </div>
+              </FleetOpsPageShell>
             )}
             {activeTab === 'fleet_availability' && (
-              <div className="pb-stack-lg">
+              <FleetOpsPageShell activeTab="fleet_availability" onNavigate={setActiveTab}>
                 <FleetAvailabilityPanel />
-              </div>
+              </FleetOpsPageShell>
             )}
             {activeTab === 'fleet_documents' && (
-              <div className="pb-stack-lg">
+              <FleetOpsPageShell activeTab="fleet_documents" onNavigate={setActiveTab}>
                 <FleetDocumentsPanel />
-              </div>
+              </FleetOpsPageShell>
             )}
             {activeTab === 'fleet_expenses' && (
-              <div className="pb-stack-lg">
+              <FleetOpsPageShell activeTab="fleet_expenses" onNavigate={setActiveTab}>
                 <FleetExpensesPanel />
-              </div>
+              </FleetOpsPageShell>
             )}
             {activeTab === 'fleet_digest' && (
-              <div className="pb-stack-lg">
+              <FleetOpsPageShell activeTab="fleet_digest" onNavigate={setActiveTab}>
                 <FleetDigestPanel
                   onOpenPayments={() => {
                     setSettingsSubTab('payments');
@@ -2270,7 +2256,7 @@ export default function BackOffice() {
                   }}
                   onOpenCalendar={() => setActiveTab('fleet_calendar')}
                 />
-              </div>
+              </FleetOpsPageShell>
             )}
             {activeTab === 'lost_found' && renderLostFound()}
             {activeTab === 'email' && (
