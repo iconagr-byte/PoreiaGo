@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import mimetypes
 import re
 from datetime import datetime, timezone
@@ -13,6 +14,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 router = APIRouter(tags=["site-appearance"])
+logger = logging.getLogger(__name__)
 
 _DATA = Path(__file__).resolve().parents[1] / "data"
 _APPEARANCE_FILE = _DATA / "site_appearance.json"
@@ -27,6 +29,9 @@ _PLATFORM_HOST_RE = re.compile(
     r"^(www\.)?(poreiago\.com|localhost|127\.0\.0\.1)$",
     re.I,
 )
+# Achillion Travel logo was uploaded into the shared platform file store and
+# poisoned www.poreiago.com branding. One-shot wipe on first appearance read.
+_PURGE_ACHILLION_PLATFORM_LOGO_MARKER = _DATA / ".purged_achillion_platform_logo_v1"
 
 
 def _is_platform_placeholder_logo(url: str | None) -> bool:
@@ -247,6 +252,49 @@ def _asset_api_url(kind: str) -> str:
     return f"/api/site/assets/{kind}?v={version}"
 
 
+def _is_platform_host(host: str | None) -> bool:
+    value = str(host or "").strip()
+    if not value:
+        return True
+    return bool(_PLATFORM_HOST_RE.match(value))
+
+
+def purge_mistaken_platform_logo(*, force: bool = False) -> bool:
+    """Remove Achillion Travel logo from the PoreiaGo platform appearance store.
+
+    The shared uploads/site/logo.* file was used as the marketing-site logo on
+    poreiago.com. Tenant offices keep their own branding in Postgres.
+    """
+    if not force and _PURGE_ACHILLION_PLATFORM_LOGO_MARKER.exists():
+        return False
+    removed_files = 0
+    try:
+        _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        for path in list(_UPLOAD_DIR.glob("logo.*")):
+            path.unlink(missing_ok=True)
+            removed_files += 1
+        current = _read_appearance()
+        logo = str(current.get("logo_url") or "").strip()
+        if logo:
+            current["logo_url"] = ""
+            _write_appearance(current)
+        _DATA.mkdir(parents=True, exist_ok=True)
+        _PURGE_ACHILLION_PLATFORM_LOGO_MARKER.write_text(
+            "Cleared platform site logo — Achillion Travel mark was incorrectly "
+            "used on PoreiaGo marketing hosts.\n",
+            encoding="utf-8",
+        )
+        logger.info(
+            "Purged mistaken platform logo (removed_files=%s, cleared_logo_url=%s)",
+            removed_files,
+            bool(logo),
+        )
+        return True
+    except OSError as exc:
+        logger.warning("Failed to purge mistaken platform logo: %s", exc)
+        return False
+
+
 def _read_checkout_settings() -> dict:
     try:
         from travel_platform.settings.payment_settings_store import get_public_payment_settings
@@ -325,6 +373,8 @@ async def get_public_checkout_settings():
 
 @router.get("/api/site/appearance", response_model=SiteAppearanceResponse)
 async def get_public_site_appearance(host: str | None = Query(default=None)):
+    purge_mistaken_platform_logo()
+
     # Prefer tenant homepage from Postgres when Host maps to an office.
     if host:
         try:
@@ -343,7 +393,7 @@ async def get_public_site_appearance(host: str | None = Query(default=None)):
             pass
 
         # Custom / office host without DB row — never serve PoreiaGo platform logo.
-        if not _PLATFORM_HOST_RE.match(str(host).strip()):
+        if not _is_platform_host(host):
             data = {**DEFAULT_SITE_APPEARANCE, **_read_appearance()}
             logo = str(data.get("logo_url") or "")
             if _is_platform_placeholder_logo(logo):
@@ -351,7 +401,10 @@ async def get_public_site_appearance(host: str | None = Query(default=None)):
             return SiteAppearanceResponse(**data)
 
     data = _read_appearance()
-    if not data.get("logo_url"):
+    # Platform marketing hosts: never auto-fill logo from the shared uploads/site
+    # file store. That path resurrected the Achillion Travel mark after logo_url
+    # was cleared in JSON. Explicit admin uploads still set logo_url on write.
+    if not _is_platform_host(host) and not data.get("logo_url"):
         api_logo = _asset_api_url("logo")
         if api_logo:
             data["logo_url"] = api_logo
