@@ -125,7 +125,6 @@ export async function updateRentalBookingStatus(id, rentalStatus) {
   });
 }
 
-<<<<<<< HEAD
 export async function updateRentalIdVerification(id, idVerificationStatus) {
   return rentalFetch(`/bookings/${encodeURIComponent(id)}/id-verification`, {
     method: 'PATCH',
@@ -133,7 +132,6 @@ export async function updateRentalIdVerification(id, idVerificationStatus) {
   });
 }
 
-=======
 export async function verifyRentalQr(code) {
   return rentalFetch('/verify-qr', {
     method: 'POST',
@@ -145,7 +143,6 @@ export async function fetchRentalBooking(id) {
   return rentalFetch(`/bookings/${encodeURIComponent(id)}`);
 }
 
->>>>>>> origin/cursor/rent-qr-desk-scan-5ffb
 export async function fetchRentalCalendar(days = 30) {
   const data = await rentalFetch(`/calendar?days=${days}`);
   return data.blocks || [];

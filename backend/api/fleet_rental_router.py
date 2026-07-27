@@ -240,7 +240,6 @@ async def patch_booking_status(
     return row
 
 
-<<<<<<< HEAD
 @router.patch("/bookings/{booking_id}/id-verification")
 async def patch_booking_id_verification(
     booking_id: str,
@@ -255,7 +254,13 @@ async def patch_booking_id_verification(
             booking_id,
             body.id_verification_status,
         )
-=======
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
 @router.post("/verify-qr")
 async def verify_rental_qr(
     body: VerifyQrBody,
@@ -265,13 +270,10 @@ async def verify_rental_qr(
     """Desk scan of Rent Wallet pass (`RENT:{booking_id}`) — verify only."""
     try:
         return store.verify_rental_qr(_tid(tenant_id), body.code)
->>>>>>> origin/cursor/rent-qr-desk-scan-5ffb
     except ValueError as exc:
         msg = str(exc)
         code = 404 if "δεν βρέθηκε" in msg else 400
         raise HTTPException(status_code=code, detail=msg) from exc
-<<<<<<< HEAD
-=======
 
 
 @router.get("/bookings/{booking_id}")
@@ -283,7 +285,6 @@ async def get_booking(
     row = store.get_booking(_tid(tenant_id), booking_id)
     if not row:
         raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
->>>>>>> origin/cursor/rent-qr-desk-scan-5ffb
     return row
 
 
