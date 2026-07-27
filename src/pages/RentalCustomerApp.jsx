@@ -28,6 +28,8 @@ const TABS = [
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
+const HOME_CATEGORIES = ['', 'CAR', 'VAN', 'MINIBUS'];
+
 function RentalAuthGate() {
   // Re-check auth after in-place login (same URL /rent).
   const location = useLocation();
@@ -54,6 +56,15 @@ function RentalAuthenticatedApp() {
   const [homeFleet, setHomeFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [featuredVehicle, setFeaturedVehicle] = useState(null);
+  const [homeCategory, setHomeCategory] = useState('');
+  const [homeQuery, setHomeQuery] = useState('');
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rent_favorites_v1') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => setupRentalPwa(), []);
 
@@ -71,6 +82,22 @@ function RentalAuthenticatedApp() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('rent_favorites_v1', JSON.stringify(favorites));
+    } catch {
+      /* ignore */
+    }
+  }, [favorites]);
+
+  const filteredHomeFleet = homeFleet
+    .filter((v) => (homeCategory ? v.category === homeCategory : true))
+    .filter((v) => {
+      const q = homeQuery.trim().toLowerCase();
+      if (!q) return true;
+      return `${v.model || ''} ${v.category || ''}`.toLowerCase().includes(q);
+    });
 
   useEffect(() => {
     let cancelled = false;
@@ -144,12 +171,33 @@ function RentalAuthenticatedApp() {
                       Δες όλα
                     </button>
                   </div>
+                  <div className="rent-home-fleet-tools">
+                    <input
+                      type="search"
+                      value={homeQuery}
+                      onChange={(e) => setHomeQuery(e.target.value)}
+                      placeholder="Αναζήτηση μοντέλου…"
+                    />
+                    <div className="rent-home-fleet-cats">
+                      {HOME_CATEGORIES.map((c) => (
+                        <button
+                          key={c || 'all'}
+                          type="button"
+                          className={homeCategory === c ? 'is-active' : ''}
+                          onClick={() => setHomeCategory(c)}
+                        >
+                          {c || 'Όλα'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   {fleetLoading ? (
                     <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
-                  ) : homeFleet.length ? (
+                  ) : filteredHomeFleet.length ? (
                     <div className="rent-home-fleet-strip">
-                      {homeFleet.map((v) => {
+                      {filteredHomeFleet.map((v) => {
                         const cover = v.photo_urls?.[0] || v.photo_url || '';
+                        const isFav = favorites.includes(v.id);
                         return (
                           <button
                             key={v.id}
@@ -160,6 +208,20 @@ function RentalAuthenticatedApp() {
                               setTab('book');
                             }}
                           >
+                            <span
+                              className="rent-home-fleet-fav"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setFavorites((prev) =>
+                                  prev.includes(v.id) ? prev.filter((id) => id !== v.id) : [...prev, v.id],
+                                );
+                              }}
+                            >
+                              <span className="material-symbols-outlined" aria-hidden>
+                                {isFav ? 'favorite' : 'favorite_border'}
+                              </span>
+                            </span>
                             <div className="rent-home-fleet-media">
                               {cover ? (
                                 <img src={cover} alt={v.model || 'Όχημα'} loading="lazy" />
@@ -180,7 +242,7 @@ function RentalAuthenticatedApp() {
                     </div>
                   ) : (
                     <p className="rent-home-fleet-empty">
-                      Δεν υπάρχουν διαθέσιμα οχήματα αυτή τη στιγμή.
+                      Δεν βρέθηκαν οχήματα για τα φίλτρα που έβαλες.
                     </p>
                   )}
                 </section>
