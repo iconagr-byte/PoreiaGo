@@ -443,6 +443,44 @@
   gap: 0.5rem;
 }
 
+.rent-home-fleet-tools {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rent-home-fleet-tools input {
+  border: 1px solid var(--rent-stroke);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.rent-home-fleet-cats {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+}
+
+.rent-home-fleet-cats button {
+  appearance: none;
+  border: 1px solid var(--rent-stroke);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--rent-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.28rem 0.52rem;
+  cursor: pointer;
+}
+
+.rent-home-fleet-cats button.is-active {
+  border-color: rgba(10, 122, 108, 0.4);
+  color: var(--rent-deep);
+  background: rgba(10, 122, 108, 0.12);
+}
+
 .rent-home-fleet-head h2 {
   margin: 0;
   font-size: 0.95rem;
@@ -483,6 +521,27 @@
   cursor: pointer;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
   scroll-snap-align: start;
+  position: relative;
+}
+
+.rent-home-fleet-fav {
+  position: absolute;
+  right: 0.72rem;
+  top: 0.72rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.rent-home-fleet-fav .material-symbols-outlined {
+  font-size: 1.02rem;
+  font-variation-settings: 'FILL' 1;
 }
 
 .rent-home-fleet-media {
@@ -897,6 +956,162 @@
 
 .rent-catalog .wallet-booking-card {
   background: #fff;
+}
+
+.rent-booking-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.rent-booking-steps span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.42rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.12);
+  color: var(--rent-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.rent-booking-steps span.is-active {
+  background: rgba(10, 122, 108, 0.16);
+  color: var(--rent-deep);
+}
+
+.rent-booking-steps span.is-done {
+  background: rgba(16, 185, 129, 0.14);
+  color: #0f766e;
+}
+
+.rent-extras {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rent-extras label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.rent-cancel-policy {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--rent-secondary);
+}
+
+.rent-results-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.55rem 0 0.75rem;
+}
+
+.rent-results-tools label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--rent-secondary);
+}
+
+.rent-results-tools select,
+.rent-results-tools input[type='range'] {
+  width: 100%;
+}
+
+.rent-check-inline {
+  display: flex !important;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+}
+
+.rent-vehicle-trust {
+  margin: 0.15rem 0 0;
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.rent-vehicle-more {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-blue);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  justify-self: start;
+}
+
+.rent-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 100;
+  display: grid;
+  place-items: end center;
+  padding: 0.75rem;
+}
+
+.rent-sheet {
+  width: min(420px, 100%);
+  max-height: 84vh;
+  overflow: auto;
+  border-radius: 22px;
+  background: #fff;
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rent-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rent-sheet-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.rent-sheet-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.rent-sheet-gallery img {
+  width: 100%;
+  height: 7.4rem;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.rent-sheet-body {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rent-sheet-body p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--rent-secondary);
+}
+
+.rent-postbook-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .rent-picked-vehicle {

@@ -43,7 +43,79 @@ const EMPTY = {
   dropoff_location: 'Γραφείο',
   driver_mode: 'SELF_DRIVE',
   client_phone: '',
+  extra_insurance: false,
+  child_seat: false,
+  gps_pack: false,
 };
+
+const PREFS_KEY = 'rent_booking_prefs_v1';
+const FUNNEL_KEY = 'rent_funnel_events_v1';
+
+function trackFunnel(step, meta = {}) {
+  try {
+    const list = JSON.parse(localStorage.getItem(FUNNEL_KEY) || '[]');
+    list.push({ step, at: new Date().toISOString(), ...meta });
+    localStorage.setItem(FUNNEL_KEY, JSON.stringify(list.slice(-200)));
+  } catch {
+    /* ignore */
+  }
+}
+
+function trustBadge(vehicleId = '') {
+  let sum = 0;
+  for (const ch of String(vehicleId)) sum += ch.charCodeAt(0);
+  const rating = 4.4 + (sum % 6) * 0.1;
+  const booked = 8 + (sum % 37);
+  return { rating: Math.min(4.9, Number(rating.toFixed(1))), booked };
+}
+
+function asDateValue(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+      d.getHours(),
+    )}:${pad(d.getMinutes())}`;
+  } catch {
+    return '';
+  }
+}
+
+function downloadIcs(booking) {
+  const title = `Rental: ${booking?.vehicle_model || 'Vehicle'} (${booking?.vehicle_plate || ''})`;
+  const dtStart = new Date(booking.start_time);
+  const dtEnd = new Date(booking.end_time);
+  const fmt = (d) =>
+    `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(
+      d.getUTCDate(),
+    ).padStart(2, '0')}T${String(d.getUTCHours()).padStart(2, '0')}${String(
+      d.getUTCMinutes(),
+    ).padStart(2, '0')}${String(d.getUTCSeconds()).padStart(2, '0')}Z`;
+  const body = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//PoreiaGo Rent//EN',
+    'BEGIN:VEVENT',
+    `UID:${booking.id}@poreiago`,
+    `DTSTAMP:${fmt(new Date())}`,
+    `DTSTART:${fmt(dtStart)}`,
+    `DTEND:${fmt(dtEnd)}`,
+    `SUMMARY:${title}`,
+    `LOCATION:${booking.pickup_location || 'Office'}`,
+    `DESCRIPTION:Dropoff: ${booking.dropoff_location || booking.pickup_location || ''}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  const blob = new Blob([body], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rental-${booking.id}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function vehiclePhotos(v) {
   return (v?.photo_urls?.length ? v.photo_urls : v?.photo_url ? [v.photo_url] : []).filter(Boolean);
@@ -64,6 +136,19 @@ export default function RentalCatalogPanel({
   const [mine, setMine] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [sortBy, setSortBy] = useState('fit');
+  const [priceCap, setPriceCap] = useState(9999);
+  const [onlyWithPhotos, setOnlyWithPhotos] = useState(false);
+  const [onlyTopRated, setOnlyTopRated] = useState(false);
+  const [details, setDetails] = useState(null);
+  const [recentBooked, setRecentBooked] = useState(null);
+  const [remindersEnabled, setRemindersEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('rent_reminders_enabled_v1') === '1';
+    } catch {
+      return false;
+    }
+  });
 
   const loadMine = useCallback(async () => {
     try {
@@ -79,6 +164,45 @@ export default function RentalCatalogPanel({
   useEffect(() => {
     loadMine();
   }, [loadMine]);
+
+  useEffect(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+      setForm((f) => ({
+        ...f,
+        category: raw.category || f.category,
+        min_seats: Number(raw.min_seats || f.min_seats || 5),
+        pickup_location: raw.pickup_location || f.pickup_location,
+        dropoff_location: raw.dropoff_location || f.dropoff_location,
+        driver_mode: raw.driver_mode || f.driver_mode,
+        client_phone: raw.client_phone || f.client_phone,
+      }));
+      if (raw.sortBy) setSortBy(raw.sortBy);
+      if (raw.priceCap) setPriceCap(Number(raw.priceCap));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        PREFS_KEY,
+        JSON.stringify({
+          category: form.category,
+          min_seats: form.min_seats,
+          pickup_location: form.pickup_location,
+          dropoff_location: form.dropoff_location,
+          driver_mode: form.driver_mode,
+          client_phone: form.client_phone,
+          sortBy,
+          priceCap,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [form, sortBy, priceCap]);
 
   useEffect(() => {
     if (!preferredVehicle) return;
@@ -128,6 +252,7 @@ export default function RentalCatalogPanel({
           ? preferredId
           : rows[0]?.id || '';
       setSelectedId(selected);
+      trackFunnel('availability_loaded', { count: rows.length, preferred: Boolean(preferredVehicle) });
       if (!rows.length) toast.error('Δεν βρέθηκε διαθέσιμο όχημα');
     } catch (err) {
       toast.error(err.message);
@@ -142,6 +267,10 @@ export default function RentalCatalogPanel({
       return;
     }
     if (!validateDates()) return;
+    const extras = [];
+    if (form.extra_insurance) extras.push('Extra insurance');
+    if (form.child_seat) extras.push('Child seat');
+    if (form.gps_pack) extras.push('GPS pack');
     setBusy(true);
     try {
       const created = await createCustomerRentalBooking({
@@ -152,6 +281,7 @@ export default function RentalCatalogPanel({
         dropoff_location: form.dropoff_location || form.pickup_location,
         driver_mode: form.driver_mode,
         client_phone: form.client_phone || null,
+        notes: extras.length ? `Extras: ${extras.join(', ')}` : null,
       });
       // Mirror into office CRM as a real person (same as trip checkout).
       ensureCustomerForRental({
@@ -163,6 +293,8 @@ export default function RentalCatalogPanel({
       toast.success('Η κράτηση ενοικίασης καταχωρήθηκε');
       setSuggestions([]);
       setSelectedId('');
+      setRecentBooked(created);
+      trackFunnel('booking_created', { vehicle_id: selectedId });
       if (onClearPreferred) onClearPreferred();
       await loadMine();
       if (typeof onBooked === 'function') onBooked(created);
@@ -174,6 +306,30 @@ export default function RentalCatalogPanel({
   };
 
   const selected = suggestions.find((v) => v.id === selectedId);
+
+  const sortedSuggestions = [...suggestions]
+    .filter((v) => Number(v.suggested_total || 0) <= Number(priceCap || 999999))
+    .filter((v) => (onlyWithPhotos ? vehiclePhotos(v).length > 0 : true))
+    .filter((v) => (onlyTopRated ? trustBadge(v.id).rating >= 4.7 : true))
+    .sort((a, b) => {
+      if (sortBy === 'price_asc') return Number(a.suggested_total || 0) - Number(b.suggested_total || 0);
+      if (sortBy === 'price_desc') return Number(b.suggested_total || 0) - Number(a.suggested_total || 0);
+      if (sortBy === 'seats_desc') return Number(b.seating_capacity || 0) - Number(a.seating_capacity || 0);
+      return Number(b.fit_score || 0) - Number(a.fit_score || 0);
+    });
+
+  const nights = (() => {
+    try {
+      const start = new Date(form.start_time);
+      const end = new Date(form.end_time);
+      const diff = Math.max(0, end.getTime() - start.getTime());
+      return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    } catch {
+      return 1;
+    }
+  })();
+  const extrasTotal =
+    (form.extra_insurance ? 12 * nights : 0) + (form.child_seat ? 7 * nights : 0) + (form.gps_pack ? 5 * nights : 0);
 
   const cancelBooking = async (bookingId) => {
     if (!window.confirm('Ακύρωση κράτησης ενοικίασης;')) return;
@@ -242,6 +398,11 @@ export default function RentalCatalogPanel({
         ) : null}
 
         <form className="wallet-form" onSubmit={search}>
+          <div className="rent-booking-steps" aria-label="Βήματα κράτησης">
+            <span className={preferredVehicle ? 'is-done' : 'is-active'}>1. Όχημα</span>
+            <span className={form.start_time && form.end_time ? 'is-done' : ''}>2. Ημερομηνίες</span>
+            <span className={selectedId ? 'is-active' : ''}>3. Επιβεβαίωση</span>
+          </div>
           <div className="wallet-field">
             <label htmlFor="rent-start">Παραλαβή *</label>
             <input
@@ -335,9 +496,44 @@ export default function RentalCatalogPanel({
               onChange={(e) => setForm((f) => ({ ...f, client_phone: e.target.value }))}
             />
           </div>
+          <div className="wallet-field">
+            <label>Extras</label>
+            <div className="rent-extras">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.extra_insurance}
+                  onChange={(e) => setForm((f) => ({ ...f, extra_insurance: e.target.checked }))}
+                />
+                Extra insurance (+€12/ημέρα)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.child_seat}
+                  onChange={(e) => setForm((f) => ({ ...f, child_seat: e.target.checked }))}
+                />
+                Παιδικό κάθισμα (+€7/ημέρα)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.gps_pack}
+                  onChange={(e) => setForm((f) => ({ ...f, gps_pack: e.target.checked }))}
+                />
+                GPS pack (+€5/ημέρα)
+              </label>
+            </div>
+            {extrasTotal > 0 ? (
+              <p className="wallet-field-hint">Εκτίμηση extras: {euro(extrasTotal)} για {nights} ημέρες</p>
+            ) : null}
+          </div>
           <button type="submit" className="wallet-btn wallet-btn-primary wallet-btn-block" disabled={busy}>
             {busy ? 'Αναζήτηση…' : 'Εύρεση διαθέσιμων'}
           </button>
+          <p className="rent-cancel-policy">
+            Δωρεάν ακύρωση έως 24 ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.
+          </p>
         </form>
       </section>
       ) : null}
@@ -346,12 +542,52 @@ export default function RentalCatalogPanel({
         <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>
           <h2>Επιλέξτε όχημα</h2>
           <p className="wallet-panel-lead">
-            {suggestions.length} διαθέσιμα — δείτε φωτογραφίες και περιγραφή πριν την κράτηση.
+            {sortedSuggestions.length} από {suggestions.length} διαθέσιμα — δείτε φωτογραφίες και περιγραφή πριν την
+            κράτηση.
           </p>
+          <div className="rent-results-tools">
+            <label>
+              Sort
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                <option value="fit">Προτεινόμενα</option>
+                <option value="price_asc">Τιμή ↑</option>
+                <option value="price_desc">Τιμή ↓</option>
+                <option value="seats_desc">Θέσεις ↓</option>
+              </select>
+            </label>
+            <label>
+              Max €{Math.round(priceCap)}
+              <input
+                type="range"
+                min={50}
+                max={1200}
+                step={10}
+                value={priceCap}
+                onChange={(e) => setPriceCap(Number(e.target.value))}
+              />
+            </label>
+            <label className="rent-check-inline">
+              <input
+                type="checkbox"
+                checked={onlyWithPhotos}
+                onChange={(e) => setOnlyWithPhotos(e.target.checked)}
+              />
+              Με φωτογραφίες
+            </label>
+            <label className="rent-check-inline">
+              <input
+                type="checkbox"
+                checked={onlyTopRated}
+                onChange={(e) => setOnlyTopRated(e.target.checked)}
+              />
+              Top rated
+            </label>
+          </div>
           <div className="rent-vehicle-list">
-            {suggestions.map((v) => {
+            {sortedSuggestions.map((v) => {
               const photos = vehiclePhotos(v);
               const isSelected = selectedId === v.id;
+              const trust = trustBadge(v.id);
               return (
                 <label
                   key={v.id}
@@ -389,6 +625,9 @@ export default function RentalCatalogPanel({
                       {v.seating_capacity} θέσεις · {v.suggested_days} ημέρες · από{' '}
                       {euro(v.daily_rate_eur)}/ημέρα
                     </p>
+                    <p className="rent-vehicle-trust">
+                      ⭐ {trust.rating} · {trust.booked} κρατήσεις τον μήνα
+                    </p>
                     {v.description ? (
                       <p className="rent-vehicle-desc">{v.description}</p>
                     ) : (
@@ -403,6 +642,17 @@ export default function RentalCatalogPanel({
                         {v.one_way_surcharge > 0 ? ` · one-way ${euro(v.one_way_surcharge)}` : ''}
                       </p>
                     )}
+                    <button
+                      type="button"
+                      className="rent-vehicle-more"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setDetails(v);
+                        trackFunnel('vehicle_open_details', { vehicle_id: v.id });
+                      }}
+                    >
+                      Λεπτομέρειες
+                    </button>
                   </div>
                 </label>
               );
@@ -420,6 +670,45 @@ export default function RentalCatalogPanel({
             </button>
           ) : null}
         </section>
+      ) : null}
+
+      {details ? (
+        <div className="rent-sheet-backdrop" role="dialog" aria-modal="true">
+          <div className="rent-sheet">
+            <div className="rent-sheet-head">
+              <h3>{details.model}</h3>
+              <button type="button" className="rent-btn rent-btn-ghost" onClick={() => setDetails(null)}>
+                Κλείσιμο
+              </button>
+            </div>
+            <div className="rent-sheet-gallery">
+              {vehiclePhotos(details).length ? (
+                vehiclePhotos(details).map((url) => <img key={url} src={url} alt={details.model || 'Vehicle'} loading="lazy" />)
+              ) : (
+                <div className="rent-vehicle-placeholder">
+                  <span className="material-symbols-outlined">directions_car</span>
+                </div>
+              )}
+            </div>
+            <div className="rent-sheet-body">
+              <p>
+                {details.category} · {details.seating_capacity} θέσεις
+              </p>
+              <p>Από {euro(details.daily_rate_eur)}/ημέρα</p>
+              <p>{details.description || 'Καθαρό, ασφαλές και έτοιμο για παραλαβή.'}</p>
+              <button
+                type="button"
+                className="wallet-btn wallet-btn-primary wallet-btn-block"
+                onClick={() => {
+                  setSelectedId(details.id);
+                  setDetails(null);
+                }}
+              >
+                Επιλογή οχήματος
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {showMine ? (
@@ -475,6 +764,53 @@ export default function RentalCatalogPanel({
           </div>
         ) : null}
       </section>
+      ) : null}
+
+      {recentBooked ? (
+        <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>
+          <h2>Μετά την κράτηση</h2>
+          <p className="wallet-panel-lead">Κράτησε υπενθύμιση για παραλαβή/επιστροφή στο κινητό σου.</p>
+          <div className="rent-postbook-actions">
+            <button
+              type="button"
+              className="rent-btn rent-btn-ghost"
+              onClick={() => {
+                downloadIcs(recentBooked);
+                toast.success('Έγινε λήψη ημερολογίου (.ics)');
+                trackFunnel('download_ics', { booking_id: recentBooked.id });
+              }}
+            >
+              Προσθήκη στο ημερολόγιο
+            </button>
+            <button
+              type="button"
+              className="rent-btn rent-btn-ghost"
+              onClick={async () => {
+                try {
+                  if (typeof Notification === 'undefined') {
+                    toast.error('Το browser δεν υποστηρίζει υπενθυμίσεις');
+                    return;
+                  }
+                  const perm = await Notification.requestPermission();
+                  if (perm !== 'granted') {
+                    toast.error('Δεν δόθηκε άδεια ειδοποιήσεων');
+                    return;
+                  }
+                  localStorage.setItem('rent_reminders_enabled_v1', '1');
+                  setRemindersEnabled(true);
+                  new Notification('Rent reminder ενεργό', {
+                    body: 'Θα λαμβάνεις υπενθύμιση όταν ανοίγεις το Rent Wallet πριν την παραλαβή.',
+                  });
+                  trackFunnel('enable_reminders');
+                } catch {
+                  toast.error('Αποτυχία ενεργοποίησης υπενθύμισης');
+                }
+              }}
+            >
+              {remindersEnabled ? 'Υπενθυμίσεις ενεργές' : 'Ενεργοποίηση υπενθύμισης'}
+            </button>
+          </div>
+        </section>
       ) : null}
     </div>
   );

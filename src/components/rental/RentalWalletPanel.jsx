@@ -57,6 +57,7 @@ export default function RentalWalletPanel({
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [selectedId, setSelectedId] = useState('');
+  const [reminderShown, setReminderShown] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +89,28 @@ export default function RentalWalletPanel({
     () => rows.filter((b) => b.id !== featured?.id),
     [rows, featured],
   );
+
+  useEffect(() => {
+    if (reminderShown) return;
+    try {
+      const enabled = localStorage.getItem('rent_reminders_enabled_v1') === '1';
+      if (!enabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+      const upcoming = rows.find((b) => {
+        if (b.rental_status !== 'CONFIRMED') return false;
+        const start = new Date(b.start_time).getTime();
+        if (!Number.isFinite(start)) return false;
+        const diffH = (start - Date.now()) / (1000 * 60 * 60);
+        return diffH >= 0 && diffH <= 24;
+      });
+      if (!upcoming) return;
+      new Notification('Υπενθύμιση παραλαβής οχήματος', {
+        body: `${upcoming.vehicle_model || 'Όχημα'} · ${formatWhen(upcoming.start_time)}`,
+      });
+      setReminderShown(true);
+    } catch {
+      /* ignore */
+    }
+  }, [rows, reminderShown]);
 
   const cancelBooking = async (booking) => {
     if (!booking?.id) return;
