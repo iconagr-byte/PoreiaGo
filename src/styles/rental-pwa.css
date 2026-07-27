@@ -1114,6 +1114,307 @@
   gap: 0.5rem;
 }
 
+
+.rent-postbook-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rent-pay-panel {
+  margin-top: 1rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 122, 108, 0.2);
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.08), rgba(255, 255, 255, 0.92));
+}
+
+.rent-pay-panel h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  color: var(--rent-deep);
+}
+
+.rent-pay-plans,
+.rent-pay-methods {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.65rem 0;
+}
+
+.rent-pay-plan,
+.rent-pay-method {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.7rem;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 61, 74, 0.12);
+  background: #fff;
+  color: var(--rent-deep);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.rent-pay-plan:hover,
+.rent-pay-method:hover {
+  border-color: rgba(10, 122, 108, 0.35);
+  transform: translateY(-1px);
+}
+
+.rent-pay-plan.is-active,
+.rent-pay-method.is-active {
+  border-color: rgba(10, 122, 108, 0.55);
+  background: rgba(10, 122, 108, 0.1);
+  box-shadow: 0 0 0 1px rgba(10, 122, 108, 0.12);
+}
+
+.rent-pay-plan .material-symbols-outlined,
+.rent-pay-method .material-symbols-outlined {
+  font-size: 1.2rem;
+  color: var(--rent-teal);
+}
+
+.rent-pay-plan span:nth-child(2) {
+  display: grid;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.rent-pay-plan strong {
+  font-size: 0.82rem;
+}
+
+.rent-pay-plan small {
+  font-size: 0.7rem;
+  color: var(--rent-secondary);
+  line-height: 1.35;
+}
+
+.rent-pay-plan em {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.rent-pay-method {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.rent-pay-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.74rem;
+  color: var(--rent-secondary);
+  line-height: 1.4;
+}
+
+.rent-wallet-pay {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.55rem 0 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  background: rgba(10, 122, 108, 0.08);
+  color: var(--rent-deep, #0b3d4a);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rent-wallet-pay .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-id-panel {
+  margin: 0.35rem 0 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 122, 108, 0.2);
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.07), rgba(255, 255, 255, 0.95));
+}
+
+.rent-id-panel h3 {
+  margin: 0 0 0.2rem;
+  font-size: 0.92rem;
+  color: var(--rent-deep);
+}
+
+.rent-id-uploads {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.65rem 0;
+}
+
+.rent-id-upload {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 14px;
+  border: 1px dashed rgba(15, 61, 74, 0.22);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.rent-id-upload:hover {
+  border-color: rgba(10, 122, 108, 0.45);
+}
+
+.rent-id-upload.is-done {
+  border-style: solid;
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.rent-id-upload .material-symbols-outlined {
+  color: var(--rent-teal);
+  font-size: 1.25rem;
+}
+
+.rent-id-upload span:nth-child(2) {
+  display: grid;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.rent-id-upload strong {
+  font-size: 0.8rem;
+}
+
+.rent-id-upload small {
+  font-size: 0.68rem;
+  color: var(--rent-secondary);
+}
+
+.rent-id-upload input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rent-id-previews {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+}
+
+.rent-id-previews img {
+  width: 100%;
+  height: 4.5rem;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 61, 74, 0.12);
+}
+
+.rent-id-fields {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-wallet-id {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.55rem 0 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.rent-wallet-id .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.rent-wallet-id.is-pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+}
+
+.rent-wallet-id.is-ok {
+  background: rgba(16, 185, 129, 0.12);
+  color: #065f46;
+}
+
+.rent-wallet-id.is-bad {
+  background: rgba(244, 63, 94, 0.12);
+  color: #9f1239;
+}
+
+.rent-contract-panel {
+  margin-top: 1rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 122, 108, 0.2);
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.07), #fff);
+}
+
+.rent-contract-panel h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--rent-deep);
+}
+
+.rent-contract-clauses {
+  margin: 0.55rem 0 0.75rem;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--rent-secondary);
+  line-height: 1.4;
+}
+
+.rent-contract-accept {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--rent-deep);
+  margin-bottom: 0.65rem;
+}
+
+.rent-contract-sign {
+  padding: 0.55rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(15, 61, 74, 0.1);
+}
+
+.rent-wallet-cancel-locked {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #8e8e93;
+  line-height: 1.4;
+}
+
+.rent-wallet-contract-ok {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #0f766e;
+}
+
+.rent-wallet-contract-ok .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+
 .rent-picked-vehicle {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -1712,4 +2013,203 @@
   .rent-nav {
     bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
   }
+}
+
+.rent-wallet-fiscal {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.55rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.75rem;
+  background: rgba(14, 165, 233, 0.1);
+  color: #0369a1;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rent-wallet-fiscal .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.rent-wallet-afm {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: var(--rent-secondary);
+}
+
+.rent-wallet-sheet {
+  margin: 0.85rem 0 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--rent-stroke);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rent-wallet-sheet h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.rent-wallet-sheet label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--rent-secondary);
+}
+
+.rent-wallet-sheet-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.rent-wallet-photo input[type='file'] {
+  font-size: 0.75rem;
+}
+
+.rent-wallet-sig {
+  margin-top: 0.25rem;
+}
+
+/* Trip safety — SOS, roadside, checklist, insurance */
+.rent-sos-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 3rem;
+  border: none;
+  border-radius: 0.85rem;
+  background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(185, 28, 28, 0.35);
+  animation: rent-sos-pulse 2.4s ease-in-out infinite;
+}
+
+.rent-sos-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  animation: none;
+}
+
+.rent-sos-btn .material-symbols-outlined {
+  font-size: 1.35rem;
+}
+
+@keyframes rent-sos-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.rent-safety-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 55%, #e0f2fe 100%);
+  border: 1px solid #99f6e4;
+}
+
+.rent-safety-card-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0f766e;
+}
+
+.rent-safety-phone {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0b3d4a;
+  text-decoration: none;
+}
+
+.rent-safety-qr {
+  flex-shrink: 0;
+  padding: 0.25rem;
+  background: #fff;
+  border-radius: 0.5rem;
+}
+
+.rent-checklist {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.rent-checklist-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.rent-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  margin: 0.25rem 0;
+}
+
+.rent-insurance-sheet {
+  margin-bottom: 1rem;
+  padding: 0.85rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(160deg, #fff7ed 0%, #fffbeb 100%);
+  border: 1px solid #fdba74;
+}
+
+.rent-insurance-sheet h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.rent-insurance-block {
+  margin-bottom: 0.75rem;
+}
+
+.rent-insurance-label {
+  margin: 0 0 0.25rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #9a3412;
+}
+
+.rent-insurance-block ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: #57534e;
+}
+
+.rental-share-track .passenger-track-map {
+  flex: 1;
+  min-height: 55vh;
+  position: relative;
 }

@@ -344,6 +344,22 @@ async def _dispatch_webhook_async(tenant_id: str, event_type: str, payload: dict
         return {"event_id": event.id}
 
 
+@celery_app.task(name="workers.tasks.scan_rental_reminders", bind=True, max_retries=2)
+def scan_rental_reminders(self, within_hours: float = 24):
+    """Every 15m: push reminders for upcoming CONFIRMED rentals."""
+    try:
+        return _run_async(_scan_rental_reminders_async(within_hours=within_hours))
+    except Exception as exc:
+        logger.exception("Rental reminders scan failed")
+        raise self.retry(exc=exc, countdown=120) from exc
+
+
+async def _scan_rental_reminders_async(*, within_hours: float = 24) -> dict:
+    from travel_platform.notifications.rental_customer_push import scan_and_notify_upcoming_rentals
+
+    return await scan_and_notify_upcoming_rentals(within_hours=within_hours)
+
+
 @celery_app.task(name="workers.tasks.send_fiscal_pipeline_alert_task", bind=True, max_retries=2)
 def send_fiscal_pipeline_alert_task(self, kind: str = "digest"):
     """Daily digest or immediate admin email when fiscal pipeline has issues."""
