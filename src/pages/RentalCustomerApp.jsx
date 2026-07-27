@@ -11,7 +11,7 @@ import {
 import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
-import { fetchCustomerRentalCatalog } from '../services/customerRentalApi.js';
+import { fetchCustomerRentalCatalog, fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
@@ -30,26 +30,225 @@ const TABS = [
 
 const HOME_CATEGORIES = ['', 'CAR', 'VAN', 'MINIBUS'];
 
+const PREFERRED_VEHICLE_ID_KEY = 'rent_preferred_vehicle_id_v1';
+
+function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
+  const [brandName, setBrandName] = useState('Ενοικίαση');
+  const [homeFleet, setHomeFleet] = useState([]);
+  const [fleetLoading, setFleetLoading] = useState(true);
+  const [homeCategory, setHomeCategory] = useState('');
+  const [homeQuery, setHomeQuery] = useState('');
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rent_favorites_v1') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    setFleetLoading(true);
+    fetchPublicRentalCatalog()
+      .then((rows) => {
+        if (cancelled) return;
+        setHomeFleet(Array.isArray(rows) ? rows.slice(0, 12) : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setHomeFleet([]);
+      })
+      .finally(() => {
+        if (!cancelled) setFleetLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSiteAppearance()
+      .then((data) => {
+        if (cancelled) return;
+        const brand = resolveOfficeBrand(data || {});
+        const office = brand.displayName || 'Γραφείο';
+        setBrandName(`${office} Rent`);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('rent_favorites_v1', JSON.stringify(favorites));
+    } catch {
+      /* ignore */
+    }
+  }, [favorites]);
+
+  const filteredHomeFleet = homeFleet
+    .filter((v) => (homeCategory ? v.category === homeCategory : true))
+    .filter((v) => {
+      const q = homeQuery.trim().toLowerCase();
+      if (!q) return true;
+      return `${v.model || ''} ${v.category || ''}`.toLowerCase().includes(q);
+    });
+
+  return (
+    <div className="rent-phone-stage">
+      <div className="rent-app rent-app--guest">
+        <header className="rent-topbar">
+          <button
+            type="button"
+            className="rent-topbar-brand"
+            onClick={() => {
+              /* no-op */
+            }}
+          >
+            {brandName}
+          </button>
+          <button type="button" className="rent-btn rent-btn-ghost" onClick={onRequireLogin}>
+            Κράτηση
+          </button>
+        </header>
+
+        <main className="rent-home">
+          <section className="rent-hero" aria-label="Ενοικίαση">
+            <p className="rent-hero-brand">{brandName}</p>
+            <h1 className="rent-hero-title">Δες τον στόλο πριν κλείσεις</h1>
+            <p className="rent-hero-copy">
+              Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.
+            </p>
+            <button type="button" className="rent-hero-cta" onClick={onRequireLogin}>
+              <span className="material-symbols-outlined" aria-hidden>
+                lock
+              </span>
+              Σύνδεση για κράτηση
+            </button>
+          </section>
+
+          <div className="rent-home-stack">
+            <div className="rent-panel" style={{ padding: '0.9rem 1.0rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--rent-ink)' }}>
+                Στόλος ενοικίασης
+              </h2>
+              <p className="rent-panel-lead" style={{ marginBottom: '0.75rem' }}>
+                Διάλεξε όχημα για προεπιλογή — μετά θα σε πάει στο login.
+              </p>
+
+              <div className="rent-home-fleet-tools">
+                <input
+                  type="search"
+                  value={homeQuery}
+                  onChange={(e) => setHomeQuery(e.target.value)}
+                  placeholder="Αναζήτηση μοντέλου…"
+                />
+                <div className="rent-home-fleet-cats">
+                  {HOME_CATEGORIES.map((c) => (
+                    <button
+                      key={c || 'all'}
+                      type="button"
+                      className={homeCategory === c ? 'is-active' : ''}
+                      onClick={() => setHomeCategory(c)}
+                    >
+                      {c || 'Όλα'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {fleetLoading ? (
+                <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
+              ) : filteredHomeFleet.length ? (
+                <div className="rent-home-fleet-strip">
+                  {filteredHomeFleet.map((v) => {
+                    const cover = v.photo_urls?.[0] || v.photo_url || '';
+                    const isFav = favorites.includes(v.id);
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        className="rent-home-fleet-card"
+                        onClick={() => {
+                          try {
+                            localStorage.setItem(PREFERRED_VEHICLE_ID_KEY, String(v.id));
+                          } catch {
+                            /* ignore */
+                          }
+                          onPickVehicle?.(v);
+                          onRequireLogin?.();
+                        }}
+                      >
+                        <span
+                          className="rent-home-fleet-fav"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setFavorites((prev) => (isFav ? prev.filter((id) => id !== v.id) : [...prev, v.id]));
+                          }}
+                        >
+                          <span className="material-symbols-outlined" aria-hidden>
+                            {isFav ? 'favorite' : 'favorite_border'}
+                          </span>
+                        </span>
+                        <div className="rent-home-fleet-media">
+                          {cover ? <img src={cover} alt={v.model || 'Όχημα'} loading="lazy" /> : <span className="material-symbols-outlined">directions_car</span>}
+                        </div>
+                        <div className="rent-home-fleet-body">
+                          <strong>{v.model || 'Όχημα'}</strong>
+                          <span>
+                            {v.seating_capacity || '—'} θέσεις · από €{Number(v.daily_rate_eur || 0).toFixed(0)}/ημέρα
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rent-home-fleet-empty">Δεν βρέθηκαν οχήματα για τα φίλτρα.</p>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
 function RentalAuthGate() {
   // Re-check auth after in-place login (same URL /rent).
   const location = useLocation();
+  const [showLogin, setShowLogin] = useState(false);
   useEffect(() => setupRentalPwa(), []);
 
-  if (isCustomer() && !getCustomerToken()) {
-    logoutCustomer();
-  }
+  if (isCustomer() && !getCustomerToken()) logoutCustomer();
 
-  if (isCustomer() && getCustomerToken()) {
-    return <RentalAuthenticatedApp key={location.key} />;
-  }
+  if (getCustomerToken()) return <RentalAuthenticatedApp key={location.key} />;
 
-  // Share link /rent → customer login in-place (URL stays /rent, never Traefik deep-link 404).
-  return <LoginPage rentEntrance />;
+  if (showLogin) return <LoginPage rentEntrance />;
+
+  return (
+    <RentalGuestPreviewApp
+      onRequireLogin={() => setShowLogin(true)}
+      onPickVehicle={() => {
+        /* handled in guest */
+      }}
+    />
+  );
 }
 
 function RentalAuthenticatedApp() {
   // Land in Rent Wallet after login/register — separate from bus My Wallet.
-  const [tab, setTab] = useState('wallet');
+  const [tab, setTab] = useState(() => {
+    try {
+      return localStorage.getItem(PREFERRED_VEHICLE_ID_KEY) ? 'book' : 'wallet';
+    } catch {
+      return 'wallet';
+    }
+  });
   const [brandName, setBrandName] = useState('Ενοικίαση');
   const [calKey, setCalKey] = useState(0);
   const [walletKey, setWalletKey] = useState(0);
@@ -105,7 +304,21 @@ function RentalAuthenticatedApp() {
     fetchCustomerRentalCatalog()
       .then((rows) => {
         if (cancelled) return;
-        setHomeFleet(Array.isArray(rows) ? rows.slice(0, 12) : []);
+        const sliced = Array.isArray(rows) ? rows.slice(0, 12) : [];
+        setHomeFleet(sliced);
+        // If user came from guest preview, preselect the chosen vehicle.
+        try {
+          const preferredId = localStorage.getItem(PREFERRED_VEHICLE_ID_KEY);
+          if (preferredId) {
+            const found = sliced.find((v) => String(v.id) === String(preferredId));
+            if (found) {
+              setFeaturedVehicle(found);
+              setTab('book');
+            }
+          }
+        } catch {
+          /* ignore */
+        }
       })
       .catch(() => {
         if (cancelled) return;
@@ -275,10 +488,22 @@ function RentalAuthenticatedApp() {
               <RentalCatalogPanel
                 mode="book"
                 preferredVehicle={featuredVehicle}
-                onClearPreferred={() => setFeaturedVehicle(null)}
+                onClearPreferred={() => {
+                  setFeaturedVehicle(null);
+                  try {
+                    localStorage.removeItem(PREFERRED_VEHICLE_ID_KEY);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
                 onBooked={() => {
                   setCalKey((k) => k + 1);
                   setWalletKey((k) => k + 1);
+                  try {
+                    localStorage.removeItem(PREFERRED_VEHICLE_ID_KEY);
+                  } catch {
+                    /* ignore */
+                  }
                   setTab('wallet');
                 }}
               />

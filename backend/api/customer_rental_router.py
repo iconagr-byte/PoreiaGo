@@ -93,6 +93,35 @@ async def rental_catalog(
     return {"vehicles": vehicles, "count": len(vehicles)}
 
 
+@router.get("/public/catalog")
+async def rental_public_catalog(
+    request: Request,
+    category: str | None = None,
+):
+    """Public-only vehicle cards (guest preview, no auth).
+
+    Booking/availability still requires customer auth.
+    """
+    vehicles = store.public_catalog(await _tenant_id(request), category=category)
+    public = []
+    for v in vehicles:
+        public.append(
+            {
+                "id": v["id"],
+                "category": v.get("category"),
+                "model": v.get("model"),
+                "seating_capacity": v.get("seating_capacity"),
+                "daily_rate_eur": v.get("daily_rate_eur"),
+                "one_way_surcharge_eur": v.get("one_way_surcharge_eur"),
+                "with_driver_daily_eur": v.get("with_driver_daily_eur"),
+                "photo_url": v.get("photo_url") or ((v.get("photo_urls") or [None])[0]),
+                "photo_urls": list(v.get("photo_urls") or ([] if not v.get("photo_url") else [v.get("photo_url")])),
+                "description": v.get("description"),
+            }
+        )
+    return {"vehicles": public, "count": len(public)}
+
+
 @router.get("/availability")
 async def rental_availability(
     request: Request,
