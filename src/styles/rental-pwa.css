@@ -1114,6 +1114,116 @@
   gap: 0.5rem;
 }
 
+.rent-pay-panel {
+  margin-top: 1rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 122, 108, 0.2);
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.08), rgba(255, 255, 255, 0.92));
+}
+
+.rent-pay-panel h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  color: var(--rent-deep);
+}
+
+.rent-pay-plans,
+.rent-pay-methods {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.65rem 0;
+}
+
+.rent-pay-plan,
+.rent-pay-method {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.7rem;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 61, 74, 0.12);
+  background: #fff;
+  color: var(--rent-deep);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.rent-pay-plan:hover,
+.rent-pay-method:hover {
+  border-color: rgba(10, 122, 108, 0.35);
+  transform: translateY(-1px);
+}
+
+.rent-pay-plan.is-active,
+.rent-pay-method.is-active {
+  border-color: rgba(10, 122, 108, 0.55);
+  background: rgba(10, 122, 108, 0.1);
+  box-shadow: 0 0 0 1px rgba(10, 122, 108, 0.12);
+}
+
+.rent-pay-plan .material-symbols-outlined,
+.rent-pay-method .material-symbols-outlined {
+  font-size: 1.2rem;
+  color: var(--rent-teal);
+}
+
+.rent-pay-plan span:nth-child(2) {
+  display: grid;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.rent-pay-plan strong {
+  font-size: 0.82rem;
+}
+
+.rent-pay-plan small {
+  font-size: 0.7rem;
+  color: var(--rent-secondary);
+  line-height: 1.35;
+}
+
+.rent-pay-plan em {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.rent-pay-method {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.rent-pay-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.74rem;
+  color: var(--rent-secondary);
+  line-height: 1.4;
+}
+
+.rent-wallet-pay {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.55rem 0 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  background: rgba(10, 122, 108, 0.08);
+  color: var(--rent-deep, #0b3d4a);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rent-wallet-pay .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: var(--rent-teal, #0a7a6c);
+}
+
 .rent-picked-vehicle {
   display: grid;
   grid-template-columns: auto 1fr auto;
