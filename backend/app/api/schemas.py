@@ -142,7 +142,10 @@ class BillingSignupCheckoutRequest(BaseModel):
     admin_email: EmailStr
     subdomain: str = Field(min_length=2, max_length=48, pattern=r"^[a-z0-9-]+$")
     password: str = Field(min_length=8, max_length=128)
-    plan: str = Field(default="starter", pattern="^(starter|professional|enterprise)$")
+    plan: str = Field(
+        default="starter",
+        pattern="^(starter|professional|enterprise|rent)$",
+    )
     billing_interval: str = Field(default="month", pattern="^(month|year)$")
 
 

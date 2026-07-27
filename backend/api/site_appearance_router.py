@@ -9,7 +9,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -563,3 +563,52 @@ async def get_public_fleet(host: str | None = Query(default=None)):
             tenant_id = None
 
     return read_public_fleet(tenant_id=tenant_id)
+
+
+class OfficeModulesResponse(BaseModel):
+    trips_enabled: bool = True
+    rent_enabled: bool = False
+    plan: str = "starter"
+    mode: str = "trips_only"
+
+
+@router.get("/api/site/modules", response_model=OfficeModulesResponse)
+async def get_public_office_modules(
+    request: Request,
+    host: str | None = Query(default=None),
+):
+    """
+    Public storefront modules for an office host.
+    Rent-only contracts hide trips; bus plans show trips; add-on enables Rent.
+    """
+    effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if effective_host and "," in effective_host:
+        effective_host = effective_host.split(",")[0].strip()
+
+    if effective_host:
+        try:
+            from app.core.database import AsyncSessionLocal
+            from olympus.tenant.domain_resolver import DomainResolver
+            from app.services.tenant_modules import modules_for_tenant
+            from sqlalchemy import select
+            from app.models.tenant import Tenant
+
+            async with AsyncSessionLocal() as session:
+                resolved = await DomainResolver(session).resolve(effective_host)
+                if resolved:
+                    row = await session.execute(
+                        select(Tenant).where(Tenant.id == resolved.tenant_id)
+                    )
+                    tenant = row.scalar_one_or_none()
+                    if tenant:
+                        return OfficeModulesResponse(**modules_for_tenant(tenant))
+        except Exception:
+            logger.exception("office modules resolve failed for host=%s", effective_host)
+
+    # Platform / unknown host — default bus storefront shape.
+    return OfficeModulesResponse(
+        trips_enabled=True,
+        rent_enabled=False,
+        plan="starter",
+        mode="trips_only",
+    )

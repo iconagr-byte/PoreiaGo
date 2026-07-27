@@ -1,8 +1,10 @@
 /**
  * Full marketing page for Rent services — shareable for advertising.
  * Route: /rent/services
+ * On office domains, redirect to the storefront homepage (#rent) —
+ * offices do not need a separate PoreiaGo-branded services page.
  */
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import { RENT_SERVICE_FEATURES, rentServiceCopy } from '../lib/rental/rentServicesCatalog.js';
 import {
@@ -12,8 +14,13 @@ import {
   rentStandaloneDisplayPrice,
 } from '../lib/billing/planCatalog.js';
 import { getRentLang, setRentLang, t } from '../lib/rental/rentI18n.js';
+import { isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
 
 export default function RentalServicesPage() {
+  if (isTenantStorefrontHost()) {
+    return <Navigate to="/" replace />;
+  }
+
   const lang = getRentLang();
   const en = lang === 'en';
   const standalonePrice = rentStandaloneDisplayPrice('month');

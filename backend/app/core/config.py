@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     stripe_price_starter_yearly: str = Field(default="", alias="STRIPE_PRICE_STARTER_YEARLY")
     stripe_price_professional_yearly: str = Field(default="", alias="STRIPE_PRICE_PROFESSIONAL_YEARLY")
     stripe_price_enterprise_yearly: str = Field(default="", alias="STRIPE_PRICE_ENTERPRISE_YEARLY")
+    stripe_price_rent: str = Field(default="", alias="STRIPE_PRICE_RENT")
+    stripe_price_rent_yearly: str = Field(default="", alias="STRIPE_PRICE_RENT_YEARLY")
+    stripe_price_rent_addon: str = Field(default="", alias="STRIPE_PRICE_RENT_ADDON")
     billing_success_url: str = Field(
         default="http://localhost:5173/admin?billing=success",
         alias="BILLING_SUCCESS_URL",

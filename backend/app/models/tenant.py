@@ -17,6 +17,8 @@ class TenantPlan(str, enum.Enum):
     STARTER = "starter"
     PROFESSIONAL = "professional"
     ENTERPRISE = "enterprise"
+    # Standalone vehicle rentals — no bus/trips storefront.
+    RENT = "rent"
 
 
 class Tenant(Base, TimestampMixin):

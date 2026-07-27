@@ -68,7 +68,12 @@ function hasWalletSession() {
   return Boolean(isCustomer() && getCustomerToken());
 }
 
-export default function StorefrontHeader({ siteAppearance, templateId = 'glass_dark' }) {
+export default function StorefrontHeader({
+  siteAppearance,
+  templateId = 'glass_dark',
+  tripsEnabled = true,
+  rentEnabled = false,
+}) {
   const style = HEADER_STYLES[templateId] || HEADER_STYLES.glass_dark;
   const isDark = style.variant === 'dark';
   const [scrolled, setScrolled] = useState(false);
@@ -78,7 +83,7 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
   );
 
   const phone = String(siteAppearance?.footer_contact_phone || '').trim();
-  const showFleet = siteAppearance?.show_fleet_section !== false;
+  const showFleet = tripsEnabled && siteAppearance?.show_fleet_section !== false;
   const tel = phoneHref(phone);
 
   useEffect(() => {
@@ -138,9 +143,16 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
         <StorefrontBrand siteAppearance={siteAppearance} variant={style.variant} />
 
         <nav className="hidden md:flex items-center gap-4 lg:gap-5" aria-label="Κύριο μενού">
-          <a href="#search-results" className={navLink}>
-            Εκδρομές
-          </a>
+          {tripsEnabled ? (
+            <a href="#search-results" className={navLink}>
+              Εκδρομές
+            </a>
+          ) : null}
+          {rentEnabled ? (
+            <Link to="/rent" className={navLink}>
+              Rent
+            </Link>
+          ) : null}
           {showFleet ? (
             <a href="#our-fleet" className={navLink}>
               Στόλος
@@ -149,9 +161,11 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
           <a href="#contact" className={navLink}>
             Επικοινωνία
           </a>
-          <Link to="/my-booking" className={navLink}>
-            Η κράτησή μου
-          </Link>
+          {tripsEnabled ? (
+            <Link to="/my-booking" className={navLink}>
+              Η κράτησή μου
+            </Link>
+          ) : null}
           {tel ? (
             <a href={tel} className={phoneLink} aria-label={`Τηλέφωνο ${phone}`}>
               <span className="material-symbols-outlined text-[18px]" aria-hidden>
@@ -208,9 +222,16 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
           }`}
         >
           <nav className="max-w-container-max mx-auto px-margin-desktop py-4 flex flex-col gap-1" aria-label="Μενού κινητού">
-            <a href="#search-results" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
-              Εκδρομές
-            </a>
+            {tripsEnabled ? (
+              <a href="#search-results" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+                Εκδρομές
+              </a>
+            ) : null}
+            {rentEnabled ? (
+              <Link to="/rent" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+                Rent
+              </Link>
+            ) : null}
             {showFleet ? (
               <a href="#our-fleet" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
                 Στόλος
@@ -238,13 +259,15 @@ export default function StorefrontHeader({ siteAppearance, templateId = 'glass_d
               </span>
               My Wallet
             </Link>
-            <Link
-              to="/my-booking"
-              onClick={closeMenu}
-              className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5"
-            >
-              Η κράτησή μου
-            </Link>
+            {tripsEnabled ? (
+              <Link
+                to="/my-booking"
+                onClick={closeMenu}
+                className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5"
+              >
+                Η κράτησή μου
+              </Link>
+            ) : null}
           </nav>
         </div>
       ) : null}

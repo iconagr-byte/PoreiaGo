@@ -271,17 +271,17 @@ export default function AgencyPlansPage() {
           </h3>
           <ul className="list-disc list-inside space-y-1">
             <li>
-              <strong>Λεωφορεία μόνο:</strong> Starter / Professional / Enterprise — χωρίς Rent
+              <strong>Λεωφορεία μόνο:</strong> Starter / Professional / Enterprise — η αρχική του domain δείχνει εκδρομές
             </li>
             <li>
               <strong>Rent μόνο:</strong> συμβόλαιο {RENT_STANDALONE_PLAN.name} (
               {rentStandalonePrice.label}
-              {rentStandalonePrice.suffix}) — χωρίς στόλο λεωφορείων
+              {rentStandalonePrice.suffix}) — η αρχική του domain δείχνει μόνο Rent, χωρίς λεωφορεία
             </li>
             <li>
               <strong>Και τα δύο:</strong> πλάνο λεωφορείων + add-on Ενοικιάσεις (
               {rentAddonPrice.label}
-              {rentAddonPrice.suffix})
+              {rentAddonPrice.suffix}) — εκδρομές και Rent στην ίδια αρχική
             </li>
             <li>Email Hub με {CAMPAIGN_TEMPLATE_COUNT}+ πρότυπα · GDPR · διαχείριση από Συμβόλαιο</li>
           </ul>

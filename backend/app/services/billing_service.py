@@ -53,7 +53,7 @@ def stripe_readiness() -> dict:
     portal_ready = bool(settings.stripe_secret_key)
     # Demo signup/trial without real charge: explicit flag OR Stripe not configured.
     demo_mode = bool(getattr(settings, "billing_demo_mode", False)) or not checkout_ready
-    plans = ["starter", "professional"]
+    plans = ["starter", "professional", "rent"]
     if settings.stripe_price_enterprise:
         plans.append("enterprise")
     return {
@@ -87,6 +87,9 @@ def _plan_price_id(plan: TenantPlan, *, billing_interval: str = "month") -> str:
         TenantPlan.ENTERPRISE: (
             settings.stripe_price_enterprise_yearly if yearly else settings.stripe_price_enterprise
         ),
+        TenantPlan.RENT: (
+            settings.stripe_price_rent_yearly if yearly else settings.stripe_price_rent
+        ),
     }
     price_id = mapping.get(plan, "")
     if not price_id and yearly:
@@ -94,6 +97,7 @@ def _plan_price_id(plan: TenantPlan, *, billing_interval: str = "month") -> str:
             TenantPlan.STARTER: settings.stripe_price_starter,
             TenantPlan.PROFESSIONAL: settings.stripe_price_professional,
             TenantPlan.ENTERPRISE: settings.stripe_price_enterprise,
+            TenantPlan.RENT: settings.stripe_price_rent,
         }
         price_id = mapping_monthly.get(plan, "")
     if not price_id:
@@ -106,6 +110,7 @@ def _plan_base_cents(plan: TenantPlan, *, billing_interval: str = "month") -> in
         TenantPlan.STARTER: 9900,
         TenantPlan.PROFESSIONAL: 29900,
         TenantPlan.ENTERPRISE: 0,
+        TenantPlan.RENT: 14900,
     }.get(plan, 9900)
     if billing_interval == "year" and monthly:
         return monthly * 10
@@ -182,10 +187,11 @@ class BillingService:
         _stripe_client()
         line_items = [{"price": price_id, "quantity": 1}]
         settings = self._settings
-        if settings.stripe_price_metered_bus:
-            line_items.append({"price": settings.stripe_price_metered_bus})
-        if settings.stripe_price_metered_trip:
-            line_items.append({"price": settings.stripe_price_metered_trip})
+        if target_plan != TenantPlan.RENT:
+            if settings.stripe_price_metered_bus:
+                line_items.append({"price": settings.stripe_price_metered_bus})
+            if settings.stripe_price_metered_trip:
+                line_items.append({"price": settings.stripe_price_metered_trip})
 
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -258,10 +264,11 @@ class BillingService:
         _stripe_client()
         line_items = [{"price": price_id, "quantity": 1}]
         settings = self._settings
-        if settings.stripe_price_metered_bus:
-            line_items.append({"price": settings.stripe_price_metered_bus})
-        if settings.stripe_price_metered_trip:
-            line_items.append({"price": settings.stripe_price_metered_trip})
+        if plan != TenantPlan.RENT:
+            if settings.stripe_price_metered_bus:
+                line_items.append({"price": settings.stripe_price_metered_bus})
+            if settings.stripe_price_metered_trip:
+                line_items.append({"price": settings.stripe_price_metered_trip})
 
         session = stripe.checkout.Session.create(
             mode="subscription",

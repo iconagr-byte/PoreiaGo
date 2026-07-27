@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { listPublishedTrips } from '../lib/trips/tripStore.js';
 import { getTripMarket, MARKET_DOMESTIC, MARKET_INTERNATIONAL } from '../lib/trips/tripMarket.js';
 import {
@@ -26,11 +26,28 @@ import {
 } from '../lib/homepage/homepagePreview.js';
 import { isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
 import { fetchPublicFleet } from '../services/fleetPublicApi.js';
+import {
+  DEFAULT_OFFICE_MODULES,
+  fetchOfficeModules,
+  isRentOnlyModules,
+} from '../services/officeModulesApi.js';
+import { fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
 import FleetShowcaseSection from '../components/FleetShowcaseSection.jsx';
 import StorefrontHeader from '../components/storefront/StorefrontHeader.jsx';
 import StorefrontHero from '../components/storefront/StorefrontHero.jsx';
 import StorefrontFooter from '../components/storefront/StorefrontFooter.jsx';
+import StorefrontRentSection from '../components/storefront/StorefrontRentSection.jsx';
 import TripsSection from '../components/storefront/TripsSection.jsx';
+
+const RENT_ONLY_HERO = {
+  hero_badge: 'Ενοικιάσεις οχημάτων',
+  hero_title: 'Νοίκιασε όχημα,',
+  hero_title_accent: 'online σε λίγα λεπτά.',
+  hero_subtitle:
+    'Διάλεξε από τον στόλο ενοικίασης, κλείσε ημερομηνίες και παρέλαβε — χωρίς εκδρομές λεωφορείου σε αυτή τη σελίδα.',
+  hero_search_label: 'Ενοικίαση',
+};
+
 export default function StorefrontDemoPage() {
   const navigate = useNavigate();
   const isPreview = isStorefrontPreviewMode();
@@ -62,6 +79,13 @@ export default function StorefrontDemoPage() {
   const [siteAppearance, setSiteAppearance] = useState(DEFAULT_SITE_APPEARANCE);
   const [fleetShowcase, setFleetShowcase] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
+  const [modules, setModules] = useState(DEFAULT_OFFICE_MODULES);
+  const [rentalVehicles, setRentalVehicles] = useState([]);
+  const [rentalLoading, setRentalLoading] = useState(false);
+
+  const tripsEnabled = modules.trips_enabled !== false;
+  const rentEnabled = Boolean(modules.rent_enabled);
+  const rentOnly = isRentOnlyModules(modules);
 
   const pickerTrips = useMemo(
     () => sortTripsByDeparture(tripsForMarketFilter(trips, searchFilters.market)),
@@ -93,6 +117,21 @@ export default function StorefrontDemoPage() {
     (showDomestic ? filteredDomestic.length : 0) +
     (showInternational ? filteredInternational.length : 0);
 
+  const heroAppearance = useMemo(() => {
+    if (!rentOnly) return siteAppearance;
+    const brand =
+      siteAppearance.footer_brand_name ||
+      siteAppearance.display_name ||
+      '';
+    return {
+      ...siteAppearance,
+      ...RENT_ONLY_HERO,
+      hero_subtitle: brand
+        ? `Κλείσε online από τον στόλο του ${brand} — ημερομηνίες, παραλαβή και επιστροφή σε λίγα βήματα.`
+        : RENT_ONLY_HERO.hero_subtitle,
+    };
+  }, [rentOnly, siteAppearance]);
+
   useEffect(() => {
     const applyPreviewAppearance = () => {
       const draft = readHomepagePreviewDraft();
@@ -101,6 +140,11 @@ export default function StorefrontDemoPage() {
         return true;
       }
       return false;
+    };
+
+    const loadCommon = () => {
+      fetchOfficeModules().then(setModules);
+      fetchPlatformSettings().then(setPricingSettings);
     };
 
     if (isStorefrontPreviewMode()) {
@@ -113,7 +157,7 @@ export default function StorefrontDemoPage() {
         }
       };
       window.addEventListener('storage', onStorage);
-      fetchPlatformSettings().then(setPricingSettings);
+      loadCommon();
       setFleetLoading(true);
       fetchPublicFleet()
         .then(setFleetShowcase)
@@ -122,12 +166,34 @@ export default function StorefrontDemoPage() {
     }
 
     fetchSiteAppearance().then(setSiteAppearance);
-    fetchPlatformSettings().then(setPricingSettings);
+    loadCommon();
     setFleetLoading(true);
     fetchPublicFleet()
       .then(setFleetShowcase)
       .finally(() => setFleetLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!rentEnabled) {
+      setRentalVehicles([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setRentalLoading(true);
+    fetchPublicRentalCatalog()
+      .then((rows) => {
+        if (!cancelled) setRentalVehicles(rows || []);
+      })
+      .catch(() => {
+        if (!cancelled) setRentalVehicles([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRentalLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rentEnabled]);
 
   const handleMarketChange = (market) => {
     setSearchFilters((f) => ({
@@ -167,6 +233,33 @@ export default function StorefrontDemoPage() {
     '--sf-secondary': siteAppearance.secondary_color || '#1e3a5f',
     '--sf-surface': siteAppearance.surface_color || '#f8fafc',
   };
+
+  const rentHeroCta = (
+    <div className="mt-2 p-4 md:p-6 rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-md space-y-4 max-w-xl">
+      <p className="text-xs font-bold uppercase tracking-wider text-white/70">
+        {heroAppearance.hero_search_label || 'Ενοικίαση'}
+      </p>
+      <p className="text-sm text-white/85 leading-relaxed">
+        Διαθέσιμος στόλος για ημερήσια ή πολυήμερη ενοικίαση. Συνέχισε στην εφαρμογή Rent για ημερομηνίες και κράτηση.
+      </p>
+      <div className="flex flex-wrap gap-3 pt-1">
+        <Link
+          to="/rent"
+          className="bg-teal-600 text-white px-8 py-3.5 rounded-full font-label-md font-bold hover:bg-teal-500 transition-all inline-flex items-center justify-center gap-2"
+        >
+          Δες στόλο ενοικίασης
+          <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+        </Link>
+        <a
+          href="#rent"
+          className="px-8 py-3.5 rounded-full font-label-md font-bold bg-white text-slate-900 hover:bg-white/90 transition-all inline-flex items-center gap-2"
+        >
+          Περισσότερα
+          <span className="material-symbols-outlined text-[20px]">expand_more</span>
+        </a>
+      </div>
+    </div>
+  );
 
   const searchForm = (
     <form
@@ -295,6 +388,15 @@ export default function StorefrontDemoPage() {
             <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
           </button>
         )}
+        {rentEnabled ? (
+          <Link
+            to="/rent"
+            className="px-6 py-3.5 rounded-full font-label-md font-bold bg-teal-600/90 text-white hover:bg-teal-500 transition-all inline-flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[20px]">directions_car</span>
+            Rent
+          </Link>
+        ) : null}
       </div>
     </form>
   );
@@ -303,47 +405,69 @@ export default function StorefrontDemoPage() {
     return <Navigate to="/" replace />;
   }
 
+  const brandName =
+    siteAppearance.footer_brand_name || siteAppearance.display_name || '';
+  const showBusFleet = tripsEnabled && siteAppearance.show_fleet_section !== false;
+
   return (
     <div className="storefront-themed min-h-screen" style={themeVars}>
-      <StorefrontHeader siteAppearance={siteAppearance} templateId={headerTemplate} />
+      <StorefrontHeader
+        siteAppearance={siteAppearance}
+        templateId={headerTemplate}
+        tripsEnabled={tripsEnabled}
+        rentEnabled={rentEnabled}
+      />
       <main>
         <StorefrontHero
-          siteAppearance={siteAppearance}
+          siteAppearance={heroAppearance}
           templateId={siteAppearance.hero_template || 'fullscreen_overlay'}
-          searchForm={searchForm}
+          searchForm={rentOnly ? rentHeroCta : searchForm}
         />
 
-        <TripsSection
-          id="search-results"
-          eyebrow={siteAppearance.trips_section_eyebrow}
-          title={siteAppearance.trips_section_title}
-          subtitle={siteAppearance.trips_section_subtitle}
-          trips={showDomestic ? filteredDomestic : []}
-          emptyMessage={
-            showDomestic
-              ? 'Δεν βρέθηκαν εγχώριες εκδρομές με τα κριτήριά σας.'
-              : 'Επιλέξατε διεθνείς εκδρομές — δείτε παρακάτω.'
-          }
-          siteAppearance={siteAppearance}
-          pricingSettings={pricingSettings}
-        />
+        {tripsEnabled ? (
+          <>
+            <TripsSection
+              id="search-results"
+              eyebrow={siteAppearance.trips_section_eyebrow}
+              title={siteAppearance.trips_section_title}
+              subtitle={siteAppearance.trips_section_subtitle}
+              trips={showDomestic ? filteredDomestic : []}
+              emptyMessage={
+                showDomestic
+                  ? 'Δεν βρέθηκαν εγχώριες εκδρομές με τα κριτήριά σας.'
+                  : 'Επιλέξατε διεθνείς εκδρομές — δείτε παρακάτω.'
+              }
+              siteAppearance={siteAppearance}
+              pricingSettings={pricingSettings}
+            />
 
-        <TripsSection
-          id="international-trips"
-          eyebrow={siteAppearance.intl_section_eyebrow}
-          title={siteAppearance.intl_section_title}
-          subtitle={siteAppearance.intl_section_subtitle}
-          trips={filteredInternational}
-          emptyMessage="Δεν βρέθηκαν διεθνή δρομολόγια με τα κριτήριά σας."
-          siteAppearance={siteAppearance}
-          pricingSettings={pricingSettings}
-          hidden={!showInternational}
-        />
+            <TripsSection
+              id="international-trips"
+              eyebrow={siteAppearance.intl_section_eyebrow}
+              title={siteAppearance.intl_section_title}
+              subtitle={siteAppearance.intl_section_subtitle}
+              trips={filteredInternational}
+              emptyMessage="Δεν βρέθηκαν διεθνή δρομολόγια με τα κριτήριά σας."
+              siteAppearance={siteAppearance}
+              pricingSettings={pricingSettings}
+              hidden={!showInternational}
+            />
+          </>
+        ) : null}
+
+        {rentEnabled ? (
+          <StorefrontRentSection
+            vehicles={rentalVehicles}
+            loading={rentalLoading}
+            rentOnly={rentOnly}
+            brandName={brandName}
+          />
+        ) : null}
 
         <FleetShowcaseSection
           vehicles={fleetShowcase}
           loading={fleetLoading}
-          hidden={siteAppearance.show_fleet_section === false}
+          hidden={!showBusFleet}
         />
 
         {siteAppearance.show_why_us_section !== false && (
@@ -354,31 +478,53 @@ export default function StorefrontDemoPage() {
                 Γιατί να μας επιλέξετε
               </h2>
               <p className="font-body-lg text-on-surface-variant">
-                Όλες οι premium υπηρεσίες μας με μια ματιά. Από πανεύκολες κρατήσεις μέχρι ασφάλεια και εγγύηση κάθε στιγμή.
+                {rentOnly
+                  ? 'Online κράτηση ενοικίασης, ξεκάθαροι όροι και υποστήριξη πριν και κατά τη διαδρομή.'
+                  : 'Όλες οι premium υπηρεσίες μας με μια ματιά. Από πανεύκολες κρατήσεις μέχρι ασφάλεια και εγγύηση κάθε στιγμή.'}
               </p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
               <div className="bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform">
                 <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-6">
-                  <span className="material-symbols-outlined text-[32px]">event_available</span>
+                  <span className="material-symbols-outlined text-[32px]">
+                    {rentOnly ? 'smartphone' : 'event_available'}
+                  </span>
                 </div>
-                <h3 className="font-headline-sm font-bold text-on-surface mb-3">Εύκολη Κράτηση</h3>
-                <p className="text-on-surface-variant font-body-md">Διαλέξτε ημερομηνία και κλείστε τη θέση σας με λίγα μόνο κλικ.</p>
+                <h3 className="font-headline-sm font-bold text-on-surface mb-3">
+                  {rentOnly ? 'Κράτηση από το κινητό' : 'Εύκολη Κράτηση'}
+                </h3>
+                <p className="text-on-surface-variant font-body-md">
+                  {rentOnly
+                    ? 'Διάλεξε όχημα και ημερομηνίες στο Rent app — χωρίς τηλεφωνική αναμονή.'
+                    : 'Διαλέξτε ημερομηνία και κλείστε τη θέση σας με λίγα μόνο κλικ.'}
+                </p>
               </div>
               <div className="bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform">
                 <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-6">
-                  <span className="material-symbols-outlined text-[32px]">airline_seat_recline_extra</span>
+                  <span className="material-symbols-outlined text-[32px]">
+                    {rentOnly ? 'directions_car' : 'airline_seat_recline_extra'}
+                  </span>
                 </div>
-                <h3 className="font-headline-sm font-bold text-on-surface mb-3">Άνεση & Πολυτέλεια</h3>
-                <p className="text-on-surface-variant font-body-md">Ταξιδέψτε με υπερσύγχρονα οχήματα και αναπαυτικά καθίσματα.</p>
+                <h3 className="font-headline-sm font-bold text-on-surface mb-3">
+                  {rentOnly ? 'Στόλος σε ετοιμότητα' : 'Άνεση & Πολυτέλεια'}
+                </h3>
+                <p className="text-on-surface-variant font-body-md">
+                  {rentOnly
+                    ? 'Οχήματα συντηρημένα και έτοιμα για παραλαβή με καθαρό ιστορικό.'
+                    : 'Ταξιδέψτε με υπερσύγχρονα οχήματα και αναπαυτικά καθίσματα.'}
+                </p>
               </div>
               <div className="bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform">
                 <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6">
                   <span className="material-symbols-outlined text-[32px]">shield_person</span>
                 </div>
                 <h3 className="font-headline-sm font-bold text-on-surface mb-3">Απόλυτη Ασφάλεια</h3>
-                <p className="text-on-surface-variant font-body-md">Έμπειροι οδηγοί και αυστηρά μέτρα προστασίας σε κάθε διαδρομή.</p>
+                <p className="text-on-surface-variant font-body-md">
+                  {rentOnly
+                    ? 'Υποστήριξη διαδρομής, όροι ενοικίασης και βοήθεια όταν τη χρειάζεσαι.'
+                    : 'Έμπειροι οδηγοί και αυστηρά μέτρα προστασίας σε κάθε διαδρομή.'}
+                </p>
               </div>
             </div>
           </div>

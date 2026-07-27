@@ -31,6 +31,7 @@ _PLAN_BASE_CENTS = {
     TenantPlan.STARTER: 9900,
     TenantPlan.PROFESSIONAL: 29900,
     TenantPlan.ENTERPRISE: 0,
+    TenantPlan.RENT: 14900,
 }
 
 _SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")

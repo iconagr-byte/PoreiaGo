@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -16,6 +17,7 @@ from app.models.tenant import Tenant, TenantPlan
 from app.models.user import User
 from app.services.audit_service import AuditService
 from app.models.audit import AuditAction
+from app.services.tenant_modules import initial_settings_for_plan
 
 from olympus.tenant.dedicated_db import provision_dedicated_database
 from olympus.tenant.schema_provision import (
@@ -70,6 +72,7 @@ class TenantProvisioningService:
             else IsolationStrategy.SHARED_RLS.value
         )
 
+        rent_only = plan == TenantPlan.RENT
         tenant = Tenant(
             id=uuid4(),
             slug=slug,
@@ -79,7 +82,7 @@ class TenantProvisioningService:
             is_active=True,
             stripe_customer_id=stripe_customer_id,
             isolation_strategy=isolation,
-            settings_json='{"theme":{"primary":"#005d90"}}',
+            settings_json=json.dumps(initial_settings_for_plan(plan), ensure_ascii=False),
         )
 
         subscription = Subscription(
@@ -89,8 +92,8 @@ class TenantProvisioningService:
             status=SubscriptionStatus.TRIALING,
             plan=plan,
             trial_ends_at=datetime.now(timezone.utc) + timedelta(days=trial_days),
-            metered_buses=True,
-            metered_trips=True,
+            metered_buses=not rent_only,
+            metered_trips=not rent_only,
         )
 
         admin = User(
@@ -157,8 +160,6 @@ class TenantProvisioningService:
         tenant = result.scalar_one_or_none()
         if not tenant:
             return
-        import json
-
         settings = {}
         if tenant.settings_json:
             try:

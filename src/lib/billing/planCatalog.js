@@ -69,7 +69,7 @@ export const RENT_STANDALONE_PLAN = {
     'Customer app /rent + Rent Wallet',
     'Στόλος ενοικίασης, κρατήσεις, QR check-in',
     'SOS, οδική 24/7, CDW/SCDW, share trip, checklist',
-    'Δημόσια σελίδα υπηρεσιών για διαφήμιση',
+    'Αρχική σελίδα γραφείου μόνο με Rent (χωρίς λεωφορεία)',
     'Desk Ενοικιάσεις στο Control Panel',
   ],
   highlighted: true,
