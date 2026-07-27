@@ -106,7 +106,9 @@ async def list_vehicles(
     tenant_id: UUID = Depends(get_current_tenant_id),
     _: dict = Depends(_require_admin),
 ):
-    return {"vehicles": store.list_vehicles(_tid(tenant_id), category=category)}
+    tid = _tid(tenant_id)
+    store.ensure_demo_rental_fleet(tid)
+    return {"vehicles": store.list_vehicles(tid, category=category)}
 
 
 @router.post("/vehicles")

@@ -24,6 +24,132 @@ ACTIVE_BOOKING_STATUSES = frozenset({"CONFIRMED", "ACTIVE"})
 INSPECTION_TYPES = ("PICKUP_CHECK", "RETURN_CHECK")
 SERVICE_MILEAGE_EVERY = 15_000
 
+# Stable demo fleet (3 passenger cars + 3 vans) — seeded when a tenant has no vehicles.
+_DEMO_FLEET_MARKER = "demo_rent_fleet_v1"
+_DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
+    {
+        "id_suffix": "car-yaris",
+        "plate_number": "DEMO-C01",
+        "category": "CAR",
+        "model": "Toyota Yaris",
+        "seating_capacity": 5,
+        "daily_rate_eur": 35,
+        "one_way_surcharge_eur": 25,
+        "with_driver_daily_eur": 80,
+        "current_mileage": 18200,
+        "photo_url": "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=1200&q=80",
+        "description": "Οικονομικό επιβατικό για πόλη και κοντινές αποδράσεις.",
+    },
+    {
+        "id_suffix": "car-corolla",
+        "plate_number": "DEMO-C02",
+        "category": "CAR",
+        "model": "Toyota Corolla",
+        "seating_capacity": 5,
+        "daily_rate_eur": 48,
+        "one_way_surcharge_eur": 30,
+        "with_driver_daily_eur": 90,
+        "current_mileage": 24100,
+        "photo_url": "https://images.unsplash.com/photo-1623869675781-80aa31012a5a?auto=format&fit=crop&w=1200&q=80",
+        "description": "Άνετο οικογενειακό sedan με χαμηλή κατανάλωση.",
+    },
+    {
+        "id_suffix": "car-tucson",
+        "plate_number": "DEMO-C03",
+        "category": "CAR",
+        "model": "Hyundai Tucson",
+        "seating_capacity": 5,
+        "daily_rate_eur": 65,
+        "one_way_surcharge_eur": 40,
+        "with_driver_daily_eur": 110,
+        "current_mileage": 15600,
+        "photo_url": "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=1200&q=80",
+        "description": "SUV επιβατικό για μεγαλύτερα ταξίδια και αποσκευές.",
+    },
+    {
+        "id_suffix": "van-transporter",
+        "plate_number": "DEMO-V01",
+        "category": "VAN",
+        "model": "VW Transporter",
+        "seating_capacity": 9,
+        "daily_rate_eur": 95,
+        "one_way_surcharge_eur": 50,
+        "with_driver_daily_eur": 140,
+        "current_mileage": 31200,
+        "photo_url": "https://images.unsplash.com/photo-1527786356903-a4b4c4f0ad83?auto=format&fit=crop&w=1200&q=80",
+        "description": "Van 9 θέσεων για ομάδες και μεταφορές.",
+    },
+    {
+        "id_suffix": "van-vito",
+        "plate_number": "DEMO-V02",
+        "category": "VAN",
+        "model": "Mercedes Vito",
+        "seating_capacity": 8,
+        "daily_rate_eur": 110,
+        "one_way_surcharge_eur": 55,
+        "with_driver_daily_eur": 150,
+        "current_mileage": 27800,
+        "photo_url": "https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?auto=format&fit=crop&w=1200&q=80",
+        "description": "Premium van για άνετες μετακινήσεις ομάδας.",
+    },
+    {
+        "id_suffix": "van-trafic",
+        "plate_number": "DEMO-V03",
+        "category": "VAN",
+        "model": "Renault Trafic",
+        "seating_capacity": 9,
+        "daily_rate_eur": 88,
+        "one_way_surcharge_eur": 45,
+        "with_driver_daily_eur": 130,
+        "current_mileage": 33400,
+        "photo_url": "https://images.unsplash.com/photo-1544620341-1adc1baa16c2?auto=format&fit=crop&w=1200&q=80",
+        "description": "Ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις.",
+    },
+)
+
+
+def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
+    """
+    Seed 3 επιβατικά + 3 van when the tenant has no rental vehicles yet.
+    Idempotent — skips if any vehicle already exists for the tenant.
+    Returns number of vehicles inserted.
+    """
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        existing = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
+        if existing:
+            return 0
+        now = _now()
+        added = 0
+        for spec in _DEMO_VEHICLE_SPECS:
+            photo = str(spec.get("photo_url") or "").strip() or None
+            row = {
+                "id": f"demo-rent-{tid[:8]}-{spec['id_suffix']}",
+                "tenant_id": tid,
+                "plate_number": spec["plate_number"],
+                "category": spec["category"],
+                "model": spec["model"],
+                "seating_capacity": int(spec["seating_capacity"]),
+                "current_status": "AVAILABLE",
+                "current_mileage": int(spec.get("current_mileage") or 0),
+                "daily_rate_eur": float(spec["daily_rate_eur"]),
+                "one_way_surcharge_eur": float(spec.get("one_way_surcharge_eur") or 0),
+                "with_driver_daily_eur": float(spec.get("with_driver_daily_eur") or 0),
+                "gps_device_id": None,
+                "photo_url": photo,
+                "photo_urls": [photo] if photo else [],
+                "description": spec.get("description"),
+                "notes": _DEMO_FLEET_MARKER,
+                "created_at": now,
+                "updated_at": now,
+            }
+            data["vehicles"].append(row)
+            added += 1
+        if added:
+            _write(data)
+        return added
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -715,7 +841,8 @@ def cancel_booking_for_customer(
 
 
 def public_catalog(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
-    """Customer-facing vehicle cards (no internal notes)."""
+    """Customer-facing vehicle cards (no internal notes). Seeds demo fleet if empty."""
+    ensure_demo_rental_fleet(tenant_id)
     rows = list_vehicles(tenant_id, category=category)
     out = []
     for v in rows:

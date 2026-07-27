@@ -12,6 +12,7 @@ import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { fetchCustomerRentalCatalog, fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
+import { withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
@@ -52,11 +53,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
     fetchPublicRentalCatalog()
       .then((rows) => {
         if (cancelled) return;
-        setHomeFleet(Array.isArray(rows) ? rows.slice(0, 12) : []);
+        setHomeFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 12));
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet([]);
+        setHomeFleet(withDemoRentFleet([]));
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);
@@ -304,7 +305,7 @@ function RentalAuthenticatedApp() {
     fetchCustomerRentalCatalog()
       .then((rows) => {
         if (cancelled) return;
-        const sliced = Array.isArray(rows) ? rows.slice(0, 12) : [];
+        const sliced = withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 12);
         setHomeFleet(sliced);
         // If user came from guest preview, preselect the chosen vehicle.
         try {
@@ -322,7 +323,7 @@ function RentalAuthenticatedApp() {
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet([]);
+        setHomeFleet(withDemoRentFleet([]));
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);

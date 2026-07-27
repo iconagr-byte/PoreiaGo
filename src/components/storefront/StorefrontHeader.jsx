@@ -153,6 +153,11 @@ export default function StorefrontHeader({
               Rent
             </Link>
           ) : null}
+          {rentEnabled ? (
+            <a href="#rent-services" className={navLink}>
+              Υπηρεσίες
+            </a>
+          ) : null}
           {showFleet ? (
             <a href="#our-fleet" className={navLink}>
               Στόλος
@@ -231,6 +236,11 @@ export default function StorefrontHeader({
               <Link to="/rent" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
                 Rent
               </Link>
+            ) : null}
+            {rentEnabled ? (
+              <a href="#rent-services" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">
+                Υπηρεσίες
+              </a>
             ) : null}
             {showFleet ? (
               <a href="#our-fleet" onClick={closeMenu} className="rounded-xl px-3 py-3 text-sm font-semibold hover:bg-black/5">

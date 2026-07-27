@@ -32,6 +32,7 @@ import {
   isRentOnlyModules,
 } from '../services/officeModulesApi.js';
 import { fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
+import { withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
 import FleetShowcaseSection from '../components/FleetShowcaseSection.jsx';
 import StorefrontHeader from '../components/storefront/StorefrontHeader.jsx';
 import StorefrontHero from '../components/storefront/StorefrontHero.jsx';
@@ -182,10 +183,10 @@ export default function StorefrontDemoPage() {
     setRentalLoading(true);
     fetchPublicRentalCatalog()
       .then((rows) => {
-        if (!cancelled) setRentalVehicles(rows || []);
+        if (!cancelled) setRentalVehicles(withDemoRentFleet(rows || []));
       })
       .catch(() => {
-        if (!cancelled) setRentalVehicles([]);
+        if (!cancelled) setRentalVehicles(withDemoRentFleet([]));
       })
       .finally(() => {
         if (!cancelled) setRentalLoading(false);
