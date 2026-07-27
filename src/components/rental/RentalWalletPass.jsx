@@ -37,10 +37,16 @@ function depositLabel(status, lang) {
   return null;
 }
 
+function telHref(phone) {
+  const digits = String(phone || '').replace(/[^\d+]/g, '');
+  return digits ? `tel:${digits}` : null;
+}
+
 export default function RentalWalletPass({
   booking,
   brandLabel = 'Rent Wallet',
   passengerName = '',
+  safetyContacts = null,
   onBookVehicle,
   onCancel,
   cancelling = false,
@@ -50,6 +56,10 @@ export default function RentalWalletPass({
   onCheckOut,
   onReview,
   reviewBusy = false,
+  onSos,
+  sosBusy = false,
+  onShareTrip,
+  shareBusy = false,
 }) {
   const lang = getRentLang();
 
@@ -80,6 +90,10 @@ export default function RentalWalletPass({
   const dropoff = booking.dropoff_location || pickup;
   const qrValue = `RENT:${code}`;
   const dep = depositLabel(booking.damage_deposit_status, lang);
+  const live = status === 'CONFIRMED' || status === 'ACTIVE';
+  const roadsidePhone = safetyContacts?.roadside_phone_24_7 || '';
+  const roadsideLabel = safetyContacts?.roadside_label || t('roadside_24_7', lang);
+  const roadsideTel = telHref(roadsidePhone);
 
   return (
     <section className="wallet-pass rent-wallet-pass" aria-label="Κάρτα ενοικίασης">
@@ -203,6 +217,26 @@ export default function RentalWalletPass({
           </span>
         </div>
 
+        {live && roadsidePhone ? (
+          <div className="rent-safety-card">
+            <div className="rent-safety-card-copy">
+              <p className="rent-safety-card-title">{roadsideLabel || t('roadside_24_7', lang)}</p>
+              <a className="rent-safety-phone" href={roadsideTel || undefined}>
+                {roadsidePhone}
+              </a>
+            </div>
+            <div className="rent-safety-qr" aria-hidden>
+              <QRCode
+                value={`ROADSIDE:${roadsidePhone.replace(/\s/g, '')}`}
+                size={72}
+                bgColor="#ffffff"
+                fgColor="#0b3d4a"
+                level="M"
+              />
+            </div>
+          </div>
+        ) : null}
+
         <div className="wallet-pass-perforation" aria-hidden>
           <span />
           <span />
@@ -216,6 +250,29 @@ export default function RentalWalletPass({
         </div>
 
         <div className="wallet-pass-actions">
+          {live && onSos ? (
+            <button
+              type="button"
+              className="rent-sos-btn"
+              disabled={sosBusy}
+              onClick={() => onSos(booking)}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                emergency
+              </span>
+              {sosBusy ? t('sos_sending', lang) : t('sos', lang)}
+            </button>
+          ) : null}
+          {live && onShareTrip ? (
+            <button
+              type="button"
+              className="wallet-btn wallet-btn-block"
+              disabled={shareBusy}
+              onClick={() => onShareTrip(booking)}
+            >
+              {t('share_trip', lang)}
+            </button>
+          ) : null}
           {status === 'CONFIRMED' && onCancel ? (
             <button
               type="button"

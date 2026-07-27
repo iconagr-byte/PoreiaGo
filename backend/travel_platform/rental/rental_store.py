@@ -47,7 +47,8 @@ DEFAULT_BRANCH_NAME = "Κύριο γραφείο"
 
 # Daily extras (EUR) — must match customer PWA labels.
 EXTRA_DAILY_RATES = {
-    "extra_insurance": 12.0,
+    "extra_insurance": 12.0,  # CDW
+    "scdw": 8.0,  # Super CDW — reduces franchise
     "child_seat": 7.0,
     "gps_pack": 5.0,
     "young_driver": 15.0,
@@ -59,12 +60,21 @@ EXTRA_FLAT_RATES = {
 }
 
 EXTRA_LABELS = {
-    "extra_insurance": "Extra insurance",
+    "extra_insurance": "CDW / επιπλέον ασφάλεια",
+    "scdw": "SCDW (μηδενική απαλλαγή)",
     "child_seat": "Child seat",
     "gps_pack": "GPS pack",
     "young_driver": "Young driver (<25)",
     "airport_pickup": "Airport pickup",
 }
+
+PICKUP_CHECKLIST_REQUIRED = (
+    "tires_ok",
+    "lights_ok",
+    "fluids_ok",
+    "documents_ok",
+    "spare_wheel_ok",
+)
 
 _AIRPORT_TOKENS = ("αεροδρ", "airport", "ath", "skb")
 
@@ -1231,6 +1241,8 @@ def patch_booking_fields(
         "bank_deposit_confirmed_at",
         "amount_due_now",
         "notes",
+        "last_sos",
+        "last_share_location",
     }
     with _LOCK:
         data = _read()
@@ -1373,12 +1385,131 @@ def calendar_blocks(tenant_id: str | None, *, days: int = 30) -> list[dict[str, 
     return blocks
 
 
+def normalize_pickup_checklist(raw: dict[str, Any] | None) -> dict[str, bool]:
+    src = raw if isinstance(raw, dict) else {}
+    return {
+        "tires_ok": bool(src.get("tires_ok")),
+        "lights_ok": bool(src.get("lights_ok")),
+        "fluids_ok": bool(src.get("fluids_ok")),
+        "documents_ok": bool(src.get("documents_ok")),
+        "spare_wheel_ok": bool(src.get("spare_wheel_ok")),
+        "damages_noted": bool(src.get("damages_noted")),
+    }
+
+
+def require_pickup_checklist(checklist: dict[str, Any] | None) -> dict[str, bool]:
+    """Validate pre-departure checklist for customer PICKUP_CHECK."""
+    normalized = normalize_pickup_checklist(checklist)
+    missing = [k for k in PICKUP_CHECKLIST_REQUIRED if not normalized.get(k)]
+    if missing:
+        raise ValueError(
+            "Ολοκληρώστε τον προ-αναχώρησης έλεγχο: "
+            + ", ".join(missing)
+        )
+    return normalized
+
+
+def record_booking_sos(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    email: str,
+    lat: float,
+    lng: float,
+    accuracy: float | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Store last_sos on a customer-owned CONFIRMED/ACTIVE booking."""
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    owner = str(email or "").strip().lower()
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        if str(booking.get("client_email") or "").strip().lower() != owner:
+            raise ValueError("Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+        status = str(booking.get("rental_status") or "").upper()
+        if status not in ("CONFIRMED", "ACTIVE"):
+            raise ValueError("SOS διαθέσιμο μόνο για επιβεβαιωμένες ή ενεργές ενοικιάσεις")
+        sos = {
+            "at": _now(),
+            "lat": float(lat),
+            "lng": float(lng),
+            "note": (str(note or "").strip() or None),
+        }
+        if accuracy is not None:
+            try:
+                sos["accuracy"] = float(accuracy)
+            except (TypeError, ValueError):
+                pass
+        booking["last_sos"] = sos
+        booking["updated_at"] = _now()
+        _write(data)
+        return deepcopy(booking)
+
+
+def update_booking_live_location(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    email: str | None = None,
+    lat: float,
+    lng: float,
+    accuracy: float | None = None,
+    require_owner: bool = True,
+) -> dict[str, Any]:
+    """Update last_share_location pin while rental is ACTIVE (or CONFIRMED)."""
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        if require_owner:
+            owner = str(email or "").strip().lower()
+            if str(booking.get("client_email") or "").strip().lower() != owner:
+                raise ValueError("Δεν έχετε δικαίωμα σε αυτή την κράτηση")
+        status = str(booking.get("rental_status") or "").upper()
+        if status not in ("CONFIRMED", "ACTIVE"):
+            raise ValueError("Η θέση ενημερώνεται μόνο σε ενεργή ενοικίαση")
+        pin = {
+            "at": _now(),
+            "lat": float(lat),
+            "lng": float(lng),
+        }
+        if accuracy is not None:
+            try:
+                pin["accuracy"] = float(accuracy)
+            except (TypeError, ValueError):
+                pass
+        booking["last_share_location"] = pin
+        booking["updated_at"] = _now()
+        _write(data)
+        return deepcopy(booking)
+
+
 def create_inspection(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
     tid = _normalize_tenant(tenant_id)
     booking_id = str(body.get("rental_booking_id") or "").strip()
     itype = str(body.get("inspection_type") or "").strip().upper()
     if itype not in INSPECTION_TYPES:
         raise ValueError("Μη έγκυρος τύπος επιθεώρησης")
+    checklist_raw = body.get("checklist")
+    checklist: dict[str, bool] | None = None
+    if checklist_raw is not None or body.get("require_pickup_checklist"):
+        if itype == "PICKUP_CHECK" and body.get("require_pickup_checklist"):
+            checklist = require_pickup_checklist(checklist_raw)
+        elif checklist_raw is not None:
+            checklist = normalize_pickup_checklist(checklist_raw)
     with _LOCK:
         data = _read()
         booking = next(
@@ -1402,6 +1533,7 @@ def create_inspection(tenant_id: str | None, body: dict[str, Any]) -> dict[str, 
             "photo_urls": list(body.get("photo_urls") or []),
             "signature_url": (str(body.get("signature_url") or "").strip() or None),
             "inspector_name": (str(body.get("inspector_name") or "").strip() or None),
+            "checklist": checklist,
             "created_at": now,
             "updated_at": now,
         }

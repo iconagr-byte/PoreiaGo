@@ -1589,6 +1589,15 @@ export default function FleetRentalPanel({
                       />
                     </div>
                   ) : null}
+                  {i.checklist ? (
+                    <ul className="mt-2 text-[11px] text-slate-600 space-y-0.5">
+                      {Object.entries(i.checklist).map(([k, v]) => (
+                        <li key={k}>
+                          {v ? '✓' : '○'} {k.replace(/_/g, ' ')}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </article>
               ))
             )}

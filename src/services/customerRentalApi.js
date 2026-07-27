@@ -119,6 +119,38 @@ export async function fetchRentalContractTerms() {
   return customerRentalFetch('/contract');
 }
 
+export async function fetchRentalInsuranceCover() {
+  return customerRentalFetch('/insurance-cover');
+}
+
+export async function fetchRentalSafetyContacts() {
+  return publicRentalFetch('/safety-contacts');
+}
+
+export async function sendRentalSos(bookingId, body) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/sos`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateRentalLiveLocation(bookingId, body) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/location`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createRentalShareLink(bookingId) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/share-link`, {
+    method: 'POST',
+  });
+}
+
+export async function fetchRentalShare(token) {
+  return publicRentalFetch(`/share/${encodeURIComponent(token)}`);
+}
+
 export async function uploadCustomerRentalSignature(file) {
   const form = new FormData();
   form.append('file', file);

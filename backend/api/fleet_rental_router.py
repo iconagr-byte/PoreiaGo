@@ -465,3 +465,35 @@ async def upload_inspection_photo(
         "bytes": len(optimized.content),
         "content_type": optimized.content_type,
     }
+
+
+class SafetySettingsBody(BaseModel):
+    office_phone: str | None = None
+    roadside_phone_24_7: str | None = None
+    roadside_label: str | None = None
+    emergency_sms: str | None = None
+    cdw_franchise_eur: float | None = Field(default=None, ge=0)
+    scdw_franchise_eur: float | None = Field(default=None, ge=0)
+    scdw_daily_eur: float | None = Field(default=None, ge=0)
+
+
+@router.get("/safety-settings")
+async def get_rental_safety_settings(_: dict = Depends(_require_admin)):
+    from travel_platform.rental.rental_safety_settings import resolve_safety_contacts
+
+    return resolve_safety_contacts()
+
+
+@router.patch("/safety-settings")
+async def patch_rental_safety_settings(
+    body: SafetySettingsBody,
+    _: dict = Depends(_require_admin),
+):
+    from travel_platform.rental.rental_safety_settings import (
+        resolve_safety_contacts,
+        update_safety_settings,
+    )
+
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    update_safety_settings(patch)
+    return resolve_safety_contacts()

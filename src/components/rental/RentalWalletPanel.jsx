@@ -7,10 +7,13 @@ import toast from 'react-hot-toast';
 import {
   cancelCustomerRentalBooking,
   createCustomerRentalInspection,
+  createRentalShareLink,
   customerRentalContractUrl,
   fetchMyRentalBookings,
+  fetchRentalSafetyContacts,
   modifyCustomerRentalBooking,
   remindCustomerRentalBooking,
+  sendRentalSos,
   submitCustomerRentalReview,
   uploadCustomerRentalPhoto,
   uploadCustomerRentalSignature,
@@ -97,7 +100,18 @@ export default function RentalWalletPanel({
     damage_notes: '',
     photo_urls: [],
     signature_url: '',
+    checklist: {
+      tires_ok: false,
+      lights_ok: false,
+      fluids_ok: false,
+      documents_ok: false,
+      spare_wheel_ok: false,
+      damages_noted: false,
+    },
   });
+  const [safetyContacts, setSafetyContacts] = useState(null);
+  const [sosBusy, setSosBusy] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,6 +134,12 @@ export default function RentalWalletPanel({
   useEffect(() => {
     load();
   }, [load, refreshKey]);
+
+  useEffect(() => {
+    fetchRentalSafetyContacts()
+      .then(setSafetyContacts)
+      .catch(() => setSafetyContacts(null));
+  }, []);
 
   const featured = useMemo(
     () => rows.find((b) => b.id === selectedId) || rows[0] || null,
@@ -263,12 +283,28 @@ export default function RentalWalletPanel({
       damage_notes: '',
       photo_urls: [],
       signature_url: '',
+      checklist: {
+        tires_ok: false,
+        lights_ok: false,
+        fluids_ok: false,
+        documents_ok: false,
+        spare_wheel_ok: false,
+        damages_noted: false,
+      },
     });
     setInspectOpen(true);
   };
 
   const submitInspect = async () => {
     if (!featured?.id) return;
+    if (inspectType === 'PICKUP_CHECK') {
+      const c = inspectForm.checklist || {};
+      const required = ['tires_ok', 'lights_ok', 'fluids_ok', 'documents_ok', 'spare_wheel_ok'];
+      if (required.some((k) => !c[k])) {
+        toast.error('Ολοκληρώστε τον προ-αναχώρησης έλεγχο');
+        return;
+      }
+    }
     setBusyId(featured.id);
     try {
       await createCustomerRentalInspection(featured.id, {
@@ -278,6 +314,7 @@ export default function RentalWalletPanel({
         damage_notes: inspectForm.damage_notes || null,
         photo_urls: inspectForm.photo_urls || [],
         signature_url: inspectForm.signature_url || null,
+        checklist: inspectType === 'PICKUP_CHECK' ? inspectForm.checklist : undefined,
       });
       toast.success(inspectType === 'PICKUP_CHECK' ? 'Check-in ολοκληρώθηκε' : 'Check-out ολοκληρώθηκε');
       setInspectOpen(false);
@@ -286,6 +323,77 @@ export default function RentalWalletPanel({
       toast.error(err.message || 'Αποτυχία επιθεώρησης');
     } finally {
       setBusyId('');
+    }
+  };
+
+  const handleSos = async (booking) => {
+    if (!booking?.id || sosBusy) return;
+    const lang = getRentLang();
+    const officePhone = String(safetyContacts?.office_phone || '').replace(/[^\d+]/g, '');
+    const choice = window.confirm(
+      `${t('sos_confirm', lang)}\nOK = ${t('sos_send_location', lang)}\nCancel = ${
+        officePhone ? t('sos_call_office', lang) : 'Άκυρο'
+      }`,
+    );
+    if (!choice) {
+      if (officePhone) window.location.href = `tel:${officePhone}`;
+      return;
+    }
+    setSosBusy(true);
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation μη διαθέσιμο'));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 12000,
+        });
+      });
+      await sendRentalSos(booking.id, {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      });
+      toast.success(t('sos_sent', lang));
+      if (officePhone) {
+        window.location.href = `tel:${officePhone}`;
+      }
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία SOS');
+      if (officePhone) window.location.href = `tel:${officePhone}`;
+    } finally {
+      setSosBusy(false);
+    }
+  };
+
+  const handleShareTrip = async (booking) => {
+    if (!booking?.id || shareBusy) return;
+    const lang = getRentLang();
+    setShareBusy(true);
+    try {
+      const data = await createRentalShareLink(booking.id);
+      const url = data.url;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: t('share_trip', lang), url });
+          toast.success(t('share_copied', lang));
+          return;
+        } catch {
+          /* fall through to clipboard */
+        }
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        toast.success(t('share_copied', lang));
+      } else {
+        window.prompt(t('share_trip', lang), url);
+      }
+    } catch (err) {
+      toast.error(err.message || t('share_failed', lang));
+    } finally {
+      setShareBusy(false);
     }
   };
 
@@ -307,6 +415,7 @@ export default function RentalWalletPanel({
         booking={featured}
         brandLabel={brandLabel}
         passengerName={passengerName}
+        safetyContacts={safetyContacts}
         onBookVehicle={onBookVehicle}
         onCancel={isFreeCancelEligible(featured) ? cancelBooking : null}
         cancelling={busyId === featured?.id}
@@ -318,6 +427,10 @@ export default function RentalWalletPanel({
           featured?.rental_status === 'COMPLETED' ? () => submitReview(featured) : null
         }
         reviewBusy={busyId === featured?.id}
+        onSos={featured ? handleSos : null}
+        sosBusy={sosBusy}
+        onShareTrip={featured ? handleShareTrip : null}
+        shareBusy={shareBusy}
       />
 
       {modifyOpen ? (
@@ -398,6 +511,33 @@ export default function RentalWalletPanel({
               onChange={(e) => setInspectForm((f) => ({ ...f, damage_notes: e.target.value }))}
             />
           </label>
+          {inspectType === 'PICKUP_CHECK' ? (
+            <div className="rent-checklist">
+              <p className="rent-checklist-title">{t('checklist_title', getRentLang())}</p>
+              {[
+                ['tires_ok', 'checklist_tires'],
+                ['lights_ok', 'checklist_lights'],
+                ['fluids_ok', 'checklist_fluids'],
+                ['documents_ok', 'checklist_documents'],
+                ['spare_wheel_ok', 'checklist_spare'],
+                ['damages_noted', 'checklist_damages'],
+              ].map(([key, labelKey]) => (
+                <label key={key} className="rent-checklist-item">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(inspectForm.checklist?.[key])}
+                    onChange={(e) =>
+                      setInspectForm((f) => ({
+                        ...f,
+                        checklist: { ...f.checklist, [key]: e.target.checked },
+                      }))
+                    }
+                  />
+                  {t(labelKey, getRentLang())}
+                </label>
+              ))}
+            </div>
+          ) : null}
           <label className="rent-wallet-photo">
             Φωτογραφία (προαιρετικά)
             <input

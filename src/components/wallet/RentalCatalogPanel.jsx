@@ -9,6 +9,7 @@ import {
   fetchCustomerRentalBranches,
   fetchMyRentalBookings,
   fetchRentalContractTerms,
+  fetchRentalInsuranceCover,
   uploadCustomerRentalIdDoc,
   uploadCustomerRentalSignature,
 } from '../../services/customerRentalApi.js';
@@ -75,6 +76,7 @@ const EMPTY = {
   client_phone: '',
   client_afm: '',
   extra_insurance: false,
+  scdw: false,
   child_seat: false,
   gps_pack: false,
   airport_pickup: false,
@@ -226,6 +228,8 @@ export default function RentalCatalogPanel({
   const [uploadingKind, setUploadingKind] = useState('');
   const [contract, setContract] = useState(FALLBACK_CONTRACT);
   const [contractAccepted, setContractAccepted] = useState(false);
+  const [insuranceCover, setInsuranceCover] = useState(null);
+  const [insuranceAck, setInsuranceAck] = useState(false);
   const [signatureUrl, setSignatureUrl] = useState('');
   const [sigBusy, setSigBusy] = useState(false);
   const [remindersEnabled, setRemindersEnabled] = useState(() => {
@@ -277,6 +281,12 @@ export default function RentalCatalogPanel({
         if (!cancelled && terms?.clauses?.length) setContract(terms);
       } catch {
         /* fallback */
+      }
+      try {
+        const cover = await fetchRentalInsuranceCover();
+        if (!cancelled && cover) setInsuranceCover(cover);
+      } catch {
+        /* optional */
       }
     })();
     return () => {
@@ -513,6 +523,10 @@ export default function RentalCatalogPanel({
       toast.error('Αποδεχτείτε τους όρους μίσθωσης');
       return;
     }
+    if (form.driver_mode === 'SELF_DRIVE' && !insuranceAck) {
+      toast.error(t('insurance_ack', lang));
+      return;
+    }
     if (!signatureUrl) {
       toast.error('Υπογράψτε τη σύμβαση πριν την κράτηση');
       return;
@@ -545,6 +559,7 @@ export default function RentalCatalogPanel({
         client_afm: form.client_afm?.trim() || null,
         extras: {
           extra_insurance: Boolean(form.extra_insurance),
+          scdw: Boolean(form.scdw),
           child_seat: Boolean(form.child_seat),
           gps_pack: Boolean(form.gps_pack),
           airport_pickup: Boolean(form.airport_pickup),
@@ -592,6 +607,7 @@ export default function RentalCatalogPanel({
       setSelectedId('');
       setRecentBooked(created);
       setContractAccepted(false);
+      setInsuranceAck(false);
       setSignatureUrl('');
       trackFunnel('booking_created', {
         vehicle_id: selectedId,
@@ -637,6 +653,7 @@ export default function RentalCatalogPanel({
   })();
   const extrasTotal =
     (form.extra_insurance ? 12 * nights : 0) +
+    (form.scdw ? 8 * nights : 0) +
     (form.child_seat ? 7 * nights : 0) +
     (form.gps_pack ? 5 * nights : 0) +
     (form.young_driver ? 15 * nights : 0) +
@@ -881,7 +898,15 @@ export default function RentalCatalogPanel({
                   checked={form.extra_insurance}
                   onChange={(e) => setForm((f) => ({ ...f, extra_insurance: e.target.checked }))}
                 />
-                Extra insurance (+€12/ημέρα)
+                {t('cdw_extra', lang)} (+€12/ημέρα)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.scdw}
+                  onChange={(e) => setForm((f) => ({ ...f, scdw: e.target.checked }))}
+                />
+                {t('scdw_extra', lang)} (+€8/ημέρα)
               </label>
               <label>
                 <input
@@ -1220,6 +1245,53 @@ export default function RentalCatalogPanel({
           ) : null}
           {selected ? (
             <div className="rent-contract-panel">
+              {form.driver_mode === 'SELF_DRIVE' ? (
+                <div className="rent-insurance-sheet">
+                  <h3>{insuranceCover?.title || t('insurance_cover', lang)}</h3>
+                  <div className="rent-insurance-block">
+                    <p className="rent-insurance-label">
+                      {insuranceCover?.cdw?.label || 'CDW'}
+                    </p>
+                    <p className="wallet-field-hint">
+                      {insuranceCover?.cdw?.franchise_note ||
+                        `Απαλλαγή CDW: €${Number(insuranceCover?.cdw_franchise_eur ?? 600).toFixed(0)}`}
+                    </p>
+                    <ul>
+                      {(insuranceCover?.cdw?.covers || []).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                    <p className="wallet-field-hint">Εξαιρέσεις</p>
+                    <ul>
+                      {(insuranceCover?.cdw?.excludes || []).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="rent-insurance-block">
+                    <p className="rent-insurance-label">
+                      {insuranceCover?.scdw?.label || 'SCDW'}
+                    </p>
+                    <p className="wallet-field-hint">
+                      {insuranceCover?.scdw?.franchise_note ||
+                        `Απαλλαγή SCDW: €${Number(insuranceCover?.scdw_franchise_eur ?? 0).toFixed(0)}`}
+                    </p>
+                    <ul>
+                      {(insuranceCover?.scdw?.covers || []).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <label className="rent-contract-accept">
+                    <input
+                      type="checkbox"
+                      checked={insuranceAck}
+                      onChange={(e) => setInsuranceAck(e.target.checked)}
+                    />
+                    {insuranceCover?.ack_label || t('insurance_ack', lang)}
+                  </label>
+                </div>
+              ) : null}
               <h3>{contract.title || 'Σύμβαση μίσθωσης'}</h3>
               <p className="wallet-field-hint">Έκδοση {contract.version}</p>
               <ol className="rent-contract-clauses">
@@ -1259,7 +1331,12 @@ export default function RentalCatalogPanel({
                 type="button"
                 className="wallet-btn wallet-btn-primary wallet-btn-block"
                 style={{ marginTop: '0.75rem' }}
-                disabled={busy || !contractAccepted || !signatureUrl}
+                disabled={
+                  busy ||
+                  !contractAccepted ||
+                  !signatureUrl ||
+                  (form.driver_mode === 'SELF_DRIVE' && !insuranceAck)
+                }
                 onClick={book}
               >
                 {busy

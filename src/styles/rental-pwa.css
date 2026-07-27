@@ -2076,3 +2076,140 @@
 .rent-wallet-sig {
   margin-top: 0.25rem;
 }
+
+/* Trip safety — SOS, roadside, checklist, insurance */
+.rent-sos-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 3rem;
+  border: none;
+  border-radius: 0.85rem;
+  background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(185, 28, 28, 0.35);
+  animation: rent-sos-pulse 2.4s ease-in-out infinite;
+}
+
+.rent-sos-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  animation: none;
+}
+
+.rent-sos-btn .material-symbols-outlined {
+  font-size: 1.35rem;
+}
+
+@keyframes rent-sos-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.rent-safety-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 55%, #e0f2fe 100%);
+  border: 1px solid #99f6e4;
+}
+
+.rent-safety-card-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0f766e;
+}
+
+.rent-safety-phone {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0b3d4a;
+  text-decoration: none;
+}
+
+.rent-safety-qr {
+  flex-shrink: 0;
+  padding: 0.25rem;
+  background: #fff;
+  border-radius: 0.5rem;
+}
+
+.rent-checklist {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.rent-checklist-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.rent-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  margin: 0.25rem 0;
+}
+
+.rent-insurance-sheet {
+  margin-bottom: 1rem;
+  padding: 0.85rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(160deg, #fff7ed 0%, #fffbeb 100%);
+  border: 1px solid #fdba74;
+}
+
+.rent-insurance-sheet h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.rent-insurance-block {
+  margin-bottom: 0.75rem;
+}
+
+.rent-insurance-label {
+  margin: 0 0 0.25rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #9a3412;
+}
+
+.rent-insurance-block ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: #57534e;
+}
+
+.rental-share-track .passenger-track-map {
+  flex: 1;
+  min-height: 55vh;
+  position: relative;
+}

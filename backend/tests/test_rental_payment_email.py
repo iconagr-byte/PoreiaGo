@@ -80,7 +80,7 @@ class RentalPaymentStoreTests(unittest.TestCase):
         self.assertEqual(booking["amount_paid"], 34.2)
         self.assertEqual(booking["balance_due"], 79.8)
         self.assertEqual(booking["payment_status"], "partial")
-        self.assertIn("Extra insurance", booking["notes"])
+        self.assertIn("CDW", booking["notes"])
 
 
 class RentalConfirmationEmailTests(unittest.IsolatedAsyncioTestCase):
