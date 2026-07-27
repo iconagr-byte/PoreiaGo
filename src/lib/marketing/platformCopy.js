@@ -23,8 +23,8 @@ export const CAMPAIGN_TEMPLATE_COUNT = STITCH_CAMPAIGN_TEMPLATES.length;
 export const STATS = [
   { value: '1 panel', label: 'Αντί για 5+ εργαλεία' },
   { value: 'Live GPS', label: 'Στόλος σε πραγματικό χρόνο' },
+  { value: 'Rent', label: 'Ενοικιάσεις · αυτόνομο ή add-on' },
   { value: `${CAMPAIGN_TEMPLATE_COUNT}+`, label: 'Έτοιμα email πρότυπα' },
-  { value: 'GDPR', label: 'Έτοιμο compliance' },
 ];
 
 export const FEATURES = [
