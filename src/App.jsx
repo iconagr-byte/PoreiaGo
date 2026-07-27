@@ -15,6 +15,7 @@ import WalletMagicPage from './pages/WalletMagicPage.jsx';
 import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
 import InBusPortal from './pages/InBusPortal';
 import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
+import RentalShareTrackPage from './pages/RentalShareTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
 import DriverCommandCenter from './pages/driver/DriverCommandCenter';
 import DriverAuthPage from './pages/driver/DriverAuthPage.jsx';
@@ -118,6 +119,7 @@ function App() {
             <Route path="/checkout/resume/:token" element={<CheckoutResumePage />} />
             <Route path="/in-bus" element={<InBusPortal />} />
             <Route path="/track/trip/:tripId" element={<PassengerTrackPage />} />
+            <Route path="/track/rental/:bookingId" element={<RentalShareTrackPage />} />
           </Routes>
         </MaintenanceGate>
       </Router>

@@ -72,4 +72,8 @@ celery_app.conf.beat_schedule = {
         "task": "workers.tasks.send_fleet_digest_task",
         "schedule": crontab(hour=_fleet_digest_hour, minute=30),
     },
+    "rental-upcoming-reminders": {
+        "task": "workers.tasks.scan_rental_reminders",
+        "schedule": crontab(minute="*/15"),
+    },
 }
