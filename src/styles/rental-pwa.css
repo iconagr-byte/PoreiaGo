@@ -431,6 +431,106 @@
   padding-top: 0.25rem;
 }
 
+.rent-home-fleet {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-home-fleet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rent-home-fleet-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--rent-ink);
+}
+
+.rent-home-fleet-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-teal);
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.rent-home-fleet-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 72%;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scroll-snap-type: x mandatory;
+}
+
+.rent-home-fleet-card {
+  appearance: none;
+  border: 1px solid var(--rent-stroke);
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 18px;
+  padding: 0.5rem;
+  text-align: left;
+  display: grid;
+  gap: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+  scroll-snap-align: start;
+}
+
+.rent-home-fleet-media {
+  height: 6.6rem;
+  border-radius: 13px;
+  background: #eef5f3;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.rent-home-fleet-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rent-home-fleet-media .material-symbols-outlined {
+  font-size: 2rem;
+  color: var(--rent-teal);
+}
+
+.rent-home-fleet-body {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.rent-home-fleet-body strong {
+  font-size: 0.86rem;
+  color: var(--rent-ink);
+  letter-spacing: -0.02em;
+}
+
+.rent-home-fleet-body span {
+  font-size: 0.72rem;
+  color: var(--rent-secondary);
+}
+
+.rent-home-fleet-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--rent-secondary);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--rent-stroke);
+  border-radius: 14px;
+  padding: 0.65rem 0.75rem;
+}
+
 .rent-quick {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -797,6 +897,68 @@
 
 .rent-catalog .wallet-booking-card {
   background: #fff;
+}
+
+.rent-picked-vehicle {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.55rem;
+  margin-bottom: 0.85rem;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 122, 108, 0.22);
+  background: rgba(10, 122, 108, 0.07);
+}
+
+.rent-picked-vehicle-media {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(10, 122, 108, 0.16);
+  display: grid;
+  place-items: center;
+}
+
+.rent-picked-vehicle-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rent-picked-vehicle-media .material-symbols-outlined {
+  color: var(--rent-teal);
+  font-size: 1.35rem;
+}
+
+.rent-picked-vehicle-body {
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.rent-picked-vehicle-label {
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: var(--rent-teal);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rent-picked-vehicle-body strong {
+  font-size: 0.83rem;
+  color: var(--rent-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rent-picked-vehicle-body span {
+  font-size: 0.7rem;
+  color: var(--rent-secondary);
 }
 
 .rent-catalog .wallet-vehicle-thumb {
