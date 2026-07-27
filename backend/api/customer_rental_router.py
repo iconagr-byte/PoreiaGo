@@ -1,4 +1,4 @@
-"""Customer PWA fleet rental — catalog, availability, booking + payment + ID docs."""
+"""Customer PWA fleet rental — catalog, availability, booking, payment, ID, contract, cancel."""
 
 from __future__ import annotations
 
@@ -20,6 +20,8 @@ _DATA_ROOT = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().par
 _RENTAL_ID_DIR = _DATA_ROOT / "uploads" / "rental_id"
 _MAX_DOC_BYTES = 4 * 1024 * 1024
 _ID_KINDS = frozenset({"id_card", "driving_license"})
+_RENTAL_PHOTO_DIR = _DATA_ROOT / "uploads" / "rental_damage"
+_MAX_PHOTO_BYTES = 4 * 1024 * 1024
 
 
 async def _tenant_id(request: Request) -> str:
@@ -85,9 +87,19 @@ class CustomerBookingBody(BaseModel):
     date_of_birth: str | None = None
     license_number: str | None = Field(default=None, max_length=64)
     license_expires_at: str | None = None
+    contract_accepted: bool = False
+    contract_signature_url: str | None = None
+    contract_signer_name: str | None = None
+    contract_version: str | None = None
 
 
 def _public_booking(row: dict) -> dict:
+    eligible = store.free_cancel_eligible(row)
+    hours = None
+    try:
+        hours = round(store.hours_until_start(row.get("start_time") or ""), 1)
+    except Exception:
+        hours = None
     return {
         "id": row["id"],
         "vehicle_id": row.get("vehicle_id"),
@@ -118,6 +130,14 @@ def _public_booking(row: dict) -> dict:
         "date_of_birth": row.get("date_of_birth"),
         "license_number": row.get("license_number"),
         "license_expires_at": row.get("license_expires_at"),
+        "contract_accepted": bool(row.get("contract_accepted")),
+        "contract_version": row.get("contract_version"),
+        "contract_accepted_at": row.get("contract_accepted_at"),
+        "contract_signature_url": row.get("contract_signature_url"),
+        "contract_signer_name": row.get("contract_signer_name"),
+        "free_cancel_eligible": eligible,
+        "free_cancel_hours": store.FREE_CANCEL_HOURS,
+        "hours_until_start": hours,
         "created_at": row.get("created_at"),
     }
 
@@ -202,6 +222,56 @@ async def upload_rental_id_doc(
         "content_type": optimized.content_type,
     }
 
+@router.post("/signature-upload")
+async def upload_rental_contract_signature(
+    file: UploadFile = File(...),
+    _: dict = Depends(get_current_customer),
+):
+    """Customer contract e-signature PNG — same storage as inspection signatures."""
+    from travel_platform.media.image_optimize import optimize_driver_photo
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (PNG/JPG)")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    if len(content) > _MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 4 MB)")
+
+    optimized = optimize_driver_photo(content, max_side=1200, quality=88)
+    if optimized.ext == ".bin":
+        raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
+
+    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "signature").stem)[:40] or "signature"
+    filename = f"contract-{safe_stem}-{uuid.uuid4().hex[:10]}{optimized.ext}"
+    _RENTAL_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    (_RENTAL_PHOTO_DIR / filename).write_bytes(optimized.content)
+    return {
+        "ok": True,
+        "url": f"/api/site/rental-photos/{filename}",
+        "filename": filename,
+        "bytes": len(optimized.content),
+        "content_type": optimized.content_type,
+    }
+
+
+@router.get("/contract")
+async def rental_contract_terms(_: dict = Depends(get_current_customer)):
+    """Static Greek rental contract summary for the PWA accept step."""
+    return {
+        "version": store.CONTRACT_VERSION,
+        "title": "Σύμβαση μίσθωσης οχήματος",
+        "free_cancel_hours": store.FREE_CANCEL_HOURS,
+        "clauses": [
+            "Ο μισθωτής δηλώνει ότι κατέχει έγκυρο δίπλωμα οδήγησης και αναλαμβάνει την ευθύνη χρήσης του οχήματος.",
+            "Το όχημα παραδίδεται καθαρό, με καύσιμο όπως συμφωνήθηκε, και επιστρέφεται στην ίδια κατάσταση.",
+            "Ζημιές, πρόστιμα και παραβάσεις ΚΟΚ κατά τη διάρκεια της μίσθωσης βαρύνουν τον μισθωτή.",
+            "Απαγορεύεται η υπεκμίσθωση, η μεταφορά επιβατών έναντι αμοιβής και η οδήγηση υπό επήρεια.",
+            f"Δωρεάν ακύρωση έως {store.FREE_CANCEL_HOURS} ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.",
+            "Η κράτηση επιβεβαιώνεται με την αποδοχή των όρων και την ηλεκτρονική υπογραφή του μισθωτή.",
+        ],
+    }
+
 
 @router.get("/availability")
 async def rental_availability(
@@ -228,7 +298,6 @@ async def rental_availability(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    # Strip internal notes from customer responses.
     public = []
     for r in rows:
         public.append(
@@ -295,6 +364,11 @@ async def book_rental(
         "date_of_birth": body.date_of_birth,
         "license_number": body.license_number,
         "license_expires_at": body.license_expires_at,
+        "contract_accepted": body.contract_accepted,
+        "contract_signature_url": body.contract_signature_url,
+        "contract_signer_name": body.contract_signer_name
+        or (account.get("name") or account["email"].split("@")[0]).strip(),
+        "contract_version": body.contract_version or store.CONTRACT_VERSION,
         "channel": "WALLET",
     }
     try:
@@ -307,7 +381,6 @@ async def book_rental(
 
         await notify_rental_booking_to_office(row)
     except Exception:
-        # Booking must succeed even if office push fails.
         pass
 
     try:

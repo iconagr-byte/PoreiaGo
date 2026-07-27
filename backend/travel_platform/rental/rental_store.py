@@ -40,6 +40,10 @@ ID_VERIFICATION_STATUSES = ("pending", "verified", "rejected", "not_required")
 MIN_DRIVER_AGE_YEARS = 21
 ID_DOC_URL_PREFIX = "/api/site/rental-id/"
 
+FREE_CANCEL_HOURS = 24
+CONTRACT_VERSION = "rent-contract-v1"
+CONTRACT_SIGNATURE_URL_PREFIX = "/api/site/rental-photos/"
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -462,6 +466,73 @@ def update_id_verification(
         return deepcopy(booking)
 
 
+def hours_until_start(start_time: str | datetime, *, now: datetime | None = None) -> float:
+    start = _parse_dt(start_time)
+    ref = now or datetime.now(timezone.utc)
+    return (start - ref).total_seconds() / 3600.0
+
+
+def free_cancel_eligible(booking: dict[str, Any], *, now: datetime | None = None) -> bool:
+    """True when customer may cancel for free (≥ FREE_CANCEL_HOURS before pickup)."""
+    status = str(booking.get("rental_status") or "").upper()
+    if status != "CONFIRMED":
+        return False
+    return hours_until_start(booking.get("start_time") or "", now=now) >= FREE_CANCEL_HOURS
+
+
+def _safe_contract_signature_url(value: Any) -> str | None:
+    url = str(value or "").strip()
+    if not url:
+        return None
+    if url.startswith(CONTRACT_SIGNATURE_URL_PREFIX) and ".." not in url and " " not in url:
+        return url
+    raise ValueError("Μη έγκυρη υπογραφή σύμβασης")
+
+
+def validate_contract_acceptance(
+    body: dict[str, Any],
+    *,
+    channel: str,
+    client_name: str,
+) -> dict[str, Any]:
+    """Wallet bookings must accept terms + provide signature URL."""
+    ch = str(channel or "DESK").upper()
+    accepted = bool(body.get("contract_accepted"))
+    signature_url = _safe_contract_signature_url(body.get("contract_signature_url"))
+    signer = str(body.get("contract_signer_name") or client_name or "").strip() or None
+    version = str(body.get("contract_version") or CONTRACT_VERSION).strip() or CONTRACT_VERSION
+
+    if ch == "WALLET":
+        if not accepted:
+            raise ValueError("Απαιτείται αποδοχή όρων μίσθωσης")
+        if not signature_url:
+            raise ValueError("Απαιτείται υπογραφή σύμβασης")
+        return {
+            "contract_version": version,
+            "contract_accepted": True,
+            "contract_accepted_at": _now(),
+            "contract_signature_url": signature_url,
+            "contract_signer_name": signer,
+        }
+
+    if accepted or signature_url:
+        return {
+            "contract_version": version,
+            "contract_accepted": bool(accepted or signature_url),
+            "contract_accepted_at": _now() if (accepted or signature_url) else None,
+            "contract_signature_url": signature_url,
+            "contract_signer_name": signer,
+        }
+
+    return {
+        "contract_version": None,
+        "contract_accepted": False,
+        "contract_accepted_at": None,
+        "contract_signature_url": None,
+        "contract_signer_name": None,
+    }
+
+
 def quote_vehicle(
     vehicle: dict[str, Any],
     *,
@@ -619,6 +690,12 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             rental_end=end,
         )
 
+        contract = validate_contract_acceptance(
+            body,
+            channel=channel,
+            client_name=client_name,
+        )
+
         has_payment_input = (
             body.get("payment_plan") is not None
             or body.get("payment_method") is not None
@@ -701,6 +778,11 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "license_number": identity["license_number"],
             "license_expires_at": identity["license_expires_at"],
             "id_verification_status": identity["id_verification_status"],
+            "contract_version": contract["contract_version"],
+            "contract_accepted": contract["contract_accepted"],
+            "contract_accepted_at": contract["contract_accepted_at"],
+            "contract_signature_url": contract["contract_signature_url"],
+            "contract_signer_name": contract["contract_signer_name"],
             "created_at": now,
             "updated_at": now,
             "vehicle_plate": vehicle.get("plate_number"),
@@ -983,8 +1065,9 @@ def cancel_booking_for_customer(
     booking_id: str,
     *,
     email: str,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Customer self-cancel — only CONFIRMED bookings owned by this email."""
+    """Customer self-cancel — CONFIRMED only, free within FREE_CANCEL_HOURS before pickup."""
     tid = _normalize_tenant(tenant_id)
     needle = str(email or "").strip().lower()
     bid = str(booking_id or "").strip()
@@ -1006,6 +1089,15 @@ def cancel_booking_for_customer(
             return deepcopy(booking)
         if status != "CONFIRMED":
             raise ValueError("Μπορείτε να ακυρώσετε μόνο επιβεβαιωμένες κρατήσεις (όχι ενεργές)")
+        if not free_cancel_eligible(booking, now=now):
+            raise ValueError(
+                f"Η δωρεάν ακύρωση ισχύει έως {FREE_CANCEL_HOURS} ώρες πριν την παραλαβή. "
+                "Επικοινωνήστε με το γραφείο."
+            )
+        booking["cancelled_at"] = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat()
+        booking["cancel_reason"] = "customer_free_cancel"
+        booking["updated_at"] = _now()
+        _write(data)
     return update_booking_status(tid, bid, "CANCELLED")
 
 

@@ -154,6 +154,9 @@ class FleetRentalStoreTests(unittest.TestCase):
                 "date_of_birth": "1992-01-01",
                 "license_number": "ML-1",
                 "license_expires_at": "2030-01-01",
+                "contract_accepted": True,
+                "contract_signature_url": "/api/site/rental-photos/contract-maria.png",
+                "contract_signer_name": "Μαρία Wallet",
             },
         )
         store.create_booking(

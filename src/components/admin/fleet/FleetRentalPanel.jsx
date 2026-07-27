@@ -1023,6 +1023,26 @@ export default function FleetRentalPanel({
                       {b.client_email ? ` · ${b.client_email}` : ''}
                       {b.client_phone ? ` · ${b.client_phone}` : ''}
                     </p>
+                    {b.contract_accepted ? (
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          Σύμβαση OK
+                        </span>
+                        {b.contract_signature_url ? (
+                          <a
+                            href={b.contract_signature_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] font-bold text-primary"
+                          >
+                            Υπογραφή
+                          </a>
+                        ) : null}
+                        {b.contract_version ? (
+                          <span className="text-[11px] text-gray-500">{b.contract_version}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                         {bookingSource(b)}

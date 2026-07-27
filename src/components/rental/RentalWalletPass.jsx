@@ -184,6 +184,20 @@ export default function RentalWalletPass({
               {cancelling ? 'Ακύρωση…' : 'Ακύρωση κράτησης'}
             </button>
           ) : null}
+          {status === 'CONFIRMED' && !onCancel ? (
+            <p className="rent-wallet-cancel-locked">
+              Online ακύρωση κλειστή — λιγότερο από 24 ώρες πριν την παραλαβή. Επικοινωνήστε με το γραφείο.
+            </p>
+          ) : null}
+          {booking.contract_accepted ? (
+            <p className="rent-wallet-contract-ok">
+              <span className="material-symbols-outlined" aria-hidden>
+                draw
+              </span>
+              Σύμβαση υπογεγραμμένη
+              {booking.contract_version ? ` · ${booking.contract_version}` : ''}
+            </p>
+          ) : null}
           <button type="button" className="wallet-pass-cta" onClick={onBookVehicle}>
             Νέα κράτηση
           </button>

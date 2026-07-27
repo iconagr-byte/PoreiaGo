@@ -5,7 +5,9 @@ import {
   createCustomerRentalBooking,
   fetchCustomerRentalAvailability,
   fetchMyRentalBookings,
+  fetchRentalContractTerms,
   uploadCustomerRentalIdDoc,
+  uploadCustomerRentalSignature,
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
@@ -22,6 +24,13 @@ import {
   getRentalPaymentPlans,
   paymentStatusLabel,
 } from '../../lib/rental/rentalPayment.js';
+import RentalSignaturePad from '../admin/fleet/RentalSignaturePad.jsx';
+import { FALLBACK_CONTRACT } from '../../lib/rental/rentalContract.js';
+import {
+  cancelBlockedMessage,
+  FREE_CANCEL_HOURS,
+  isFreeCancelEligible,
+} from '../../lib/rental/rentalCancel.js';
 
 const CATEGORIES = [
   { value: '', label: 'Όλες' },
@@ -191,6 +200,10 @@ export default function RentalCatalogPanel({
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [idDocs, setIdDocs] = useState(EMPTY_ID);
   const [uploadingKind, setUploadingKind] = useState('');
+  const [contract, setContract] = useState(FALLBACK_CONTRACT);
+  const [contractAccepted, setContractAccepted] = useState(false);
+  const [signatureUrl, setSignatureUrl] = useState('');
+  const [sigBusy, setSigBusy] = useState(false);
   const [remindersEnabled, setRemindersEnabled] = useState(() => {
     try {
       return localStorage.getItem('rent_reminders_enabled_v1') === '1';
@@ -207,6 +220,21 @@ export default function RentalCatalogPanel({
         if (!cancelled) setPaymentSettings(settings);
       } catch {
         /* offline — defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const terms = await fetchRentalContractTerms();
+        if (!cancelled && terms?.clauses?.length) setContract(terms);
+      } catch {
+        /* fallback */
       }
     })();
     return () => {
@@ -435,6 +463,14 @@ export default function RentalCatalogPanel({
       toast.error('Δεν υπάρχουν διαθέσιμοι τρόποι πληρωμής');
       return;
     }
+    if (!contractAccepted) {
+      toast.error('Αποδεχτείτε τους όρους μίσθωσης');
+      return;
+    }
+    if (!signatureUrl) {
+      toast.error('Υπογράψτε τη σύμβαση πριν την κράτηση');
+      return;
+    }
     setBusy(true);
     try {
       if (paymentMethod === 'card' || paymentMethod === 'paypal' || paymentMethod === 'apple') {
@@ -468,6 +504,10 @@ export default function RentalCatalogPanel({
         payment_method: paymentMethod,
         deposit_percent: depositPercent,
         ...identity,
+        contract_accepted: true,
+        contract_signature_url: signatureUrl,
+        contract_signer_name: getCustomerName() || getCustomerEmail() || 'Πελάτης',
+        contract_version: contract.version,
       });
       // Mirror into office CRM as a real person (same as trip checkout).
       ensureCustomerForRental({
@@ -484,15 +524,18 @@ export default function RentalCatalogPanel({
             : '';
       const idNote =
         form.driver_mode === 'SELF_DRIVE' ? ' · εκκρεμεί έλεγχος ταυτότητας' : '';
-      toast.success(`Η κράτηση καταχωρήθηκε${payNote}${idNote}. Στάλθηκε email επιβεβαίωσης.`);
+      toast.success(`Η κράτηση και η σύμβαση καταχωρήθηκαν${payNote}${idNote}.`);
       setSuggestions([]);
       setSelectedId('');
       setRecentBooked(created);
+      setContractAccepted(false);
+      setSignatureUrl('');
       trackFunnel('booking_created', {
         vehicle_id: selectedId,
         payment_plan: paymentPlan,
         payment_method: paymentMethod,
         has_id: Boolean(identity.id_document_url),
+        contract: true,
       });
       if (onClearPreferred) onClearPreferred();
       await loadMine();
@@ -534,11 +577,23 @@ export default function RentalCatalogPanel({
   const dueNow = amountDueAtCheckout(selectedTotal, paymentPlan, depositPercent);
   const isDepositPlan = depositEnabled && paymentPlan === PAYMENT_PLAN_DEPOSIT;
 
-  const cancelBooking = async (bookingId) => {
-    if (!window.confirm('Ακύρωση κράτησης ενοικίασης;')) return;
+  const cancelBooking = async (booking) => {
+    const row = typeof booking === 'string' ? mine.find((b) => b.id === booking) : booking;
+    const id = row?.id || booking;
+    if (!row || !isFreeCancelEligible(row)) {
+      toast.error(cancelBlockedMessage(row || {}));
+      return;
+    }
+    if (
+      !window.confirm(
+        `Δωρεάν ακύρωση (έως ${FREE_CANCEL_HOURS} ώρες πριν). Να ακυρωθεί η κράτηση;`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     try {
-      await cancelCustomerRentalBooking(bookingId);
+      await cancelCustomerRentalBooking(id);
       toast.success('Η κράτηση ακυρώθηκε');
       await loadMine();
     } catch (err) {
@@ -606,12 +661,22 @@ export default function RentalCatalogPanel({
             <span className={form.start_time && form.end_time ? 'is-done' : ''}>2. Ημερομηνίες</span>
             <span
               className={
-                idDocs.id_document_url && idDocs.driving_license_url ? 'is-done' : 'is-active'
+                form.driver_mode !== 'SELF_DRIVE' ||
+                (idDocs.id_document_url && idDocs.driving_license_url)
+                  ? 'is-done'
+                  : 'is-active'
               }
             >
               3. Ταυτότητα
             </span>
-            <span className={selectedId ? 'is-active' : ''}>4. Πληρωμή</span>
+            <span className={selectedId ? 'is-done' : ''}>4. Πληρωμή</span>
+            <span
+              className={
+                contractAccepted && signatureUrl ? 'is-done' : selectedId ? 'is-active' : ''
+              }
+            >
+              5. Σύμβαση
+            </span>
           </div>
           <div className="wallet-field">
             <label htmlFor="rent-start">Παραλαβή *</label>
@@ -837,7 +902,7 @@ export default function RentalCatalogPanel({
             {busy ? 'Αναζήτηση…' : 'Εύρεση διαθέσιμων'}
           </button>
           <p className="rent-cancel-policy">
-            Δωρεάν ακύρωση έως 24 ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.
+            Δωρεάν ακύρωση έως {FREE_CANCEL_HOURS} ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.
           </p>
         </form>
       </section>
@@ -1030,18 +1095,61 @@ export default function RentalCatalogPanel({
                   επιβεβαίωσης.
                 </p>
               ) : null}
+              <p className="rent-pay-hint">
+                Σύνολο κράτησης {euro(selectedTotal)}
+                {isDepositPlan ? ` · πληρωμή τώρα ${euro(dueNow)}` : ''}. Ολοκληρώστε τη σύμβαση παρακάτω.
+              </p>
+            </div>
+          ) : null}
+          {selected ? (
+            <div className="rent-contract-panel">
+              <h3>{contract.title || 'Σύμβαση μίσθωσης'}</h3>
+              <p className="wallet-field-hint">Έκδοση {contract.version}</p>
+              <ol className="rent-contract-clauses">
+                {(contract.clauses || []).map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ol>
+              <label className="rent-contract-accept">
+                <input
+                  type="checkbox"
+                  checked={contractAccepted}
+                  onChange={(e) => setContractAccepted(e.target.checked)}
+                />
+                Αποδέχομαι τους όρους μίσθωσης
+              </label>
+              <div className="rent-contract-sign">
+                <RentalSignaturePad
+                  previewUrl={signatureUrl || null}
+                  busy={sigBusy}
+                  onClear={() => setSignatureUrl('')}
+                  onCommit={async (file) => {
+                    setSigBusy(true);
+                    try {
+                      const data = await uploadCustomerRentalSignature(file);
+                      setSignatureUrl(data.url);
+                      trackFunnel('contract_signed');
+                      toast.success('Η υπογραφή αποθηκεύτηκε');
+                    } catch (err) {
+                      toast.error(err.message);
+                    } finally {
+                      setSigBusy(false);
+                    }
+                  }}
+                />
+              </div>
               <button
                 type="button"
                 className="wallet-btn wallet-btn-primary wallet-btn-block"
                 style={{ marginTop: '0.75rem' }}
-                disabled={busy}
+                disabled={busy || !contractAccepted || !signatureUrl}
                 onClick={book}
               >
                 {busy
                   ? 'Ολοκλήρωση…'
                   : paymentMethod === 'bank_transfer'
-                    ? `Κράτηση · κατάθεση ${euro(dueNow)}`
-                    : `Πληρωμή ${euro(dueNow)} · Κράτηση`}
+                    ? `Υπογραφή & κράτηση · κατάθεση ${euro(dueNow)}`
+                    : `Υπογραφή & πληρωμή ${euro(dueNow)}`}
               </button>
             </div>
           ) : null}
@@ -1155,15 +1263,25 @@ export default function RentalCatalogPanel({
                             : 'Έλεγχος ταυτότητας'}
                       </span>
                     ) : null}
-                    {b.rental_status === 'CONFIRMED' ? (
+                    {b.rental_status === 'CONFIRMED' && isFreeCancelEligible(b) ? (
                       <button
                         type="button"
                         className="wallet-btn wallet-btn-danger"
                         disabled={busy}
-                        onClick={() => cancelBooking(b.id)}
+                        onClick={() => cancelBooking(b)}
                       >
                         Ακύρωση
                       </button>
+                    ) : b.rental_status === 'CONFIRMED' ? (
+                      <span className="wallet-chip wallet-chip-muted">Ακύρωση μόνο μέσω γραφείου</span>
+                    ) : null}
+                    {b.contract_accepted ? (
+                      <p className="rent-wallet-contract-ok">
+                        <span className="material-symbols-outlined" aria-hidden>
+                          draw
+                        </span>
+                        Σύμβαση υπογεγραμμένη
+                      </p>
                     ) : null}
                   </div>
                 </div>

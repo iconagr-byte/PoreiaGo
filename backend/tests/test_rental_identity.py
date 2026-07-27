@@ -117,6 +117,9 @@ class RentalIdentityTests(unittest.TestCase):
                 "date_of_birth": "1995-03-15",
                 "license_number": "DL-7788",
                 "license_expires_at": "2029-12-31",
+                "contract_accepted": True,
+                "contract_signature_url": "/api/site/rental-photos/contract-anna.png",
+                "contract_signer_name": "Άννα",
             },
         )
         self.assertEqual(booking["id_verification_status"], "pending")
@@ -137,6 +140,9 @@ class RentalIdentityTests(unittest.TestCase):
                 "start_time": "2026-10-01T10:00:00+00:00",
                 "end_time": "2026-10-02T10:00:00+00:00",
                 "pickup_location": "Αεροδρόμιο",
+                "contract_accepted": True,
+                "contract_signature_url": "/api/site/rental-photos/contract-giorgos.png",
+                "contract_signer_name": "Γιώργος",
             },
         )
         self.assertEqual(booking["id_verification_status"], "not_required")
