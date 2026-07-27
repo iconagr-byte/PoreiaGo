@@ -125,6 +125,13 @@ export async function updateRentalBookingStatus(id, rentalStatus) {
   });
 }
 
+export async function updateRentalIdVerification(id, idVerificationStatus) {
+  return rentalFetch(`/bookings/${encodeURIComponent(id)}/id-verification`, {
+    method: 'PATCH',
+    body: JSON.stringify({ id_verification_status: idVerificationStatus }),
+  });
+}
+
 export async function fetchRentalCalendar(days = 30) {
   const data = await rentalFetch(`/calendar?days=${days}`);
   return data.blocks || [];

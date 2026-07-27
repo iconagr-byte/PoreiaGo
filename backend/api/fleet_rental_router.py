@@ -81,6 +81,10 @@ class BookingStatusBody(BaseModel):
     rental_status: str
 
 
+class IdVerificationBody(BaseModel):
+    id_verification_status: str = Field(description="pending | verified | rejected")
+
+
 class InspectionBody(BaseModel):
     rental_booking_id: str
     inspection_type: str
@@ -225,6 +229,27 @@ async def patch_booking_status(
 ):
     try:
         row = store.update_booking_status(_tid(tenant_id), booking_id, body.rental_status)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.patch("/bookings/{booking_id}/id-verification")
+async def patch_booking_id_verification(
+    booking_id: str,
+    body: IdVerificationBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Desk review of customer ID / driving license photos."""
+    try:
+        row = store.update_id_verification(
+            _tid(tenant_id),
+            booking_id,
+            body.id_verification_status,
+        )
     except ValueError as exc:
         msg = str(exc)
         code = 404 if "δεν βρέθηκε" in msg else 400
