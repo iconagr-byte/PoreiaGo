@@ -16,6 +16,7 @@ import {
   fetchRentalSummary,
   fetchRentalVehicles,
   updateRentalBookingStatus,
+  updateRentalIdVerification,
   uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
@@ -28,6 +29,7 @@ import {
 import RentalSignaturePad from './RentalSignaturePad.jsx';
 import RentalCalendarBoard from './RentalCalendarBoard.jsx';
 import RentAppShareBanner from './RentAppShareBanner.jsx';
+import RentalDeskQrScan from './RentalDeskQrScan.jsx';
 import '../../../styles/rental-admin-apple.css';
 
 const CATEGORIES = [
@@ -39,6 +41,7 @@ const CATEGORIES = [
 const TABS = [
   { id: 'clients', label: 'Πελάτες', icon: 'groups' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
+  { id: 'scan', label: 'Σάρωση QR', icon: 'qr_code_scanner' },
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard' },
   { id: 'vehicles', label: 'Στόλος', icon: 'directions_car' },
   { id: 'wizard', label: 'Νέα κράτηση', icon: 'add_circle' },
@@ -566,6 +569,7 @@ export default function FleetRentalPanel({
             {[
               { id: 'clients', label: 'Πελάτες ενοικίασης', copy: `${clients.length} πελάτες · γραφείο + Wallet`, icon: 'groups' },
               { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
+              { id: 'scan', label: 'Σάρωση QR', copy: 'Επαλήθευση Rent Wallet · check-in', icon: 'qr_code_scanner' },
               { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
@@ -971,6 +975,33 @@ export default function FleetRentalPanel({
         </div>
       )}
 
+      {tab === 'scan' && (
+        <RentalDeskQrScan
+          onCheckIn={(booking) => {
+            setInsp((s) => ({
+              ...s,
+              rental_booking_id: booking.id,
+              inspection_type: 'PICKUP_CHECK',
+            }));
+            setTab('inspections');
+            toast.success('Ανοίγει check-in για αυτή την κράτηση');
+          }}
+          onCheckOut={(booking) => {
+            setInsp((s) => ({
+              ...s,
+              rental_booking_id: booking.id,
+              inspection_type: 'RETURN_CHECK',
+            }));
+            setTab('inspections');
+            toast.success('Ανοίγει check-out για αυτή την κράτηση');
+          }}
+          onOpenBooking={() => {
+            setBookingFilter('ALL');
+            setTab('bookings');
+          }}
+        />
+      )}
+
       {tab === 'bookings' && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
@@ -1022,6 +1053,26 @@ export default function FleetRentalPanel({
                       {b.client_email ? ` · ${b.client_email}` : ''}
                       {b.client_phone ? ` · ${b.client_phone}` : ''}
                     </p>
+                    {b.contract_accepted ? (
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          Σύμβαση OK
+                        </span>
+                        {b.contract_signature_url ? (
+                          <a
+                            href={b.contract_signature_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] font-bold text-primary"
+                          >
+                            Υπογραφή
+                          </a>
+                        ) : null}
+                        {b.contract_version ? (
+                          <span className="text-[11px] text-gray-500">{b.contract_version}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                         {bookingSource(b)}
@@ -1034,9 +1085,99 @@ export default function FleetRentalPanel({
                           One-way
                         </span>
                       ) : null}
+                      {b.id_verification_status && b.id_verification_status !== 'not_required' ? (
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            b.id_verification_status === 'verified'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : b.id_verification_status === 'rejected'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          ID:{' '}
+                          {b.id_verification_status === 'verified'
+                            ? 'OK'
+                            : b.id_verification_status === 'rejected'
+                              ? 'Απορρίφθηκε'
+                              : 'Εκκρεμεί'}
+                        </span>
+                      ) : null}
                     </div>
+                    {(b.id_document_url || b.driving_license_url) && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {b.id_document_url ? (
+                          <a
+                            href={b.id_document_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">badge</span>
+                            Ταυτότητα
+                          </a>
+                        ) : null}
+                        {b.driving_license_url ? (
+                          <a
+                            href={b.driving_license_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">credit_card</span>
+                            Δίπλωμα
+                            {b.license_number ? ` · ${b.license_number}` : ''}
+                          </a>
+                        ) : null}
+                        {b.date_of_birth ? (
+                          <span className="text-[11px] text-gray-500">Γέννηση {b.date_of_birth}</span>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {b.id_verification_status === 'pending' ? (
+                      <>
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-emerald-700"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await updateRentalIdVerification(b.id, 'verified');
+                              toast.success('Ταυτότητα επαληθεύτηκε');
+                              await reload();
+                            } catch (err) {
+                              toast.error(err.message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Επαλήθευση ID
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-rose-600"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await updateRentalIdVerification(b.id, 'rejected');
+                              toast.success('Έγγραφα απορρίφθηκαν');
+                              await reload();
+                            } catch (err) {
+                              toast.error(err.message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Απόρριψη ID
+                        </button>
+                      </>
+                    ) : null}
                     {b.rental_status === 'CONFIRMED' ? (
                       <>
                         <button

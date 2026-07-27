@@ -24,6 +24,26 @@ ACTIVE_BOOKING_STATUSES = frozenset({"CONFIRMED", "ACTIVE"})
 INSPECTION_TYPES = ("PICKUP_CHECK", "RETURN_CHECK")
 SERVICE_MILEAGE_EVERY = 15_000
 
+PAYMENT_PLANS = ("full", "deposit")
+PAYMENT_METHODS = ("card", "paypal", "apple", "bank_transfer", "cash_office")
+PAYMENT_STATUSES = ("pending", "partial", "paid")
+DEFAULT_DEPOSIT_PERCENT = 30
+
+# Daily extras (EUR) — must match customer PWA labels.
+EXTRA_DAILY_RATES = {
+    "extra_insurance": 12.0,
+    "child_seat": 7.0,
+    "gps_pack": 5.0,
+}
+
+ID_VERIFICATION_STATUSES = ("pending", "verified", "rejected", "not_required")
+MIN_DRIVER_AGE_YEARS = 21
+ID_DOC_URL_PREFIX = "/api/site/rental-id/"
+
+FREE_CANCEL_HOURS = 24
+CONTRACT_VERSION = "rent-contract-v1"
+CONTRACT_SIGNATURE_URL_PREFIX = "/api/site/rental-photos/"
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -210,6 +230,62 @@ def list_bookings(
     return sorted(rows, key=lambda b: b.get("start_time") or "", reverse=True)
 
 
+def get_booking(tenant_id: str | None, booking_id: str) -> dict[str, Any] | None:
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    if not bid:
+        return None
+    with _LOCK:
+        for b in _read()["bookings"]:
+            if b.get("tenant_id") == tid and b.get("id") == bid:
+                return deepcopy(b)
+    return None
+
+
+def parse_rental_qr_code(raw: str | None) -> str:
+    """Extract booking id from `RENT:{uuid}` or bare UUID."""
+    value = str(raw or "").strip()
+    if not value:
+        raise ValueError("Κενός κωδικός QR")
+    upper = value.upper()
+    if upper.startswith("RENT:"):
+        value = value.split(":", 1)[1].strip()
+    value = value.strip()
+    if not value:
+        raise ValueError("Μη έγκυρος κωδικός QR ενοικίασης")
+    return value
+
+
+def verify_rental_qr(tenant_id: str | None, raw_code: str) -> dict[str, Any]:
+    """Desk verify wallet pass QR — read-only, no status mutation."""
+    booking_id = parse_rental_qr_code(raw_code)
+    booking = get_booking(tenant_id, booking_id)
+    if not booking:
+        raise ValueError("Η κράτηση δεν βρέθηκε")
+    status = str(booking.get("rental_status") or "").upper()
+    eligible_checkin = status == "CONFIRMED"
+    eligible_checkout = status == "ACTIVE"
+    if status == "CANCELLED":
+        reason = "Η κράτηση έχει ακυρωθεί"
+    elif status == "COMPLETED":
+        reason = "Η ενοικίαση έχει ολοκληρωθεί"
+    elif eligible_checkin:
+        reason = "Έτοιμη για check-in"
+    elif eligible_checkout:
+        reason = "Έτοιμη για check-out / επιστροφή"
+    else:
+        reason = f"Κατάσταση: {status or '—'}"
+    return {
+        "ok": True,
+        "code": f"RENT:{booking_id}",
+        "booking_id": booking_id,
+        "booking": booking,
+        "eligible_checkin": eligible_checkin,
+        "eligible_checkout": eligible_checkout,
+        "reason": reason,
+    }
+
+
 def _vehicle_conflicts(
     data: dict[str, Any],
     *,
@@ -238,6 +314,281 @@ def _norm_place(value: str | None) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
+def _normalize_deposit_percent(value: Any) -> int:
+    try:
+        pct = int(value)
+    except (TypeError, ValueError):
+        pct = DEFAULT_DEPOSIT_PERCENT
+    return max(5, min(90, pct))
+
+
+def compute_extras_total(days: int, extras: dict[str, Any] | None = None) -> tuple[float, list[str]]:
+    """Return (extras_total, label list) for selected daily add-ons."""
+    days = max(1, int(days or 1))
+    selected = extras if isinstance(extras, dict) else {}
+    lines: list[str] = []
+    total = 0.0
+    labels = {
+        "extra_insurance": "Extra insurance",
+        "child_seat": "Child seat",
+        "gps_pack": "GPS pack",
+    }
+    for key, daily in EXTRA_DAILY_RATES.items():
+        if selected.get(key):
+            total += daily * days
+            lines.append(labels.get(key, key))
+    return round(total, 2), lines
+
+
+def compute_payment_split(
+    total_eur: float,
+    *,
+    payment_plan: str = "full",
+    payment_method: str = "card",
+    deposit_percent: int | None = None,
+) -> dict[str, Any]:
+    """Deposit/full split + payment status for a rental booking."""
+    plan = str(payment_plan or "full").strip().lower() or "full"
+    if plan not in PAYMENT_PLANS:
+        plan = "full"
+    method = str(payment_method or "card").strip().lower() or "card"
+    if method not in PAYMENT_METHODS:
+        method = "card"
+    pct = _normalize_deposit_percent(
+        deposit_percent if deposit_percent is not None else DEFAULT_DEPOSIT_PERCENT
+    )
+    total = round(float(total_eur or 0), 2)
+    if plan == "deposit":
+        due_now = round(total * (pct / 100.0), 2)
+        balance = round(total - due_now, 2)
+    else:
+        due_now = total
+        balance = 0.0
+
+    if method == "bank_transfer":
+        amount_paid = 0.0
+        payment_status = "pending"
+        if plan == "deposit":
+            payment_label = f"PENDING · Προκαταβολή {pct}% (Τράπεζα)"
+        else:
+            payment_label = "PENDING (Bank Transfer)"
+    elif method == "cash_office":
+        amount_paid = 0.0
+        payment_status = "pending"
+        payment_label = "PENDING (Cash at office)"
+    else:
+        amount_paid = due_now
+        if balance > 0:
+            payment_status = "partial"
+            method_name = {"card": "Credit Card", "paypal": "PayPal", "apple": "Apple Pay"}.get(
+                method, method
+            )
+            payment_label = f"DEPOSIT {pct}% ({method_name})"
+        else:
+            payment_status = "paid"
+            method_name = {"card": "Credit Card", "paypal": "PayPal", "apple": "Apple Pay"}.get(
+                method, method
+            )
+            payment_label = f"PAID ({method_name})"
+
+    return {
+        "payment_plan": plan,
+        "payment_method": method,
+        "deposit_percent": pct,
+        "amount_due_now": due_now,
+        "amount_paid": amount_paid,
+        "balance_due": balance,
+        "payment_status": payment_status,
+        "payment_label": payment_label,
+    }
+
+def _parse_date_only(value: str | None) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        if "T" in raw:
+            return _parse_dt(raw)
+        return datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise ValueError("Μη έγκυρη ημερομηνία") from exc
+
+
+def _age_years(dob: datetime, *, on: datetime | None = None) -> int:
+    ref = on or datetime.now(timezone.utc)
+    years = ref.year - dob.year
+    if (ref.month, ref.day) < (dob.month, dob.day):
+        years -= 1
+    return years
+
+
+def _safe_doc_url(value: Any) -> str | None:
+    url = str(value or "").strip()
+    if not url:
+        return None
+    if url.startswith(ID_DOC_URL_PREFIX) and ".." not in url and " " not in url:
+        return url
+    raise ValueError("Μη έγκυρο αρχείο ταυτότητας/διπλώματος")
+
+
+def validate_renter_identity(
+    body: dict[str, Any],
+    *,
+    driver_mode: str,
+    channel: str,
+    rental_end: datetime,
+) -> dict[str, Any]:
+    """Validate ID/license for wallet self-drive (and optional desk docs)."""
+    mode = str(driver_mode or "SELF_DRIVE").upper()
+    ch = str(channel or "DESK").upper()
+    require_docs = ch == "WALLET" and mode == "SELF_DRIVE"
+
+    id_url = None
+    license_url = None
+    raw_id = body.get("id_document_url")
+    raw_lic = body.get("driving_license_url")
+    if raw_id:
+        id_url = _safe_doc_url(raw_id)
+    if raw_lic:
+        license_url = _safe_doc_url(raw_lic)
+
+    dob_raw = str(body.get("date_of_birth") or "").strip() or None
+    license_number = str(body.get("license_number") or "").strip() or None
+    license_expires_raw = str(body.get("license_expires_at") or "").strip() or None
+
+    if require_docs:
+        if not id_url:
+            raise ValueError("Απαιτείται φωτογραφία ταυτότητας ή διαβατηρίου")
+        if not license_url:
+            raise ValueError("Απαιτείται φωτογραφία διπλώματος οδήγησης")
+        if not dob_raw:
+            raise ValueError("Απαιτείται ημερομηνία γέννησης")
+        if not license_number:
+            raise ValueError("Απαιτείται αριθμός διπλώματος")
+        if not license_expires_raw:
+            raise ValueError("Απαιτείται ημερομηνία λήξης διπλώματος")
+
+    dob = _parse_date_only(dob_raw) if dob_raw else None
+    license_expires = _parse_date_only(license_expires_raw) if license_expires_raw else None
+
+    if dob is not None:
+        age = _age_years(dob)
+        if age < MIN_DRIVER_AGE_YEARS and mode == "SELF_DRIVE":
+            raise ValueError(f"Ελάχιστη ηλικία οδηγού: {MIN_DRIVER_AGE_YEARS} ετών")
+
+    if license_expires is not None and license_expires.date() < rental_end.date():
+        raise ValueError("Το δίπλωμα λήγει πριν το τέλος της ενοικίασης")
+
+    if id_url or license_url:
+        status = "pending"
+    elif require_docs:
+        status = "pending"
+    elif mode == "WITH_DRIVER":
+        status = "not_required"
+    else:
+        status = "not_required"
+
+    return {
+        "id_document_url": id_url,
+        "driving_license_url": license_url,
+        "date_of_birth": dob.date().isoformat() if dob else None,
+        "license_number": license_number,
+        "license_expires_at": license_expires.date().isoformat() if license_expires else None,
+        "id_verification_status": status,
+    }
+
+
+def update_id_verification(
+    tenant_id: str | None,
+    booking_id: str,
+    status: str,
+) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    st = str(status or "").strip().lower()
+    if st not in ("pending", "verified", "rejected"):
+        raise ValueError("Μη έγκυρη κατάσταση επαλήθευσης")
+    bid = str(booking_id or "").strip()
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        booking["id_verification_status"] = st
+        booking["updated_at"] = _now()
+        _write(data)
+        return deepcopy(booking)
+
+
+def hours_until_start(start_time: str | datetime, *, now: datetime | None = None) -> float:
+    start = _parse_dt(start_time)
+    ref = now or datetime.now(timezone.utc)
+    return (start - ref).total_seconds() / 3600.0
+
+
+def free_cancel_eligible(booking: dict[str, Any], *, now: datetime | None = None) -> bool:
+    """True when customer may cancel for free (≥ FREE_CANCEL_HOURS before pickup)."""
+    status = str(booking.get("rental_status") or "").upper()
+    if status != "CONFIRMED":
+        return False
+    return hours_until_start(booking.get("start_time") or "", now=now) >= FREE_CANCEL_HOURS
+
+
+def _safe_contract_signature_url(value: Any) -> str | None:
+    url = str(value or "").strip()
+    if not url:
+        return None
+    if url.startswith(CONTRACT_SIGNATURE_URL_PREFIX) and ".." not in url and " " not in url:
+        return url
+    raise ValueError("Μη έγκυρη υπογραφή σύμβασης")
+
+
+def validate_contract_acceptance(
+    body: dict[str, Any],
+    *,
+    channel: str,
+    client_name: str,
+) -> dict[str, Any]:
+    """Wallet bookings must accept terms + provide signature URL."""
+    ch = str(channel or "DESK").upper()
+    accepted = bool(body.get("contract_accepted"))
+    signature_url = _safe_contract_signature_url(body.get("contract_signature_url"))
+    signer = str(body.get("contract_signer_name") or client_name or "").strip() or None
+    version = str(body.get("contract_version") or CONTRACT_VERSION).strip() or CONTRACT_VERSION
+
+    if ch == "WALLET":
+        if not accepted:
+            raise ValueError("Απαιτείται αποδοχή όρων μίσθωσης")
+        if not signature_url:
+            raise ValueError("Απαιτείται υπογραφή σύμβασης")
+        return {
+            "contract_version": version,
+            "contract_accepted": True,
+            "contract_accepted_at": _now(),
+            "contract_signature_url": signature_url,
+            "contract_signer_name": signer,
+        }
+
+    if accepted or signature_url:
+        return {
+            "contract_version": version,
+            "contract_accepted": bool(accepted or signature_url),
+            "contract_accepted_at": _now() if (accepted or signature_url) else None,
+            "contract_signature_url": signature_url,
+            "contract_signer_name": signer,
+        }
+
+    return {
+        "contract_version": None,
+        "contract_accepted": False,
+        "contract_accepted_at": None,
+        "contract_signature_url": None,
+        "contract_signer_name": None,
+    }
+
+
 def quote_vehicle(
     vehicle: dict[str, Any],
     *,
@@ -246,8 +597,9 @@ def quote_vehicle(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
+    extras: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Compute rental quote: base days + optional one-way + with-driver."""
+    """Compute rental quote: base days + optional one-way + with-driver + extras."""
     days = max(1, math.ceil((end - start).total_seconds() / 86400))
     rate = float(vehicle.get("daily_rate_eur") or 0)
     one_way_fee = float(vehicle.get("one_way_surcharge_eur") or 0)
@@ -259,12 +611,17 @@ def quote_vehicle(
     base_total = round(rate * days, 2)
     driver_surcharge = round(with_driver_daily * days, 2) if mode == "WITH_DRIVER" else 0.0
     one_way_surcharge = round(one_way_fee, 2) if is_one_way else 0.0
+    extras_total, extras_lines = compute_extras_total(days, extras)
     return {
         "suggested_days": days,
         "base_total": base_total,
         "driver_surcharge": driver_surcharge,
         "one_way_surcharge": one_way_surcharge,
-        "suggested_total": round(base_total + driver_surcharge + one_way_surcharge, 2),
+        "extras_total": extras_total,
+        "extras_lines": extras_lines,
+        "suggested_total": round(
+            base_total + driver_surcharge + one_way_surcharge + extras_total, 2
+        ),
         "is_one_way": is_one_way,
         "driver_mode": mode,
     }
@@ -362,6 +719,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             raise ValueError("Το όχημα δεν είναι διαθέσιμο για αυτές τις ημερομηνίες")
 
         driver_mode = str(body.get("driver_mode") or "SELF_DRIVE").strip().upper() or "SELF_DRIVE"
+        extras = body.get("extras") if isinstance(body.get("extras"), dict) else {}
         quote = quote_vehicle(
             vehicle,
             start=start,
@@ -369,6 +727,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             pickup_location=pickup,
             dropoff_location=dropoff,
             driver_mode=driver_mode,
+            extras=extras,
         )
         total = body.get("total_cost")
         if total is None:
@@ -379,6 +738,59 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         channel = str(body.get("channel") or "DESK").strip().upper() or "DESK"
         if channel not in ("DESK", "WALLET"):
             channel = "DESK"
+
+        identity = validate_renter_identity(
+            body,
+            driver_mode=driver_mode,
+            channel=channel,
+            rental_end=end,
+        )
+
+        contract = validate_contract_acceptance(
+            body,
+            channel=channel,
+            client_name=client_name,
+        )
+
+        has_payment_input = (
+            body.get("payment_plan") is not None
+            or body.get("payment_method") is not None
+            or body.get("deposit_percent") is not None
+            or channel == "WALLET"
+        )
+
+        deposit_percent = body.get("deposit_percent")
+        if deposit_percent is None and has_payment_input:
+            try:
+                from travel_platform.settings.payment_settings_store import read_payment_settings
+
+                deposit_percent = (read_payment_settings().get("deposit") or {}).get("percent")
+            except Exception:
+                deposit_percent = DEFAULT_DEPOSIT_PERCENT
+
+        if has_payment_input:
+            pay = compute_payment_split(
+                total,
+                payment_plan=str(body.get("payment_plan") or "full"),
+                payment_method=str(body.get("payment_method") or "card"),
+                deposit_percent=deposit_percent,
+            )
+        else:
+            # Legacy desk bookings without payment UI — treat as settled at counter.
+            pay = {
+                "payment_plan": "full",
+                "payment_method": "cash_office",
+                "deposit_percent": DEFAULT_DEPOSIT_PERCENT,
+                "amount_due_now": total,
+                "amount_paid": total,
+                "balance_due": 0.0,
+                "payment_status": "paid",
+                "payment_label": "PAID (Cash at office)",
+            }
+
+        notes = str(body.get("notes") or "").strip() or None
+        if quote["extras_lines"] and not notes:
+            notes = f"Extras: {', '.join(quote['extras_lines'])}"
 
         now = _now()
         row = {
@@ -400,12 +812,33 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
                 "base_total": quote["base_total"],
                 "driver_surcharge": quote["driver_surcharge"],
                 "one_way_surcharge": quote["one_way_surcharge"],
+                "extras_total": quote["extras_total"],
+                "extras_lines": quote["extras_lines"],
                 "is_one_way": quote["is_one_way"],
             },
+            "payment_plan": pay["payment_plan"],
+            "payment_method": pay["payment_method"],
+            "deposit_percent": pay["deposit_percent"],
+            "amount_due_now": pay["amount_due_now"],
+            "amount_paid": pay["amount_paid"],
+            "balance_due": pay["balance_due"],
+            "payment_status": pay["payment_status"],
+            "payment_label": pay["payment_label"],
             "rental_status": "CONFIRMED",
             "driver_mode": driver_mode,
             "assigned_driver_id": (str(body.get("assigned_driver_id") or "").strip() or None),
-            "notes": (str(body.get("notes") or "").strip() or None),
+            "notes": notes,
+            "id_document_url": identity["id_document_url"],
+            "driving_license_url": identity["driving_license_url"],
+            "date_of_birth": identity["date_of_birth"],
+            "license_number": identity["license_number"],
+            "license_expires_at": identity["license_expires_at"],
+            "id_verification_status": identity["id_verification_status"],
+            "contract_version": contract["contract_version"],
+            "contract_accepted": contract["contract_accepted"],
+            "contract_accepted_at": contract["contract_accepted_at"],
+            "contract_signature_url": contract["contract_signature_url"],
+            "contract_signer_name": contract["contract_signer_name"],
             "created_at": now,
             "updated_at": now,
             "vehicle_plate": vehicle.get("plate_number"),
@@ -688,8 +1121,9 @@ def cancel_booking_for_customer(
     booking_id: str,
     *,
     email: str,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Customer self-cancel — only CONFIRMED bookings owned by this email."""
+    """Customer self-cancel — CONFIRMED only, free within FREE_CANCEL_HOURS before pickup."""
     tid = _normalize_tenant(tenant_id)
     needle = str(email or "").strip().lower()
     bid = str(booking_id or "").strip()
@@ -711,6 +1145,15 @@ def cancel_booking_for_customer(
             return deepcopy(booking)
         if status != "CONFIRMED":
             raise ValueError("Μπορείτε να ακυρώσετε μόνο επιβεβαιωμένες κρατήσεις (όχι ενεργές)")
+        if not free_cancel_eligible(booking, now=now):
+            raise ValueError(
+                f"Η δωρεάν ακύρωση ισχύει έως {FREE_CANCEL_HOURS} ώρες πριν την παραλαβή. "
+                "Επικοινωνήστε με το γραφείο."
+            )
+        booking["cancelled_at"] = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat()
+        booking["cancel_reason"] = "customer_free_cancel"
+        booking["updated_at"] = _now()
+        _write(data)
     return update_booking_status(tid, bid, "CANCELLED")
 
 

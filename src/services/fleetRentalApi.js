@@ -125,6 +125,24 @@ export async function updateRentalBookingStatus(id, rentalStatus) {
   });
 }
 
+export async function updateRentalIdVerification(id, idVerificationStatus) {
+  return rentalFetch(`/bookings/${encodeURIComponent(id)}/id-verification`, {
+    method: 'PATCH',
+    body: JSON.stringify({ id_verification_status: idVerificationStatus }),
+  });
+}
+
+export async function verifyRentalQr(code) {
+  return rentalFetch('/verify-qr', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function fetchRentalBooking(id) {
+  return rentalFetch(`/bookings/${encodeURIComponent(id)}`);
+}
+
 export async function fetchRentalCalendar(days = 30) {
   const data = await rentalFetch(`/calendar?days=${days}`);
   return data.blocks || [];
