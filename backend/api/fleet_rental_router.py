@@ -65,6 +65,7 @@ class BookingBody(BaseModel):
     client_name: str = Field(min_length=1, max_length=160)
     client_email: str | None = None
     client_phone: str | None = None
+    client_afm: str | None = None
     client_id: str | None = None
     channel: str = "DESK"
     start_time: str
@@ -79,6 +80,19 @@ class BookingBody(BaseModel):
 
 class BookingStatusBody(BaseModel):
     rental_status: str
+
+
+class IssueReceiptBody(BaseModel):
+    kind: str = "local_receipt"
+    amount: float | None = None
+
+
+class IdVerificationBody(BaseModel):
+    id_verification_status: str = Field(description="pending | verified | rejected")
+
+
+class VerifyQrBody(BaseModel):
+    code: str = Field(min_length=1, max_length=240)
 
 
 class InspectionBody(BaseModel):
@@ -229,6 +243,89 @@ async def patch_booking_status(
         msg = str(exc)
         code = 404 if "δεν βρέθηκε" in msg else 400
         raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/bookings/{booking_id}/issue-receipt")
+async def issue_booking_receipt(
+    booking_id: str,
+    body: IssueReceiptBody | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Issue a lightweight fiscal receipt mark (local / AADE when available)."""
+    from travel_platform.rental.rental_fiscal import issue_receipt_for_booking
+
+    payload = body or IssueReceiptBody()
+    try:
+        row = issue_receipt_for_booking(
+            _tid(tenant_id),
+            booking_id,
+            kind=payload.kind,
+            amount=payload.amount,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/reminders/scan")
+async def admin_scan_rental_reminders(
+    within_hours: float = Query(default=24, ge=1, le=168),
+    _: dict = Depends(_require_admin),
+):
+    from travel_platform.notifications.rental_customer_push import scan_and_notify_upcoming_rentals
+
+    return await scan_and_notify_upcoming_rentals(within_hours=within_hours)
+
+
+@router.patch("/bookings/{booking_id}/id-verification")
+async def patch_booking_id_verification(
+    booking_id: str,
+    body: IdVerificationBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Desk review of customer ID / driving license photos."""
+    try:
+        row = store.update_id_verification(
+            _tid(tenant_id),
+            booking_id,
+            body.id_verification_status,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/verify-qr")
+async def verify_rental_qr(
+    body: VerifyQrBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Desk scan of Rent Wallet pass (`RENT:{booking_id}`) — verify only."""
+    try:
+        return store.verify_rental_qr(_tid(tenant_id), body.code)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+
+@router.get("/bookings/{booking_id}")
+async def get_booking(
+    booking_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    row = store.get_booking(_tid(tenant_id), booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
     return row
 
 

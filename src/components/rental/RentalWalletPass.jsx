@@ -42,6 +42,10 @@ export default function RentalWalletPass({
   onBookVehicle,
   onCancel,
   cancelling = false,
+  onModify,
+  onContract,
+  onCheckIn,
+  onCheckOut,
 }) {
   if (!booking) {
     return (
@@ -111,6 +115,59 @@ export default function RentalWalletPass({
           </div>
         </div>
 
+        {booking.payment_status || booking.payment_label ? (
+          <div className="rent-wallet-pay">
+            <span className="material-symbols-outlined" aria-hidden>
+              payments
+            </span>
+            <span>
+              {booking.payment_label || booking.payment_status}
+              {Number(booking.balance_due) > 0
+                ? ` · υπόλοιπο €${Number(booking.balance_due).toFixed(2)}`
+                : ''}
+            </span>
+          </div>
+        ) : null}
+
+        {booking.fiscal_mark ? (
+          <div className="rent-wallet-fiscal">
+            <span className="material-symbols-outlined" aria-hidden>
+              receipt_long
+            </span>
+            <span>
+              Απόδειξη {booking.fiscal_mark}
+              {booking.fiscal_amount != null ? ` · €${Number(booking.fiscal_amount).toFixed(2)}` : ''}
+            </span>
+          </div>
+        ) : null}
+
+        {booking.client_afm ? (
+          <p className="rent-wallet-afm">ΑΦΜ {booking.client_afm}</p>
+        ) : null}
+
+        {booking.id_verification_status && booking.id_verification_status !== 'not_required' ? (
+          <div
+            className={`rent-wallet-id ${
+              booking.id_verification_status === 'verified'
+                ? 'is-ok'
+                : booking.id_verification_status === 'rejected'
+                  ? 'is-bad'
+                  : 'is-pending'
+            }`}
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              {booking.id_verification_status === 'verified' ? 'verified_user' : 'badge'}
+            </span>
+            <span>
+              {booking.id_verification_status === 'verified'
+                ? 'Ταυτότητα επαληθεύτηκε'
+                : booking.id_verification_status === 'rejected'
+                  ? 'Έγγραφα απορρίφθηκαν — επικοινωνήστε με το γραφείο'
+                  : 'Έλεγχος ταυτότητας · εκκρεμεί από το γραφείο'}
+            </span>
+          </div>
+        ) : null}
+
         <div className="rent-wallet-route">
           <span className="material-symbols-outlined" aria-hidden>
             trip_origin
@@ -146,6 +203,40 @@ export default function RentalWalletPass({
             >
               {cancelling ? 'Ακύρωση…' : 'Ακύρωση κράτησης'}
             </button>
+          ) : null}
+          {status === 'CONFIRMED' && !onCancel ? (
+            <p className="rent-wallet-cancel-locked">
+              Online ακύρωση κλειστή — λιγότερο από 24 ώρες πριν την παραλαβή. Επικοινωνήστε με το γραφείο.
+            </p>
+          ) : null}
+          {onModify ? (
+            <button type="button" className="wallet-btn wallet-btn-block" onClick={onModify}>
+              Αλλαγή ημερομηνιών
+            </button>
+          ) : null}
+          {onCheckIn ? (
+            <button type="button" className="wallet-btn wallet-btn-block" onClick={onCheckIn}>
+              Check-in
+            </button>
+          ) : null}
+          {onCheckOut ? (
+            <button type="button" className="wallet-btn wallet-btn-block" onClick={onCheckOut}>
+              Check-out
+            </button>
+          ) : null}
+          {onContract ? (
+            <button type="button" className="wallet-btn wallet-btn-block" onClick={onContract}>
+              Λήψη σύμβασης
+            </button>
+          ) : null}
+          {booking.contract_accepted ? (
+            <p className="rent-wallet-contract-ok">
+              <span className="material-symbols-outlined" aria-hidden>
+                draw
+              </span>
+              Σύμβαση υπογεγραμμένη
+              {booking.contract_version ? ` · ${booking.contract_version}` : ''}
+            </p>
           ) : null}
           <button type="button" className="wallet-pass-cta" onClick={onBookVehicle}>
             Νέα κράτηση

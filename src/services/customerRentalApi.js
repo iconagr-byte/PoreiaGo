@@ -86,8 +86,103 @@ export async function createCustomerRentalBooking(body) {
   });
 }
 
+export async function uploadCustomerRentalIdDoc(file, kind) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(
+    `${API_BASE}/api/customer/rentals/id-docs/upload?kind=${encodeURIComponent(kind)}`,
+    {
+      method: 'POST',
+      headers: {
+        ...customerAuthHeaders(),
+      },
+      body: form,
+    },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data?.detail;
+    const msg =
+      typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d) => d.msg || d).join(', ')
+          : data?.message || `Αποτυχία ανεβάσματος (${res.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+export async function fetchRentalContractTerms() {
+  return customerRentalFetch('/contract');
+}
+
+export async function uploadCustomerRentalSignature(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/api/customer/rentals/signature-upload`, {
+    method: 'POST',
+    headers: {
+      ...customerAuthHeaders(),
+    },
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || `Αποτυχία υπογραφής (${res.status})`);
+  }
+  return data;
+}
+
 export async function cancelCustomerRentalBooking(bookingId) {
   return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
     method: 'POST',
   });
+}
+
+export async function modifyCustomerRentalBooking(bookingId, body) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export function customerRentalContractUrl(bookingId) {
+  return `${API_BASE}/api/customer/rentals/bookings/${encodeURIComponent(bookingId)}/contract`;
+}
+
+export async function remindCustomerRentalBooking(bookingId) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/remind`, {
+    method: 'POST',
+  });
+}
+
+export async function createCustomerRentalPaymentIntent(bookingId) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/payment-intent`, {
+    method: 'POST',
+  });
+}
+
+export async function createCustomerRentalInspection(bookingId, body) {
+  return customerRentalFetch(`/bookings/${encodeURIComponent(bookingId)}/inspections`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function uploadCustomerRentalPhoto(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/api/customer/rentals/photos/upload`, {
+    method: 'POST',
+    headers: {
+      ...customerAuthHeaders(),
+    },
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || `Αποτυχία ανεβάσματος (${res.status})`);
+  }
+  return data;
 }

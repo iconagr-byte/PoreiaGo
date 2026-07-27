@@ -7,6 +7,11 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchMyRentalBookings, cancelCustomerRentalBooking } from '../../services/customerRentalApi.js';
 import {
+  cancelBlockedMessage,
+  FREE_CANCEL_HOURS,
+  isFreeCancelEligible,
+} from '../../lib/rental/rentalCancel.js';
+import {
   geocodePlaces,
   jitterLatLng,
   placesFromBookings,
@@ -190,13 +195,23 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
     });
   }, [dayBookings, monthBookings, geoByPlace]);
 
-  const cancelBooking = async (id) => {
-    if (!window.confirm('Ακύρωση κράτησης;')) return;
+  const cancelBooking = async (booking) => {
+    if (!isFreeCancelEligible(booking)) {
+      toast.error(cancelBlockedMessage(booking));
+      return;
+    }
+    if (
+      !window.confirm(
+        `Δωρεάν ακύρωση (έως ${FREE_CANCEL_HOURS} ώρες πριν). Να ακυρωθεί η κράτηση;`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     try {
-      await cancelCustomerRentalBooking(id);
+      await cancelCustomerRentalBooking(booking.id);
       toast.success('Ακυρώθηκε');
-      setBookings((rows) => rows.filter((b) => b.id !== id));
+      setBookings((rows) => rows.filter((b) => b.id !== booking.id));
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -305,7 +320,7 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
                   {` · ${b.rental_status}`}
                 </span>
               </button>
-              {b.rental_status === 'CONFIRMED' ? (
+              {b.rental_status === 'CONFIRMED' && isFreeCancelEligible(b) ? (
                 <button
                   type="button"
                   disabled={busy}
@@ -320,10 +335,14 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
                     fontSize: '0.75rem',
                     cursor: 'pointer',
                   }}
-                  onClick={() => cancelBooking(b.id)}
+                  onClick={() => cancelBooking(b)}
                 >
                   Ακύρωση
                 </button>
+              ) : b.rental_status === 'CONFIRMED' ? (
+                <p style={{ margin: '0.35rem 0 0', fontSize: '0.7rem', color: '#8e8e93' }}>
+                  Ακύρωση μόνο μέσω γραφείου
+                </p>
               ) : null}
             </div>
           ))}
