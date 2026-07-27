@@ -45,7 +45,16 @@ const EMPTY = {
   client_phone: '',
 };
 
-export default function RentalCatalogPanel({ mode = 'full', onBooked } = {}) {
+function vehiclePhotos(v) {
+  return (v?.photo_urls?.length ? v.photo_urls : v?.photo_url ? [v.photo_url] : []).filter(Boolean);
+}
+
+export default function RentalCatalogPanel({
+  mode = 'full',
+  onBooked,
+  preferredVehicle = null,
+  onClearPreferred,
+} = {}) {
   const showBook = mode === 'full' || mode === 'book';
   const showMine = mode === 'full' || mode === 'mine';
   const bare = mode !== 'full';
@@ -70,6 +79,15 @@ export default function RentalCatalogPanel({ mode = 'full', onBooked } = {}) {
   useEffect(() => {
     loadMine();
   }, [loadMine]);
+
+  useEffect(() => {
+    if (!preferredVehicle) return;
+    setForm((f) => ({
+      ...f,
+      category: f.category || preferredVehicle.category || '',
+      min_seats: Math.max(Number(f.min_seats || 2), Number(preferredVehicle.seating_capacity || 2)),
+    }));
+  }, [preferredVehicle]);
 
   const validateDates = () => {
     if (!form.start_time || !form.end_time) {
@@ -104,7 +122,12 @@ export default function RentalCatalogPanel({ mode = 'full', onBooked } = {}) {
         driverMode: form.driver_mode,
       });
       setSuggestions(rows);
-      setSelectedId(rows[0]?.id || '');
+      const preferredId = preferredVehicle?.id;
+      const selected =
+        preferredId && rows.some((v) => String(v.id) === String(preferredId))
+          ? preferredId
+          : rows[0]?.id || '';
+      setSelectedId(selected);
       if (!rows.length) toast.error('Δεν βρέθηκε διαθέσιμο όχημα');
     } catch (err) {
       toast.error(err.message);
@@ -140,6 +163,7 @@ export default function RentalCatalogPanel({ mode = 'full', onBooked } = {}) {
       toast.success('Η κράτηση ενοικίασης καταχωρήθηκε');
       setSuggestions([]);
       setSelectedId('');
+      if (onClearPreferred) onClearPreferred();
       await loadMine();
       if (typeof onBooked === 'function') onBooked(created);
     } catch (err) {
@@ -179,6 +203,42 @@ export default function RentalCatalogPanel({ mode = 'full', onBooked } = {}) {
             <p>Βρείτε διαθέσιμο όχημα και κλείστε άμεσα από το κινητό.</p>
           </div>
         </div>
+        ) : null}
+
+        {preferredVehicle ? (
+          <div className="rent-picked-vehicle">
+            <div className="rent-picked-vehicle-media">
+              {vehiclePhotos(preferredVehicle)[0] ? (
+                <img
+                  src={vehiclePhotos(preferredVehicle)[0]}
+                  alt={preferredVehicle.model || 'Όχημα'}
+                  loading="lazy"
+                />
+              ) : (
+                <span className="material-symbols-outlined">directions_car</span>
+              )}
+            </div>
+            <div className="rent-picked-vehicle-body">
+              <p className="rent-picked-vehicle-label">Επιλεγμένο από στόλο</p>
+              <strong>
+                {preferredVehicle.model}{' '}
+                {preferredVehicle.category ? `· ${preferredVehicle.category}` : ''}
+              </strong>
+              <span>
+                {preferredVehicle.seating_capacity || '—'} θέσεις · από{' '}
+                {euro(preferredVehicle.daily_rate_eur)}/ημέρα
+              </span>
+            </div>
+            {onClearPreferred ? (
+              <button
+                type="button"
+                className="rent-btn rent-btn-ghost"
+                onClick={() => onClearPreferred()}
+              >
+                Αλλαγή
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         <form className="wallet-form" onSubmit={search}>
@@ -290,13 +350,7 @@ export default function RentalCatalogPanel({ mode = 'full', onBooked } = {}) {
           </p>
           <div className="rent-vehicle-list">
             {suggestions.map((v) => {
-              const photos = (
-                v.photo_urls?.length
-                  ? v.photo_urls
-                  : v.photo_url
-                    ? [v.photo_url]
-                    : []
-              ).filter(Boolean);
+              const photos = vehiclePhotos(v);
               const isSelected = selectedId === v.id;
               return (
                 <label

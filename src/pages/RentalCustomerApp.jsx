@@ -11,6 +11,7 @@ import {
 import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import { fetchCustomerRentalCatalog } from '../services/customerRentalApi.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
@@ -50,6 +51,9 @@ function RentalAuthenticatedApp() {
   const [brandName, setBrandName] = useState('Ενοικίαση');
   const [calKey, setCalKey] = useState(0);
   const [walletKey, setWalletKey] = useState(0);
+  const [homeFleet, setHomeFleet] = useState([]);
+  const [fleetLoading, setFleetLoading] = useState(true);
+  const [featuredVehicle, setFeaturedVehicle] = useState(null);
 
   useEffect(() => setupRentalPwa(), []);
 
@@ -63,6 +67,26 @@ function RentalAuthenticatedApp() {
         setBrandName(`${office} Rent`);
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setFleetLoading(true);
+    fetchCustomerRentalCatalog()
+      .then((rows) => {
+        if (cancelled) return;
+        setHomeFleet(Array.isArray(rows) ? rows.slice(0, 12) : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setHomeFleet([]);
+      })
+      .finally(() => {
+        if (!cancelled) setFleetLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -109,6 +133,57 @@ function RentalAuthenticatedApp() {
               </section>
               <div className="rent-home-stack">
                 <RentalInstallPrompt force />
+                <section className="rent-home-fleet" aria-label="Στόλος ενοικίασης">
+                  <div className="rent-home-fleet-head">
+                    <h2>Στόλος ενοικίασης</h2>
+                    <button
+                      type="button"
+                      className="rent-home-fleet-link"
+                      onClick={() => setTab('book')}
+                    >
+                      Δες όλα
+                    </button>
+                  </div>
+                  {fleetLoading ? (
+                    <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
+                  ) : homeFleet.length ? (
+                    <div className="rent-home-fleet-strip">
+                      {homeFleet.map((v) => {
+                        const cover = v.photo_urls?.[0] || v.photo_url || '';
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            className="rent-home-fleet-card"
+                            onClick={() => {
+                              setFeaturedVehicle(v);
+                              setTab('book');
+                            }}
+                          >
+                            <div className="rent-home-fleet-media">
+                              {cover ? (
+                                <img src={cover} alt={v.model || 'Όχημα'} loading="lazy" />
+                              ) : (
+                                <span className="material-symbols-outlined">directions_car</span>
+                              )}
+                            </div>
+                            <div className="rent-home-fleet-body">
+                              <strong>{v.model || 'Όχημα'}</strong>
+                              <span>
+                                {v.seating_capacity || '—'} θέσεις · από €{Number(v.daily_rate_eur || 0).toFixed(0)}
+                                /ημέρα
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="rent-home-fleet-empty">
+                      Δεν υπάρχουν διαθέσιμα οχήματα αυτή τη στιγμή.
+                    </p>
+                  )}
+                </section>
                 <div className="rent-quick">
                   <button type="button" onClick={() => setTab('calendar')}>
                     <span className="material-symbols-outlined" aria-hidden>
@@ -137,6 +212,8 @@ function RentalAuthenticatedApp() {
               </p>
               <RentalCatalogPanel
                 mode="book"
+                preferredVehicle={featuredVehicle}
+                onClearPreferred={() => setFeaturedVehicle(null)}
                 onBooked={() => {
                   setCalKey((k) => k + 1);
                   setWalletKey((k) => k + 1);
