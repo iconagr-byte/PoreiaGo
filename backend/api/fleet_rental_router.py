@@ -81,6 +81,10 @@ class BookingStatusBody(BaseModel):
     rental_status: str
 
 
+class VerifyQrBody(BaseModel):
+    code: str = Field(min_length=1, max_length=240)
+
+
 class InspectionBody(BaseModel):
     rental_booking_id: str
     inspection_type: str
@@ -229,6 +233,33 @@ async def patch_booking_status(
         msg = str(exc)
         code = 404 if "δεν βρέθηκε" in msg else 400
         raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/verify-qr")
+async def verify_rental_qr(
+    body: VerifyQrBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Desk scan of Rent Wallet pass (`RENT:{booking_id}`) — verify only."""
+    try:
+        return store.verify_rental_qr(_tid(tenant_id), body.code)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+
+@router.get("/bookings/{booking_id}")
+async def get_booking(
+    booking_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    row = store.get_booking(_tid(tenant_id), booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
     return row
 
 
