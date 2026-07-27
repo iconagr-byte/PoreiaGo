@@ -13,8 +13,10 @@ import TripDetails from './pages/TripDetails';
 import SimpleWalletPage from './pages/SimpleWalletPage.jsx';
 import WalletMagicPage from './pages/WalletMagicPage.jsx';
 import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
+import RentalServicesPage from './pages/RentalServicesPage.jsx';
 import InBusPortal from './pages/InBusPortal';
 import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
+import RentalShareTrackPage from './pages/RentalShareTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
 import DriverCommandCenter from './pages/driver/DriverCommandCenter';
 import DriverAuthPage from './pages/driver/DriverAuthPage.jsx';
@@ -73,6 +75,7 @@ function App() {
             {/* Rent auth lives on /rent (share URL). /rent/login is an alias only. */}
             <Route path="/rent/login" element={<Navigate to="/rent" replace />} />
             <Route path="/rent/register" element={<RegisterPage />} />
+            <Route path="/rent/services" element={<RentalServicesPage />} />
             <Route path="/rent" element={<RentalCustomerApp />} />
             <Route path="/rent/*" element={<RentalCustomerApp />} />
             <Route path="/" element={<HomePage />} />
@@ -118,6 +121,7 @@ function App() {
             <Route path="/checkout/resume/:token" element={<CheckoutResumePage />} />
             <Route path="/in-bus" element={<InBusPortal />} />
             <Route path="/track/trip/:tripId" element={<PassengerTrackPage />} />
+            <Route path="/track/rental/:bookingId" element={<RentalShareTrackPage />} />
           </Routes>
         </MaintenanceGate>
       </Router>

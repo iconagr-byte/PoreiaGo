@@ -43,27 +43,29 @@ function NavList({ activeTab, onNavigate, onItemClick }) {
   );
 }
 
-export default function AdminLayout({ activeTab, title, children, footer }) {
+export default function AdminLayout({ activeTab, title, children, footer, hideNav = false }) {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="bg-surface text-on-surface h-dvh max-h-dvh flex overflow-hidden">
-      <aside className="w-64 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0">
-        <div className="p-6">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-left"
-            aria-label="Αρχική"
-          >
-            <OfficeBrandMark className="h-9" variant="light" asLink={false} fallbackLabel="Admin" />
-          </button>
-        </div>
-        <NavList activeTab={activeTab} onNavigate={navigate} />
-      </aside>
+      {!hideNav ? (
+        <aside className="w-64 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0">
+          <div className="p-6">
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="text-left"
+              aria-label="Αρχική"
+            >
+              <OfficeBrandMark className="h-9" variant="light" asLink={false} fallbackLabel="Admin" />
+            </button>
+          </div>
+          <NavList activeTab={activeTab} onNavigate={navigate} />
+        </aside>
+      ) : null}
 
-      {mobileOpen ? (
+      {!hideNav && mobileOpen ? (
         <div className="fixed inset-0 z-[80] md:hidden" role="dialog" aria-modal="true">
           <button type="button" className="absolute inset-0 bg-black/40" aria-label="Κλείσιμο" onClick={() => setMobileOpen(false)} />
           <aside className="absolute inset-y-0 left-0 w-[min(100%,20rem)] bg-surface-container-lowest shadow-2xl flex flex-col">
@@ -81,14 +83,16 @@ export default function AdminLayout({ activeTab, title, children, footer }) {
       <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {title && (
           <header className="min-h-16 sm:h-20 glass-overlay border-b border-black/[0.05] flex items-center gap-3 px-4 sm:px-margin-desktop shrink-0 py-3">
-            <button
-              type="button"
-              className="md:hidden w-11 h-11 rounded-full bg-white border border-black/[0.08] shadow-sm flex items-center justify-center shrink-0"
-              aria-label="Άνοιγμα μενού"
-              onClick={() => setMobileOpen(true)}
-            >
-              <span className="material-symbols-outlined">menu</span>
-            </button>
+            {!hideNav ? (
+              <button
+                type="button"
+                className="md:hidden w-11 h-11 rounded-full bg-white border border-black/[0.08] shadow-sm flex items-center justify-center shrink-0"
+                aria-label="Άνοιγμα μενού"
+                onClick={() => setMobileOpen(true)}
+              >
+                <span className="material-symbols-outlined">menu</span>
+              </button>
+            ) : null}
             <div className="min-w-0 flex-1">{title}</div>
           </header>
         )}

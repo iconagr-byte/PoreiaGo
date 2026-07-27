@@ -58,6 +58,8 @@ class VehicleBody(BaseModel):
     photo_urls: list[str] = Field(default_factory=list)
     description: str | None = Field(default=None, max_length=2000)
     notes: str | None = None
+    branch_id: str | None = None
+    branch_name: str | None = None
 
 
 class BookingBody(BaseModel):
@@ -65,6 +67,7 @@ class BookingBody(BaseModel):
     client_name: str = Field(min_length=1, max_length=160)
     client_email: str | None = None
     client_phone: str | None = None
+    client_afm: str | None = None
     client_id: str | None = None
     channel: str = "DESK"
     start_time: str
@@ -79,6 +82,29 @@ class BookingBody(BaseModel):
 
 class BookingStatusBody(BaseModel):
     rental_status: str
+
+
+class IssueReceiptBody(BaseModel):
+    kind: str = "aade_receipt"
+    amount: float | None = None
+
+
+class BankDepositConfirmBody(BaseModel):
+    confirmed_amount: float | None = None
+    reference_code: str | None = None
+    note: str | None = None
+
+
+class DamageDepositBody(BaseModel):
+    action: str = Field(description="release | capture | hold")
+
+
+class IdVerificationBody(BaseModel):
+    id_verification_status: str = Field(description="pending | verified | rejected")
+
+
+class VerifyQrBody(BaseModel):
+    code: str = Field(min_length=1, max_length=240)
 
 
 class InspectionBody(BaseModel):
@@ -162,6 +188,7 @@ async def availability(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
+    branch: str | None = None,
     tenant_id: UUID = Depends(get_current_tenant_id),
     _: dict = Depends(_require_admin),
 ):
@@ -175,6 +202,7 @@ async def availability(
             pickup_location=pickup_location,
             dropoff_location=dropoff_location,
             driver_mode=driver_mode,
+            branch=branch,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -229,6 +257,137 @@ async def patch_booking_status(
         msg = str(exc)
         code = 404 if "δεν βρέθηκε" in msg else 400
         raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/bookings/{booking_id}/issue-receipt")
+async def issue_booking_receipt(
+    booking_id: str,
+    body: IssueReceiptBody | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Issue fiscal receipt — tries AADE/myDATA first; LOCAL-* on failure.
+
+    AADE_MODE=stub returns MARK-STUB marks from the gateway.
+    """
+    from travel_platform.rental.rental_fiscal import issue_receipt_for_booking
+
+    payload = body or IssueReceiptBody()
+    try:
+        row = issue_receipt_for_booking(
+            _tid(tenant_id),
+            booking_id,
+            kind=payload.kind or "aade_receipt",
+            amount=payload.amount,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/bookings/{booking_id}/confirm-bank-deposit")
+async def confirm_rental_bank_deposit(
+    booking_id: str,
+    body: BankDepositConfirmBody | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    payload: dict = Depends(_require_admin),
+):
+    """Admin confirm bank transfer for a pending rental booking."""
+    data = body or BankDepositConfirmBody()
+    try:
+        row = store.confirm_bank_deposit_for_rental(
+            _tid(tenant_id),
+            booking_id,
+            confirmed_amount=data.confirmed_amount,
+            reference_code=data.reference_code,
+            note=data.note,
+            actor_id=str(payload.get("sub") or payload.get("user_id") or "") or None,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/bookings/{booking_id}/damage-deposit")
+async def rental_damage_deposit_action(
+    booking_id: str,
+    body: DamageDepositBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        row = store.set_damage_deposit_status(
+            _tid(tenant_id),
+            booking_id,
+            action=body.action,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/reminders/scan")
+async def admin_scan_rental_reminders(
+    within_hours: float = Query(default=24, ge=1, le=168),
+    _: dict = Depends(_require_admin),
+):
+    from travel_platform.notifications.rental_customer_push import scan_and_notify_upcoming_rentals
+
+    return await scan_and_notify_upcoming_rentals(within_hours=within_hours)
+
+
+@router.patch("/bookings/{booking_id}/id-verification")
+async def patch_booking_id_verification(
+    booking_id: str,
+    body: IdVerificationBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Desk review of customer ID / driving license photos."""
+    try:
+        row = store.update_id_verification(
+            _tid(tenant_id),
+            booking_id,
+            body.id_verification_status,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.post("/verify-qr")
+async def verify_rental_qr(
+    body: VerifyQrBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Desk scan of Rent Wallet pass (`RENT:{booking_id}`) — verify only."""
+    try:
+        return store.verify_rental_qr(_tid(tenant_id), body.code)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+
+@router.get("/bookings/{booking_id}")
+async def get_booking(
+    booking_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    row = store.get_booking(_tid(tenant_id), booking_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Η κράτηση δεν βρέθηκε")
     return row
 
 
@@ -306,3 +465,64 @@ async def upload_inspection_photo(
         "bytes": len(optimized.content),
         "content_type": optimized.content_type,
     }
+
+
+class SafetySettingsBody(BaseModel):
+    office_phone: str | None = None
+    roadside_phone_24_7: str | None = None
+    roadside_label: str | None = None
+    emergency_sms: str | None = None
+    cdw_franchise_eur: float | None = Field(default=None, ge=0)
+    scdw_franchise_eur: float | None = Field(default=None, ge=0)
+    scdw_daily_eur: float | None = Field(default=None, ge=0)
+
+
+@router.get("/safety-settings")
+async def get_rental_safety_settings(_: dict = Depends(_require_admin)):
+    from travel_platform.rental.rental_safety_settings import resolve_safety_contacts
+
+    return resolve_safety_contacts()
+
+
+@router.patch("/safety-settings")
+async def patch_rental_safety_settings(
+    body: SafetySettingsBody,
+    _: dict = Depends(_require_admin),
+):
+    from travel_platform.rental.rental_safety_settings import (
+        resolve_safety_contacts,
+        update_safety_settings,
+    )
+
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    update_safety_settings(patch)
+    return resolve_safety_contacts()
+
+
+class RentModuleBody(BaseModel):
+    rent_enabled: bool | None = None
+    rent_addon_monthly_eur: float | None = Field(default=None, ge=0)
+    note: str | None = None
+
+
+@router.get("/module")
+async def get_rent_module(_: dict = Depends(_require_admin)):
+    """Rent SaaS add-on entitlement (separate from bus/core plan)."""
+    from travel_platform.rental.rental_module_entitlement import read_rent_module
+
+    return read_rent_module()
+
+
+@router.patch("/module")
+async def patch_rent_module(
+    body: RentModuleBody,
+    _: dict = Depends(_require_admin),
+):
+    from travel_platform.rental.rental_module_entitlement import (
+        read_rent_module,
+        update_rent_module,
+    )
+
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    update_rent_module(patch)
+    return read_rent_module()

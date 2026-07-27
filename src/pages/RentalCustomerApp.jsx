@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   getCustomerEmail,
   getCustomerName,
@@ -11,12 +11,18 @@ import {
 import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
-import { fetchCustomerRentalCatalog, fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
+import {
+  fetchCustomerRentalCatalog,
+  fetchPublicRentalCatalog,
+  fetchPublicRentModule,
+} from '../services/customerRentalApi.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
 import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
+import RentalServicesShowcase from '../components/rental/RentalServicesShowcase.jsx';
 import LoginPage from './LoginPage.jsx';
+import { getRentLang, setRentLang, t } from '../lib/rental/rentI18n.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -211,6 +217,14 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                 <p className="rent-home-fleet-empty">Δεν βρέθηκαν οχήματα για τα φίλτρα.</p>
               )}
             </div>
+
+            <RentalServicesShowcase
+              compact
+              onCta={() => {
+                window.location.assign('/rent/services');
+              }}
+              ctaLabel={t('services_help', getRentLang())}
+            />
           </div>
         </main>
       </div>
@@ -222,9 +236,55 @@ function RentalAuthGate() {
   // Re-check auth after in-place login (same URL /rent).
   const location = useLocation();
   const [showLogin, setShowLogin] = useState(false);
+  const [rentEnabled, setRentEnabled] = useState(true);
+  const [moduleLoaded, setModuleLoaded] = useState(false);
+
   useEffect(() => setupRentalPwa(), []);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicRentModule()
+      .then((mod) => {
+        if (!cancelled) setRentEnabled(mod?.rent_enabled !== false);
+      })
+      .catch(() => {
+        if (!cancelled) setRentEnabled(true);
+      })
+      .finally(() => {
+        if (!cancelled) setModuleLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (isCustomer() && !getCustomerToken()) logoutCustomer();
+
+  if (moduleLoaded && !rentEnabled) {
+    const lang = getRentLang();
+    return (
+      <div className="rent-phone-stage">
+        <div className="rent-app rent-app--guest">
+          <header className="rent-topbar">
+            <span className="rent-topbar-brand">Rent</span>
+          </header>
+          <main className="rent-home">
+            <section className="rent-hero">
+              <h1 className="rent-hero-title">{t('services_unavailable', lang)}</h1>
+              <p className="rent-hero-copy">
+                {lang === 'en'
+                  ? 'Ask the office to enable the Rent module on their contract.'
+                  : 'Ζητήστε από το γραφείο να ενεργοποιήσει το module Ενοικιάσεις στο συμβόλαιο.'}
+              </p>
+              <Link to="/" className="rent-hero-cta">
+                Αρχική
+              </Link>
+            </section>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   if (getCustomerToken()) return <RentalAuthenticatedApp key={location.key} />;
 
@@ -250,6 +310,7 @@ function RentalAuthenticatedApp() {
     }
   });
   const [brandName, setBrandName] = useState('Ενοικίαση');
+  const [lang, setLang] = useState(() => getRentLang());
   const [calKey, setCalKey] = useState(0);
   const [walletKey, setWalletKey] = useState(0);
   const [homeFleet, setHomeFleet] = useState([]);
@@ -349,9 +410,23 @@ function RentalAuthenticatedApp() {
             <button type="button" className="rent-topbar-brand" onClick={() => setTab('home')}>
               {brandName}
             </button>
-            <button type="button" className="rent-btn rent-btn-ghost" onClick={() => setTab('book')}>
-              Νέα κράτηση
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rent-btn rent-btn-ghost"
+                onClick={() => {
+                  const next = getRentLang() === 'en' ? 'el' : 'en';
+                  setRentLang(next);
+                  setLang(next);
+                }}
+                aria-label={t('language', lang)}
+              >
+                {lang === 'en' ? 'EL' : 'EN'}
+              </button>
+              <button type="button" className="rent-btn rent-btn-ghost" onClick={() => setTab('book')}>
+                {t('new_booking', lang)}
+              </button>
+            </div>
           </header>
         ) : null}
 
@@ -475,6 +550,14 @@ function RentalAuthenticatedApp() {
                     <span className="rent-quick-meta">Κάρτες ενοικίασης</span>
                   </button>
                 </div>
+
+                <RentalServicesShowcase
+                  compact
+                  onCta={() => {
+                    window.location.assign('/rent/services');
+                  }}
+                  ctaLabel={t('services_help', getRentLang())}
+                />
               </div>
             </>
           ) : null}
@@ -558,6 +641,9 @@ function RentalAuthenticatedApp() {
               </dl>
               <RentalInstallPrompt force />
               <div style={{ display: 'grid', gap: '0.6rem', marginTop: '1.25rem' }}>
+                <Link to="/rent/services" className="rent-btn rent-btn-ghost rent-btn-block">
+                  {t('services_help', getRentLang())}
+                </Link>
                 <button
                   type="button"
                   className="rent-btn rent-btn-ghost rent-btn-block"

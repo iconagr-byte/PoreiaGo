@@ -31,6 +31,7 @@ _PLAN_BASE_CENTS = {
     TenantPlan.STARTER: 9900,
     TenantPlan.PROFESSIONAL: 29900,
     TenantPlan.ENTERPRISE: 0,
+    TenantPlan.RENT: 14900,
 }
 
 _SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
@@ -336,13 +337,14 @@ class PlatformAdminService:
         self._session.add(tenant)
         await self._session.flush()
 
+        base_cents = _PLAN_BASE_CENTS.get(plan, _PLAN_BASE_CENTS[TenantPlan.STARTER])
         self._session.add(
             Subscription(
                 id=uuid4(),
                 tenant_id=tenant.id,
                 plan=plan,
                 status=SubscriptionStatus.TRIALING,
-                base_amount_cents=_PLAN_BASE_CENTS[plan],
+                base_amount_cents=base_cents,
                 trial_ends_at=datetime.now(timezone.utc) + timedelta(days=14),
             ),
         )

@@ -1,20 +1,51 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   cancelCustomerRentalBooking,
   createCustomerRentalBooking,
+  createCustomerRentalPaymentIntent,
+  confirmCustomerRentalPayment,
   fetchCustomerRentalAvailability,
+  fetchCustomerRentalBranches,
   fetchMyRentalBookings,
+  fetchRentalContractTerms,
+  fetchRentalInsuranceCover,
+  uploadCustomerRentalIdDoc,
+  uploadCustomerRentalSignature,
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
+import { fetchPublicPaymentSettings } from '../../services/paymentSettingsApi.js';
+import { toLegacyCheckoutShape } from '../../lib/payments/paymentSettings.js';
+import {
+  amountDueAtCheckout,
+  computeDepositSplit,
+  PAYMENT_PLAN_DEPOSIT,
+  PAYMENT_PLAN_FULL,
+} from '../../lib/payments/depositPayment.js';
+import { getCheckoutPaymentMethods } from '../../lib/payments/bankTransfer.js';
+import {
+  getRentalPaymentPlans,
+  paymentStatusLabel,
+} from '../../lib/rental/rentalPayment.js';
+import RentalSignaturePad from '../admin/fleet/RentalSignaturePad.jsx';
+import RentalStripePay from '../rental/RentalStripePay.jsx';
+import { FALLBACK_CONTRACT } from '../../lib/rental/rentalContract.js';
+import {
+  cancelBlockedMessage,
+  FREE_CANCEL_HOURS,
+  isFreeCancelEligible,
+} from '../../lib/rental/rentalCancel.js';
+import { getRentLang, t } from '../../lib/rental/rentI18n.js';
 
 const CATEGORIES = [
-  { value: '', label: 'Όλες' },
+  { value: '', labelKey: 'all_categories' },
   { value: 'CAR', label: 'Αυτοκίνητο' },
   { value: 'VAN', label: 'Van' },
   { value: 'MINIBUS', label: 'Μινιμπάς' },
 ];
+
+const AGE_BY_CATEGORY = { CAR: 21, VAN: 23, MINIBUS: 25 };
 
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
@@ -43,13 +74,46 @@ const EMPTY = {
   dropoff_location: 'Γραφείο',
   driver_mode: 'SELF_DRIVE',
   client_phone: '',
+  client_afm: '',
   extra_insurance: false,
+  scdw: false,
   child_seat: false,
   gps_pack: false,
+  airport_pickup: false,
+  young_driver: false,
 };
 
 const PREFS_KEY = 'rent_booking_prefs_v1';
 const FUNNEL_KEY = 'rent_funnel_events_v1';
+const ID_DOCS_KEY = 'rent_id_docs_v1';
+
+const EMPTY_ID = {
+  id_document_url: '',
+  driving_license_url: '',
+  date_of_birth: '',
+  license_number: '',
+  license_expires_at: '',
+};
+
+function loadSavedIdDocs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(ID_DOCS_KEY) || '{}');
+    return { ...EMPTY_ID, ...raw };
+  } catch {
+    return { ...EMPTY_ID };
+  }
+}
+
+function ageFromDob(dob) {
+  if (!dob) return null;
+  const d = new Date(`${dob}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age -= 1;
+  return age;
+}
 
 function trackFunnel(step, meta = {}) {
   try {
@@ -61,12 +125,27 @@ function trackFunnel(step, meta = {}) {
   }
 }
 
-function trustBadge(vehicleId = '') {
+function trustBadge(vehicle) {
+  if (vehicle?.trust?.real && vehicle.trust.rating != null) {
+    return {
+      rating: Number(vehicle.trust.rating),
+      booked: Number(vehicle.trust.booked || vehicle.rating_count || 0),
+      real: true,
+    };
+  }
+  if (vehicle?.rating_avg != null) {
+    return {
+      rating: Number(vehicle.rating_avg),
+      booked: Number(vehicle.rating_count || 0),
+      real: true,
+    };
+  }
+  const vehicleId = vehicle?.id || vehicle || '';
   let sum = 0;
   for (const ch of String(vehicleId)) sum += ch.charCodeAt(0);
   const rating = 4.4 + (sum % 6) * 0.1;
   const booked = 8 + (sum % 37);
-  return { rating: Math.min(4.9, Number(rating.toFixed(1))), booked };
+  return { rating: Math.min(4.9, Number(rating.toFixed(1))), booked, real: false };
 }
 
 function asDateValue(iso) {
@@ -142,6 +221,17 @@ export default function RentalCatalogPanel({
   const [onlyTopRated, setOnlyTopRated] = useState(false);
   const [details, setDetails] = useState(null);
   const [recentBooked, setRecentBooked] = useState(null);
+  const [paymentSettings, setPaymentSettings] = useState(null);
+  const [paymentPlan, setPaymentPlan] = useState(PAYMENT_PLAN_FULL);
+  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [idDocs, setIdDocs] = useState(EMPTY_ID);
+  const [uploadingKind, setUploadingKind] = useState('');
+  const [contract, setContract] = useState(FALLBACK_CONTRACT);
+  const [contractAccepted, setContractAccepted] = useState(false);
+  const [insuranceCover, setInsuranceCover] = useState(null);
+  const [insuranceAck, setInsuranceAck] = useState(false);
+  const [signatureUrl, setSignatureUrl] = useState('');
+  const [sigBusy, setSigBusy] = useState(false);
   const [remindersEnabled, setRemindersEnabled] = useState(() => {
     try {
       return localStorage.getItem('rent_reminders_enabled_v1') === '1';
@@ -149,6 +239,103 @@ export default function RentalCatalogPanel({
       return false;
     }
   });
+  const [stripePay, setStripePay] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [branchFilter, setBranchFilter] = useState('');
+  const lang = getRentLang();
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCustomerRentalBranches()
+      .then((rows) => {
+        if (!cancelled) setBranches(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setBranches([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const settings = await fetchPublicPaymentSettings();
+        if (!cancelled) setPaymentSettings(settings);
+      } catch {
+        /* offline — defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const terms = await fetchRentalContractTerms();
+        if (!cancelled && terms?.clauses?.length) setContract(terms);
+      } catch {
+        /* fallback */
+      }
+      try {
+        const cover = await fetchRentalInsuranceCover();
+        if (!cancelled && cover) setInsuranceCover(cover);
+      } catch {
+        /* optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const checkoutSettings = useMemo(
+    () => (paymentSettings ? toLegacyCheckoutShape(paymentSettings) : null),
+    [paymentSettings],
+  );
+  const depositPercent = checkoutSettings?.checkout_deposit_percent ?? 30;
+  const depositEnabled = checkoutSettings?.checkout_deposit_enabled !== false;
+  const paymentPlans = useMemo(
+    () =>
+      depositEnabled
+        ? getRentalPaymentPlans(depositPercent)
+        : getRentalPaymentPlans(depositPercent).slice(0, 1),
+    [depositEnabled, depositPercent],
+  );
+  const paymentMethods = useMemo(
+    () => getCheckoutPaymentMethods(paymentSettings || checkoutSettings || {}),
+    [paymentSettings, checkoutSettings],
+  );
+
+  useEffect(() => {
+    if (!depositEnabled && paymentPlan !== PAYMENT_PLAN_FULL) {
+      setPaymentPlan(PAYMENT_PLAN_FULL);
+    }
+  }, [depositEnabled, paymentPlan]);
+
+  useEffect(() => {
+    if (!paymentMethods.length) return;
+    if (!paymentMethods.some((m) => m.id === paymentMethod)) {
+      setPaymentMethod(paymentMethods[0].id);
+    }
+  }, [paymentMethods, paymentMethod]);
+
+  useEffect(() => {
+    setIdDocs(loadSavedIdDocs());
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ID_DOCS_KEY, JSON.stringify(idDocs));
+    } catch {
+      /* ignore */
+    }
+  }, [idDocs]);
 
   const loadMine = useCallback(async () => {
     try {
@@ -244,6 +431,7 @@ export default function RentalCatalogPanel({
         pickupLocation: form.pickup_location,
         dropoffLocation: form.dropoff_location,
         driverMode: form.driver_mode,
+        branch: branchFilter || undefined,
       });
       setSuggestions(rows);
       const preferredId = preferredVehicle?.id;
@@ -261,18 +449,105 @@ export default function RentalCatalogPanel({
     }
   };
 
+  const uploadIdDoc = async (kind, file) => {
+    if (!file) return;
+    setUploadingKind(kind);
+    try {
+      const data = await uploadCustomerRentalIdDoc(file, kind);
+      setIdDocs((prev) => ({
+        ...prev,
+        ...(kind === 'id_card'
+          ? { id_document_url: data.url }
+          : { driving_license_url: data.url }),
+      }));
+      trackFunnel('id_doc_uploaded', { kind });
+      toast.success(kind === 'id_card' ? 'Ταυτότητα ανέβηκε' : 'Δίπλωμα ανέβηκε');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUploadingKind('');
+    }
+  };
+
+  const validateIdentity = () => {
+    if (form.driver_mode !== 'SELF_DRIVE') return true;
+    if (!idDocs.id_document_url) {
+      toast.error('Ανεβάστε φωτογραφία ταυτότητας ή διαβατηρίου');
+      return false;
+    }
+    if (!idDocs.driving_license_url) {
+      toast.error('Ανεβάστε φωτογραφία διπλώματος');
+      return false;
+    }
+    if (!idDocs.date_of_birth) {
+      toast.error('Συμπληρώστε ημερομηνία γέννησης');
+      return false;
+    }
+    const selectedVehicle = suggestions.find((v) => v.id === selectedId);
+    const cat = selectedVehicle?.category || form.category || 'CAR';
+    const minAge = AGE_BY_CATEGORY[String(cat).toUpperCase()] || 21;
+    const age = ageFromDob(idDocs.date_of_birth);
+    if (age == null || age < minAge) {
+      toast.error(`${t('min_age', lang)}: ${minAge} (${cat})`);
+      return false;
+    }
+    if (!idDocs.license_number.trim()) {
+      toast.error('Συμπληρώστε αριθμό διπλώματος');
+      return false;
+    }
+    if (!idDocs.license_expires_at) {
+      toast.error('Συμπληρώστε λήξη διπλώματος');
+      return false;
+    }
+    const expiry = new Date(`${idDocs.license_expires_at}T23:59:59`);
+    const end = new Date(form.end_time);
+    if (Number.isFinite(expiry.getTime()) && Number.isFinite(end.getTime()) && expiry < end) {
+      toast.error('Το δίπλωμα λήγει πριν το τέλος της ενοικίασης');
+      return false;
+    }
+    return true;
+  };
+
   const book = async () => {
     if (!selectedId) {
       toast.error('Επιλέξτε όχημα');
       return;
     }
     if (!validateDates()) return;
-    const extras = [];
-    if (form.extra_insurance) extras.push('Extra insurance');
-    if (form.child_seat) extras.push('Child seat');
-    if (form.gps_pack) extras.push('GPS pack');
+    if (!validateIdentity()) return;
+    if (!paymentMethods.length) {
+      toast.error('Δεν υπάρχουν διαθέσιμοι τρόποι πληρωμής');
+      return;
+    }
+    if (!contractAccepted) {
+      toast.error('Αποδεχτείτε τους όρους μίσθωσης');
+      return;
+    }
+    if (form.driver_mode === 'SELF_DRIVE' && !insuranceAck) {
+      toast.error(t('insurance_ack', lang));
+      return;
+    }
+    if (!signatureUrl) {
+      toast.error('Υπογράψτε τη σύμβαση πριν την κράτηση');
+      return;
+    }
     setBusy(true);
     try {
+      if (form.client_afm && !/^\d{9}$/.test(String(form.client_afm).trim())) {
+        toast.error('Το ΑΦΜ πρέπει να έχει 9 ψηφία');
+        setBusy(false);
+        return;
+      }
+      const identity =
+        form.driver_mode === 'SELF_DRIVE'
+          ? {
+              id_document_url: idDocs.id_document_url,
+              driving_license_url: idDocs.driving_license_url,
+              date_of_birth: idDocs.date_of_birth,
+              license_number: idDocs.license_number.trim(),
+              license_expires_at: idDocs.license_expires_at,
+            }
+          : {};
       const created = await createCustomerRentalBooking({
         vehicle_id: selectedId,
         start_time: new Date(form.start_time).toISOString(),
@@ -281,20 +556,66 @@ export default function RentalCatalogPanel({
         dropoff_location: form.dropoff_location || form.pickup_location,
         driver_mode: form.driver_mode,
         client_phone: form.client_phone || null,
-        notes: extras.length ? `Extras: ${extras.join(', ')}` : null,
+        client_afm: form.client_afm?.trim() || null,
+        extras: {
+          extra_insurance: Boolean(form.extra_insurance),
+          scdw: Boolean(form.scdw),
+          child_seat: Boolean(form.child_seat),
+          gps_pack: Boolean(form.gps_pack),
+          airport_pickup: Boolean(form.airport_pickup),
+          young_driver: Boolean(form.young_driver),
+        },
+        payment_plan: paymentPlan,
+        payment_method: paymentMethod,
+        deposit_percent: depositPercent,
+        ...identity,
+        contract_accepted: true,
+        contract_signature_url: signatureUrl,
+        contract_signer_name: getCustomerName() || getCustomerEmail() || 'Πελάτης',
+        contract_version: contract.version,
       });
+      if (paymentMethod === 'card' || paymentMethod === 'paypal' || paymentMethod === 'apple') {
+        try {
+          const pi = await createCustomerRentalPaymentIntent(created.id);
+          if (pi?.client_secret) {
+            setStripePay({ clientSecret: pi.client_secret, bookingId: created.id });
+          } else if (pi?.demo) {
+            await new Promise((r) => setTimeout(r, 900));
+          }
+        } catch {
+          await new Promise((r) => setTimeout(r, 900));
+        }
+      }
       // Mirror into office CRM as a real person (same as trip checkout).
       ensureCustomerForRental({
         id: created?.client_id || undefined,
         name: getCustomerName() || '',
         email: getCustomerEmail() || '',
         phone: form.client_phone || '',
+        afm: form.client_afm?.trim() || '',
       });
-      toast.success('Η κράτηση ενοικίασης καταχωρήθηκε');
+      const payNote =
+        created?.payment_status === 'pending'
+          ? ` · ${t('payment_pending', lang)}`
+          : created?.payment_status === 'partial'
+            ? ` · ${t('payment_partial', lang)}`
+            : '';
+      const idNote =
+        form.driver_mode === 'SELF_DRIVE' ? ' · εκκρεμεί έλεγχος ταυτότητας' : '';
+      toast.success(`${t('book', lang)} OK${payNote}${idNote}.`);
       setSuggestions([]);
       setSelectedId('');
       setRecentBooked(created);
-      trackFunnel('booking_created', { vehicle_id: selectedId });
+      setContractAccepted(false);
+      setInsuranceAck(false);
+      setSignatureUrl('');
+      trackFunnel('booking_created', {
+        vehicle_id: selectedId,
+        payment_plan: paymentPlan,
+        payment_method: paymentMethod,
+        has_id: Boolean(identity.id_document_url),
+        contract: true,
+      });
       if (onClearPreferred) onClearPreferred();
       await loadMine();
       if (typeof onBooked === 'function') onBooked(created);
@@ -306,11 +627,13 @@ export default function RentalCatalogPanel({
   };
 
   const selected = suggestions.find((v) => v.id === selectedId);
+  const selectedMinAge =
+    AGE_BY_CATEGORY[String(selected?.category || form.category || 'CAR').toUpperCase()] || 21;
 
   const sortedSuggestions = [...suggestions]
     .filter((v) => Number(v.suggested_total || 0) <= Number(priceCap || 999999))
     .filter((v) => (onlyWithPhotos ? vehiclePhotos(v).length > 0 : true))
-    .filter((v) => (onlyTopRated ? trustBadge(v.id).rating >= 4.7 : true))
+    .filter((v) => (onlyTopRated ? trustBadge(v).rating >= 4.7 : true))
     .sort((a, b) => {
       if (sortBy === 'price_asc') return Number(a.suggested_total || 0) - Number(b.suggested_total || 0);
       if (sortBy === 'price_desc') return Number(b.suggested_total || 0) - Number(a.suggested_total || 0);
@@ -329,13 +652,34 @@ export default function RentalCatalogPanel({
     }
   })();
   const extrasTotal =
-    (form.extra_insurance ? 12 * nights : 0) + (form.child_seat ? 7 * nights : 0) + (form.gps_pack ? 5 * nights : 0);
+    (form.extra_insurance ? 12 * nights : 0) +
+    (form.scdw ? 8 * nights : 0) +
+    (form.child_seat ? 7 * nights : 0) +
+    (form.gps_pack ? 5 * nights : 0) +
+    (form.young_driver ? 15 * nights : 0) +
+    (form.airport_pickup ? 25 : 0);
+  const selectedTotal = Number(selected?.suggested_total || 0) + extrasTotal;
+  const paySplit = computeDepositSplit(selectedTotal, depositPercent);
+  const dueNow = amountDueAtCheckout(selectedTotal, paymentPlan, depositPercent);
+  const isDepositPlan = depositEnabled && paymentPlan === PAYMENT_PLAN_DEPOSIT;
 
-  const cancelBooking = async (bookingId) => {
-    if (!window.confirm('Ακύρωση κράτησης ενοικίασης;')) return;
+  const cancelBooking = async (booking) => {
+    const row = typeof booking === 'string' ? mine.find((b) => b.id === booking) : booking;
+    const id = row?.id || booking;
+    if (!row || !isFreeCancelEligible(row)) {
+      toast.error(cancelBlockedMessage(row || {}));
+      return;
+    }
+    if (
+      !window.confirm(
+        `Δωρεάν ακύρωση (έως ${FREE_CANCEL_HOURS} ώρες πριν). Να ακυρωθεί η κράτηση;`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     try {
-      await cancelCustomerRentalBooking(bookingId);
+      await cancelCustomerRentalBooking(id);
       toast.success('Η κράτηση ακυρώθηκε');
       await loadMine();
     } catch (err) {
@@ -399,9 +743,26 @@ export default function RentalCatalogPanel({
 
         <form className="wallet-form" onSubmit={search}>
           <div className="rent-booking-steps" aria-label="Βήματα κράτησης">
-            <span className={preferredVehicle ? 'is-done' : 'is-active'}>1. Όχημα</span>
+            <span className={preferredVehicle || selectedId ? 'is-done' : 'is-active'}>1. Όχημα</span>
             <span className={form.start_time && form.end_time ? 'is-done' : ''}>2. Ημερομηνίες</span>
-            <span className={selectedId ? 'is-active' : ''}>3. Επιβεβαίωση</span>
+            <span
+              className={
+                form.driver_mode !== 'SELF_DRIVE' ||
+                (idDocs.id_document_url && idDocs.driving_license_url)
+                  ? 'is-done'
+                  : 'is-active'
+              }
+            >
+              3. Ταυτότητα
+            </span>
+            <span className={selectedId ? 'is-done' : ''}>4. Πληρωμή</span>
+            <span
+              className={
+                contractAccepted && signatureUrl ? 'is-done' : selectedId ? 'is-active' : ''
+              }
+            >
+              5. Σύμβαση
+            </span>
           </div>
           <div className="wallet-field">
             <label htmlFor="rent-start">Παραλαβή *</label>
@@ -435,11 +796,29 @@ export default function RentalCatalogPanel({
             >
               {CATEGORIES.map((c) => (
                 <option key={c.value || 'all'} value={c.value}>
-                  {c.label}
+                  {c.labelKey ? t(c.labelKey, lang) : c.label}
                 </option>
               ))}
             </select>
           </div>
+          {branches.length > 1 ? (
+            <div className="wallet-field">
+              <label htmlFor="rent-branch">{t('branch', lang)}</label>
+              <select
+                id="rent-branch"
+                className="wallet-select"
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+              >
+                <option value="">{t('all_categories', lang)}</option>
+                {branches.map((b) => (
+                  <option key={b.branch_name} value={b.branch_name}>
+                    {b.branch_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className="wallet-field">
             <label htmlFor="rent-seats">Ελάχ. θέσεις</label>
             <input
@@ -497,6 +876,20 @@ export default function RentalCatalogPanel({
             />
           </div>
           <div className="wallet-field">
+            <label htmlFor="rent-afm">ΑΦΜ (προαιρετικό)</label>
+            <input
+              id="rent-afm"
+              className="wallet-input"
+              inputMode="numeric"
+              maxLength={9}
+              placeholder="9 ψηφία"
+              value={form.client_afm}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, client_afm: e.target.value.replace(/\D/g, '').slice(0, 9) }))
+              }
+            />
+          </div>
+          <div className="wallet-field">
             <label>Extras</label>
             <div className="rent-extras">
               <label>
@@ -505,7 +898,15 @@ export default function RentalCatalogPanel({
                   checked={form.extra_insurance}
                   onChange={(e) => setForm((f) => ({ ...f, extra_insurance: e.target.checked }))}
                 />
-                Extra insurance (+€12/ημέρα)
+                {t('cdw_extra', lang)} (+€12/ημέρα)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.scdw}
+                  onChange={(e) => setForm((f) => ({ ...f, scdw: e.target.checked }))}
+                />
+                {t('scdw_extra', lang)} (+€8/ημέρα)
               </label>
               <label>
                 <input
@@ -523,16 +924,127 @@ export default function RentalCatalogPanel({
                 />
                 GPS pack (+€5/ημέρα)
               </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.airport_pickup}
+                  onChange={(e) => setForm((f) => ({ ...f, airport_pickup: e.target.checked }))}
+                />
+                Παραλαβή αεροδρόμιο (+€25)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.young_driver}
+                  onChange={(e) => setForm((f) => ({ ...f, young_driver: e.target.checked }))}
+                />
+                Νέος οδηγός κάτω των 25 (+€15/ημέρα)
+              </label>
             </div>
             {extrasTotal > 0 ? (
               <p className="wallet-field-hint">Εκτίμηση extras: {euro(extrasTotal)} για {nights} ημέρες</p>
             ) : null}
           </div>
+          {form.driver_mode === 'SELF_DRIVE' ? (
+            <div className="rent-id-panel">
+              <h3>Ταυτότητα & δίπλωμα</h3>
+              <p className="wallet-field-hint">
+                Απαιτείται για self-drive · {t('min_age', lang)} {selectedMinAge}. Τα έγγραφα ελέγχονται από το γραφείο.
+              </p>
+              <div className="rent-id-uploads">
+                <label className={`rent-id-upload${idDocs.id_document_url ? ' is-done' : ''}`}>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    badge
+                  </span>
+                  <span>
+                    <strong>Ταυτότητα / Διαβατήριο</strong>
+                    <small>{idDocs.id_document_url ? 'Ανέβηκε' : 'Φωτογραφία ή κάμερα'}</small>
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    disabled={Boolean(uploadingKind)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      uploadIdDoc('id_card', file);
+                    }}
+                  />
+                </label>
+                <label className={`rent-id-upload${idDocs.driving_license_url ? ' is-done' : ''}`}>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    credit_card
+                  </span>
+                  <span>
+                    <strong>Δίπλωμα οδήγησης</strong>
+                    <small>{idDocs.driving_license_url ? 'Ανέβηκε' : 'Φωτογραφία ή κάμερα'}</small>
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    disabled={Boolean(uploadingKind)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      uploadIdDoc('driving_license', file);
+                    }}
+                  />
+                </label>
+              </div>
+              {uploadingKind ? <p className="wallet-field-hint">Ανέβασμα…</p> : null}
+              {(idDocs.id_document_url || idDocs.driving_license_url) && (
+                <div className="rent-id-previews">
+                  {idDocs.id_document_url ? (
+                    <img src={idDocs.id_document_url} alt="Ταυτότητα" />
+                  ) : null}
+                  {idDocs.driving_license_url ? (
+                    <img src={idDocs.driving_license_url} alt="Δίπλωμα" />
+                  ) : null}
+                </div>
+              )}
+              <div className="rent-id-fields">
+                <div className="wallet-field">
+                  <label htmlFor="rent-dob">Ημερομηνία γέννησης *</label>
+                  <input
+                    id="rent-dob"
+                    type="date"
+                    className="wallet-input"
+                    value={idDocs.date_of_birth}
+                    onChange={(e) => setIdDocs((d) => ({ ...d, date_of_birth: e.target.value }))}
+                  />
+                </div>
+                <div className="wallet-field">
+                  <label htmlFor="rent-lic-no">Αριθμός διπλώματος *</label>
+                  <input
+                    id="rent-lic-no"
+                    className="wallet-input"
+                    value={idDocs.license_number}
+                    onChange={(e) => setIdDocs((d) => ({ ...d, license_number: e.target.value }))}
+                    placeholder="π.χ. ΑΒ123456"
+                  />
+                </div>
+                <div className="wallet-field">
+                  <label htmlFor="rent-lic-exp">Λήξη διπλώματος *</label>
+                  <input
+                    id="rent-lic-exp"
+                    type="date"
+                    className="wallet-input"
+                    value={idDocs.license_expires_at}
+                    onChange={(e) => setIdDocs((d) => ({ ...d, license_expires_at: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="wallet-field-hint">Με οδηγό — δεν απαιτείται δίπλωμα πελάτη.</p>
+          )}
           <button type="submit" className="wallet-btn wallet-btn-primary wallet-btn-block" disabled={busy}>
             {busy ? 'Αναζήτηση…' : 'Εύρεση διαθέσιμων'}
           </button>
           <p className="rent-cancel-policy">
-            Δωρεάν ακύρωση έως 24 ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.
+            Δωρεάν ακύρωση έως {FREE_CANCEL_HOURS} ώρες πριν την παραλαβή. Μετά ισχύει πολιτική γραφείου.
           </p>
         </form>
       </section>
@@ -587,7 +1099,7 @@ export default function RentalCatalogPanel({
             {sortedSuggestions.map((v) => {
               const photos = vehiclePhotos(v);
               const isSelected = selectedId === v.id;
-              const trust = trustBadge(v.id);
+              const trust = trustBadge(v);
               return (
                 <label
                   key={v.id}
@@ -659,15 +1171,181 @@ export default function RentalCatalogPanel({
             })}
           </div>
           {selected ? (
-            <button
-              type="button"
-              className="wallet-btn wallet-btn-primary wallet-btn-block"
-              style={{ marginTop: '0.75rem' }}
-              disabled={busy}
-              onClick={book}
-            >
-              Κράτηση · {euro(selected.suggested_total)}
-            </button>
+            <div className="rent-pay-panel">
+              <h3>Πληρωμή</h3>
+              <p className="wallet-panel-lead">
+                Σύνολο {euro(selectedTotal)}
+                {extrasTotal > 0 ? ` (βάση ${euro(selected.suggested_total)} + extras ${euro(extrasTotal)})` : ''}
+              </p>
+              {depositEnabled ? (
+                <div className="rent-pay-plans" role="radiogroup" aria-label="Πλάνο πληρωμής">
+                  {paymentPlans.map((plan) => {
+                    const amount =
+                      plan.id === PAYMENT_PLAN_DEPOSIT ? paySplit.depositAmount : paySplit.total;
+                    const active = paymentPlan === plan.id;
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        className={`rent-pay-plan${active ? ' is-active' : ''}`}
+                        aria-pressed={active}
+                        onClick={() => setPaymentPlan(plan.id)}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden>
+                          {plan.icon}
+                        </span>
+                        <span>
+                          <strong>{plan.label}</strong>
+                          <small>{plan.description}</small>
+                        </span>
+                        <em>{euro(amount)}</em>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <div className="rent-pay-methods" role="radiogroup" aria-label="Τρόπος πληρωμής">
+                {paymentMethods.map((m) => {
+                  const active = paymentMethod === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`rent-pay-method${active ? ' is-active' : ''}`}
+                      aria-pressed={active}
+                      onClick={() => setPaymentMethod(m.id)}
+                    >
+                      <span className="material-symbols-outlined" aria-hidden>
+                        {m.icon}
+                      </span>
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {isDepositPlan ? (
+                <p className="rent-pay-hint">
+                  Πληρώνετε τώρα {euro(dueNow)} ({paySplit.depositPercent}%). Υπόλοιπο{' '}
+                  {euro(paySplit.balanceDue)} στην παραλαβή.
+                </p>
+              ) : (
+                <p className="rent-pay-hint">Πληρωμή τώρα: {euro(dueNow)}</p>
+              )}
+              {paymentMethod === 'bank_transfer' ? (
+                <p className="rent-pay-hint">
+                  Με τραπεζική μεταφορά η κράτηση δεσμεύεται · θα λάβετε IBAN και αιτιολογία στο email
+                  επιβεβαίωσης.
+                </p>
+              ) : null}
+              <p className="rent-pay-hint">
+                Σύνολο κράτησης {euro(selectedTotal)}
+                {isDepositPlan ? ` · πληρωμή τώρα ${euro(dueNow)}` : ''}. Ολοκληρώστε τη σύμβαση παρακάτω.
+              </p>
+            </div>
+          ) : null}
+          {selected ? (
+            <div className="rent-contract-panel">
+              {form.driver_mode === 'SELF_DRIVE' ? (
+                <div className="rent-insurance-sheet">
+                  <h3>{insuranceCover?.title || t('insurance_cover', lang)}</h3>
+                  <div className="rent-insurance-block">
+                    <p className="rent-insurance-label">
+                      {insuranceCover?.cdw?.label || 'CDW'}
+                    </p>
+                    <p className="wallet-field-hint">
+                      {insuranceCover?.cdw?.franchise_note ||
+                        `Απαλλαγή CDW: €${Number(insuranceCover?.cdw_franchise_eur ?? 600).toFixed(0)}`}
+                    </p>
+                    <ul>
+                      {(insuranceCover?.cdw?.covers || []).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                    <p className="wallet-field-hint">Εξαιρέσεις</p>
+                    <ul>
+                      {(insuranceCover?.cdw?.excludes || []).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="rent-insurance-block">
+                    <p className="rent-insurance-label">
+                      {insuranceCover?.scdw?.label || 'SCDW'}
+                    </p>
+                    <p className="wallet-field-hint">
+                      {insuranceCover?.scdw?.franchise_note ||
+                        `Απαλλαγή SCDW: €${Number(insuranceCover?.scdw_franchise_eur ?? 0).toFixed(0)}`}
+                    </p>
+                    <ul>
+                      {(insuranceCover?.scdw?.covers || []).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <label className="rent-contract-accept">
+                    <input
+                      type="checkbox"
+                      checked={insuranceAck}
+                      onChange={(e) => setInsuranceAck(e.target.checked)}
+                    />
+                    {insuranceCover?.ack_label || t('insurance_ack', lang)}
+                  </label>
+                </div>
+              ) : null}
+              <h3>{contract.title || 'Σύμβαση μίσθωσης'}</h3>
+              <p className="wallet-field-hint">Έκδοση {contract.version}</p>
+              <ol className="rent-contract-clauses">
+                {(contract.clauses || []).map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ol>
+              <label className="rent-contract-accept">
+                <input
+                  type="checkbox"
+                  checked={contractAccepted}
+                  onChange={(e) => setContractAccepted(e.target.checked)}
+                />
+                Αποδέχομαι τους όρους μίσθωσης
+              </label>
+              <div className="rent-contract-sign">
+                <RentalSignaturePad
+                  previewUrl={signatureUrl || null}
+                  busy={sigBusy}
+                  onClear={() => setSignatureUrl('')}
+                  onCommit={async (file) => {
+                    setSigBusy(true);
+                    try {
+                      const data = await uploadCustomerRentalSignature(file);
+                      setSignatureUrl(data.url);
+                      trackFunnel('contract_signed');
+                      toast.success('Η υπογραφή αποθηκεύτηκε');
+                    } catch (err) {
+                      toast.error(err.message);
+                    } finally {
+                      setSigBusy(false);
+                    }
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                className="wallet-btn wallet-btn-primary wallet-btn-block"
+                style={{ marginTop: '0.75rem' }}
+                disabled={
+                  busy ||
+                  !contractAccepted ||
+                  !signatureUrl ||
+                  (form.driver_mode === 'SELF_DRIVE' && !insuranceAck)
+                }
+                onClick={book}
+              >
+                {busy
+                  ? '…'
+                  : paymentMethod === 'bank_transfer'
+                    ? `${t('book_now', lang)} · ${euro(dueNow)}`
+                    : `${t('pay_with_card', lang)} ${euro(dueNow)}`}
+              </button>
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -734,6 +1412,7 @@ export default function RentalCatalogPanel({
                       ? ` → ${b.dropoff_location}`
                       : ''}
                     {` · ${euro(b.total_cost)} · ${b.rental_status}`}
+                    {b.payment_label ? ` · ${b.payment_label}` : ''}
                   </p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
                     <span
@@ -747,15 +1426,56 @@ export default function RentalCatalogPanel({
                     >
                       {b.driver_mode === 'WITH_DRIVER' ? 'Με οδηγό' : 'Self-drive'}
                     </span>
-                    {b.rental_status === 'CONFIRMED' ? (
+                    {paymentStatusLabel(b.payment_status) ? (
+                      <span
+                        className={`wallet-chip ${
+                          b.payment_status === 'paid'
+                            ? 'wallet-chip-ok'
+                            : b.payment_status === 'partial'
+                              ? 'wallet-chip-warn'
+                              : 'wallet-chip-muted'
+                        }`}
+                      >
+                        {paymentStatusLabel(b.payment_status)}
+                        {Number(b.balance_due) > 0 ? ` · υπόλ. ${euro(b.balance_due)}` : ''}
+                      </span>
+                    ) : null}
+                    {b.id_verification_status && b.id_verification_status !== 'not_required' ? (
+                      <span
+                        className={`wallet-chip ${
+                          b.id_verification_status === 'verified'
+                            ? 'wallet-chip-ok'
+                            : b.id_verification_status === 'rejected'
+                              ? 'wallet-chip-muted'
+                              : 'wallet-chip-warn'
+                        }`}
+                      >
+                        {b.id_verification_status === 'verified'
+                          ? 'Ταυτότητα OK'
+                          : b.id_verification_status === 'rejected'
+                            ? 'Απορρίφθηκε'
+                            : 'Έλεγχος ταυτότητας'}
+                      </span>
+                    ) : null}
+                    {b.rental_status === 'CONFIRMED' && isFreeCancelEligible(b) ? (
                       <button
                         type="button"
                         className="wallet-btn wallet-btn-danger"
                         disabled={busy}
-                        onClick={() => cancelBooking(b.id)}
+                        onClick={() => cancelBooking(b)}
                       >
                         Ακύρωση
                       </button>
+                    ) : b.rental_status === 'CONFIRMED' ? (
+                      <span className="wallet-chip wallet-chip-muted">Ακύρωση μόνο μέσω γραφείου</span>
+                    ) : null}
+                    {b.contract_accepted ? (
+                      <p className="rent-wallet-contract-ok">
+                        <span className="material-symbols-outlined" aria-hidden>
+                          draw
+                        </span>
+                        Σύμβαση υπογεγραμμένη
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -769,7 +1489,14 @@ export default function RentalCatalogPanel({
       {recentBooked ? (
         <section className={bare ? '' : 'wallet-panel'} style={bare ? { marginTop: '1rem' } : undefined}>
           <h2>Μετά την κράτηση</h2>
-          <p className="wallet-panel-lead">Κράτησε υπενθύμιση για παραλαβή/επιστροφή στο κινητό σου.</p>
+          <p className="wallet-panel-lead">
+            Στάλθηκε email επιβεβαίωσης
+            {recentBooked.payment_label ? ` · ${recentBooked.payment_label}` : ''}.
+            {Number(recentBooked.balance_due) > 0
+              ? ` Υπόλοιπο στην παραλαβή: ${euro(recentBooked.balance_due)}.`
+              : ''}{' '}
+            Κράτησε υπενθύμιση για παραλαβή/επιστροφή στο κινητό σου.
+          </p>
           <div className="rent-postbook-actions">
             <button
               type="button"
@@ -811,6 +1538,23 @@ export default function RentalCatalogPanel({
             </button>
           </div>
         </section>
+      ) : null}
+
+      {stripePay?.clientSecret ? (
+        <RentalStripePay
+          clientSecret={stripePay.clientSecret}
+          onClose={() => setStripePay(null)}
+          onSuccess={async () => {
+            try {
+              await confirmCustomerRentalPayment(stripePay.bookingId);
+              toast.success(t('pay_success', lang));
+              setStripePay(null);
+              await loadMine();
+            } catch (err) {
+              toast.error(err.message || 'Payment confirm failed');
+            }
+          }}
+        />
       ) : null}
     </div>
   );

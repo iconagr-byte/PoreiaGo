@@ -87,6 +87,13 @@ def _plan_price_id(plan: TenantPlan, *, billing_interval: str = "month") -> str:
         TenantPlan.ENTERPRISE: (
             settings.stripe_price_enterprise_yearly if yearly else settings.stripe_price_enterprise
         ),
+        # Rent-only reuses starter Stripe prices until a dedicated price is configured.
+        TenantPlan.RENT: (
+            getattr(settings, "stripe_price_rent_yearly", "")
+            or (settings.stripe_price_starter_yearly if yearly else "")
+            or getattr(settings, "stripe_price_rent", "")
+            or settings.stripe_price_starter
+        ),
     }
     price_id = mapping.get(plan, "")
     if not price_id and yearly:
@@ -94,6 +101,7 @@ def _plan_price_id(plan: TenantPlan, *, billing_interval: str = "month") -> str:
             TenantPlan.STARTER: settings.stripe_price_starter,
             TenantPlan.PROFESSIONAL: settings.stripe_price_professional,
             TenantPlan.ENTERPRISE: settings.stripe_price_enterprise,
+            TenantPlan.RENT: getattr(settings, "stripe_price_rent", "") or settings.stripe_price_starter,
         }
         price_id = mapping_monthly.get(plan, "")
     if not price_id:
@@ -106,6 +114,7 @@ def _plan_base_cents(plan: TenantPlan, *, billing_interval: str = "month") -> in
         TenantPlan.STARTER: 9900,
         TenantPlan.PROFESSIONAL: 29900,
         TenantPlan.ENTERPRISE: 0,
+        TenantPlan.RENT: 14900,
     }.get(plan, 9900)
     if billing_interval == "year" and monthly:
         return monthly * 10

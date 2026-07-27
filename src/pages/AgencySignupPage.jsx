@@ -3,10 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import {
-  AGENCY_PLANS,
   BILLING_INTERVALS,
   displayPrice,
   getPlanById,
+  selectableAgencyPlans,
 } from '../lib/billing/planCatalog.js';
 import { createSignupCheckout, fetchBillingConfig } from '../services/billingApi.js';
 import { getPlatformBaseDomain } from '../lib/platform/domain.js';
@@ -187,7 +187,7 @@ export default function AgencySignupPage() {
                 ))}
               </div>
               <div className="grid gap-2">
-                {AGENCY_PLANS.filter((p) => !p.contactSales).map((p) => {
+                {selectableAgencyPlans().map((p) => {
                   const pPrice = displayPrice(p, interval);
                   const selected = planId === p.id;
                   return (
@@ -197,13 +197,22 @@ export default function AgencySignupPage() {
                       onClick={() => setPlanId(p.id)}
                       className={`w-full text-left rounded-2xl border px-4 py-3 transition-all ${
                         selected
-                          ? 'border-primary/40 bg-white ring-2 ring-primary/15'
+                          ? p.id === 'rent'
+                            ? 'border-teal-400/50 bg-white ring-2 ring-teal-500/20'
+                            : 'border-primary/40 bg-white ring-2 ring-primary/15'
                           : 'border-black/[0.06] bg-white/60 hover:bg-white'
                       }`}
                     >
                       <div className="flex justify-between gap-3 items-center">
                         <div>
-                          <p className="font-bold text-sm">{p.name}</p>
+                          <p className="font-bold text-sm">
+                            {p.name}
+                            {p.id === 'rent' ? (
+                              <span className="ml-2 text-[10px] font-bold uppercase text-teal-700">
+                                μόνο
+                              </span>
+                            ) : null}
+                          </p>
                           <p className="text-xs text-gray-500">{p.tagline}</p>
                         </div>
                         <p className="font-bold text-sm shrink-0">

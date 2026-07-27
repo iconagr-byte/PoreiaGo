@@ -1,0 +1,203 @@
+/**
+ * Minimal EL/EN dictionary for Rent Wallet / catalog CTAs.
+ * Persist language via rent_lang_v1 in localStorage.
+ */
+const DICTS = {
+  el: {
+    book: 'Κράτηση',
+    book_now: 'Κλείσε τώρα',
+    cancel: 'Ακύρωση κράτησης',
+    cancelling: 'Ακύρωση…',
+    cancel_ok: 'Η κράτηση ακυρώθηκε',
+    cancel_refunded: 'Η κράτηση ακυρώθηκε · επιστροφή χρημάτων',
+    cancel_refund_pending: 'Η κράτηση ακυρώθηκε · εκκρεμεί επιστροφή από το γραφείο',
+    contract: 'Λήψη σύμβασης',
+    contract_signed: 'Σύμβαση υπογεγραμμένη',
+    payment: 'Πληρωμή',
+    payment_pending: 'εκκρεμεί πληρωμή',
+    payment_partial: 'προκαταβολή καταχωρήθηκε',
+    pay_with_card: 'Πληρωμή με κάρτα',
+    pay_success: 'Η πληρωμή ολοκληρώθηκε',
+    wallet: 'Wallet',
+    wallet_empty_title: 'Δεν έχετε ακόμα ενοικίαση',
+    wallet_empty_copy:
+      'Κλείστε όχημα από την εφαρμογή ενοικίασης — η κράτηση εμφανίζεται εδώ στο Rent Wallet.',
+    find_vehicle: 'Βρες όχημα',
+    new_booking: 'Νέα κράτηση',
+    pickup: 'Παραλαβή',
+    code: 'Κωδικός',
+    amount: 'Ποσό',
+    customer: 'Πελάτης',
+    status_confirmed: 'Επιβεβαιωμένη',
+    status_active: 'Σε εξέλιξη',
+    status_completed: 'Ολοκληρωμένη',
+    status_cancelled: 'Ακυρωμένη',
+    self_drive: 'Self-drive',
+    with_driver: 'Με οδηγό',
+    check_in: 'Check-in',
+    check_out: 'Check-out',
+    modify_dates: 'Αλλαγή ημερομηνιών',
+    review: 'Αξιολόγηση',
+    review_submit: 'Υποβολή αξιολόγησης',
+    review_thanks: 'Ευχαριστούμε για την αξιολόγηση',
+    damage_deposit: 'Εγγύηση ζημιάς',
+    deposit_held: 'Δεσμευμένη',
+    deposit_released: 'Απελευθερώθηκε',
+    deposit_captured: 'Κατακρατήθηκε',
+    branch: 'Γραφείο',
+    search: 'Αναζήτηση',
+    all_categories: 'Όλες',
+    min_age: 'Ελάχιστη ηλικία',
+    language: 'Γλώσσα',
+    sos: 'SOS',
+    sos_sending: 'Αποστολή SOS…',
+    sos_sent: 'Η θέση στάλθηκε στο γραφείο',
+    sos_call_office: 'Κλήση γραφείου',
+    sos_send_location: 'Αποστολή θέσης',
+    sos_confirm: 'Έκτακτη ανάγκη — καλέστε το γραφείο ή στείλτε τη θέση σας;',
+    roadside_24_7: 'Οδική βοήθεια 24/7',
+    share_trip: 'Κοινοποίηση διαδρομής',
+    share_copied: 'Ο σύνδεσμος αντιγράφηκε',
+    share_failed: 'Αποτυχία κοινοποίησης',
+    insurance_cover: 'Ασφαλιστική κάλυψη',
+    insurance_ack: 'Διάβασα την ασφαλιστική κάλυψη',
+    cdw_extra: 'CDW / επιπλέον ασφάλεια',
+    scdw_extra: 'SCDW (μηδενική απαλλαγή)',
+    checklist_title: 'Έλεγχος προ αναχώρησης',
+    checklist_tires: 'Ελαστικά ΟΚ',
+    checklist_lights: 'Φώτα ΟΚ',
+    checklist_fluids: 'Υγρά ΟΚ',
+    checklist_documents: 'Έγγραφα ΟΚ',
+    checklist_spare: 'Ρεζέρβα ΟΚ',
+    checklist_damages: 'Καταγράφηκαν ζημιές',
+    services_kicker: 'Υπηρεσίες',
+    services_title: 'Τι περιλαμβάνει η ενοικίαση',
+    services_lead:
+      'Ασφάλεια στο ταξίδι — SOS, οδική 24/7, καθαρή ασφάλεια, share στην οικογένεια και checklist πριν φύγετε.',
+    services_cta: 'Δες τον στόλο',
+    services_cta_fleet: 'Δες στόλο & κλείσε',
+    services_hero_title: 'Ενοικίαση με υποστήριξη στο δρόμο',
+    services_hero_copy:
+      'Μοιραστείτε αυτή τη σελίδα — χωρίς σύνδεση. Οι υπηρεσίες ενεργοποιούνται στο Rent Wallet όταν νοικιάζετε.',
+    services_help: 'Βοήθεια & υπηρεσίες',
+    services_unavailable: 'Η υπηρεσία ενοικίασης δεν είναι ενεργή για αυτό το γραφείο.',
+  },
+  en: {
+    book: 'Book',
+    book_now: 'Book now',
+    cancel: 'Cancel booking',
+    cancelling: 'Cancelling…',
+    cancel_ok: 'Booking cancelled',
+    cancel_refunded: 'Booking cancelled · refund processed',
+    cancel_refund_pending: 'Booking cancelled · refund pending at desk',
+    contract: 'Download contract',
+    contract_signed: 'Contract signed',
+    payment: 'Payment',
+    payment_pending: 'payment pending',
+    payment_partial: 'deposit recorded',
+    pay_with_card: 'Pay with card',
+    pay_success: 'Payment completed',
+    wallet: 'Wallet',
+    wallet_empty_title: 'No rental yet',
+    wallet_empty_copy:
+      'Book a vehicle from the rental app — it appears here in Rent Wallet.',
+    find_vehicle: 'Find a vehicle',
+    new_booking: 'New booking',
+    pickup: 'Pickup',
+    code: 'Code',
+    amount: 'Amount',
+    customer: 'Customer',
+    status_confirmed: 'Confirmed',
+    status_active: 'Active',
+    status_completed: 'Completed',
+    status_cancelled: 'Cancelled',
+    self_drive: 'Self-drive',
+    with_driver: 'With driver',
+    check_in: 'Check-in',
+    check_out: 'Check-out',
+    modify_dates: 'Change dates',
+    review: 'Review',
+    review_submit: 'Submit review',
+    review_thanks: 'Thanks for your review',
+    damage_deposit: 'Damage deposit',
+    deposit_held: 'Held',
+    deposit_released: 'Released',
+    deposit_captured: 'Captured',
+    branch: 'Branch',
+    search: 'Search',
+    all_categories: 'All',
+    min_age: 'Minimum age',
+    language: 'Language',
+    sos: 'SOS',
+    sos_sending: 'Sending SOS…',
+    sos_sent: 'Location sent to the office',
+    sos_call_office: 'Call office',
+    sos_send_location: 'Send location',
+    sos_confirm: 'Emergency — call the office or send your location?',
+    roadside_24_7: '24/7 roadside assistance',
+    share_trip: 'Share trip',
+    share_copied: 'Link copied',
+    share_failed: 'Could not share',
+    insurance_cover: 'Insurance cover',
+    insurance_ack: 'I have read the insurance cover',
+    cdw_extra: 'CDW / extra insurance',
+    scdw_extra: 'SCDW (zero excess)',
+    checklist_title: 'Pre-departure checklist',
+    checklist_tires: 'Tires OK',
+    checklist_lights: 'Lights OK',
+    checklist_fluids: 'Fluids OK',
+    checklist_documents: 'Documents OK',
+    checklist_spare: 'Spare wheel OK',
+    checklist_damages: 'Damages noted',
+    services_kicker: 'Services',
+    services_title: 'What’s included with rental',
+    services_lead:
+      'Trip safety — SOS, 24/7 roadside, clear insurance, family share, and a pre-departure checklist.',
+    services_cta: 'Browse fleet',
+    services_cta_fleet: 'Browse fleet & book',
+    services_hero_title: 'Rental with roadside support',
+    services_hero_copy:
+      'Share this page — no login needed. Features unlock in Rent Wallet when you rent.',
+    services_help: 'Help & services',
+    services_unavailable: 'Vehicle rental is not enabled for this office.',
+  },
+};
+
+const LANG_KEY = 'rent_lang_v1';
+
+export function getRentLang() {
+  try {
+    const raw = localStorage.getItem(LANG_KEY);
+    if (raw === 'en' || raw === 'el') return raw;
+  } catch {
+    /* ignore */
+  }
+  return 'el';
+}
+
+export function setRentLang(lang) {
+  const next = lang === 'en' ? 'en' : 'el';
+  try {
+    localStorage.setItem(LANG_KEY, next);
+  } catch {
+    /* ignore */
+  }
+  return next;
+}
+
+export function t(key, lang = getRentLang()) {
+  const dict = DICTS[lang] || DICTS.el;
+  return dict[key] || DICTS.el[key] || key;
+}
+
+export function rentStatusLabel(status, lang = getRentLang()) {
+  const map = {
+    CONFIRMED: 'status_confirmed',
+    ACTIVE: 'status_active',
+    COMPLETED: 'status_completed',
+    CANCELLED: 'status_cancelled',
+  };
+  return t(map[status] || 'status_confirmed', lang);
+}
+
+export { DICTS, LANG_KEY };
