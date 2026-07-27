@@ -30,6 +30,28 @@ export async function fetchCustomerRentalCatalog(category) {
   return data.vehicles || [];
 }
 
+async function publicRentalFetch(path, options = {}) {
+  const res = await fetch(`${API_BASE}/api/customer/rentals${path}`, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data?.detail;
+    const msg =
+      typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d) => d.msg || d).join(', ')
+          : data?.message || `Σφάλμα ενοικίασης (${res.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+export async function fetchPublicRentalCatalog(category) {
+  const q = category ? `?category=${encodeURIComponent(category)}` : '';
+  const data = await publicRentalFetch(`/public/catalog${q}`);
+  return data.vehicles || [];
+}
+
 export async function fetchCustomerRentalAvailability({
   startTime,
   endTime,
