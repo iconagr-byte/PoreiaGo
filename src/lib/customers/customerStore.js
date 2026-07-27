@@ -141,13 +141,14 @@ export function ensureCustomerForPassenger({ name, email, phone }) {
 }
 
 /** Δημιουργία/ενημέρωση φυσικού προσώπου από κράτηση ενοικίασης. */
-export function ensureCustomerForRental({ name, email, phone, id } = {}) {
+export function ensureCustomerForRental({ name, email, phone, id, afm } = {}) {
   if (!email) return null;
   return upsertCustomer({
     id,
     name,
     email,
     phone,
+    afm,
     source: 'rental',
   });
 }

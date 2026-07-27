@@ -6,9 +6,24 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   cancelCustomerRentalBooking,
+  createCustomerRentalInspection,
+  customerRentalContractUrl,
   fetchMyRentalBookings,
+  modifyCustomerRentalBooking,
+  remindCustomerRentalBooking,
+  submitCustomerRentalReview,
+  uploadCustomerRentalPhoto,
+  uploadCustomerRentalSignature,
 } from '../../services/customerRentalApi.js';
+import { customerAuthHeaders } from '../../services/customerAuthApi.js';
 import RentalWalletPass from './RentalWalletPass.jsx';
+import RentalSignaturePad from '../admin/fleet/RentalSignaturePad.jsx';
+import {
+  cancelBlockedMessage,
+  FREE_CANCEL_HOURS,
+  isFreeCancelEligible,
+} from '../../lib/rental/rentalCancel.js';
+import { getRentLang, t } from '../../lib/rental/rentI18n.js';
 
 const STATUS_LABEL = {
   CONFIRMED: 'Επιβεβαιωμένη',
@@ -47,6 +62,20 @@ function sortBookings(rows) {
   });
 }
 
+function hoursUntil(iso) {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  return (t - Date.now()) / (1000 * 60 * 60);
+}
+
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function RentalWalletPanel({
   brandLabel = 'Rent Wallet',
   passengerName = '',
@@ -58,6 +87,17 @@ export default function RentalWalletPanel({
   const [busyId, setBusyId] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [reminderShown, setReminderShown] = useState(false);
+  const [modifyOpen, setModifyOpen] = useState(false);
+  const [modifyForm, setModifyForm] = useState({ start_time: '', end_time: '', pickup_location: '' });
+  const [inspectOpen, setInspectOpen] = useState(false);
+  const [inspectType, setInspectType] = useState('PICKUP_CHECK');
+  const [inspectForm, setInspectForm] = useState({
+    fuel_level: 100,
+    mileage: 0,
+    damage_notes: '',
+    photo_urls: [],
+    signature_url: '',
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,18 +134,19 @@ export default function RentalWalletPanel({
     if (reminderShown) return;
     try {
       const enabled = localStorage.getItem('rent_reminders_enabled_v1') === '1';
-      if (!enabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+      if (!enabled) return;
       const upcoming = rows.find((b) => {
         if (b.rental_status !== 'CONFIRMED') return false;
-        const start = new Date(b.start_time).getTime();
-        if (!Number.isFinite(start)) return false;
-        const diffH = (start - Date.now()) / (1000 * 60 * 60);
-        return diffH >= 0 && diffH <= 24;
+        const diffH = hoursUntil(b.start_time);
+        return diffH != null && diffH >= 0 && diffH <= 48;
       });
       if (!upcoming) return;
-      new Notification('Υπενθύμιση παραλαβής οχήματος', {
-        body: `${upcoming.vehicle_model || 'Όχημα'} · ${formatWhen(upcoming.start_time)}`,
-      });
+      remindCustomerRentalBooking(upcoming.id).catch(() => {});
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification('Υπενθύμιση παραλαβής οχήματος', {
+          body: `${upcoming.vehicle_model || 'Όχημα'} · ${formatWhen(upcoming.start_time)}`,
+        });
+      }
       setReminderShown(true);
     } catch {
       /* ignore */
@@ -114,11 +155,28 @@ export default function RentalWalletPanel({
 
   const cancelBooking = async (booking) => {
     if (!booking?.id) return;
-    if (!window.confirm('Να ακυρωθεί αυτή η κράτηση;')) return;
+    if (!isFreeCancelEligible(booking)) {
+      toast.error(cancelBlockedMessage(booking));
+      return;
+    }
+    if (
+      !window.confirm(
+        `Δωρεάν ακύρωση (έως ${FREE_CANCEL_HOURS} ώρες πριν). Να ακυρωθεί αυτή η κράτηση;`,
+      )
+    ) {
+      return;
+    }
     setBusyId(booking.id);
     try {
-      await cancelCustomerRentalBooking(booking.id);
-      toast.success('Η κράτηση ακυρώθηκε');
+      const cancelled = await cancelCustomerRentalBooking(booking.id);
+      const lang = getRentLang();
+      if (cancelled?.payment_status === 'refunded') {
+        toast.success(t('cancel_refunded', lang));
+      } else if (cancelled?.payment_status === 'refund_pending') {
+        toast.success(t('cancel_refund_pending', lang));
+      } else {
+        toast.success(t('cancel_ok', lang));
+      }
       await load();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία ακύρωσης');
@@ -126,6 +184,118 @@ export default function RentalWalletPanel({
       setBusyId('');
     }
   };
+
+  const submitReview = async (booking) => {
+    if (!booking?.id) return;
+    const ratingRaw = window.prompt('Βαθμολογία 1–5', '5');
+    if (ratingRaw == null) return;
+    const rating = Number(ratingRaw);
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+      toast.error('Η βαθμολογία πρέπει να είναι 1–5');
+      return;
+    }
+    const comment = window.prompt('Σχόλιο (προαιρετικό)', '') || '';
+    setBusyId(booking.id);
+    try {
+      await submitCustomerRentalReview(booking.id, { rating, comment: comment || null });
+      toast.success(t('review_thanks', getRentLang()));
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία αξιολόγησης');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const openModify = (booking) => {
+    if (!booking) return;
+    setModifyForm({
+      start_time: toLocalInput(booking.start_time),
+      end_time: toLocalInput(booking.end_time),
+      pickup_location: booking.pickup_location || '',
+    });
+    setModifyOpen(true);
+  };
+
+  const submitModify = async () => {
+    if (!featured?.id) return;
+    setBusyId(featured.id);
+    try {
+      await modifyCustomerRentalBooking(featured.id, {
+        start_time: new Date(modifyForm.start_time).toISOString(),
+        end_time: new Date(modifyForm.end_time).toISOString(),
+        pickup_location: modifyForm.pickup_location || undefined,
+      });
+      toast.success('Οι ημερομηνίες ενημερώθηκαν');
+      setModifyOpen(false);
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία τροποποίησης');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const openContract = (booking) => {
+    if (!booking?.id) return;
+    const url = customerRentalContractUrl(booking.id);
+    const headers = customerAuthHeaders();
+    fetch(url, { headers })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Αποτυχία σύμβασης');
+        const html = await res.text();
+        const w = window.open('', '_blank');
+        if (w) {
+          w.document.write(html);
+          w.document.close();
+        } else {
+          toast.error('Επιτρέψτε τα pop-ups για τη σύμβαση');
+        }
+      })
+      .catch((err) => toast.error(err.message || 'Αποτυχία σύμβασης'));
+  };
+
+  const openInspect = (booking, type) => {
+    setInspectType(type);
+    setInspectForm({
+      fuel_level: 100,
+      mileage: 0,
+      damage_notes: '',
+      photo_urls: [],
+      signature_url: '',
+    });
+    setInspectOpen(true);
+  };
+
+  const submitInspect = async () => {
+    if (!featured?.id) return;
+    setBusyId(featured.id);
+    try {
+      await createCustomerRentalInspection(featured.id, {
+        inspection_type: inspectType,
+        fuel_level: Number(inspectForm.fuel_level) || 100,
+        mileage: Number(inspectForm.mileage) || 0,
+        damage_notes: inspectForm.damage_notes || null,
+        photo_urls: inspectForm.photo_urls || [],
+        signature_url: inspectForm.signature_url || null,
+      });
+      toast.success(inspectType === 'PICKUP_CHECK' ? 'Check-in ολοκληρώθηκε' : 'Check-out ολοκληρώθηκε');
+      setInspectOpen(false);
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία επιθεώρησης');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const canCheckIn =
+    featured?.rental_status === 'CONFIRMED' &&
+    (() => {
+      const h = hoursUntil(featured?.start_time);
+      return h != null && h <= 6 && h >= -2;
+    })();
+  const canCheckOut = featured?.rental_status === 'ACTIVE';
 
   if (loading && !rows.length) {
     return <p className="rent-panel-lead">Φόρτωση Rent Wallet…</p>;
@@ -138,9 +308,148 @@ export default function RentalWalletPanel({
         brandLabel={brandLabel}
         passengerName={passengerName}
         onBookVehicle={onBookVehicle}
-        onCancel={cancelBooking}
+        onCancel={isFreeCancelEligible(featured) ? cancelBooking : null}
         cancelling={busyId === featured?.id}
+        onModify={isFreeCancelEligible(featured) ? () => openModify(featured) : null}
+        onContract={featured ? () => openContract(featured) : null}
+        onCheckIn={canCheckIn ? () => openInspect(featured, 'PICKUP_CHECK') : null}
+        onCheckOut={canCheckOut ? () => openInspect(featured, 'RETURN_CHECK') : null}
+        onReview={
+          featured?.rental_status === 'COMPLETED' ? () => submitReview(featured) : null
+        }
+        reviewBusy={busyId === featured?.id}
       />
+
+      {modifyOpen ? (
+        <div className="rent-wallet-sheet" role="dialog" aria-label="Αλλαγή ημερομηνιών">
+          <h3>Αλλαγή ημερομηνιών</h3>
+          <label>
+            Έναρξη
+            <input
+              type="datetime-local"
+              className="wallet-input"
+              value={modifyForm.start_time}
+              onChange={(e) => setModifyForm((f) => ({ ...f, start_time: e.target.value }))}
+            />
+          </label>
+          <label>
+            Λήξη
+            <input
+              type="datetime-local"
+              className="wallet-input"
+              value={modifyForm.end_time}
+              onChange={(e) => setModifyForm((f) => ({ ...f, end_time: e.target.value }))}
+            />
+          </label>
+          <label>
+            Παραλαβή
+            <input
+              className="wallet-input"
+              value={modifyForm.pickup_location}
+              onChange={(e) => setModifyForm((f) => ({ ...f, pickup_location: e.target.value }))}
+            />
+          </label>
+          <div className="rent-wallet-sheet-actions">
+            <button type="button" className="wallet-btn" onClick={() => setModifyOpen(false)}>
+              Άκυρο
+            </button>
+            <button
+              type="button"
+              className="wallet-pass-cta"
+              disabled={busyId === featured?.id}
+              onClick={submitModify}
+            >
+              Αποθήκευση
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {inspectOpen ? (
+        <div className="rent-wallet-sheet" role="dialog" aria-label="Επιθεώρηση">
+          <h3>{inspectType === 'PICKUP_CHECK' ? 'Check-in' : 'Check-out'}</h3>
+          <label>
+            Καύσιμο %
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="wallet-input"
+              value={inspectForm.fuel_level}
+              onChange={(e) => setInspectForm((f) => ({ ...f, fuel_level: e.target.value }))}
+            />
+          </label>
+          <label>
+            Χιλιόμετρα
+            <input
+              type="number"
+              min={0}
+              className="wallet-input"
+              value={inspectForm.mileage}
+              onChange={(e) => setInspectForm((f) => ({ ...f, mileage: e.target.value }))}
+            />
+          </label>
+          <label>
+            Σημειώσεις
+            <textarea
+              className="wallet-input"
+              rows={2}
+              value={inspectForm.damage_notes}
+              onChange={(e) => setInspectForm((f) => ({ ...f, damage_notes: e.target.value }))}
+            />
+          </label>
+          <label className="rent-wallet-photo">
+            Φωτογραφία (προαιρετικά)
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                  const up = await uploadCustomerRentalPhoto(file);
+                  setInspectForm((f) => ({
+                    ...f,
+                    photo_urls: [...(f.photo_urls || []), up.url].slice(0, 4),
+                  }));
+                  toast.success('Φωτογραφία ανέβηκε');
+                } catch (err) {
+                  toast.error(err.message);
+                }
+              }}
+            />
+          </label>
+          <div className="rent-wallet-sig">
+            <p className="wallet-field-hint">Υπογραφή</p>
+            <RentalSignaturePad
+              previewUrl={inspectForm.signature_url || null}
+              onCommit={async (blob) => {
+                try {
+                  const file = new File([blob], 'checkin-sign.png', { type: 'image/png' });
+                  const up = await uploadCustomerRentalSignature(file);
+                  setInspectForm((f) => ({ ...f, signature_url: up.url }));
+                } catch (err) {
+                  toast.error(err.message);
+                }
+              }}
+              onClear={() => setInspectForm((f) => ({ ...f, signature_url: '' }))}
+            />
+          </div>
+          <div className="rent-wallet-sheet-actions">
+            <button type="button" className="wallet-btn" onClick={() => setInspectOpen(false)}>
+              Άκυρο
+            </button>
+            <button
+              type="button"
+              className="wallet-pass-cta"
+              disabled={busyId === featured?.id}
+              onClick={submitInspect}
+            >
+              Υποβολή
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {others.length ? (
         <section className="wallet-home-more rent-wallet-more" aria-label="Άλλες ενοικιάσεις">
@@ -165,6 +474,7 @@ export default function RentalWalletPanel({
                     {` · €${Number(b.total_cost || 0).toFixed(2)} · ${
                       STATUS_LABEL[b.rental_status] || b.rental_status
                     }`}
+                    {b.fiscal_mark ? ` · Απόδειξη` : ''}
                   </p>
                 </div>
                 <span className="material-symbols-outlined" aria-hidden>
