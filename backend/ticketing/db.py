@@ -48,12 +48,14 @@ CREATE TABLE IF NOT EXISTS customer_bookings (
     id TEXT PRIMARY KEY,
     customer_email TEXT NOT NULL,
     customer_id TEXT,
+    tenant_id TEXT,
     payload_json TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_cb_email ON customer_bookings(customer_email);
 CREATE INDEX IF NOT EXISTS idx_cb_customer ON customer_bookings(customer_id);
+CREATE INDEX IF NOT EXISTS idx_cb_email_tenant ON customer_bookings(customer_email, tenant_id);
 
 CREATE TABLE IF NOT EXISTS lost_items (
     id TEXT PRIMARY KEY,
@@ -95,6 +97,36 @@ async def init_ticketing_db() -> None:
     await _db.executescript(SCHEMA)
     try:
         await _db.execute("ALTER TABLE ticket_bookings ADD COLUMN saas_booking_id TEXT")
+    except Exception:
+        pass
+    try:
+        await _db.execute("ALTER TABLE customer_bookings ADD COLUMN tenant_id TEXT")
+    except Exception:
+        pass
+    try:
+        await _db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cb_email_tenant ON customer_bookings(customer_email, tenant_id)"
+        )
+    except Exception:
+        pass
+    # Backfill tenant_id from payload when missing (legacy wallet rows).
+    try:
+        cur = await _db.execute(
+            "SELECT id, payload_json FROM customer_bookings "
+            "WHERE tenant_id IS NULL OR tenant_id = ''"
+        )
+        rows = await cur.fetchall()
+        for row in rows:
+            try:
+                payload = json.loads(row["payload_json"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                continue
+            tid = str(payload.get("tenant_id") or payload.get("tenantId") or "").strip()
+            if tid:
+                await _db.execute(
+                    "UPDATE customer_bookings SET tenant_id = ? WHERE id = ?",
+                    (tid, row["id"]),
+                )
     except Exception:
         pass
     await _db.commit()

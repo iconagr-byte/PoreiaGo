@@ -95,6 +95,8 @@ FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/settings",
     "/api/admin/platform/branding",
     "/api/admin/platform/seat-pricing",
+    "/api/admin/platform/payment-settings",
+    "/api/admin/platform/bank-accounts",
     "/api/admin/platform/rent-plan-catalog",
     "/api/admin/platform/drivers",
 )

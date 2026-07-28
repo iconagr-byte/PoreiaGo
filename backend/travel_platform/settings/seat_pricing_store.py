@@ -1,13 +1,45 @@
-"""Seat pricing & amenities per bus layout — JSON store."""
+"""Seat pricing & amenities per bus layout — per-tenant JSON store."""
 
 from __future__ import annotations
 
 import json
+import os
+import re
+import threading
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-_SETTINGS_FILE = Path(__file__).resolve().parent / "seat_pricing.json"
+from travel_platform.settings.drivers_store import DEMO_TENANT_ID
+
+_LEGACY_SETTINGS_FILE = Path(__file__).resolve().parent / "seat_pricing.json"
+_LOCK = threading.Lock()
+_SAFE_TENANT = re.compile(r"[^a-zA-Z0-9_-]+")
+
+
+def _data_dir() -> Path:
+    raw = (os.getenv("POREIAGO_DATA_DIR") or "").strip()
+    if raw:
+        return Path(raw)
+    return Path(__file__).resolve().parents[2] / "data"
+
+
+def _settings_dir() -> Path:
+    return _data_dir() / "seat_pricing"
+
+
+def _safe_tenant_key(tenant_id: str | None) -> str:
+    tid = str(tenant_id or "").strip() or DEMO_TENANT_ID
+    cleaned = _SAFE_TENANT.sub("_", tid)
+    return cleaned[:120] or DEMO_TENANT_ID
+
+
+def _path_for(tenant_id: str | None) -> Path:
+    return _settings_dir() / f"{_safe_tenant_key(tenant_id)}.json"
+
+
+def _normalize_tenant(tenant_id: str | None) -> str:
+    return str(tenant_id or "").strip() or DEMO_TENANT_ID
 
 DEFAULT_LAYOUT_PRICING: dict[str, Any] = {
     "show_popup": True,
@@ -168,36 +200,61 @@ def _merge_layout(raw: dict | None) -> dict[str, Any]:
     return merged
 
 
-def read_seat_pricing() -> dict[str, Any]:
+def _load_layouts(raw: dict | None) -> dict[str, Any]:
     layouts = deepcopy(DEFAULT_SEAT_PRICING["layouts"])
-    if not _SETTINGS_FILE.exists():
-        return {"layouts": layouts}
-    try:
-        raw = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError, TypeError):
-        return {"layouts": layouts}
+    if not raw:
+        return layouts
     stored = raw.get("layouts") or {}
     for layout_id in LAYOUT_IDS:
         if layout_id in stored:
             layouts[layout_id] = _merge_layout(stored[layout_id])
-    return {"layouts": layouts}
+    return layouts
 
 
-def write_seat_pricing(data: dict[str, Any]) -> dict[str, Any]:
-    current = read_seat_pricing()
+def read_seat_pricing(tenant_id: str | None = None) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    path = _path_for(tid)
+    with _LOCK:
+        if not path.exists():
+            if _LEGACY_SETTINGS_FILE.exists():
+                try:
+                    raw = json.loads(_LEGACY_SETTINGS_FILE.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError, TypeError):
+                    raw = None
+                layouts = _load_layouts(raw if isinstance(raw, dict) else None)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                data = {"layouts": layouts}
+                path.write_text(
+                    json.dumps(data, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                return data
+            return {"layouts": deepcopy(DEFAULT_SEAT_PRICING["layouts"])}
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, TypeError):
+            return {"layouts": deepcopy(DEFAULT_SEAT_PRICING["layouts"])}
+        return {"layouts": _load_layouts(raw if isinstance(raw, dict) else None)}
+
+
+def write_seat_pricing(data: dict[str, Any], tenant_id: str | None = None) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    path = _path_for(tid)
+    current = read_seat_pricing(tid)
     patch_layouts = data.get("layouts") or {}
     for layout_id, patch in patch_layouts.items():
         if layout_id not in LAYOUT_IDS:
             continue
         current["layouts"][layout_id] = _merge_layout({**current["layouts"][layout_id], **patch})
-    _SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _SETTINGS_FILE.write_text(
-        json.dumps(current, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    with _LOCK:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(current, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
     return current
 
 
-def get_layout_pricing(layout_id: str) -> dict[str, Any]:
-    all_data = read_seat_pricing()
+def get_layout_pricing(layout_id: str, tenant_id: str | None = None) -> dict[str, Any]:
+    all_data = read_seat_pricing(tenant_id)
     return all_data["layouts"].get(layout_id, deepcopy(DEFAULT_LAYOUT_PRICING))

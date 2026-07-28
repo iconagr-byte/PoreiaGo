@@ -1,17 +1,48 @@
-"""Payment methods, deposit rules & bank accounts — JSON store."""
+"""Payment methods, deposit rules & bank accounts — per-tenant JSON store."""
 
 from __future__ import annotations
 
 import json
+import os
+import re
+import threading
 import uuid
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from travel_platform.payments.payment_security import validate_iban_checksum
+from travel_platform.settings.drivers_store import DEMO_TENANT_ID
 
-_SETTINGS_FILE = Path(__file__).resolve().parent / "payment_settings.json"
+_LEGACY_SETTINGS_FILE = Path(__file__).resolve().parent / "payment_settings.json"
 _PLATFORM_FILE = Path(__file__).resolve().parent / "platform_settings.json"
+_LOCK = threading.Lock()
+_SAFE_TENANT = re.compile(r"[^a-zA-Z0-9_-]+")
+
+
+def _data_dir() -> Path:
+    raw = (os.getenv("POREIAGO_DATA_DIR") or "").strip()
+    if raw:
+        return Path(raw)
+    return Path(__file__).resolve().parents[2] / "data"
+
+
+def _settings_dir() -> Path:
+    return _data_dir() / "payment_settings"
+
+
+def _safe_tenant_key(tenant_id: str | None) -> str:
+    tid = str(tenant_id or "").strip() or DEMO_TENANT_ID
+    cleaned = _SAFE_TENANT.sub("_", tid)
+    return (cleaned[:120] or DEMO_TENANT_ID)
+
+
+def _path_for(tenant_id: str | None) -> Path:
+    return _settings_dir() / f"{_safe_tenant_key(tenant_id)}.json"
+
+
+def _normalize_tenant(tenant_id: str | None) -> str:
+    return str(tenant_id or "").strip() or DEMO_TENANT_ID
 
 DEFAULT_METHODS: dict[str, Any] = {
     "card": {"enabled": True, "label": "Πιστωτική / Χρεωστική"},
@@ -188,30 +219,54 @@ def _merge_settings(raw: dict | None) -> dict[str, Any]:
     return merged
 
 
-def read_payment_settings() -> dict[str, Any]:
-    if not _SETTINGS_FILE.exists():
-        data = _merge_settings(None)
-        write_payment_settings(data)
-        return data
+def _seed_from_legacy(path: Path) -> dict[str, Any] | None:
+    """One-time copy of shared payment_settings.json into a tenant file."""
+    if path.exists() or not _LEGACY_SETTINGS_FILE.exists():
+        return None
     try:
-        raw = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(_LEGACY_SETTINGS_FILE.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError, TypeError):
-        raw = None
-    return _merge_settings(raw)
+        return None
+    if not isinstance(raw, dict):
+        return None
+    return raw
 
 
-def write_payment_settings(data: dict[str, Any]) -> dict[str, Any]:
+def read_payment_settings(tenant_id: str | None = None) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    path = _path_for(tid)
+    with _LOCK:
+        if not path.exists():
+            seeded = _seed_from_legacy(path)
+            data = _merge_settings(seeded)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(data, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            return data
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, TypeError):
+            raw = None
+        return _merge_settings(raw)
+
+
+def write_payment_settings(data: dict[str, Any], tenant_id: str | None = None) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    path = _path_for(tid)
     merged = _merge_settings(data)
-    _SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _SETTINGS_FILE.write_text(
-        json.dumps(merged, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    with _LOCK:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(merged, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
     return merged
 
 
-def get_public_payment_settings() -> dict[str, Any]:
-    data = read_payment_settings()
+def get_public_payment_settings(tenant_id: str | None = None) -> dict[str, Any]:
+    data = read_payment_settings(tenant_id)
     security = data.get("security") or deepcopy(DEFAULT_SECURITY)
     accounts = [a for a in data["bank_accounts"] if a.get("enabled")]
     methods = {
@@ -229,8 +284,8 @@ def get_public_payment_settings() -> dict[str, Any]:
     }
 
 
-def patch_payment_settings(patch: dict[str, Any]) -> dict[str, Any]:
-    current = read_payment_settings()
+def patch_payment_settings(patch: dict[str, Any], tenant_id: str | None = None) -> dict[str, Any]:
+    current = read_payment_settings(tenant_id)
     if isinstance(patch.get("deposit"), dict):
         current["deposit"] = {**current["deposit"], **patch["deposit"]}
     if isinstance(patch.get("methods"), dict):
@@ -252,11 +307,11 @@ def patch_payment_settings(patch: dict[str, Any]) -> dict[str, Any]:
             elif val is not None:
                 current_sec[key] = val
         current["security"] = current_sec
-    return write_payment_settings(current)
+    return write_payment_settings(current, tenant_id)
 
 
-def _validate_account_iban(account: dict[str, Any]) -> None:
-    settings = read_payment_settings()
+def _validate_account_iban(account: dict[str, Any], tenant_id: str | None = None) -> None:
+    settings = read_payment_settings(tenant_id)
     security = settings.get("security") or DEFAULT_SECURITY
     if not security.get("validate_iban_checksum", True):
         return
@@ -265,24 +320,28 @@ def _validate_account_iban(account: dict[str, Any]) -> None:
         raise ValueError("Invalid IBAN — checksum failed (MOD-97)")
 
 
-def add_bank_account(payload: dict[str, Any]) -> dict[str, Any]:
-    current = read_payment_settings()
+def add_bank_account(payload: dict[str, Any], tenant_id: str | None = None) -> dict[str, Any]:
+    current = read_payment_settings(tenant_id)
     account = _normalize_bank_account({**payload, "id": uuid.uuid4().hex[:12]})
     if not account:
         raise ValueError("Invalid bank account — IBAN required")
-    _validate_account_iban(account)
+    _validate_account_iban(account, tenant_id)
     if payload.get("is_default") or not any(a.get("is_default") for a in current["bank_accounts"]):
         for acc in current["bank_accounts"]:
             acc["is_default"] = False
         account["is_default"] = True
     current["bank_accounts"].append(account)
     current["bank_accounts"] = _ensure_default_account(current["bank_accounts"])
-    write_payment_settings(current)
+    write_payment_settings(current, tenant_id)
     return account
 
 
-def update_bank_account(account_id: str, patch: dict[str, Any]) -> dict[str, Any]:
-    current = read_payment_settings()
+def update_bank_account(
+    account_id: str,
+    patch: dict[str, Any],
+    tenant_id: str | None = None,
+) -> dict[str, Any]:
+    current = read_payment_settings(tenant_id)
     idx = next((i for i, a in enumerate(current["bank_accounts"]) if a["id"] == account_id), -1)
     if idx < 0:
         raise KeyError(account_id)
@@ -290,7 +349,7 @@ def update_bank_account(account_id: str, patch: dict[str, Any]) -> dict[str, Any
     account = _normalize_bank_account(merged)
     if not account:
         raise ValueError("Invalid bank account")
-    _validate_account_iban(account)
+    _validate_account_iban(account, tenant_id)
     if patch.get("is_default"):
         for acc in current["bank_accounts"]:
             acc["is_default"] = acc["id"] == account_id
@@ -299,16 +358,16 @@ def update_bank_account(account_id: str, patch: dict[str, Any]) -> dict[str, Any
     )
     current["bank_accounts"][idx] = account
     current["bank_accounts"] = _ensure_default_account(current["bank_accounts"])
-    write_payment_settings(current)
+    write_payment_settings(current, tenant_id)
     return account
 
 
-def delete_bank_account(account_id: str) -> dict[str, Any]:
-    current = read_payment_settings()
+def delete_bank_account(account_id: str, tenant_id: str | None = None) -> dict[str, Any]:
+    current = read_payment_settings(tenant_id)
     remaining = [a for a in current["bank_accounts"] if a["id"] != account_id]
     if not remaining:
         raise ValueError("Cannot delete the last bank account")
     if not any(a.get("is_default") for a in remaining):
         remaining[0]["is_default"] = True
     current["bank_accounts"] = _ensure_default_account(remaining)
-    return write_payment_settings(current)
+    return write_payment_settings(current, tenant_id)

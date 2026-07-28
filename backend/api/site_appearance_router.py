@@ -317,11 +317,11 @@ def purge_mistaken_platform_logo(*, force: bool = False) -> bool:
         return False
 
 
-def _read_checkout_settings() -> dict:
+def _read_checkout_settings(tenant_id: str | None = None) -> dict:
     try:
         from travel_platform.settings.payment_settings_store import get_public_payment_settings
 
-        pub = get_public_payment_settings()
+        pub = get_public_payment_settings(tenant_id)
         default_account = next((a for a in pub["bank_accounts"] if a.get("is_default")), None)
         if not default_account and pub["bank_accounts"]:
             default_account = pub["bank_accounts"][0]
@@ -389,8 +389,11 @@ def _read_checkout_settings() -> dict:
 
 
 @router.get("/api/site/checkout-settings", response_model=CheckoutSettingsResponse)
-async def get_public_checkout_settings():
-    return CheckoutSettingsResponse(**_read_checkout_settings())
+async def get_public_checkout_settings(request: Request):
+    from api.request_tenant import public_tenant_id
+
+    tid = await public_tenant_id(request)
+    return CheckoutSettingsResponse(**_read_checkout_settings(tid))
 
 
 @router.get("/api/site/appearance", response_model=SiteAppearanceResponse)

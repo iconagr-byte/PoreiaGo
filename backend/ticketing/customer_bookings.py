@@ -12,6 +12,11 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def _normalize_tenant(tenant_id: str | None) -> str | None:
+    tid = str(tenant_id or "").strip()
+    return tid or None
+
+
 def _row_to_booking(row) -> dict:
     try:
         data = json.loads(row["payload_json"])
@@ -20,7 +25,22 @@ def _row_to_booking(row) -> dict:
     data.setdefault("id", row["id"])
     data.setdefault("email", row["customer_email"])
     data.setdefault("customerId", row["customer_id"])
+    row_tid = None
+    try:
+        row_tid = row["tenant_id"]
+    except (KeyError, IndexError):
+        row_tid = None
+    tid = _normalize_tenant(row_tid) or _normalize_tenant(
+        data.get("tenant_id") or data.get("tenantId")
+    )
+    if tid:
+        data["tenant_id"] = tid
+        data["tenantId"] = tid
     return data
+
+
+def _booking_tenant(booking: dict) -> str | None:
+    return _normalize_tenant(booking.get("tenant_id") or booking.get("tenantId"))
 
 
 async def list_all_bookings() -> list[dict]:
@@ -32,25 +52,58 @@ async def list_all_bookings() -> list[dict]:
     return [_row_to_booking(r) for r in rows]
 
 
-async def list_bookings_for_email(email: str) -> list[dict]:
+async def list_bookings_for_email(
+    email: str,
+    tenant_id: str | None = None,
+) -> list[dict]:
+    """List wallet bookings for email, scoped to one office when tenant_id is set."""
     key = email.strip().lower()
+    tid = _normalize_tenant(tenant_id)
     db = get_db()
-    cursor = await db.execute(
-        "SELECT * FROM customer_bookings WHERE customer_email = ? ORDER BY updated_at DESC",
-        (key,),
-    )
+    if tid:
+        cursor = await db.execute(
+            """
+            SELECT * FROM customer_bookings
+            WHERE customer_email = ?
+              AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')
+            ORDER BY updated_at DESC
+            """,
+            (key, tid),
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT * FROM customer_bookings WHERE customer_email = ? ORDER BY updated_at DESC",
+            (key,),
+        )
     rows = await cursor.fetchall()
-    return [_row_to_booking(r) for r in rows]
+    items = [_row_to_booking(r) for r in rows]
+    if tid:
+        return [b for b in items if _booking_tenant(b) == tid]
+    return items
 
 
-async def get_booking(booking_id: str) -> dict | None:
+async def get_booking(booking_id: str, tenant_id: str | None = None) -> dict | None:
     db = get_db()
     cursor = await db.execute(
         "SELECT * FROM customer_bookings WHERE id = ?",
         (booking_id,),
     )
     row = await cursor.fetchone()
-    return _row_to_booking(row) if row else None
+    if not row:
+        return None
+    booking = _row_to_booking(row)
+    tid = _normalize_tenant(tenant_id)
+    if tid:
+        btid = _booking_tenant(booking)
+        # Legacy rows without tenant stay visible only until backfilled — deny cross-office.
+        if btid and btid != tid:
+            return None
+        if not btid:
+            # Unscoped legacy: allow only when explicitly requested without tenant,
+            # or treat as belonging to first office that claims it via email list.
+            # Safer default: hide from office-scoped wallet until tenant is stamped.
+            return None
+    return booking
 
 
 async def upsert_booking(
@@ -58,6 +111,7 @@ async def upsert_booking(
     *,
     customer_email: str | None = None,
     customer_id: str | None = None,
+    tenant_id: str | None = None,
 ) -> dict:
     booking_id = str(booking.get("id") or "").strip()
     if not booking_id:
@@ -73,10 +127,14 @@ async def upsert_booking(
         raise ValueError("Booking email is required")
 
     cid = customer_id or booking.get("customerId") or booking.get("customer_id")
+    tid = _normalize_tenant(tenant_id) or _booking_tenant(booking)
     payload = dict(booking)
     payload["email"] = email
     if cid:
         payload["customerId"] = cid
+    if tid:
+        payload["tenant_id"] = tid
+        payload["tenantId"] = tid
 
     try:
         from travel_platform.telemetry.passenger_track_links import enrich_booking_passenger_track
@@ -88,27 +146,41 @@ async def upsert_booking(
     now = _now_iso()
     db = get_db()
     cursor = await db.execute(
-        "SELECT created_at FROM customer_bookings WHERE id = ?",
+        "SELECT created_at, tenant_id FROM customer_bookings WHERE id = ?",
         (booking_id,),
     )
     existing = await cursor.fetchone()
     created = existing["created_at"] if existing else now
+    if existing and not tid:
+        try:
+            tid = _normalize_tenant(existing["tenant_id"])
+        except (KeyError, IndexError):
+            tid = None
 
     await db.execute(
         """
         INSERT INTO customer_bookings
-          (id, customer_email, customer_id, payload_json, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+          (id, customer_email, customer_id, tenant_id, payload_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           customer_email = excluded.customer_email,
           customer_id = excluded.customer_id,
+          tenant_id = COALESCE(excluded.tenant_id, customer_bookings.tenant_id),
           payload_json = excluded.payload_json,
           updated_at = excluded.updated_at
         """,
-        (booking_id, email, cid, json.dumps(payload, ensure_ascii=False), created, now),
+        (booking_id, email, cid, tid, json.dumps(payload, ensure_ascii=False), created, now),
     )
     await db.commit()
-    saved = await get_booking(booking_id)
+    saved = await get_booking(booking_id, tenant_id=None)
+    # get_booking without tenant returns row even if unscoped — use direct read for save result
+    if saved is None:
+        cursor = await db.execute(
+            "SELECT * FROM customer_bookings WHERE id = ?",
+            (booking_id,),
+        )
+        row = await cursor.fetchone()
+        saved = _row_to_booking(row) if row else payload
     return saved  # type: ignore[return-value]
 
 
@@ -116,18 +188,25 @@ async def upsert_many_for_customer(
     email: str,
     customer_id: str | None,
     bookings: list[dict],
+    tenant_id: str | None = None,
 ) -> list[dict]:
     key = email.strip().lower()
+    tid = _normalize_tenant(tenant_id)
     for booking in bookings:
         b_email = str(booking.get("email") or "").strip().lower()
         if b_email and b_email != key:
             raise ValueError(f"Booking {booking.get('id')} belongs to another customer")
+        stamped = {**booking, "email": key}
+        if tid:
+            stamped["tenant_id"] = tid
+            stamped["tenantId"] = tid
         await upsert_booking(
-            {**booking, "email": key},
+            stamped,
             customer_email=key,
             customer_id=customer_id or booking.get("customerId"),
+            tenant_id=tid,
         )
-    return await list_bookings_for_email(key)
+    return await list_bookings_for_email(key, tenant_id=tid)
 
 
 async def seed_customer_bookings_if_empty() -> None:
@@ -136,6 +215,8 @@ async def seed_customer_bookings_if_empty() -> None:
     row = await cur.fetchone()
     if row and row[0] > 0:
         return
+
+    from travel_platform.settings.drivers_store import DEMO_TENANT_ID
 
     seed = [
         {
@@ -158,6 +239,7 @@ async def seed_customer_bookings_if_empty() -> None:
             "basePrice": 36.29,
             "taxes": 8.71,
             "bookingSource": "Website (B2C)",
+            "tenant_id": DEMO_TENANT_ID,
         },
         {
             "id": "B-1030",
@@ -179,6 +261,7 @@ async def seed_customer_bookings_if_empty() -> None:
             "basePrice": 72.58,
             "taxes": 17.42,
             "bookingSource": "Phone Call",
+            "tenant_id": DEMO_TENANT_ID,
         },
         {
             "id": "B-1031",
@@ -201,6 +284,7 @@ async def seed_customer_bookings_if_empty() -> None:
             "basePrice": 52.42,
             "taxes": 12.58,
             "bookingSource": "B2B Partner",
+            "tenant_id": DEMO_TENANT_ID,
         },
         {
             "id": "B-0995",
@@ -223,8 +307,9 @@ async def seed_customer_bookings_if_empty() -> None:
             "basePrice": 96.77,
             "taxes": 23.23,
             "bookingSource": "Office Walk-in",
+            "tenant_id": DEMO_TENANT_ID,
         },
     ]
 
     for booking in seed:
-        await upsert_booking(booking)
+        await upsert_booking(booking, tenant_id=DEMO_TENANT_ID)
