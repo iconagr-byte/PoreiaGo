@@ -9,6 +9,7 @@ import {
   updateEmailSettings,
 } from '../../../services/emailSettingsApi.js';
 import {
+  downloadEmailSettingsEnvTemplate,
   downloadEmailSettingsTemplate,
   parseEmailSettingsFile,
 } from '../../../lib/email/emailSettingsImport.js';
@@ -223,15 +224,15 @@ export default function EmailSettingsPanel({ onAccountChange }) {
         <div>
           <h2 className="font-headline-md text-headline-md text-on-surface">Ρυθμίσεις Email</h2>
           <p className="text-body-sm text-on-surface-variant mt-1">
-            Συνδέστε τον δικό σας λογαριασμό (π.χ. info@mydomain.gr) — IMAP/SMTP, όχι .env.
-            Εισαγωγή από <strong>JSON</strong> ή <strong>.env</strong> αρχείο.
+            Συνδέστε τον δικό σας λογαριασμό (π.χ. info@mydomain.gr) — IMAP/SMTP.
+            Εισαγωγή από <strong>JSON</strong> ή <strong>.env</strong> (και .env.prod).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,.env,.txt,application/json,text/plain"
+            accept=".json,.env,.txt,application/json,text/plain,.env.prod,.env.local"
             className="hidden"
             onChange={handleImportFile}
           />
@@ -249,6 +250,13 @@ export default function EmailSettingsPanel({ onAccountChange }) {
             className="px-4 py-2 rounded-lg border border-outline-variant text-label-md"
           >
             Πρότυπο JSON
+          </button>
+          <button
+            type="button"
+            onClick={downloadEmailSettingsEnvTemplate}
+            className="px-4 py-2 rounded-lg border border-outline-variant text-label-md"
+          >
+            Πρότυπο .env
           </button>
           <button
             type="button"
