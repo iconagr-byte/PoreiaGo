@@ -375,18 +375,6 @@ export function RentProductSection() {
                 από €149<span className="text-sm font-semibold text-white/55">/μήνα</span>
               </p>
             </article>
-            <article className="rounded-[24px] border border-white/15 bg-white/10 backdrop-blur-md p-6 text-white">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-sky-200">
-                Add-on
-              </p>
-              <h3 className="mt-2 text-xl font-bold">Πάνω σε λεωφορεία</h3>
-              <p className="mt-1 text-sm text-white/65">
-                Starter / Professional / Enterprise + module Ενοικιάσεις.
-              </p>
-              <p className="mt-4 text-2xl font-bold tabular-nums">
-                +€79<span className="text-sm font-semibold text-white/55">/μήνα</span>
-              </p>
-            </article>
           </div>
         </div>
       </div>
