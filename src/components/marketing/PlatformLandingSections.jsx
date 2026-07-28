@@ -367,7 +367,7 @@ export function RentProductSection() {
               <p className="text-[11px] font-bold uppercase tracking-wider text-teal-200">
                 Αυτόνομο συμβόλαιο
               </p>
-              <h3 className="mt-2 text-xl font-bold">Rent μόνο</h3>
+              <h3 className="mt-2 text-xl font-bold">PoreiaGo Rent</h3>
               <p className="mt-1 text-sm text-white/65">
                 Για γραφεία ενοικίασης χωρίς λεωφορεία — πλήρες /rent stack.
               </p>
