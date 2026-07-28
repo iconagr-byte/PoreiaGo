@@ -284,6 +284,7 @@ export default function SortableSidebarNav({
           // Expand collapsed targets while dragging so items can be dropped.
           if (section.collapsible && sectionCollapsed) {
             setCollapsed((prev) => {
+              if (prev[section.id] === false) return prev;
               const next = { ...prev, [section.id]: false };
               saveCollapsedMap(next);
               return next;
