@@ -186,7 +186,6 @@ export default function EmailSettingsPanel({ onAccountChange }) {
   const readImportFileText = async (file) => {
     if (typeof file.arrayBuffer === 'function') {
       const buf = await file.arrayBuffer();
-      const { decodeEmailSettingsBytes } = await import('../../../lib/email/emailSettingsImport.js');
       return decodeEmailSettingsBytes(buf);
     }
     return file.text();
