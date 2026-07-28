@@ -74,7 +74,6 @@ export default function SettingsTabPanels({
     );
   }
   if (tab === 'users') return <UsersManagementPanel />;
-  if (tab === 'telematics') return <TelemetrySettingsPanel />;
 
   return null;
 }
