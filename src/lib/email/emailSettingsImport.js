@@ -51,8 +51,11 @@ const ENV_ALIASES = {
   SMTP_SSL: 'smtp_secure',
   SMTP_TLS: 'smtp_secure',
   SMTP_STARTTLS: 'smtp_secure',
+  MAIL_ENCRYPTION: 'mail_encryption',
+  SMTP_ENCRYPTION: 'mail_encryption',
   LABEL: 'label',
   MAIL_LABEL: 'label',
+  MAIL_FROM_NAME: 'label',
   // Single host often used by shared hosting (Intechs / cPanel).
   MAIL_SERVER: 'smtp_host',
   EMAIL_HOST: 'smtp_host',
@@ -63,6 +66,34 @@ function stripBom(text) {
   return String(text || '').replace(/^\uFEFF/, '');
 }
 
+/** Decode UTF-8 / UTF-16LE / UTF-16BE from raw bytes (Windows Notepad etc.). */
+export function decodeEmailSettingsBytes(buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  if (bytes.length >= 2) {
+    if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+      return new TextDecoder('utf-16le').decode(bytes);
+    }
+    if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+      return new TextDecoder('utf-16be').decode(bytes);
+    }
+  }
+  // UTF-16LE without BOM: lots of 0x00 in odd positions
+  if (bytes.length >= 8) {
+    let zeros = 0;
+    for (let i = 1; i < Math.min(bytes.length, 64); i += 2) {
+      if (bytes[i] === 0) zeros += 1;
+    }
+    if (zeros >= 8) {
+      try {
+        return new TextDecoder('utf-16le').decode(bytes);
+      } catch {
+        /* fall through */
+      }
+    }
+  }
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
 function looksLikeEnvText(text) {
   const lines = text
     .split(/\r?\n/)
@@ -70,7 +101,7 @@ function looksLikeEnvText(text) {
     .filter((l) => l && !l.startsWith('#'));
   if (!lines.length) return false;
   let kv = 0;
-  for (const line of lines.slice(0, 40)) {
+  for (const line of lines.slice(0, 80)) {
     if (/^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(line)) kv += 1;
   }
   return kv >= 2;
@@ -83,7 +114,6 @@ function filenameSuggestsEnv(filename = '') {
   if (lower.includes('.env.') || lower.endsWith('.env.local') || lower.endsWith('.env.prod')) {
     return true;
   }
-  // bare names: env, env.prod, production.env
   if (/(^|[\\/])(\.?env)([.\\-_].*)?$/i.test(lower)) return true;
   if (lower.endsWith('.env.example') || lower.endsWith('.env.sample')) return true;
   return false;
@@ -92,8 +122,8 @@ function filenameSuggestsEnv(filename = '') {
 function parseBool(value) {
   if (typeof value === 'boolean') return value;
   const v = String(value ?? '').trim().toLowerCase();
-  if (['1', 'true', 'yes', 'on'].includes(v)) return true;
-  if (['0', 'false', 'no', 'off', ''].includes(v)) return false;
+  if (['1', 'true', 'yes', 'on', 'ssl', 'tls', 'starttls'].includes(v)) return true;
+  if (['0', 'false', 'no', 'off', '', 'null', 'none'].includes(v)) return false;
   return Boolean(value);
 }
 
@@ -102,10 +132,24 @@ function parsePort(value, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+function applyEncryptionHints(src) {
+  const enc = String(src.mail_encryption || '').trim().toLowerCase();
+  if (!enc) return src;
+  const next = { ...src };
+  if (['ssl', 'smtps'].includes(enc)) {
+    if (next.smtp_secure == null || next.smtp_secure === '') next.smtp_secure = true;
+    if (!next.smtp_port) next.smtp_port = 465;
+  } else if (['tls', 'starttls'].includes(enc)) {
+    if (next.smtp_secure == null || next.smtp_secure === '') next.smtp_secure = true;
+    if (!next.smtp_port) next.smtp_port = 587;
+  }
+  return next;
+}
+
 function normalizeRawAccount(raw) {
   if (!raw || typeof raw !== 'object') return null;
 
-  const src = { ...raw };
+  let src = { ...raw };
   // Flat JSON that used .env-style keys (EMAIL, IMAP_HOST, …).
   for (const [key, value] of Object.entries(raw)) {
     const alias = ENV_ALIASES[String(key).trim().toUpperCase()];
@@ -116,6 +160,7 @@ function normalizeRawAccount(raw) {
   if (src.email && !src.email_address) src.email_address = src.email;
   if (src.username && !src.mail_username) src.mail_username = src.username;
   if (src.password && !src.mail_password) src.mail_password = src.password;
+  src = applyEncryptionHints(src);
 
   let email = String(src.email_address || src.email || '').trim();
   const username = String(src.mail_username || src.username || '').trim();
@@ -147,6 +192,15 @@ function normalizeRawAccount(raw) {
   };
 }
 
+function stripInlineEnvComment(value) {
+  // Keep passwords/values that intentionally contain # inside quotes (already unquoted).
+  if (!value.includes('#')) return value;
+  // Unquoted trailing comment: host.example.com # production
+  const hash = value.indexOf(' #');
+  if (hash > 0) return value.slice(0, hash).trim();
+  return value;
+}
+
 function parseEnvText(text) {
   const map = {};
   for (const line of text.split(/\r?\n/)) {
@@ -158,11 +212,13 @@ function parseEnvText(text) {
     if (eq < 1) continue;
     const key = lineBody.slice(0, eq).trim().toUpperCase();
     let value = lineBody.slice(eq + 1).trim();
-    if (
+    const quoted =
       (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
+      (value.startsWith("'") && value.endsWith("'"));
+    if (quoted) {
       value = value.slice(1, -1);
+    } else {
+      value = stripInlineEnvComment(value);
     }
     const alias = ENV_ALIASES[key];
     if (alias) map[alias] = value;
@@ -200,13 +256,25 @@ function parseAsEnv(text) {
     return {
       accounts: [],
       errors: [
-        'Το αρχείο δεν περιέχει EMAIL (ή MAIL_FROM), IMAP_HOST και SMTP_HOST. Δείτε το «Πρότυπο JSON» ή χρησιμοποιήστε .env με αυτά τα keys.',
+        'Το αρχείο δεν περιέχει EMAIL (ή MAIL_FROM / MAIL_FROM_ADDRESS), και SMTP_HOST ή IMAP_HOST (π.χ. MAIL_HOST). Δείτε το «Πρότυπο .env».',
       ],
     };
   }
   const errors = [];
-  if (!one.mail_password) errors.push('Λείπει MAIL_PASSWORD (ή SMTP_PASSWORD) στο αρχείο');
+  if (!one.mail_password) {
+    errors.push('Λείπει MAIL_PASSWORD (ή SMTP_PASSWORD) στο αρχείο — χωρίς κωδικό δεν γίνεται αποθήκευση');
+  }
   return { accounts: [one], errors };
+}
+
+function tryParseJson(text) {
+  const cleaned = text.trim();
+  if (!(cleaned.startsWith('{') || cleaned.startsWith('['))) return null;
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -220,8 +288,13 @@ export function parseEmailSettingsFile(text, filename = '') {
     return { accounts: [], errors: ['Το αρχείο είναι κενό'] };
   }
 
-  const preferEnv = filenameSuggestsEnv(filename) || looksLikeEnvText(cleaned);
+  // Prefer JSON when content is clearly JSON — even if named .env.prod.
+  const asJson = tryParseJson(cleaned);
+  if (asJson != null) {
+    return finalizeAccounts(extractAccountsFromJson(asJson));
+  }
 
+  const preferEnv = filenameSuggestsEnv(filename) || looksLikeEnvText(cleaned);
   if (preferEnv) {
     return parseAsEnv(cleaned);
   }
@@ -230,14 +303,13 @@ export function parseEmailSettingsFile(text, filename = '') {
     const data = JSON.parse(cleaned);
     return finalizeAccounts(extractAccountsFromJson(data));
   } catch {
-    // Many users upload .env.prod / secrets without a .json extension.
     if (looksLikeEnvText(cleaned)) {
       return parseAsEnv(cleaned);
     }
     return {
       accounts: [],
       errors: [
-        'Μη έγκυρο αρχείο — χρειάζεται JSON (κουμπί «Πρότυπο JSON») ή .env με τουλάχιστον EMAIL + SMTP_HOST (ή IMAP_HOST) + MAIL_PASSWORD. Αν ανεβάζετε .env.prod, βεβαιωθείτε ότι δεν είναι Word/PDF.',
+        'Μη έγκυρο αρχείο — χρειάζεται JSON («Πρότυπο JSON») ή .env με EMAIL + MAIL_HOST/SMTP_HOST + MAIL_PASSWORD. Όχι Word/PDF.',
       ],
     };
   }
@@ -271,6 +343,11 @@ SMTP_HOST=mail.mydomain.gr
 SMTP_PORT=587
 SMTP_SECURE=true
 LABEL=Πωλήσεις
+
+# Laravel / shared hosting aliases also work:
+# MAIL_FROM_ADDRESS=info@mydomain.gr
+# MAIL_HOST=mail.mydomain.gr
+# MAIL_ENCRYPTION=tls
 `;
 
 export function downloadEmailSettingsTemplate() {

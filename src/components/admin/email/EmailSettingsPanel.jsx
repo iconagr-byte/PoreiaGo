@@ -9,6 +9,7 @@ import {
   updateEmailSettings,
 } from '../../../services/emailSettingsApi.js';
 import {
+  decodeEmailSettingsBytes,
   downloadEmailSettingsEnvTemplate,
   downloadEmailSettingsTemplate,
   parseEmailSettingsFile,
@@ -173,6 +174,21 @@ export default function EmailSettingsPanel({ onAccountChange }) {
       ...account,
       mail_password: account.mail_password || '',
     });
+    // Scroll the editor into view — import used to feel like a no-op above the fold.
+    requestAnimationFrame(() => {
+      document.getElementById('email-settings-editor')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
+
+  const readImportFileText = async (file) => {
+    if (typeof file.arrayBuffer === 'function') {
+      const buf = await file.arrayBuffer();
+      return decodeEmailSettingsBytes(buf);
+    }
+    return file.text();
   };
 
   const handleImportFile = async (event) => {
@@ -182,26 +198,55 @@ export default function EmailSettingsPanel({ onAccountChange }) {
 
     setImporting(true);
     try {
-      const text = await file.text();
+      const text = await readImportFileText(file);
       const { accounts, errors } = parseEmailSettingsFile(text, file.name);
 
-      if (errors.length) {
-        errors.forEach((msg) => toast.error(msg, { duration: 5000 }));
-      }
       if (!accounts.length) {
-        if (!errors.length) toast.error('Δεν βρέθηκαν έγκυροι λογαριασμοί στο αρχείο');
+        if (errors.length) errors.forEach((msg) => toast.error(msg, { duration: 6000 }));
+        else toast.error('Δεν βρέθηκαν έγκυροι λογαριασμοί στο αρχείο');
         return;
       }
+
+      // Soft warnings (e.g. missing password) — still show form when we cannot save yet.
+      const softErrors = errors.filter(Boolean);
 
       if (accounts.length === 1) {
-        applyImportedAccount(accounts[0]);
-        toast.success('Οι ρυθμίσεις φορτώθηκαν — ελέγξτε και πατήστε Αποθήκευση');
+        const account = accounts[0];
+        if (account.mail_password && account.mail_password !== 'YOUR_PASSWORD_HERE') {
+          try {
+            const created = await createEmailSettings({
+              ...account,
+              imap_port: Number(account.imap_port) || 993,
+              smtp_port: Number(account.smtp_port) || 587,
+              mail_username: account.mail_username || account.email_address,
+            });
+            toast.success('Ο λογαριασμός εισήχθη και αποθηκεύτηκε');
+            onAccountChange?.(created.id);
+            localStorage.setItem('email_active_account', created.id);
+            setEditingId(null);
+            load();
+            return;
+          } catch (err) {
+            // Fall back to form so the user can fix and save.
+            toast.error(err.message || 'Αποτυχία αποθήκευσης — ελέγξτε τη φόρμα');
+            applyImportedAccount(account);
+            return;
+          }
+        }
+        applyImportedAccount(account);
+        softErrors.forEach((msg) => toast.error(msg, { duration: 6000 }));
+        toast.success(
+          account.mail_password
+            ? 'Φορτώθηκε — αλλάξτε τον κωδικό-πρότυπο και πατήστε Αποθήκευση'
+            : 'Φορτώθηκε η φόρμα — συμπληρώστε κωδικό και πατήστε Αποθήκευση',
+        );
         return;
       }
 
+      softErrors.forEach((msg) => toast.error(msg, { duration: 5000 }));
       let created = 0;
       for (const account of accounts) {
-        if (!account.mail_password) continue;
+        if (!account.mail_password || account.mail_password === 'YOUR_PASSWORD_HERE') continue;
         await createEmailSettings(account);
         created += 1;
       }
@@ -209,7 +254,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
         toast.success(`Εισήχθησαν ${created} λογαριασμοί`);
         load();
       } else {
-        toast.error('Κανένας λογαριασμός δεν αποθηκεύτηκε — λείπουν κωδικοί');
+        applyImportedAccount(accounts[0]);
+        toast.error('Κανένας λογαριασμός δεν αποθηκεύτηκε αυτόματα — συμπληρώστε κωδικό και Αποθήκευση');
       }
     } catch (err) {
       toast.error(err.message || 'Αποτυχία εισαγωγής');
@@ -225,7 +271,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
           <h2 className="font-headline-md text-headline-md text-on-surface">Ρυθμίσεις Email</h2>
           <p className="text-body-sm text-on-surface-variant mt-1">
             Συνδέστε τον δικό σας λογαριασμό (π.χ. info@mydomain.gr) — IMAP/SMTP.
-            Εισαγωγή από <strong>JSON</strong> ή <strong>.env</strong> (και .env.prod).
+            Εισαγωγή από <strong>JSON</strong> ή <strong>.env</strong> (και .env.prod) —
+            αποθηκεύεται αυτόματα όταν υπάρχει κωδικός.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -299,7 +346,10 @@ export default function EmailSettingsPanel({ onAccountChange }) {
       )}
 
       {editingId && (
-        <div className="rounded-2xl border border-outline-variant p-6 space-y-4 bg-surface-container-lowest">
+        <div
+          id="email-settings-editor"
+          className="rounded-2xl border border-outline-variant p-6 space-y-4 bg-surface-container-lowest"
+        >
           <h3 className="font-title-md text-title-md">
             {editingId === 'new' ? 'Νέος λογαριασμός' : 'Επεξεργασία'}
           </h3>
