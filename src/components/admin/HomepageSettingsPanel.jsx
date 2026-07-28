@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TemplatePicker from './homepage/TemplatePicker.jsx';
 import ThemeGallery from './homepage/ThemeGallery.jsx';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
+import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
 import {
   FOOTER_TEMPLATES,
   HEADER_TEMPLATES,
@@ -31,8 +32,32 @@ import {
   clampLogoMaxWidth,
   officeLogoImageStyle,
 } from '../../lib/branding/officeBrand.js';
+import {
+  resolveRentAppBranding,
+} from '../../lib/rental/rentAppBranding.js';
 
-const SECTIONS = [
+const DESIGN_PAGES = [
+  {
+    id: 'home',
+    label: 'Αρχική',
+    title: 'Αρχική σελίδα',
+    blurb: '20 έτοιμα θέματα ή προσαρμογή κάθε τμήματος.',
+    previewTo: '/storefront?preview=1',
+    previewLabel: 'Προεπισκόπηση σε νέο tab',
+    icon: 'home',
+  },
+  {
+    id: 'rent',
+    label: 'Ενοικιάσεις',
+    title: 'Σελίδα ενοικιάσεων',
+    blurb: 'Όνομα γραφείου, τίτλοι και κείμενα για την εφαρμογή /rent.',
+    previewTo: '/rent',
+    previewLabel: 'Άνοιγμα /rent',
+    icon: 'key',
+  },
+];
+
+const HOME_SECTIONS = [
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-violet-500' },
   { id: 'themes', label: 'Θέματα', icon: 'palette', accent: 'bg-fuchsia-500' },
   { id: 'general', label: 'Γενικά', icon: 'tune', accent: 'bg-slate-600' },
@@ -42,6 +67,15 @@ const SECTIONS = [
   { id: 'branding', label: 'Λογότυπο & εικόνες', icon: 'image', accent: 'bg-amber-500' },
   { id: 'footer', label: 'Footer', icon: 'vertical_align_bottom', accent: 'bg-rose-500' },
 ];
+
+const RENT_SECTIONS = [
+  { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-teal-600' },
+  { id: 'copy', label: 'Όνομα & κείμενα', icon: 'edit_note', accent: 'bg-cyan-600' },
+];
+
+function sanitizeDesignPage(value) {
+  return value === 'rent' ? 'rent' : 'home';
+}
 
 function PanelCard({ title, description, children, action }) {
   return (
@@ -399,13 +433,38 @@ function OverviewSummary({ form }) {
   );
 }
 
-export default function HomepageSettingsPanel() {
+export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageFromQuery = searchParams.get('page') || searchParams.get('designPage');
+  const [designPage, setDesignPage] = useState(() =>
+    sanitizeDesignPage(initialDesignPage || pageFromQuery),
+  );
   const [section, setSection] = useState('overview');
   const [form, setForm] = useState({ ...DEFAULT_SITE_APPEARANCE });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingHero, setUploadingHero] = useState(false);
+
+  useEffect(() => {
+    const next = sanitizeDesignPage(initialDesignPage || pageFromQuery);
+    setDesignPage(next);
+  }, [initialDesignPage, pageFromQuery]);
+
+  const selectDesignPage = (id) => {
+    const next = sanitizeDesignPage(id);
+    setDesignPage(next);
+    setSection('overview');
+    const params = new URLSearchParams(searchParams);
+    if (next === 'rent') params.set('page', 'rent');
+    else params.delete('page');
+    params.delete('designPage');
+    setSearchParams(params, { replace: true });
+  };
+
+  const navSections = designPage === 'rent' ? RENT_SECTIONS : HOME_SECTIONS;
+  const activePageMeta = DESIGN_PAGES.find((p) => p.id === designPage) || DESIGN_PAGES[0];
+  const rentPreview = resolveRentAppBranding(form, { guest: false });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -551,32 +610,61 @@ export default function HomepageSettingsPanel() {
     form.hero_image_url && form.hero_image_url !== DEFAULT_SITE_APPEARANCE.hero_image_url;
 
   if (loading) {
-    return <p className="text-sm text-gray-500 py-4">Φόρτωση ρυθμίσεων αρχικής…</p>;
+    return <p className="text-sm text-gray-500 py-4">Φόρτωση ρυθμίσεων εμφάνισης…</p>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row gap-6 min-w-0">
-      <nav className="lg:w-56 shrink-0">
+      <nav className="lg:w-60 shrink-0">
         <div className="lg:sticky lg:top-4 space-y-2">
-          <div className="rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-700 text-white p-4 mb-4 shadow-lg shadow-violet-500/20">
+          <div
+            className={`rounded-2xl text-white p-4 mb-4 shadow-lg ${
+              designPage === 'rent'
+                ? 'bg-gradient-to-br from-teal-700 via-cyan-700 to-sky-800 shadow-teal-500/20'
+                : 'bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-700 shadow-violet-500/20'
+            }`}
+          >
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Διαμόρφωση</p>
-            <p className="font-bold text-lg mt-0.5">Αρχική σελίδα</p>
-            <p className="text-xs text-white/75 mt-2">
-              20 έτοιμα θέματα ή προσαρμογή κάθε τμήματος.
-            </p>
+            <p className="font-bold text-lg mt-0.5">{activePageMeta.title}</p>
+            <p className="text-xs text-white/75 mt-2">{activePageMeta.blurb}</p>
+
+            <div
+              className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-black/20 p-1"
+              role="tablist"
+              aria-label="Σελίδα προς σχεδιασμό"
+            >
+              {DESIGN_PAGES.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={designPage === p.id}
+                  onClick={() => selectDesignPage(p.id)}
+                  className={`inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition-colors ${
+                    designPage === p.id
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-white/85 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">{p.icon}</span>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
             <Link
-              to="/storefront?preview=1"
+              to={activePageMeta.previewTo}
               target="_blank"
-              className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-2 rounded-full transition-colors"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-2 rounded-full transition-colors"
             >
               <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-              Προεπισκόπηση σε νέο tab
+              {activePageMeta.previewLabel}
             </Link>
           </div>
 
           <div className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
-            {SECTIONS.map((s) => (
+            {navSections.map((s) => (
               <button
                 key={s.id}
                 type="button"
@@ -598,7 +686,75 @@ export default function HomepageSettingsPanel() {
       </nav>
 
       <div className="flex-1 min-w-0 space-y-6">
-        {section === 'overview' && (
+        {designPage === 'rent' ? (
+          <>
+            {section === 'overview' && (
+              <>
+                <PanelCard
+                  title="Τρέχουσα εμφάνιση /rent"
+                  description="Σύνοψη κειμένων της εφαρμογής ενοικίασης. Αλλάξτε τα από «Όνομα & κείμενα»."
+                >
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {[
+                      { label: 'Όνομα γραφείου', value: rentPreview.brandLabel },
+                      { label: 'Τίτλος', value: rentPreview.title },
+                      { label: 'Κουμπί', value: rentPreview.ctaLabel },
+                      {
+                        label: 'Περιγραφή',
+                        value: rentPreview.copy,
+                      },
+                    ].map((row) => (
+                      <div
+                        key={row.label}
+                        className="rounded-2xl border border-black/[0.06] bg-slate-50/80 p-4"
+                      >
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                          {row.label}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900 line-clamp-3">
+                          {row.value || '—'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </PanelCard>
+                <PanelCard
+                  title="Γρήγορη εκκίνηση"
+                  description="Επεξεργαστείτε όνομα, τίτλους και κείμενα — με ζωντανή προεπισκόπηση κινητού."
+                >
+                  <button
+                    type="button"
+                    onClick={() => setSection('copy')}
+                    className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full sm:max-w-md"
+                  >
+                    <span className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <span className="material-symbols-outlined">edit_note</span>
+                    </span>
+                    <span>
+                      <span className="font-bold text-gray-900 block">Όνομα & κείμενα</span>
+                      <span className="text-xs text-gray-500">Συνδεδεμένος / επισκέπτης · CTA</span>
+                    </span>
+                  </button>
+                </PanelCard>
+              </>
+            )}
+            {section === 'copy' && (
+              <PanelCard
+                title="Όνομα & κείμενα /rent"
+                description="Εμφανίζονται αμέσως στην εφαρμογή ενοικίασης μετά την αποθήκευση."
+              >
+                <RentAppBrandingEditor
+                  embedded
+                  onSaved={(appearance) => {
+                    if (appearance) setForm((p) => ({ ...p, ...appearance }));
+                  }}
+                />
+              </PanelCard>
+            )}
+          </>
+        ) : null}
+
+        {designPage === 'home' && section === 'overview' && (
           <>
             <PanelCard
               title="Τρέχουσα διάταξη"
@@ -611,7 +767,7 @@ export default function HomepageSettingsPanel() {
               description="Προτείνουμε: Θέματα → Γενικά → Header → Hero → Καρτέλες → Footer."
             >
               <div className="grid sm:grid-cols-2 gap-3">
-                {SECTIONS.filter((s) => s.id !== 'overview').map((s) => (
+                {HOME_SECTIONS.filter((s) => s.id !== 'overview').map((s) => (
                   <button
                     key={s.id}
                     type="button"
@@ -629,7 +785,7 @@ export default function HomepageSettingsPanel() {
           </>
         )}
 
-        {section === 'themes' && (
+        {designPage === 'home' && section === 'themes' && (
           <PanelCard
             title="Θέματα αρχικής σελίδας"
             description="Επίλεξε θέμα — εφαρμόζει χρώματα, header, hero, κάρτες και footer μαζί."
@@ -643,7 +799,7 @@ export default function HomepageSettingsPanel() {
           </PanelCard>
         )}
 
-        {section === 'general' && (
+        {designPage === 'home' && section === 'general' && (
           <form
             onSubmit={patchForm(
               {
@@ -773,7 +929,7 @@ export default function HomepageSettingsPanel() {
           </form>
         )}
 
-        {section === 'header' && (
+        {designPage === 'home' && section === 'header' && (
           <form onSubmit={saveLayout}>
             <PanelCard
               title="Πρότυπα Header"
@@ -790,7 +946,7 @@ export default function HomepageSettingsPanel() {
           </form>
         )}
 
-        {section === 'hero' && (
+        {designPage === 'home' && section === 'hero' && (
           <form
             onSubmit={patchForm(
               {
@@ -864,7 +1020,7 @@ export default function HomepageSettingsPanel() {
           </form>
         )}
 
-        {section === 'trips' && (
+        {designPage === 'home' && section === 'trips' && (
           <>
             <form onSubmit={saveLayout}>
               <PanelCard
@@ -951,7 +1107,7 @@ export default function HomepageSettingsPanel() {
           </>
         )}
 
-        {section === 'branding' && (
+        {designPage === 'home' && section === 'branding' && (
           <form
             onSubmit={patchForm(
               {
@@ -996,7 +1152,7 @@ export default function HomepageSettingsPanel() {
           </form>
         )}
 
-        {section === 'footer' && (
+        {designPage === 'home' && section === 'footer' && (
           <form
             onSubmit={patchForm(
               {

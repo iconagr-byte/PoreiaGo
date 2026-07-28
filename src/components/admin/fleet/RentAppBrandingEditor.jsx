@@ -66,7 +66,7 @@ function formFromAppearance(data) {
   };
 }
 
-export default function RentAppBrandingEditor() {
+export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}) {
   const [form, setForm] = useState(() => formFromAppearance(null));
   const [saved, setSaved] = useState('');
   const [loading, setLoading] = useState(true);
@@ -113,10 +113,12 @@ export default function RentAppBrandingEditor() {
       if (payload.rent_office_name) {
         payload.footer_brand_name = payload.rent_office_name;
       }
-      await updateSiteAppearance(payload);
-      const next = formFromAppearance({ ...form, ...payload });
+      const result = await updateSiteAppearance(payload);
+      const merged = { ...form, ...(result?.data || payload) };
+      const next = formFromAppearance(merged);
       setForm(next);
       setSaved(JSON.stringify(next));
+      onSaved?.(result?.data || payload);
       toast.success('Αποθηκεύτηκε — η σελίδα /rent ενημερώθηκε');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');
@@ -137,22 +139,24 @@ export default function RentAppBrandingEditor() {
   }
 
   return (
-    <form onSubmit={onSave} className="rent-brand-editor space-y-4">
-      <header className="rent-brand-hero">
-        <div className="rent-brand-hero-copy">
-          <p className="rent-brand-kicker">Πρώτα βήματα · εμφάνιση /rent</p>
-          <h3 className="rent-brand-title">Το πρόσωπο του γραφείου σας</h3>
-          <p className="rent-brand-lead">
-            Συμπληρώστε όνομα και κείμενα μία φορά — μετά το Save εμφανίζονται αμέσως στην εφαρμογή
-            ενοικίασης. Σε νέο συμβόλαιο Rent γεμίζουν αυτόματα από την επωνυμία του γραφείου.
-          </p>
-        </div>
-        <div className="rent-brand-hero-art" aria-hidden>
-          <span className="material-symbols-outlined">car_rental</span>
-          <span className="material-symbols-outlined">edit_note</span>
-          <span className="material-symbols-outlined">phone_iphone</span>
-        </div>
-      </header>
+    <form onSubmit={onSave} className={`rent-brand-editor space-y-4 ${embedded ? 'rent-brand-editor--embedded' : ''}`}>
+      {!embedded ? (
+        <header className="rent-brand-hero">
+          <div className="rent-brand-hero-copy">
+            <p className="rent-brand-kicker">Πρώτα βήματα · εμφάνιση /rent</p>
+            <h3 className="rent-brand-title">Το πρόσωπο του γραφείου σας</h3>
+            <p className="rent-brand-lead">
+              Συμπληρώστε όνομα και κείμενα μία φορά — μετά το Save εμφανίζονται αμέσως στην εφαρμογή
+              ενοικίασης. Σε νέο συμβόλαιο Rent γεμίζουν αυτόματα από την επωνυμία του γραφείου.
+            </p>
+          </div>
+          <div className="rent-brand-hero-art" aria-hidden>
+            <span className="material-symbols-outlined">car_rental</span>
+            <span className="material-symbols-outlined">edit_note</span>
+            <span className="material-symbols-outlined">phone_iphone</span>
+          </div>
+        </header>
+      ) : null}
 
       <div className="rent-brand-grid">
         <div className="rent-brand-fields space-y-3">

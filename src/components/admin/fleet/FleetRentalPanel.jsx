@@ -605,7 +605,7 @@ export default function FleetRentalPanel({
               { id: 'clients', label: 'Πελάτες ενοικίασης', copy: `${clients.length} πελάτες · γραφείο + Wallet`, icon: 'groups' },
               { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
               { id: 'paperwork', label: 'Χαρτούρα συμβολαίων', copy: 'Συμβάσεις · υπογραφές · εκτύπωση PDF', icon: 'description' },
-              { id: 'branding', label: 'Εμφάνιση app', copy: 'Όνομα γραφείου · τίτλος · κείμενα /rent', icon: 'palette' },
+              { id: 'branding', label: 'Εμφάνιση /rent', copy: 'Σχεδιασμός σελίδων → Ενοικιάσεις', icon: 'palette', designHref: '/admin?tab=settings&sub=homepage&page=rent' },
               { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
@@ -615,7 +615,13 @@ export default function FleetRentalPanel({
               <button
                 key={hub.id}
                 type="button"
-                onClick={() => setTab(hub.id)}
+                onClick={() => {
+                  if (hub.designHref) {
+                    navigate(hub.designHref);
+                    return;
+                  }
+                  setTab(hub.id);
+                }}
                 className="text-left bg-white rounded-2xl border border-black/[0.06] px-4 py-3 hover:border-primary/40 transition-colors"
               >
                 <div className="flex items-center gap-2">
