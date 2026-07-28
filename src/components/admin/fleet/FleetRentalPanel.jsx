@@ -29,6 +29,7 @@ import RentalSignaturePad from './RentalSignaturePad.jsx';
 import RentalCalendarBoard from './RentalCalendarBoard.jsx';
 import RentAppShareBanner from './RentAppShareBanner.jsx';
 import RentPlanCardsEditor from './RentPlanCardsEditor.jsx';
+import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import '../../../styles/rental-admin-apple.css';
 
 const CATEGORIES = [
@@ -37,17 +38,7 @@ const CATEGORIES = [
   { value: 'MINIBUS', label: 'Μινιμπάς' },
 ];
 
-const TABS = [
-  { id: 'clients', label: 'Πελάτες', icon: 'groups' },
-  { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
-  { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard' },
-  { id: 'vehicles', label: 'Στόλος', icon: 'directions_car' },
-  { id: 'wizard', label: 'Νέα κράτηση', icon: 'add_circle' },
-  { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
-  { id: 'inspections', label: 'Check-in / out', icon: 'fact_check' },
-  { id: 'live_gps', label: 'Ζωντανά GPS', icon: 'my_location' },
-  { id: 'plans', label: 'Συμβόλαια Rent', icon: 'sell' },
-];
+const TABS = RENT_DESK_TABS;
 
 function bookingSource(b) {
   const channel = String(b?.channel || '').toUpperCase();
@@ -94,13 +85,21 @@ export default function FleetRentalPanel({
   onOpenLiveMap,
   onOpenCustomer,
   initialTab,
+  activeTab: controlledTab,
+  onTabChange,
+  hideSideNav = false,
 } = {}) {
   const navigate = useNavigate();
-  const [tab, setTab] = useState(() =>
-    typeof initialTab === 'string' && TABS.some((t) => t.id === initialTab)
-      ? initialTab
-      : 'clients',
+  const isControlled = typeof controlledTab === 'string' && typeof onTabChange === 'function';
+  const [internalTab, setInternalTab] = useState(() =>
+    sanitizeRentDeskTab(typeof initialTab === 'string' ? initialTab : 'clients'),
   );
+  const tab = isControlled ? sanitizeRentDeskTab(controlledTab) : internalTab;
+  const setTab = (next) => {
+    const safe = sanitizeRentDeskTab(next);
+    if (isControlled) onTabChange(safe);
+    else setInternalTab(safe);
+  };
   const [summary, setSummary] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -115,10 +114,11 @@ export default function FleetRentalPanel({
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (typeof initialTab === 'string' && TABS.some((t) => t.id === initialTab)) {
-      setTab(initialTab);
+    if (isControlled) return;
+    if (typeof initialTab === 'string') {
+      setInternalTab(sanitizeRentDeskTab(initialTab));
     }
-  }, [initialTab]);
+  }, [initialTab, isControlled]);
 
   // Wizard state
   const [wiz, setWiz] = useState({
@@ -411,7 +411,8 @@ export default function FleetRentalPanel({
         </div>
       </header>
 
-      <div className="rental-apple-body">
+      <div className={`rental-apple-body${hideSideNav ? ' is-sidebar-driven' : ''}`}>
+      {!hideSideNav && (
       <nav className="rental-apple-nav-wrap" aria-label="Μενού ενοικιάσεων">
         <div className="rental-apple-nav" role="tablist" aria-orientation="vertical">
           {TABS.map((t) => (
@@ -431,6 +432,7 @@ export default function FleetRentalPanel({
           ))}
         </div>
       </nav>
+      )}
 
       <div className="rental-apple-main min-w-0 flex-1 space-y-4">
       {tab === 'clients' && (

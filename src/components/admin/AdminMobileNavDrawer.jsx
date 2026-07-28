@@ -10,8 +10,10 @@ export default function AdminMobileNavDrawer({
   onClose,
   activeTab,
   settingsSubTab,
+  fleetRentalTab,
   onTabChange,
   onSettingsSubTabChange,
+  onFleetRentalTabChange,
   onEmailClick,
   onNavigate,
   officeMode = 'trips_only',
@@ -60,8 +62,10 @@ export default function AdminMobileNavDrawer({
         <SortableSidebarNav
           activeTab={activeTab}
           settingsSubTab={settingsSubTab}
+          fleetRentalTab={fleetRentalTab}
           onTabChange={go(onTabChange)}
           onSettingsSubTabChange={onSettingsSubTabChange}
+          onFleetRentalTabChange={onFleetRentalTabChange}
           onEmailClick={go(onEmailClick)}
           onNavigate={go(onNavigate)}
           officeMode={officeMode}

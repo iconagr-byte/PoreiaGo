@@ -7,10 +7,12 @@ import {
   saveNavLayout,
 } from '../../lib/admin/sidebarNav.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, sanitizeSettingsSubTab } from '../../lib/admin/settingsTabs.js';
+import { DEFAULT_RENT_DESK_TAB, sanitizeRentDeskTab } from '../../lib/admin/rentDeskNav.js';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 
 const SECTIONS = [
   { id: 'main', label: 'Λειτουργίες' },
+  { id: 'rent', label: 'Ενοικιάσεις' },
   { id: 'fleet_ops', label: 'Λειτουργίες Στόλου' },
   { id: 'platform', label: 'Πλατφόρμα SaaS', superOnly: true },
   { id: 'settings', label: 'Ρυθμίσεις' },
@@ -19,8 +21,10 @@ const SECTIONS = [
 export default function SortableSidebarNav({
   activeTab,
   settingsSubTab,
+  fleetRentalTab,
   onTabChange,
   onSettingsSubTabChange,
+  onFleetRentalTabChange,
   onEmailClick,
   onNavigate,
   officeMode = 'trips_only',
@@ -53,7 +57,7 @@ export default function SortableSidebarNav({
     return visible
       .map((section) => ({
         ...section,
-        label: rentOnly && section.id === 'main' ? 'Rent' : section.label,
+        label: rentOnly && section.id === 'main' ? 'Γραφείο' : section.label,
         order: displayLayout[section.id] || [],
         items: navItemsFromIds(displayLayout[section.id] || [], superAdmin).filter(
           (item) => superAdmin || item.settingsSection !== 'platform',
@@ -112,6 +116,11 @@ export default function SortableSidebarNav({
     onTabChange?.('settings');
   };
 
+  const openRentDesk = (subTab) => {
+    onFleetRentalTabChange?.(sanitizeRentDeskTab(subTab));
+    onTabChange?.('fleet_rental');
+  };
+
   const handleClick = (item) => {
     if (item.type === 'email') {
       onEmailClick?.();
@@ -125,6 +134,10 @@ export default function SortableSidebarNav({
       openSettings(item.settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB);
       return;
     }
+    if (item.type === 'fleet_rental_subtab') {
+      openRentDesk(item.fleetRentalTab || DEFAULT_RENT_DESK_TAB);
+      return;
+    }
     onTabChange?.(item.tab || item.id);
   };
 
@@ -133,9 +146,13 @@ export default function SortableSidebarNav({
       item.type === 'settings_subtab' &&
       activeTab === 'settings' &&
       settingsSubTab === item.settingsSubTab;
+    const isRentSubActive =
+      item.type === 'fleet_rental_subtab' &&
+      activeTab === 'fleet_rental' &&
+      sanitizeRentDeskTab(fleetRentalTab) === item.fleetRentalTab;
     const isTabActive = item.type === 'tab' && activeTab === item.tab;
     const isEmailActive = item.type === 'email' && activeTab === 'email';
-    const isActive = isSettingsSubActive || isTabActive || isEmailActive;
+    const isActive = isSettingsSubActive || isRentSubActive || isTabActive || isEmailActive;
 
     const classes = ['admin-nav-btn'];
     if (isActive) {
@@ -189,6 +206,7 @@ export default function SortableSidebarNav({
 
   const renderSection = (section) => {
     const isSettingsSection = section.id === 'settings';
+    const isRentSection = section.id === 'rent';
     const isFleetOpsSection = section.id === 'fleet_ops';
     const isPlatformSection = section.id === 'platform';
     const isDropTarget = !rentOnly && dragState.draggingId && dragState.section === section.id;
@@ -198,9 +216,9 @@ export default function SortableSidebarNav({
         key={section.id}
         className={`admin-nav-section ${isPlatformSection ? 'admin-nav-section-platform' : ''} ${
           isSettingsSection ? 'admin-nav-section-settings' : ''
-        } ${isFleetOpsSection ? 'admin-nav-section-fleet' : ''} ${
-          isDropTarget ? 'admin-nav-section-drop-target' : ''
-        }`}
+        } ${isRentSection ? 'admin-nav-section-rent' : ''} ${
+          isFleetOpsSection ? 'admin-nav-section-fleet' : ''
+        } ${isDropTarget ? 'admin-nav-section-drop-target' : ''}`}
         onDragOver={(e) => {
           if (rentOnly || !dragState.draggingId) return;
           e.preventDefault();
@@ -216,7 +234,9 @@ export default function SortableSidebarNav({
         <p
           className={`admin-nav-section-label ${
             isPlatformSection ? 'admin-nav-section-label-platform' : ''
-          } ${isSettingsSection ? 'admin-nav-section-label-settings' : ''}`}
+          } ${isSettingsSection ? 'admin-nav-section-label-settings' : ''} ${
+            isRentSection ? 'admin-nav-section-label-rent' : ''
+          }`}
         >
           {section.label}
         </p>
@@ -260,7 +280,9 @@ export default function SortableSidebarNav({
                   handleDrop(section.id, idx);
                 }}
               >
-                {renderRow(item, section.id, { nested: isSettingsSection || isFleetOpsSection })}
+                {renderRow(item, section.id, {
+                  nested: isSettingsSection || isFleetOpsSection || isRentSection,
+                })}
               </div>
             </li>
           ))}

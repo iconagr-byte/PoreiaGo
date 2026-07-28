@@ -146,6 +146,10 @@
   min-height: 0;
 }
 
+.rental-apple-body.is-sidebar-driven {
+  display: block;
+}
+
 .rental-apple-nav-wrap {
   position: relative;
   flex-shrink: 0;

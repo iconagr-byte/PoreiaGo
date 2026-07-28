@@ -55,6 +55,7 @@ import {
 } from '../services/platformApi.js';
 import { clearSaasSession, getSaasToken } from '../services/saasApi.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, DEFAULT_PLATFORM_TAB, sanitizeSettingsSubTab } from '../lib/admin/settingsTabs.js';
+import { DEFAULT_RENT_DESK_TAB, sanitizeRentDeskTab } from '../lib/admin/rentDeskNav.js';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
@@ -120,6 +121,12 @@ export default function BackOffice() {
     }
     return isSaasSuperAdmin() ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
   });
+  const [fleetRentalTab, setFleetRentalTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('rentTab') || params.get('fleetRentalTab');
+    const fromState = location.state?.fleetRentalTab;
+    return sanitizeRentDeskTab(fromQuery || fromState || DEFAULT_RENT_DESK_TAB);
+  });
   const [trips, setTrips] = useState(() => loadTrips());
   const [routesMarket, setRoutesMarket] = useState(MARKET_DOMESTIC);
   const [lostItems, setLostItems] = useState([]);
@@ -183,6 +190,11 @@ export default function BackOffice() {
       setActiveTab('settings');
       setSettingsSubTab(sanitizeSettingsSubTab(sub, isSaasSuperAdmin()));
     }
+    const rentTab = params.get('rentTab') || params.get('fleetRentalTab');
+    if (rentTab) {
+      setActiveTab('fleet_rental');
+      setFleetRentalTab(sanitizeRentDeskTab(rentTab));
+    }
   }, [location.search]);
 
   useEffect(() => {
@@ -227,6 +239,9 @@ export default function BackOffice() {
           isSaasSuperAdmin(),
         ),
       );
+    }
+    if (location.state?.fleetRentalTab) {
+      setFleetRentalTab(sanitizeRentDeskTab(location.state.fleetRentalTab));
     }
     if (location.state?.activeTab === 'email') {
       setEmailIntent({
@@ -593,7 +608,10 @@ export default function BackOffice() {
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => setActiveTab('fleet_rental')}
+                onClick={() => {
+                  setFleetRentalTab('clients');
+                  setActiveTab('fleet_rental');
+                }}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-teal-700 text-white text-sm font-bold hover:bg-teal-800"
               >
                 <span className="material-symbols-outlined text-[18px]">car_rental</span>
@@ -2206,8 +2224,10 @@ export default function BackOffice() {
         <SortableSidebarNav
           activeTab={activeTab}
           settingsSubTab={settingsSubTab}
+          fleetRentalTab={fleetRentalTab}
           onTabChange={setActiveTab}
           onSettingsSubTabChange={setSettingsSubTab}
+          onFleetRentalTabChange={setFleetRentalTab}
           onEmailClick={goToEmailMailbox}
           onNavigate={(path) => navigate(path)}
           officeMode={officeMode}
@@ -2219,8 +2239,10 @@ export default function BackOffice() {
         onClose={() => setMobileNavOpen(false)}
         activeTab={activeTab}
         settingsSubTab={settingsSubTab}
+        fleetRentalTab={fleetRentalTab}
         onTabChange={setActiveTab}
         onSettingsSubTabChange={setSettingsSubTab}
+        onFleetRentalTabChange={setFleetRentalTab}
         onEmailClick={goToEmailMailbox}
         onNavigate={(path) => navigate(path)}
         officeMode={officeMode}
@@ -2340,7 +2362,10 @@ export default function BackOffice() {
             {activeTab === 'fleet_rental' && (
               <div className="pb-stack-lg">
                 <FleetRentalPanel
-                  initialTab={location.state?.fleetRentalTab}
+                  hideSideNav
+                  activeTab={fleetRentalTab}
+                  onTabChange={setFleetRentalTab}
+                  initialTab={fleetRentalTab}
                   onOpenLiveMap={() => setActiveTab('fleet_live_map')}
                   onOpenCustomer={(person) => {
                     setSelectedCustomer(person);

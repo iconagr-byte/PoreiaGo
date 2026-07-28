@@ -22,6 +22,10 @@
   margin-top: 0.125rem;
 }
 
+.admin-nav-section-label-rent {
+  color: color-mix(in srgb, #0f766e 70%, var(--color-on-surface-variant));
+}
+
 .admin-nav-section-label {
   font-size: 0.625rem;
   font-weight: 700;
