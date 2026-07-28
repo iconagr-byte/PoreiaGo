@@ -7,22 +7,29 @@ const ENV_ALIASES = {
   EMAIL_ADDRESS: 'email_address',
   MAIL_FROM: 'email_address',
   MAIL_EMAIL: 'email_address',
+  MAIL_FROM_ADDRESS: 'email_address',
+  FROM_EMAIL: 'email_address',
   SMTP_FROM: 'email_address',
+  SMTP_FROM_EMAIL: 'email_address',
   MAIL_USERNAME: 'mail_username',
   USERNAME: 'mail_username',
+  USER: 'mail_username',
   SMTP_USER: 'mail_username',
   SMTP_USERNAME: 'mail_username',
   IMAP_USER: 'mail_username',
   IMAP_USERNAME: 'mail_username',
   MAIL_PASSWORD: 'mail_password',
   PASSWORD: 'mail_password',
+  PASS: 'mail_password',
   SMTP_PASSWORD: 'mail_password',
   SMTP_PASS: 'mail_password',
   IMAP_PASSWORD: 'mail_password',
   IMAP_PASS: 'mail_password',
+  MAIL_PASS: 'mail_password',
   IMAP_HOST: 'imap_host',
   MAIL_IMAP_HOST: 'imap_host',
   IMAP_SERVER: 'imap_host',
+  IMAP_HOSTNAME: 'imap_host',
   IMAP_PORT: 'imap_port',
   MAIL_IMAP_PORT: 'imap_port',
   IMAP_SECURE: 'imap_secure',
@@ -36,6 +43,7 @@ const ENV_ALIASES = {
   MAIL_HOST: 'smtp_host',
   MAIL_SMTP_HOST: 'smtp_host',
   SMTP_SERVER: 'smtp_host',
+  SMTP_HOSTNAME: 'smtp_host',
   SMTP_PORT: 'smtp_port',
   MAIL_PORT: 'smtp_port',
   MAIL_SMTP_PORT: 'smtp_port',
@@ -45,6 +53,10 @@ const ENV_ALIASES = {
   SMTP_STARTTLS: 'smtp_secure',
   LABEL: 'label',
   MAIL_LABEL: 'label',
+  // Single host often used by shared hosting (Intechs / cPanel).
+  MAIL_SERVER: 'smtp_host',
+  EMAIL_HOST: 'smtp_host',
+  HOST: 'smtp_host',
 };
 
 function stripBom(text) {
@@ -94,13 +106,26 @@ function normalizeRawAccount(raw) {
   if (!raw || typeof raw !== 'object') return null;
 
   const src = { ...raw };
+  // Flat JSON that used .env-style keys (EMAIL, IMAP_HOST, …).
+  for (const [key, value] of Object.entries(raw)) {
+    const alias = ENV_ALIASES[String(key).trim().toUpperCase()];
+    if (alias && (src[alias] == null || src[alias] === '')) {
+      src[alias] = value;
+    }
+  }
   if (src.email && !src.email_address) src.email_address = src.email;
   if (src.username && !src.mail_username) src.mail_username = src.username;
   if (src.password && !src.mail_password) src.mail_password = src.password;
 
-  const email = String(src.email_address || src.email || '').trim();
-  const imapHost = String(src.imap_host || '').trim();
-  const smtpHost = String(src.smtp_host || '').trim();
+  let email = String(src.email_address || src.email || '').trim();
+  const username = String(src.mail_username || src.username || '').trim();
+  if (!email && username.includes('@')) email = username;
+
+  let imapHost = String(src.imap_host || '').trim();
+  let smtpHost = String(src.smtp_host || '').trim();
+  // Same mail server for IMAP+SMTP is the common Intechs / cPanel case.
+  if (!imapHost && smtpHost) imapHost = smtpHost;
+  if (!smtpHost && imapHost) smtpHost = imapHost;
   if (!email || !imapHost || !smtpHost) return null;
 
   return {
@@ -212,7 +237,7 @@ export function parseEmailSettingsFile(text, filename = '') {
     return {
       accounts: [],
       errors: [
-        'Μη έγκυρο αρχείο — χρειάζεται JSON (πρότυπο) ή .env με EMAIL, IMAP_HOST, SMTP_HOST, MAIL_PASSWORD',
+        'Μη έγκυρο αρχείο — χρειάζεται JSON (κουμπί «Πρότυπο JSON») ή .env με τουλάχιστον EMAIL + SMTP_HOST (ή IMAP_HOST) + MAIL_PASSWORD. Αν ανεβάζετε .env.prod, βεβαιωθείτε ότι δεν είναι Word/PDF.',
       ],
     };
   }

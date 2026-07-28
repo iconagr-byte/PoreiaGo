@@ -232,7 +232,7 @@ export default function EmailSettingsPanel({ onAccountChange }) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,.env,.txt,application/json,text/plain,.env.prod,.env.local"
+            accept=".json,.env,.txt,application/json,text/plain,.env.prod,.env.local,.env.example,*/*"
             className="hidden"
             onChange={handleImportFile}
           />

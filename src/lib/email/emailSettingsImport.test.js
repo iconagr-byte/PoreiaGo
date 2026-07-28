@@ -52,4 +52,27 @@ MAIL_PASSWORD=1
 );
 console.assert(bomEnv.accounts[0]?.email_address === 'bom@test.gr', 'BOM stripped');
 
+const smtpOnly = parseEmailSettingsFile(
+  `EMAIL=info@achilliotravel.com
+SMTP_HOST=mail.achilliotravel.com
+MAIL_PASSWORD=secret
+`,
+  '.env.prod',
+);
+console.assert(smtpOnly.accounts.length === 1, 'smtp-only env');
+console.assert(
+  smtpOnly.accounts[0].imap_host === 'mail.achilliotravel.com',
+  'imap derived from smtp',
+);
+
+const envKeyedJson = parseEmailSettingsFile(
+  JSON.stringify({
+    EMAIL: 'a@b.gr',
+    SMTP_HOST: 'mail.b.gr',
+    MAIL_PASSWORD: 'x',
+  }),
+  'settings.json',
+);
+console.assert(envKeyedJson.accounts.length === 1, 'env keys inside JSON');
+
 console.log('emailSettingsImport: OK');
