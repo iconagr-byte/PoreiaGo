@@ -11,6 +11,8 @@ function tripToPayload(trip) {
     price: Number(trip.price) || 0,
     available_seats: trip.availableSeats ?? null,
     total_seats: trip.totalSeats || trip.capacity || null,
+    availableSeats: trip.availableSeats ?? null,
+    totalSeats: trip.totalSeats || trip.capacity || null,
     destination: trip.destination || '',
     meeting_point: trip.meetingPoint || trip.meeting_point || '',
     meetingPoint: trip.meetingPoint || trip.meeting_point || '',
@@ -20,6 +22,21 @@ function tripToPayload(trip) {
     arrivalTime: trip.arrivalTime || trip.arrival_time || '',
     stops: Array.isArray(trip.stops) ? trip.stops : [],
     segments: Array.isArray(trip.segments) ? trip.segments : [],
+    status: trip.status === 'draft' ? 'draft' : 'published',
+    featured: Boolean(trip.featured),
+    description: trip.description || '',
+    image: trip.image || '',
+    hook: trip.hook || '',
+    durationLabel: trip.durationLabel || '',
+    badge: trip.badge || '',
+    highlights: Array.isArray(trip.highlights) ? trip.highlights : [],
+    market: trip.market || null,
+    vehicleType: trip.vehicleType || '',
+    currency: trip.currency || 'EUR',
+    childPrice:
+      trip.childPrice === null || trip.childPrice === undefined || trip.childPrice === ''
+        ? null
+        : Number(trip.childPrice),
   };
 }
 
@@ -36,9 +53,10 @@ async function parseAdminError(res) {
  * @param {object[]} trips
  * @returns {Promise<{ synced: number, skipped: number, postgres_available: boolean }>}
  */
-export async function syncTripsToPostgres(trips, { tenantId } = {}) {
+export async function syncTripsToPostgres(trips, { tenantId, replaceCatalog = false } = {}) {
   const payload = {
     tenant_id: tenantId || getSaasTenantId() || undefined,
+    replace_catalog: Boolean(replaceCatalog),
     trips: (trips || []).map(tripToPayload),
   };
 
@@ -46,7 +64,10 @@ export async function syncTripsToPostgres(trips, { tenantId } = {}) {
     try {
       return await saasFetch('/api/v1/operations/trips/sync', {
         method: 'POST',
-        body: JSON.stringify({ trips: payload.trips }),
+        body: JSON.stringify({
+          trips: payload.trips,
+          replace_catalog: payload.replace_catalog,
+        }),
       });
     } catch (err) {
       console.warn('[trips-sync] SaaS API failed, trying admin sync', err);
@@ -69,8 +90,8 @@ export function syncTripToPostgres(trip) {
   });
 }
 
-/** Sync every trip from tripStore (admin panels). */
+/** Sync every trip from tripStore (admin panels) — replaces public catalog. */
 export async function syncAllLocalTrips() {
   const { loadTrips } = await import('../lib/trips/tripStore.js');
-  return syncTripsToPostgres(loadTrips());
+  return syncTripsToPostgres(loadTrips(), { replaceCatalog: true });
 }

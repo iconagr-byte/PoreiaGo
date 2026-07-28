@@ -30,6 +30,8 @@ class MasterQrExchangeResponse(BaseModel):
 
 
 class TripSyncItem(BaseModel):
+    model_config = {"extra": "allow"}
+
     id: int = Field(..., gt=0)
     title: str = ""
     price: float = Field(default=0, ge=0)
@@ -44,10 +46,25 @@ class TripSyncItem(BaseModel):
     arrivalTime: str | None = None
     stops: list[dict] = Field(default_factory=list)
     segments: list[dict] = Field(default_factory=list)
+    status: str | None = None
+    featured: bool | None = None
+    description: str | None = None
+    image: str | None = None
+    hook: str | None = None
+    durationLabel: str | None = None
+    badge: str | None = None
+    highlights: list | None = None
+    market: str | None = None
+    vehicleType: str | None = None
+    currency: str | None = None
+    childPrice: float | None = None
+    availableSeats: int | None = None
+    totalSeats: int | None = None
 
 
 class TripsSyncRequest(BaseModel):
     trips: list[TripSyncItem] = Field(default_factory=list)
+    replace_catalog: bool = False
 
 
 class TripsSyncResponse(BaseModel):

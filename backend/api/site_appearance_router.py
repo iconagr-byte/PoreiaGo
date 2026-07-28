@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["site-appearance"])
 logger = logging.getLogger(__name__)
@@ -612,3 +612,66 @@ async def get_public_office_modules(
         plan="starter",
         mode="trips_only",
     )
+
+
+class PublicTripResponse(BaseModel):
+    id: int
+    title: str = ""
+    destination: str = ""
+    departureTime: str = ""
+    arrivalTime: str = ""
+    price: float = 0
+    childPrice: float | None = None
+    availableSeats: int = 0
+    totalSeats: int = 0
+    description: str = ""
+    image: str = ""
+    hook: str = ""
+    durationLabel: str = ""
+    badge: str = ""
+    featured: bool = False
+    status: str = "published"
+    meetingPoint: str = ""
+    highlights: list = Field(default_factory=list)
+    stops: list = Field(default_factory=list)
+    market: str | None = None
+    vehicleType: str = ""
+    currency: str = "EUR"
+
+
+@router.get("/api/site/trips", response_model=list[PublicTripResponse])
+async def get_public_office_trips(
+    request: Request,
+    host: str | None = Query(default=None),
+):
+    """
+    Published trips for an office Host — strictly scoped by tenant_id.
+    Never returns another office's catalog or shared demo trips.
+    """
+    from travel_platform.operations.tenant_trip_catalog_store import list_tenant_trips
+
+    effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if effective_host and "," in effective_host:
+        effective_host = effective_host.split(",")[0].strip()
+    if effective_host and ":" in effective_host:
+        effective_host = effective_host.split(":")[0].strip()
+
+    tenant_id: str | None = None
+    if effective_host:
+        try:
+            from app.core.database import AsyncSessionLocal
+            from olympus.tenant.domain_resolver import DomainResolver
+
+            async with AsyncSessionLocal() as session:
+                resolved = await DomainResolver(session).resolve(effective_host)
+                if resolved:
+                    tenant_id = str(resolved.tenant_id)
+        except Exception:
+            logger.exception("public trips resolve failed for host=%s", effective_host)
+            tenant_id = None
+
+    if not tenant_id:
+        return []
+
+    rows = list_tenant_trips(tenant_id, published_only=True)
+    return [PublicTripResponse(**row) for row in rows]

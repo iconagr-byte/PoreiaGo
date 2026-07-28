@@ -1,6 +1,5 @@
 import { mockTrips } from '../../data/mockData.js';
 import {
-  getTripMarket,
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
   normalizeTrip,
@@ -13,6 +12,7 @@ import {
   isAuthenticatedOfficeSession,
   officeStorageKey,
 } from '../admin/officeTenantStore.js';
+import { isTenantStorefrontHost } from '../platform/tenantHost.js';
 
 const STORAGE_KEY_BASE = 'aerostride_trips_v1';
 
@@ -20,7 +20,17 @@ function storageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
 }
 
+/**
+ * Admin / authenticated office trip list (localStorage, tenant-scoped).
+ * Public storefronts must use fetchPublicOfficeTrips() instead — never this.
+ */
 export function loadTrips() {
+  // Public tenant office domains: never read shared browser catalog or mocks.
+  // StorefrontDemoPage loads /api/site/trips (Host → tenant).
+  if (!isAuthenticatedOfficeSession() && isTenantStorefrontHost()) {
+    return [];
+  }
+
   let base;
   try {
     const raw = localStorage.getItem(storageKey());
@@ -40,14 +50,10 @@ export function loadTrips() {
     return Array.isArray(base) ? base.map(normalizeTrip) : [];
   }
 
-  if (!base) return mockTrips.map(normalizeTrip);
-
-  const ids = new Set(base.map((t) => t.id));
-  const missingIntl = mockTrips.filter(
-    (t) => getTripMarket(t) === MARKET_INTERNATIONAL && !ids.has(t.id),
-  );
-  const merged = missingIntl.length ? [...base, ...missingIntl.map(normalizeTrip)] : base;
-  return merged.map(normalizeTrip);
+  // Platform marketing / anonymous non-tenant: no shared mock bleed.
+  // Explicit demo only when localStorage already has office-authored trips.
+  if (!base) return [];
+  return base.map(normalizeTrip);
 }
 
 export function saveTrips(trips) {
@@ -87,6 +93,10 @@ export function deleteTrip(tripId) {
   const id = Number(tripId);
   const trips = loadTrips().filter((t) => t.id !== id);
   saveTrips(trips);
+  // Rebuild public catalog without the deleted trip.
+  import('../../services/tripsSyncApi.js')
+    .then(({ syncTripsToPostgres }) => syncTripsToPostgres(trips, { replaceCatalog: true }))
+    .catch(() => {});
 }
 
 export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
@@ -208,4 +218,9 @@ export function isPublishedTrip(trip) {
 
 export function listPublishedTrips(trips = loadTrips()) {
   return trips.filter(isPublishedTrip);
+}
+
+/** Dev-only helper — platform mocks must never feed live office domains. */
+export function loadPlatformDemoTrips() {
+  return mockTrips.map(normalizeTrip);
 }

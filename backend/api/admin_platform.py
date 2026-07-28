@@ -7,6 +7,7 @@ Admin platform API — ρυθμίσεις πλατφόρμας, χρήστες, 
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import uuid
@@ -16,6 +17,8 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from travel_platform.settings.backup_service import (
     BACKUP_DIR,
@@ -807,11 +810,25 @@ async def master_qr_png(
 
 
 @router.post("/trips/sync", response_model=TripsSyncResponse)
-async def sync_trips_admin(body: TripsSyncRequest):
+async def sync_trips_admin(request: Request, body: TripsSyncRequest):
     from travel_platform.operations.trips_sync import sync_trips_to_postgres
 
+    # Never trust body.tenant_id alone — prefer JWT / request tenant context.
+    tenant_id = _request_tenant_id(request)
+    if body.tenant_id and str(body.tenant_id).strip() and str(body.tenant_id).strip() != tenant_id:
+        # Only allow body tenant when request has no office JWT (legacy) AND
+        # body matches the resolved platform tenant — still prefer request.
+        logger.warning(
+            "Ignoring body.tenant_id=%s; using request tenant=%s",
+            body.tenant_id,
+            tenant_id,
+        )
     payload = [t.model_dump() for t in body.trips]
-    result = await sync_trips_to_postgres(payload, tenant_id=body.tenant_id)
+    result = await sync_trips_to_postgres(
+        payload,
+        tenant_id=tenant_id,
+        replace_catalog=bool(getattr(body, "replace_catalog", False)),
+    )
     return TripsSyncResponse(**result)
 
 

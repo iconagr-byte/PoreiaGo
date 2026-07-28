@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { listPublishedTrips } from '../lib/trips/tripStore.js';
+import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
 import { getTripMarket, MARKET_DOMESTIC, MARKET_INTERNATIONAL } from '../lib/trips/tripMarket.js';
 import {
   filterTrips,
@@ -56,7 +57,7 @@ export default function StorefrontDemoPage() {
   // Preview from admin OR live office domain/subdomain.
   const allowStorefront = isPreview || isLiveTenantSite;
 
-  const [trips] = useState(() => listPublishedTrips());
+  const [trips, setTrips] = useState([]);
   const domesticTrips = useMemo(
     () =>
       trips
@@ -163,6 +164,12 @@ export default function StorefrontDemoPage() {
       fetchPublicFleet()
         .then(setFleetShowcase)
         .finally(() => setFleetLoading(false));
+      // Preview on a live office domain must still be Host-scoped.
+      if (isLiveTenantSite) {
+        fetchPublicOfficeTrips().then(setTrips);
+      } else {
+        setTrips(listPublishedTrips());
+      }
       return () => window.removeEventListener('storage', onStorage);
     }
 
@@ -172,6 +179,16 @@ export default function StorefrontDemoPage() {
     fetchPublicFleet()
       .then(setFleetShowcase)
       .finally(() => setFleetLoading(false));
+
+    // Live office domains: Host-scoped API only (never shared localStorage/mocks).
+    // Admin preview on platform host may still use the logged-in office's local list.
+    if (isLiveTenantSite) {
+      fetchPublicOfficeTrips().then(setTrips);
+    } else if (isPreview) {
+      setTrips(listPublishedTrips());
+    } else {
+      setTrips([]);
+    }
   }, []);
 
   useEffect(() => {

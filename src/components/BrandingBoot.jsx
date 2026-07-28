@@ -32,12 +32,22 @@ export default function BrandingBoot() {
       .then((branding) => {
         cacheBranding(branding);
         // Guest booking lookup / wallet need tenant_id on custom domains (no SaaS login).
+        // Never overwrite saas_tenant_id while an office JWT session is active —
+        // that remaps officeStorageKey and can leak trips across offices.
         if (branding?.tenant_id && typeof localStorage !== 'undefined') {
           try {
-            const prev = localStorage.getItem('saas_tenant_id') || '';
-            if (!prev || onTenant) {
+            const hasOfficeJwt = Boolean(localStorage.getItem('saas_access_token'));
+            if (hasOfficeJwt) {
+              /* keep JWT tenant */
+            } else if (onTenant) {
               localStorage.setItem('saas_tenant_id', branding.tenant_id);
               window.dispatchEvent(new Event('saas-session-changed'));
+            } else {
+              const prev = localStorage.getItem('saas_tenant_id') || '';
+              if (!prev) {
+                localStorage.setItem('saas_tenant_id', branding.tenant_id);
+                window.dispatchEvent(new Event('saas-session-changed'));
+              }
             }
           } catch {
             /* ignore */
