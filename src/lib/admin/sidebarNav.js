@@ -277,7 +277,6 @@ export const ADMIN_NAV_ITEMS = {
   fleet_kpis: {
     id: 'fleet_kpis',
     label: 'Δείκτες στόλου',
-    shortLabel: 'Δείκτες',
     icon: 'analytics',
     filled: true,
     type: 'tab',
@@ -288,7 +287,6 @@ export const ADMIN_NAV_ITEMS = {
   hybrid_sla: {
     id: 'hybrid_sla',
     label: 'Hybrid SLA',
-    shortLabel: 'Hybrid',
     icon: 'connecting_airports',
     filled: true,
     type: 'tab',
@@ -299,7 +297,6 @@ export const ADMIN_NAV_ITEMS = {
   driver_chat: {
     id: 'driver_chat',
     label: 'Chat Οδηγών',
-    shortLabel: 'Chat',
     icon: 'forum',
     filled: true,
     type: 'tab',
@@ -310,7 +307,6 @@ export const ADMIN_NAV_ITEMS = {
   fleet_route_playback: {
     id: 'fleet_route_playback',
     label: 'Ιστορικό Διαδρομής',
-    shortLabel: 'Διαδρομές',
     icon: 'route',
     filled: true,
     type: 'tab',
@@ -321,7 +317,6 @@ export const ADMIN_NAV_ITEMS = {
   fleet_calendar: {
     id: 'fleet_calendar',
     label: 'Ημερολόγιο',
-    shortLabel: 'Ημερολόγιο',
     icon: 'calendar_month',
     filled: true,
     type: 'tab',
@@ -332,7 +327,6 @@ export const ADMIN_NAV_ITEMS = {
   fleet_availability: {
     id: 'fleet_availability',
     label: 'Διαθεσιμότητα',
-    shortLabel: 'Διαθεσιμότητα',
     icon: 'event_available',
     filled: true,
     type: 'tab',
@@ -343,7 +337,6 @@ export const ADMIN_NAV_ITEMS = {
   fleet_documents: {
     id: 'fleet_documents',
     label: 'Έγγραφα',
-    shortLabel: 'Έγγραφα',
     icon: 'folder_managed',
     filled: true,
     type: 'tab',
@@ -354,7 +347,6 @@ export const ADMIN_NAV_ITEMS = {
   fleet_expenses: {
     id: 'fleet_expenses',
     label: 'Έξοδα στόλου',
-    shortLabel: 'Έξοδα',
     icon: 'local_gas_station',
     filled: true,
     type: 'tab',
@@ -365,7 +357,6 @@ export const ADMIN_NAV_ITEMS = {
   fleet_digest: {
     id: 'fleet_digest',
     label: 'Ειδοποιήσεις',
-    shortLabel: 'Ειδοποιήσεις',
     icon: 'notifications_active',
     filled: true,
     type: 'tab',

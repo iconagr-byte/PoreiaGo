@@ -13,30 +13,10 @@ import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 const SECTIONS = [
   { id: 'main', label: 'Λειτουργίες' },
   { id: 'rent', label: 'Ενοικιάσεις' },
-  { id: 'fleet_ops', label: 'Στόλος', collapsible: true, defaultCollapsed: true },
+  { id: 'fleet_ops', label: 'Λειτουργίες Στόλου' },
   { id: 'platform', label: 'Πλατφόρμα SaaS', superOnly: true },
-  { id: 'settings', label: 'Ρυθμίσεις', collapsible: true, defaultCollapsed: false },
+  { id: 'settings', label: 'Ρυθμίσεις' },
 ];
-
-const COLLAPSE_STORAGE_KEY = 'poreiago_admin_nav_collapsed_v1';
-
-function loadCollapsedMap() {
-  try {
-    const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveCollapsedMap(map) {
-  try {
-    localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(map));
-  } catch {
-    /* ignore */
-  }
-}
 
 export default function SortableSidebarNav({
   activeTab,
@@ -52,7 +32,6 @@ export default function SortableSidebarNav({
   const superAdmin = isSaasSuperAdmin();
   const rentOnly = officeMode === 'rent_only';
   const [layout, setLayout] = useState(() => loadNavLayout(superAdmin));
-  const [collapsed, setCollapsed] = useState(() => loadCollapsedMap());
   const [dragState, setDragState] = useState({
     section: null,
     fromSection: null,
@@ -87,49 +66,6 @@ export default function SortableSidebarNav({
       .filter((section) => section.items.length > 0 || (!rentOnly && section.id !== 'fleet_ops'));
   }, [displayLayout, superAdmin, rentOnly]);
 
-  const isItemActive = useCallback(
-    (item) => {
-      if (item.type === 'settings_subtab') {
-        return activeTab === 'settings' && settingsSubTab === item.settingsSubTab;
-      }
-      if (item.type === 'fleet_rental_subtab') {
-        return (
-          activeTab === 'fleet_rental' &&
-          sanitizeRentDeskTab(fleetRentalTab) === item.fleetRentalTab
-        );
-      }
-      if (item.type === 'tab') return activeTab === item.tab;
-      if (item.type === 'email') return activeTab === 'email';
-      return false;
-    },
-    [activeTab, settingsSubTab, fleetRentalTab],
-  );
-
-  const isSectionCollapsed = useCallback(
-    (section) => {
-      if (!section.collapsible) return false;
-      // Keep open when an item inside is active so the user sees context.
-      if (section.items.some((item) => isItemActive(item))) return false;
-      if (Object.prototype.hasOwnProperty.call(collapsed, section.id)) {
-        return Boolean(collapsed[section.id]);
-      }
-      return Boolean(section.defaultCollapsed);
-    },
-    [collapsed, isItemActive],
-  );
-
-  const toggleSection = (sectionId) => {
-    setCollapsed((prev) => {
-      const section = SECTIONS.find((s) => s.id === sectionId);
-      const currently =
-        Object.prototype.hasOwnProperty.call(prev, sectionId)
-          ? Boolean(prev[sectionId])
-          : Boolean(section?.defaultCollapsed);
-      const next = { ...prev, [sectionId]: !currently };
-      saveCollapsedMap(next);
-      return next;
-    });
-  };
   const persistLayout = useCallback(
     (next) => {
       // Rent-only menu is fixed by contract — don't overwrite the full-office layout.
@@ -206,7 +142,17 @@ export default function SortableSidebarNav({
   };
 
   const buttonClass = (item) => {
-    const isActive = isItemActive(item);
+    const isSettingsSubActive =
+      item.type === 'settings_subtab' &&
+      activeTab === 'settings' &&
+      settingsSubTab === item.settingsSubTab;
+    const isRentSubActive =
+      item.type === 'fleet_rental_subtab' &&
+      activeTab === 'fleet_rental' &&
+      sanitizeRentDeskTab(fleetRentalTab) === item.fleetRentalTab;
+    const isTabActive = item.type === 'tab' && activeTab === item.tab;
+    const isEmailActive = item.type === 'email' && activeTab === 'email';
+    const isActive = isSettingsSubActive || isRentSubActive || isTabActive || isEmailActive;
 
     const classes = ['admin-nav-btn'];
     if (isActive) {
@@ -252,7 +198,7 @@ export default function SortableSidebarNav({
               {item.icon}
             </span>
           </span>
-          <span className="admin-nav-label">{item.shortLabel || item.label}</span>
+          <span className="admin-nav-label">{item.label}</span>
         </button>
       </div>
     );
@@ -264,8 +210,6 @@ export default function SortableSidebarNav({
     const isFleetOpsSection = section.id === 'fleet_ops';
     const isPlatformSection = section.id === 'platform';
     const isDropTarget = !rentOnly && dragState.draggingId && dragState.section === section.id;
-    const sectionCollapsed = isSectionCollapsed(section);
-    const activeCount = section.items.filter((item) => isItemActive(item)).length;
 
     return (
       <div
@@ -274,22 +218,11 @@ export default function SortableSidebarNav({
           isSettingsSection ? 'admin-nav-section-settings' : ''
         } ${isRentSection ? 'admin-nav-section-rent' : ''} ${
           isFleetOpsSection ? 'admin-nav-section-fleet' : ''
-        } ${sectionCollapsed ? 'admin-nav-section-collapsed' : ''} ${
-          isDropTarget ? 'admin-nav-section-drop-target' : ''
-        }`}
+        } ${isDropTarget ? 'admin-nav-section-drop-target' : ''}`}
         onDragOver={(e) => {
           if (rentOnly || !dragState.draggingId) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          // Expand collapsed targets while dragging so items can be dropped.
-          if (section.collapsible && sectionCollapsed) {
-            setCollapsed((prev) => {
-              if (prev[section.id] === false) return prev;
-              const next = { ...prev, [section.id]: false };
-              saveCollapsedMap(next);
-              return next;
-            });
-          }
           if (section.items.length === 0) markDropTarget(section.id, 0);
         }}
         onDrop={(e) => {
@@ -298,38 +231,16 @@ export default function SortableSidebarNav({
           if (section.items.length === 0) handleDrop(section.id, 0);
         }}
       >
-        {section.collapsible ? (
-          <button
-            type="button"
-            className={`admin-nav-section-label admin-nav-section-toggle ${
-              isPlatformSection ? 'admin-nav-section-label-platform' : ''
-            } ${isSettingsSection ? 'admin-nav-section-label-settings' : ''} ${
-              isRentSection ? 'admin-nav-section-label-rent' : ''
-            } ${isFleetOpsSection ? 'admin-nav-section-label-fleet' : ''}`}
-            onClick={() => toggleSection(section.id)}
-            aria-expanded={!sectionCollapsed}
-          >
-            <span className="admin-nav-section-toggle-text">
-              {section.label}
-              <span className="admin-nav-section-count">{section.items.length}</span>
-            </span>
-            <span className="material-symbols-outlined admin-nav-section-chevron" aria-hidden>
-              {sectionCollapsed ? 'expand_more' : 'expand_less'}
-            </span>
-          </button>
-        ) : (
-          <p
-            className={`admin-nav-section-label ${
-              isPlatformSection ? 'admin-nav-section-label-platform' : ''
-            } ${isSettingsSection ? 'admin-nav-section-label-settings' : ''} ${
-              isRentSection ? 'admin-nav-section-label-rent' : ''
-            }`}
-          >
-            {section.label}
-          </p>
-        )}
+        <p
+          className={`admin-nav-section-label ${
+            isPlatformSection ? 'admin-nav-section-label-platform' : ''
+          } ${isSettingsSection ? 'admin-nav-section-label-settings' : ''} ${
+            isRentSection ? 'admin-nav-section-label-rent' : ''
+          }`}
+        >
+          {section.label}
+        </p>
 
-        {!sectionCollapsed ? (
         <ul className="admin-nav-list">
           {section.items.length === 0 && !rentOnly && (
             <li
@@ -398,28 +309,25 @@ export default function SortableSidebarNav({
             </li>
           )}
         </ul>
-        ) : (
-          <p className="admin-nav-collapsed-hint">
-            {activeCount > 0 ? 'Ανοιχτό από ενεργή σελίδα' : 'Πατήστε για εμφάνιση'}
-          </p>
-        )}
       </div>
     );
   };
 
   return (
     <nav
-      className="admin-sidebar-nav admin-sidebar-nav--compact flex-1 flex flex-col min-h-0"
+      className="admin-sidebar-nav flex-1 flex flex-col min-h-0"
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) {
           setDragState((prev) => ({ ...prev, overIndex: null }));
         }
       }}
     >
-      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-2 py-1.5 space-y-2 admin-nav-scroll">
+      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-2.5 py-2 space-y-3 admin-nav-scroll">
         {rentOnly ? (
-          <p className="admin-nav-hint">Μενού Rent</p>
-        ) : null}
+          <p className="admin-nav-hint">Μενού Rent — χωρίς εκδρομές / λεωφορεία</p>
+        ) : (
+          <p className="admin-nav-hint">Σύρετε ⋮⋮ σε οποιαδήποτε ενότητα</p>
+        )}
         {sections.map((section) => renderSection(section))}
       </div>
     </nav>
