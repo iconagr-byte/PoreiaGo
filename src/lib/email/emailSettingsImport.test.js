@@ -144,4 +144,31 @@ console.assert(
   'prompts for password',
 );
 
+const vbsPop = parseEmailSettingsBytes(
+  readFileSync(join(here, 'fixtures/mail-achilliotravel.vbs')),
+  'mail.achilliotravel.com Secure Email Setup.vbs',
+);
+console.assert(vbsPop.accounts.length === 1, 'cPanel vbs account');
+console.assert(
+  vbsPop.accounts[0].email_address === 'info@achilliotravel.com',
+  'vbs email',
+);
+console.assert(
+  vbsPop.accounts[0].imap_host === 'mail.achilliotravel.com',
+  'vbs imap host',
+);
+console.assert(vbsPop.accounts[0].imap_port === 993, 'POP profile mapped to IMAP 993');
+console.assert(vbsPop.accounts[0].smtp_port === 465, 'vbs smtp hex 000001d1 → 465');
+console.assert(vbsPop.accounts[0].smtp_secure === true, 'vbs ssl');
+console.assert(!vbsPop.accounts[0].mail_password, 'vbs has no password');
+console.assert(vbsPop.errors.some((e) => e.includes('κωδικός')), 'vbs prompts password');
+
+const vbsImap = parseEmailSettingsBytes(
+  readFileSync(join(here, 'fixtures/imap-example.vbs')),
+  'imap-example.vbs',
+);
+console.assert(vbsImap.accounts[0]?.imap_port === 993, 'imap vbs hex 000003e1');
+console.assert(vbsImap.accounts[0]?.smtp_port === 587, 'imap vbs smtp hex 0000024b → 587');
+console.assert(vbsImap.accounts[0]?.email_address === 'imap@example.com', 'imap vbs email');
+
 console.log('emailSettingsImport: OK');
