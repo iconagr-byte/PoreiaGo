@@ -1204,7 +1204,19 @@ export default function FleetRentalPanel({
 
       {tab === 'plans' && <RentPlanCardsEditor />}
 
-      {tab === 'branding' && <RentAppBrandingEditor />}
+      {tab === 'branding' && (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => navigate('/admin?tab=settings&sub=homepage&page=rent')}
+            className="w-full sm:w-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-teal-200 bg-teal-50 text-teal-900 text-sm font-bold hover:bg-teal-100"
+          >
+            <span className="material-symbols-outlined text-[18px]">web</span>
+            Σχεδιασμός σελίδων → Ενοικιάσεις
+          </button>
+          <RentAppBrandingEditor />
+        </div>
+      )}
 
       {tab === 'paperwork' && (
         <RentalPaperworkDesk
