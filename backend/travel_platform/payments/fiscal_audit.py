@@ -15,6 +15,7 @@ def record_fiscal_audit(
     actor_id: str | None = None,
     detail: str | None = None,
     metadata: dict[str, Any] | None = None,
+    tenant_id: str | None = None,
 ) -> dict[str, Any] | None:
     return append_payment_audit(
         action=action,
@@ -23,4 +24,5 @@ def record_fiscal_audit(
         actor_id=actor_id,
         detail=detail,
         metadata=metadata,
+        tenant_id=tenant_id,
     )

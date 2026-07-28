@@ -88,6 +88,14 @@ ADMIN_PUBLIC_GET_PREFIXES = (
     "/api/admin/platform/site-appearance",
 )
 
+# Email / mailbox / campaigns — SQLite-backed, must not be world-writable.
+# Require the same admin JWT gate as file-store admin routes.
+EMAIL_ADMIN_PREFIXES = (
+    "/api/email/",
+    "/api/mailbox/",
+    "/api/campaigns/",
+)
+
 # JSON file-store admin routes — skip Postgres RLS / suspended-tenant gate AFTER
 # JWT + admin-role checks. Never leave these unauthenticated.
 FILE_STORE_ADMIN_PREFIXES = (
@@ -140,7 +148,9 @@ def _attach_bearer_tenant_context(
 
 
 def _requires_jwt(path: str) -> bool:
-    return path.startswith(PLATFORM_PREFIX) or path.startswith(ADMIN_PREFIX)
+    if path.startswith(PLATFORM_PREFIX) or path.startswith(ADMIN_PREFIX):
+        return True
+    return any(path.startswith(p) for p in EMAIL_ADMIN_PREFIXES)
 
 
 def _admin_public_get(path: str, method: str) -> bool:
@@ -149,6 +159,53 @@ def _admin_public_get(path: str, method: str) -> bool:
 
 def _is_file_store_admin(path: str) -> bool:
     return any(path.startswith(p) for p in FILE_STORE_ADMIN_PREFIXES)
+
+
+def _is_email_admin(path: str) -> bool:
+    return any(path.startswith(p) for p in EMAIL_ADMIN_PREFIXES)
+
+
+def _admin_auth_disabled_allowed() -> bool:
+    """ADMIN_AUTH_DISABLED is local-dev only — never honor in production."""
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    return env in ("development", "dev", "local", "test")
+
+
+async def _require_admin_bearer(
+    request: Request,
+    jwt_secret: str,
+    jwt_algorithm: str,
+) -> JSONResponse | None:
+    """
+    JWT + admin roles for email/mailbox/campaigns (and similar SQLite admin APIs).
+    Returns an error response, or None when request.state is populated and OK.
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"detail": "Missing bearer token"})
+    token = auth[7:].strip()
+    if not jwt_secret:
+        return JSONResponse(status_code=503, content={"detail": "Auth not configured"})
+    try:
+        payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
+    except jwt.PyJWTError:
+        return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+    raw_tid = payload.get("tenant_id")
+    if not raw_tid:
+        return JSONResponse(status_code=403, content={"detail": "tenant_id required"})
+    try:
+        request.state.tenant_id = UUID(str(raw_tid))
+    except ValueError:
+        return JSONResponse(status_code=403, content={"detail": "Invalid tenant_id"})
+    roles = list(payload.get("roles") or [])
+    request.state.user_id = payload.get("sub")
+    request.state.roles = roles
+    if not set(roles) & ADMIN_ACCESS_ROLES:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Admin access required"},
+        )
+    return None
 
 
 async def _apply_dev_admin_context(request: Request) -> None:
@@ -222,11 +279,24 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         jwt_secret, jwt_algorithm, admin_auth_disabled = _jwt_settings()
+        # Never honor ADMIN_AUTH_DISABLED outside local/dev/test.
+        if admin_auth_disabled and not _admin_auth_disabled_allowed():
+            admin_auth_disabled = False
 
         if path in PUBLIC_PATHS:
             return await call_next(request)
 
         if not _requires_jwt(path):
+            return await call_next(request)
+
+        # Email / mailbox / campaigns — admin JWT, skip Postgres RLS.
+        if _is_email_admin(path):
+            if admin_auth_disabled:
+                await _apply_dev_admin_context(request)
+                return await call_next(request)
+            err = await _require_admin_bearer(request, jwt_secret, jwt_algorithm)
+            if err is not None:
+                return err
             return await call_next(request)
 
         if path.startswith(ADMIN_PREFIX):
@@ -239,31 +309,9 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
             # They only skip the Postgres RLS / suspended-tenant gate below
             # (storage is JSON files, not tenant RLS sessions).
             if _is_file_store_admin(path):
-                auth = request.headers.get("Authorization", "")
-                if not auth.startswith("Bearer "):
-                    return JSONResponse(status_code=401, content={"detail": "Missing bearer token"})
-                token = auth[7:].strip()
-                if not jwt_secret:
-                    return JSONResponse(status_code=503, content={"detail": "Auth not configured"})
-                try:
-                    payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
-                except jwt.PyJWTError:
-                    return JSONResponse(status_code=401, content={"detail": "Invalid token"})
-                raw_tid = payload.get("tenant_id")
-                if not raw_tid:
-                    return JSONResponse(status_code=403, content={"detail": "tenant_id required"})
-                try:
-                    request.state.tenant_id = UUID(str(raw_tid))
-                except ValueError:
-                    return JSONResponse(status_code=403, content={"detail": "Invalid tenant_id"})
-                roles = list(payload.get("roles") or [])
-                request.state.user_id = payload.get("sub")
-                request.state.roles = roles
-                if not set(roles) & ADMIN_ACCESS_ROLES:
-                    return JSONResponse(
-                        status_code=403,
-                        content={"detail": "Admin access required"},
-                    )
+                err = await _require_admin_bearer(request, jwt_secret, jwt_algorithm)
+                if err is not None:
+                    return err
                 return await call_next(request)
 
         if path.startswith(PLATFORM_ADMIN_PREFIX) and admin_auth_disabled:

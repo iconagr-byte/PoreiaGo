@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 def admin_tenant_id(request: "Request") -> str:
     """Office scope for admin file-backed settings — JWT preferred over Host."""
+    from fastapi import HTTPException
+
     tid = getattr(request.state, "tenant_id", None)
     if tid:
         return str(tid)
@@ -32,7 +34,10 @@ def admin_tenant_id(request: "Request") -> str:
                         return str(raw)
             except Exception:
                 pass
-    return DEMO_TENANT_ID
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    if env in ("development", "dev", "local", "test"):
+        return DEMO_TENANT_ID
+    raise HTTPException(status_code=403, detail="tenant_id required")
 
 
 async def public_tenant_id(request: "Request", *, allow_demo_fallback: bool = True) -> str | None:

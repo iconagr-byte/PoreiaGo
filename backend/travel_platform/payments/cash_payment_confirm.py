@@ -138,4 +138,5 @@ def record_cash_audit(
         actor_id=actor_id,
         detail=detail or channel.value,
         metadata={"channel": channel.value, "receipt_number": receipt_number},
+        tenant_id=tenant_id,
     )
