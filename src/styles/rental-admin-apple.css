@@ -306,3 +306,503 @@
 .rental-apple-shell .rounded-full {
   letter-spacing: -0.01em;
 }
+
+/* ── Συμβόλαια Rent editor ── */
+.rent-plan-editor-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1.5rem;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #6e6e73;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.rent-plan-editor-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem;
+  border-radius: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background:
+    radial-gradient(80% 120% at 100% 0%, rgba(10, 122, 108, 0.14), transparent 55%),
+    linear-gradient(145deg, #fff 0%, #f3faf8 100%);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.05);
+}
+
+.rent-plan-editor-kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0a7a6c;
+}
+
+.rent-plan-editor-hero-title {
+  margin: 0.2rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #1d1d1f;
+}
+
+.rent-plan-editor-hero-copy {
+  margin: 0.4rem 0 0;
+  max-width: 40rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #6e6e73;
+}
+
+.rent-plan-editor-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rent-plan-dirty {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #c9860a;
+  background: rgba(255, 159, 10, 0.14);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+}
+
+.rent-plan-primary-btn,
+.rent-plan-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.rent-plan-primary-btn {
+  background: #0a7a6c;
+  color: #fff;
+}
+
+.rent-plan-primary-btn:hover:not(:disabled) {
+  background: #08665b;
+}
+
+.rent-plan-primary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rent-plan-secondary-btn {
+  background: rgba(255, 255, 255, 0.9);
+  color: #1d1d1f;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.rent-plan-secondary-btn:hover {
+  background: #fff;
+}
+
+.rent-plan-section-bar {
+  padding: 1rem 1.15rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.rent-plan-editor-card {
+  border-radius: 26px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.rent-plan-editor-card--teal {
+  border-color: rgba(10, 122, 108, 0.18);
+}
+
+.rent-plan-editor-card--slate {
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+.rent-plan-editor-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 1.1rem 1.2rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background: linear-gradient(180deg, rgba(245, 245, 247, 0.7), transparent);
+}
+
+.rent-plan-editor-card--teal .rent-plan-editor-card-head {
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.08), transparent);
+}
+
+.rent-plan-editor-title {
+  margin: 0.15rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.rent-plan-editor-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: #6e6e73;
+}
+
+.rent-plan-editor-grid {
+  display: grid;
+  gap: 1.15rem;
+  padding: 1.15rem 1.2rem 1.35rem;
+}
+
+@media (min-width: 1100px) {
+  .rent-plan-editor-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+    align-items: start;
+  }
+}
+
+.rent-plan-field {
+  display: block;
+}
+
+.rent-plan-field-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6e6e73;
+}
+
+.rent-plan-field-hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #aeaeb2;
+}
+
+.rent-plan-input {
+  margin-top: 0.4rem;
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #f5f5f7;
+  border-radius: 14px !important;
+  padding: 0.72rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.rent-plan-input:focus {
+  outline: 2px solid rgba(10, 122, 108, 0.35);
+  outline-offset: 1px;
+  background: #fff;
+}
+
+.rent-plan-input--lg {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.rent-plan-price-wrap {
+  position: relative;
+  margin-top: 0.4rem;
+}
+
+.rent-plan-price-wrap > span {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 800;
+  color: #6e6e73;
+}
+
+.rent-plan-price-wrap .rent-plan-input {
+  margin-top: 0;
+  padding-left: 1.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rent-plan-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rent-plan-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rent-plan-toggle-track {
+  width: 2.5rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  background: #d2d2d7;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.rent-plan-toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 0.18rem;
+  left: 0.18rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.rent-plan-toggle.is-on .rent-plan-toggle-track {
+  background: #0a7a6c;
+}
+
+.rent-plan-toggle.is-on .rent-plan-toggle-track::after {
+  transform: translateX(1.05rem);
+}
+
+.rent-plan-toggle-text {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1d1d1f;
+}
+
+.rent-plan-features-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.rent-plan-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(10, 122, 108, 0.25);
+  background: rgba(10, 122, 108, 0.08);
+  color: #0a7a6c;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rent-plan-feature-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.rent-plan-feature-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.rent-plan-feature-handle {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #6e6e73;
+  background: #f5f5f7;
+}
+
+.rent-plan-feature-row .rent-plan-input {
+  margin-top: 0;
+}
+
+.rent-plan-feature-actions {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+
+.rent-plan-icon-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  border: 0;
+  background: #f5f5f7;
+  color: #6e6e73;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.rent-plan-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.rent-plan-icon-btn.is-danger:hover {
+  background: rgba(255, 59, 48, 0.12);
+  color: #ff3b30;
+}
+
+.rent-plan-preview {
+  border-radius: 22px;
+  padding: 1.15rem 1.1rem 1.2rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(160deg, #f0faf7 0%, #fff 55%);
+}
+
+.rent-plan-preview--slate {
+  background: linear-gradient(160deg, #f4f5f7 0%, #fff 55%);
+}
+
+.rent-plan-preview.is-hidden {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+}
+
+.rent-plan-preview-hidden {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #c9860a;
+}
+
+.rent-plan-preview-badge {
+  display: inline-flex;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  background: #0a7a6c;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rent-plan-preview--slate .rent-plan-preview-badge {
+  background: #1d1d1f;
+}
+
+.rent-plan-preview-title {
+  margin: 0.7rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.rent-plan-preview-tagline {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  color: #6e6e73;
+  line-height: 1.4;
+}
+
+.rent-plan-preview-price {
+  margin: 0.85rem 0 0;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rent-plan-preview-price span {
+  margin-left: 0.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+.rent-plan-preview-features {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.rent-plan-preview-features li {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+  font-size: 0.8rem;
+  color: #3a3a3c;
+  line-height: 1.35;
+}
+
+.rent-plan-preview-features .material-symbols-outlined {
+  font-size: 1rem;
+  color: #0a7a6c;
+  margin-top: 0.05rem;
+}
+
+.rent-plan-preview--slate .rent-plan-preview-features .material-symbols-outlined {
+  color: #1d1d1f;
+}
+
+.rent-plan-preview-cta {
+  margin-top: 1rem;
+  text-align: center;
+  padding: 0.7rem 0.9rem;
+  border-radius: 999px;
+  background: #0a7a6c;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rent-plan-preview--slate .rent-plan-preview-cta {
+  background: #1d1d1f;
+}
+
+.rent-plan-sticky-save {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
+}
