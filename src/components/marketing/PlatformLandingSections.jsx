@@ -326,24 +326,23 @@ export function RentProductSection() {
               <div>
                 <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-400/15 border border-teal-300/25 text-xs font-bold uppercase tracking-wider text-teal-200 mb-5">
                   <span className="material-symbols-outlined text-[16px]">car_rental</span>
-                  Νέα υπηρεσία · Rent
+                  Νέα υπηρεσία · Ενοικιάσεις
                 </span>
                 <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight">
-                  Ενοικιάσεις οχημάτων με SOS, οδική βοήθεια και καθαρή ασφάλεια
+                  Ενοικιάσεις οχημάτων με έκτακτη ανάγκη, οδική βοήθεια και καθαρή ασφάλεια
                 </h2>
                 <p className="mt-4 text-base md:text-lg text-teal-50/75 leading-relaxed max-w-xl">
-                  Ξεχωριστό συμβόλαιο μόνο για Rent, ή add-on πάνω στο πλάνο λεωφορείων. Ο πελάτης
-                  βλέπει τις υπηρεσίες στο{' '}
-                  <span className="text-white font-semibold">/rent/services</span> — χωρίς σύνδεση.
+                  Ξεχωριστό συμβόλαιο μόνο για ενοικιάσεις, ή πρόσθετο πάνω στο πλάνο λεωφορείων. Ο
+                  πελάτης βλέπει τις υπηρεσίες στη δημόσια σελίδα ενοικιάσεων — χωρίς σύνδεση.
                 </p>
                 <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-teal-50/90">
                   {[
-                    'SOS + live τοποθεσία',
-                    'Οδική βοήθεια 24/7',
-                    'CDW / SCDW πριν την υπογραφή',
-                    'Share trip στην οικογένεια',
-                    'Checklist πριν την αναχώρηση',
-                    'Desk Ενοικιάσεις στο panel',
+                    'Έκτακτη ανάγκη και ζωντανή τοποθεσία',
+                    'Οδική βοήθεια όλο το εικοσιτετράωρο',
+                    'Κάλυψη ζημιών πριν την υπογραφή',
+                    'Κοινοποίηση διαδρομής στην οικογένεια',
+                    'Λίστα ελέγχου πριν την αναχώρηση',
+                    'Γραφείο ενοικιάσεων στο πάνελ',
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-2">
                       <span className="material-symbols-outlined text-teal-300 text-[18px] mt-0.5">
@@ -365,7 +364,7 @@ export function RentProductSection() {
                     to="/grafeia"
                     className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
                   >
-                    Συμβόλαια Rent
+                    Συμβόλαια ενοικιάσεων
                   </Link>
                 </div>
               </div>
@@ -406,25 +405,24 @@ export function RentProductSection() {
               <div>
                 <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-50 border border-teal-200/80 text-xs font-bold uppercase tracking-wider text-teal-800 mb-5">
                   <span className="material-symbols-outlined text-[16px]">directions_car</span>
-                  Στόλος για ενοικίαση · Add-on
+                  Στόλος για ενοικίαση · Πρόσθετο
                 </span>
                 <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
                   Προσθέστε στόλο ενοικίασης πάνω στο συμβόλαιο λεωφορείων
                 </h2>
                 <p className="mt-4 text-base md:text-lg text-slate-600 leading-relaxed max-w-xl">
-                  Ιδανικό για γραφεία που ήδη τρέχουν εκδρομές — κρατήσεις Rent, QR check-in και
-                  ζωντανό GPS χωρίς να αλλάξετε το core πλάνο λεωφορείων.
+                  Ιδανικό για γραφεία που ήδη τρέχουν εκδρομές — κρατήσεις ενοικίασης, έλεγχος με
+                  κωδικό QR και ζωντανό εντοπισμό, χωρίς να αλλάξετε το βασικό πλάνο λεωφορείων.
                 </p>
                 <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-slate-700">
-                  {(addon.features?.length
-                    ? addon.features
-                    : [
-                        'Όλα του Rent module πάνω στο υπάρχον πλάνο',
-                        'Ίδιο /rent app & wallet για πελάτες',
-                        'SOS · οδική · ασφάλεια · share · checklist',
-                        'Χωρίς αλλαγή του core συμβολαίου λεωφορείων',
-                      ]
-                  ).map((item) => (
+                  {[
+                    'Όλο το module ενοικιάσεων στο υπάρχον πλάνο',
+                    'Ίδια εφαρμογή και πορτοφόλι για πελάτες',
+                    'Έκτακτη ανάγκη, οδική βοήθεια και ασφάλεια',
+                    'Κοινοποίηση διαδρομής και λίστα ελέγχου',
+                    'Στόλος, κρατήσεις και γραφείο ενοικιάσεων',
+                    'Χωρίς αλλαγή του βασικού συμβολαίου λεωφορείων',
+                  ].map((item) => (
                     <li key={item} className="flex items-start gap-2">
                       <span className="material-symbols-outlined text-teal-600 text-[18px] mt-0.5">
                         check_circle
@@ -438,14 +436,14 @@ export function RentProductSection() {
                     to="/grafeia"
                     className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-teal-700 text-white font-bold hover:bg-teal-800"
                   >
-                    {addon.ctaGuest || 'Θέλω λεωφορεία + Rent'}
+                    Θέλω λεωφορεία και ενοικιάσεις
                     <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                   </Link>
                   <Link
                     to="/rent/services"
                     className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-slate-300 text-slate-800 font-bold hover:bg-slate-50"
                   >
-                    {addon.servicesLinkLabel?.replace(/\s*→\s*$/, '') || 'Δες δημόσια υπηρεσία'}
+                    Δες δημόσια σελίδα υπηρεσιών
                   </Link>
                 </div>
               </div>
@@ -479,7 +477,7 @@ export function FinalCtaSection() {
           Έτοιμοι να ξεκινήσετε;
         </h2>
         <p className="text-white/80 mb-8 max-w-lg mx-auto">
-          Συνδεθείτε στο panel του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
+          Συνδεθείτε στο πάνελ του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link
