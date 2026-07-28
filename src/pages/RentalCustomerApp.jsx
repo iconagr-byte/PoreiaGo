@@ -25,17 +25,6 @@ import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
-const TABS = [
-  { id: 'home', label: 'Αρχική', icon: 'home' },
-  { id: 'book', label: 'Κράτηση', icon: 'directions_car' },
-  { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
-  { id: 'wallet', label: 'Wallet', icon: 'account_balance_wallet' },
-  { id: 'account', label: 'Εγώ', icon: 'person' },
-];
-
-/** Mobile Rent app = Wallet-first (no fleet home gallery). */
-const MOBILE_TABS = TABS.filter((t) => t.id !== 'home');
-
 const HOME_CATEGORIES = ['', 'CAR', 'VAN', 'MINIBUS'];
 
 const PREFERRED_VEHICLE_ID_KEY = 'rent_preferred_vehicle_id_v1';
@@ -257,17 +246,6 @@ function RentalAuthGate() {
 
 function RentalAuthenticatedApp() {
   const isMobile = useRentMobile();
-  const navTabs = isMobile ? MOBILE_TABS : TABS;
-  // Land in Rent Wallet after login/register — separate from bus My Wallet.
-  // Mobile app is Wallet-only home; desktop may open book if a fleet pick is pending.
-  const [tab, setTab] = useState(() => {
-    if (isRentMobileViewport()) return 'wallet';
-    try {
-      return localStorage.getItem(PREFERRED_VEHICLE_ID_KEY) ? 'book' : 'wallet';
-    } catch {
-      return 'wallet';
-    }
-  });
   const [brandName, setBrandName] = useState('Ενοικίαση');
   const [calKey, setCalKey] = useState(0);
   const [walletKey, setWalletKey] = useState(0);
@@ -285,11 +263,6 @@ function RentalAuthenticatedApp() {
   });
 
   useEffect(() => setupRentalPwa(), []);
-
-  useEffect(() => {
-    // Mobile: never stay on fleet "home" — app surface is Wallet.
-    if (isMobile && tab === 'home') setTab('wallet');
-  }, [isMobile, tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -330,17 +303,11 @@ function RentalAuthenticatedApp() {
         if (cancelled) return;
         const sliced = withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 12);
         setHomeFleet(sliced);
-        // Desktop: if user came from guest fleet pick, open booking.
-        // Mobile app stays on Wallet (fleet lives on the office homepage).
-        if (isRentMobileViewport()) return;
         try {
           const preferredId = localStorage.getItem(PREFERRED_VEHICLE_ID_KEY);
           if (preferredId) {
             const found = sliced.find((v) => String(v.id) === String(preferredId));
-            if (found) {
-              setFeaturedVehicle(found);
-              setTab('book');
-            }
+            if (found) setFeaturedVehicle(found);
           }
         } catch {
           /* ignore */
@@ -367,40 +334,67 @@ function RentalAuthenticatedApp() {
     };
   }, []);
 
-  return (
-    <div className={`rent-phone-stage${isMobile ? ' rent-phone-stage--mobile-wallet' : ' rent-phone-stage--desktop'}`}>
-      <div className="rent-app">
-        {tab !== 'home' ? (
-          <header className="rent-topbar">
-            <button
-              type="button"
-              className="rent-topbar-brand"
-              onClick={() => setTab(isMobile ? 'wallet' : 'home')}
-            >
-              {brandName}
-            </button>
-            <button type="button" className="rent-btn rent-btn-ghost" onClick={() => setTab('book')}>
-              Νέα κράτηση
-            </button>
-          </header>
-        ) : null}
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
-        <main className={tab === 'home' ? 'rent-home' : 'rent-main'}>
-          {tab === 'home' && !isMobile ? (
-            <>
-              <section className="rent-hero" aria-label="Ενοικίαση">
+  const openWallet = () => {
+    setWalletKey((k) => k + 1);
+    requestAnimationFrame(() => scrollToSection('rent-wallet'));
+  };
+
+  const pickVehicle = (v) => {
+    setFeaturedVehicle(v);
+    try {
+      localStorage.setItem(PREFERRED_VEHICLE_ID_KEY, String(v.id));
+    } catch {
+      /* ignore */
+    }
+    requestAnimationFrame(() => scrollToSection('rent-book'));
+  };
+
+  return (
+    <div
+      className={`rent-phone-stage rent-phone-stage--inline${
+        isMobile ? ' rent-phone-stage--mobile-wallet' : ' rent-phone-stage--desktop'
+      }`}
+    >
+      <div className="rent-app rent-app--inline">
+        <header className="rent-topbar">
+          <button
+            type="button"
+            className="rent-topbar-brand"
+            onClick={() => scrollToSection(isMobile ? 'rent-wallet' : 'rent-home')}
+          >
+            {brandName}
+          </button>
+          <button type="button" className="rent-btn rent-btn-wallet" onClick={openWallet}>
+            <span className="material-symbols-outlined" aria-hidden>
+              account_balance_wallet
+            </span>
+            My Wallet
+          </button>
+        </header>
+
+        <main className="rent-main rent-main--inline">
+          {!isMobile ? (
+            <section id="rent-home" className="rent-inline-section" aria-label="Αρχική">
+              <section className="rent-hero rent-hero--inline" aria-label="Ενοικίαση">
                 <p className="rent-hero-brand">{brandName}</p>
                 <h1 className="rent-hero-title">Το όχημά σας, σε λίγα βήματα</h1>
                 <p className="rent-hero-copy">
-                  Κράτηση, ημερολόγιο και χάρτης παραλαβής — εγκαταστήστε την εφαρμογή στο κινητό.
+                  Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.
                 </p>
-                <button type="button" className="rent-hero-cta" onClick={() => setTab('book')}>
+                <button type="button" className="rent-hero-cta" onClick={() => scrollToSection('rent-book')}>
                   <span className="material-symbols-outlined" aria-hidden>
                     search
                   </span>
                   Βρες όχημα
                 </button>
               </section>
+
               <div className="rent-home-stack">
                 <RentalInstallPrompt force />
                 <section className="rent-home-fleet" aria-label="Στόλος ενοικίασης">
@@ -409,9 +403,9 @@ function RentalAuthenticatedApp() {
                     <button
                       type="button"
                       className="rent-home-fleet-link"
-                      onClick={() => setTab('book')}
+                      onClick={() => scrollToSection('rent-book')}
                     >
-                      Δες όλα
+                      Δες κράτηση
                     </button>
                   </div>
                   <div className="rent-home-fleet-tools">
@@ -446,10 +440,7 @@ function RentalAuthenticatedApp() {
                             key={v.id}
                             type="button"
                             className="rent-home-fleet-card"
-                            onClick={() => {
-                              setFeaturedVehicle(v);
-                              setTab('book');
-                            }}
+                            onClick={() => pickVehicle(v)}
                           >
                             <span
                               className="rent-home-fleet-fav"
@@ -457,7 +448,9 @@ function RentalAuthenticatedApp() {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 setFavorites((prev) =>
-                                  prev.includes(v.id) ? prev.filter((id) => id !== v.id) : [...prev, v.id],
+                                  prev.includes(v.id)
+                                    ? prev.filter((id) => id !== v.id)
+                                    : [...prev, v.id],
                                 );
                               }}
                             >
@@ -475,7 +468,8 @@ function RentalAuthenticatedApp() {
                             <div className="rent-home-fleet-body">
                               <strong>{v.model || 'Όχημα'}</strong>
                               <span>
-                                {v.seating_capacity || '—'} θέσεις · από €{Number(v.daily_rate_eur || 0).toFixed(0)}
+                                {v.seating_capacity || '—'} θέσεις · από €
+                                {Number(v.daily_rate_eur || 0).toFixed(0)}
                                 /ημέρα
                               </span>
                             </div>
@@ -489,27 +483,26 @@ function RentalAuthenticatedApp() {
                     </p>
                   )}
                 </section>
-                <div className="rent-quick">
-                  <button type="button" onClick={() => setTab('calendar')}>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      calendar_month
-                    </span>
-                    <span className="rent-quick-label">Ημερολόγιο</span>
-                    <span className="rent-quick-meta">Μέρες & χάρτης</span>
-                  </button>
-                  <button type="button" onClick={() => setTab('wallet')}>
-                    <span className="material-symbols-outlined" aria-hidden>
-                      account_balance_wallet
-                    </span>
-                    <span className="rent-quick-label">Rent Wallet</span>
-                    <span className="rent-quick-meta">Κάρτες ενοικίασης</span>
-                  </button>
-                </div>
               </div>
-            </>
+            </section>
           ) : null}
 
-          {tab === 'book' ? (
+          <section id="rent-wallet" className="rent-inline-section">
+            <div className="rent-panel rent-panel--wallet">
+              <h2>My Wallet</h2>
+              <p className="rent-panel-lead">
+                Οι κάρτες ενοικίασής σας — χωριστά από το My Wallet των λεωφορείων.
+              </p>
+              <RentalWalletPanel
+                brandLabel={`${brandName}`}
+                passengerName={profile.name}
+                refreshKey={walletKey}
+                onBookVehicle={() => scrollToSection('rent-book')}
+              />
+            </div>
+          </section>
+
+          <section id="rent-book" className="rent-inline-section">
             <div className="rent-panel">
               <h2>Κράτηση</h2>
               <p className="rent-panel-lead">
@@ -534,13 +527,13 @@ function RentalAuthenticatedApp() {
                   } catch {
                     /* ignore */
                   }
-                  setTab('wallet');
+                  requestAnimationFrame(() => scrollToSection('rent-wallet'));
                 }}
               />
             </div>
-          ) : null}
+          </section>
 
-          {tab === 'calendar' ? (
+          <section id="rent-calendar" className="rent-inline-section">
             <div className="rent-panel">
               <h2>Ημερολόγιο</h2>
               <p className="rent-panel-lead">
@@ -548,29 +541,14 @@ function RentalAuthenticatedApp() {
               </p>
               <RentalCustomerCalendar refreshKey={calKey} />
             </div>
-          ) : null}
+          </section>
 
-          {tab === 'wallet' ? (
-            <div className="rent-panel rent-panel--wallet">
-              <h2>Rent Wallet</h2>
-              <p className="rent-panel-lead">
-                Οι κάρτες ενοικίασής σας — χωριστά από το My Wallet των λεωφορείων.
-              </p>
-              <RentalWalletPanel
-                brandLabel={`${brandName}`}
-                passengerName={profile.name}
-                refreshKey={walletKey}
-                onBookVehicle={() => setTab('book')}
-              />
-            </div>
-          ) : null}
-
-          {tab === 'account' ? (
+          <section id="rent-account" className="rent-inline-section">
             <div className="rent-panel">
               <h2>Λογαριασμός</h2>
               <p className="rent-panel-lead">
                 Στοιχεία σύνδεσης για την εφαρμογή ενοικίασης. Τα εισιτήρια λεωφορείου είναι στο My
-                Wallet.
+                Wallet λεωφορείων.
               </p>
               <dl style={{ margin: 0 }}>
                 <div className="rent-account-row">
@@ -590,17 +568,9 @@ function RentalAuthenticatedApp() {
               <div style={{ display: 'grid', gap: '0.6rem', marginTop: '1.25rem' }}>
                 <button
                   type="button"
-                  className="rent-btn rent-btn-ghost rent-btn-block"
-                  onClick={() => setTab('wallet')}
-                >
-                  Άνοιγμα Rent Wallet
-                </button>
-                <button
-                  type="button"
                   className="rent-btn rent-btn-danger rent-btn-block"
                   onClick={() => {
                     logoutCustomer();
-                    // Office public homepage — not the admin dashboard.
                     window.location.assign('/');
                   }}
                 >
@@ -608,24 +578,8 @@ function RentalAuthenticatedApp() {
                 </button>
               </div>
             </div>
-          ) : null}
+          </section>
         </main>
-
-        <nav className="rent-nav" aria-label="Ενοικίαση">
-          {navTabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={tab === t.id ? 'is-active' : ''}
-              onClick={() => setTab(t.id)}
-            >
-              <span className="material-symbols-outlined" aria-hidden>
-                {t.icon}
-              </span>
-              {t.label}
-            </button>
-          ))}
-        </nav>
       </div>
     </div>
   );
