@@ -255,7 +255,15 @@ export default function TripForm({
   };
 
   const onQuickDriverCreated = async (created, target) => {
-    const list = await fetchFleetDrivers();
+    let list = drivers;
+    try {
+      list = await fetchFleetDrivers();
+    } catch {
+      /* keep current list */
+    }
+    if (created?.id && !list.some((d) => d.id === created.id)) {
+      list = [...list, created];
+    }
     setDrivers(list);
     const id = created?.id;
     if (!id) {
