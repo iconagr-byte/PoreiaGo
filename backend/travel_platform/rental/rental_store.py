@@ -336,6 +336,62 @@ def list_bookings(
     return sorted(rows, key=lambda b: b.get("start_time") or "", reverse=True)
 
 
+def get_booking(tenant_id: str | None, booking_id: str) -> dict[str, Any] | None:
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    if not bid:
+        return None
+    with _LOCK:
+        for b in _read()["bookings"]:
+            if b.get("tenant_id") == tid and b.get("id") == bid:
+                return deepcopy(b)
+    return None
+
+
+def parse_rental_qr_code(raw: str | None) -> str:
+    """Extract booking id from `RENT:{uuid}` or bare UUID."""
+    value = str(raw or "").strip()
+    if not value:
+        raise ValueError("Κενός κωδικός QR")
+    upper = value.upper()
+    if upper.startswith("RENT:"):
+        value = value.split(":", 1)[1].strip()
+    value = value.strip()
+    if not value:
+        raise ValueError("Μη έγκυρος κωδικός QR ενοικίασης")
+    return value
+
+
+def verify_rental_qr(tenant_id: str | None, raw_code: str) -> dict[str, Any]:
+    """Desk verify wallet pass QR — read-only, no status mutation."""
+    booking_id = parse_rental_qr_code(raw_code)
+    booking = get_booking(tenant_id, booking_id)
+    if not booking:
+        raise ValueError("Η κράτηση δεν βρέθηκε")
+    status = str(booking.get("rental_status") or "").upper()
+    eligible_checkin = status == "CONFIRMED"
+    eligible_checkout = status == "ACTIVE"
+    if status == "CANCELLED":
+        reason = "Η κράτηση έχει ακυρωθεί"
+    elif status == "COMPLETED":
+        reason = "Η ενοικίαση έχει ολοκληρωθεί"
+    elif eligible_checkin:
+        reason = "Έτοιμη για check-in"
+    elif eligible_checkout:
+        reason = "Έτοιμη για check-out / επιστροφή"
+    else:
+        reason = f"Κατάσταση: {status or '—'}"
+    return {
+        "ok": True,
+        "code": f"RENT:{booking_id}",
+        "booking_id": booking_id,
+        "booking": booking,
+        "eligible_checkin": eligible_checkin,
+        "eligible_checkout": eligible_checkout,
+        "reason": reason,
+    }
+
+
 def _vehicle_conflicts(
     data: dict[str, Any],
     *,
