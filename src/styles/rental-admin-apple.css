@@ -283,3 +283,26 @@
     font-size: 0.78rem;
   }
 }
+
+/* Soften nested white cards inside the shell */
+.rental-apple-shell .bg-white.rounded-2xl,
+.rental-apple-shell .rounded-2xl.bg-white {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  backdrop-filter: blur(16px) saturate(1.25);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  border-radius: 22px !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 14px 36px rgba(15, 23, 42, 0.06);
+}
+
+.rental-apple-shell input,
+.rental-apple-shell select,
+.rental-apple-shell textarea {
+  border-radius: 14px !important;
+}
+
+.rental-apple-shell .rounded-full {
+  letter-spacing: -0.01em;
+}
