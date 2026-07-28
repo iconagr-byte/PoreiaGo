@@ -4,7 +4,6 @@ export const PLATFORM_NAME = 'PoreiaGo';
 export const PLATFORM_TAGLINE = 'Η πλατφόρμα που τρέχει το ταξιδιωτικό σας γραφείο';
 
 export const HERO = {
-  badge: 'Cloud SaaS · Multi-tenant · Ελλάδα & EU',
   title: 'Μία πλατφόρμα για',
   titleAccent: 'όλο το ταξιδιωτικό σας γραφείο',
   subtitle:

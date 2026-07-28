@@ -48,20 +48,6 @@ export function HeroSection() {
 
       <div className="relative z-10 w-full max-w-6xl mx-auto px-4 md:px-8 py-28 md:py-32">
         <div className="max-w-2xl">
-          <div className="flex flex-wrap items-center gap-2 mb-6">
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-bold uppercase tracking-wider text-sky-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              {HERO.badge}
-            </span>
-            <Link
-              to="/rent/services"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-teal-500/20 border border-teal-300/35 text-xs font-bold uppercase tracking-wider text-teal-100 hover:bg-teal-400/25 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[14px]">car_rental</span>
-              Νέο · Ενοικιάσεις
-            </Link>
-          </div>
-
           <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-bold text-white leading-[1.08] tracking-tight mb-6">
             {HERO.title}{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-cyan-200 to-indigo-300">
