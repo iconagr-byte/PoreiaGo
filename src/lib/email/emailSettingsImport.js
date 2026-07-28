@@ -5,28 +5,83 @@
 const ENV_ALIASES = {
   EMAIL: 'email_address',
   EMAIL_ADDRESS: 'email_address',
+  MAIL_FROM: 'email_address',
+  MAIL_EMAIL: 'email_address',
+  SMTP_FROM: 'email_address',
   MAIL_USERNAME: 'mail_username',
   USERNAME: 'mail_username',
+  SMTP_USER: 'mail_username',
+  SMTP_USERNAME: 'mail_username',
+  IMAP_USER: 'mail_username',
+  IMAP_USERNAME: 'mail_username',
   MAIL_PASSWORD: 'mail_password',
   PASSWORD: 'mail_password',
+  SMTP_PASSWORD: 'mail_password',
+  SMTP_PASS: 'mail_password',
+  IMAP_PASSWORD: 'mail_password',
+  IMAP_PASS: 'mail_password',
   IMAP_HOST: 'imap_host',
+  MAIL_IMAP_HOST: 'imap_host',
+  IMAP_SERVER: 'imap_host',
   IMAP_PORT: 'imap_port',
+  MAIL_IMAP_PORT: 'imap_port',
   IMAP_SECURE: 'imap_secure',
+  IMAP_SSL: 'imap_secure',
+  IMAP_TLS: 'imap_secure',
   IMAP_MAILBOX: 'imap_mailbox',
+  IMAP_FOLDER: 'imap_mailbox',
   IMAP_FOLDER_SENT: 'imap_folder_sent',
   IMAP_FOLDER_SPAM: 'imap_folder_spam',
   SMTP_HOST: 'smtp_host',
+  MAIL_HOST: 'smtp_host',
+  MAIL_SMTP_HOST: 'smtp_host',
+  SMTP_SERVER: 'smtp_host',
   SMTP_PORT: 'smtp_port',
+  MAIL_PORT: 'smtp_port',
+  MAIL_SMTP_PORT: 'smtp_port',
   SMTP_SECURE: 'smtp_secure',
+  SMTP_SSL: 'smtp_secure',
+  SMTP_TLS: 'smtp_secure',
   SMTP_STARTTLS: 'smtp_secure',
   LABEL: 'label',
+  MAIL_LABEL: 'label',
 };
+
+function stripBom(text) {
+  return String(text || '').replace(/^\uFEFF/, '');
+}
+
+function looksLikeEnvText(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'));
+  if (!lines.length) return false;
+  let kv = 0;
+  for (const line of lines.slice(0, 40)) {
+    if (/^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(line)) kv += 1;
+  }
+  return kv >= 2;
+}
+
+function filenameSuggestsEnv(filename = '') {
+  const lower = String(filename || '').toLowerCase();
+  if (!lower) return false;
+  if (lower.endsWith('.env') || lower.endsWith('.txt')) return true;
+  if (lower.includes('.env.') || lower.endsWith('.env.local') || lower.endsWith('.env.prod')) {
+    return true;
+  }
+  // bare names: env, env.prod, production.env
+  if (/(^|[\\/])(\.?env)([.\\-_].*)?$/i.test(lower)) return true;
+  if (lower.endsWith('.env.example') || lower.endsWith('.env.sample')) return true;
+  return false;
+}
 
 function parseBool(value) {
   if (typeof value === 'boolean') return value;
   const v = String(value ?? '').trim().toLowerCase();
   if (['1', 'true', 'yes', 'on'].includes(v)) return true;
-  if (['0', 'false', 'no', 'off'].includes(v)) return false;
+  if (['0', 'false', 'no', 'off', ''].includes(v)) return false;
   return Boolean(value);
 }
 
@@ -72,10 +127,12 @@ function parseEnvText(text) {
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
+    const exportPrefix = /^export\s+/i;
+    const lineBody = exportPrefix.test(trimmed) ? trimmed.replace(exportPrefix, '') : trimmed;
+    const eq = lineBody.indexOf('=');
     if (eq < 1) continue;
-    const key = trimmed.slice(0, eq).trim().toUpperCase();
-    let value = trimmed.slice(eq + 1).trim();
+    const key = lineBody.slice(0, eq).trim().toUpperCase();
+    let value = lineBody.slice(eq + 1).trim();
     if (
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
@@ -95,35 +152,8 @@ function extractAccountsFromJson(data) {
   return [];
 }
 
-/**
- * @param {string} text
- * @param {string} [filename]
- * @returns {{ accounts: object[], errors: string[] }}
- */
-export function parseEmailSettingsFile(text, filename = '') {
+function finalizeAccounts(rawList) {
   const errors = [];
-  const lower = (filename || '').toLowerCase();
-
-  if (lower.endsWith('.env') || lower.endsWith('.txt')) {
-    const one = normalizeRawAccount(parseEnvText(text));
-    if (!one) {
-      return {
-        accounts: [],
-        errors: ['Το αρχείο .env δεν περιέχει EMAIL, IMAP_HOST και SMTP_HOST'],
-      };
-    }
-    if (!one.mail_password) errors.push('Λείπει MAIL_PASSWORD στο αρχείο');
-    return { accounts: [one], errors };
-  }
-
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    return { accounts: [], errors: ['Μη έγκυρο JSON αρχείο'] };
-  }
-
-  const rawList = extractAccountsFromJson(data);
   const accounts = [];
   rawList.forEach((raw, idx) => {
     const normalized = normalizeRawAccount(raw);
@@ -136,8 +166,56 @@ export function parseEmailSettingsFile(text, filename = '') {
     }
     accounts.push(normalized);
   });
-
   return { accounts, errors };
+}
+
+function parseAsEnv(text) {
+  const one = normalizeRawAccount(parseEnvText(text));
+  if (!one) {
+    return {
+      accounts: [],
+      errors: [
+        'Το αρχείο δεν περιέχει EMAIL (ή MAIL_FROM), IMAP_HOST και SMTP_HOST. Δείτε το «Πρότυπο JSON» ή χρησιμοποιήστε .env με αυτά τα keys.',
+      ],
+    };
+  }
+  const errors = [];
+  if (!one.mail_password) errors.push('Λείπει MAIL_PASSWORD (ή SMTP_PASSWORD) στο αρχείο');
+  return { accounts: [one], errors };
+}
+
+/**
+ * @param {string} text
+ * @param {string} [filename]
+ * @returns {{ accounts: object[], errors: string[] }}
+ */
+export function parseEmailSettingsFile(text, filename = '') {
+  const cleaned = stripBom(text).trim();
+  if (!cleaned) {
+    return { accounts: [], errors: ['Το αρχείο είναι κενό'] };
+  }
+
+  const preferEnv = filenameSuggestsEnv(filename) || looksLikeEnvText(cleaned);
+
+  if (preferEnv) {
+    return parseAsEnv(cleaned);
+  }
+
+  try {
+    const data = JSON.parse(cleaned);
+    return finalizeAccounts(extractAccountsFromJson(data));
+  } catch {
+    // Many users upload .env.prod / secrets without a .json extension.
+    if (looksLikeEnvText(cleaned)) {
+      return parseAsEnv(cleaned);
+    }
+    return {
+      accounts: [],
+      errors: [
+        'Μη έγκυρο αρχείο — χρειάζεται JSON (πρότυπο) ή .env με EMAIL, IMAP_HOST, SMTP_HOST, MAIL_PASSWORD',
+      ],
+    };
+  }
 }
 
 export const EMAIL_SETTINGS_TEMPLATE = {
@@ -157,6 +235,19 @@ export const EMAIL_SETTINGS_TEMPLATE = {
   is_active: true,
 };
 
+export const EMAIL_SETTINGS_ENV_TEMPLATE = `# PoreiaGo email account (.env)
+EMAIL=info@mydomain.gr
+MAIL_USERNAME=info@mydomain.gr
+MAIL_PASSWORD=YOUR_PASSWORD_HERE
+IMAP_HOST=mail.mydomain.gr
+IMAP_PORT=993
+IMAP_SECURE=true
+SMTP_HOST=mail.mydomain.gr
+SMTP_PORT=587
+SMTP_SECURE=true
+LABEL=Πωλήσεις
+`;
+
 export function downloadEmailSettingsTemplate() {
   const blob = new Blob([`${JSON.stringify(EMAIL_SETTINGS_TEMPLATE, null, 2)}\n`], {
     type: 'application/json',
@@ -165,6 +256,16 @@ export function downloadEmailSettingsTemplate() {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'email-account.example.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function downloadEmailSettingsEnvTemplate() {
+  const blob = new Blob([EMAIL_SETTINGS_ENV_TEMPLATE], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'email-account.example.env';
   a.click();
   URL.revokeObjectURL(url);
 }
