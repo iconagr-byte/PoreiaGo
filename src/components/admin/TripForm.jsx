@@ -40,6 +40,20 @@ const DURATION_PRESETS = ['Ημιημερήσια', 'Ημερήσια', '2 ημ�
 const BADGE_PRESETS = ['Προτεινόμενη', 'Νέα', 'Last seats', 'Early bird'];
 const HIGHLIGHT_SUGGESTIONS = ['Ξενάγηση', 'Γεύμα', 'Wi‑Fi', 'A/C', 'USB φόρτιση', 'Ασφάλεια'];
 
+const VEHICLE_TYPE_OPTIONS = [
+  { value: 'Luxury Coach', label: 'Luxury Coach (50 θέσεις)' },
+  { value: 'Premium Express', label: 'Premium Express (30 θέσεις)' },
+  { value: 'VIP Minibus', label: 'VIP Minibus (15 θέσεις)' },
+];
+
+const emptyFleetRow = () => ({
+  driverId: '',
+  driverName: '',
+  vehicleType: 'Luxury Coach',
+  vehiclePlate: '',
+  vehicleCode: '',
+});
+
 const fieldClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10 placeholder:text-slate-400';
 
@@ -123,6 +137,48 @@ export default function TripForm({
       vehicleCode: driver.vehicle_code || formData.vehicleCode || '',
     });
   };
+
+  const additionalFleet = Array.isArray(formData.additionalFleet) ? formData.additionalFleet : [];
+
+  const setAdditionalFleet = (next) => patch({ additionalFleet: next });
+
+  const addFleetUnit = () => {
+    setAdditionalFleet([...additionalFleet, emptyFleetRow()]);
+  };
+
+  const updateAdditionalFleet = (index, partial) => {
+    setAdditionalFleet(
+      additionalFleet.map((row, i) => (i === index ? { ...row, ...partial } : row)),
+    );
+  };
+
+  const assignAdditionalDriver = (index, driverId) => {
+    if (!driverId) {
+      updateAdditionalFleet(index, {
+        driverId: '',
+        driverName: '',
+        vehiclePlate: '',
+        vehicleCode: '',
+      });
+      return;
+    }
+    const driver = drivers.find((d) => d.id === driverId);
+    if (!driver) return;
+    updateAdditionalFleet(index, {
+      driverId: driver.id,
+      driverName: driver.name,
+      vehiclePlate: driver.license_plate || additionalFleet[index]?.vehiclePlate || '',
+      vehicleCode: driver.vehicle_code || additionalFleet[index]?.vehicleCode || '',
+    });
+  };
+
+  const removeAdditionalFleet = (index) => {
+    setAdditionalFleet(additionalFleet.filter((_, i) => i !== index));
+  };
+
+  const usedDriverIds = new Set(
+    [formData.driverId, ...additionalFleet.map((r) => r.driverId)].filter(Boolean),
+  );
 
   const handleAddStop = () => {
     const newId = Date.now();

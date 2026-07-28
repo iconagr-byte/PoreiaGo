@@ -118,6 +118,8 @@ export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
     driverName: '',
     vehiclePlate: '',
     vehicleCode: '',
+    /** Extra coaches beyond the primary driver/vehicle pair. */
+    additionalFleet: [],
     image: '',
     hook: '',
     durationLabel: 'Ημερήσια',
@@ -154,6 +156,15 @@ export function tripToFormData(trip) {
     segments: trip.segments ? [...trip.segments] : [],
     passengerFlightSeats: trip.passengerFlightSeats ? [...trip.passengerFlightSeats] : [],
     luggageCheckins: trip.luggageCheckins ? [...trip.luggageCheckins] : [],
+    additionalFleet: Array.isArray(trip.additionalFleet)
+      ? trip.additionalFleet.map((row) => ({
+          driverId: row.driverId || '',
+          driverName: row.driverName || '',
+          vehicleType: row.vehicleType || 'Luxury Coach',
+          vehiclePlate: row.vehiclePlate || '',
+          vehicleCode: row.vehicleCode || '',
+        }))
+      : [],
   });
 }
 
