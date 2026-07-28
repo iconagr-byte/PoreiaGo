@@ -9,6 +9,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import { useRentMobile } from '../lib/rental/rentDevice.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -28,6 +29,7 @@ function isRentAuthPath(pathname) {
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useRentMobile();
   const pathRent = isRentAuthPath(location.pathname);
   const redirectTo = pathRent
     ? isRentReturn(location.state?.from)
@@ -145,7 +147,9 @@ export default function RegisterPage() {
         }
       : { from: redirectTo };
 
-  const shellClass = rentIntent ? 'rent-auth-stage' : 'wallet-auth-stage';
+  const shellClass = rentIntent
+    ? `rent-auth-stage${isMobile ? '' : ' rent-auth-stage--desktop'}`
+    : 'wallet-auth-stage';
   const cardClass = rentIntent ? 'rent-auth-shell' : 'wallet-auth-shell';
   const scrollClass = rentIntent ? 'rent-auth-scroll' : 'wallet-auth-scroll';
   const panelClass = rentIntent ? 'rent-auth-card' : 'wallet-auth-card';

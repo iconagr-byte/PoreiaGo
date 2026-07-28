@@ -1674,6 +1674,86 @@
   background: rgba(0, 0, 0, 0.08);
 }
 
+/* Desktop (JS: !isMobile): fill the whole viewport — no phone chrome */
+.rent-phone-stage--desktop,
+.rent-auth-stage--desktop {
+  padding: 0;
+  align-items: stretch;
+  background: #f5f5f7;
+}
+
+.rent-auth-stage--desktop {
+  background:
+    radial-gradient(70% 55% at 50% 0%, rgba(10, 122, 108, 0.18), transparent 55%),
+    linear-gradient(180deg, #0b3d4a 0%, #062a30 40%, #05080a 100%);
+}
+
+.rent-phone-stage--desktop .rent-app,
+.rent-auth-stage--desktop .rent-auth-shell,
+.rent-auth-stage--desktop .rent-gate {
+  width: 100%;
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.rent-phone-stage--desktop .rent-app::before,
+.rent-auth-stage--desktop .rent-auth-shell::before,
+.rent-auth-stage--desktop .rent-gate::before {
+  display: none;
+}
+
+.rent-phone-stage--desktop .rent-topbar,
+.rent-phone-stage--desktop .rent-main,
+.rent-phone-stage--desktop .rent-home-stack {
+  width: 100%;
+  max-width: 1120px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.rent-phone-stage--desktop .rent-topbar {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.rent-phone-stage--desktop .rent-main {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.rent-phone-stage--desktop .rent-home {
+  max-width: none;
+}
+
+.rent-phone-stage--desktop .rent-hero {
+  min-height: min(52dvh, 560px);
+  padding-left: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+  padding-right: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+}
+
+.rent-phone-stage--desktop .rent-home-fleet-strip {
+  grid-auto-columns: minmax(220px, 260px);
+}
+
+.rent-phone-stage--desktop .rent-nav {
+  left: max(0.65rem, calc((100% - 1120px) / 2));
+  right: max(0.65rem, calc((100% - 1120px) / 2));
+  width: auto;
+  max-width: none;
+}
+
+.rent-auth-stage--desktop .rent-auth-scroll {
+  padding: 2.5rem 1.5rem;
+  align-items: center;
+}
+
+.rent-auth-stage--desktop .rent-auth-card {
+  width: min(440px, 100%);
+}
+
 /* Real phones: full-bleed, no device chrome */
 @media (max-width: 480px) {
   .rent-phone-stage,

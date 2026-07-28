@@ -21,6 +21,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import { useRentMobile } from '../lib/rental/rentDevice.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -40,6 +41,7 @@ function isRentAuthPath(pathname) {
 export default function LoginPage({ rentEntrance = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useRentMobile();
   const { enabled: googleEnabled } = useGoogleAuthConfig();
   // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
   const pathRent = rentEntrance || isRentAuthPath(location.pathname);
@@ -343,7 +345,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
 
   if (rentIntent) {
     return (
-      <div className="rent-auth-stage">
+      <div className={`rent-auth-stage${isMobile ? '' : ' rent-auth-stage--desktop'}`}>
         <div className="rent-auth-shell">
           <div className="rent-auth-scroll">
             <div className="rent-auth-card">{formBody}</div>

@@ -2,6 +2,7 @@
  * Device detection for Rent customer app.
  * Mobile → Wallet-first PWA. Desktop → may browse fleet before login.
  */
+import { useEffect, useState } from 'react';
 
 const MOBILE_MQ = '(max-width: 900px)';
 const TOUCH_HANDHELD_MQ = '(hover: none) and (pointer: coarse) and (max-width: 1200px)';
@@ -47,4 +48,11 @@ export function subscribeRentMobileViewport(onChange) {
       else if (mq.removeListener) mq.removeListener(notify);
     });
   };
+}
+
+/** React hook — true on phone / tablet Rent surface. */
+export function useRentMobile() {
+  const [mobile, setMobile] = useState(() => isRentMobileViewport());
+  useEffect(() => subscribeRentMobileViewport(setMobile), []);
+  return mobile;
 }

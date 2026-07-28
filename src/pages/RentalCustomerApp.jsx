@@ -11,7 +11,7 @@ import {
 import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
 import {
   isRentMobileViewport,
-  subscribeRentMobileViewport,
+  useRentMobile,
 } from '../lib/rental/rentDevice.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
@@ -40,13 +40,8 @@ const HOME_CATEGORIES = ['', 'CAR', 'VAN', 'MINIBUS'];
 
 const PREFERRED_VEHICLE_ID_KEY = 'rent_preferred_vehicle_id_v1';
 
-function useRentMobile() {
-  const [mobile, setMobile] = useState(() => isRentMobileViewport());
-  useEffect(() => subscribeRentMobileViewport(setMobile), []);
-  return mobile;
-}
-
 function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
+  const isMobile = useRentMobile();
   const [brandName, setBrandName] = useState('Ενοικίαση');
   const [homeFleet, setHomeFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
@@ -112,7 +107,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
     });
 
   return (
-    <div className="rent-phone-stage">
+    <div className={`rent-phone-stage${isMobile ? '' : ' rent-phone-stage--desktop'}`}>
       <div className="rent-app rent-app--guest">
         <header className="rent-topbar">
           <button
@@ -373,7 +368,7 @@ function RentalAuthenticatedApp() {
   }, []);
 
   return (
-    <div className={`rent-phone-stage${isMobile ? ' rent-phone-stage--mobile-wallet' : ''}`}>
+    <div className={`rent-phone-stage${isMobile ? ' rent-phone-stage--mobile-wallet' : ' rent-phone-stage--desktop'}`}>
       <div className="rent-app">
         {tab !== 'home' ? (
           <header className="rent-topbar">
