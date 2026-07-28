@@ -1,24 +1,45 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import {
   AGENCY_PLANS,
   BILLING_INTERVALS,
+  DEFAULT_RENT_SECTION_TITLE,
   RENT_ADDON,
   RENT_STANDALONE_PLAN,
   displayPrice,
+  mergeRentPlanCatalog,
   rentAddonDisplayPrice,
   rentStandaloneDisplayPrice,
 } from '../lib/billing/planCatalog.js';
 import { CAMPAIGN_TEMPLATE_COUNT } from '../lib/marketing/platformCopy.js';
 import { getSaasToken } from '../services/saasApi.js';
+import { fetchPublicRentPlanCatalog } from '../services/rentPlanCatalogApi.js';
 
 export default function AgencyPlansPage() {
   const navigate = useNavigate();
   const [interval, setInterval] = useState('month');
   const loggedIn = Boolean(getSaasToken());
-  const rentStandalonePrice = rentStandaloneDisplayPrice(interval);
-  const rentAddonPrice = rentAddonDisplayPrice(interval);
+  const [rentCatalog, setRentCatalog] = useState(() => mergeRentPlanCatalog(null));
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicRentPlanCatalog().then((data) => {
+      if (!cancelled) setRentCatalog(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const standalone = rentCatalog.standalone || RENT_STANDALONE_PLAN;
+  const addon = rentCatalog.addon || RENT_ADDON;
+  const rentStandalonePrice = rentStandaloneDisplayPrice(interval, standalone);
+  const rentAddonPrice = rentAddonDisplayPrice(interval, addon);
+  const visibleCards = [standalone.visible !== false, addon.visible !== false].filter(Boolean)
+    .length;
+  const rentGridClass =
+    visibleCards <= 1 ? 'grid md:grid-cols-1 max-w-xl gap-6' : 'grid md:grid-cols-2 gap-6';
 
   const choosePlan = (planId) => {
     if (planId === 'enterprise') {
@@ -164,13 +185,15 @@ export default function AgencyPlansPage() {
                         {f}
                       </li>
                     ))}
-                    <li className="flex gap-2 text-teal-800 font-semibold">
-                      <span className="material-symbols-outlined text-teal-700 text-[18px] shrink-0">
-                        add_circle
-                      </span>
-                      Προαιρετικό add-on Ενοικιάσεις (+{rentAddonPrice.label}
-                      {rentAddonPrice.suffix})
-                    </li>
+                    {addon.visible !== false ? (
+                      <li className="flex gap-2 text-teal-800 font-semibold">
+                        <span className="material-symbols-outlined text-teal-700 text-[18px] shrink-0">
+                          add_circle
+                        </span>
+                        Προαιρετικό add-on Ενοικιάσεις (+{rentAddonPrice.label}
+                        {rentAddonPrice.suffix})
+                      </li>
+                    ) : null}
                   </ul>
                   <button
                     type="button"
@@ -194,73 +217,81 @@ export default function AgencyPlansPage() {
         </section>
 
         <section className="space-y-5">
-          <h2 className="text-xl font-bold tracking-tight">Ενοικιάσεις — ξεχωριστά</h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            <article className="rounded-[28px] border border-teal-200 bg-gradient-to-br from-teal-50 via-white to-sky-50 p-6 md:p-8 flex flex-col shadow-sm">
-              <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-teal-700 text-white text-[11px] font-bold uppercase tracking-wider">
-                Αυτόνομο συμβόλαιο
-              </span>
-              <h3 className="mt-4 text-2xl font-bold">{RENT_STANDALONE_PLAN.name}</h3>
-              <p className="text-sm text-slate-600 mt-1">{RENT_STANDALONE_PLAN.tagline}</p>
-              <p className="mt-5 text-3xl font-bold tracking-tight tabular-nums">
-                {rentStandalonePrice.label}
-                <span className="text-base font-medium text-gray-500">
-                  {rentStandalonePrice.suffix}
+          <h2 className="text-xl font-bold tracking-tight">
+            {rentCatalog.sectionTitle || DEFAULT_RENT_SECTION_TITLE}
+          </h2>
+          <div className={rentGridClass}>
+            {standalone.visible !== false ? (
+              <article className="rounded-[28px] border border-teal-200 bg-gradient-to-br from-teal-50 via-white to-sky-50 p-6 md:p-8 flex flex-col shadow-sm">
+                <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-teal-700 text-white text-[11px] font-bold uppercase tracking-wider">
+                  {standalone.badge}
                 </span>
-              </p>
-              <ul className="mt-5 space-y-2 flex-1 text-sm text-slate-700">
-                {RENT_STANDALONE_PLAN.features.map((f) => (
-                  <li key={f} className="flex gap-2">
-                    <span className="material-symbols-outlined text-teal-700 text-[18px] shrink-0">
-                      check_circle
-                    </span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                onClick={() => choosePlan('rent')}
-                className="mt-8 w-full py-3.5 rounded-full font-bold text-sm bg-teal-700 text-white hover:bg-teal-800"
-              >
-                {loggedIn ? 'Επιλογή Rent συμβολαίου' : 'Εγγραφή μόνο για Rent'}
-              </button>
-            </article>
+                <h3 className="mt-4 text-2xl font-bold">{standalone.name}</h3>
+                <p className="text-sm text-slate-600 mt-1">{standalone.tagline}</p>
+                <p className="mt-5 text-3xl font-bold tracking-tight tabular-nums">
+                  {rentStandalonePrice.label}
+                  <span className="text-base font-medium text-gray-500">
+                    {rentStandalonePrice.suffix}
+                  </span>
+                </p>
+                <ul className="mt-5 space-y-2 flex-1 text-sm text-slate-700">
+                  {standalone.features.map((f) => (
+                    <li key={f} className="flex gap-2">
+                      <span className="material-symbols-outlined text-teal-700 text-[18px] shrink-0">
+                        check_circle
+                      </span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => choosePlan('rent')}
+                  className="mt-8 w-full py-3.5 rounded-full font-bold text-sm bg-teal-700 text-white hover:bg-teal-800"
+                >
+                  {loggedIn ? standalone.ctaLoggedIn : standalone.ctaGuest}
+                </button>
+              </article>
+            ) : null}
 
-            <article className="rounded-[28px] border border-slate-200 bg-white p-6 md:p-8 flex flex-col shadow-sm">
-              <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
-                Add-on σε λεωφορεία
-              </span>
-              <h3 className="mt-4 text-2xl font-bold">{RENT_ADDON.name}</h3>
-              <p className="text-sm text-slate-600 mt-1">{RENT_ADDON.tagline}</p>
-              <p className="mt-5 text-3xl font-bold tracking-tight tabular-nums">
-                {rentAddonPrice.label}
-                <span className="text-base font-medium text-gray-500">{rentAddonPrice.suffix}</span>
-              </p>
-              <ul className="mt-5 space-y-2 flex-1 text-sm text-slate-700">
-                {RENT_ADDON.features.map((f) => (
-                  <li key={f} className="flex gap-2">
-                    <span className="material-symbols-outlined text-slate-700 text-[18px] shrink-0">
-                      check_circle
-                    </span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                onClick={openRentAddon}
-                className="mt-8 w-full py-3.5 rounded-full font-bold text-sm bg-slate-900 text-white hover:opacity-90"
-              >
-                {loggedIn ? 'Ενεργοποίηση add-on στο συμβόλαιο' : 'Θέλω λεωφορεία + Rent'}
-              </button>
-              <Link
-                to="/rent/services"
-                className="mt-3 text-center text-sm font-bold text-teal-800 hover:underline"
-              >
-                Δες δημόσια σελίδα υπηρεσιών →
-              </Link>
-            </article>
+            {addon.visible !== false ? (
+              <article className="rounded-[28px] border border-slate-200 bg-white p-6 md:p-8 flex flex-col shadow-sm">
+                <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
+                  {addon.badge}
+                </span>
+                <h3 className="mt-4 text-2xl font-bold">{addon.name}</h3>
+                <p className="text-sm text-slate-600 mt-1">{addon.tagline}</p>
+                <p className="mt-5 text-3xl font-bold tracking-tight tabular-nums">
+                  {rentAddonPrice.label}
+                  <span className="text-base font-medium text-gray-500">{rentAddonPrice.suffix}</span>
+                </p>
+                <ul className="mt-5 space-y-2 flex-1 text-sm text-slate-700">
+                  {addon.features.map((f) => (
+                    <li key={f} className="flex gap-2">
+                      <span className="material-symbols-outlined text-slate-700 text-[18px] shrink-0">
+                        check_circle
+                      </span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={openRentAddon}
+                  className="mt-8 w-full py-3.5 rounded-full font-bold text-sm bg-slate-900 text-white hover:opacity-90"
+                >
+                  {loggedIn ? addon.ctaLoggedIn : addon.ctaGuest}
+                </button>
+                {addon.servicesLinkLabel ? (
+                  <Link
+                    to="/rent/services"
+                    className="mt-3 text-center text-sm font-bold text-teal-800 hover:underline"
+                  >
+                    {addon.servicesLinkLabel}
+                  </Link>
+                ) : null}
+              </article>
+            ) : null}
           </div>
         </section>
 
@@ -274,7 +305,7 @@ export default function AgencyPlansPage() {
               <strong>Λεωφορεία μόνο:</strong> Starter / Professional / Enterprise — η αρχική του domain δείχνει εκδρομές
             </li>
             <li>
-              <strong>Rent μόνο:</strong> συμβόλαιο {RENT_STANDALONE_PLAN.name} (
+              <strong>Rent μόνο:</strong> συμβόλαιο {standalone.name} (
               {rentStandalonePrice.label}
               {rentStandalonePrice.suffix}) — η αρχική του domain δείχνει μόνο Rent, χωρίς λεωφορεία
             </li>

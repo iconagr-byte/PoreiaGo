@@ -28,6 +28,7 @@ import {
 import RentalSignaturePad from './RentalSignaturePad.jsx';
 import RentalCalendarBoard from './RentalCalendarBoard.jsx';
 import RentAppShareBanner from './RentAppShareBanner.jsx';
+import RentPlanCardsEditor from './RentPlanCardsEditor.jsx';
 import '../../../styles/rental-admin-apple.css';
 
 const CATEGORIES = [
@@ -45,6 +46,7 @@ const TABS = [
   { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
   { id: 'inspections', label: 'Check-in / out', icon: 'fact_check' },
   { id: 'live_gps', label: 'Ζωντανά GPS', icon: 'my_location' },
+  { id: 'plans', label: 'Συμβόλαια Rent', icon: 'sell' },
 ];
 
 function bookingSource(b) {
@@ -570,6 +572,7 @@ export default function FleetRentalPanel({
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
               { id: 'live_gps', label: 'Ζωντανά GPS', copy: `${overlays.length} ενεργά για χάρτη`, icon: 'my_location' },
+              { id: 'plans', label: 'Συμβόλαια Rent', copy: 'Επεξεργασία καρτών /grafeia', icon: 'sell' },
             ].map((hub) => (
               <button
                 key={hub.id}
@@ -1147,6 +1150,8 @@ export default function FleetRentalPanel({
           </div>
         </div>
       )}
+
+      {tab === 'plans' && <RentPlanCardsEditor />}
 
       {tab === 'calendar' && (
         <RentalCalendarBoard

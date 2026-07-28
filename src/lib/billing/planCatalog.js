@@ -57,11 +57,13 @@ export const AGENCY_PLANS = [
 
 /**
  * Standalone Rent-only contract — for offices that rent vehicles
- * without needing bus ticketing / fleet GPS.
+ * without needing bus ticketing / trip GPS.
+ * Marketing copy can be overridden via /api/site/rent-plan-catalog.
  */
 export const RENT_STANDALONE_PLAN = {
   id: 'rent',
-  name: 'Rent',
+  badge: 'Αυτόνομο συμβόλαιο',
+  name: 'PoreiaGo Rent',
   tagline: 'Μόνο ενοικιάσεις οχημάτων — χωρίς λεωφορεία',
   kind: 'rent_only',
   monthlyEur: 149,
@@ -72,6 +74,9 @@ export const RENT_STANDALONE_PLAN = {
     'Αρχική σελίδα γραφείου μόνο με Rent (χωρίς λεωφορεία)',
     'Desk Ενοικιάσεις στο Control Panel',
   ],
+  ctaLoggedIn: 'Επιλογή Rent συμβολαίου',
+  ctaGuest: 'Εγγραφή μόνο για Rent',
+  visible: true,
   highlighted: true,
 };
 
@@ -80,6 +85,7 @@ export const RENT_STANDALONE_PLAN = {
  */
 export const RENT_ADDON = {
   id: 'rent_addon',
+  badge: 'Add-on σε λεωφορεία',
   name: 'Add-on Ενοικιάσεις',
   tagline: 'Προσθήκη Rent πάνω στο συμβόλαιο λεωφορείων',
   kind: 'addon',
@@ -90,7 +96,46 @@ export const RENT_ADDON = {
     'SOS · οδική · ασφάλεια · share · checklist',
     'Χωρίς αλλαγή του core συμβολαίου λεωφορείων',
   ],
+  ctaLoggedIn: 'Ενεργοποίηση add-on στο συμβόλαιο',
+  ctaGuest: 'Θέλω λεωφορεία + Rent',
+  servicesLinkLabel: 'Δες δημόσια σελίδα υπηρεσιών →',
+  visible: true,
 };
+
+export const DEFAULT_RENT_SECTION_TITLE = 'Ενοικιάσεις — ξεχωριστά';
+
+export function mergeRentCard(defaults, override) {
+  if (!override || typeof override !== 'object') {
+    return { ...defaults, features: [...(defaults.features || [])] };
+  }
+  const features = Array.isArray(override.features)
+    ? override.features.map((f) => String(f).trim()).filter(Boolean)
+    : defaults.features;
+  const monthly =
+    override.monthlyEur != null && Number.isFinite(Number(override.monthlyEur))
+      ? Number(override.monthlyEur)
+      : defaults.monthlyEur;
+  return {
+    ...defaults,
+    ...override,
+    id: defaults.id,
+    kind: defaults.kind,
+    monthlyEur: monthly,
+    features: features?.length ? features : [...(defaults.features || [])],
+    visible: override.visible !== false,
+    highlighted: defaults.highlighted,
+  };
+}
+
+export function mergeRentPlanCatalog(payload) {
+  return {
+    sectionTitle:
+      (payload?.sectionTitle && String(payload.sectionTitle).trim()) ||
+      DEFAULT_RENT_SECTION_TITLE,
+    standalone: mergeRentCard(RENT_STANDALONE_PLAN, payload?.standalone),
+    addon: mergeRentCard(RENT_ADDON, payload?.addon),
+  };
+}
 
 export function yearlyFromMonthly(monthlyEur) {
   if (monthlyEur == null) return null;
@@ -131,10 +176,10 @@ export function displayPrice(plan, interval) {
   };
 }
 
-export function rentAddonDisplayPrice(interval = 'month') {
-  return displayPrice(RENT_ADDON, interval);
+export function rentAddonDisplayPrice(interval = 'month', plan = RENT_ADDON) {
+  return displayPrice(plan, interval);
 }
 
-export function rentStandaloneDisplayPrice(interval = 'month') {
-  return displayPrice(RENT_STANDALONE_PLAN, interval);
+export function rentStandaloneDisplayPrice(interval = 'month', plan = RENT_STANDALONE_PLAN) {
+  return displayPrice(plan, interval);
 }
