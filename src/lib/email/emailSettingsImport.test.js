@@ -1,7 +1,10 @@
 /**
  * Smoke tests for email settings file import (JSON + .env).
  */
-import { parseEmailSettingsFile } from './emailSettingsImport.js';
+import {
+  decodeEmailSettingsBytes,
+  parseEmailSettingsFile,
+} from './emailSettingsImport.js';
 
 const jsonOk = parseEmailSettingsFile(
   JSON.stringify({
@@ -74,5 +77,32 @@ const envKeyedJson = parseEmailSettingsFile(
   'settings.json',
 );
 console.assert(envKeyedJson.accounts.length === 1, 'env keys inside JSON');
+
+const laravel = parseEmailSettingsFile(
+  `MAIL_FROM_ADDRESS=info@office.gr
+MAIL_HOST=mail.office.gr
+MAIL_PASSWORD=secret
+MAIL_ENCRYPTION=tls
+MAIL_PORT=587
+`,
+  '.env',
+);
+console.assert(laravel.accounts.length === 1, 'laravel aliases');
+console.assert(laravel.accounts[0].smtp_port === 587, 'laravel port');
+
+const jsonNamedEnv = parseEmailSettingsFile(
+  JSON.stringify({
+    email_address: 'j@son.gr',
+    smtp_host: 'mail.son.gr',
+    mail_password: 'p',
+  }),
+  '.env.prod',
+);
+console.assert(jsonNamedEnv.accounts[0]?.email_address === 'j@son.gr', 'json inside .env.prod name');
+
+const utf16 = decodeEmailSettingsBytes(
+  new Uint8Array([0xff, 0xfe, 0x45, 0x00, 0x3d, 0x00, 0x61, 0x00]),
+);
+console.assert(utf16.includes('E=a') || utf16.startsWith('E='), 'utf16 decode');
 
 console.log('emailSettingsImport: OK');
