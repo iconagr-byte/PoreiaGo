@@ -121,5 +121,62 @@ class WalletBookingTenantIsolationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([b["id"] for b in b_items], ["B-B1"])
 
 
+class LegacyWalletDbMigrationTests(unittest.IsolatedAsyncioTestCase):
+    """Prod crash: CREATE INDEX on tenant_id ran before ALTER on legacy SQLite."""
+
+    async def test_init_upgrades_customer_bookings_without_tenant_id(self):
+        import aiosqlite
+
+        self._tmpdir = tempfile.TemporaryDirectory()
+        db_path = Path(self._tmpdir.name) / "legacy.sqlite"
+        async with aiosqlite.connect(db_path) as raw:
+            await raw.executescript(
+                """
+                CREATE TABLE customer_bookings (
+                    id TEXT PRIMARY KEY,
+                    customer_email TEXT NOT NULL,
+                    customer_id TEXT,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    updated_at TEXT DEFAULT (datetime('now'))
+                );
+                INSERT INTO customer_bookings (id, customer_email, payload_json)
+                VALUES (
+                  'LEGACY-1',
+                  'legacy@example.com',
+                  '{"id":"LEGACY-1","tenant_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}'
+                );
+                """
+            )
+            await raw.commit()
+
+        self._env = patch.dict(
+            "os.environ",
+            {"TICKETING_DB_PATH": str(db_path), "POREIAGO_DATA_DIR": self._tmpdir.name},
+            clear=False,
+        )
+        self._env.start()
+        from ticketing import config as ticketing_config
+        from ticketing import db as ticketing_db
+
+        ticketing_config.settings.sqlite_path = str(db_path)
+        await ticketing_db.close_ticketing_db()
+        await ticketing_db.init_ticketing_db()
+
+        db = ticketing_db.get_db()
+        cur = await db.execute("PRAGMA table_info(customer_bookings)")
+        cols = {row[1] for row in await cur.fetchall()}
+        self.assertIn("tenant_id", cols)
+        cur = await db.execute(
+            "SELECT tenant_id FROM customer_bookings WHERE id = 'LEGACY-1'"
+        )
+        row = await cur.fetchone()
+        self.assertEqual(row[0], "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+        await ticketing_db.close_ticketing_db()
+        self._env.stop()
+        self._tmpdir.cleanup()
+
+
 if __name__ == "__main__":
     unittest.main()

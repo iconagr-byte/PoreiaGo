@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS customer_bookings (
 );
 CREATE INDEX IF NOT EXISTS idx_cb_email ON customer_bookings(customer_email);
 CREATE INDEX IF NOT EXISTS idx_cb_customer ON customer_bookings(customer_id);
-CREATE INDEX IF NOT EXISTS idx_cb_email_tenant ON customer_bookings(customer_email, tenant_id);
+-- idx_cb_email_tenant is created after ALTER (legacy DBs lack tenant_id until migrated)
 
 CREATE TABLE IF NOT EXISTS lost_items (
     id TEXT PRIMARY KEY,
