@@ -262,7 +262,7 @@ export default function EmailSettingsPanel({ onAccountChange }) {
           <h2 className="font-headline-md text-headline-md text-on-surface">Ρυθμίσεις Email</h2>
           <p className="text-body-sm text-on-surface-variant mt-1">
             Συνδέστε τον δικό σας λογαριασμό (π.χ. info@mydomain.gr) — IMAP/SMTP.
-            Εισαγωγή από <strong>.mobileconfig</strong> (Apple Secure Email / cPanel),{' '}
+            Εισαγωγή από <strong>.mobileconfig</strong> / <strong>.vbs</strong> (cPanel Secure Email),{' '}
             <strong>JSON</strong> ή <strong>.env</strong> — αποθηκεύεται αυτόματα όταν υπάρχει κωδικός.
           </p>
         </div>
@@ -270,7 +270,7 @@ export default function EmailSettingsPanel({ onAccountChange }) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".mobileconfig,.json,.env,.txt,application/json,text/plain,.env.prod,.env.local,.env.example,application/x-apple-aspen-config,*/*"
+            accept=".mobileconfig,.vbs,.json,.env,.txt,application/json,text/plain,.env.prod,.env.local,.env.example,application/x-apple-aspen-config,text/vbscript,*/*"
             className="hidden"
             onChange={handleImportFile}
           />

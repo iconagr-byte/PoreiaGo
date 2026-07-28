@@ -281,6 +281,117 @@ function filenameSuggestsMobileconfig(filename = '') {
   return String(filename || '').toLowerCase().endsWith('.mobileconfig');
 }
 
+function filenameSuggestsVbs(filename = '') {
+  return String(filename || '').toLowerCase().endsWith('.vbs');
+}
+
+function looksLikeCpanelVbs(text) {
+  const t = String(text || '');
+  return (
+    /strIncServerAddress\s*=/i.test(t) &&
+    /strAccount\s*=/i.test(t) &&
+    (/strServerSmtpPort\s*=/i.test(t) || /strOutServerAddress\s*=/i.test(t))
+  );
+}
+
+/** cPanel VBS stores ports as hex DWORD strings, e.g. "000003e1" → 993. */
+function parseVbsHexDword(value, fallback) {
+  const raw = String(value ?? '').trim().replace(/^["']|["']$/g, '');
+  if (!raw) return fallback;
+  if (/^0x/i.test(raw) || /^[0-9a-f]+$/i.test(raw)) {
+    const n = Number.parseInt(raw.replace(/^0x/i, ''), 16);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return parsePort(raw, fallback);
+}
+
+function parseVbsQuotedAssign(text, varName) {
+  const re = new RegExp(
+    `\\b${varName}\\s*=\\s*"([^"]*)"`,
+    'i',
+  );
+  const m = re.exec(text);
+  return m ? m[1].trim() : '';
+}
+
+function parseVbsBoolAssign(text, varName, fallback = false) {
+  const re = new RegExp(`\\b${varName}\\s*=\\s*(True|False)\\b`, 'i');
+  const m = re.exec(text);
+  if (!m) return fallback;
+  return String(m[1]).toLowerCase() === 'true';
+}
+
+/**
+ * Parse cPanel / hosting «Secure Email Setup.vbs» (Windows Live Mail).
+ * @param {string} text
+ * @returns {{ accounts: object[], errors: string[] }}
+ */
+export function parseVbsEmailSettings(text) {
+  const cleaned = stripBom(text);
+  if (!looksLikeCpanelVbs(cleaned)) {
+    return {
+      accounts: [],
+      errors: [
+        'Δεν βρέθηκε cPanel Secure Email Setup (.vbs). Χρειάζεται strAccount / strIncServerAddress.',
+      ],
+    };
+  }
+
+  const email = parseVbsQuotedAssign(cleaned, 'strAccount');
+  const imapHost = parseVbsQuotedAssign(cleaned, 'strIncServerAddress');
+  const smtpHost =
+    parseVbsQuotedAssign(cleaned, 'strOutServerAddress') || imapHost;
+  const secureHex = parseVbsQuotedAssign(cleaned, 'strSecureConnection');
+  const secure =
+    secureHex === ''
+      ? true
+      : parseVbsHexDword(secureHex, 1) !== 0;
+  const isPop = parseVbsBoolAssign(cleaned, 'boolPop', false);
+  let imapPort = parseVbsHexDword(
+    parseVbsQuotedAssign(cleaned, 'strServerMailPort'),
+    secure ? 993 : 143,
+  );
+  // PoreiaGo is IMAP-only — map POP SSL/plain ports to IMAP equivalents.
+  if (isPop || imapPort === 995 || imapPort === 110) {
+    imapPort = secure ? 993 : 143;
+  }
+  const smtpPort = parseVbsHexDword(
+    parseVbsQuotedAssign(cleaned, 'strServerSmtpPort'),
+    secure ? 465 : 587,
+  );
+  const password =
+    parseVbsQuotedAssign(cleaned, 'strPassword') ||
+    parseVbsQuotedAssign(cleaned, 'strMailPassword') ||
+    parseVbsQuotedAssign(cleaned, 'strAccountPassword');
+
+  const result = finalizeAccounts([
+    {
+      label: email,
+      email_address: email,
+      imap_host: imapHost,
+      imap_port: imapPort,
+      imap_secure: secure,
+      imap_mailbox: 'INBOX',
+      smtp_host: smtpHost,
+      smtp_port: smtpPort,
+      smtp_secure: secure,
+      mail_username: email,
+      mail_password: password,
+      is_active: true,
+    },
+  ]);
+  if (
+    result.accounts.length &&
+    result.accounts.every((a) => !a.mail_password) &&
+    !result.errors.some((e) => e.includes('κωδικός'))
+  ) {
+    result.errors.push(
+      'Το .vbs δεν περιλαμβάνει κωδικό — συμπληρώστε τον στη φόρμα και Αποθήκευση',
+    );
+  }
+  return result;
+}
+
 function bytesToBinaryString(bytes) {
   const chunk = 0x8000;
   let out = '';
@@ -470,6 +581,14 @@ export function parseEmailSettingsFile(text, filename = '') {
     }
   }
 
+  // cPanel Windows Live Mail Secure Email Setup (.vbs)
+  if (filenameSuggestsVbs(filename) || looksLikeCpanelVbs(cleaned)) {
+    const vbs = parseVbsEmailSettings(cleaned);
+    if (vbs.accounts.length || filenameSuggestsVbs(filename)) {
+      return vbs;
+    }
+  }
+
   // Prefer JSON when content is clearly JSON — even if named .env.prod.
   const asJson = tryParseJson(cleaned);
   if (asJson != null) {
@@ -491,7 +610,7 @@ export function parseEmailSettingsFile(text, filename = '') {
     return {
       accounts: [],
       errors: [
-        'Μη έγκυρο αρχείο — χρειάζεται .mobileconfig (Apple Secure Email), JSON ή .env με EMAIL + MAIL_HOST/SMTP_HOST. Όχι Word/PDF.',
+        'Μη έγκυρο αρχείο — χρειάζεται .mobileconfig / .vbs (cPanel Secure Email), JSON ή .env με EMAIL + MAIL_HOST/SMTP_HOST. Όχι Word/PDF.',
       ],
     };
   }
