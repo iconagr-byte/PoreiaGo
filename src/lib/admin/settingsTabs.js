@@ -9,7 +9,6 @@ export const TENANT_SETTINGS_TABS = [
   { id: 'homepage', label: 'Σχεδιασμός σελίδων', icon: 'web', section: 'office' },
   { id: 'domain', label: 'Domain', icon: 'language', section: 'office' },
   { id: 'users', label: 'Χρήστες', icon: 'group', section: 'office' },
-  { id: 'telematics', label: 'Telematics', icon: 'tune', section: 'office' },
 ];
 
 /** Settings relevant for a Rent-only office (no bus driver portal settings). */
@@ -22,7 +21,6 @@ export const RENT_ONLY_SETTINGS_TAB_IDS = new Set([
   'homepage',
   'domain',
   'users',
-  'telematics',
 ]);
 
 export const PLATFORM_OPERATOR_TABS = [

@@ -2,7 +2,6 @@ import PlatformSettingsPanel from './PlatformSettingsPanel.jsx';
 import PaymentManagementPanel from './PaymentManagementPanel.jsx';
 import FiscalSettingsPanel from './FiscalSettingsPanel.jsx';
 import SeatPricingPanel from './SeatPricingPanel.jsx';
-import TelemetrySettingsPanel from './TelemetrySettingsPanel.jsx';
 import UsersManagementPanel from './UsersManagementPanel.jsx';
 import BrandingPanel from './BrandingPanel.jsx';
 import HomepageSettingsPanel from './HomepageSettingsPanel.jsx';
@@ -75,7 +74,6 @@ export default function SettingsTabPanels({
     );
   }
   if (tab === 'users') return <UsersManagementPanel />;
-  if (tab === 'telematics') return <TelemetrySettingsPanel />;
 
   return null;
 }

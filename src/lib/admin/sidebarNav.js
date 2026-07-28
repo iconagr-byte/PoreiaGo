@@ -64,7 +64,6 @@ export const RENT_ONLY_SETTINGS_NAV_ORDER = [
   'settings_contracts',
   'settings_compliance',
   'settings_users',
-  'settings_telematics',
 ];
 
 export const RENT_ONLY_TAB_IDS = new Set([
@@ -74,7 +73,13 @@ export const RENT_ONLY_TAB_IDS = new Set([
 ]);
 
 /** Old single «Ενοικιάσεις» entry — replaced by rent desk subtabs. */
-export const LEGACY_NAV_IDS = new Set(['settings', 'payments', 'fleet_active_drivers', 'fleet_rental']);
+export const LEGACY_NAV_IDS = new Set([
+  'settings',
+  'payments',
+  'fleet_active_drivers',
+  'fleet_rental',
+  'settings_telematics',
+]);
 
 const PLATFORM_IDS = PLATFORM_NAV_IDS;
 const OFFICE_SETTINGS_IDS = TENANT_SETTINGS_TABS.map((t) => `settings_${t.id}`);
