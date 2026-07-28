@@ -7,7 +7,6 @@ import UsersManagementPanel from './UsersManagementPanel.jsx';
 import BrandingPanel from './BrandingPanel.jsx';
 import HomepageSettingsPanel from './HomepageSettingsPanel.jsx';
 import PartnerWebhooksPanel from './PartnerWebhooksPanel.jsx';
-import DriversHub from './DriversHub.jsx';
 import GdprCompliancePanel from './GdprCompliancePanel.jsx';
 import ContractsPanel from './ContractsPanel.jsx';
 import SuperAdminPanel from './SuperAdminPanel.jsx';
@@ -74,9 +73,6 @@ export default function SettingsTabPanels({
         <PartnerWebhooksPanel />
       </div>
     );
-  }
-  if (tab === 'drivers') {
-    return <DriversHub showPageHeader={false} />;
   }
   if (tab === 'users') return <UsersManagementPanel />;
   if (tab === 'telematics') return <TelemetrySettingsPanel />;
