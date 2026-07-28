@@ -1023,8 +1023,19 @@ export default function BackOffice() {
                     {trip.vehiclePlate && (
                       <span className="block text-xs font-mono text-gray-500">{trip.vehiclePlate}</span>
                     )}
+                    {Array.isArray(trip.additionalFleet) && trip.additionalFleet.length > 0 ? (
+                      <span className="block text-[11px] font-semibold text-teal-700 mt-0.5">
+                        +{trip.additionalFleet.length} επιπλέον λεωφορεί
+                        {trip.additionalFleet.length === 1 ? 'ο' : 'α'}
+                      </span>
+                    ) : null}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface">{trip.vehicleType}</td>
+                  <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface">
+                    {trip.vehicleType}
+                    {Array.isArray(trip.additionalFleet) && trip.additionalFleet.length > 0
+                      ? ` · ${1 + trip.additionalFleet.length} οχήματα`
+                      : ''}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <span className={`px-3 py-1 bg-surface-container text-on-surface rounded-full font-label-sm ${trip.availableSeats === 0 ? 'bg-error text-white' : ''}`}>
                       {trip.availableSeats}

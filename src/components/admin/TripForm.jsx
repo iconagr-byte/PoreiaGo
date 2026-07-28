@@ -611,7 +611,8 @@ export default function TripForm({
 
       <Section
         icon="badge"
-        title="Οδηγός & όχημα"
+        title="Οδηγοί & λεωφορεία"
+        hint="Προσθέστε όσα λεωφορεία χρειάζεται η εκδρομή — κάθε όχημα με τον οδηγό του."
         action={
           <Link
             to="/admin"
@@ -622,43 +623,136 @@ export default function TripForm({
           </Link>
         }
       >
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Οδηγός" className="sm:col-span-2">
-            <select
-              value={formData.driverId || ''}
-              onChange={(e) => handleDriverChange(e.target.value)}
-              className={fieldClass}
+        <div className="space-y-3">
+          <article className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Κύριο λεωφορείο
+              </p>
+              <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full">
+                #1
+              </span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Οδηγός" className="sm:col-span-2">
+                <select
+                  value={formData.driverId || ''}
+                  onChange={(e) => handleDriverChange(e.target.value)}
+                  className={fieldClass}
+                >
+                  <option value="">— Επιλέξτε οδηγό —</option>
+                  {assignableDrivers
+                    .filter((d) => d.id === formData.driverId || !usedDriverIds.has(d.id))
+                    .map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                        {d.license_plate ? ` · ${d.license_plate}` : ''}
+                        {d.status === 'on_leave' ? ' (άδεια)' : ''}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+              <Field label="Τύπος οχήματος">
+                <select
+                  value={formData.vehicleType}
+                  onChange={(e) => patch({ vehicleType: e.target.value })}
+                  className={fieldClass}
+                >
+                  {VEHICLE_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Πινακίδα">
+                <input
+                  type="text"
+                  value={formData.vehiclePlate || ''}
+                  onChange={(e) => patch({ vehiclePlate: e.target.value })}
+                  className={`${fieldClass} font-mono`}
+                  placeholder="π.χ. XAH-4021"
+                />
+              </Field>
+            </div>
+          </article>
+
+          {additionalFleet.map((row, index) => (
+            <article
+              key={`fleet-extra-${index}`}
+              className="rounded-xl border border-slate-200 bg-white p-4 space-y-3"
             >
-              <option value="">— Επιλέξτε οδηγό —</option>
-              {assignableDrivers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                  {d.license_plate ? ` · ${d.license_plate}` : ''}
-                  {d.status === 'on_leave' ? ' (άδεια)' : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Τύπος οχήματος">
-            <select
-              value={formData.vehicleType}
-              onChange={(e) => patch({ vehicleType: e.target.value })}
-              className={fieldClass}
-            >
-              <option value="Luxury Coach">Luxury Coach (50 θέσεις)</option>
-              <option value="Premium Express">Premium Express (30 θέσεις)</option>
-              <option value="VIP Minibus">VIP Minibus (15 θέσεις)</option>
-            </select>
-          </Field>
-          <Field label="Πινακίδα">
-            <input
-              type="text"
-              value={formData.vehiclePlate || ''}
-              onChange={(e) => patch({ vehiclePlate: e.target.value })}
-              className={`${fieldClass} font-mono`}
-              placeholder="π.χ. XAH-4021"
-            />
-          </Field>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Επιπλέον λεωφορείο
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                    #{index + 2}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeAdditionalFleet(index)}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Αφαίρεση
+                  </button>
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Οδηγός" className="sm:col-span-2">
+                  <select
+                    value={row.driverId || ''}
+                    onChange={(e) => assignAdditionalDriver(index, e.target.value)}
+                    className={fieldClass}
+                  >
+                    <option value="">— Επιλέξτε οδηγό —</option>
+                    {assignableDrivers
+                      .filter((d) => d.id === row.driverId || !usedDriverIds.has(d.id))
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                          {d.license_plate ? ` · ${d.license_plate}` : ''}
+                          {d.status === 'on_leave' ? ' (άδεια)' : ''}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                <Field label="Τύπος οχήματος">
+                  <select
+                    value={row.vehicleType || 'Luxury Coach'}
+                    onChange={(e) => updateAdditionalFleet(index, { vehicleType: e.target.value })}
+                    className={fieldClass}
+                  >
+                    {VEHICLE_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Πινακίδα">
+                  <input
+                    type="text"
+                    value={row.vehiclePlate || ''}
+                    onChange={(e) => updateAdditionalFleet(index, { vehiclePlate: e.target.value })}
+                    className={`${fieldClass} font-mono`}
+                    placeholder="π.χ. XAH-4021"
+                  />
+                </Field>
+              </div>
+            </article>
+          ))}
+
+          <button
+            type="button"
+            onClick={addFleetUnit}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-sm font-bold text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50"
+          >
+            <span className="material-symbols-outlined text-[18px]">add_circle</span>
+            Προσθήκη οδηγού & λεωφορείου
+          </button>
         </div>
       </Section>
 
