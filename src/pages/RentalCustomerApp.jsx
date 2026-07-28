@@ -9,6 +9,10 @@ import {
   logoutCustomer,
 } from '../lib/auth.js';
 import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
+import {
+  isRentMobileViewport,
+  subscribeRentMobileViewport,
+} from '../lib/rental/rentDevice.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { fetchCustomerRentalCatalog, fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
@@ -29,9 +33,18 @@ const TABS = [
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
+/** Mobile Rent app = Wallet-first (no fleet home gallery). */
+const MOBILE_TABS = TABS.filter((t) => t.id !== 'home');
+
 const HOME_CATEGORIES = ['', 'CAR', 'VAN', 'MINIBUS'];
 
 const PREFERRED_VEHICLE_ID_KEY = 'rent_preferred_vehicle_id_v1';
+
+function useRentMobile() {
+  const [mobile, setMobile] = useState(() => isRentMobileViewport());
+  useEffect(() => subscribeRentMobileViewport(setMobile), []);
+  return mobile;
+}
 
 function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const [brandName, setBrandName] = useState('Ενοικίαση');
@@ -222,14 +235,20 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
 function RentalAuthGate() {
   // Re-check auth after in-place login (same URL /rent).
   const location = useLocation();
-  const [showLogin, setShowLogin] = useState(false);
+  const isMobile = useRentMobile();
+  // Mobile app = Wallet entrance. Desktop guests may browse fleet first.
+  const [showLogin, setShowLogin] = useState(() => isRentMobileViewport());
   useEffect(() => setupRentalPwa(), []);
+
+  useEffect(() => {
+    if (isMobile) setShowLogin(true);
+  }, [isMobile]);
 
   if (isCustomer() && !getCustomerToken()) logoutCustomer();
 
   if (getCustomerToken()) return <RentalAuthenticatedApp key={location.key} />;
 
-  if (showLogin) return <LoginPage rentEntrance />;
+  if (showLogin || isMobile) return <LoginPage rentEntrance />;
 
   return (
     <RentalGuestPreviewApp
@@ -242,8 +261,12 @@ function RentalAuthGate() {
 }
 
 function RentalAuthenticatedApp() {
+  const isMobile = useRentMobile();
+  const navTabs = isMobile ? MOBILE_TABS : TABS;
   // Land in Rent Wallet after login/register — separate from bus My Wallet.
+  // Mobile app is Wallet-only home; desktop may open book if a fleet pick is pending.
   const [tab, setTab] = useState(() => {
+    if (isRentMobileViewport()) return 'wallet';
     try {
       return localStorage.getItem(PREFERRED_VEHICLE_ID_KEY) ? 'book' : 'wallet';
     } catch {
@@ -267,6 +290,11 @@ function RentalAuthenticatedApp() {
   });
 
   useEffect(() => setupRentalPwa(), []);
+
+  useEffect(() => {
+    // Mobile: never stay on fleet "home" — app surface is Wallet.
+    if (isMobile && tab === 'home') setTab('wallet');
+  }, [isMobile, tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -307,7 +335,9 @@ function RentalAuthenticatedApp() {
         if (cancelled) return;
         const sliced = withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 12);
         setHomeFleet(sliced);
-        // If user came from guest preview, preselect the chosen vehicle.
+        // Desktop: if user came from guest fleet pick, open booking.
+        // Mobile app stays on Wallet (fleet lives on the office homepage).
+        if (isRentMobileViewport()) return;
         try {
           const preferredId = localStorage.getItem(PREFERRED_VEHICLE_ID_KEY);
           if (preferredId) {
@@ -343,11 +373,15 @@ function RentalAuthenticatedApp() {
   }, []);
 
   return (
-    <div className="rent-phone-stage">
+    <div className={`rent-phone-stage${isMobile ? ' rent-phone-stage--mobile-wallet' : ''}`}>
       <div className="rent-app">
         {tab !== 'home' ? (
           <header className="rent-topbar">
-            <button type="button" className="rent-topbar-brand" onClick={() => setTab('home')}>
+            <button
+              type="button"
+              className="rent-topbar-brand"
+              onClick={() => setTab(isMobile ? 'wallet' : 'home')}
+            >
               {brandName}
             </button>
             <button type="button" className="rent-btn rent-btn-ghost" onClick={() => setTab('book')}>
@@ -357,7 +391,7 @@ function RentalAuthenticatedApp() {
         ) : null}
 
         <main className={tab === 'home' ? 'rent-home' : 'rent-main'}>
-          {tab === 'home' ? (
+          {tab === 'home' && !isMobile ? (
             <>
               <section className="rent-hero" aria-label="Ενοικίαση">
                 <p className="rent-hero-brand">{brandName}</p>
@@ -583,7 +617,7 @@ function RentalAuthenticatedApp() {
         </main>
 
         <nav className="rent-nav" aria-label="Ενοικίαση">
-          {TABS.map((t) => (
+          {navTabs.map((t) => (
             <button
               key={t.id}
               type="button"
