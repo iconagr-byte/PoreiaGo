@@ -409,10 +409,9 @@ export default function FleetRentalPanel({
         </div>
       </header>
 
+      <div className="rental-apple-body">
       <nav className="rental-apple-nav-wrap" aria-label="Μενού ενοικιάσεων">
-        <div className="rental-apple-nav-fade is-left" aria-hidden />
-        <div className="rental-apple-nav-fade is-right" aria-hidden />
-        <div className="rental-apple-nav" role="tablist">
+        <div className="rental-apple-nav" role="tablist" aria-orientation="vertical">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -425,12 +424,13 @@ export default function FleetRentalPanel({
               <span className="material-symbols-outlined" aria-hidden>
                 {t.icon}
               </span>
-              {t.label}
+              <span className="rental-apple-nav-label">{t.label}</span>
             </button>
           ))}
         </div>
       </nav>
 
+      <div className="rental-apple-main min-w-0 flex-1 space-y-4">
       {tab === 'clients' && (
         <div className="space-y-3">
           <div className="bg-white rounded-2xl border border-black/[0.06] p-4 flex flex-wrap items-end justify-between gap-3">
@@ -1348,6 +1348,8 @@ export default function FleetRentalPanel({
           </div>
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 }

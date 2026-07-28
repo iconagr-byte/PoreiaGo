@@ -137,13 +137,23 @@
   font-size: 1.1rem;
 }
 
-/* Segmented tab menu */
+/* Vertical left nav + content (desktop); horizontal scroll on small screens */
+.rental-apple-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: stretch;
+  min-height: 0;
+}
+
 .rental-apple-nav-wrap {
   position: relative;
+  flex-shrink: 0;
 }
 
 .rental-apple-nav {
   display: flex;
+  flex-direction: row;
   gap: 0.35rem;
   overflow-x: auto;
   padding: 0.4rem;
@@ -173,7 +183,7 @@
   min-height: 2.65rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -189,6 +199,11 @@
 .rental-apple-nav-btn .material-symbols-outlined {
   font-size: 1.2rem;
   opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.rental-apple-nav-label {
+  min-width: 0;
 }
 
 .rental-apple-nav-btn:hover {
@@ -213,48 +228,48 @@
   transform: scale(0.985);
 }
 
-.rental-apple-nav-fade {
-  pointer-events: none;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2.25rem;
-  z-index: 1;
+.rental-apple-main {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.rental-apple-nav-fade.is-left {
-  left: 0;
-  border-radius: 22px 0 0 22px;
-  background: linear-gradient(90deg, rgba(245, 245, 247, 0.95), transparent);
-}
+@media (min-width: 900px) {
+  .rental-apple-body {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 1rem;
+  }
 
-.rental-apple-nav-fade.is-right {
-  right: 0;
-  border-radius: 0 22px 22px 0;
-  background: linear-gradient(270deg, rgba(245, 245, 247, 0.95), transparent);
-}
+  .rental-apple-nav-wrap {
+    width: 12.75rem;
+    position: sticky;
+    top: 5.5rem;
+    align-self: flex-start;
+  }
 
-/* Soften nested white cards inside the shell */
-.rental-apple-shell .bg-white.rounded-2xl,
-.rental-apple-shell .rounded-2xl.bg-white {
-  background: rgba(255, 255, 255, 0.82) !important;
-  border-color: rgba(0, 0, 0, 0.06) !important;
-  backdrop-filter: blur(16px) saturate(1.25);
-  -webkit-backdrop-filter: blur(16px) saturate(1.25);
-  border-radius: 22px !important;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.03),
-    0 14px 36px rgba(15, 23, 42, 0.06);
-}
+  .rental-apple-nav {
+    flex-direction: column;
+    overflow-x: visible;
+    overflow-y: auto;
+    max-height: calc(100vh - 8rem);
+    padding: 0.45rem;
+    gap: 0.28rem;
+  }
 
-.rental-apple-shell input,
-.rental-apple-shell select,
-.rental-apple-shell textarea {
-  border-radius: 14px !important;
-}
+  .rental-apple-nav-btn {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.65rem 0.8rem;
+    min-height: 2.75rem;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.25;
+  }
 
-.rental-apple-shell .rounded-full {
-  letter-spacing: -0.01em;
+  .rental-apple-main {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 640px) {
