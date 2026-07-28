@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TemplatePicker from './homepage/TemplatePicker.jsx';
 import ThemeGallery from './homepage/ThemeGallery.jsx';
-import HomepageLivePreview from './homepage/HomepageLivePreview.jsx';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import {
   FOOTER_TEMPLATES,
@@ -557,19 +556,14 @@ export default function HomepageSettingsPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="lg:hidden">
-        <HomepageLivePreview form={form} />
-      </div>
-
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_min(360px,34%)] gap-6 items-start">
-        <div className="flex flex-col lg:flex-row gap-6 min-w-0">
+      <div className="flex flex-col lg:flex-row gap-6 min-w-0">
       <nav className="lg:w-56 shrink-0">
         <div className="lg:sticky lg:top-4 space-y-2">
           <div className="rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-700 text-white p-4 mb-4 shadow-lg shadow-violet-500/20">
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Διαμόρφωση</p>
             <p className="font-bold text-lg mt-0.5">Αρχική σελίδα</p>
             <p className="text-xs text-white/75 mt-2">
-              20 έτοιμα θέματα ή προσαρμογή κάθε τμήματος — με live preview δεξιά.
+              20 έτοιμα θέματα ή προσαρμογή κάθε τμήματος.
             </p>
             <Link
               to="/storefront?preview=1"
@@ -577,7 +571,7 @@ export default function HomepageSettingsPanel() {
               className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-2 rounded-full transition-colors"
             >
               <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-              Πλήρης προεπισκόπηση
+              Προεπισκόπηση σε νέο tab
             </Link>
           </div>
 
@@ -1118,13 +1112,6 @@ export default function HomepageSettingsPanel() {
           </form>
         )}
       </div>
-        </div>
-
-        <aside className="hidden xl:block">
-          <div className="sticky top-4">
-            <HomepageLivePreview form={form} />
-          </div>
-        </aside>
       </div>
     </div>
   );
