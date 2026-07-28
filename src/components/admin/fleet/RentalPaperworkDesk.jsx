@@ -35,6 +35,8 @@ export default function RentalPaperworkDesk({
   initialBookingId = null,
   onOpenCheckIn,
   onConsumedFocus,
+  onBookingUpdated,
+  onToast,
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('ALL');
@@ -94,6 +96,8 @@ export default function RentalPaperworkDesk({
         officeName={officeName}
         onClose={() => setSelectedId(null)}
         onOpenCheckIn={onOpenCheckIn}
+        onBookingUpdated={onBookingUpdated}
+        onToast={onToast}
       />
     );
   }
@@ -111,8 +115,8 @@ export default function RentalPaperworkDesk({
         <div>
           <h3 className="font-bold text-gray-900">Χαρτούρα κρατήσεων</h3>
           <p className="text-sm text-gray-500 mt-1 max-w-xl">
-            Συμβόλαια ενοικίασης, υπογραφές check-in/out και εκτυπώσιμη χαρτούρα — για αυτόνομο
-            γραφείο ενοικιάσεων χωρίς λεωφορεία.
+            Νομικό πακέτο (σύμβαση, άδεια, ασφάλιση, εγγύηση, GDPR, όροι) + πρωτόκολλα
+            παραλαβής/επιστροφής — έτοιμα για υπογραφή και εκτύπωση.
           </p>
           <p className="text-xs text-gray-400 mt-2">
             Εκκρεμούν υπογραφές: {pendingCount} · Πλήρεις φάκελοι: {completeCount}
@@ -159,8 +163,8 @@ export default function RentalPaperworkDesk({
           <div className="p-6 space-y-1">
             <p className="text-sm font-bold text-gray-800">Δεν υπάρχουν φάκελοι σε αυτό το φίλτρο</p>
             <p className="text-sm text-gray-500">
-              Οι κρατήσεις εμφανίζονται εδώ αυτόματα. Η υπογραφή γίνεται στο Check-in / out και
-              επισυνάπτεται στη σύμβαση.
+              Οι κρατήσεις εμφανίζονται εδώ αυτόματα. Ανοίξτε τον φάκελο για να υπογράψει ο πελάτης
+              όλα τα νομικά έντυπα· το Check-in / out καλύπτει τα πρωτόκολλα παραλαβής/επιστροφής.
             </p>
           </div>
         ) : (
@@ -197,6 +201,9 @@ export default function RentalPaperworkDesk({
                       Επιστροφή ✓
                     </span>
                   ) : null}
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-black/[0.04]">
+                    Νομικά {paper.legal?.signedCount ?? 0}/{paper.legal?.total ?? 8}
+                  </span>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -205,7 +212,7 @@ export default function RentalPaperworkDesk({
                   className="px-3 py-1.5 rounded-xl bg-teal-700 text-white text-xs font-bold"
                   onClick={() => setSelectedId(b.id)}
                 >
-                  Άνοιγμα σύμβασης
+                  Άνοιγμα φακέλου
                 </button>
                 {!paper.pickupSigned && onOpenCheckIn ? (
                   <button

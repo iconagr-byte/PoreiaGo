@@ -532,6 +532,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "driver_mode": driver_mode,
             "assigned_driver_id": (str(body.get("assigned_driver_id") or "").strip() or None),
             "notes": (str(body.get("notes") or "").strip() or None),
+            "legal_doc_signatures": {},
             "created_at": now,
             "updated_at": now,
             "vehicle_plate": vehicle.get("plate_number"),
@@ -602,6 +603,58 @@ def update_booking_status(tenant_id: str | None, booking_id: str, status: str) -
             elif st == "ACTIVE":
                 vehicle["current_status"] = "RENTED"
             vehicle["updated_at"] = _now()
+        _write(data)
+        return deepcopy(booking)
+
+
+_LEGAL_DOC_IDS = frozenset(
+    {
+        "agreement",
+        "license_decl",
+        "insurance_ack",
+        "deposit",
+        "gdpr",
+        "terms",
+    }
+)
+
+
+def save_legal_doc_signature(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    doc_id: str,
+    signature_url: str,
+    signer_name: str | None = None,
+) -> dict[str, Any]:
+    """Attach a customer signature to a booking legal document (non-inspection docs)."""
+    tid = _normalize_tenant(tenant_id)
+    doc = str(doc_id or "").strip()
+    url = str(signature_url or "").strip()
+    if doc not in _LEGAL_DOC_IDS:
+        raise ValueError("Μη έγκυρο νομικό έγγραφο")
+    if not url:
+        raise ValueError("Απαιτείται υπογραφή")
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == booking_id),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        if booking.get("rental_status") == "CANCELLED":
+            raise ValueError("Η κράτηση είναι ακυρωμένη")
+        sigs = booking.get("legal_doc_signatures")
+        if not isinstance(sigs, dict):
+            sigs = {}
+        sigs[doc] = {
+            "signature_url": url,
+            "signed_at": _now(),
+            "signer_name": (str(signer_name or "").strip() or booking.get("client_name") or None),
+        }
+        booking["legal_doc_signatures"] = sigs
+        booking["updated_at"] = _now()
         _write(data)
         return deepcopy(booking)
 

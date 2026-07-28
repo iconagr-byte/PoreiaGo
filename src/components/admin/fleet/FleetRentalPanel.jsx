@@ -1210,6 +1210,14 @@ export default function FleetRentalPanel({
           initialBookingId={paperworkFocusId}
           onOpenCheckIn={openPaperworkCheckIn}
           onConsumedFocus={() => setPaperworkFocusId(null)}
+          onBookingUpdated={(updated) => {
+            if (!updated?.id) return;
+            setBookings((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
+          }}
+          onToast={(kind, message) => {
+            if (kind === 'error') toast.error(message);
+            else toast.success(message);
+          }}
         />
       )}
 

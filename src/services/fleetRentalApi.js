@@ -125,6 +125,18 @@ export async function updateRentalBookingStatus(id, rentalStatus) {
   });
 }
 
+/** Attach signature to a legal paperwork document on a booking. */
+export async function saveRentalLegalDocSignature(bookingId, { docId, signatureUrl, signerName }) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/legal-docs`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      doc_id: docId,
+      signature_url: signatureUrl,
+      signer_name: signerName || undefined,
+    }),
+  });
+}
+
 export async function fetchRentalCalendar(days = 30) {
   const data = await rentalFetch(`/calendar?days=${days}`);
   return data.blocks || [];

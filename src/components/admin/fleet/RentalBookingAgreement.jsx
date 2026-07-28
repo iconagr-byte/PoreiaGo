@@ -1,11 +1,14 @@
 /**
- * Printable rental agreement / paperwork sheet for a booking.
+ * Printable rental agreement / paperwork sheet for a booking — includes legal doc pack.
  */
+import { useEffect, useState } from 'react';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
 import {
-  RENTAL_AGREEMENT_TERMS,
-  paperworkStatusForBooking,
-} from '../../../lib/rental/rentalPaperwork.js';
+  legalDocById,
+  legalPackProgress,
+} from '../../../lib/rental/rentalLegalDocs.js';
+import { paperworkStatusForBooking } from '../../../lib/rental/rentalPaperwork.js';
+import RentalLegalDocPack from './RentalLegalDocPack.jsx';
 
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
@@ -37,31 +40,48 @@ function statusEl(status) {
 }
 
 export default function RentalBookingAgreement({
-  booking,
+  booking: bookingProp,
   vehicle,
   inspections = [],
   officeName = 'Γραφείο ενοικιάσεων',
   onClose,
   onOpenCheckIn,
+  onBookingUpdated,
+  onToast,
 }) {
+  const [booking, setBooking] = useState(bookingProp);
+  useEffect(() => {
+    setBooking(bookingProp);
+  }, [bookingProp]);
   if (!booking) return null;
 
   const paper = paperworkStatusForBooking(booking, inspections);
+  const legal = legalPackProgress(booking, inspections);
   const plate = booking.vehicle_plate || vehicle?.plate_number || '—';
   const model = booking.vehicle_model || vehicle?.model || '—';
   const category = booking.vehicle_category || vehicle?.category || '—';
+  const agreementDoc = legalDocById('agreement');
 
   const print = () => {
     window.print();
+  };
+
+  const handleUpdated = (updated) => {
+    if (updated?.id) setBooking(updated);
+    onBookingUpdated?.(updated);
   };
 
   return (
     <div className="rental-agreement-sheet space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
-          <h3 className="font-bold text-gray-900 text-lg">Σύμβαση ενοικίασης</h3>
+          <h3 className="font-bold text-gray-900 text-lg">Φάκελος χαρτούρας</h3>
           <p className="text-sm text-gray-500 mt-0.5">
-            Χαρτούρα κράτησης · εκτύπωση ή αποθήκευση ως PDF από τον εκτυπωτή του προγράμματος περιήγησης
+            Νομικό πακέτο έτοιμο για υπογραφή · εκτύπωση ή PDF από τον εκτυπωτή του προγράμματος
+            περιήγησης
+          </p>
+          <p className="text-xs text-teal-800 font-semibold mt-1">
+            Νομικά {legal.signedCount}/{legal.total} · {paper.statusLabel}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -71,7 +91,7 @@ export default function RentalBookingAgreement({
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-700 text-white text-sm font-bold hover:bg-teal-800"
           >
             <span className="material-symbols-outlined text-[18px]">print</span>
-            Εκτύπωση / PDF
+            Εκτύπωση πακέτου / PDF
           </button>
           {!paper.pickupSigned && onOpenCheckIn ? (
             <button
@@ -151,14 +171,18 @@ export default function RentalBookingAgreement({
           </div>
         </section>
 
-        <section>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">Όροι</p>
-          <ol className="list-decimal pl-5 space-y-1.5 text-sm text-gray-700 leading-relaxed">
-            {RENTAL_AGREEMENT_TERMS.map((term) => (
-              <li key={term}>{term}</li>
-            ))}
-          </ol>
-        </section>
+        {agreementDoc ? (
+          <section>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+              Βασικοί όροι σύμβασης
+            </p>
+            <ol className="list-decimal pl-5 space-y-1.5 text-sm text-gray-700 leading-relaxed">
+              {agreementDoc.clauses.map((term) => (
+                <li key={term.slice(0, 40)}>{term}</li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
 
         <section className="grid sm:grid-cols-2 gap-4">
           <SignatureBlock
@@ -178,6 +202,15 @@ export default function RentalBookingAgreement({
           <span>{officeName}</span>
         </footer>
       </article>
+
+      <RentalLegalDocPack
+        booking={booking}
+        inspections={inspections}
+        officeName={officeName}
+        onBookingUpdated={handleUpdated}
+        onOpenCheckIn={onOpenCheckIn}
+        onToast={onToast}
+      />
     </div>
   );
 }

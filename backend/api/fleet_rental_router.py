@@ -81,6 +81,12 @@ class BookingStatusBody(BaseModel):
     rental_status: str
 
 
+class LegalDocSignatureBody(BaseModel):
+    doc_id: str = Field(min_length=2, max_length=64)
+    signature_url: str = Field(min_length=4, max_length=500)
+    signer_name: str | None = Field(default=None, max_length=160)
+
+
 class InspectionBody(BaseModel):
     rental_booking_id: str
     inspection_type: str
@@ -227,6 +233,29 @@ async def patch_booking_status(
 ):
     try:
         row = store.update_booking_status(_tid(tenant_id), booking_id, body.rental_status)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return row
+
+
+@router.patch("/bookings/{booking_id}/legal-docs")
+async def patch_booking_legal_doc(
+    booking_id: str,
+    body: LegalDocSignatureBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Save customer signature on a rental legal document (σύμβαση, GDPR, κ.λπ.)."""
+    try:
+        row = store.save_legal_doc_signature(
+            _tid(tenant_id),
+            booking_id,
+            doc_id=body.doc_id,
+            signature_url=body.signature_url,
+            signer_name=body.signer_name,
+        )
     except ValueError as exc:
         msg = str(exc)
         code = 404 if "δεν βρέθηκε" in msg else 400
