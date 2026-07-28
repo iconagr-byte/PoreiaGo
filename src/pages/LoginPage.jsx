@@ -363,11 +363,67 @@ export default function LoginPage({ rentEntrance = false } = {}) {
     <div className={`wallet-auth-stage${isMobile ? '' : ' wallet-auth-stage--desktop'}`}>
       <div className="wallet-auth-shell">
         <div className="wallet-auth-scroll">
-          <div className="wallet-auth-card">{formBody}</div>
-          <Link to="/" className="wallet-auth-back">
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Επιστροφή στην Αρχική
-          </Link>
+          {!isMobile ? (
+            <aside className="wallet-auth-aside" aria-label="Σχετικά με το My Wallet">
+              <p className="wallet-auth-aside-kicker">My Wallet</p>
+              <h2 className="wallet-auth-aside-title">
+                Τα εισιτήριά σας,<br />πάντα στο κινητό
+              </h2>
+              <p className="wallet-auth-aside-lead">
+                Συνδεθείτε για να δείτε κρατήσεις λεωφορείου, QR επιβίβασης και ιστορικό ταξιδιών —
+                σε έναν ασφαλή λογαριασμό στον server.
+              </p>
+              <ul className="wallet-auth-aside-list">
+                <li>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    qr_code_2
+                  </span>
+                  <div>
+                    <strong>QR επιβίβασης</strong>
+                    <span>Ανοίξτε το εισιτήριο χωρίς email ή PDF.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    confirmation_number
+                  </span>
+                  <div>
+                    <strong>Όλες οι κρατήσεις</strong>
+                    <span>Προσεχή και παλαιά ταξίδια σε μία λίστα.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    notifications_active
+                  </span>
+                  <div>
+                    <strong>Ενημερώσεις διαδρομής</strong>
+                    <span>Ειδοποιήσεις για αλλαγές και υπενθυμίσεις.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    lock
+                  </span>
+                  <div>
+                    <strong>Ασφαλής λογαριασμός</strong>
+                    <span>Τα δεδομένα μένουν στο γραφείο σας, όχι μόνο στη συσκευή.</span>
+                  </div>
+                </li>
+              </ul>
+              <p className="wallet-auth-aside-note">
+                Η ενοικίαση οχήματος γίνεται στην εφαρμογή <strong>Rent</strong> (πράσινο) — χωριστά
+                από το My Wallet.
+              </p>
+            </aside>
+          ) : null}
+          <div className="wallet-auth-panel">
+            <div className="wallet-auth-card">{formBody}</div>
+            <Link to="/" className="wallet-auth-back">
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              Επιστροφή στην Αρχική
+            </Link>
+          </div>
         </div>
       </div>
     </div>
