@@ -118,6 +118,31 @@ except ImportError as exc:
     ws_telemetry_router = None
 
 try:
+    from api.email_settings_router import router as email_settings_router
+except ImportError:
+    email_settings_router = None
+
+try:
+    from api.email_campaigns_router import router as email_campaigns_router
+except ImportError:
+    email_campaigns_router = None
+
+try:
+    from api.email_mailbox_router import router as email_mailbox_router
+except ImportError:
+    email_mailbox_router = None
+
+try:
+    from api.email_tracking_router import router as email_tracking_router
+except ImportError:
+    email_tracking_router = None
+
+try:
+    from api.email_retry_router import router as email_retry_router
+except ImportError:
+    email_retry_router = None
+
+try:
     from travel_platform.telemetry.eta_intelligence import start_eta_refresh_loop
     from travel_platform.telemetry.processor import get_live_fleet, process_telemetry_payload
     from travel_platform.telemetry.queue import start_consumer
@@ -138,6 +163,24 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         __import__("logging").getLogger("poreiago.startup").warning(
             "Lost-items seed skipped: %s", exc
+        )
+    try:
+        from email_client.store import init_email_client_tables
+        from email_marketing.store import init_email_marketing_tables
+
+        await init_email_marketing_tables()
+        await init_email_client_tables()
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Email client/marketing tables skipped: %s", exc
+        )
+    try:
+        from email_client.sync_worker import start_imap_sync_worker
+
+        start_imap_sync_worker()
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "IMAP sync worker skipped: %s", exc
         )
     try:
         from travel_platform.notifications.web_push_service import ensure_web_push_keys
@@ -214,6 +257,12 @@ async def lifespan(app: FastAPI):
         apply_telemetry_settings_to_services()
         await start_eta_refresh_loop(get_live_fleet())
     yield
+    try:
+        from email_client.sync_worker import stop_imap_sync_worker
+
+        await stop_imap_sync_worker()
+    except Exception:
+        pass
     await close_ticketing_db()
 
 
@@ -310,6 +359,16 @@ except ImportError:
     fleet_rental_router = None
 if fleet_rental_router:
     app.include_router(fleet_rental_router)
+if email_settings_router:
+    app.include_router(email_settings_router)
+if email_campaigns_router:
+    app.include_router(email_campaigns_router)
+if email_mailbox_router:
+    app.include_router(email_mailbox_router)
+if email_tracking_router:
+    app.include_router(email_tracking_router)
+if email_retry_router:
+    app.include_router(email_retry_router)
 
 
 class ConnectionManager:
