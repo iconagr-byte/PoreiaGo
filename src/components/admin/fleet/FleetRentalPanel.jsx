@@ -29,6 +29,9 @@ import RentalSignaturePad from './RentalSignaturePad.jsx';
 import RentalCalendarBoard from './RentalCalendarBoard.jsx';
 import RentAppShareBanner from './RentAppShareBanner.jsx';
 import RentPlanCardsEditor from './RentPlanCardsEditor.jsx';
+import RentalPaperworkDesk from './RentalPaperworkDesk.jsx';
+import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
+import { fetchSiteAppearance } from '../../../services/siteAppearanceApi.js';
 import '../../../styles/rental-admin-apple.css';
 
 const CATEGORIES = [
@@ -40,13 +43,14 @@ const CATEGORIES = [
 const TABS = [
   { id: 'clients', label: 'Πελάτες', icon: 'groups' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
+  { id: 'paperwork', label: 'Χαρτούρα', icon: 'description' },
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard' },
   { id: 'vehicles', label: 'Στόλος', icon: 'directions_car' },
   { id: 'wizard', label: 'Νέα κράτηση', icon: 'add_circle' },
   { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
   { id: 'inspections', label: 'Check-in / out', icon: 'fact_check' },
   { id: 'live_gps', label: 'Ζωντανά GPS', icon: 'my_location' },
-  { id: 'plans', label: 'Συμβόλαια Rent', icon: 'sell' },
+  { id: 'plans', label: 'Κάρτες τιμών', icon: 'sell' },
 ];
 
 function bookingSource(b) {
@@ -151,6 +155,36 @@ export default function FleetRentalPanel({
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingSignature, setUploadingSignature] = useState(false);
   const [signaturePadKey, setSignaturePadKey] = useState(0);
+  const [officeName, setOfficeName] = useState('Γραφείο ενοικιάσεων');
+  const [paperworkFocusId, setPaperworkFocusId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSiteAppearance()
+      .then((appearance) => {
+        if (cancelled) return;
+        const brand = resolveOfficeBrand(appearance || {});
+        if (brand?.name) setOfficeName(brand.name);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const openPaperworkCheckIn = (bookingId, inspectionType = 'PICKUP_CHECK') => {
+    setInsp((s) => ({
+      ...s,
+      rental_booking_id: bookingId,
+      inspection_type: inspectionType,
+    }));
+    setTab('inspections');
+  };
+
+  const openPaperwork = (bookingId) => {
+    setPaperworkFocusId(bookingId || null);
+    setTab('paperwork');
+  };
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -394,8 +428,8 @@ export default function FleetRentalPanel({
             <div className="min-w-0">
               <h2 className="rental-apple-title">Ενοικιάσεις</h2>
               <p className="rental-apple-subtitle">
-                Στόλος, κρατήσεις γραφείου &amp; Wallet, check-in/out, υπογραφή και ζωντανό GPS —
-                όλα σε μία οθόνη.
+                Στόλος, κρατήσεις, χαρτούρα συμβολαίων, check-in/out με υπογραφή και ζωντανό GPS —
+                πλήρες αυτόνομο γραφείο ενοικιάσεων.
               </p>
             </div>
           </div>
@@ -568,11 +602,12 @@ export default function FleetRentalPanel({
             {[
               { id: 'clients', label: 'Πελάτες ενοικίασης', copy: `${clients.length} πελάτες · γραφείο + Wallet`, icon: 'groups' },
               { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
+              { id: 'paperwork', label: 'Χαρτούρα συμβολαίων', copy: 'Συμβάσεις · υπογραφές · εκτύπωση PDF', icon: 'description' },
               { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
               { id: 'live_gps', label: 'Ζωντανά GPS', copy: `${overlays.length} ενεργά για χάρτη`, icon: 'my_location' },
-              { id: 'plans', label: 'Συμβόλαια Rent', copy: 'Επεξεργασία καρτών /grafeia', icon: 'sell' },
+              { id: 'plans', label: 'Κάρτες τιμών', copy: 'Τιμές marketing στη σελίδα /grafeia', icon: 'sell' },
             ].map((hub) => (
               <button
                 key={hub.id}
@@ -1040,6 +1075,13 @@ export default function FleetRentalPanel({
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-teal-800"
+                      onClick={() => openPaperwork(b.id)}
+                    >
+                      Χαρτούρα
+                    </button>
                     {b.rental_status === 'CONFIRMED' ? (
                       <>
                         <button
@@ -1152,6 +1194,19 @@ export default function FleetRentalPanel({
       )}
 
       {tab === 'plans' && <RentPlanCardsEditor />}
+
+      {tab === 'paperwork' && (
+        <RentalPaperworkDesk
+          bookings={bookings}
+          vehicles={vehicles}
+          inspections={inspections}
+          loading={loading}
+          officeName={officeName}
+          initialBookingId={paperworkFocusId}
+          onOpenCheckIn={openPaperworkCheckIn}
+          onConsumedFocus={() => setPaperworkFocusId(null)}
+        />
+      )}
 
       {tab === 'calendar' && (
         <RentalCalendarBoard
