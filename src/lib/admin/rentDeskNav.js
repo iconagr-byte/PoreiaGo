@@ -6,13 +6,14 @@
 export const RENT_DESK_TABS = [
   { id: 'clients', label: 'Πελάτες', icon: 'groups' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
+  { id: 'paperwork', label: 'Χαρτούρα', icon: 'description' },
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard' },
   { id: 'vehicles', label: 'Στόλος', icon: 'directions_car' },
   { id: 'wizard', label: 'Νέα κράτηση', icon: 'add_circle' },
   { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
   { id: 'inspections', label: 'Check-in / out', icon: 'fact_check' },
   { id: 'live_gps', label: 'Ζωντανά GPS', icon: 'my_location' },
-  { id: 'plans', label: 'Συμβόλαια Rent', icon: 'sell' },
+  { id: 'plans', label: 'Κάρτες τιμών', icon: 'sell' },
 ];
 
 export const DEFAULT_RENT_DESK_TAB = 'clients';
