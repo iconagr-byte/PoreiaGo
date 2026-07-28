@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
-import { fetchFleetDrivers } from '../../services/platformApi.js';
+import { createFleetDriver, fetchFleetDrivers } from '../../services/platformApi.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -87,6 +87,112 @@ function Field({ label, hint, children, className = '' }) {
   );
 }
 
+/** Minimal inline create — name only (optional phone / plate). */
+function QuickAddDriverPanel({ onCreated, onCancel }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [plate, setPlate] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    const clean = name.trim();
+    if (clean.length < 2) {
+      toast.error('Γράψτε το όνομα του οδηγού');
+      return;
+    }
+    setBusy(true);
+    try {
+      const stamp = Date.now().toString(36).slice(-6);
+      const slug =
+        clean
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '')
+          .slice(0, 14) || 'driver';
+      const created = await createFleetDriver({
+        name: clean,
+        license_no: `TMP${stamp}`.toUpperCase().slice(0, 12),
+        phone: phone.trim(),
+        email: `${slug}.${stamp}@drivers.poreiago.com`,
+        status: 'active',
+        license_plate: plate.trim() || null,
+        vehicle_code: plate.trim() || null,
+        password: 'driver123',
+        hiring_date: new Date().toISOString().slice(0, 10),
+      });
+      toast.success('Ο οδηγός προστέθηκε — μπορείτε να συμπληρώσετε στοιχεία αργότερα στους Οδηγούς');
+      onCreated?.(created);
+      setName('');
+      setPhone('');
+      setPlate('');
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία δημιουργίας οδηγού');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-3 space-y-3">
+      <p className="text-xs font-bold text-teal-900">Νέος οδηγός (μόνο όνομα αρκεί)</p>
+      <div className="grid sm:grid-cols-3 gap-2">
+        <input
+          className={fieldClass}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Όνομα επώνυμο *"
+          autoFocus
+          minLength={2}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <input
+          className={fieldClass}
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Τηλέφωνο (προαιρετικό)"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.preventDefault();
+          }}
+        />
+        <input
+          className={`${fieldClass} font-mono`}
+          value={plate}
+          onChange={(e) => setPlate(e.target.value)}
+          placeholder="Πινακίδα (προαιρετικό)"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.preventDefault();
+          }}
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={submit}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-700 text-white text-xs font-bold disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">person_add</span>
+          {busy ? 'Αποθήκευση…' : 'Προσθήκη οδηγού'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-2 rounded-xl border text-xs font-bold text-slate-600"
+        >
+          Άκυρο
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function TripForm({
   formData,
   setFormData,
@@ -101,6 +207,7 @@ export default function TripForm({
   const [drivers, setDrivers] = useState([]);
   const [coverUploading, setCoverUploading] = useState(false);
   const [highlightDraft, setHighlightDraft] = useState('');
+  const [quickAddFor, setQuickAddFor] = useState(null); // 'primary' | number index | null
 
   useEffect(() => {
     fetchFleetDrivers().then(setDrivers);
@@ -123,12 +230,12 @@ export default function TripForm({
   const isInternational = formData.market === MARKET_INTERNATIONAL;
   const isDraft = formData.status === 'draft';
 
-  const handleDriverChange = (driverId) => {
+  const handleDriverChange = (driverId, list = drivers) => {
     if (!driverId) {
       patch({ driverId: '', driverName: '', vehiclePlate: '', vehicleCode: '' });
       return;
     }
-    const driver = drivers.find((d) => d.id === driverId);
+    const driver = list.find((d) => d.id === driverId);
     if (!driver) return;
     patch({
       driverId: driver.id,
@@ -144,6 +251,31 @@ export default function TripForm({
 
   const addFleetUnit = () => {
     setAdditionalFleet([...additionalFleet, emptyFleetRow()]);
+    setQuickAddFor(additionalFleet.length);
+  };
+
+  const onQuickDriverCreated = async (created, target) => {
+    let list = drivers;
+    try {
+      list = await fetchFleetDrivers();
+    } catch {
+      /* keep current list */
+    }
+    if (created?.id && !list.some((d) => d.id === created.id)) {
+      list = [...list, created];
+    }
+    setDrivers(list);
+    const id = created?.id;
+    if (!id) {
+      setQuickAddFor(null);
+      return;
+    }
+    if (target === 'primary') {
+      handleDriverChange(id, list);
+    } else if (typeof target === 'number') {
+      assignAdditionalDriver(target, id, list);
+    }
+    setQuickAddFor(null);
   };
 
   const updateAdditionalFleet = (index, partial) => {
@@ -152,7 +284,7 @@ export default function TripForm({
     );
   };
 
-  const assignAdditionalDriver = (index, driverId) => {
+  const assignAdditionalDriver = (index, driverId, list = drivers) => {
     if (!driverId) {
       updateAdditionalFleet(index, {
         driverId: '',
@@ -162,7 +294,7 @@ export default function TripForm({
       });
       return;
     }
-    const driver = drivers.find((d) => d.id === driverId);
+    const driver = list.find((d) => d.id === driverId);
     if (!driver) return;
     updateAdditionalFleet(index, {
       driverId: driver.id,
@@ -612,7 +744,7 @@ export default function TripForm({
       <Section
         icon="badge"
         title="Οδηγοί & λεωφορεία"
-        hint="Προσθέστε όσα λεωφορεία χρειάζεται η εκδρομή — κάθε όχημα με τον οδηγό του."
+        hint="Προσθέστε οδηγό με ένα όνομα — το λεωφορείο είναι προαιρετικό."
         action={
           <Link
             to="/admin"
@@ -627,32 +759,52 @@ export default function TripForm({
           <article className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Κύριο λεωφορείο
+                Κύριος οδηγός
               </p>
               <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full">
                 #1
               </span>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
-              <Field label="Οδηγός" className="sm:col-span-2">
-                <select
-                  value={formData.driverId || ''}
-                  onChange={(e) => handleDriverChange(e.target.value)}
-                  className={fieldClass}
-                >
-                  <option value="">— Επιλέξτε οδηγό —</option>
-                  {assignableDrivers
-                    .filter((d) => d.id === formData.driverId || !usedDriverIds.has(d.id))
-                    .map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                        {d.license_plate ? ` · ${d.license_plate}` : ''}
-                        {d.status === 'on_leave' ? ' (άδεια)' : ''}
-                      </option>
-                    ))}
-                </select>
-              </Field>
-              <Field label="Τύπος οχήματος">
+              <div className="sm:col-span-2 space-y-2">
+                <Field label="Οδηγός">
+                  <select
+                    value={formData.driverId || ''}
+                    onChange={(e) => {
+                      handleDriverChange(e.target.value);
+                      setQuickAddFor(null);
+                    }}
+                    className={fieldClass}
+                  >
+                    <option value="">— Επιλέξτε οδηγό —</option>
+                    {assignableDrivers
+                      .filter((d) => d.id === formData.driverId || !usedDriverIds.has(d.id))
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                          {d.license_plate ? ` · ${d.license_plate}` : ''}
+                          {d.status === 'on_leave' ? ' (άδεια)' : ''}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                {quickAddFor === 'primary' ? (
+                  <QuickAddDriverPanel
+                    onCreated={(created) => onQuickDriverCreated(created, 'primary')}
+                    onCancel={() => setQuickAddFor(null)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setQuickAddFor('primary')}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-900"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">person_add</span>
+                    + Νέος οδηγός
+                  </button>
+                )}
+              </div>
+              <Field label="Τύπος οχήματος" hint="Προαιρετικό">
                 <select
                   value={formData.vehicleType}
                   onChange={(e) => patch({ vehicleType: e.target.value })}
@@ -665,7 +817,7 @@ export default function TripForm({
                   ))}
                 </select>
               </Field>
-              <Field label="Πινακίδα">
+              <Field label="Πινακίδα" hint="Προαιρετικό">
                 <input
                   type="text"
                   value={formData.vehiclePlate || ''}
@@ -684,7 +836,7 @@ export default function TripForm({
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Επιπλέον λεωφορείο
+                  Επιπλέον οδηγός
                 </p>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -692,7 +844,12 @@ export default function TripForm({
                   </span>
                   <button
                     type="button"
-                    onClick={() => removeAdditionalFleet(index)}
+                    onClick={() => {
+                      removeAdditionalFleet(index);
+                      setQuickAddFor((cur) =>
+                        cur === index ? null : typeof cur === 'number' && cur > index ? cur - 1 : cur,
+                      );
+                    }}
                     className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700"
                   >
                     <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -701,25 +858,45 @@ export default function TripForm({
                 </div>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
-                <Field label="Οδηγός" className="sm:col-span-2">
-                  <select
-                    value={row.driverId || ''}
-                    onChange={(e) => assignAdditionalDriver(index, e.target.value)}
-                    className={fieldClass}
-                  >
-                    <option value="">— Επιλέξτε οδηγό —</option>
-                    {assignableDrivers
-                      .filter((d) => d.id === row.driverId || !usedDriverIds.has(d.id))
-                      .map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                          {d.license_plate ? ` · ${d.license_plate}` : ''}
-                          {d.status === 'on_leave' ? ' (άδεια)' : ''}
-                        </option>
-                      ))}
-                  </select>
-                </Field>
-                <Field label="Τύπος οχήματος">
+                <div className="sm:col-span-2 space-y-2">
+                  <Field label="Οδηγός">
+                    <select
+                      value={row.driverId || ''}
+                      onChange={(e) => {
+                        assignAdditionalDriver(index, e.target.value);
+                        setQuickAddFor(null);
+                      }}
+                      className={fieldClass}
+                    >
+                      <option value="">— Επιλέξτε οδηγό —</option>
+                      {assignableDrivers
+                        .filter((d) => d.id === row.driverId || !usedDriverIds.has(d.id))
+                        .map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                            {d.license_plate ? ` · ${d.license_plate}` : ''}
+                            {d.status === 'on_leave' ? ' (άδεια)' : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                  {quickAddFor === index ? (
+                    <QuickAddDriverPanel
+                      onCreated={(created) => onQuickDriverCreated(created, index)}
+                      onCancel={() => setQuickAddFor(null)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setQuickAddFor(index)}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-900"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">person_add</span>
+                      + Νέος οδηγός
+                    </button>
+                  )}
+                </div>
+                <Field label="Τύπος οχήματος" hint="Προαιρετικό">
                   <select
                     value={row.vehicleType || 'Luxury Coach'}
                     onChange={(e) => updateAdditionalFleet(index, { vehicleType: e.target.value })}
@@ -732,7 +909,7 @@ export default function TripForm({
                     ))}
                   </select>
                 </Field>
-                <Field label="Πινακίδα">
+                <Field label="Πινακίδα" hint="Προαιρετικό">
                   <input
                     type="text"
                     value={row.vehiclePlate || ''}
@@ -750,8 +927,8 @@ export default function TripForm({
             onClick={addFleetUnit}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-sm font-bold text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50"
           >
-            <span className="material-symbols-outlined text-[18px]">add_circle</span>
-            Προσθήκη οδηγού & λεωφορείου
+            <span className="material-symbols-outlined text-[18px]">person_add</span>
+            Προσθήκη οδηγού
           </button>
         </div>
       </Section>
