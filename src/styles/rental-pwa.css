@@ -286,6 +286,20 @@
   border: 1px solid var(--rent-stroke);
 }
 
+.rent-btn-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--rent-deep, #0b3d4a);
+  color: #fff;
+  border: 0;
+  box-shadow: 0 8px 20px rgba(11, 61, 74, 0.22);
+}
+
+.rent-btn-wallet .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
 .rent-btn-danger {
   background: rgba(255, 59, 48, 0.1);
   color: #ff3b30;
@@ -348,6 +362,41 @@
 
 .rent-nav button.is-active .material-symbols-outlined {
   font-variation-settings: 'FILL' 1;
+}
+
+/* Single-page Rent: no bottom tabs — sections stacked in main */
+.rent-app--inline .rent-nav {
+  display: none;
+}
+
+.rent-main--inline {
+  padding: 1rem 1rem max(1.5rem, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rent-inline-section {
+  scroll-margin-top: 4.5rem;
+}
+
+.rent-hero--inline {
+  border-radius: 24px;
+  min-height: auto;
+  margin: 0;
+}
+
+.rent-phone-stage--inline.rent-phone-stage--desktop .rent-main--inline {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  max-width: 1120px;
+  margin-inline: auto;
+  width: 100%;
+}
+
+.rent-phone-stage--inline.rent-phone-stage--desktop .rent-hero--inline {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
 
 /* Install card */
