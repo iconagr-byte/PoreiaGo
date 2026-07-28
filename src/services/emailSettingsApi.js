@@ -1,4 +1,5 @@
 import { API_BASE } from '../config/api.js';
+import { adminAuthHeaders } from './adminApi.js';
 
 function parseError(data) {
   const d = data?.detail;
@@ -11,12 +12,17 @@ async function request(path, options = {}) {
   let res;
   try {
     res = await fetch(`${API_BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...options.headers },
       ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...adminAuthHeaders(),
+        ...(options.headers || {}),
+      },
     });
   } catch {
     throw new Error('Ο server δεν απαντά. Τρέξτε: npm run dev:backend');
   }
+  if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(parseError(data));
   return data;

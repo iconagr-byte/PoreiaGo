@@ -253,14 +253,15 @@ async def issue_wallet_magic(body: WalletMagicIssueRequest):
     Issue a short-lived magic link for My Wallet (phase B).
 
     Always returns ok when inputs look valid — avoids email enumeration.
-    Optionally emails the link (ticket confirmation embeds it directly).
+    The raw magic URL is NEVER returned to untrusted clients (account takeover).
+    Ticket confirmation emails mint tokens server-side in ticketing.ticket_email.
     """
     email = body.email.strip().lower()
     booking_id = body.booking_id.strip()
     if email in STAFF_EMAILS:
-        return {"ok": True, "sent": False}
+        return {"ok": True, "sent": False, "expires_minutes": MAGIC_TTL_MINUTES}
 
-    magic_url = None
+    sent = False
     try:
         token = await create_wallet_magic_token(
             email=email,
@@ -269,6 +270,7 @@ async def issue_wallet_magic(body: WalletMagicIssueRequest):
             phone=body.phone,
         )
         magic_url = f"{_public_base_url()}/wallet/magic?token={token}"
+        # Public API only delivers by email — never leak the token URL in JSON.
         if body.send_email:
             subject = "My Wallet — Άνοιγμα εισιτηρίου"
             html = f"""<!DOCTYPE html><html lang="el"><body style="font-family:Arial,sans-serif;padding:24px;background:#f4f7fb;">
@@ -281,15 +283,14 @@ async def issue_wallet_magic(body: WalletMagicIssueRequest):
               </div>
             </body></html>"""
             await send_email(email, subject, html)
+            sent = True
     except Exception:
-        magic_url = None
+        sent = False
 
     return {
         "ok": True,
-        "sent": bool(magic_url and body.send_email),
+        "sent": sent,
         "expires_minutes": MAGIC_TTL_MINUTES,
-        # When send_email=false, caller (ticket email) embeds the URL itself.
-        "magic_url": magic_url if not body.send_email else None,
     }
 
 

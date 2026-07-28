@@ -188,6 +188,7 @@ class PaymentAuditEntry(BaseModel):
     actor_id: str | None = None
     detail: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    tenant_id: str | None = None
 
 
 async def _load_booking_for_confirm(booking_key: str, request: Request) -> dict[str, Any] | None:
@@ -289,16 +290,20 @@ async def patch_admin_payment_settings(body: PaymentSettingsPatch, request: Requ
 
 
 @router.get("/api/admin/platform/payment-audit", response_model=list[PaymentAuditEntry])
-async def get_payment_audit(limit: int = Query(default=50, ge=1, le=200)):
-    return list_payment_audit(limit=limit)
+async def get_payment_audit(
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=200),
+):
+    return list_payment_audit(limit=limit, tenant_id=admin_tenant_id(request))
 
 
 @router.get("/api/admin/platform/payment-audit/export")
 async def export_payment_audit_csv(
+    request: Request,
     limit: int = Query(default=200, ge=1, le=500),
     fiscal_only: bool = Query(default=False),
 ):
-    rows = list_payment_audit(limit=limit)
+    rows = list_payment_audit(limit=limit, tenant_id=admin_tenant_id(request))
     filtered = filter_payment_audit(rows, fiscal_only=fiscal_only)
     content = serialize_payment_audit_csv(filtered)
     suffix = "fiscal" if fiscal_only else "payments"

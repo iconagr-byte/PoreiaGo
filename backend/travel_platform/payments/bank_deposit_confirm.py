@@ -95,4 +95,5 @@ def record_confirm_audit(
         reference=reference,
         actor_id=actor_id,
         detail=detail,
+        tenant_id=tenant_id,
     )

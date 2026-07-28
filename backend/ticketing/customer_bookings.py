@@ -146,16 +146,23 @@ async def upsert_booking(
     now = _now_iso()
     db = get_db()
     cursor = await db.execute(
-        "SELECT created_at, tenant_id FROM customer_bookings WHERE id = ?",
+        "SELECT created_at, tenant_id, customer_email FROM customer_bookings WHERE id = ?",
         (booking_id,),
     )
     existing = await cursor.fetchone()
     created = existing["created_at"] if existing else now
-    if existing and not tid:
+    if existing:
+        existing_email = str(existing["customer_email"] or "").strip().lower()
+        if existing_email and existing_email != email:
+            raise ValueError("Η κράτηση ανήκει σε άλλο λογαριασμό")
         try:
-            tid = _normalize_tenant(existing["tenant_id"])
+            existing_tid = _normalize_tenant(existing["tenant_id"])
         except (KeyError, IndexError):
-            tid = None
+            existing_tid = None
+        if existing_tid and tid and existing_tid != tid:
+            raise ValueError("Η κράτηση ανήκει σε άλλο γραφείο")
+        if existing and not tid:
+            tid = existing_tid
 
     await db.execute(
         """

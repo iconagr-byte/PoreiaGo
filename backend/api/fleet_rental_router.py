@@ -324,7 +324,7 @@ async def upload_inspection_photo(
     if optimized.ext == ".bin":
         raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
     safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "damage").stem)[:40] or "damage"
-    filename = f"{safe_stem}-{uuid.uuid4().hex[:10]}{optimized.ext}"
+    filename = f"{safe_stem}-{uuid.uuid4().hex}{optimized.ext}"
 
     _RENTAL_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
     out_path = _RENTAL_PHOTO_DIR / filename

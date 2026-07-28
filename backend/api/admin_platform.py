@@ -270,7 +270,7 @@ async def upload_driver_photo(file: UploadFile = File(...)):
     if optimized.ext == ".bin":
         raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
     safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "photo").stem)[:40] or "photo"
-    filename = f"{safe_stem}-{uuid.uuid4().hex[:10]}{optimized.ext}"
+    filename = f"{safe_stem}-{uuid.uuid4().hex}{optimized.ext}"
 
     _DRIVER_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
     out_path = _DRIVER_PHOTO_DIR / filename

@@ -392,7 +392,22 @@ manager = ConnectionManager()
 
 @app.websocket("/ws/admin/boarding/{trip_id}")
 async def boarding_ws(websocket: WebSocket, trip_id: int):
-    """Push manifest refresh to driver tablets (optional)."""
+    """Push manifest refresh to driver tablets — requires admin/driver JWT (?token=)."""
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4401)
+        return
+    try:
+        from api.ws_telemetry import _decode_admin_ws_token, _decode_driver_token
+
+        try:
+            _decode_admin_ws_token(token)
+        except Exception:
+            _decode_driver_token(token)
+    except Exception:
+        await websocket.close(code=4401)
+        return
+
     await manager.connect(websocket)
     try:
         while True:

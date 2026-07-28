@@ -51,6 +51,7 @@ def append_payment_audit(
     actor_id: str | None = None,
     detail: str | None = None,
     metadata: dict[str, Any] | None = None,
+    tenant_id: str | None = None,
 ) -> dict[str, Any]:
     entry = {
         "id": uuid.uuid4().hex[:16],
@@ -62,6 +63,7 @@ def append_payment_audit(
         "actor_id": actor_id,
         "detail": detail,
         "metadata": metadata or {},
+        "tenant_id": str(tenant_id).strip() if tenant_id else None,
     }
     rows = _read_all()
     rows.insert(0, entry)
@@ -71,9 +73,17 @@ def append_payment_audit(
     return entry
 
 
-def list_payment_audit(*, limit: int = 50) -> list[dict[str, Any]]:
+def list_payment_audit(*, limit: int = 50, tenant_id: str | None = None) -> list[dict[str, Any]]:
     limit = max(1, min(limit, 200))
-    return _read_all()[:limit]
+    rows = _read_all()
+    tid = str(tenant_id).strip() if tenant_id else ""
+    if tid:
+        rows = [
+            row
+            for row in rows
+            if not row.get("tenant_id") or str(row.get("tenant_id")) == tid
+        ]
+    return rows[:limit]
 
 
 def filter_payment_audit(
