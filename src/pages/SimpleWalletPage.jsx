@@ -305,7 +305,7 @@ function WalletAuthenticatedApp() {
   );
 
   return (
-    <div className="wallet-phone-stage">
+    <div className={`wallet-phone-stage${isMobile ? '' : ' wallet-phone-stage--desktop'}`}>
       <div className="wallet-app">
         <header className="wallet-topbar">
           <button type="button" className="wallet-topbar-btn" onClick={() => navigate('/')}>
