@@ -30,6 +30,7 @@ import RentalCalendarBoard from './RentalCalendarBoard.jsx';
 import RentAppShareBanner from './RentAppShareBanner.jsx';
 import RentPlanCardsEditor from './RentPlanCardsEditor.jsx';
 import RentalPaperworkDesk from './RentalPaperworkDesk.jsx';
+import RentAppBrandingEditor from './RentAppBrandingEditor.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../../../services/siteAppearanceApi.js';
@@ -604,6 +605,7 @@ export default function FleetRentalPanel({
               { id: 'clients', label: 'Πελάτες ενοικίασης', copy: `${clients.length} πελάτες · γραφείο + Wallet`, icon: 'groups' },
               { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
               { id: 'paperwork', label: 'Χαρτούρα συμβολαίων', copy: 'Συμβάσεις · υπογραφές · εκτύπωση PDF', icon: 'description' },
+              { id: 'branding', label: 'Εμφάνιση app', copy: 'Όνομα γραφείου · τίτλος · κείμενα /rent', icon: 'palette' },
               { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
@@ -1195,6 +1197,8 @@ export default function FleetRentalPanel({
       )}
 
       {tab === 'plans' && <RentPlanCardsEditor />}
+
+      {tab === 'branding' && <RentAppBrandingEditor />}
 
       {tab === 'paperwork' && (
         <RentalPaperworkDesk

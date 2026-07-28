@@ -65,6 +65,12 @@ DEFAULT_SITE_APPEARANCE = {
     "footer_contact_email": "",
     "footer_contact_phone": "",
     "footer_address": "",
+    "rent_office_name": "",
+    "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
+    "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
+    "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
+    "rent_guest_hero_copy": "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.",
+    "rent_cta_label": "Βρες όχημα",
     "homepage_theme_id": "aegean_classic",
     "accent_color": "#0ea5e9",
     "secondary_color": "#1e3a5f",
@@ -113,6 +119,16 @@ class SiteAppearanceResponse(BaseModel):
     footer_contact_email: str = ""
     footer_contact_phone: str = ""
     footer_address: str = ""
+    rent_office_name: str = ""
+    rent_hero_title: str = "Το όχημά σας, σε λίγα βήματα"
+    rent_hero_copy: str = (
+        "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
+    )
+    rent_guest_hero_title: str = "Δες τον στόλο πριν κλείσεις"
+    rent_guest_hero_copy: str = (
+        "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος."
+    )
+    rent_cta_label: str = "Βρες όχημα"
     homepage_theme_id: str = "aegean_classic"
     accent_color: str = "#0ea5e9"
     secondary_color: str = "#1e3a5f"
@@ -172,6 +188,12 @@ class SiteAppearanceUpdate(BaseModel):
     footer_contact_email: str | None = None
     footer_contact_phone: str | None = None
     footer_address: str | None = None
+    rent_office_name: str | None = None
+    rent_hero_title: str | None = None
+    rent_hero_copy: str | None = None
+    rent_guest_hero_title: str | None = None
+    rent_guest_hero_copy: str | None = None
+    rent_cta_label: str | None = None
     homepage_theme_id: str | None = None
     accent_color: str | None = None
     secondary_color: str | None = None

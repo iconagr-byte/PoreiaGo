@@ -82,7 +82,10 @@ class TenantProvisioningService:
             is_active=True,
             stripe_customer_id=stripe_customer_id,
             isolation_strategy=isolation,
-            settings_json=json.dumps(initial_settings_for_plan(plan), ensure_ascii=False),
+            settings_json=json.dumps(
+                initial_settings_for_plan(plan, office_name=legal_name),
+                ensure_ascii=False,
+            ),
         )
 
         subscription = Subscription(

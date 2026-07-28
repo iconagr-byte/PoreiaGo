@@ -18,13 +18,29 @@ def parse_tenant_settings(raw: str | None) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def initial_settings_for_plan(plan: TenantPlan | str) -> dict[str, Any]:
+def initial_settings_for_plan(plan: TenantPlan | str, *, office_name: str | None = None) -> dict[str, Any]:
     """Seed settings_json when provisioning a new office."""
     plan_value = plan.value if isinstance(plan, TenantPlan) else str(plan or "starter")
     settings: dict[str, Any] = {"theme": {"primary": "#005d90"}}
     if plan_value == TenantPlan.RENT.value:
         settings["addons"] = {"rent": True}
         settings["modules"] = {"trips_enabled": False, "rent_enabled": True}
+        name = str(office_name or "").strip()
+        settings["site_appearance"] = {
+            "rent_office_name": name,
+            "footer_brand_name": name,
+            "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
+            "rent_hero_copy": (
+                "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
+            ),
+            "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
+            "rent_guest_hero_copy": (
+                "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος."
+            ),
+            "rent_cta_label": "Βρες όχημα",
+            "show_fleet_section": False,
+            "show_why_us_section": False,
+        }
     return settings
 
 

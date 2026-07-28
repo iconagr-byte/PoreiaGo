@@ -38,6 +38,12 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "footer_contact_email": "",
     "footer_contact_phone": "",
     "footer_address": "",
+    "rent_office_name": "",
+    "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
+    "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
+    "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
+    "rent_guest_hero_copy": "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.",
+    "rent_cta_label": "Βρες όχημα",
     "homepage_theme_id": "aegean_classic",
     "accent_color": "#0ea5e9",
     "show_fleet_section": True,
@@ -104,6 +110,9 @@ def _enrich_from_tenant(data: dict[str, Any], tenant: Tenant, settings: dict[str
 
     if not str(out.get("footer_brand_name") or "").strip() and office_name:
         out["footer_brand_name"] = office_name
+
+    if not str(out.get("rent_office_name") or "").strip() and office_name:
+        out["rent_office_name"] = office_name
 
     if not str(out.get("footer_copyright") or "").strip() and office_name:
         out["footer_copyright"] = f"© {datetime.utcnow().year} {office_name}"

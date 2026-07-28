@@ -401,6 +401,12 @@ class TenantSiteAppearanceResponse(BaseModel):
     hero_search_label: str = ""
     footer_brand_name: str = ""
     footer_copyright: str = ""
+    rent_office_name: str = ""
+    rent_hero_title: str = ""
+    rent_hero_copy: str = ""
+    rent_guest_hero_title: str = ""
+    rent_guest_hero_copy: str = ""
+    rent_cta_label: str = ""
     homepage_theme_id: str = "aegean_classic"
     accent_color: str = "#0ea5e9"
     show_fleet_section: bool = True
@@ -420,6 +426,12 @@ class TenantSiteAppearanceUpdate(BaseModel):
     hero_search_label: str | None = None
     footer_brand_name: str | None = None
     footer_copyright: str | None = None
+    rent_office_name: str | None = None
+    rent_hero_title: str | None = None
+    rent_hero_copy: str | None = None
+    rent_guest_hero_title: str | None = None
+    rent_guest_hero_copy: str | None = None
+    rent_cta_label: str | None = None
     homepage_theme_id: str | None = None
     accent_color: str | None = None
     show_fleet_section: bool | None = None

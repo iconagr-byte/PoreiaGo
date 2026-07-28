@@ -44,9 +44,12 @@ def test_explicit_modules_override():
 
 
 def test_initial_settings_for_rent_plan():
-    seed = initial_settings_for_plan(TenantPlan.RENT)
+    seed = initial_settings_for_plan(TenantPlan.RENT, office_name="Achillio Travel")
     assert seed["modules"]["rent_enabled"] is True
     assert seed["modules"]["trips_enabled"] is False
+    assert seed["site_appearance"]["rent_office_name"] == "Achillio Travel"
+    assert seed["site_appearance"]["footer_brand_name"] == "Achillio Travel"
+    assert "Το όχημά σας" in seed["site_appearance"]["rent_hero_title"]
 
 
 def test_enable_rent_addon_merge():

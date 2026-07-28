@@ -14,6 +14,7 @@ import {
   useRentMobile,
 } from '../lib/rental/rentDevice.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
+import { resolveRentAppBranding } from '../lib/rental/rentAppBranding.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { fetchCustomerRentalCatalog, fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
 import { withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
@@ -31,7 +32,7 @@ const PREFERRED_VEHICLE_ID_KEY = 'rent_preferred_vehicle_id_v1';
 
 function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const isMobile = useRentMobile();
-  const [brandName, setBrandName] = useState('Ενοικίαση');
+  const [branding, setBranding] = useState(() => resolveRentAppBranding({}, { guest: true }));
   const [homeFleet, setHomeFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [homeCategory, setHomeCategory] = useState('');
@@ -70,8 +71,16 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       .then((data) => {
         if (cancelled) return;
         const brand = resolveOfficeBrand(data || {});
-        const office = brand.displayName || 'Γραφείο';
-        setBrandName(`${office} Rent`);
+        setBranding(
+          resolveRentAppBranding(
+            {
+              ...(data || {}),
+              footer_brand_name: data?.footer_brand_name || brand.displayName || brand.name,
+              display_name: brand.displayName || brand.name,
+            },
+            { guest: true },
+          ),
+        );
       })
       .catch(() => {});
     return () => {
@@ -106,7 +115,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               /* no-op */
             }}
           >
-            {brandName}
+            {branding.brandLabel}
           </button>
           <button type="button" className="rent-btn rent-btn-ghost" onClick={onRequireLogin}>
             Κράτηση
@@ -115,11 +124,9 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
 
         <main className="rent-home">
           <section className="rent-hero" aria-label="Ενοικίαση">
-            <p className="rent-hero-brand">{brandName}</p>
-            <h1 className="rent-hero-title">Δες τον στόλο πριν κλείσεις</h1>
-            <p className="rent-hero-copy">
-              Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.
-            </p>
+            <p className="rent-hero-brand">{branding.brandLabel}</p>
+            <h1 className="rent-hero-title">{branding.title}</h1>
+            <p className="rent-hero-copy">{branding.copy}</p>
             <button type="button" className="rent-hero-cta" onClick={onRequireLogin}>
               <span className="material-symbols-outlined" aria-hidden>
                 lock
@@ -246,7 +253,7 @@ function RentalAuthGate() {
 
 function RentalAuthenticatedApp() {
   const isMobile = useRentMobile();
-  const [brandName, setBrandName] = useState('Ενοικίαση');
+  const [branding, setBranding] = useState(() => resolveRentAppBranding({}));
   const [calKey, setCalKey] = useState(0);
   const [walletKey, setWalletKey] = useState(0);
   const [homeFleet, setHomeFleet] = useState([]);
@@ -270,8 +277,13 @@ function RentalAuthenticatedApp() {
       .then((data) => {
         if (cancelled) return;
         const brand = resolveOfficeBrand(data || {});
-        const office = brand.displayName || 'Γραφείο';
-        setBrandName(`${office} Rent`);
+        setBranding(
+          resolveRentAppBranding({
+            ...(data || {}),
+            footer_brand_name: data?.footer_brand_name || brand.displayName || brand.name,
+            display_name: brand.displayName || brand.name,
+          }),
+        );
       })
       .catch(() => {});
     return () => {
@@ -368,7 +380,7 @@ function RentalAuthenticatedApp() {
             className="rent-topbar-brand"
             onClick={() => scrollToSection(isMobile ? 'rent-wallet' : 'rent-home')}
           >
-            {brandName}
+            {branding.brandLabel}
           </button>
           <button type="button" className="rent-btn rent-btn-wallet" onClick={openWallet}>
             <span className="material-symbols-outlined" aria-hidden>
@@ -382,16 +394,14 @@ function RentalAuthenticatedApp() {
           {!isMobile ? (
             <section id="rent-home" className="rent-inline-section" aria-label="Αρχική">
               <section className="rent-hero rent-hero--inline" aria-label="Ενοικίαση">
-                <p className="rent-hero-brand">{brandName}</p>
-                <h1 className="rent-hero-title">Το όχημά σας, σε λίγα βήματα</h1>
-                <p className="rent-hero-copy">
-                  Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.
-                </p>
+                <p className="rent-hero-brand">{branding.brandLabel}</p>
+                <h1 className="rent-hero-title">{branding.title}</h1>
+                <p className="rent-hero-copy">{branding.copy}</p>
                 <button type="button" className="rent-hero-cta" onClick={() => scrollToSection('rent-book')}>
                   <span className="material-symbols-outlined" aria-hidden>
                     search
                   </span>
-                  Βρες όχημα
+                  {branding.ctaLabel}
                 </button>
               </section>
 
@@ -494,7 +504,7 @@ function RentalAuthenticatedApp() {
                 Οι κάρτες ενοικίασής σας — χωριστά από το My Wallet των λεωφορείων.
               </p>
               <RentalWalletPanel
-                brandLabel={`${brandName}`}
+                brandLabel={branding.brandLabel}
                 passengerName={profile.name}
                 refreshKey={walletKey}
                 onBookVehicle={() => scrollToSection('rent-book')}

@@ -811,6 +811,269 @@
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
 }
 
+/* Rent app branding onboarding */
+.rent-brand-editor {
+  color: #1d1d1f;
+}
+
+.rent-brand-editor--loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-weight: 700;
+  color: #6e6e73;
+}
+
+.rent-brand-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.35rem;
+  border-radius: 24px;
+  background:
+    radial-gradient(700px 240px at 0% 0%, rgba(10, 122, 108, 0.16), transparent 55%),
+    linear-gradient(135deg, #0b3d4a 0%, #0a7a6c 55%, #0f766e 100%);
+  color: #fff;
+}
+
+.rent-brand-kicker {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.rent-brand-title {
+  margin: 0.35rem 0 0.4rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.rent-brand-lead {
+  margin: 0;
+  max-width: 36rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  opacity: 0.88;
+}
+
+.rent-brand-hero-art {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.rent-brand-hero-art .material-symbols-outlined {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 1.35rem;
+}
+
+.rent-brand-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 960px) {
+  .rent-brand-grid {
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: start;
+  }
+}
+
+.rent-brand-fields {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 22px;
+  padding: 1.1rem;
+}
+
+.rent-brand-field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.rent-brand-field-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #1d1d1f;
+}
+
+.rent-brand-field-hint {
+  font-size: 0.72rem;
+  color: #6e6e73;
+}
+
+.rent-brand-input {
+  width: 100%;
+  margin-top: 0.2rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  background: #fbfbfd;
+}
+
+.rent-brand-input:focus {
+  outline: 2px solid rgba(10, 122, 108, 0.35);
+  border-color: #0a7a6c;
+  background: #fff;
+}
+
+.rent-brand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.rent-brand-primary-btn,
+.rent-brand-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.rent-brand-primary-btn {
+  border: 0;
+  background: #0a7a6c;
+  color: #fff;
+}
+
+.rent-brand-primary-btn:disabled {
+  opacity: 0.45;
+}
+
+.rent-brand-secondary-btn {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  color: #1d1d1f;
+}
+
+.rent-brand-preview-col {
+  position: sticky;
+  top: 1rem;
+}
+
+.rent-brand-preview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.rent-brand-preview-toggle {
+  display: inline-flex;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: #ececef;
+  gap: 0.15rem;
+}
+
+.rent-brand-preview-toggle button {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #6e6e73;
+  cursor: pointer;
+}
+
+.rent-brand-preview-toggle button.is-active {
+  background: #fff;
+  color: #0b3d4a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.rent-brand-phone {
+  border-radius: 28px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #111;
+  padding: 0.55rem;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.rent-brand-phone-notch {
+  width: 34%;
+  height: 0.35rem;
+  margin: 0.25rem auto 0.55rem;
+  border-radius: 999px;
+  background: #2a2a2c;
+}
+
+.rent-brand-phone-hero {
+  border-radius: 22px;
+  min-height: 280px;
+  padding: 1.35rem 1.15rem 1.25rem;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(45, 212, 191, 0.28), transparent),
+    linear-gradient(160deg, #062a30 0%, #0b3d4a 45%, #0a7a6c 100%);
+  color: #fff;
+}
+
+.rent-brand-phone-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  opacity: 0.92;
+}
+
+.rent-brand-phone-title {
+  margin: 0.65rem 0 0.45rem;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.rent-brand-phone-copy {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  opacity: 0.78;
+}
+
+.rent-brand-phone-cta {
+  margin-top: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b3d4a;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rent-brand-phone-cta .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
 /* Printable rental agreement */
 @media print {
   body * {
