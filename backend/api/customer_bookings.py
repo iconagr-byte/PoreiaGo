@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api.customer_auth import get_current_customer
@@ -222,7 +222,32 @@ async def download_apple_pass(
 
 
 @router.get("/api/bookings")
-async def list_bookings_admin():
-    """Όλες οι κρατήσεις — Control Panel (demo, ίδιο pattern με localStorage)."""
+async def list_bookings_admin(request: Request):
+    """Όλες οι κρατήσεις — Control Panel (requires admin JWT; never public)."""
+    from middleware.tenant import ADMIN_ACCESS_ROLES, _jwt_settings
+    import jwt as pyjwt
+
+    secret, algorithm, admin_disabled = _jwt_settings()
+    if admin_disabled:
+        items = await list_all_bookings()
+        return {"items": items, "total": len(items)}
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    try:
+        payload = pyjwt.decode(auth[7:].strip(), secret, algorithms=[algorithm])
+    except pyjwt.PyJWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid token") from exc
+    roles = set(payload.get("roles") or [])
+    if not roles & ADMIN_ACCESS_ROLES:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    # Prefer Postgres admin bookings for tenant-scoped offices; SQLite dump is
+    # only for superadmin (legacy demo). Office admins get empty here — use
+    # /api/admin/platform/bookings instead.
+    if "superadmin" not in roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Χρησιμοποιήστε /api/admin/platform/bookings για κρατήσεις γραφείου",
+        )
     items = await list_all_bookings()
     return {"items": items, "total": len(items)}

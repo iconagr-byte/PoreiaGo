@@ -948,34 +948,35 @@ class DriverChatSendBody(BaseModel):
     sender_name: str | None = None
 
 
-async def _chat_tenant_id() -> str:
-    try:
-        from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
-
-        return str(await resolve_platform_tenant_id())
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="Tenant unavailable") from exc
+async def _chat_tenant_id(request: Request) -> str:
+    """Office scope for driver chat — JWT / request tenant, never global platform id."""
+    tid = _request_tenant_id(request)
+    if tid:
+        return str(tid)
+    raise HTTPException(status_code=401, detail="Tenant required")
 
 
 @router.get("/driver-chat/threads")
-async def admin_chat_threads(limit: int = Query(50, ge=1, le=200)):
+async def admin_chat_threads(
+    request: Request,
+    limit: int = Query(50, ge=1, le=200),
+):
     from travel_platform.driver.chat_store import list_threads
-    from travel_platform.settings.drivers_store import get_driver as _get
 
-    tenant_id = await _chat_tenant_id()
+    tenant_id = await _chat_tenant_id(request)
     threads = list_threads(tenant_id=tenant_id, limit=limit)
     for t in threads:
-        d = _get(t.get("driver_id"))
+        d = _driver_for_tenant(t.get("driver_id"), tenant_id)
         t["driver_name"] = d.name if d else None
         t["vehicle_plate"] = (d.license_plate or d.vehicle_code) if d else None
     return {"tenant_id": tenant_id, "threads": threads}
 
 
 @router.get("/driver-chat/unread")
-async def admin_chat_unread():
+async def admin_chat_unread(request: Request):
     from travel_platform.driver.chat_store import unread_counts
 
-    tenant_id = await _chat_tenant_id()
+    tenant_id = await _chat_tenant_id(request)
     counts = unread_counts(tenant_id=tenant_id)
     return {"tenant_id": tenant_id, "unread": counts.get("office", 0)}
 
@@ -983,15 +984,15 @@ async def admin_chat_unread():
 @router.get("/driver-chat/{driver_id}/messages")
 async def admin_chat_messages(
     driver_id: str,
+    request: Request,
     after: str | None = Query(default=None),
     limit: int = Query(100, ge=1, le=500),
 ):
     from travel_platform.driver.chat_store import list_messages, unread_counts
-    from travel_platform.settings.drivers_store import get_driver as _get
 
-    if not _get(driver_id):
+    tenant_id = await _chat_tenant_id(request)
+    if not _driver_for_tenant(driver_id, tenant_id):
         raise HTTPException(status_code=404, detail="Driver not found")
-    tenant_id = await _chat_tenant_id()
     messages = list_messages(
         tenant_id=tenant_id,
         driver_id=driver_id,
@@ -1008,14 +1009,13 @@ async def admin_chat_messages(
 
 
 @router.post("/driver-chat/{driver_id}/messages")
-async def admin_chat_send(driver_id: str, body: DriverChatSendBody):
+async def admin_chat_send(driver_id: str, body: DriverChatSendBody, request: Request):
     from travel_platform.driver.chat_store import append_message
-    from travel_platform.settings.drivers_store import get_driver as _get
 
-    driver = _get(driver_id)
+    tenant_id = await _chat_tenant_id(request)
+    driver = _driver_for_tenant(driver_id, tenant_id)
     if not driver:
         raise HTTPException(status_code=404, detail="Driver not found")
-    tenant_id = await _chat_tenant_id()
     try:
         row = append_message(
             tenant_id=tenant_id,
@@ -1046,12 +1046,11 @@ async def admin_chat_send(driver_id: str, body: DriverChatSendBody):
 
 
 @router.post("/driver-chat/{driver_id}/read")
-async def admin_chat_read(driver_id: str):
+async def admin_chat_read(driver_id: str, request: Request):
     from travel_platform.driver.chat_store import mark_thread_read
-    from travel_platform.settings.drivers_store import get_driver as _get
 
-    if not _get(driver_id):
+    tenant_id = await _chat_tenant_id(request)
+    if not _driver_for_tenant(driver_id, tenant_id):
         raise HTTPException(status_code=404, detail="Driver not found")
-    tenant_id = await _chat_tenant_id()
     changed = mark_thread_read(tenant_id=tenant_id, driver_id=driver_id, reader="office")
-    return {"ok": True, "marked": changed}
+    return {"ok": True, "marked": changed, "driver_id": driver_id}

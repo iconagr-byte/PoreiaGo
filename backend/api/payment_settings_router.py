@@ -36,6 +36,35 @@ from travel_platform.settings.payment_settings_store import (
 router = APIRouter(tags=["payment-settings"])
 
 
+async def _tenant_id_for_admin_request(request: Request):
+    """Resolve office from JWT/request state — never default silently when JWT present."""
+    from uuid import UUID
+
+    from api.admin_bookings_router import _resolve_tenant_id
+
+    raw = getattr(request.state, "tenant_id", None)
+    if raw:
+        try:
+            return UUID(str(raw))
+        except ValueError:
+            pass
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        try:
+            import jwt
+            from middleware.tenant import _jwt_settings
+
+            secret, algorithm, _ = _jwt_settings()
+            if secret:
+                payload = jwt.decode(auth[7:].strip(), secret, algorithms=[algorithm])
+                tid = payload.get("tenant_id")
+                if tid:
+                    return UUID(str(tid))
+        except Exception:
+            pass
+    return await _resolve_tenant_id(None)
+
+
 class DepositSettingsModel(BaseModel):
     enabled: bool = True
     percent: int = Field(default=30, ge=5, le=90)
@@ -160,7 +189,7 @@ class PaymentAuditEntry(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-async def _load_booking_for_confirm(booking_key: str) -> dict[str, Any] | None:
+async def _load_booking_for_confirm(booking_key: str, request: Request) -> dict[str, Any] | None:
     from ticketing.customer_bookings import get_booking
 
     local = await get_booking(booking_key.strip())
@@ -168,12 +197,12 @@ async def _load_booking_for_confirm(booking_key: str) -> dict[str, Any] | None:
         return local
 
     try:
-        from api.admin_bookings_router import _find_booking, _resolve_tenant_id
+        from api.admin_bookings_router import _find_booking
         from api.admin_booking_mapper import booking_to_admin_dict
         from app.core.auth_deps import apply_tenant_rls
         from app.core.database import AsyncSessionLocal
 
-        tenant_id = await _resolve_tenant_id(None)
+        tenant_id = await _tenant_id_for_admin_request(request)
         async with AsyncSessionLocal() as db:
             await apply_tenant_rls(db, tenant_id)
             booking = await _find_booking(db, tenant_id, booking_key)
@@ -184,7 +213,12 @@ async def _load_booking_for_confirm(booking_key: str) -> dict[str, Any] | None:
     return None
 
 
-async def _persist_confirmed_booking(booking_key: str, booking: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+async def _persist_confirmed_booking(
+    booking_key: str,
+    booking: dict[str, Any],
+    patch: dict[str, Any],
+    request: Request,
+) -> dict[str, Any]:
     from ticketing.customer_bookings import upsert_booking
 
     merged = {**booking, **patch}
@@ -193,11 +227,11 @@ async def _persist_confirmed_booking(booking_key: str, booking: dict[str, Any], 
 
     try:
         from api.admin_booking_mapper import apply_patch_to_booking, booking_to_admin_dict
-        from api.admin_bookings_router import _find_booking, _resolve_tenant_id
+        from api.admin_bookings_router import _find_booking
         from app.core.auth_deps import apply_tenant_rls
         from app.core.database import AsyncSessionLocal
 
-        tenant_id = await _resolve_tenant_id(None)
+        tenant_id = await _tenant_id_for_admin_request(request)
         async with AsyncSessionLocal() as db:
             await apply_tenant_rls(db, tenant_id)
             pg_booking = await _find_booking(db, tenant_id, booking_key)
@@ -285,7 +319,7 @@ async def confirm_bank_deposit(
         send_payment_confirmation_notifications,
     )
 
-    booking = await _load_booking_for_confirm(booking_key)
+    booking = await _load_booking_for_confirm(booking_key, request)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
@@ -297,7 +331,7 @@ async def confirm_bank_deposit(
     expected_amount = float(booking.get("balanceDue") or booking.get("price") or 0)
     capture_amount = Decimal(str(body.confirmed_amount if body.confirmed_amount is not None else expected_amount))
 
-    tenant_id = await _resolve_tenant_id(None)
+    tenant_id = await _tenant_id_for_admin_request(request)
     actor_id = getattr(request.state, "user_id", None)
     fiscal_invoice_id = None
     result_status = "captured"
@@ -390,7 +424,7 @@ async def record_cash_payment_admin(
         send_payment_confirmation_notifications,
     )
 
-    booking = await _load_booking_for_confirm(booking_key)
+    booking = await _load_booking_for_confirm(booking_key, request)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
@@ -399,7 +433,7 @@ async def record_cash_payment_admin(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    tenant_id = await _resolve_tenant_id(None)
+    tenant_id = await _tenant_id_for_admin_request(request)
     actor_id = getattr(request.state, "user_id", None)
     fiscal_invoice_id = None
     result_status = "captured"
@@ -461,7 +495,7 @@ async def record_cash_payment_admin(
         note=body.note,
         receipt_number=body.receipt_number,
     )
-    saved = await _persist_confirmed_booking(booking_key, pg_snapshot["admin"], patch)
+    saved = await _persist_confirmed_booking(booking_key, pg_snapshot["admin"], patch, request)
 
     record_cash_audit(
         booking_id=str(pg_snapshot["id"]),

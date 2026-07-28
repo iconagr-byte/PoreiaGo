@@ -4,6 +4,7 @@ import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
 import { playNotificationClick, unlockNotificationAudio } from '../lib/admin/notificationClickSound.js';
 import { fetchDriverChatUnread, fetchDriverChatThreads } from '../services/platformApi.js';
 import { fetchTelemetryAlerts } from '../services/telemetryApi.js';
+import { getSaasToken } from '../services/saasApi.js';
 
 const STORAGE_KEY = 'admin_notif_inbox_v1';
 const MAX_ITEMS = 40;
@@ -132,8 +133,10 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
   // Live alerts WebSocket.
   useEffect(() => {
     if (!enabled) return undefined;
-    const qs = `?tenant_id=${tenantId}`;
-    const url = buildWsUrl(`/ws/admin/telemetry/alerts${qs}`);
+    const url = buildWsUrl('/ws/admin/telemetry/alerts', {
+      tenant_id: tenantId,
+      token: getSaasToken() || '',
+    });
     let closed = false;
     let reconnectTimer;
 

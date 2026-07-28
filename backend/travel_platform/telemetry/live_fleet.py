@@ -208,25 +208,30 @@ class LiveFleetService:
         """
         Active vehicles for the admin map.
 
-        Merges:
-        - legacy demo tenant (…0001) GPS into a real office tenant
-        - platform SaaS tenant GPS into a legacy demo-tenant admin session
-          (drivers are remapped onto the platform tenant; old admin JWTs
-          still carry …0001 and would otherwise see an empty map)
+        Cross-tenant demo/platform merge is OFF by default (tenant isolation).
+        Enable only with ALLOW_CROSS_TENANT_FLEET_MERGE=1 for legacy single-office
+        migrations.
         """
-        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+        import os
 
         primary = self.list_active(tenant_id)
+        allow_merge = os.getenv("ALLOW_CROSS_TENANT_FLEET_MERGE", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if not allow_merge:
+            return primary
+
+        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
         demo = UUID(DEFAULT_TENANT)
         extras: list[list[LiveVehicleState]] = []
 
         if str(tenant_id) != str(demo):
             extras.append(self.list_active(demo))
         else:
-            # Demo admin JWT → also show remapped platform GPS.
             try:
-                import os
-
                 platform_raw = (
                     os.getenv("SAAS_DEFAULT_TENANT_ID")
                     or os.getenv("DEFAULT_TENANT_ID")
@@ -240,10 +245,20 @@ class LiveFleetService:
         return self._merge_admin_fleets(primary, *extras)
 
     async def list_active_for_admin_async(self, tenant_id: UUID) -> list[LiveVehicleState]:
+        import os
+
+        primary = await self.list_active_async(tenant_id)
+        allow_merge = os.getenv("ALLOW_CROSS_TENANT_FLEET_MERGE", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if not allow_merge:
+            return primary
+
         from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
         from travel_platform.operations.master_qr_local import DEFAULT_TENANT
 
-        primary = await self.list_active_async(tenant_id)
         demo = UUID(DEFAULT_TENANT)
         extras: list[list[LiveVehicleState]] = []
         seen_tenants = {str(tenant_id)}
@@ -260,15 +275,13 @@ class LiveFleetService:
             except Exception:
                 pass
 
-        # GPS was briefly remapped onto the obsolete seed slug «achillio»
-        # while the real office (custom_domain) is admin-achillio-gr — merge both.
         try:
             from sqlalchemy import select
 
             from app.core.database import AsyncSessionLocal
             from app.models.tenant import Tenant
 
-            seed_slug = (__import__("os").getenv("DEFAULT_TENANT_SLUG") or "achillio").strip().lower()
+            seed_slug = (os.getenv("DEFAULT_TENANT_SLUG") or "achillio").strip().lower()
             async with AsyncSessionLocal() as db:
                 result = await db.execute(select(Tenant).where(Tenant.slug == seed_slug).limit(1))
                 seed = result.scalar_one_or_none()

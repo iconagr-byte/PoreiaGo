@@ -88,10 +88,8 @@ ADMIN_PUBLIC_GET_PREFIXES = (
     "/api/admin/platform/site-appearance",
 )
 
-# JSON file-store admin routes — skip Postgres RLS / suspended-tenant gate.
-# Drivers stay file-backed (fleet_drivers.json). JWT is still sent by the admin UI;
-# we MUST still attach tenant_id from the Bearer token so multi-office creates
-# are not forced into the demo tenant when Host is www/api.poreiago.com.
+# JSON file-store admin routes — skip Postgres RLS / suspended-tenant gate AFTER
+# JWT + admin-role checks. Never leave these unauthenticated.
 FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/site-appearance",
     "/api/admin/platform/settings",
@@ -232,13 +230,38 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         if path.startswith(ADMIN_PREFIX):
             if _admin_public_get(path, request.method):
                 return await call_next(request)
-            if _is_file_store_admin(path):
-                # Keep file-store open (no role/Postgres gate) but bind the office
-                # from the admin JWT so driver create/list is multi-tenant safe.
-                _attach_bearer_tenant_context(request, jwt_secret, jwt_algorithm)
-                return await call_next(request)
             if admin_auth_disabled:
                 await _apply_dev_admin_context(request)
+                return await call_next(request)
+            # File-store admin routes still REQUIRE JWT + admin roles.
+            # They only skip the Postgres RLS / suspended-tenant gate below
+            # (storage is JSON files, not tenant RLS sessions).
+            if _is_file_store_admin(path):
+                auth = request.headers.get("Authorization", "")
+                if not auth.startswith("Bearer "):
+                    return JSONResponse(status_code=401, content={"detail": "Missing bearer token"})
+                token = auth[7:].strip()
+                if not jwt_secret:
+                    return JSONResponse(status_code=503, content={"detail": "Auth not configured"})
+                try:
+                    payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
+                except jwt.PyJWTError:
+                    return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+                raw_tid = payload.get("tenant_id")
+                if not raw_tid:
+                    return JSONResponse(status_code=403, content={"detail": "tenant_id required"})
+                try:
+                    request.state.tenant_id = UUID(str(raw_tid))
+                except ValueError:
+                    return JSONResponse(status_code=403, content={"detail": "Invalid tenant_id"})
+                roles = list(payload.get("roles") or [])
+                request.state.user_id = payload.get("sub")
+                request.state.roles = roles
+                if not set(roles) & ADMIN_ACCESS_ROLES:
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "Admin access required"},
+                    )
                 return await call_next(request)
 
         if path.startswith(PLATFORM_ADMIN_PREFIX) and admin_auth_disabled:
@@ -290,7 +313,9 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
                     content={"detail": "Admin access required"},
                 )
 
-        if not _suspended_tenant_allowed(path, roles):
+        # Skip suspended-tenant gate for file-store routes (handled above) and
+        # for billing/compliance / platform superadmin paths.
+        if not _is_file_store_admin(path) and not _suspended_tenant_allowed(path, roles):
             if not await _tenant_is_active(request.state.tenant_id):
                 return JSONResponse(
                     status_code=403,

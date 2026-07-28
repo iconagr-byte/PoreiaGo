@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/customer/rentals", tags=["Customer Rentals"])
 
 
 async def _tenant_id(request: Request) -> str:
-    """Office scope for Wallet rentals — Host/middleware first, Origin fallback."""
+    """Office scope for Wallet rentals — Host/middleware first; never demo fallback in prod."""
     tid = getattr(request.state, "tenant_id", None)
     if tid:
         return str(tid)
@@ -48,8 +48,20 @@ async def _tenant_id(request: Request) -> str:
     except Exception:
         pass
 
-    return DEMO_TENANT_ID
+    import os
 
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    if env in ("development", "dev", "local") or os.getenv("ALLOW_DEMO_RENT_FALLBACK", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return DEMO_TENANT_ID
+
+    raise HTTPException(
+        status_code=404,
+        detail="Δεν βρέθηκε γραφείο ενοικίασης για αυτό το domain.",
+    )
 
 class CustomerBookingBody(BaseModel):
     vehicle_id: str

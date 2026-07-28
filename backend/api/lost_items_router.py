@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+import jwt as pyjwt
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api.customer_auth import get_current_customer
@@ -26,6 +27,25 @@ class LostItemStatusBody(BaseModel):
     status: str = Field(..., pattern="^(OPEN|FOUND|CLOSED)$")
 
 
+def _require_admin_jwt(request: Request) -> dict:
+    from middleware.tenant import ADMIN_ACCESS_ROLES, _jwt_settings
+
+    secret, algorithm, admin_disabled = _jwt_settings()
+    if admin_disabled:
+        return {"roles": ["tenant_admin", "superadmin"], "sub": "dev-admin"}
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    try:
+        payload = pyjwt.decode(auth[7:].strip(), secret, algorithms=[algorithm])
+    except pyjwt.PyJWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid token") from exc
+    roles = set(payload.get("roles") or [])
+    if not roles & ADMIN_ACCESS_ROLES:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return payload
+
+
 def _to_admin_row(item: dict) -> dict:
     return {
         "id": item["id"],
@@ -40,8 +60,9 @@ def _to_admin_row(item: dict) -> dict:
 
 
 @router.get("/api/lost-items")
-async def list_lost_items_admin():
-    """Όλες οι δηλώσεις — Control Panel."""
+async def list_lost_items_admin(request: Request):
+    """Όλες οι δηλώσεις — Control Panel (admin JWT required)."""
+    _require_admin_jwt(request)
     items = await list_all_lost_items()
     return {
         "items": [_to_admin_row(i) for i in items],
@@ -50,7 +71,8 @@ async def list_lost_items_admin():
 
 
 @router.patch("/api/lost-items/{item_id}")
-async def patch_lost_item_admin(item_id: str, body: LostItemStatusBody):
+async def patch_lost_item_admin(item_id: str, body: LostItemStatusBody, request: Request):
+    _require_admin_jwt(request)
     try:
         updated = await update_lost_item_status(item_id, body.status)
     except ValueError as exc:

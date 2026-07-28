@@ -1,5 +1,8 @@
 """
 WebSocket endpoints — passenger ETA, admin alerts, driver GPS ingress, fleet egress.
+
+Admin egress/alerts require a SaaS admin JWT (?token=). Tenant is taken from the
+JWT only — path/query tenant_id cannot grant access to another office.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["telemetry-ws"])
 
 JWT_ALGORITHM = "HS256"
+_ADMIN_WS_ROLES = frozenset({"tenant_admin", "dispatcher", "superadmin", "auditor"})
 
 
 def _jwt_secrets() -> list[str]:
@@ -45,6 +49,32 @@ def _jwt_secrets() -> list[str]:
     return out
 
 
+def _admin_jwt_secrets() -> list[str]:
+    ordered = [
+        os.getenv("AUTH_JWT_SECRET"),
+        os.getenv("TICKET_JWT_SECRET"),
+        local_secret(),
+    ]
+    try:
+        from app.core.config import get_settings
+        from app.core.security import get_jwt_verification_key
+
+        settings = get_settings()
+        key = get_jwt_verification_key(settings)
+        if key:
+            ordered.insert(0, key if isinstance(key, str) else key.decode("utf-8", errors="ignore"))
+    except Exception:
+        pass
+    seen: set[str] = set()
+    out: list[str] = []
+    for secret in ordered:
+        if not secret or secret in seen:
+            continue
+        seen.add(secret)
+        out.append(str(secret))
+    return out
+
+
 def _decode_driver_token(token: str) -> dict:
     raw = token.strip()
     last_error: Exception | None = None
@@ -62,13 +92,81 @@ def _decode_driver_token(token: str) -> dict:
     return payload
 
 
+def _decode_admin_ws_token(token: str | None) -> dict:
+    """Validate admin Bearer/query token for live-map / alerts WebSockets."""
+    if os.getenv("ADMIN_AUTH_DISABLED", "").lower() in ("1", "true", "yes"):
+        return {
+            "tenant_id": os.getenv("DEFAULT_TENANT_ID") or str(DEMO_TENANT),
+            "roles": ["tenant_admin", "superadmin"],
+            "sub": "dev-admin",
+        }
+    raw = (token or "").strip()
+    if not raw:
+        raise jwt.InvalidTokenError("Missing admin token")
+    last_error: Exception | None = None
+    payload = None
+    algo = os.getenv("AUTH_JWT_ALGORITHM", "HS256")
+    for secret in _admin_jwt_secrets():
+        try:
+            payload = jwt.decode(raw, secret, algorithms=[algo])
+            break
+        except jwt.PyJWTError as exc:
+            last_error = exc
+            payload = None
+    else:
+        raise last_error or jwt.InvalidTokenError("Invalid admin token")
+    roles = set(payload.get("roles") or [])
+    if not roles & _ADMIN_WS_ROLES:
+        raise jwt.InvalidTokenError("Admin access required")
+    if not payload.get("tenant_id"):
+        raise jwt.InvalidTokenError("tenant_id required")
+    return payload
+
+
+async def _reject_ws(websocket: WebSocket, code: int, detail: str) -> None:
+    await websocket.accept()
+    await websocket.send_text(json.dumps({"type": "error", "detail": detail}))
+    await websocket.close(code=code)
+
+
 @router.websocket("/ws/passenger/eta/{trip_id}")
 async def passenger_eta_ws(
     websocket: WebSocket,
     trip_id: int,
     tenant_id: UUID | None = Query(default=None),
+    token: str | None = Query(default=None),
 ):
-    tid = tenant_id or DEMO_TENANT
+    """
+    Passenger ETA feed. Prefer signed track token when provided.
+    Client-supplied tenant_id alone is ignored in production unless
+    PASSENGER_ETA_ALLOW_TENANT_QUERY=1 (dev only).
+    """
+    tid = DEMO_TENANT
+    allow_query = os.getenv("PASSENGER_ETA_ALLOW_TENANT_QUERY", "").lower() in ("1", "true", "yes")
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    if token:
+        try:
+            # Track tokens may embed tenant_id — reuse admin/driver secret decode loosely.
+            payload = None
+            for secret in _jwt_secrets():
+                try:
+                    payload = jwt.decode(token.strip(), secret, algorithms=[JWT_ALGORITHM])
+                    break
+                except jwt.PyJWTError:
+                    continue
+            if payload and payload.get("tenant_id"):
+                tid = UUID(str(payload["tenant_id"]))
+            elif tenant_id and (allow_query or env in ("development", "dev", "local")):
+                tid = tenant_id
+        except Exception:
+            await _reject_ws(websocket, 4401, "invalid_token")
+            return
+    elif tenant_id and (allow_query or env in ("development", "dev", "local")):
+        tid = tenant_id
+    elif env not in ("development", "dev", "local"):
+        await _reject_ws(websocket, 4401, "track_token_required")
+        return
+
     hub = get_eta_ws_hub()
     await hub.connect(trip_id, websocket)
 
@@ -88,9 +186,22 @@ async def passenger_eta_ws(
 @router.websocket("/ws/admin/telemetry/alerts")
 async def admin_telemetry_alerts_ws(
     websocket: WebSocket,
+    token: str | None = Query(default=None),
     tenant_id: UUID | None = Query(default=None),
 ):
-    tid = str(tenant_id or DEMO_TENANT)
+    try:
+        payload = _decode_admin_ws_token(token)
+    except jwt.PyJWTError:
+        await _reject_ws(websocket, 4401, "unauthorized")
+        return
+
+    jwt_tid = str(payload["tenant_id"])
+    # Ignore client-supplied tenant_id unless it matches the JWT (legacy query).
+    if tenant_id is not None and str(tenant_id) != jwt_tid:
+        await _reject_ws(websocket, 4403, "tenant_mismatch")
+        return
+
+    tid = jwt_tid
     hub = get_alerts_ws_hub()
     await hub.connect(tid, websocket)
 
@@ -203,9 +314,29 @@ async def driver_telemetry_ingress_ws(
 async def admin_fleet_egress_ws(
     websocket: WebSocket,
     tenant_id: UUID,
+    token: str | None = Query(default=None),
 ):
-    """Admin live map — streams fleet_location events from Redis pub/sub (+ in-process fan-out)."""
-    tid = str(tenant_id)
+    """Admin live map — streams fleet_location events. Tenant from JWT only."""
+    try:
+        payload = _decode_admin_ws_token(token)
+    except jwt.PyJWTError:
+        await _reject_ws(websocket, 4401, "unauthorized")
+        return
+
+    jwt_tid = str(payload["tenant_id"])
+    roles = set(payload.get("roles") or [])
+    # Office admins always bind to JWT tenant (path cannot spoof another office).
+    # Superadmin may open any tenant's egress stream.
+    if "superadmin" in roles:
+        tid = str(tenant_id)
+        tenant_uuid = tenant_id
+    else:
+        if str(tenant_id) != jwt_tid:
+            await _reject_ws(websocket, 4403, "tenant_mismatch")
+            return
+        tid = jwt_tid
+        tenant_uuid = UUID(jwt_tid)
+
     hub = get_fleet_egress_hub()
     await ensure_redis_bridge(tid)
     await hub.connect(tid, websocket)
@@ -216,8 +347,8 @@ async def admin_fleet_egress_ws(
     snapshot = []
     from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
-    for vehicle in await live.list_active_for_admin_async(tenant_id):
-        meta = await live.vehicle_meta_async(tenant_id, vehicle.vehicle_id)
+    for vehicle in await live.list_active_for_admin_async(tenant_uuid):
+        meta = await live.vehicle_meta_async(tenant_uuid, vehicle.vehicle_id)
         if not meta:
             meta = live._vehicles.get(vehicle.vehicle_id, {})
         trip_title = await resolve_trip_title(vehicle.trip_id, preferred=meta.get("trip_title"))

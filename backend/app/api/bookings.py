@@ -37,32 +37,59 @@ def _normalize_reference(code: str) -> str:
     return c
 
 
+async def _resolve_guest_tenant(request: Request, body_tenant_id: UUID | None) -> UUID:
+    """
+    Bind public checkout/lookup to the office Host when resolvable.
+    body.tenant_id may only be used on platform hosts, or must match Host tenant.
+    """
+    host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or ""
+    ).split(",")[0].strip().split(":")[0].strip().lower()
+
+    resolved_id: UUID | None = None
+    try:
+        from olympus.tenant.domain_resolver import DomainResolver
+
+        async with AsyncSessionLocal() as session:
+            resolved = await DomainResolver(session).resolve(host)
+            if resolved:
+                resolved_id = resolved.tenant_id
+    except Exception:
+        resolved_id = None
+
+    # Also honor middleware DomainTenant when present.
+    state_tid = getattr(request.state, "tenant_id", None)
+    if state_tid is not None and resolved_id is None:
+        try:
+            resolved_id = UUID(str(state_tid))
+        except ValueError:
+            resolved_id = None
+
+    if resolved_id is not None:
+        if body_tenant_id is not None and str(body_tenant_id) != str(resolved_id):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="Το tenant_id δεν ταιριάζει με το domain του γραφείου.",
+            )
+        return resolved_id
+
+    if body_tenant_id is not None:
+        return body_tenant_id
+
+    raise HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        detail="Δεν βρέθηκε γραφείο για αυτό το domain — δοκιμάστε ξανά από το site του γραφείου.",
+    )
+
+
 @router.post("/lookup", response_model=BookingResponse)
 async def lookup_guest_booking(body: GuestBookingLookup, request: Request):
     """Public B2C — email + reference code must both match (no email-only search)."""
     ref = _normalize_reference(body.reference_code)
     email = body.passenger_email.strip().lower()
-    tenant_id = body.tenant_id
-    if tenant_id is None:
-        host = (
-            request.headers.get("x-forwarded-host")
-            or request.headers.get("host")
-            or ""
-        ).split(",")[0].strip()
-        try:
-            from olympus.tenant.domain_resolver import DomainResolver
-
-            async with AsyncSessionLocal() as session:
-                resolved = await DomainResolver(session).resolve(host)
-                if resolved:
-                    tenant_id = resolved.tenant_id
-        except Exception:
-            tenant_id = None
-    if tenant_id is None:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Δεν βρέθηκε γραφείο για αυτό το domain — δοκιμάστε ξανά από το site του γραφείου.",
-        )
+    tenant_id = await _resolve_guest_tenant(request, body.tenant_id)
     async with AsyncSessionLocal() as db:
         await apply_tenant_rls(db, tenant_id)
         stmt = select(Booking).where(
@@ -86,7 +113,8 @@ async def lookup_guest_booking(body: GuestBookingLookup, request: Request):
     status_code=status.HTTP_201_CREATED,
 )
 async def create_guest_booking(body: GuestBookingCreate, request: Request):
-    """Public B2C checkout — requires tenant_id (from VITE_SAAS_TENANT_ID)."""
+    """Public B2C checkout — tenant from Host when possible; body.tenant_id must match."""
+    tenant_id = await _resolve_guest_tenant(request, body.tenant_id)
     ref = f"BK-{secrets.token_hex(4).upper()}"
     total = Decimal(str(body.total_eur if body.total_eur is not None else body.amount_eur))
     paid_now = Decimal(str(body.amount_eur))
@@ -115,9 +143,9 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         booking_status = BookingStatus.CONFIRMED
         payment_status = PaymentStatus.PARTIAL if paid_now > 0 else PaymentStatus.PENDING
     async with AsyncSessionLocal() as db:
-        await apply_tenant_rls(db, body.tenant_id)
+        await apply_tenant_rls(db, tenant_id)
         booking = Booking(
-            tenant_id=body.tenant_id,
+            tenant_id=tenant_id,
             trip_id=None,
             customer_user_id=None,
             reference_code=ref,
@@ -139,7 +167,7 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
 
             vat_base = float(body.amount_eur) / 1.24
             await AadeQueueService(db).enqueue_invoice(
-                tenant_id=body.tenant_id,
+                tenant_id=tenant_id,
                 booking_id=booking.id,
                 payload={
                     "amount_eur": float(body.amount_eur),
@@ -158,7 +186,7 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
             pass
 
         await AuditService(db).record(
-            tenant_id=body.tenant_id,
+            tenant_id=tenant_id,
             actor_id=None,
             actor_email=body.passenger_email,
             action=AuditAction.CREATE,

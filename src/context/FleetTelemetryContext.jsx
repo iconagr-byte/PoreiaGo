@@ -156,7 +156,9 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
     tick();
     pollTimer = window.setInterval(tick, FLEET_LIVE_POLL_MS);
 
-    const url = buildWsUrl(`/ws/telemetry/egress/${tenantId}`);
+    const url = buildWsUrl(`/ws/telemetry/egress/${tenantId}`, {
+      token: getSaasToken() || '',
+    });
     try {
       ws = new WebSocket(url);
       wsRef.current = ws;

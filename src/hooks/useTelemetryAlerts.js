@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { fetchTelemetryAlerts } from '../services/telemetryApi.js';
 import { buildWsUrl } from '../lib/wsUrl.js';
+import { getSaasToken } from '../services/saasApi.js';
 import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
 
 const DEMO_TENANT = '00000000-0000-0000-0000-000000000001';
@@ -81,8 +82,10 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
     if (!enabled) return undefined;
     load();
 
-    const qs = `?tenant_id=${tenantId}`;
-    const url = buildWsUrl(`/ws/admin/telemetry/alerts${qs}`);
+    const url = buildWsUrl('/ws/admin/telemetry/alerts', {
+      tenant_id: tenantId,
+      token: getSaasToken() || '',
+    });
     let closed = false;
     let reconnectTimer;
 
