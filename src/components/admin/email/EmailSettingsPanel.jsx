@@ -9,10 +9,9 @@ import {
   updateEmailSettings,
 } from '../../../services/emailSettingsApi.js';
 import {
-  decodeEmailSettingsBytes,
   downloadEmailSettingsEnvTemplate,
   downloadEmailSettingsTemplate,
-  parseEmailSettingsFile,
+  parseEmailSettingsBytes,
 } from '../../../lib/email/emailSettingsImport.js';
 const EMPTY = {
   label: '',
@@ -183,14 +182,6 @@ export default function EmailSettingsPanel({ onAccountChange }) {
     });
   };
 
-  const readImportFileText = async (file) => {
-    if (typeof file.arrayBuffer === 'function') {
-      const buf = await file.arrayBuffer();
-      return decodeEmailSettingsBytes(buf);
-    }
-    return file.text();
-  };
-
   const handleImportFile = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -198,8 +189,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
 
     setImporting(true);
     try {
-      const text = await readImportFileText(file);
-      const { accounts, errors } = parseEmailSettingsFile(text, file.name);
+      const buf = await file.arrayBuffer();
+      const { accounts, errors } = parseEmailSettingsBytes(buf, file.name);
 
       if (!accounts.length) {
         if (errors.length) errors.forEach((msg) => toast.error(msg, { duration: 6000 }));
@@ -271,15 +262,15 @@ export default function EmailSettingsPanel({ onAccountChange }) {
           <h2 className="font-headline-md text-headline-md text-on-surface">Ρυθμίσεις Email</h2>
           <p className="text-body-sm text-on-surface-variant mt-1">
             Συνδέστε τον δικό σας λογαριασμό (π.χ. info@mydomain.gr) — IMAP/SMTP.
-            Εισαγωγή από <strong>JSON</strong> ή <strong>.env</strong> (και .env.prod) —
-            αποθηκεύεται αυτόματα όταν υπάρχει κωδικός.
+            Εισαγωγή από <strong>.mobileconfig</strong> (Apple Secure Email / cPanel),{' '}
+            <strong>JSON</strong> ή <strong>.env</strong> — αποθηκεύεται αυτόματα όταν υπάρχει κωδικός.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,.env,.txt,application/json,text/plain,.env.prod,.env.local,.env.example,*/*"
+            accept=".mobileconfig,.json,.env,.txt,application/json,text/plain,.env.prod,.env.local,.env.example,application/x-apple-aspen-config,*/*"
             className="hidden"
             onChange={handleImportFile}
           />

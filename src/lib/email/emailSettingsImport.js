@@ -1,5 +1,5 @@
 /**
- * Parse email account settings from JSON or .env-style file for IMAP/SMTP import.
+ * Parse email account settings from JSON, .env, or Apple .mobileconfig (cPanel Secure Email Setup).
  */
 
 const ENV_ALIASES = {
@@ -277,6 +277,176 @@ function tryParseJson(text) {
   }
 }
 
+function filenameSuggestsMobileconfig(filename = '') {
+  return String(filename || '').toLowerCase().endsWith('.mobileconfig');
+}
+
+function bytesToBinaryString(bytes) {
+  const chunk = 0x8000;
+  let out = '';
+  for (let i = 0; i < bytes.length; i += chunk) {
+    out += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return out;
+}
+
+/** Extract XML plist from unsigned .mobileconfig or signed PKCS#7 DER profile. */
+export function extractMobileconfigPlistXml(buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  if (!bytes.length) return '';
+  const asBin = bytesToBinaryString(bytes);
+  let start = asBin.indexOf('<?xml');
+  if (start < 0) start = asBin.indexOf('<plist');
+  if (start < 0) return '';
+  const end = asBin.indexOf('</plist>', start);
+  if (end < 0) return '';
+  const xmlBin = asBin.slice(start, end + '</plist>'.length);
+  // Profiles use UTF-8 ASCII for keys; decode via TextDecoder for safety.
+  const xmlBytes = new Uint8Array(xmlBin.length);
+  for (let i = 0; i < xmlBin.length; i += 1) xmlBytes[i] = xmlBin.charCodeAt(i) & 0xff;
+  return new TextDecoder('utf-8').decode(xmlBytes);
+}
+
+function decodeXmlEntities(value) {
+  return String(value || '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+function plistValueAfterKey(dictXml, key) {
+  const keyRe = new RegExp(
+    `<key>${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<\\/key>\\s*`,
+    'i',
+  );
+  const km = keyRe.exec(dictXml);
+  if (!km) return null;
+  const rest = dictXml.slice(km.index + km[0].length);
+  const str = /^<string>([\s\S]*?)<\/string>/i.exec(rest);
+  if (str) return { type: 'string', value: decodeXmlEntities(str[1]) };
+  const integer = /^<integer>(-?\d+)<\/integer>/i.exec(rest);
+  if (integer) return { type: 'integer', value: Number(integer[1]) };
+  const boolTrue = /^<true\s*\/>/i.exec(rest);
+  if (boolTrue) return { type: 'bool', value: true };
+  const boolFalse = /^<false\s*\/>/i.exec(rest);
+  if (boolFalse) return { type: 'bool', value: false };
+  return null;
+}
+
+function plistString(dictXml, key) {
+  const v = plistValueAfterKey(dictXml, key);
+  return v && v.type === 'string' ? String(v.value).trim() : '';
+}
+
+function plistPort(dictXml, key, fallback) {
+  const v = plistValueAfterKey(dictXml, key);
+  if (v && v.type === 'integer') return parsePort(v.value, fallback);
+  if (v && v.type === 'string') return parsePort(v.value, fallback);
+  return fallback;
+}
+
+function plistBool(dictXml, key, fallback) {
+  const v = plistValueAfterKey(dictXml, key);
+  if (v && v.type === 'bool') return v.value;
+  if (v && v.type === 'string') return parseBool(v.value);
+  return fallback;
+}
+
+/** Top-level <dict> blocks that look like com.apple.mail.managed payloads. */
+function extractMailPayloadDicts(plistXml) {
+  const blocks = [];
+  const re = /<dict>([\s\S]*?)<\/dict>/gi;
+  let m;
+  while ((m = re.exec(plistXml))) {
+    const body = m[1];
+    if (
+      /<key>EmailAddress<\/key>/i.test(body) &&
+      /<key>IncomingMailServerHostName<\/key>/i.test(body)
+    ) {
+      blocks.push(body);
+    }
+  }
+  return blocks;
+}
+
+function mobileconfigDictToRaw(dictXml) {
+  const email =
+    plistString(dictXml, 'EmailAddress') ||
+    plistString(dictXml, 'IncomingMailServerUsername');
+  const imapHost = plistString(dictXml, 'IncomingMailServerHostName');
+  const smtpHost =
+    plistString(dictXml, 'OutgoingMailServerHostName') || imapHost;
+  const password =
+    plistString(dictXml, 'IncomingPassword') ||
+    plistString(dictXml, 'OutgoingPassword') ||
+    plistString(dictXml, 'Password');
+  const label =
+    plistString(dictXml, 'EmailAccountDescription') ||
+    plistString(dictXml, 'EmailAccountName') ||
+    plistString(dictXml, 'PayloadDisplayName') ||
+    email;
+  const username =
+    plistString(dictXml, 'IncomingMailServerUsername') ||
+    plistString(dictXml, 'OutgoingMailServerUsername') ||
+    email;
+  const mailbox =
+    plistString(dictXml, 'IncomingMailServerIMAPPathPrefix') || 'INBOX';
+
+  return {
+    label,
+    email_address: email,
+    imap_host: imapHost,
+    imap_port: plistPort(dictXml, 'IncomingMailServerPortNumber', 993),
+    imap_secure: plistBool(dictXml, 'IncomingMailServerUseSSL', true),
+    imap_mailbox: mailbox || 'INBOX',
+    smtp_host: smtpHost,
+    smtp_port: plistPort(dictXml, 'OutgoingMailServerPortNumber', 587),
+    smtp_secure: plistBool(dictXml, 'OutgoingMailServerUseSSL', true),
+    mail_username: username,
+    mail_password: password,
+    is_active: true,
+  };
+}
+
+/**
+ * @param {ArrayBuffer|Uint8Array} buffer
+ * @returns {{ accounts: object[], errors: string[] }}
+ */
+export function parseMobileconfigEmailSettings(buffer) {
+  const xml = extractMobileconfigPlistXml(buffer);
+  if (!xml) {
+    return {
+      accounts: [],
+      errors: [
+        'Δεν βρέθηκε Apple profile (.mobileconfig). Χρησιμοποιήστε το «Secure Email Setup» από cPanel / hosting.',
+      ],
+    };
+  }
+  const dicts = extractMailPayloadDicts(xml);
+  if (!dicts.length) {
+    return {
+      accounts: [],
+      errors: [
+        'Το .mobileconfig δεν περιέχει λογαριασμό email (com.apple.mail.managed).',
+      ],
+    };
+  }
+  const result = finalizeAccounts(dicts.map(mobileconfigDictToRaw));
+  // cPanel profiles almost never embed the password — guide the user clearly.
+  if (
+    result.accounts.length &&
+    result.accounts.every((a) => !a.mail_password) &&
+    !result.errors.some((e) => e.includes('κωδικός'))
+  ) {
+    result.errors.push(
+      'Το Apple profile δεν περιλαμβάνει κωδικό — συμπληρώστε τον στη φόρμα και Αποθήκευση',
+    );
+  }
+  return result;
+}
+
 /**
  * @param {string} text
  * @param {string} [filename]
@@ -286,6 +456,18 @@ export function parseEmailSettingsFile(text, filename = '') {
   const cleaned = stripBom(text).trim();
   if (!cleaned) {
     return { accounts: [], errors: ['Το αρχείο είναι κενό'] };
+  }
+
+  // Unsigned .mobileconfig saved as plain XML plist.
+  if (
+    filenameSuggestsMobileconfig(filename) ||
+    (cleaned.includes('<plist') && cleaned.includes('EmailAddress'))
+  ) {
+    const enc = new TextEncoder().encode(cleaned);
+    const mobile = parseMobileconfigEmailSettings(enc);
+    if (mobile.accounts.length || filenameSuggestsMobileconfig(filename)) {
+      return mobile;
+    }
   }
 
   // Prefer JSON when content is clearly JSON — even if named .env.prod.
@@ -309,10 +491,34 @@ export function parseEmailSettingsFile(text, filename = '') {
     return {
       accounts: [],
       errors: [
-        'Μη έγκυρο αρχείο — χρειάζεται JSON («Πρότυπο JSON») ή .env με EMAIL + MAIL_HOST/SMTP_HOST + MAIL_PASSWORD. Όχι Word/PDF.',
+        'Μη έγκυρο αρχείο — χρειάζεται .mobileconfig (Apple Secure Email), JSON ή .env με EMAIL + MAIL_HOST/SMTP_HOST. Όχι Word/PDF.',
       ],
     };
   }
+}
+
+/**
+ * Preferred entry for file input: handles signed .mobileconfig binary + text formats.
+ * @param {ArrayBuffer|Uint8Array} buffer
+ * @param {string} [filename]
+ * @returns {{ accounts: object[], errors: string[] }}
+ */
+export function parseEmailSettingsBytes(buffer, filename = '') {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  if (!bytes.length) {
+    return { accounts: [], errors: ['Το αρχείο είναι κενό'] };
+  }
+
+  const looksSigned =
+    bytes.length > 4 && bytes[0] === 0x30 && (bytes[1] === 0x82 || bytes[1] === 0x80);
+  if (filenameSuggestsMobileconfig(filename) || looksSigned) {
+    const mobile = parseMobileconfigEmailSettings(bytes);
+    if (mobile.accounts.length || filenameSuggestsMobileconfig(filename)) {
+      return mobile;
+    }
+  }
+
+  return parseEmailSettingsFile(decodeEmailSettingsBytes(bytes), filename);
 }
 
 export const EMAIL_SETTINGS_TEMPLATE = {
