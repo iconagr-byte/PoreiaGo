@@ -149,7 +149,7 @@ export default function RegisterPage() {
 
   const shellClass = rentIntent
     ? `rent-auth-stage${isMobile ? '' : ' rent-auth-stage--desktop'}`
-    : 'wallet-auth-stage';
+    : `wallet-auth-stage${isMobile ? '' : ' wallet-auth-stage--desktop'}`;
   const cardClass = rentIntent ? 'rent-auth-shell' : 'wallet-auth-shell';
   const scrollClass = rentIntent ? 'rent-auth-scroll' : 'wallet-auth-scroll';
   const panelClass = rentIntent ? 'rent-auth-card' : 'wallet-auth-card';

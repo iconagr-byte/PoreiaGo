@@ -360,7 +360,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   }
 
   return (
-    <div className="wallet-auth-stage">
+    <div className={`wallet-auth-stage${isMobile ? '' : ' wallet-auth-stage--desktop'}`}>
       <div className="wallet-auth-shell">
         <div className="wallet-auth-scroll">
           <div className="wallet-auth-card">{formBody}</div>

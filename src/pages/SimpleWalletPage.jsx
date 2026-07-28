@@ -37,6 +37,7 @@ import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
+import { useRentMobile } from '../lib/rental/rentDevice.js';
 import '../styles/wallet-pass.css';
 
 const TABS = [
@@ -132,6 +133,7 @@ function WalletAuthGate() {
 function WalletAuthenticatedApp() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useRentMobile();
   const [activeTab, setActiveTab] = useState('home');
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
