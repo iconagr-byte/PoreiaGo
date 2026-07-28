@@ -368,14 +368,15 @@ export function RentProductSection() {
           <div className="grid gap-4">
             <article className="rounded-[24px] border border-white/15 bg-white/10 backdrop-blur-md p-6 text-white">
               <p className="text-[11px] font-bold uppercase tracking-wider text-teal-200">
-                Αυτόνομο συμβόλαιο
+                {standalone.badge}
               </p>
-              <h3 className="mt-2 text-xl font-bold">PoreiaGo Rent</h3>
+              <h3 className="mt-2 text-xl font-bold">{standalone.name}</h3>
               <p className="mt-1 text-sm text-white/65">
-                Για γραφεία ενοικίασης χωρίς λεωφορεία — πλήρες /rent stack.
+                {standalone.tagline}
               </p>
               <p className="mt-4 text-2xl font-bold tabular-nums">
-                από €149<span className="text-sm font-semibold text-white/55">/μήνα</span>
+                από €{standalone.monthlyEur}
+                <span className="text-sm font-semibold text-white/55">/μήνα</span>
               </p>
             </article>
           </div>
