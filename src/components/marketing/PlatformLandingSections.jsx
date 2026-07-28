@@ -152,24 +152,18 @@ export function PainPointsSection() {
             Αναγνωρίζετε τον εαυτό σας;
           </h2>
           <p className="text-slate-600 mt-3 text-base md:text-lg leading-relaxed">
-            Πέντε καθημερινές προκλήσεις που λύνουμε με μία πλατφόρμα.
+            Έξι καθημερινές προκλήσεις που λύνουμε με μία πλατφόρμα.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-5 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 max-w-5xl mx-auto">
           {AUDIENCE_HOOKS.map((item, index) => {
             const iconStyle = FEATURE_ICON_STYLES[item.accent] || FEATURE_ICON_STYLES.indigo;
-            const gridClass =
-              index < 3
-                ? 'lg:col-span-2'
-                : index === 3
-                  ? 'lg:col-span-2 lg:col-start-2'
-                  : 'lg:col-span-2 lg:col-start-4';
 
             return (
               <article
                 key={item.text}
-                className={`group relative flex flex-col sm:flex-row lg:flex-col gap-4 p-6 md:p-7 rounded-[22px] bg-white border border-slate-200/80 shadow-[0_4px_24px_rgba(15,23,42,0.04)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.10)] hover:border-indigo-200/80 hover:-translate-y-1 transition-all duration-300 ${gridClass}`}
+                className="group relative flex flex-col gap-4 p-6 md:p-7 rounded-[22px] bg-gradient-to-br from-indigo-50/90 via-white to-sky-50/70 border border-indigo-200/70 shadow-[0_8px_28px_rgba(79,91,213,0.08)] hover:shadow-[0_16px_40px_rgba(79,91,213,0.14)] hover:border-indigo-300 hover:-translate-y-1 transition-all duration-300"
               >
                 <div
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ${iconStyle}`}
@@ -188,7 +182,7 @@ export function PainPointsSection() {
                   </span>
                 </div>
                 <div
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-indigo-50 text-indigo-400 flex items-center justify-center text-xs font-black opacity-40 group-hover:opacity-100 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-all"
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-indigo-100/90 text-indigo-500 flex items-center justify-center text-xs font-black"
                   aria-hidden
                 >
                   {index + 1}
@@ -199,7 +193,7 @@ export function PainPointsSection() {
         </div>
 
         <div className="mt-12 md:mt-16 max-w-2xl mx-auto text-center">
-          <div className="inline-flex flex-col items-center gap-4 px-8 py-6 rounded-[24px] bg-white border border-indigo-100 shadow-[0_8px_32px_rgba(99,102,241,0.08)] text-slate-800">
+          <div className="inline-flex flex-col items-center gap-4 px-8 py-6 rounded-[24px] bg-gradient-to-br from-indigo-50 to-sky-50 border border-indigo-200/80 shadow-[0_8px_32px_rgba(99,102,241,0.08)] text-slate-800">
             <span className="material-symbols-outlined text-[28px] text-indigo-500">handshake</span>
             <p className="text-sm md:text-base text-slate-600 leading-relaxed font-medium">
               Αν απαντήσατε «ναι» σε οποιοδήποτε — η πλατφόρμα είναι φτιαγμένη για εσάς, όχι για ένα
