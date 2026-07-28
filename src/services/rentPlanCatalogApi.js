@@ -5,9 +5,17 @@ import { mergeRentPlanCatalog } from '../lib/billing/planCatalog.js';
 async function parseError(res) {
   const err = await res.json().catch(() => ({}));
   const detail = err.detail;
-  throw new Error(
-    typeof detail === 'string' ? detail : res.statusText || 'Request failed',
-  );
+  if (typeof detail === 'string' && detail.trim()) {
+    throw new Error(detail);
+  }
+  if (Array.isArray(detail) && detail.length) {
+    const msg = detail
+      .map((d) => d?.msg || d?.message || JSON.stringify(d))
+      .filter(Boolean)
+      .join('; ');
+    throw new Error(msg || res.statusText || 'Request failed');
+  }
+  throw new Error(res.statusText || `Σφάλμα αποθήκευσης (${res.status})`);
 }
 
 export async function fetchPublicRentPlanCatalog() {

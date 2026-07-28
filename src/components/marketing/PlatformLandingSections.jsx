@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AUDIENCE_HOOKS,
@@ -8,6 +9,8 @@ import {
   STATS,
   STEPS,
 } from '../../lib/marketing/platformCopy.js';
+import { mergeRentPlanCatalog } from '../../lib/billing/planCatalog.js';
+import { fetchPublicRentPlanCatalog } from '../../services/rentPlanCatalogApi.js';
 import AgencyPlansHook from './AgencyPlansHook.jsx';
 
 const FEATURE_ICON_STYLES = {
@@ -286,6 +289,20 @@ export function PricingTeaserSection() {
 }
 
 export function RentProductSection() {
+  const [standalone, setStandalone] = useState(() => mergeRentPlanCatalog(null).standalone);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicRentPlanCatalog().then((data) => {
+      if (!cancelled) setStandalone(data.standalone);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (standalone.visible === false) return null;
+
   return (
     <section
       id="rent"

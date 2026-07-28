@@ -166,18 +166,22 @@ export default function RentPlanCardsEditor() {
   }, [load]);
 
   const onSave = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
+    if (saving) return;
     setSaving(true);
     try {
-      const saved = await updateRentPlanCatalog({
+      const payload = {
         sectionTitle,
         standalone: formToCard(standalone),
         addon: formToCard(addon),
-      });
+      };
+      const saved = await updateRentPlanCatalog(payload);
       setSectionTitle(saved.sectionTitle);
       setStandalone(cardToForm(saved.standalone));
       setAddon(cardToForm(saved.addon));
-      toast.success('Οι κάρτες Rent αποθηκεύτηκαν');
+      toast.success(
+        `Αποθηκεύτηκε · ${saved.standalone.name} €${saved.standalone.monthlyEur}/μήνα`,
+      );
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');
     } finally {
@@ -225,8 +229,9 @@ export default function RentPlanCardsEditor() {
 
       <div className="flex flex-wrap items-center gap-3">
         <button
-          type="submit"
+          type="button"
           disabled={saving}
+          onClick={onSave}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-teal-700 text-white text-sm font-bold hover:bg-teal-800 disabled:opacity-60"
         >
           <span className="material-symbols-outlined text-[18px]">save</span>

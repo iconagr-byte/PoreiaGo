@@ -1,13 +1,20 @@
-"""Editable Rent SaaS plan cards (standalone + add-on) — JSON store."""
+"""Editable Rent SaaS plan cards (standalone + add-on) — durable JSON store."""
 
 from __future__ import annotations
 
 import json
+import os
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-_SETTINGS_FILE = Path(__file__).resolve().parent / "rent_plan_catalog.json"
+# Prefer persistent volume in production (docker mount /app/data).
+_DATA_DIR = Path(
+    os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[2] / "data"
+)
+_SETTINGS_FILE = _DATA_DIR / "rent_plan_catalog.json"
+# Legacy path inside the image — used only to migrate once after deploy.
+_LEGACY_SETTINGS_FILE = Path(__file__).resolve().parent / "rent_plan_catalog.json"
 
 DEFAULT_STANDALONE: dict[str, Any] = {
     "badge": "Αυτόνομο συμβόλαιο",
@@ -86,21 +93,33 @@ def _merge_card(base: dict[str, Any], raw: dict | None) -> dict[str, Any]:
     return merged
 
 
-def read_rent_plan_catalog() -> dict[str, Any]:
-    catalog = deepcopy(DEFAULT_CATALOG)
-    if not _SETTINGS_FILE.exists():
-        return catalog
+def _load_raw_file(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
     try:
-        raw = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError, TypeError):
-        return catalog
-    if not isinstance(raw, dict):
-        return catalog
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def _apply_raw(catalog: dict[str, Any], raw: dict[str, Any]) -> dict[str, Any]:
     if raw.get("sectionTitle") is not None:
         catalog["sectionTitle"] = str(raw["sectionTitle"]).strip() or catalog["sectionTitle"]
     catalog["standalone"] = _merge_card(DEFAULT_STANDALONE, raw.get("standalone"))
     catalog["addon"] = _merge_card(DEFAULT_ADDON, raw.get("addon"))
     return catalog
+
+
+def read_rent_plan_catalog() -> dict[str, Any]:
+    catalog = deepcopy(DEFAULT_CATALOG)
+    raw = _load_raw_file(_SETTINGS_FILE)
+    if raw is None:
+        # Fall back to legacy image path (pre-volume). Next save writes to /app/data.
+        raw = _load_raw_file(_LEGACY_SETTINGS_FILE)
+    if raw is None:
+        return catalog
+    return _apply_raw(catalog, raw)
 
 
 def write_rent_plan_catalog(data: dict[str, Any]) -> dict[str, Any]:
@@ -114,8 +133,8 @@ def write_rent_plan_catalog(data: dict[str, Any]) -> dict[str, Any]:
     if isinstance(data.get("addon"), dict):
         current["addon"] = _merge_card(current["addon"], data["addon"])
     _SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _SETTINGS_FILE.write_text(
-        json.dumps(current, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    tmp = _SETTINGS_FILE.with_suffix(".json.tmp")
+    payload = json.dumps(current, indent=2, ensure_ascii=False)
+    tmp.write_text(payload, encoding="utf-8")
+    tmp.replace(_SETTINGS_FILE)
     return current
