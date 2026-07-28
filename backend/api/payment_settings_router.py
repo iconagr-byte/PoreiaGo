@@ -188,6 +188,7 @@ class PaymentAuditEntry(BaseModel):
     actor_id: str | None = None
     detail: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    tenant_id: str | None = None
 
 
 async def _load_booking_for_confirm(booking_key: str, request: Request) -> dict[str, Any] | None:
