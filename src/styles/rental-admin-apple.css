@@ -806,3 +806,35 @@
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
 }
+
+/* Printable rental agreement */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .rental-agreement-sheet,
+  .rental-agreement-sheet * {
+    visibility: visible !important;
+  }
+
+  .rental-agreement-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .rental-agreement-print {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+}
+
