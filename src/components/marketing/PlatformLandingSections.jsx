@@ -121,28 +121,30 @@ export function HeroSection() {
 
 export function PainPointsSection() {
   return (
-    <section className="relative py-20 md:py-28 overflow-hidden bg-gradient-to-b from-white via-indigo-50/40 to-slate-50 border-y border-slate-200/60">
+    <section className="relative py-20 md:py-28 overflow-hidden bg-[#f5f7fb] border-y border-slate-200/70 text-slate-900">
       <div
-        className="absolute inset-0 pointer-events-none opacity-60"
+        className="absolute inset-0 pointer-events-none"
         aria-hidden
         style={{
           backgroundImage:
-            'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.12), transparent), radial-gradient(ellipse 60% 40% at 100% 100%, rgba(139,92,246,0.08), transparent)',
+            'radial-gradient(ellipse 90% 55% at 50% -15%, rgba(99,102,241,0.10), transparent 58%), radial-gradient(ellipse 50% 35% at 0% 80%, rgba(14,165,233,0.06), transparent 55%), radial-gradient(ellipse 45% 30% at 100% 90%, rgba(99,102,241,0.05), transparent 50%)',
         }}
       />
       <div
-        className="absolute inset-0 opacity-[0.35] pointer-events-none"
+        className="absolute inset-0 opacity-40 pointer-events-none"
         aria-hidden
         style={{
           backgroundImage:
-            'linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
+            'linear-gradient(rgba(148,163,184,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.12) 1px, transparent 1px)',
+          backgroundSize: '44px 44px',
+          maskImage: 'linear-gradient(180deg, black 0%, transparent 92%)',
+          WebkitMaskImage: 'linear-gradient(180deg, black 0%, transparent 92%)',
         }}
       />
 
       <div className="relative max-w-6xl mx-auto px-4 md:px-8">
         <div className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100/80 border border-indigo-200/60 text-xs font-bold uppercase tracking-wider text-indigo-700 mb-5">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100/90 border border-indigo-200/70 text-xs font-bold uppercase tracking-wider text-indigo-700 mb-5">
             <span className="material-symbols-outlined text-[16px]">groups</span>
             Για ποιον είναι
           </span>
@@ -167,7 +169,7 @@ export function PainPointsSection() {
             return (
               <article
                 key={item.text}
-                className={`group relative flex flex-col sm:flex-row lg:flex-col gap-4 p-6 md:p-7 rounded-[22px] bg-white/90 backdrop-blur-sm border border-white shadow-[0_4px_24px_rgba(15,23,42,0.05)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.12)] hover:border-indigo-200/80 hover:-translate-y-1 transition-all duration-300 ${gridClass}`}
+                className={`group relative flex flex-col sm:flex-row lg:flex-col gap-4 p-6 md:p-7 rounded-[22px] bg-white border border-slate-200/80 shadow-[0_4px_24px_rgba(15,23,42,0.04)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.10)] hover:border-indigo-200/80 hover:-translate-y-1 transition-all duration-300 ${gridClass}`}
               >
                 <div
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ${iconStyle}`}
@@ -197,9 +199,9 @@ export function PainPointsSection() {
         </div>
 
         <div className="mt-12 md:mt-16 max-w-2xl mx-auto text-center">
-          <div className="inline-flex flex-col items-center gap-4 px-8 py-6 rounded-[24px] bg-gradient-to-br from-slate-900 to-indigo-950 text-white shadow-xl shadow-indigo-900/20">
-            <span className="material-symbols-outlined text-[28px] text-indigo-300">handshake</span>
-            <p className="text-sm md:text-base text-white/90 leading-relaxed font-medium">
+          <div className="inline-flex flex-col items-center gap-4 px-8 py-6 rounded-[24px] bg-white border border-indigo-100 shadow-[0_8px_32px_rgba(99,102,241,0.08)] text-slate-800">
+            <span className="material-symbols-outlined text-[28px] text-indigo-500">handshake</span>
+            <p className="text-sm md:text-base text-slate-600 leading-relaxed font-medium">
               Αν απαντήσατε «ναι» σε οποιοδήποτε — η πλατφόρμα είναι φτιαγμένη για εσάς, όχι για ένα
               μεμονωμένο brand.
             </p>
