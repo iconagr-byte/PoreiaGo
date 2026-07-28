@@ -17,7 +17,10 @@ def validate_confirm_request(booking: dict[str, Any], body: dict[str, Any]) -> N
     if not is_pending_bank_transfer_booking(booking):
         raise ValueError("Booking is not pending bank transfer")
 
-    settings = read_payment_settings()
+    from api.request_tenant import booking_tenant_id
+    from travel_platform.settings.payment_settings_store import read_payment_settings
+
+    settings = read_payment_settings(booking_tenant_id(booking))
     security = settings.get("security") or {}
 
     expected_amount = float(booking.get("balanceDue") or booking.get("price") or 0)
@@ -79,8 +82,9 @@ def record_confirm_audit(
     reference: str | None,
     actor_id: str | None = None,
     detail: str | None = None,
+    tenant_id: str | None = None,
 ) -> dict[str, Any] | None:
-    settings = read_payment_settings()
+    settings = read_payment_settings(tenant_id)
     security = settings.get("security") or {}
     if not security.get("audit_payment_actions", True):
         return None

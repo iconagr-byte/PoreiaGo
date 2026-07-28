@@ -14,7 +14,9 @@ class TenantIsolationHardeningTests(unittest.TestCase):
 
         self.assertTrue(_is_file_store_admin("/api/admin/platform/drivers"))
         self.assertTrue(_is_file_store_admin("/api/admin/platform/site-appearance"))
+        self.assertTrue(_is_file_store_admin("/api/admin/platform/payment-settings"))
         self.assertIn("/api/admin/platform/drivers", FILE_STORE_ADMIN_PREFIXES)
+        self.assertIn("/api/admin/platform/payment-settings", FILE_STORE_ADMIN_PREFIXES)
 
     def test_live_fleet_merge_off_by_default(self):
         from travel_platform.telemetry.live_fleet import LiveFleetService

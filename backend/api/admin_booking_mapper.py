@@ -283,6 +283,8 @@ def booking_to_admin_dict(
         "bookingSource": meta.get("source") or "Postgres",
         "passenger_vat_id": booking.passenger_vat_id,
         "notes": booking.notes,
+        "tenant_id": str(booking.tenant_id) if getattr(booking, "tenant_id", None) else None,
+        "tenantId": str(booking.tenant_id) if getattr(booking, "tenant_id", None) else None,
     }
     result.update(build_fiscal_admin_fields(booking, fiscal_invoices))
     return result

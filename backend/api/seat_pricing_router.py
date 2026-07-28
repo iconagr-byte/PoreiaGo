@@ -1,12 +1,13 @@
-"""Public + admin seat pricing (per bus layout)."""
+"""Public + admin seat pricing (per bus layout, per office)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from api.request_tenant import admin_tenant_id, public_tenant_id
 from travel_platform.settings.seat_pricing_store import (
     LAYOUT_IDS,
     get_layout_pricing,
@@ -66,22 +67,28 @@ class PublicLayoutPricingResponse(LayoutPricingModel):
 
 
 @router.get("/api/site/seat-pricing", response_model=PublicLayoutPricingResponse)
-async def get_public_seat_pricing(layout_id: str = Query(default="luxury-coach")):
+async def get_public_seat_pricing(
+    request: Request,
+    layout_id: str = Query(default="luxury-coach"),
+):
+    tid = await public_tenant_id(request)
+    if not tid:
+        raise HTTPException(status_code=404, detail="Office not found for this domain")
     lid = layout_id if layout_id in LAYOUT_IDS else "luxury-coach"
-    row = get_layout_pricing(lid)
+    row = get_layout_pricing(lid, tid)
     return PublicLayoutPricingResponse(layout_id=lid, **row)
 
 
 @router.get("/api/admin/platform/seat-pricing", response_model=SeatPricingResponse)
-async def get_admin_seat_pricing():
-    data = read_seat_pricing()
+async def get_admin_seat_pricing(request: Request):
+    data = read_seat_pricing(admin_tenant_id(request))
     return SeatPricingResponse(
         layouts={k: LayoutPricingModel(**v) for k, v in data["layouts"].items()}
     )
 
 
 @router.patch("/api/admin/platform/seat-pricing", response_model=SeatPricingResponse)
-async def patch_seat_pricing(body: SeatPricingPatch):
+async def patch_seat_pricing(body: SeatPricingPatch, request: Request):
     if not body.layouts:
         raise HTTPException(status_code=400, detail="No layouts in patch")
     patch = {
@@ -91,7 +98,7 @@ async def patch_seat_pricing(body: SeatPricingPatch):
             if k in LAYOUT_IDS
         }
     }
-    saved = write_seat_pricing(patch)
+    saved = write_seat_pricing(patch, admin_tenant_id(request))
     return SeatPricingResponse(
         layouts={k: LayoutPricingModel(**v) for k, v in saved["layouts"].items()}
     )

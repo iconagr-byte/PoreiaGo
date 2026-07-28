@@ -56,7 +56,9 @@ def validate_cash_payment_request(booking: dict[str, Any], body: dict[str, Any])
     if amount_f > max_allowed + 0.01:
         raise ValueError(f"Το ποσό υπερβαίνει το υπόλοιπο (€{max_allowed:.2f})")
 
-    settings = read_payment_settings()
+    settings = read_payment_settings(
+        (booking.get("tenant_id") or booking.get("tenantId") or None)
+    )
     security = settings.get("security") or {}
     if security.get("require_amount_on_confirm", True) and amount_f <= 0:
         raise ValueError("confirmed amount required")
@@ -122,8 +124,9 @@ def record_cash_audit(
     reference: str | None = None,
     detail: str | None = None,
     receipt_number: str | None = None,
+    tenant_id: str | None = None,
 ) -> dict[str, Any] | None:
-    settings = read_payment_settings()
+    settings = read_payment_settings(tenant_id)
     security = settings.get("security") or {}
     if not security.get("audit_payment_actions", True):
         return None
