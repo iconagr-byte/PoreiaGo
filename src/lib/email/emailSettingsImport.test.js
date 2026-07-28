@@ -1,10 +1,16 @@
 /**
- * Smoke tests for email settings file import (JSON + .env).
+ * Smoke tests for email settings file import (JSON + .env + Apple .mobileconfig).
  */
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   decodeEmailSettingsBytes,
+  parseEmailSettingsBytes,
   parseEmailSettingsFile,
 } from './emailSettingsImport.js';
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 const jsonOk = parseEmailSettingsFile(
   JSON.stringify({
@@ -104,5 +110,38 @@ const utf16 = decodeEmailSettingsBytes(
   new Uint8Array([0xff, 0xfe, 0x45, 0x00, 0x3d, 0x00, 0x61, 0x00]),
 );
 console.assert(utf16.includes('E=a') || utf16.startsWith('E='), 'utf16 decode');
+
+const unsignedMc = parseEmailSettingsBytes(
+  readFileSync(join(here, 'fixtures/unsigned-email.mobileconfig')),
+  'unsigned-email.mobileconfig',
+);
+console.assert(unsignedMc.accounts.length === 1, 'unsigned mobileconfig account');
+console.assert(unsignedMc.accounts[0].email_address === 'sales@example.com', 'mc email');
+console.assert(unsignedMc.accounts[0].imap_host === 'mail.example.com', 'mc imap');
+console.assert(unsignedMc.accounts[0].smtp_port === 465, 'mc smtp 465');
+console.assert(unsignedMc.accounts[0].mail_password === 'secret-pass', 'mc password');
+console.assert(unsignedMc.errors.length === 0, 'unsigned with password has no soft errors');
+
+const signedMc = parseEmailSettingsBytes(
+  readFileSync(join(here, 'fixtures/info-achilliotravel.mobileconfig')),
+  'info@achilliotravel.com Secure Email Setup.mobileconfig',
+);
+console.assert(signedMc.accounts.length === 1, 'signed PKCS#7 mobileconfig');
+console.assert(
+  signedMc.accounts[0].email_address === 'info@achilliotravel.com',
+  'signed email',
+);
+console.assert(
+  signedMc.accounts[0].imap_host === 'mail.achilliotravel.com',
+  'signed imap host',
+);
+console.assert(signedMc.accounts[0].imap_port === 993, 'signed imap port');
+console.assert(signedMc.accounts[0].smtp_port === 465, 'signed smtp port');
+console.assert(signedMc.accounts[0].smtp_secure === true, 'signed smtp ssl');
+console.assert(!signedMc.accounts[0].mail_password, 'cPanel profile has no password');
+console.assert(
+  signedMc.errors.some((e) => e.includes('κωδικός')),
+  'prompts for password',
+);
 
 console.log('emailSettingsImport: OK');
