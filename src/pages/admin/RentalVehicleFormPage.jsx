@@ -210,7 +210,7 @@ export default function RentalVehicleFormPage() {
 
   if (loading) {
     return (
-      <AdminLayout activeTab="fleet" title={header}>
+      <AdminLayout activeTab="fleet_rental" title={header} hideNav>
         <p className="text-on-surface-variant">Φόρτωση…</p>
       </AdminLayout>
     );
@@ -237,7 +237,7 @@ export default function RentalVehicleFormPage() {
   );
 
   return (
-    <AdminLayout activeTab="fleet" title={header} footer={actions}>
+    <AdminLayout activeTab="fleet_rental" title={header} footer={actions} hideNav>
       <form
         id="rental-vehicle-form"
         onSubmit={save}
