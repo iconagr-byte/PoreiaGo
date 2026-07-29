@@ -1,12 +1,13 @@
 /**
  * Full marketing page for Rent services — shareable for advertising.
  * Route: /rent/services
- * On office domains, redirect to the storefront homepage (#rent) —
- * offices do not need a separate PoreiaGo-branded services page.
+ * - Platform host: PoreiaGo marketing + contracts
+ * - Office/tenant host: office-branded services landing → /rent booking
  */
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
+import RentalOfficeServicesPage from '../components/rental/RentalOfficeServicesPage.jsx';
 import { RENT_SERVICE_FEATURES, rentServiceCopy } from '../lib/rental/rentServicesCatalog.js';
 import {
   RENT_ADDON,
@@ -18,6 +19,7 @@ import {
 import { getRentLang, setRentLang, t } from '../lib/rental/rentI18n.js';
 import { isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
 import { fetchPublicRentPlanCatalog } from '../services/rentPlanCatalogApi.js';
+import '../styles/rental-pwa.css';
 
 export default function RentalServicesPage() {
   const lang = getRentLang();
@@ -35,7 +37,7 @@ export default function RentalServicesPage() {
   }, []);
 
   if (isTenantStorefrontHost()) {
-    return <Navigate to="/" replace />;
+    return <RentalOfficeServicesPage />;
   }
 
   const standalone = rentCatalog.standalone || RENT_STANDALONE_PLAN;
@@ -124,19 +126,35 @@ export default function RentalServicesPage() {
             </h2>
             <p className="mt-3 text-slate-600 leading-relaxed">{t('services_lead', lang)}</p>
           </div>
-          <ul className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+          <ul className="grid gap-5 md:gap-6">
             {RENT_SERVICE_FEATURES.map((feature) => {
               const copy = rentServiceCopy(feature, lang);
               return (
                 <li
                   key={feature.id}
-                  className="rounded-[24px] border border-black/[0.06] bg-white p-6 shadow-[0_8px_30px_rgba(15,23,42,0.04)]"
+                  className="rounded-[24px] border border-black/[0.06] bg-white p-6 md:p-7 shadow-[0_8px_30px_rgba(15,23,42,0.04)]"
                 >
-                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-[#0b3d4a] text-white mb-4">
-                    <span className="material-symbols-outlined">{feature.icon}</span>
-                  </span>
-                  <h3 className="font-bold text-lg tracking-tight">{copy.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600 leading-relaxed">{copy.copy}</p>
+                  <div className="flex gap-4 items-start">
+                    <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-[#0b3d4a] text-white">
+                      <span className="material-symbols-outlined">{feature.icon}</span>
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-lg tracking-tight">{copy.title}</h3>
+                      <p className="mt-2 text-sm text-slate-600 leading-relaxed">{copy.copy}</p>
+                      {copy.details?.length ? (
+                        <ul className="mt-4 space-y-2">
+                          {copy.details.map((line) => (
+                            <li key={line} className="flex gap-2 text-sm text-slate-700">
+                              <span className="material-symbols-outlined text-teal-700 text-[18px] shrink-0">
+                                check_circle
+                              </span>
+                              {line}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  </div>
                 </li>
               );
             })}
@@ -196,10 +214,10 @@ export default function RentalServicesPage() {
                   </span>
                   <h3 className="mt-4 text-2xl font-bold">{addon.name}</h3>
                   <p className="text-sm text-slate-600 mt-1">{addon.tagline}</p>
-                  <p className="mt-5 text-3xl font-bold tabular-nums">
+                  <div className="mt-5 text-3xl font-bold tabular-nums">
                     {addonPrice.label}
                     <span className="text-base font-semibold text-slate-500">{addonPrice.suffix}</span>
-                  </p>
+                  </div>
                   <ul className="mt-5 space-y-2 flex-1 text-sm text-slate-700">
                     {addon.features.map((f) => (
                       <li key={f} className="flex gap-2">
