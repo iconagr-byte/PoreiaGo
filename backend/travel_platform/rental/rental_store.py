@@ -38,7 +38,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "with_driver_daily_eur": 80,
         "current_mileage": 18200,
         "photo_url": "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=1200&q=80",
-        "description": "Οικονομικό επιβατικό για πόλη και κοντινές αποδράσεις.",
+        "description": (
+            "Συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και "
+            "κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες."
+        ),
     },
     {
         "id_suffix": "car-corolla",
@@ -51,7 +54,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "with_driver_daily_eur": 90,
         "current_mileage": 24100,
         "photo_url": "https://images.unsplash.com/photo-1623869675781-80aa31012a5a?auto=format&fit=crop&w=1200&q=80",
-        "description": "Άνετο οικογενειακό sedan με χαμηλή κατανάλωση.",
+        "description": (
+            "Άνετο οικογενειακό sedan με χώρο για αποσκευές και σταθερή οδήγηση στον αυτοκινητόδρομο. "
+            "Ιδανικό για πολυήμερες διακοπές ή επαγγελματικά ταξίδια με άνεση και οικονομία."
+        ),
     },
     {
         "id_suffix": "car-tucson",
@@ -64,7 +70,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "with_driver_daily_eur": 110,
         "current_mileage": 15600,
         "photo_url": "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=1200&q=80",
-        "description": "SUV επιβατικό για μεγαλύτερα ταξίδια και αποσκευές.",
+        "description": (
+            "SUV με ψηλή ορατότητα, χώρο για οικοσκευή και άνεση σε μεγαλύτερες αποστάσεις. "
+            "Κατάλληλο για οικογένειες, ορεινές διαδρομές και ταξίδια με περισσότερες αποσκευές."
+        ),
     },
     {
         "id_suffix": "van-transporter",
@@ -77,7 +86,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "with_driver_daily_eur": 140,
         "current_mileage": 31200,
         "photo_url": "https://images.unsplash.com/photo-1527786356903-a4b4c4f0ad83?auto=format&fit=crop&w=1200&q=80",
-        "description": "Van 9 θέσεων για ομάδες και μεταφορές.",
+        "description": (
+            "Ευρύχωρο van 9 θέσεων για ομάδες, εκδρομές και μεταφορές με αποσκευές. "
+            "Σταθερό στον δρόμο, με χώρο για επιβάτες και εξοπλισμό — ιδανικό για τουριστικά ή εταιρικά γκρουπ."
+        ),
     },
     {
         "id_suffix": "van-vito",
@@ -90,7 +102,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "with_driver_daily_eur": 150,
         "current_mileage": 27800,
         "photo_url": "https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?auto=format&fit=crop&w=1200&q=80",
-        "description": "Premium van για άνετες μετακινήσεις ομάδας.",
+        "description": (
+            "Premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. "
+            "Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης."
+        ),
     },
     {
         "id_suffix": "van-trafic",
@@ -103,9 +118,46 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "with_driver_daily_eur": 130,
         "current_mileage": 33400,
         "photo_url": "https://images.unsplash.com/photo-1544620341-1adc1baa16c2?auto=format&fit=crop&w=1200&q=80",
-        "description": "Ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις.",
+        "description": (
+            "Ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις. "
+            "Ισορροπία χώρου, οικονομίας και ευελιξίας — ιδανικό για αεροδρόμιο, ξενοδοχεία και ημερήσιες εκδρομές με ομάδα."
+        ),
     },
 )
+
+
+def _refresh_demo_fleet_copy(data: dict[str, Any], tenant_id: str) -> int:
+    """Refresh marketing descriptions on seeded demo vehicles (short → rich copy)."""
+    by_suffix = {spec["id_suffix"]: spec for spec in _DEMO_VEHICLE_SPECS}
+    updated = 0
+    now = _now()
+    for row in data.get("vehicles") or []:
+        if row.get("tenant_id") != tenant_id:
+            continue
+        if str(row.get("notes") or "") != _DEMO_FLEET_MARKER:
+            continue
+        vid = str(row.get("id") or "")
+        suffix = None
+        for key in by_suffix:
+            if vid.endswith(key) or key in vid:
+                suffix = key
+                break
+        if not suffix:
+            model = str(row.get("model") or "").strip().lower()
+            for key, spec in by_suffix.items():
+                if str(spec.get("model") or "").strip().lower() == model:
+                    suffix = key
+                    break
+        if not suffix:
+            continue
+        spec = by_suffix[suffix]
+        new_desc = str(spec.get("description") or "").strip()
+        old_desc = str(row.get("description") or "").strip()
+        if new_desc and old_desc != new_desc:
+            row["description"] = new_desc
+            row["updated_at"] = now
+            updated += 1
+    return updated
 
 
 def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
@@ -119,6 +171,8 @@ def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
         data = _read()
         existing = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
         if existing:
+            if _refresh_demo_fleet_copy(data, tid):
+                _write(data)
             return 0
         now = _now()
         added = 0

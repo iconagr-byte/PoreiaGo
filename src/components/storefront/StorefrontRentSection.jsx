@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { RENT_SERVICE_FEATURES, rentServiceCopy } from '../../lib/rental/rentServicesCatalog.js';
 import { rentCategoryLabel, withDemoRentFleet } from '../../lib/rental/demoRentFleet.js';
+import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 
 /**
  * Homepage Rent block for office storefronts that have rent_enabled.
@@ -55,12 +56,14 @@ export default function StorefrontRentSection({
             <p className="text-sm text-on-surface-variant">Φόρτωση στόλου ενοικίασης…</p>
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0">
-              {preview.map((v) => {
+              {preview.map((raw) => {
+                const v = enrichRentVehicle(raw);
                 const photo =
                   resolveSiteAssetUrl(v.primary_photo_url || v.photo_url || v.image_url) || '';
                 const name = v.display_name || v.name || v.model || 'Όχημα';
                 const price = v.daily_rate_eur ?? v.price_per_day ?? v.daily_price;
                 const seats = v.seating_capacity;
+                const meta = [v.transmission, v.fuel, v.luggage].filter(Boolean).slice(0, 2);
                 return (
                   <li key={v.id || name}>
                     <Link
@@ -85,9 +88,17 @@ export default function StorefrontRentSection({
                         <h3 className="mt-1 font-headline-sm font-bold text-on-surface group-hover:text-teal-800 transition-colors">
                           {name}
                         </h3>
-                        {v.description ? (
-                          <p className="mt-2 text-sm text-on-surface-variant line-clamp-2">
-                            {v.description}
+                        {v.display_headline ? (
+                          <p className="mt-1 text-xs font-semibold text-teal-800">{v.display_headline}</p>
+                        ) : null}
+                        {v.display_blurb ? (
+                          <p className="mt-2 text-sm text-on-surface-variant line-clamp-3">
+                            {v.display_blurb}
+                          </p>
+                        ) : null}
+                        {meta.length ? (
+                          <p className="mt-2 text-xs font-semibold text-on-surface-variant">
+                            {meta.join(' · ')}
                           </p>
                         ) : null}
                         {price != null && price !== '' ? (

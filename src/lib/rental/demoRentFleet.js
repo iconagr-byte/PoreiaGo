@@ -9,9 +9,12 @@ export const DEMO_RENT_FLEET = [
     model: 'Toyota Yaris',
     seating_capacity: 5,
     daily_rate_eur: 35,
+    one_way_surcharge_eur: 25,
+    with_driver_daily_eur: 80,
     photo_url:
       'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=1200&q=80',
-    description: 'Οικονομικό επιβατικό για πόλη και κοντινές αποδράσεις.',
+    description:
+      'Συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
   },
   {
     id: 'demo-rent-car-corolla',
@@ -19,9 +22,12 @@ export const DEMO_RENT_FLEET = [
     model: 'Toyota Corolla',
     seating_capacity: 5,
     daily_rate_eur: 48,
+    one_way_surcharge_eur: 30,
+    with_driver_daily_eur: 90,
     photo_url:
       'https://images.unsplash.com/photo-1623869675781-80aa31012a5a?auto=format&fit=crop&w=1200&q=80',
-    description: 'Άνετο οικογενειακό sedan με χαμηλή κατανάλωση.',
+    description:
+      'Άνετο οικογενειακό sedan με χώρο για αποσκευές και σταθερή οδήγηση στον αυτοκινητόδρομο. Ιδανικό για πολυήμερες διακοπές ή επαγγελματικά ταξίδια με άνεση και οικονομία.',
   },
   {
     id: 'demo-rent-car-tucson',
@@ -29,9 +35,12 @@ export const DEMO_RENT_FLEET = [
     model: 'Hyundai Tucson',
     seating_capacity: 5,
     daily_rate_eur: 65,
+    one_way_surcharge_eur: 40,
+    with_driver_daily_eur: 110,
     photo_url:
       'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=1200&q=80',
-    description: 'SUV επιβατικό για μεγαλύτερα ταξίδια και αποσκευές.',
+    description:
+      'SUV με ψηλή ορατότητα, χώρο για οικοσκευή και άνεση σε μεγαλύτερες αποστάσεις. Κατάλληλο για οικογένειες, ορεινές διαδρομές και ταξίδια με περισσότερες αποσκευές.',
   },
   {
     id: 'demo-rent-van-transporter',
@@ -39,9 +48,12 @@ export const DEMO_RENT_FLEET = [
     model: 'VW Transporter',
     seating_capacity: 9,
     daily_rate_eur: 95,
+    one_way_surcharge_eur: 50,
+    with_driver_daily_eur: 140,
     photo_url:
       'https://images.unsplash.com/photo-1527786356903-a4b4c4f0ad83?auto=format&fit=crop&w=1200&q=80',
-    description: 'Van 9 θέσεων για ομάδες και μεταφορές.',
+    description:
+      'Ευρύχωρο van 9 θέσεων για ομάδες, εκδρομές και μεταφορές με αποσκευές. Σταθερό στον δρόμο, με χώρο για επιβάτες και εξοπλισμό — ιδανικό για τουριστικά ή εταιρικά γκρουπ.',
   },
   {
     id: 'demo-rent-van-vito',
@@ -49,9 +61,12 @@ export const DEMO_RENT_FLEET = [
     model: 'Mercedes Vito',
     seating_capacity: 8,
     daily_rate_eur: 110,
+    one_way_surcharge_eur: 55,
+    with_driver_daily_eur: 150,
     photo_url:
       'https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?auto=format&fit=crop&w=1200&q=80',
-    description: 'Premium van για άνετες μετακινήσεις ομάδας.',
+    description:
+      'Premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης.',
   },
   {
     id: 'demo-rent-van-trafic',
@@ -59,9 +74,12 @@ export const DEMO_RENT_FLEET = [
     model: 'Renault Trafic',
     seating_capacity: 9,
     daily_rate_eur: 88,
+    one_way_surcharge_eur: 45,
+    with_driver_daily_eur: 130,
     photo_url:
       'https://images.unsplash.com/photo-1544620341-1adc1baa16c2?auto=format&fit=crop&w=1200&q=80',
-    description: 'Ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις.',
+    description:
+      'Ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις. Ισορροπία χώρου, οικονομίας και ευελιξίας — ιδανικό για αεροδρόμιο, ξενοδοχεία και ημερήσιες εκδρομές με ομάδα.',
   },
 ];
 
