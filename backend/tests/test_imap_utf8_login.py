@@ -42,21 +42,32 @@ class ImapUtf8LoginTests(unittest.TestCase):
 
         fake._mode_utf8.side_effect = mode_utf8
 
-        with patch("email_client.imap_utf8.imaplib.IMAP4_SSL", return_value=fake):
-            client = connect_imap(
-                {
-                    "host": "mail.example.com",
-                    "port": 993,
-                    "user": "info@example.com",
-                    "password": "κωδικός1",
-                    "use_ssl": True,
-                }
-            )
+        with patch("email_client.imap_utf8.imaplib.IMAP4_SSL", return_value=fake) as ssl_ctor:
+            with patch("email_client.imap_utf8._resolve_ipv4", return_value="203.0.113.10"):
+                client = connect_imap(
+                    {
+                        "host": "mail.example.com",
+                        "port": 993,
+                        "user": "info@example.com",
+                        "password": "κωδικός1",
+                        "use_ssl": True,
+                    }
+                )
 
         self.assertIs(client, fake)
+        ssl_ctor.assert_called_once()
+        self.assertEqual(ssl_ctor.call_args.args[0], "203.0.113.10")
         fake._mode_utf8.assert_called_once_with()
         fake.login.assert_called_once_with("info@example.com", "κωδικός1")
         self.assertEqual(fake._encoding, "utf-8")
+
+    def test_format_timeout_mentions_gmail_alternative(self):
+        from email_client.imap_utf8 import TIMEOUT_HINT_EL, format_imap_connect_error
+
+        exc = OSError(110, "Connection timed out")
+        msg = format_imap_connect_error(exc)
+        self.assertEqual(msg, TIMEOUT_HINT_EL)
+        self.assertIn("imap.gmail.com", msg)
 
     def test_format_imap_connect_error_greek_hint(self):
         from email_client.imap_utf8 import ENCODING_HINT_EL, format_imap_connect_error

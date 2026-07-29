@@ -54,8 +54,8 @@ function syncErrorHint(error) {
   if (/AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(msg)) {
     return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login).';
   }
-  if (/timed out|timeout|Errno 110|δεν μπορεί να φτάσει τον mail host/i.test(msg)) {
-    return 'Το PoreiaGo δεν φτάνει τον mail server (firewall). Ζητήστε από Intechs/cPanel whitelist του IP 34.141.98.145 στις θύρες 993 και 587.';
+  if (/timed out|timeout|Errno 110|δεν φτάνει τον mail host|δεν μπορεί να φτάσει τον mail host/i.test(msg)) {
+    return 'Το PoreiaGo δεν φτάνει τον mail server (firewall). Δοκιμάστε IMAP 143 STARTTLS, ή forward σε Gmail (imap.gmail.com), ή whitelist IP 34.141.98.145 από Intechs.';
   }
   if (/ascii codec|ordinal not in range|encoding/i.test(msg)) {
     return 'Πρόβλημα encoding — δοκιμάστε ξανά μετά από αποθήκευση κωδικού.';
@@ -110,6 +110,15 @@ export default function EmailSettingsPanel({ onAccountChange }) {
     setTestResult(null);
   };
 
+  const applyImapPreset = (preset) => {
+    if (preset === '993') {
+      setForm((f) => ({ ...f, imap_port: 993, imap_secure: true }));
+    } else if (preset === '143') {
+      setForm((f) => ({ ...f, imap_port: 143, imap_secure: false }));
+    }
+    setTestResult(null);
+  };
+
   const applySmtpPreset = (preset) => {
     if (preset === '587') {
       setForm((f) => ({ ...f, smtp_port: 587, smtp_secure: true }));
@@ -117,6 +126,24 @@ export default function EmailSettingsPanel({ onAccountChange }) {
       setForm((f) => ({ ...f, smtp_port: 465, smtp_secure: false }));
     }
     setTestResult(null);
+  };
+
+  const applyGmailFallback = () => {
+    setForm((f) => ({
+      ...f,
+      imap_host: 'imap.gmail.com',
+      imap_port: 993,
+      imap_secure: true,
+      smtp_host: 'smtp.gmail.com',
+      smtp_port: 587,
+      smtp_secure: true,
+    }));
+    setTestResult({
+      ok: false,
+      message: 'Προεπιλογές Gmail φορτώθηκαν',
+      hint:
+        'Στο cPanel: Forwarders → forward το info@ στο Gmail σας. Στο Google: App Password. Username = το Gmail. Μετά Αποθήκευση → Έλεγχος.',
+    });
   };
 
   const startNew = () => {
@@ -355,6 +382,15 @@ export default function EmailSettingsPanel({ onAccountChange }) {
       : Number(form.smtp_port) === 587 && form.smtp_secure
         ? '587'
         : 'custom';
+  const imapPreset =
+    Number(form.imap_port) === 143 && !form.imap_secure
+      ? '143'
+      : Number(form.imap_port) === 993 && form.imap_secure
+        ? '993'
+        : 'custom';
+  const showTimeoutHelp =
+    Boolean(testResult && !testResult.ok && /timed out|timeout|Errno 110|δεν φτάνει τον mail host/i.test(testResult.message || '')) ||
+    accounts.some((a) => /timed out|timeout|Errno 110|δεν φτάνει τον mail host/i.test(String(a.last_sync_error || '')));
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -496,6 +532,38 @@ export default function EmailSettingsPanel({ onAccountChange }) {
         </ul>
       )}
 
+      {showTimeoutHelp && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-amber-950 shadow-sm">
+          <p className="text-label-md font-bold">Εναλλακτικές για Connection timeout</p>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-body-sm">
+            <li>
+              <strong>Επεξεργασία</strong> → IMAP <strong>143 · STARTTLS</strong> → Αποθήκευση → Έλεγχος
+              (μερικοί hosts ανοίγουν μόνο τη 143).
+            </li>
+            <li>
+              <strong>Gmail bridge:</strong> cPanel → Forwarders → forward το mailbox στο Gmail → Google
+              App Password → στο form πάτα «Προεπιλογές Gmail» → βάλε App Password → Αποθήκευση.
+            </li>
+            <li>
+              Ticket Intechs: whitelist IP <code className="rounded bg-amber-100 px-1">34.141.98.145</code>{' '}
+              στις θύρες 993 και 587.
+            </li>
+          </ol>
+          {!editingId && accounts[0] && (
+            <button
+              type="button"
+              onClick={() => {
+                startEdit(accounts[0]);
+                requestAnimationFrame(() => applyGmailFallback());
+              }}
+              className="mt-3 rounded-xl border border-amber-300 bg-white px-3 py-2 text-label-sm font-bold text-amber-950 hover:bg-amber-100/60"
+            >
+              Άνοιγμα επεξεργασίας + προεπιλογές Gmail
+            </button>
+          )}
+        </div>
+      )}
+
       {editingId && (
         <div
           id="email-settings-editor"
@@ -554,6 +622,36 @@ export default function EmailSettingsPanel({ onAccountChange }) {
                   onChange={set('imap_host')}
                 />
               </Field>
+              <div>
+                <p className={labelClass}>Προεπιλογή ασφαλείας</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyImapPreset('993')}
+                    className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
+                      imapPreset === '993'
+                        ? 'bg-primary text-on-primary'
+                        : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    993 · SSL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyImapPreset('143')}
+                    className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
+                      imapPreset === '143'
+                        ? 'bg-primary text-on-primary'
+                        : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    143 · STARTTLS
+                  </button>
+                </div>
+                <p className="mt-1.5 text-label-sm text-on-surface-variant/80">
+                  Αν το 993 κάνει timeout από firewall, δοκιμάστε 143 · STARTTLS.
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field id="imap-port" label="Port">
                   <input
@@ -561,7 +659,15 @@ export default function EmailSettingsPanel({ onAccountChange }) {
                     className={fieldClass}
                     type="number"
                     value={form.imap_port}
-                    onChange={set('imap_port')}
+                    onChange={(e) => {
+                      const port = Number(e.target.value);
+                      setForm((f) => ({
+                        ...f,
+                        imap_port: e.target.value,
+                        imap_secure: port === 993 ? true : port === 143 ? false : f.imap_secure,
+                      }));
+                      setTestResult(null);
+                    }}
                   />
                 </Field>
                 <div className="flex items-end pb-1">
@@ -641,6 +747,13 @@ export default function EmailSettingsPanel({ onAccountChange }) {
                     }`}
                   >
                     465 · SSL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyGmailFallback}
+                    className="rounded-xl border border-outline-variant bg-surface px-3 py-2 text-label-sm font-bold text-on-surface hover:bg-surface-container-low"
+                  >
+                    Προεπιλογές Gmail
                   </button>
                 </div>
                 <p className="mt-1.5 text-label-sm text-on-surface-variant/80">

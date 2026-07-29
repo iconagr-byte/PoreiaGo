@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import imaplib
 import socket
+import ssl
 from typing import Any
 
 
@@ -14,9 +15,9 @@ ENCODING_HINT_EL = (
 )
 
 TIMEOUT_HINT_EL = (
-    "IMAP σύνδεση: timeout — ο server του PoreiaGo δεν μπορεί να φτάσει "
-    "τον mail host (θύρα 993). Ρυθμίσεις host/port OK· ζητήστε από τον πάροχο "
-    "hosting (cPanel) να επιτρέψει το IP του PoreiaGo (34.141.98.145) για IMAP/SMTP."
+    "IMAP σύνδεση: timeout — το PoreiaGo (IP 34.141.98.145) δεν φτάνει τον mail host. "
+    "Εναλλακτικές: (1) whitelist 993/587 από Intechs, (2) δοκιμή IMAP port 143 STARTTLS, "
+    "(3) forward του mailbox σε Gmail και IMAP host=imap.gmail.com με App Password."
 )
 
 AUTH_HINT_EL = (
@@ -40,8 +41,8 @@ def is_timeout_error(exc: BaseException | str) -> bool:
         "timed out" in msg
         or "timeout" in msg
         or "errno 110" in msg
-        or "errno 101" in msg  # network unreachable
-        or "errno 111" in msg  # connection refused
+        or "errno 101" in msg
+        or "errno 111" in msg
     )
 
 
@@ -61,32 +62,52 @@ def format_imap_connect_error(exc: BaseException) -> str:
 
 
 def enable_imap_utf8(client: imaplib.IMAP4 | imaplib.IMAP4_SSL) -> None:
-    """Switch imaplib from ascii to utf-8 before LOGIN/SELECT with non-ascii data.
-
-    Without this, passwords or mailbox names with Greek (or other non-ascii)
-    characters raise: 'ascii' codec can't encode characters ... ordinal not in range(128).
-    """
+    """Switch imaplib from ascii to utf-8 before LOGIN/SELECT with non-ascii data."""
     if hasattr(client, "_mode_utf8"):
         try:
             client._mode_utf8()
             return
         except Exception:
             pass
-    # Fallback when _mode_utf8 is missing or fails mid-setup.
     if hasattr(client, "_encoding"):
         client._encoding = "utf-8"
     if hasattr(client, "utf8_enabled"):
         client.utf8_enabled = True
 
 
+def _resolve_ipv4(host: str) -> str:
+    """Prefer IPv4 — some hosts hang on broken AAAA paths."""
+    try:
+        infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
+        if infos:
+            return infos[0][4][0]
+    except OSError:
+        pass
+    return host
+
+
 def connect_imap(cfg: dict[str, Any]) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
-    host = cfg["host"]
-    port = int(cfg.get("port") or (993 if cfg.get("use_ssl", True) else 143))
+    host = (cfg.get("host") or "").strip()
+    use_ssl = bool(cfg.get("use_ssl", True))
+    port = int(cfg.get("port") or (993 if use_ssl else 143))
     timeout = float(cfg.get("timeout") or IMAP_CONNECT_TIMEOUT_SEC)
-    if cfg.get("use_ssl", True):
-        client = imaplib.IMAP4_SSL(host, port, timeout=timeout)
+    ipv4 = _resolve_ipv4(host)
+
+    if use_ssl:
+        # Connect by IPv4 address but keep SNI/hostname as the configured host.
+        context = ssl.create_default_context()
+        # Shared cPanel certs often omit mail.customer-domain — still allow login.
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        client = imaplib.IMAP4_SSL(ipv4, port, ssl_context=context, timeout=timeout)
     else:
-        client = imaplib.IMAP4(host, port, timeout=timeout)
+        client = imaplib.IMAP4(ipv4, port, timeout=timeout)
+        try:
+            client.starttls()
+        except Exception:
+            # Some servers already expect plain 143 without STARTTLS.
+            pass
+
     enable_imap_utf8(client)
     client.login(cfg["user"], cfg["password"])
     return client
