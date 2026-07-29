@@ -62,18 +62,9 @@ def _extract_body(msg: email.message.Message) -> str:
 
 
 def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
-    if cfg["use_ssl"]:
-        client = imaplib.IMAP4_SSL(cfg["host"], cfg["port"])
-    else:
-        client = imaplib.IMAP4(cfg["host"], cfg["port"])
-    # Enable UTF-8 handling for non-ascii mailbox names.
-    if hasattr(client, "_mode_utf8"):
-        try:
-            client._mode_utf8()
-        except Exception:
-            pass
-    client.login(cfg["user"], cfg["password"])
-    return client
+    from email_client.imap_utf8 import connect_imap
+
+    return connect_imap(cfg)
 
 
 def fetch_unseen_messages() -> list[dict]:

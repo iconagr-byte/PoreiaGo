@@ -14,6 +14,7 @@ from typing import Any
 
 from .constants import DEFAULT_SYNC_BATCH, FOLDER_INBOX, FOLDER_SENT, FOLDER_SPAM
 from .dynamic_mailer import settings_to_imap_config
+from .imap_utf8 import connect_imap, format_imap_connect_error
 from .store import upsert_message
 
 logger = logging.getLogger(__name__)
@@ -120,18 +121,7 @@ def _message_date(msg: email.message.Message) -> str:
 
 
 def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
-    if cfg["use_ssl"]:
-        client = imaplib.IMAP4_SSL(cfg["host"], cfg["port"])
-    else:
-        client = imaplib.IMAP4(cfg["host"], cfg["port"])
-    # Enable UTF-8 handling so non-ascii mailbox names / credentials don't crash in ascii mode.
-    if hasattr(client, "_mode_utf8"):
-        try:
-            client._mode_utf8()
-        except Exception:
-            pass
-    client.login(cfg["user"], cfg["password"])
-    return client
+    return connect_imap(cfg)
 
 
 def _fetch_all_from_imap(
@@ -150,7 +140,7 @@ def _fetch_all_from_imap(
     try:
         client = _connect_imap(cfg)
     except Exception as exc:
-        return [], [f"IMAP σύνδεση: {exc}"]
+        return [], [format_imap_connect_error(exc)]
     try:
         for imap_box, local_folder in _folder_names_from_cfg(cfg):
             try:
