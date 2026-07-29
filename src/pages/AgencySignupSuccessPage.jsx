@@ -35,17 +35,17 @@ export default function AgencySignupSuccessPage() {
             <ol className="list-decimal list-inside space-y-1">
               <li>Περιμένετε 10–30 δευτ. για provisioning (webhook Stripe)</li>
               <li>Συνδεθείτε με το admin email της εγγραφής</li>
-              <li>Ανοίξτε Email → συνδέστε το προσωπικό σας mailbox (Gmail / Outlook)</li>
+              <li>Ολοκληρώστε τον οδηγό ρύθμισης γραφείου (επωνυμία, email, IBAN, στόλος)</li>
             </ol>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               to="/admin/login"
-              state={{ activeTab: 'email', emailHubTab: 'settings', connectEmail: true }}
+              state={{ officeSetup: true, activeTab: 'dashboard' }}
               className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-primary text-white font-bold text-sm hover:opacity-90"
             >
-              Σύνδεση & καταχώρηση email
+              Σύνδεση & ρύθμιση γραφείου
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </Link>
             <Link
