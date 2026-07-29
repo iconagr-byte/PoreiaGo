@@ -513,7 +513,8 @@
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.rent-top-icon-btn:hover {
+.rent-top-icon-btn:hover,
+.rent-top-icon-btn.is-open {
   background: #fff;
   border-color: rgba(10, 122, 108, 0.28);
   color: var(--rent-deep);
@@ -521,6 +522,14 @@
 
 .rent-top-icon-btn .material-symbols-outlined {
   font-size: 1.2rem;
+}
+
+.rent-top-menu--account {
+  min-width: 9.5rem;
+}
+
+.rent-top-menu--account .rent-top-menu-item {
+  font-weight: 700;
 }
 
 .rent-top-lang {
