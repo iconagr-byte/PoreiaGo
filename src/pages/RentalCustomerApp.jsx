@@ -162,20 +162,21 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           </section>
 
           <div className="rent-home-stack">
-            <div className="rent-panel rent-panel--fleet">
-              <h2 className="rent-guest-section-title">Στόλος ενοικίασης</h2>
-              <p className="rent-panel-lead">
-                {carCount} επιβατικά · {vanCount} van — διάλεξε όχημα για προεπιλογή· η κράτηση ανοίγει μετά τη σύνδεση.
+            <section className="rent-apple-block rent-apple-fleet" aria-label="Στόλος ενοικίασης">
+              <p className="rent-apple-eyebrow">Στόλος</p>
+              <h2 className="rent-apple-title">Επιλέξτε όχημα</h2>
+              <p className="rent-apple-lead">
+                {carCount} επιβατικά · {vanCount} van. Η κράτηση ανοίγει μετά τη σύνδεση.
               </p>
 
-              <div className="rent-home-fleet-tools">
+              <div className="rent-home-fleet-tools rent-apple-tools">
                 <input
                   type="search"
                   value={homeQuery}
                   onChange={(e) => setHomeQuery(e.target.value)}
-                  placeholder="Αναζήτηση μοντέλου ή περιγραφής…"
+                  placeholder="Αναζήτηση…"
                 />
-                <div className="rent-home-fleet-cats">
+                <div className="rent-home-fleet-cats rent-apple-cats">
                   {HOME_CATEGORIES.map((c) => (
                     <button
                       key={c || 'all'}
@@ -192,7 +193,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               {fleetLoading ? (
                 <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
               ) : filteredHomeFleet.length ? (
-                <div className="rent-home-fleet-strip rent-home-fleet-strip--rich">
+                <div className="rent-fleet-rail">
                   {filteredHomeFleet.map((v) => (
                     <RentHomeFleetCard
                       key={v.id}
@@ -210,7 +211,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               ) : (
                 <p className="rent-home-fleet-empty">Δεν βρέθηκαν οχήματα για τα φίλτρα.</p>
               )}
-            </div>
+            </section>
 
             <RentGuestLandingExtras brandLabel={branding.brandLabel} onRequireLogin={onRequireLogin} />
           </div>
@@ -426,7 +427,7 @@ function RentalAuthenticatedApp() {
                   {fleetLoading ? (
                     <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
                   ) : filteredHomeFleet.length ? (
-                    <div className="rent-home-fleet-strip rent-home-fleet-strip--rich">
+                    <div className="rent-fleet-rail">
                       {filteredHomeFleet.map((v) => (
                         <RentHomeFleetCard
                           key={v.id}
