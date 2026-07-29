@@ -50,12 +50,20 @@ function Field({ id, label, hint, children }) {
   );
 }
 
+function syncErrorDisplay(error) {
+  const msg = String(error || '');
+  if (/poreiago|intechs|34\.141\.98\.145|imap\.gmail\.com|whitelist|app password|forward/i.test(msg)) {
+    return 'IMAP σύνδεση: timeout — δεν ήταν δυνατή η σύνδεση στον mail server (θύρα 993/143). Ελέγξτε host, ότι ο λογαριασμός IMAP είναι ενεργός, και ότι ο πάροχος email επιτρέπει εξωτερικές συνδέσεις.';
+  }
+  return msg;
+}
+
 function syncErrorHint(error) {
   const msg = String(error || '');
   if (/AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(msg)) {
     return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login).';
   }
-  if (/timed out|timeout|Errno 110|δεν ήταν δυνατή η σύνδεση στον mail server/i.test(msg)) {
+  if (/timed out|timeout|Errno 110|δεν ήταν δυνατή η σύνδεση|poreiago|intechs|34\.141/i.test(msg)) {
     return 'Δεν ανοίγει σύνδεση στον mail server. Ελέγξτε host/port και ότι το IMAP επιτρέπεται από τον πάροχο email.';
   }
   if (/ascii codec|ordinal not in range|encoding/i.test(msg)) {
@@ -132,24 +140,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       setForm((f) => ({ ...f, smtp_port: 465, smtp_secure: false }));
     }
     setTestResult(null);
-  };
-
-  const applyGmailFallback = () => {
-    setForm((f) => ({
-      ...f,
-      imap_host: 'imap.gmail.com',
-      imap_port: 993,
-      imap_secure: true,
-      smtp_host: 'smtp.gmail.com',
-      smtp_port: 587,
-      smtp_secure: true,
-    }));
-    setTestResult({
-      ok: false,
-      message: 'Προεπιλογές Gmail φορτώθηκαν',
-      hint:
-        'Στο cPanel: Forwarders → forward το info@ στο Gmail σας. Στο Google: App Password. Username = το Gmail. Μετά Αποθήκευση → Έλεγχος.',
-    });
   };
 
   const startNew = () => {
@@ -522,7 +512,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                       </p>
                       {hasErr && (
                         <div className="mt-2 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2 text-label-sm text-rose-800">
-                          <p className="font-semibold">Sync: {a.last_sync_error}</p>
+                          <p className="font-semibold">Sync: {syncErrorDisplay(a.last_sync_error)}</p>
                           <p className="mt-0.5 opacity-90">{syncErrorHint(a.last_sync_error)}</p>
                         </div>
                       )}
@@ -742,13 +732,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                     }`}
                   >
                     465 · SSL
-                  </button>
-                  <button
-                    type="button"
-                    onClick={applyGmailFallback}
-                    className="rounded-xl border border-outline-variant bg-surface px-3 py-2 text-label-sm font-bold text-on-surface hover:bg-surface-container-low"
-                  >
-                    Προεπιλογές Gmail
                   </button>
                 </div>
                 <p className="mt-1.5 text-label-sm text-on-surface-variant/80">

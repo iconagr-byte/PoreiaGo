@@ -8,6 +8,7 @@ from typing import Any
 
 from ticketing.db import get_db
 
+from .imap_utf8 import sanitize_stored_imap_error
 from .secrets_vault import decrypt_password, encrypt_password
 
 EMAIL_SETTINGS_SCHEMA = """
@@ -42,6 +43,10 @@ def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def _sanitize_last_sync_error(message: str | None) -> str | None:
+    return sanitize_stored_imap_error(message)
+
+
 def _new_id() -> str:
     return f"EMS-{uuid.uuid4().hex[:12]}"
 
@@ -65,7 +70,7 @@ def _row_settings(row, *, include_password: bool = False) -> dict:
         "mail_username": row["mail_username"],
         "is_active": bool(row["is_active"]),
         "last_sync_at": row["last_sync_at"],
-        "last_sync_error": row["last_sync_error"],
+        "last_sync_error": _sanitize_last_sync_error(row["last_sync_error"]),
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
         "has_password": bool(row["mail_password_enc"]),
@@ -86,7 +91,28 @@ async def init_email_settings_tables() -> None:
     await _migrate_messages_account_fk(db)
     await _migrate_auto_responder_fk(db)
     await _migrate_campaigns_account_fk(db)
+    await _scrub_branded_sync_errors(db)
     await db.commit()
+
+
+async def _scrub_branded_sync_errors(db) -> None:
+    """Replace stored PoreiaGo/Intechs/IP timeout copy with neutral hint."""
+    cur = await db.execute(
+        """
+        SELECT id, last_sync_error FROM email_settings
+        WHERE last_sync_error IS NOT NULL AND last_sync_error != ''
+        """
+    )
+    rows = await cur.fetchall()
+    for row in rows:
+        raw = row["last_sync_error"] if hasattr(row, "keys") else row[1]
+        sid = row["id"] if hasattr(row, "keys") else row[0]
+        cleaned = sanitize_stored_imap_error(raw)
+        if cleaned != raw:
+            await db.execute(
+                "UPDATE email_settings SET last_sync_error=? WHERE id=?",
+                (cleaned, sid),
+            )
 
 
 async def _migrate_messages_account_fk(db) -> None:
@@ -359,6 +385,6 @@ async def record_sync_result(
         SET last_sync_at=?, last_sync_error=?, updated_at=?
         WHERE id=?
         """,
-        (_now(), error, _now(), settings_id),
+        (_now(), sanitize_stored_imap_error(error), _now(), settings_id),
     )
     await db.commit()

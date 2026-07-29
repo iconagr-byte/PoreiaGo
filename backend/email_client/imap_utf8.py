@@ -60,6 +60,37 @@ def format_imap_connect_error(exc: BaseException) -> str:
     return f"IMAP σύνδεση: {exc}"
 
 
+def sanitize_stored_imap_error(message: str | None) -> str | None:
+    """Rewrite legacy platform-branded IMAP errors for tenant UI.
+
+    Older deploys stored messages that named PoreiaGo / VPS IP / Intechs / Gmail.
+    Those must never surface on office email settings.
+    """
+    if message is None:
+        return None
+    text = str(message).strip()
+    if not text:
+        return None
+    lower = text.lower()
+    branded = (
+        "poreiago" in lower
+        or "intechs" in lower
+        or "34.141.98.145" in text
+        or "imap.gmail.com" in lower
+        or "whitelist" in lower
+        or "app password" in lower
+        or "forward του mailbox" in lower
+        or "forwarders" in lower
+    )
+    if is_auth_error(text):
+        return AUTH_HINT_EL
+    if is_ascii_codec_error(text):
+        return ENCODING_HINT_EL
+    if branded or is_timeout_error(text):
+        return TIMEOUT_HINT_EL
+    return text
+
+
 def enable_imap_utf8(client: imaplib.IMAP4 | imaplib.IMAP4_SSL) -> None:
     """Switch imaplib from ascii to utf-8 before LOGIN/SELECT with non-ascii data."""
     if hasattr(client, "_mode_utf8"):
