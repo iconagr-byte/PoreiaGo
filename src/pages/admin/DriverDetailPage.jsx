@@ -340,12 +340,6 @@ export default function DriverDetailPage() {
             value={formatDate(driver.hiring_date)}
           />
           <InfoTile
-            icon="payments"
-            label="Αμοιβή"
-            value={`€${driver.salary_per_km}/km`}
-            sub={`€${driver.salary_per_trip} ανά εκδρομή`}
-          />
-          <InfoTile
             icon="id_card"
             label="Λήξη άδειας οδήγησης"
             value={formatDate(driver.license_expires_at)}
