@@ -26,6 +26,7 @@ import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
 import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.jsx';
 import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
+import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
@@ -137,7 +138,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   return (
     <div className={`rent-phone-stage${isMobile ? '' : ' rent-phone-stage--desktop'}`}>
       <div className="rent-app rent-app--guest">
-        <header className="rent-topbar">
+        <header className="rent-topbar rent-topbar--guest">
           <button
             type="button"
             className="rent-topbar-brand"
@@ -147,9 +148,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           >
             {branding.brandLabel}
           </button>
-          <button type="button" className="rent-btn rent-btn-ghost" onClick={onRequireLogin}>
-            Κράτηση
-          </button>
+          <RentGuestTopActions onAccount={onRequireLogin} />
         </header>
 
         <main className="rent-home rent-home--guest-land">
