@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import imaplib
 import logging
 import smtplib
@@ -239,7 +240,7 @@ def _build_message(
     return msg
 
 
-def send_email_smtp(
+def _send_email_smtp_sync(
     account: dict,
     *,
     to: str,
@@ -281,3 +282,30 @@ def send_email_smtp(
         smtp.sendmail(from_addr, recipients, msg.as_string())
 
     return f"email-smtp-{to}"
+
+
+async def send_email_smtp(
+    account: dict,
+    *,
+    to: str,
+    subject: str,
+    body_html: str,
+    cc: str = "",
+    bcc: str = "",
+    priority: str = "normal",
+    request_read_receipt: bool = False,
+    attachments: list[dict] | None = None,
+) -> str:
+    """Async SMTP send — sync smtplib runs in a worker thread (awaitable)."""
+    return await asyncio.to_thread(
+        _send_email_smtp_sync,
+        account,
+        to=to,
+        subject=subject,
+        body_html=body_html,
+        cc=cc,
+        bcc=bcc,
+        priority=priority,
+        request_read_receipt=request_read_receipt,
+        attachments=attachments,
+    )
