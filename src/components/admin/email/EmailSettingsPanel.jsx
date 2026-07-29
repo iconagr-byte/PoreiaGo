@@ -18,6 +18,7 @@ import {
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
 } from '../../../lib/email/mailReachability.js';
+import { PROVIDERS, detectProvider } from '../../../lib/email/emailProviderPresets.js';
 import EmailConnectWizard from './EmailConnectWizard.jsx';
 
 const EMPTY = {
@@ -124,6 +125,28 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       if (key === 'imap_host' && (!(f.smtp_host || '').trim() || f.smtp_host === f.imap_host)) {
         next.smtp_host = v;
       }
+      // Auto-fill Gmail / Yahoo / Outlook / cPanel hosts when the address domain is known
+      // and hosts are still empty or were previously auto-filled for another provider.
+      if (key === 'email_address') {
+        const prov = detectProvider(v);
+        const known = ['gmail', 'yahoo', 'outlook', 'achillio'].includes(prov.id);
+        const hostEmpty = !(f.imap_host || '').trim();
+        const wasProviderHost = [
+          'imap.gmail.com',
+          'imap.mail.yahoo.com',
+          'outlook.office365.com',
+          'mail.achilliotravel.com',
+        ].includes(String(f.imap_host || '').toLowerCase());
+        if (known && (hostEmpty || wasProviderHost || String(f.imap_host || '').startsWith('mail.'))) {
+          next.imap_host = prov.imap_host;
+          next.imap_port = prov.imap_port;
+          next.imap_secure = prov.imap_secure;
+          next.smtp_host = prov.smtp_host;
+          next.smtp_port = prov.smtp_port;
+          next.smtp_secure = prov.smtp_secure;
+          if (!(next.mail_username || '').trim()) next.mail_username = String(v || '').trim();
+        }
+      }
       return next;
     });
     setTestResult(null);
@@ -146,6 +169,55 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     }
     setTestResult(null);
   };
+
+  const applyProviderPreset = (providerId) => {
+    const prov =
+      providerId === 'auto'
+        ? detectProvider(form.email_address)
+        : PROVIDERS[providerId] || PROVIDERS.custom;
+    const email = (form.email_address || '').trim().toLowerCase();
+    const domain = email.includes('@') ? email.split('@')[1] : '';
+    const resolved =
+      providerId === 'auto'
+        ? prov
+        : providerId === 'custom' && domain
+          ? {
+              ...PROVIDERS.custom,
+              imap_host: `mail.${domain}`,
+              smtp_host: `mail.${domain}`,
+            }
+          : providerId === 'achillio'
+            ? detectProvider('info@achilliotravel.com')
+            : prov;
+
+    setForm((f) => ({
+      ...f,
+      imap_host: resolved.imap_host || f.imap_host,
+      imap_port: resolved.imap_port ?? 993,
+      imap_secure: Boolean(resolved.imap_secure),
+      smtp_host: resolved.smtp_host || f.smtp_host,
+      smtp_port: resolved.smtp_port ?? 465,
+      smtp_secure: Boolean(resolved.smtp_secure),
+      mail_username: (f.mail_username || '').trim() || email || f.mail_username,
+      label: (f.label || '').trim() || resolved.label || f.label,
+    }));
+    setTestResult({
+      ok: true,
+      message: `Προεπιλογές: ${resolved.label || providerId}`,
+      hint: (resolved.help || []).join(' · '),
+    });
+    toast.success(`${resolved.label || 'Προεπιλογές'} φορτώθηκαν`, { id: 'email-provider-preset' });
+  };
+
+  const activeProviderId = (() => {
+    const host = String(form.imap_host || '').toLowerCase();
+    if (host === 'imap.gmail.com') return 'gmail';
+    if (host === 'imap.mail.yahoo.com') return 'yahoo';
+    if (host === 'outlook.office365.com') return 'outlook';
+    if (host === 'mail.achilliotravel.com') return 'achillio';
+    if (host.startsWith('mail.')) return 'custom';
+    return '';
+  })();
 
   const startNew = () => {
     setShowWizard(false);
@@ -585,10 +657,51 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                 {isNew ? 'Νέος λογαριασμός' : 'Επεξεργασία λογαριασμού'}
               </h3>
               <p className="mt-0.5 text-body-sm text-on-surface-variant">
-                Συμπληρώστε όπως στο cPanel Mail Client: IMAP 993 SSL · SMTP 465 SSL.
+                Επιλέξτε πάροχο για έτοιμα IMAP/SMTP ή συμπληρώστε χειροκίνητα.
               </p>
             </div>
           </div>
+
+          <section className={sectionClass}>
+            <h4 className="text-label-md font-bold uppercase tracking-wide text-on-surface-variant">
+              Έτοιμα settings
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'gmail', label: 'Gmail / Google' },
+                { id: 'yahoo', label: 'Yahoo Mail' },
+                { id: 'outlook', label: 'Outlook / Microsoft' },
+                { id: 'achillio', label: 'Achillio cPanel' },
+                { id: 'custom', label: 'Εταιρικό mail.domain' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => applyProviderPreset(p.id)}
+                  className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
+                    activeProviderId === p.id
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => applyProviderPreset('auto')}
+                className="rounded-xl border border-dashed border-outline-variant bg-surface px-3 py-2 text-label-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
+              >
+                Από το email…
+              </button>
+            </div>
+            {activeProviderId === 'gmail' || activeProviderId === 'yahoo' ? (
+              <p className="text-label-sm text-on-surface-variant">
+                Χρειάζεται <strong>App Password</strong> (όχι τον κανονικό κωδικό λογαριασμού). Username =
+                το πλήρες email (π.χ. name@gmail.com).
+              </p>
+            ) : null}
+          </section>
 
           <section className={sectionClass}>
             <h4 className="text-label-md font-bold uppercase tracking-wide text-on-surface-variant">
