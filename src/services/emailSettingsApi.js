@@ -1,5 +1,4 @@
-import { API_BASE } from '../config/api.js';
-import { adminAuthHeaders } from './adminApi.js';
+import { adminAuthHeaders, adminFetch } from './adminApi.js';
 
 function parseError(data, status) {
   const d = data?.detail;
@@ -7,6 +6,10 @@ function parseError(data, status) {
   if (Array.isArray(d)) {
     const joined = d.map((x) => x.msg || x).filter(Boolean).join(', ');
     if (joined) return joined;
+  }
+  if (d && typeof d === 'object') {
+    const nested = d.msg || d.message || d.error;
+    if (typeof nested === 'string' && nested.trim()) return nested;
   }
   if (status === 401) return 'Απαιτείται σύνδεση διαχείρισης — κάντε login ξανά';
   if (status === 403) return 'Δεν έχετε δικαίωμα στις ρυθμίσεις email';
@@ -20,16 +23,19 @@ function parseError(data, status) {
 async function request(path, options = {}) {
   let res;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await adminFetch(path, {
       ...options,
+      retries: options.retries ?? 3,
       headers: {
         'Content-Type': 'application/json',
         ...adminAuthHeaders(),
         ...(options.headers || {}),
       },
     });
-  } catch {
-    throw new Error('Ο server δεν απαντά. Τρέξτε: npm run dev:backend');
+  } catch (err) {
+    throw new Error(
+      err?.message || 'Ο server δεν απαντά. Περιμένετε λίγο και δοκιμάστε ξανά.',
+    );
   }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));

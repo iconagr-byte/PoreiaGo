@@ -123,6 +123,11 @@ async def get_mailbox_message(message_id: str):
     if not msg["is_read"]:
         await mailbox_store.update_message(message_id, {"is_read": True})
         msg = await mailbox_store.get_message(message_id)
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+    for key in ("body_html", "subject", "sender", "recipient", "date"):
+        if msg.get(key) is None:
+            msg[key] = ""
     return EmailMessageDetail(**msg)
 
 

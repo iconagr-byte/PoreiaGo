@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { fetchEmailSettings } from '../../../services/emailSettingsApi.js';
 import EmailMailbox from './EmailMailbox.jsx';
 import MarketingDashboard from './MarketingDashboard.jsx';
@@ -45,7 +46,11 @@ export default function EmailHub({ intent = null, onIntentHandled }) {
           localStorage.setItem(STORAGE_KEY, list[0].id);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        toast.error(err.message || 'Αποτυχία φόρτωσης λογαριασμών email', {
+          id: 'email-hub-accounts',
+        });
+      });
   }, []);
 
   const selectAccount = (id) => {

@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS email_messages (
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_email_msg_id ON email_messages(message_id);
 CREATE INDEX IF NOT EXISTS idx_email_folder_date ON email_messages(folder, message_date DESC);
 CREATE INDEX IF NOT EXISTS idx_email_sender ON email_messages(sender);
 
@@ -110,7 +109,11 @@ async def init_email_client_tables() -> None:
     await _migrate_campaign_metrics(db)
     await db.commit()
     await init_email_settings_tables()
-    await sync_subscribers_from_accounts()
+    try:
+        await sync_subscribers_from_accounts()
+    except Exception:
+        logger = __import__("logging").getLogger("poreiago.email")
+        logger.exception("email subscriber sync skipped")
 
 
 async def _migrate_campaign_metrics(db) -> None:
@@ -161,11 +164,25 @@ async def upsert_message(data: dict) -> dict | None:
         return None
     sid = data.get("email_settings_id")
     db = get_db()
+    existing = None
     if sid:
         cur = await db.execute(
             "SELECT id FROM email_messages WHERE message_id = ? AND email_settings_id = ?",
             (mid, sid),
         )
+        existing = await cur.fetchone()
+        if not existing:
+            # Claim legacy rows that were synced before per-account scoping.
+            cur = await db.execute(
+                """
+                SELECT id FROM email_messages
+                WHERE message_id = ?
+                  AND (email_settings_id IS NULL OR email_settings_id = '')
+                LIMIT 1
+                """,
+                (mid,),
+            )
+            existing = await cur.fetchone()
     else:
         cur = await db.execute(
             """
@@ -174,7 +191,7 @@ async def upsert_message(data: dict) -> dict | None:
             """,
             (mid,),
         )
-    existing = await cur.fetchone()
+        existing = await cur.fetchone()
     now = _now()
     if existing:
         eid = existing["id"]

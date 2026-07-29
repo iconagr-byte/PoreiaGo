@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   AlertCircle,
@@ -27,6 +27,10 @@ import '../../../styles/emailMarketingHub.css';
 import '../../../styles/emailMailbox.css';
 import EmailComposeModal from './EmailComposeModal.jsx';
 import RichTextEditor from './RichTextEditor.jsx';
+
+function mailboxToastError(message) {
+  toast.error(message, { id: 'mailbox-request-error' });
+}
 
 const FOLDER_META = {
   Inbox: { label: 'Εισερχόμενα', Icon: Inbox, color: '#6366f1', bg: '#eef2ff' },
@@ -79,14 +83,16 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
   const [fromEmail, setFromEmail] = useState('');
+  const [lastSyncError, setLastSyncError] = useState('');
   const [replyBody, setReplyBody] = useState('<p></p>');
+  const autoSyncedFor = useRef('');
 
   const loadFolders = useCallback(async () => {
     try {
       const data = await fetchMailboxFolders(emailSettingsId || undefined);
       setFolders(data.folders || []);
     } catch (err) {
-      toast.error(err.message);
+      mailboxToastError(err.message);
     }
   }, [emailSettingsId]);
 
@@ -102,8 +108,10 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         setDetail(null);
         setCustomer(null);
       }
+      return list;
     } catch (err) {
-      toast.error(err.message);
+      mailboxToastError(err.message);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -116,14 +124,19 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   useEffect(() => {
     if (!emailSettingsId) {
       setFromEmail('');
+      setLastSyncError('');
       return;
     }
     fetchEmailSettings()
       .then((list) => {
         const acc = list.find((a) => a.id === emailSettingsId);
         setFromEmail(acc?.email_address || '');
+        setLastSyncError(acc?.last_sync_error || '');
       })
-      .catch(() => setFromEmail(''));
+      .catch(() => {
+        setFromEmail('');
+        setLastSyncError('');
+      });
   }, [emailSettingsId]);
 
   useEffect(() => {
@@ -136,6 +149,52 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
     loadMessages();
   }, [loadMessages]);
 
+  const runSync = useCallback(
+    async ({ quiet = false } = {}) => {
+      if (!emailSettingsId) {
+        if (!quiet) mailboxToastError('Επιλέξτε λογαριασμό email');
+        return;
+      }
+      setSyncing(true);
+      try {
+        const r = await syncMailbox(emailSettingsId);
+        if (!r?.ok) {
+          const detail = r?.error || r?.errors?.[0] || 'Αποτυχία συγχρονισμού IMAP';
+          setLastSyncError(detail);
+          throw new Error(detail);
+        }
+        const n = r.synced || 0;
+        setLastSyncError('');
+        if (!quiet) {
+          toast.success(
+            n ? `Συγχρονίστηκαν ${n} μηνύματα` : 'Συγχρονισμός OK — δεν βρέθηκαν νέα',
+          );
+        } else if (n) {
+          toast.success(`Συγχρονίστηκαν ${n} μηνύματα`, { id: 'mailbox-auto-sync' });
+        }
+        if (Array.isArray(r.errors) && r.errors.length) {
+          setLastSyncError(r.errors[0]);
+          toast.error(r.errors[0], { id: 'mailbox-sync-warn', duration: 6000 });
+        }
+        await loadFolders();
+        await loadMessages();
+      } catch (err) {
+        mailboxToastError(err.message);
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [emailSettingsId, loadFolders, loadMessages],
+  );
+
+  // First open of an account: pull IMAP so the inbox is not stuck empty.
+  useEffect(() => {
+    if (!emailSettingsId) return;
+    if (autoSyncedFor.current === emailSettingsId) return;
+    autoSyncedFor.current = emailSettingsId;
+    runSync({ quiet: true });
+  }, [emailSettingsId, runSync]);
+
   const selectMessage = async (id) => {
     setSelectedId(id);
     setReplyOpen(false);
@@ -147,29 +206,12 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
       loadFolders();
       loadMessages();
     } catch (err) {
-      toast.error(err.message);
+      mailboxToastError(err.message);
     }
   };
 
   const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const r = await syncMailbox(emailSettingsId || undefined);
-      if (!r?.ok) {
-        throw new Error(r?.error || 'Αποτυχία συγχρονισμού IMAP');
-      }
-      const n = r.synced || 0;
-      toast.success(n ? `Συγχρονίστηκαν ${n} μηνύματα` : 'Συγχρονισμός OK — δεν βρέθηκαν νέα');
-      if (Array.isArray(r.errors) && r.errors.length) {
-        toast.error(r.errors[0], { duration: 6000 });
-      }
-      await loadFolders();
-      await loadMessages();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSyncing(false);
-    }
+    await runSync({ quiet: false });
   };
 
   const handleTrash = async () => {
@@ -182,7 +224,7 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
       loadMessages();
       loadFolders();
     } catch (err) {
-      toast.error(err.message);
+      mailboxToastError(err.message);
     }
   };
 
@@ -194,7 +236,7 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
       setReplyOpen(false);
       loadMessages();
     } catch (err) {
-      toast.error(err.message);
+      mailboxToastError(err.message);
     }
   };
 
@@ -217,6 +259,15 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         <div className="embox-banner" role="status">
           <AlertCircle size={18} strokeWidth={2} aria-hidden />
           Προσθέστε λογαριασμό email από την καρτέλα «Ρυθμίσεις Email».
+        </div>
+      )}
+      {emailSettingsId && lastSyncError && (
+        <div className="embox-banner embox-banner-error" role="alert">
+          <AlertCircle size={18} strokeWidth={2} aria-hidden />
+          <span>
+            IMAP: {lastSyncError}. Ελέγξτε κωδικό / host στις «Ρυθμίσεις Email» και πατήστε
+            Συγχρονισμός IMAP.
+          </span>
         </div>
       )}
 

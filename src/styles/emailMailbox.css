@@ -37,6 +37,12 @@
   gap: 0.5rem;
 }
 
+.embox-banner-error {
+  background: linear-gradient(90deg, #fef2f2 0%, #fee2e2 100%);
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
 .embox-header {
   display: flex;
   align-items: center;

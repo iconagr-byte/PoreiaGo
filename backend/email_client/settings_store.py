@@ -69,9 +69,14 @@ def _row_settings(row, *, include_password: bool = False) -> dict:
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
         "has_password": bool(row["mail_password_enc"]),
+        "password_decrypt_failed": False,
     }
     if include_password:
-        out["mail_password"] = decrypt_password(row["mail_password_enc"])
+        try:
+            out["mail_password"] = decrypt_password(row["mail_password_enc"])
+        except ValueError:
+            out["mail_password"] = ""
+            out["password_decrypt_failed"] = True
     return out
 
 
@@ -87,10 +92,14 @@ async def init_email_settings_tables() -> None:
 async def _migrate_messages_account_fk(db) -> None:
     cur = await db.execute("PRAGMA table_info(email_messages)")
     cols = {r[1] for r in await cur.fetchall()}
+    if not cols:
+        return
     if "email_settings_id" not in cols:
         await db.execute(
             "ALTER TABLE email_messages ADD COLUMN email_settings_id TEXT"
         )
+    # Per-account uniqueness — drop legacy global unique on message_id alone.
+    await db.execute("DROP INDEX IF EXISTS idx_email_msg_id")
     await db.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_email_msg_account
@@ -146,6 +155,15 @@ async def list_settings(
                 row["owner_key"] = owner_key
         await db.commit()
     return rows
+
+
+async def list_all_active_settings() -> list[dict]:
+    """All active accounts (any office) — for background IMAP sync worker."""
+    db = get_db()
+    cur = await db.execute(
+        "SELECT * FROM email_settings WHERE is_active = 1 ORDER BY created_at ASC"
+    )
+    return [_row_settings(r) for r in await cur.fetchall()]
 
 
 async def claim_legacy_owner(settings_id: str, owner_key: str) -> dict | None:

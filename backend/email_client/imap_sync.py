@@ -136,10 +136,15 @@ def _fetch_all_from_imap(
 ) -> tuple[list[dict], list[str]]:
     if not cfg.get("host") or not cfg.get("user"):
         return [], ["IMAP host/username missing"]
+    if not (cfg.get("password") or "").strip():
+        return [], ["Λείπει ο κωδικός email — αποθηκεύστε τον στις Ρυθμίσεις Email"]
 
     messages: list[dict] = []
     errors: list[str] = []
-    client = _connect_imap(cfg)
+    try:
+        client = _connect_imap(cfg)
+    except Exception as exc:
+        return [], [f"IMAP σύνδεση: {exc}"]
     try:
         for imap_box, local_folder in _folder_names_from_cfg(cfg):
             try:
@@ -208,6 +213,36 @@ async def sync_account_imap(
 ) -> dict:
     """Συγχρονισμός ενός EmailSettings λογαριασμού."""
     settings_id = account["id"]
+    if account.get("password_decrypt_failed"):
+        err = (
+            "Ο κωδικός email δεν αποκρυπτογραφείται — "
+            "αποθηκεύστε τον ξανά στις Ρυθμίσεις Email"
+        )
+        from .settings_store import record_sync_result
+
+        await record_sync_result(settings_id, error=err)
+        return {
+            "ok": False,
+            "email_settings_id": settings_id,
+            "synced": 0,
+            "folders": {},
+            "errors": [err],
+            "error": err,
+        }
+    if not (account.get("mail_password") or "").strip():
+        err = "Λείπει ο κωδικός email — συμπληρώστε τον στις Ρυθμίσεις Email"
+        from .settings_store import record_sync_result
+
+        await record_sync_result(settings_id, error=err)
+        return {
+            "ok": False,
+            "email_settings_id": settings_id,
+            "synced": 0,
+            "folders": {},
+            "errors": [err],
+            "error": err,
+        }
+
     cfg = settings_to_imap_config(account)
     loop = asyncio.get_event_loop()
     messages, errors = await loop.run_in_executor(
@@ -243,19 +278,21 @@ async def sync_imap_to_database_async(
     email_settings_id: str | None = None,
     batch_per_folder: int = DEFAULT_SYNC_BATCH,
 ) -> dict:
-    from .settings_store import get_settings, list_settings
+    from .settings_store import get_settings, list_all_active_settings
 
     if email_settings_id:
         account = await get_settings(email_settings_id, with_password=True)
         if not account:
-            return {"ok": False, "error": "Account not found", "synced": 0}
+            return {"ok": False, "error": "Account not found", "synced": 0, "folders": {}, "errors": []}
         return await sync_account_imap(account, batch_per_folder=batch_per_folder)
 
-    accounts = await list_settings(active_only=True)
+    # Background / bulk sync must include tenant:* accounts, not only owner_key=default.
+    accounts = await list_all_active_settings()
     if accounts:
         total = 0
         merged_errors: list[str] = []
         all_folders: dict[str, int] = {}
+        ok_any = False
         for acc in accounts:
             full = await get_settings(acc["id"], with_password=True)
             if not full or not full.get("imap_host"):
@@ -263,16 +300,28 @@ async def sync_imap_to_database_async(
             try:
                 r = await sync_account_imap(full, batch_per_folder=batch_per_folder)
                 total += r.get("synced", 0)
-                merged_errors.extend(r.get("errors", []))
+                merged_errors.extend(r.get("errors", []) or [])
+                if r.get("error"):
+                    merged_errors.append(str(r["error"]))
                 for k, v in r.get("folders", {}).items():
                     all_folders[k] = all_folders.get(k, 0) + v
+                if r.get("ok"):
+                    ok_any = True
             except Exception as exc:
                 merged_errors.append(f"{acc['id']}: {exc}")
+        # De-dupe while preserving order
+        seen: set[str] = set()
+        uniq_errors: list[str] = []
+        for e in merged_errors:
+            if e and e not in seen:
+                seen.add(e)
+                uniq_errors.append(e)
         return {
-            "ok": True,
+            "ok": ok_any or (total > 0) or not uniq_errors,
             "synced": total,
             "folders": all_folders,
-            "errors": merged_errors,
+            "errors": uniq_errors,
+            "error": (uniq_errors[0] if uniq_errors and total == 0 else None),
             "accounts": len(accounts),
         }
 
@@ -283,6 +332,7 @@ async def sync_imap_to_database_async(
             "error": "Δεν υπάρχουν λογαριασμοί email — προσθέστε από Ρυθμίσεις",
             "synced": 0,
             "folders": {},
+            "errors": [],
         }
     loop = asyncio.get_event_loop()
     messages, errors = await loop.run_in_executor(
