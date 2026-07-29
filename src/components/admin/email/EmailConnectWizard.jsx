@@ -644,13 +644,31 @@ export default function EmailConnectWizard({
 
           {testMsg && (
             <div
-              className={`rounded-xl border px-3 py-2 text-body-sm ${
+              className={`rounded-xl border px-3 py-2 text-body-sm whitespace-pre-wrap ${
                 testMsg.ok
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                   : 'border-rose-200 bg-rose-50 text-rose-900'
               }`}
             >
               {testMsg.text}
+              {testMsg.timeout ? (
+                <button
+                  type="button"
+                  className="mt-2 block text-label-sm font-bold underline"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(testMsg.text);
+                      toast.success('Αντιγράφηκε για τον πάροχο hosting', {
+                        id: 'email-conn-copy',
+                      });
+                    } catch {
+                      toast.error('Αποτυχία αντιγραφής', { id: 'email-conn-copy' });
+                    }
+                  }}
+                >
+                  Αντιγραφή κειμένου για hosting
+                </button>
+              ) : null}
             </div>
           )}
 

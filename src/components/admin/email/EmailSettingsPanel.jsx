@@ -13,6 +13,11 @@ import {
   downloadEmailSettingsTemplate,
   parseEmailSettingsBytes,
 } from '../../../lib/email/emailSettingsImport.js';
+import {
+  isMailTimeoutMessage,
+  MAIL_TIMEOUT_TOAST_EL,
+  mailTimeoutHintEl,
+} from '../../../lib/email/mailReachability.js';
 import EmailConnectWizard from './EmailConnectWizard.jsx';
 
 const EMPTY = {
@@ -193,21 +198,41 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       if (r.ok) {
         const msg = 'IMAP & SMTP: επιτυχής σύνδεση';
         setTestResult({ ok: true, message: msg });
-        toast.success(msg);
+        toast.success(msg, { id: 'email-conn-test' });
       } else {
-        const parts = [];
-        if (r.imap && !r.imap.ok) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
-        if (r.smtp && !r.smtp.ok) parts.push(`SMTP: ${r.smtp.error || 'αποτυχία'}`);
-        const msg = parts.join(' · ') || 'Αποτυχία σύνδεσης';
-        setTestResult({
-          ok: false,
-          message: msg,
-          hint: syncErrorHint(msg),
-        });
-        toast.error(msg);
+        const imapFail = r.imap && !r.imap.ok;
+        const smtpFail = r.smtp && !r.smtp.ok;
+        const timeout =
+          (imapFail && isMailTimeoutMessage(r.imap?.error)) ||
+          (smtpFail && isMailTimeoutMessage(r.smtp?.error));
+        if (timeout) {
+          const hint = mailTimeoutHintEl({
+            mailHost: form.imap_host || form.smtp_host,
+            imapPort: Number(form.imap_port) || 993,
+            smtpPort: Number(form.smtp_port) || 465,
+          });
+          setTestResult({
+            ok: false,
+            message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
+            hint,
+            timeout: true,
+          });
+          toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
+        } else {
+          const parts = [];
+          if (imapFail) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
+          if (smtpFail) parts.push(`SMTP: ${r.smtp.error || 'αποτυχία'}`);
+          const msg = parts.join(' · ') || 'Αποτυχία σύνδεσης';
+          setTestResult({
+            ok: false,
+            message: msg,
+            hint: syncErrorHint(msg),
+          });
+          toast.error(msg, { id: 'email-conn-test' });
+        }
       }
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.message, { id: 'email-conn-test' });
       setTestResult({ ok: false, message: err.message, hint: syncErrorHint(err.message) });
     } finally {
       setTesting(false);
@@ -833,9 +858,27 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
               <p className="text-label-md font-bold">
                 {testResult.ok ? 'Έλεγχος επιτυχής' : 'Έλεγχος απέτυχε'}
               </p>
-              <p className="mt-1 text-body-sm">{testResult.message}</p>
+              <p className="mt-1 text-body-sm whitespace-pre-wrap">{testResult.message}</p>
               {!testResult.ok && testResult.hint ? (
-                <p className="mt-1 text-label-sm opacity-90">{testResult.hint}</p>
+                <p className="mt-1 text-label-sm opacity-90 whitespace-pre-wrap">{testResult.hint}</p>
+              ) : null}
+              {testResult.timeout && testResult.hint ? (
+                <button
+                  type="button"
+                  className="mt-2 text-label-sm font-bold underline"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(testResult.hint);
+                      toast.success('Αντιγράφηκε για τον πάροχο hosting', {
+                        id: 'email-conn-copy',
+                      });
+                    } catch {
+                      toast.error('Αποτυχία αντιγραφής', { id: 'email-conn-copy' });
+                    }
+                  }}
+                >
+                  Αντιγραφή κειμένου για hosting
+                </button>
               ) : null}
             </div>
           )}
