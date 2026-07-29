@@ -13,6 +13,7 @@ import {
   downloadEmailSettingsTemplate,
   parseEmailSettingsBytes,
 } from '../../../lib/email/emailSettingsImport.js';
+import EmailConnectWizard from './EmailConnectWizard.jsx';
 
 const EMPTY = {
   label: '',
@@ -66,7 +67,7 @@ function syncErrorHint(error) {
   return 'Ελέγξτε host / κωδικό και πατήστε Συγχρονισμός IMAP στο Mailbox.';
 }
 
-export default function EmailSettingsPanel({ onAccountChange }) {
+export default function EmailSettingsPanel({ onAccountChange, openConnectWizard = false }) {
   const [accounts, setAccounts] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ ...EMPTY });
@@ -75,6 +76,7 @@ export default function EmailSettingsPanel({ onAccountChange }) {
   const [importing, setImporting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [showWizard, setShowWizard] = useState(Boolean(openConnectWizard));
   const fileInputRef = useRef(null);
 
   const load = async () => {
@@ -92,6 +94,10 @@ export default function EmailSettingsPanel({ onAccountChange }) {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (openConnectWizard) setShowWizard(true);
+  }, [openConnectWizard]);
 
   const set = (key) => (e) => {
     const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -147,6 +153,7 @@ export default function EmailSettingsPanel({ onAccountChange }) {
   };
 
   const startNew = () => {
+    setShowWizard(false);
     setEditingId('new');
     setForm({ ...EMPTY });
     setTestResult(null);
@@ -154,6 +161,7 @@ export default function EmailSettingsPanel({ onAccountChange }) {
   };
 
   const startEdit = (acc) => {
+    setShowWizard(false);
     setEditingId(acc.id);
     setForm({
       ...EMPTY,
@@ -398,7 +406,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
         <div className="min-w-0">
           <h2 className="font-headline-md text-headline-md text-on-surface">Ρυθμίσεις Email</h2>
           <p className="mt-1 max-w-xl text-body-sm text-on-surface-variant">
-            Συνδέστε το mailbox του γραφείου (IMAP/SMTP). Προτεινόμενα: IMAP 993 SSL · SMTP 587 STARTTLS.
+            Συνδέστε προσωπικό ή εταιρικό mailbox αυτόνομα μετά την αγορά συμβολαίου. Gmail /
+            Outlook / Yahoo δουλεύουν απευθείας· για cPanel domain προτείνεται Gmail forward.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -409,6 +418,16 @@ export default function EmailSettingsPanel({ onAccountChange }) {
             className="hidden"
             onChange={handleImportFile}
           />
+          <button
+            type="button"
+            onClick={() => {
+              setShowWizard(true);
+              setEditingId(null);
+            }}
+            className="rounded-xl bg-primary px-4 py-2 text-label-md font-semibold text-on-primary shadow-sm hover:opacity-95"
+          >
+            + Σύνδεση email
+          </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -434,12 +453,24 @@ export default function EmailSettingsPanel({ onAccountChange }) {
           <button
             type="button"
             onClick={startNew}
-            className="rounded-xl bg-primary px-4 py-2 text-label-md font-semibold text-on-primary shadow-sm hover:opacity-95"
+            className="rounded-xl border border-outline-variant bg-surface px-3.5 py-2 text-label-md font-semibold text-on-surface hover:bg-surface-container-low"
           >
-            + Νέος λογαριασμός
+            Χειροκίνητα
           </button>
         </div>
       </div>
+
+      {(showWizard || accounts.length === 0) && !editingId && (
+        <EmailConnectWizard
+          onCancel={accounts.length ? () => setShowWizard(false) : undefined}
+          onConnected={(created) => {
+            setShowWizard(false);
+            onAccountChange?.(created.id);
+            localStorage.setItem('email_active_account', created.id);
+            load();
+          }}
+        />
+      )}
 
       {accounts.length > 0 && (
         <ul className="space-y-3">
