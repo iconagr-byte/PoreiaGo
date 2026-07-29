@@ -22,10 +22,15 @@ export default function EmailHub({ intent = null, onIntentHandled }) {
   const [accounts, setAccounts] = useState([]);
   const [composeLaunch, setComposeLaunch] = useState(null);
   const [marketingDraft, setMarketingDraft] = useState(null);
+  const [openConnectWizard, setOpenConnectWizard] = useState(false);
 
   useEffect(() => {
     if (!intent) return;
     setTab(intent.hubTab || 'mailbox');
+    if (intent.connectEmail) {
+      setTab('settings');
+      setOpenConnectWizard(true);
+    }
     if (intent.initialDraft) {
       setMarketingDraft(intent.initialDraft);
     }
@@ -41,6 +46,10 @@ export default function EmailHub({ intent = null, onIntentHandled }) {
     fetchEmailSettings()
       .then((list) => {
         setAccounts(list);
+        if (!list.length) {
+          setTab('settings');
+          setOpenConnectWizard(true);
+        }
         if (!accountId && list[0]) {
           setAccountId(list[0].id);
           localStorage.setItem(STORAGE_KEY, list[0].id);
@@ -89,8 +98,10 @@ export default function EmailHub({ intent = null, onIntentHandled }) {
       </div>
       {tab === 'settings' && (
         <EmailSettingsPanel
+          openConnectWizard={openConnectWizard}
           onAccountChange={(id) => {
             selectAccount(id);
+            setOpenConnectWizard(false);
             fetchEmailSettings().then(setAccounts);
           }}
         />

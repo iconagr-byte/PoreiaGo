@@ -67,6 +67,9 @@ export default function AdminLoginPage() {
           ...(settingsSubTab ? { settingsSubTab } : {}),
           plan: postLogin.plan,
           interval: postLogin.interval,
+          ...(postLogin.emailHubTab ? { emailHubTab: postLogin.emailHubTab } : {}),
+          ...(postLogin.connectEmail ? { connectEmail: true } : {}),
+          ...(postLogin.afterLogin || {}),
         },
       });
     } catch (apiErr) {

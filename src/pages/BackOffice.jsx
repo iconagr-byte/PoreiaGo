@@ -255,6 +255,7 @@ export default function BackOffice() {
     if (location.state?.activeTab === 'email') {
       setEmailIntent({
         hubTab: location.state.emailHubTab || 'mailbox',
+        ...(location.state?.connectEmail ? { connectEmail: true } : {}),
         ...(location.state?.emailCompose ? { compose: location.state.emailCompose } : {}),
       });
     }
