@@ -37,6 +37,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const fileInputRef = useRef(null);
 
   const load = async () => {
@@ -63,6 +65,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
   const startNew = () => {
     setEditingId('new');
     setForm({ ...EMPTY });
+    setTestResult(null);
+    setPasswordVisible(false);
   };
 
   const startEdit = (acc) => {
@@ -84,10 +88,13 @@ export default function EmailSettingsPanel({ onAccountChange }) {
       mail_password: '',
       is_active: acc.is_active,
     });
+    setTestResult(null);
+    setPasswordVisible(false);
   };
 
   const runTest = async () => {
     setTesting(true);
+    setTestResult(null);
     try {
       const r = await testEmailConnection({
         ...form,
@@ -95,10 +102,13 @@ export default function EmailSettingsPanel({ onAccountChange }) {
         smtp_port: Number(form.smtp_port),
         mail_username: form.mail_username || form.email_address,
       });
-      if (r.ok) toast.success('IMAP & SMTP: επιτυχής σύνδεση');
-      else toast.error(r.imap?.error || r.smtp?.error || 'Αποτυχία σύνδεσης');
+      const msg = r.ok ? 'IMAP & SMTP: επιτυχής σύνδεση' : r.imap?.error || r.smtp?.error || 'Αποτυχία σύνδεσης';
+      setTestResult({ ok: Boolean(r.ok), message: msg });
+      if (r.ok) toast.success(msg);
+      else toast.error(msg);
     } catch (err) {
       toast.error(err.message);
+      setTestResult({ ok: false, message: err.message });
     } finally {
       setTesting(false);
     }
@@ -147,6 +157,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
         toast.success('Ενημερώθηκε');
       }
       setEditingId(null);
+      setTestResult(null);
+      setPasswordVisible(false);
       load();
     } catch (err) {
       toast.error(err.message);
@@ -173,6 +185,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
       ...account,
       mail_password: account.mail_password || '',
     });
+    setTestResult(null);
+    setPasswordVisible(false);
     // Scroll the editor into view — import used to feel like a no-op above the fold.
     requestAnimationFrame(() => {
       document.getElementById('email-settings-editor')?.scrollIntoView({
@@ -254,6 +268,18 @@ export default function EmailSettingsPanel({ onAccountChange }) {
       setImporting(false);
     }
   };
+
+  const isNew = editingId === 'new';
+  const requiredOk = Boolean(
+    (form.email_address || '').trim() &&
+      (form.imap_host || '').trim() &&
+      (form.smtp_host || '').trim(),
+  );
+  const canTest = requiredOk && !testing && !saving;
+  const canSave =
+    requiredOk &&
+    !saving &&
+    (isNew ? Boolean((form.mail_password || '').trim()) : true);
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -344,41 +370,156 @@ export default function EmailSettingsPanel({ onAccountChange }) {
           <h3 className="font-title-md text-title-md">
             {editingId === 'new' ? 'Νέος λογαριασμός' : 'Επεξεργασία'}
           </h3>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" placeholder="Ετικέτα (π.χ. Πωλήσεις)" value={form.label} onChange={set('label')} />
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" placeholder="Email *" value={form.email_address} onChange={set('email_address')} />
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" placeholder="IMAP Host *" value={form.imap_host} onChange={set('imap_host')} />
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" type="number" placeholder="IMAP Port" value={form.imap_port} onChange={set('imap_port')} />
-            <label className="flex items-center gap-2 text-body-sm">
-              <input type="checkbox" checked={form.imap_secure} onChange={set('imap_secure')} /> IMAP SSL/TLS
-            </label>
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" placeholder="SMTP Host *" value={form.smtp_host} onChange={set('smtp_host')} />
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" type="number" placeholder="SMTP Port" value={form.smtp_port} onChange={set('smtp_port')} />
-            <label className="flex items-center gap-2 text-body-sm">
-              <input type="checkbox" checked={form.smtp_secure} onChange={set('smtp_secure')} /> SMTP STARTTLS
-            </label>
-            <input className="px-3 py-2 rounded-lg border border-outline-variant sm:col-span-2" placeholder="Username" value={form.mail_username} onChange={set('mail_username')} />
-            <input
-              className="px-3 py-2 rounded-lg border border-outline-variant sm:col-span-2"
-              type="password"
-              placeholder={editingId === 'new' ? 'Κωδικός *' : 'Κωδικός (κενό = χωρίς αλλαγή)'}
-              value={form.mail_password}
-              onChange={set('mail_password')}
-            />
-          </div>
-          <p className="text-label-sm text-on-surface-variant">
-            Φάκελοι IMAP: INBOX / {form.imap_folder_sent} / {form.imap_folder_spam}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={runTest} disabled={testing} className="px-4 py-2 rounded-lg border border-primary text-primary font-bold">
-              {testing ? 'Έλεγχος…' : 'Έλεγχος Σύνδεσης'}
-            </button>
-            <button type="button" onClick={save} disabled={saving} className="px-4 py-2 rounded-lg bg-primary text-on-primary">
-              Αποθήκευση
-            </button>
-            <button type="button" onClick={() => setEditingId(null)} className="px-4 py-2 rounded-lg border">
-              Ακύρωση
-            </button>
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <input
+                className="px-3 py-2 rounded-lg border border-outline-variant"
+                placeholder="Ετικέτα (π.χ. Πωλήσεις)"
+                value={form.label}
+                onChange={set('label')}
+              />
+              <input
+                className="px-3 py-2 rounded-lg border border-outline-variant"
+                placeholder="Email *"
+                value={form.email_address}
+                onChange={set('email_address')}
+              />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-outline-variant p-4 space-y-3 bg-surface-container-lowest">
+                <h4 className="font-bold text-label-md text-on-surface">IMAP</h4>
+                <input
+                  className="px-3 py-2 rounded-lg border border-outline-variant w-full"
+                  placeholder="IMAP Host *"
+                  value={form.imap_host}
+                  onChange={set('imap_host')}
+                />
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <input
+                    className="px-3 py-2 rounded-lg border border-outline-variant"
+                    type="number"
+                    placeholder="IMAP Port"
+                    value={form.imap_port}
+                    onChange={set('imap_port')}
+                  />
+                  <label className="flex items-center gap-2 text-body-sm">
+                    <input type="checkbox" checked={form.imap_secure} onChange={set('imap_secure')} /> IMAP SSL/TLS
+                  </label>
+                </div>
+                <input
+                  className="px-3 py-2 rounded-lg border border-outline-variant w-full"
+                  placeholder="IMAP Mailbox (π.χ. INBOX)"
+                  value={form.imap_mailbox}
+                  onChange={set('imap_mailbox')}
+                />
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <input
+                    className="px-3 py-2 rounded-lg border border-outline-variant"
+                    placeholder="IMAP Folder Sent"
+                    value={form.imap_folder_sent}
+                    onChange={set('imap_folder_sent')}
+                  />
+                  <input
+                    className="px-3 py-2 rounded-lg border border-outline-variant"
+                    placeholder="IMAP Folder Spam"
+                    value={form.imap_folder_spam}
+                    onChange={set('imap_folder_spam')}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-outline-variant p-4 space-y-3 bg-surface-container-lowest">
+                <h4 className="font-bold text-label-md text-on-surface">SMTP</h4>
+                <input
+                  className="px-3 py-2 rounded-lg border border-outline-variant w-full"
+                  placeholder="SMTP Host *"
+                  value={form.smtp_host}
+                  onChange={set('smtp_host')}
+                />
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <input
+                    className="px-3 py-2 rounded-lg border border-outline-variant"
+                    type="number"
+                    placeholder="SMTP Port"
+                    value={form.smtp_port}
+                    onChange={set('smtp_port')}
+                  />
+                  <label className="flex items-center gap-2 text-body-sm">
+                    <input type="checkbox" checked={form.smtp_secure} onChange={set('smtp_secure')} /> SMTP STARTTLS
+                  </label>
+                </div>
+                <input
+                  className="px-3 py-2 rounded-lg border border-outline-variant w-full"
+                  placeholder="Username"
+                  value={form.mail_username}
+                  onChange={set('mail_username')}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="relative">
+                <input
+                  className="px-3 py-2 rounded-lg border border-outline-variant w-full pr-24"
+                  type={passwordVisible ? 'text' : 'password'}
+                  placeholder={editingId === 'new' ? 'Κωδικός *' : 'Κωδικός (κενό = χωρίς αλλαγή)'}
+                  value={form.mail_password}
+                  onChange={set('mail_password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setPasswordVisible((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md border border-outline-variant text-label-sm font-bold bg-surface-container-lowest"
+                >
+                  {passwordVisible ? 'Απόκρυψη' : 'Εμφάνιση'}
+                </button>
+              </div>
+            </div>
+
+            {testResult && (
+              <div
+                className={`rounded-xl border p-3 ${
+                  testResult.ok
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border-rose-200 text-rose-700'
+                }`}
+                role="status"
+              >
+                <div className="font-bold text-label-md">{testResult.ok ? 'Έλεγχος OK' : 'Έλεγχος αποτυχία'}</div>
+                <div className="text-body-sm mt-1">{testResult.message}</div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={runTest}
+                disabled={!canTest}
+                className="px-4 py-2 rounded-lg border border-primary text-primary font-bold disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {testing ? 'Έλεγχος…' : 'Έλεγχος Σύνδεσης'}
+              </button>
+              <button
+                type="button"
+                onClick={save}
+                disabled={!canSave}
+                className="px-4 py-2 rounded-lg bg-primary text-on-primary disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Αποθήκευση
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingId(null);
+                  setTestResult(null);
+                  setPasswordVisible(false);
+                }}
+                className="px-4 py-2 rounded-lg border disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Ακύρωση
+              </button>
+            </div>
           </div>
         </div>
       )}

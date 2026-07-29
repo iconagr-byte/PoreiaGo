@@ -66,6 +66,12 @@ def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
         client = imaplib.IMAP4_SSL(cfg["host"], cfg["port"])
     else:
         client = imaplib.IMAP4(cfg["host"], cfg["port"])
+    # Enable UTF-8 handling for non-ascii mailbox names.
+    if hasattr(client, "_mode_utf8"):
+        try:
+            client._mode_utf8()
+        except Exception:
+            pass
     client.login(cfg["user"], cfg["password"])
     return client
 
