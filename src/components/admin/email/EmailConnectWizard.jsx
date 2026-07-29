@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   createEmailSettings,
@@ -12,26 +12,97 @@ import {
 const fieldClass =
   'mt-1.5 w-full rounded-xl border border-outline-variant/80 bg-surface px-3.5 py-2.5 text-body-md text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15';
 
+const labelClass = 'text-label-sm font-semibold text-on-surface-variant';
+
+function serverFromProvider(prov) {
+  return {
+    imap_host: prov.imap_host || '',
+    imap_port: Number(prov.imap_port) || 993,
+    imap_secure: Boolean(prov.imap_secure),
+    smtp_host: prov.smtp_host || '',
+    smtp_port: Number(prov.smtp_port) || 465,
+    smtp_secure: Boolean(prov.smtp_secure),
+  };
+}
+
 /**
  * Personal-email onboarding for offices after contract purchase.
  * Detects Gmail / Outlook / Yahoo presets; other domains use mail.{domain}.
+ * Host/port are editable so cPanel Secure SSL (993/465) can be set exactly.
  */
-export default function EmailConnectWizard({ onConnected, onCancel, compact = false }) {
+export default function EmailConnectWizard({
+  onConnected,
+  onCancel,
+  compact = false,
+  initialEmail = '',
+}) {
   const [step, setStep] = useState(1);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => String(initialEmail || '').trim());
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState(null);
   const [checks, setChecks] = useState([]);
+  const [server, setServer] = useState(() =>
+    serverFromProvider(detectProvider(String(initialEmail || '').trim())),
+  );
 
-  const provider = useMemo(() => detectProvider(email), [email]);
-  const isCustom = provider.id === 'custom';
-  const activeProvider = provider;
+  const detected = useMemo(() => detectProvider(email), [email]);
+  const isCustom = detected.id === 'custom';
+  const activeProvider = useMemo(
+    () => ({
+      ...detected,
+      ...server,
+      help: detected.help,
+      passwordLabel: detected.passwordLabel,
+      label: detected.label,
+      id: detected.id,
+    }),
+    [detected, server],
+  );
 
   const canNextEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canSave = canNextEmail && Boolean(password.trim());
+  const canSave =
+    canNextEmail &&
+    Boolean(password.trim()) &&
+    Boolean(String(server.imap_host || '').trim()) &&
+    Boolean(String(server.smtp_host || '').trim());
+
+  const goToServerStep = () => {
+    setServer(serverFromProvider(detectProvider(email)));
+    setStep(2);
+  };
+
+  useEffect(() => {
+    const next = String(initialEmail || '').trim();
+    if (!next) return;
+    setEmail(next);
+    setServer(serverFromProvider(detectProvider(next)));
+  }, [initialEmail]);
+
+  const patchServer = (patch) => {
+    setServer((s) => {
+      const next = { ...s, ...(patch || {}) };
+      if (Object.prototype.hasOwnProperty.call(patch || {}, 'imap_port')) {
+        const imapPort = Number(next.imap_port);
+        if (imapPort === 993) next.imap_secure = true;
+        if (imapPort === 143) next.imap_secure = false;
+      }
+      if (Object.prototype.hasOwnProperty.call(patch || {}, 'smtp_port')) {
+        const smtpPort = Number(next.smtp_port);
+        if (smtpPort === 465) next.smtp_secure = false;
+        if (smtpPort === 587) next.smtp_secure = true;
+      }
+      if (Object.prototype.hasOwnProperty.call(patch || {}, 'imap_secure')) {
+        next.imap_secure = Boolean(patch.imap_secure);
+      }
+      if (Object.prototype.hasOwnProperty.call(patch || {}, 'smtp_secure')) {
+        next.smtp_secure = Boolean(patch.smtp_secure);
+      }
+      return next;
+    });
+  };
 
   const draftAccount = () =>
     buildAccountFromWizard({
@@ -116,6 +187,10 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
       const smtpOk = Boolean(r.smtp?.ok);
       const imapErr = r.imap?.error || (!imapOk ? 'Αποτυχία IMAP' : '');
       const smtpErr = r.smtp?.error || (!smtpOk ? 'Αποτυχία SMTP' : '');
+      const isTimeout = (msg) =>
+        /timeout|timed out|δεν ήταν δυνατή η σύνδεση|Errno 110/i.test(String(msg || ''));
+      const imapHostFail = !imapOk && isTimeout(imapErr);
+      const smtpHostFail = !smtpOk && isTimeout(smtpErr);
 
       setChecks([
         {
@@ -127,8 +202,12 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
         {
           id: 'imap_auth',
           label: `IMAP login · ${account.mail_username || account.email_address}`,
-          status: imapOk ? 'ok' : 'fail',
-          detail: imapOk ? 'Ταυτοποίηση OK' : imapErr,
+          status: imapOk ? 'ok' : imapHostFail ? 'skip' : 'fail',
+          detail: imapOk
+            ? 'Ταυτοποίηση OK'
+            : imapHostFail
+              ? 'Παραλείφθηκε — δεν ανοίγει πρώτα ο διακομιστής'
+              : imapErr,
         },
         {
           id: 'smtp_host',
@@ -139,14 +218,23 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
         {
           id: 'smtp_auth',
           label: `SMTP login · ${account.mail_username || account.email_address}`,
-          status: smtpOk ? 'ok' : 'fail',
-          detail: smtpOk ? 'Ταυτοποίηση OK' : smtpErr,
+          status: smtpOk ? 'ok' : smtpHostFail ? 'skip' : 'fail',
+          detail: smtpOk
+            ? 'Ταυτοποίηση OK'
+            : smtpHostFail
+              ? 'Παραλείφθηκε — δεν ανοίγει πρώτα ο διακομιστής'
+              : smtpErr,
         },
       ]);
 
       if (r.ok) {
         setTestMsg({ ok: true, text: 'IMAP & SMTP επιτυχία — μπορείτε να αποθηκεύσετε' });
         toast.success('IMAP & SMTP OK');
+      } else if (imapHostFail && smtpHostFail) {
+        const text =
+          'Ένα πρόβλημα δικτύου: ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός). Ζητήστε από τον πάροχο hosting να επιτρέψει εξωτερικές συνδέσεις IMAP/SMTP (θύρες 993 και 465, όπως στο cPanel Secure SSL/TLS).';
+        setTestMsg({ ok: false, text });
+        toast.error('Mail server μη προσβάσιμος');
       } else {
         const text = [imapOk ? null : `IMAP: ${imapErr}`, smtpOk ? null : `SMTP: ${smtpErr}`]
           .filter(Boolean)
@@ -269,7 +357,7 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
             <button
               type="button"
               disabled={!canNextEmail}
-              onClick={() => setStep(2)}
+              onClick={goToServerStep}
               className="rounded-xl bg-primary px-5 py-2.5 text-label-md font-bold text-on-primary disabled:opacity-50 shadow-sm"
             >
               Συνέχεια
@@ -282,7 +370,11 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
         <div className="space-y-4">
           <div className="rounded-xl border border-outline-variant/70 bg-surface-container-low/40 px-4 py-3">
             <p className="text-label-sm font-bold text-on-surface">
-              {isCustom ? `IMAP · mail.${email.split('@')[1] || 'domain.gr'}` : activeProvider.label}
+              {isCustom ? 'Διακομιστές mailbox (cPanel)' : activeProvider.label}
+            </p>
+            <p className="mt-1 text-body-sm text-on-surface-variant">
+              Προσυμπληρώθηκαν από το domain σας — μπορείτε να τα αλλάξετε όπως στο Mail Client
+              (π.χ. IMAP 993 · SMTP 465).
             </p>
             {!isCustom && (
               <ul className="mt-2 list-disc space-y-1 pl-5 text-body-sm text-on-surface-variant">
@@ -291,19 +383,142 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
                 ))}
               </ul>
             )}
-            {isCustom && (
-              <p className="mt-1 text-body-sm text-on-surface-variant">
-                Host: <strong>{activeProvider.imap_host}</strong> · Port {activeProvider.imap_port} ·
-                SMTP {activeProvider.smtp_host}:{activeProvider.smtp_port}
-              </p>
-            )}
-            {!isCustom && (
-              <p className="mt-2 text-label-sm text-on-surface-variant/80">
-                IMAP {activeProvider.imap_host}:{activeProvider.imap_port} · SMTP{' '}
-                {activeProvider.smtp_host}:{activeProvider.smtp_port}
-              </p>
-            )}
           </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label htmlFor="wiz-imap-host" className={labelClass}>
+                IMAP host *
+              </label>
+              <input
+                id="wiz-imap-host"
+                className={fieldClass}
+                value={server.imap_host}
+                onChange={(e) => patchServer({ imap_host: e.target.value })}
+                placeholder="mail.example.com"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label htmlFor="wiz-imap-port" className={labelClass}>
+                IMAP port
+              </label>
+              <input
+                id="wiz-imap-port"
+                type="number"
+                className={fieldClass}
+                value={server.imap_port}
+                onChange={(e) => patchServer({ imap_port: e.target.value })}
+              />
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => patchServer({ imap_port: 993, imap_secure: true })}
+                  className={`rounded-lg px-2.5 py-1 text-label-sm font-bold ${
+                    Number(server.imap_port) === 993
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface'
+                  }`}
+                >
+                  993 SSL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => patchServer({ imap_port: 143, imap_secure: false })}
+                  className={`rounded-lg px-2.5 py-1 text-label-sm font-bold ${
+                    Number(server.imap_port) === 143
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface'
+                  }`}
+                >
+                  143 STARTTLS
+                </button>
+              </div>
+            </div>
+            <div className="flex items-end pb-1">
+              <label className="flex items-center gap-2 rounded-xl border border-outline-variant px-3 py-2.5 text-body-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(server.imap_secure)}
+                  onChange={(e) => patchServer({ imap_secure: e.target.checked })}
+                />
+                IMAP SSL
+              </label>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="wiz-smtp-host" className={labelClass}>
+                SMTP host *
+              </label>
+              <input
+                id="wiz-smtp-host"
+                className={fieldClass}
+                value={server.smtp_host}
+                onChange={(e) => patchServer({ smtp_host: e.target.value })}
+                placeholder="mail.example.com"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label htmlFor="wiz-smtp-port" className={labelClass}>
+                SMTP port
+              </label>
+              <input
+                id="wiz-smtp-port"
+                type="number"
+                className={fieldClass}
+                value={server.smtp_port}
+                onChange={(e) => patchServer({ smtp_port: e.target.value })}
+              />
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => patchServer({ smtp_port: 465, smtp_secure: false })}
+                  className={`rounded-lg px-2.5 py-1 text-label-sm font-bold ${
+                    Number(server.smtp_port) === 465
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface'
+                  }`}
+                >
+                  465 SSL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => patchServer({ smtp_port: 587, smtp_secure: true })}
+                  className={`rounded-lg px-2.5 py-1 text-label-sm font-bold ${
+                    Number(server.smtp_port) === 587
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface'
+                  }`}
+                >
+                  587 STARTTLS
+                </button>
+              </div>
+            </div>
+            <div className="flex items-end pb-1">
+              <label
+                className={`flex items-center gap-2 rounded-xl border border-outline-variant px-3 py-2.5 text-body-sm ${
+                  Number(server.smtp_port) === 465 ? 'opacity-60' : ''
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(server.smtp_secure)}
+                  disabled={Number(server.smtp_port) === 465}
+                  onChange={(e) => patchServer({ smtp_secure: e.target.checked })}
+                />
+                SMTP STARTTLS
+              </label>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setServer(serverFromProvider(detectProvider(email)))}
+            className="text-label-sm font-semibold text-primary"
+          >
+            Επαναφορά προεπιλογών domain
+          </button>
 
           <div className="flex flex-wrap justify-between gap-2 pt-2">
             <button
@@ -315,8 +530,9 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
             </button>
             <button
               type="button"
+              disabled={!String(server.imap_host || '').trim() || !String(server.smtp_host || '').trim()}
               onClick={() => setStep(3)}
-              className="rounded-xl bg-primary px-5 py-2.5 text-label-md font-bold text-on-primary"
+              className="rounded-xl bg-primary px-5 py-2.5 text-label-md font-bold text-on-primary disabled:opacity-50"
             >
               Συνέχεια
             </button>
@@ -330,6 +546,11 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
             <label htmlFor="wiz-pass" className="text-label-sm font-semibold text-on-surface-variant">
               {activeProvider.passwordLabel} *
             </label>
+            <p className="mt-1 text-label-sm text-on-surface-variant/80">
+              IMAP {server.imap_host}:{server.imap_port}
+              {server.imap_secure ? ' SSL' : ''} · SMTP {server.smtp_host}:{server.smtp_port}
+              {Number(server.smtp_port) === 465 ? ' SSL' : server.smtp_secure ? ' STARTTLS' : ''}
+            </p>
             <div className="relative">
               <input
                 id="wiz-pass"
@@ -362,15 +583,25 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
               <ul className="mt-2 space-y-1.5">
                 {checks.map((c) => {
                   const icon =
-                    c.status === 'ok' ? '✓' : c.status === 'fail' ? '✕' : c.status === 'running' ? '●' : '○';
+                    c.status === 'ok'
+                      ? '✓'
+                      : c.status === 'fail'
+                        ? '✕'
+                        : c.status === 'skip'
+                          ? '–'
+                          : c.status === 'running'
+                            ? '●'
+                            : '○';
                   const color =
                     c.status === 'ok'
                       ? 'text-emerald-700'
                       : c.status === 'fail'
                         ? 'text-rose-700'
-                        : c.status === 'running'
-                          ? 'text-[#0071e3]'
-                          : 'text-[#86868b]';
+                        : c.status === 'skip'
+                          ? 'text-[#86868b]'
+                          : c.status === 'running'
+                            ? 'text-[#0071e3]'
+                            : 'text-[#86868b]';
                   return (
                     <li
                       key={c.id}

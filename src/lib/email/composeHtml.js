@@ -13,27 +13,37 @@ function esc(s) {
   return d.innerHTML;
 }
 
-const DEFAULT_SIGNATURE = `
+export function defaultSignatureHtml({ brandName = '', fromEmail = '' } = {}) {
+  const name = String(brandName || '').trim() || 'Η ομάδα μας';
+  const mail = String(fromEmail || '').trim();
+  const mailLine = mail
+    ? `<br/><a href="mailto:${esc(mail)}" style="color:#0f766e;text-decoration:none;">${esc(mail)}</a>`
+    : '';
+  return `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;border-top:1px solid #e2e8f0;padding-top:16px;">
-<tr><td style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:13px;color:#64748b;line-height:1.5;">
-<strong style="color:#0f172a;">PoreiaGo Travel</strong><br/>
-<a href="mailto:info@poreiago.app" style="color:#4f46e5;text-decoration:none;">info@poreiago.app</a>
+<tr><td style="font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;color:#64748b;line-height:1.5;">
+<strong style="color:#0f172a;">${esc(name)}</strong>${mailLine}
 </td></tr></table>`;
+}
 
 export function buildComposeHtml({
   body_html = '<p></p>',
   preheader = '',
   includeSignature = true,
-  signatureHtml = DEFAULT_SIGNATURE,
+  signatureHtml,
+  brandName = '',
+  fromEmail = '',
 }) {
   const pre = preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${esc(preheader)}</div>`
     : '';
-  const sig = includeSignature ? signatureHtml : '';
+  const resolvedSig =
+    signatureHtml ?? defaultSignatureHtml({ brandName, fromEmail });
+  const sig = includeSignature ? resolvedSig : '';
   const inner = body_html || '<p></p>';
   return `<!DOCTYPE html>
 <html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f8fafc;font-family:Inter,Segoe UI,Arial,sans-serif;">
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
 ${pre}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:20px 12px;">
 <tr><td align="center">
@@ -49,7 +59,7 @@ export const COMPOSE_SNIPPETS = [
   {
     id: 'cta',
     label: 'Κουμπί CTA',
-    html: '<p style="text-align:center;margin:20px 0;"><a href="https://example.com" style="display:inline-block;padding:12px 28px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Κράτηση τώρα</a></p>',
+    html: '<p style="text-align:center;margin:20px 0;"><a href="https://example.com" style="display:inline-block;padding:12px 28px;background:#0f766e;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Κράτηση τώρα</a></p>',
   },
-  { id: 'farewell', label: 'Αποχαιρετισμός', html: '<p>Με εκτίμηση,<br/><strong>Η ομάδα PoreiaGo</strong></p>' },
+  { id: 'farewell', label: 'Αποχαιρετισμός', html: '<p>Με εκτίμηση,<br/><strong>Η ομάδα μας</strong></p>' },
 ];

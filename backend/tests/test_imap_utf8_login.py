@@ -91,6 +91,21 @@ class ImapUtf8LoginTests(unittest.TestCase):
         exc = Exception("b'[AUTHENTICATIONFAILED] Authentication failed.'")
         self.assertEqual(format_imap_connect_error(exc), AUTH_HINT_EL)
 
+    def test_sanitize_legacy_poreiago_timeout(self):
+        from email_client.imap_utf8 import TIMEOUT_HINT_EL, sanitize_stored_imap_error
+
+        legacy = (
+            "IMAP σύνδεση: timeout — το PoreiaGo (IP 34.141.98.145) δεν φτάνει τον mail host. "
+            "Εναλλακτικές: (1) whitelist 993/587 από Intechs, (2) δοκιμή IMAP port 143 STARTTLS, "
+            "(3) forward του mailbox σε Gmail και IMAP host=imap.gmail.com με App Password."
+        )
+        cleaned = sanitize_stored_imap_error(legacy)
+        self.assertEqual(cleaned, TIMEOUT_HINT_EL)
+        self.assertNotIn("PoreiaGo", cleaned)
+        self.assertNotIn("Intechs", cleaned)
+        self.assertNotIn("Gmail", cleaned)
+        self.assertNotIn("34.141.98.145", cleaned)
+
     def test_fetch_surfaces_encoding_hint(self):
         from email_client.imap_sync import _fetch_all_from_imap
 

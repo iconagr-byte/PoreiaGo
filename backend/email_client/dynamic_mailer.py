@@ -12,10 +12,22 @@ from email.mime.text import MIMEText
 from typing import Any
 
 from .attachment_utils import normalize_attachments
-from .imap_utf8 import connect_imap, format_imap_connect_error
+from .imap_utf8 import connect_imap, format_imap_connect_error, is_timeout_error
 from .settings_store import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+SMTP_TIMEOUT_HINT_EL = (
+    "SMTP σύνδεση: timeout — δεν ήταν δυνατή η σύνδεση στον mail server "
+    "(θύρα 587/465). Ελέγξτε host και ότι ο πάροχος επιτρέπει εξωτερική αποστολή."
+)
+
+
+def _format_smtp_error(exc: BaseException) -> str:
+    if is_timeout_error(exc):
+        return SMTP_TIMEOUT_HINT_EL
+    return f"SMTP σύνδεση: {exc}"
 
 
 def settings_to_imap_config(account: dict) -> dict[str, Any]:
@@ -86,7 +98,7 @@ def test_smtp_connection(account: dict) -> dict:
                 smtp.login(cfg["user"], cfg["password"])
         return {"ok": True, "message": "SMTP σύνδεση επιτυχής"}
     except Exception as exc:
-        return {"ok": False, "error": str(exc)}
+        return {"ok": False, "error": _format_smtp_error(exc)}
 
 
 def test_account_connection(account: dict) -> dict:
