@@ -36,6 +36,25 @@ class SmtpConfigTests(unittest.TestCase):
         self.assertTrue(cfg["use_ssl"])
         self.assertFalse(cfg["use_tls"])
 
+    def test_gmail_app_password_spaces_stripped(self):
+        from email_client.dynamic_mailer import normalize_mail_password, settings_to_imap_config
+
+        self.assertEqual(
+            normalize_mail_password("abcd efgh ijkl mnop", host="imap.gmail.com", email="a@gmail.com"),
+            "abcdefghijklmnop",
+        )
+        cfg = settings_to_imap_config(
+            {
+                "imap_host": "imap.gmail.com",
+                "imap_port": 993,
+                "email_address": "a@gmail.com",
+                "mail_username": "a@gmail.com",
+                "mail_password": "abcd efgh ijkl mnop",
+                "imap_secure": True,
+            }
+        )
+        self.assertEqual(cfg["password"], "abcdefghijklmnop")
+
 
 if __name__ == "__main__":
     unittest.main()

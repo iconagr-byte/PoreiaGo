@@ -133,7 +133,14 @@ async def list_email_settings(
 async def create_email_settings(body: EmailSettingsCreate, request: Request):
     if not body.mail_password:
         raise HTTPException(status_code=400, detail="Απαιτείται κωδικός email")
+    from email_client.dynamic_mailer import normalize_mail_password
+
     payload = body.model_dump()
+    payload["mail_password"] = normalize_mail_password(
+        payload.get("mail_password"),
+        host=payload.get("imap_host") or payload.get("smtp_host") or "",
+        email=payload.get("email_address") or "",
+    )
     payload["owner_key"] = _owner_key(request)
     created = await create_settings(payload)
     return EmailSettingsOut(**created)
@@ -148,7 +155,21 @@ async def get_email_settings(settings_id: str, request: Request):
 @router.patch("/{settings_id}", response_model=EmailSettingsOut)
 async def patch_email_settings(settings_id: str, body: EmailSettingsUpdate, request: Request):
     await _require_owned(settings_id, request)
-    updated = await update_settings(settings_id, body.model_dump(exclude_unset=True))
+    from email_client.dynamic_mailer import normalize_mail_password
+
+    patch = body.model_dump(exclude_unset=True)
+    if patch.get("mail_password"):
+        existing = await get_settings(settings_id) or {}
+        patch["mail_password"] = normalize_mail_password(
+            patch["mail_password"],
+            host=patch.get("imap_host")
+            or existing.get("imap_host")
+            or patch.get("smtp_host")
+            or existing.get("smtp_host")
+            or "",
+            email=patch.get("email_address") or existing.get("email_address") or "",
+        )
+    updated = await update_settings(settings_id, patch)
     if not updated:
         raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
     return EmailSettingsOut(**updated)
