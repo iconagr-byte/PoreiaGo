@@ -51,10 +51,13 @@ function Field({ id, label, hint, children }) {
 
 function syncErrorHint(error) {
   const msg = String(error || '');
-  if (/AUTHENTICATIONFAILED|Authentication failed/i.test(msg)) {
+  if (/AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(msg)) {
     return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login).';
   }
-  if (/ascii codec|ordinal not in range/i.test(msg)) {
+  if (/timed out|timeout|Errno 110|δεν μπορεί να φτάσει τον mail host/i.test(msg)) {
+    return 'Το PoreiaGo δεν φτάνει τον mail server (firewall). Ζητήστε από Intechs/cPanel whitelist του IP 34.141.98.145 στις θύρες 993 και 587.';
+  }
+  if (/ascii codec|ordinal not in range|encoding/i.test(msg)) {
     return 'Πρόβλημα encoding — δοκιμάστε ξανά μετά από αποθήκευση κωδικού.';
   }
   if (/CERTIFICATE|SSL|hostname/i.test(msg)) {

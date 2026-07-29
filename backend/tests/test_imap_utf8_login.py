@@ -65,6 +65,19 @@ class ImapUtf8LoginTests(unittest.TestCase):
         self.assertEqual(format_imap_connect_error(exc), ENCODING_HINT_EL)
         self.assertIn("encoding", format_imap_connect_error(exc))
 
+    def test_format_timeout_hint(self):
+        from email_client.imap_utf8 import TIMEOUT_HINT_EL, format_imap_connect_error
+
+        exc = OSError(110, "Connection timed out")
+        self.assertEqual(format_imap_connect_error(exc), TIMEOUT_HINT_EL)
+        self.assertIn("34.141.98.145", format_imap_connect_error(exc))
+
+    def test_format_auth_hint(self):
+        from email_client.imap_utf8 import AUTH_HINT_EL, format_imap_connect_error
+
+        exc = Exception("b'[AUTHENTICATIONFAILED] Authentication failed.'")
+        self.assertEqual(format_imap_connect_error(exc), AUTH_HINT_EL)
+
     def test_fetch_surfaces_encoding_hint(self):
         from email_client.imap_sync import _fetch_all_from_imap
 
