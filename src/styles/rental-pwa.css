@@ -222,7 +222,9 @@
 }
 
 .rent-home .rent-home-stack {
-  padding: 1rem 1rem 0.25rem;
+  padding: 1.15rem 1rem 1.5rem;
+  display: grid;
+  gap: 0.85rem;
 }
 
 .rent-panel {
@@ -556,13 +558,370 @@
   overflow-x: auto;
   padding-bottom: 0.2rem;
   scroll-snap-type: x mandatory;
+  scrollbar-width: none;
 }
 
-.rent-home-fleet-strip--rich {
-  grid-auto-columns: minmax(78%, 288px);
-  padding-bottom: 0.35rem;
+.rent-home-fleet-strip::-webkit-scrollbar {
+  display: none;
 }
 
+/* —— Apple-clean guest landing —— */
+.rent-apple-block {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 22px;
+  padding: 1.35rem 1.25rem 1.4rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
+  animation: rent-rise 480ms ease-out both;
+}
+
+.rent-apple-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rent-secondary);
+}
+
+.rent-apple-title {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  color: var(--rent-ink);
+}
+
+.rent-apple-lead {
+  margin: 0.4rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--rent-secondary);
+  max-width: 36ch;
+}
+
+.rent-apple-tools {
+  margin-top: 1.05rem;
+}
+
+.rent-apple-tools input {
+  border: 0;
+  border-radius: 14px;
+  background: rgba(120, 120, 128, 0.12);
+  padding: 0.72rem 0.9rem;
+  font-size: 0.9rem;
+  color: var(--rent-ink);
+}
+
+.rent-apple-tools input::placeholder {
+  color: rgba(60, 60, 67, 0.45);
+}
+
+.rent-apple-cats {
+  margin-top: 0.55rem;
+  gap: 0.4rem;
+}
+
+.rent-apple-cats button {
+  border: 0;
+  background: rgba(120, 120, 128, 0.1);
+  color: var(--rent-ink);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 0.42rem 0.78rem;
+}
+
+.rent-apple-cats button.is-active {
+  background: var(--rent-ink);
+  color: #fff;
+  border-color: transparent;
+}
+
+.rent-fleet-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(72%, 260px);
+  gap: 0.85rem;
+  overflow-x: auto;
+  margin-top: 1.1rem;
+  padding: 0.15rem 0.1rem 0.35rem;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.rent-fleet-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.rent-fleet-tile {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  display: grid;
+  gap: 0.7rem;
+  cursor: pointer;
+  scroll-snap-align: start;
+  position: relative;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rent-fleet-tile:hover {
+  transform: translateY(-3px);
+}
+
+.rent-fleet-tile:active {
+  transform: scale(0.985);
+}
+
+.rent-fleet-tile-media {
+  aspect-ratio: 4 / 3;
+  border-radius: 18px;
+  background: #e8eef0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.rent-fleet-tile-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rent-fleet-tile-media .material-symbols-outlined {
+  font-size: 2.2rem;
+  color: rgba(60, 60, 67, 0.35);
+}
+
+.rent-fleet-tile-fav {
+  position: absolute;
+  right: 0.7rem;
+  top: 0.7rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  color: #1c1c1e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.rent-fleet-tile-fav .material-symbols-outlined {
+  font-size: 1.05rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-fleet-tile-body {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0 0.1rem;
+}
+
+.rent-fleet-tile-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--rent-ink);
+  line-height: 1.2;
+}
+
+.rent-fleet-tile-meta {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--rent-secondary);
+  letter-spacing: -0.01em;
+}
+
+.rent-fleet-tile-price {
+  margin-top: 0.2rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--rent-ink);
+}
+
+.rent-guest-extras {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-apple-trust {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 0.75rem;
+}
+
+.rent-apple-trust li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--rent-ink);
+}
+
+.rent-apple-trust .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: var(--rent-teal);
+  opacity: 0.9;
+}
+
+.rent-apple-steps {
+  list-style: none;
+  margin: 1.15rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.rent-apple-steps li {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.85rem 0;
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.rent-apple-steps li:last-child {
+  padding-bottom: 0;
+}
+
+.rent-apple-step-i {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--rent-ink);
+  background: rgba(120, 120, 128, 0.12);
+}
+
+.rent-apple-steps strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--rent-ink);
+}
+
+.rent-apple-steps p {
+  margin: 0.2rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--rent-secondary);
+}
+
+.rent-apple-rows {
+  list-style: none;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.rent-apple-rows li {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.85rem 0;
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.rent-apple-rows li:last-child {
+  padding-bottom: 0;
+}
+
+.rent-apple-rows .material-symbols-outlined {
+  font-size: 1.25rem;
+  color: var(--rent-teal);
+  margin-top: 0.05rem;
+}
+
+.rent-apple-rows strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--rent-ink);
+}
+
+.rent-apple-rows p {
+  margin: 0.2rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--rent-secondary);
+}
+
+.rent-apple-checklist {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-apple-checklist li {
+  position: relative;
+  padding-left: 1.15rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--rent-ink);
+  line-height: 1.35;
+}
+
+.rent-apple-checklist li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.45rem;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--rent-teal);
+}
+
+.rent-apple-cta {
+  appearance: none;
+  border: 0;
+  margin-top: 1.25rem;
+  width: 100%;
+  min-height: 3.1rem;
+  border-radius: 999px;
+  background: var(--rent-ink);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.rent-apple-cta:active {
+  transform: scale(0.985);
+  opacity: 0.92;
+}
+
+/* Legacy card shell (kept for any remaining uses) */
 .rent-home-fleet-card {
   appearance: none;
   border: 1px solid var(--rent-stroke);
@@ -577,233 +936,6 @@
   scroll-snap-align: start;
   position: relative;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-
-.rent-home-fleet-card--rich:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
-}
-
-.rent-home-fleet-card--rich .rent-home-fleet-media {
-  height: 8.2rem;
-}
-
-.rent-home-fleet-cat {
-  display: inline-block;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--rent-teal);
-}
-
-.rent-home-fleet-headline {
-  margin: 0;
-  font-style: normal;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--rent-deep);
-}
-
-.rent-home-fleet-blurb {
-  margin: 0.15rem 0 0;
-  font-size: 0.72rem;
-  line-height: 1.4;
-  color: var(--rent-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.rent-home-fleet-specs {
-  list-style: none;
-  margin: 0.35rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.28rem;
-}
-
-.rent-home-fleet-specs li {
-  font-size: 0.64rem;
-  font-weight: 700;
-  color: var(--rent-ink);
-  background: rgba(10, 122, 108, 0.08);
-  border-radius: 999px;
-  padding: 0.18rem 0.45rem;
-}
-
-.rent-home-fleet-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.3rem;
-}
-
-.rent-home-fleet-tags span {
-  font-size: 0.62rem;
-  font-weight: 600;
-  color: var(--rent-secondary);
-  border: 1px solid var(--rent-stroke);
-  border-radius: 999px;
-  padding: 0.14rem 0.4rem;
-}
-
-.rent-home-fleet-price-row {
-  display: grid;
-  gap: 0.1rem;
-  margin-top: 0.35rem;
-}
-
-.rent-home-fleet-price {
-  font-size: 0.82rem;
-  font-weight: 800;
-  color: var(--rent-deep);
-  letter-spacing: -0.02em;
-}
-
-.rent-home-fleet-extra {
-  font-size: 0.64rem;
-  color: var(--rent-secondary);
-  font-weight: 600;
-}
-
-.rent-panel--fleet {
-  padding: 0.95rem 1rem 1.05rem;
-}
-
-.rent-guest-section-title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--rent-ink);
-}
-
-.rent-guest-extras {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.rent-guest-trust-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.55rem;
-}
-
-.rent-guest-trust-list li {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--rent-ink);
-  background: rgba(10, 122, 108, 0.07);
-  border-radius: 12px;
-  padding: 0.55rem 0.6rem;
-}
-
-.rent-guest-trust-list .material-symbols-outlined {
-  font-size: 1.1rem;
-  color: var(--rent-teal);
-}
-
-.rent-guest-steps {
-  list-style: none;
-  margin: 0.65rem 0 0;
-  padding: 0;
-  display: grid;
-  gap: 0.65rem;
-}
-
-.rent-guest-steps li {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  gap: 0.55rem;
-  align-items: start;
-}
-
-.rent-guest-step-num {
-  width: 1.35rem;
-  height: 1.35rem;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-size: 0.68rem;
-  font-weight: 800;
-  color: #fff;
-  background: var(--rent-deep);
-}
-
-.rent-guest-step-icon {
-  font-size: 1.2rem;
-  color: var(--rent-teal);
-  margin-top: 0.05rem;
-}
-
-.rent-guest-steps strong {
-  display: block;
-  font-size: 0.84rem;
-  color: var(--rent-ink);
-}
-
-.rent-guest-steps p {
-  margin: 0.15rem 0 0;
-  font-size: 0.74rem;
-  line-height: 1.4;
-  color: var(--rent-secondary);
-}
-
-.rent-guest-services {
-  list-style: none;
-  margin: 0.7rem 0 0;
-  padding: 0;
-  display: grid;
-  gap: 0.7rem;
-}
-
-.rent-guest-services li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.55rem;
-  align-items: start;
-}
-
-.rent-guest-services .material-symbols-outlined {
-  font-size: 1.25rem;
-  color: var(--rent-teal);
-}
-
-.rent-guest-services strong {
-  display: block;
-  font-size: 0.84rem;
-  color: var(--rent-ink);
-}
-
-.rent-guest-services p {
-  margin: 0.15rem 0 0;
-  font-size: 0.74rem;
-  line-height: 1.4;
-  color: var(--rent-secondary);
-}
-
-.rent-guest-pickup-points {
-  margin: 0.55rem 0 0.9rem;
-  padding-left: 1.1rem;
-  display: grid;
-  gap: 0.3rem;
-  font-size: 0.76rem;
-  color: var(--rent-ink);
-  font-weight: 600;
-}
-
-.rent-guest-bottom-cta {
-  margin-top: 0.25rem;
-  animation: none;
 }
 
 .rent-home-fleet-fav {
@@ -2020,22 +2152,33 @@
   grid-auto-columns: minmax(220px, 260px);
 }
 
-.rent-phone-stage--desktop .rent-home-fleet-strip--rich {
-  grid-auto-columns: minmax(260px, 300px);
+.rent-phone-stage--desktop .rent-fleet-rail {
+  grid-auto-columns: minmax(240px, 280px);
+  gap: 1.1rem;
 }
 
-.rent-phone-stage--desktop .rent-guest-extras {
+.rent-phone-stage--desktop .rent-guest-extras,
+.rent-phone-stage--desktop .rent-apple-fleet {
   max-width: 1120px;
   margin-inline: auto;
   width: 100%;
 }
 
-.rent-phone-stage--desktop .rent-guest-trust-list {
+.rent-phone-stage--desktop .rent-apple-trust {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.rent-phone-stage--desktop .rent-guest-services {
+.rent-phone-stage--desktop .rent-apple-rows {
   grid-template-columns: 1fr 1fr;
+  gap: 0 1.5rem;
+}
+
+.rent-phone-stage--desktop .rent-apple-rows li {
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.rent-phone-stage--desktop .rent-home-stack {
+  gap: 1rem;
 }
 
 .rent-phone-stage--desktop .rent-nav {
