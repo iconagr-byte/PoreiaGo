@@ -25,9 +25,16 @@ SMTP_TIMEOUT_HINT_EL = (
 
 
 def _format_smtp_error(exc: BaseException) -> str:
+    from .imap_utf8 import GMAIL_APP_PASSWORD_HINT_EL, is_gmail_app_password_error
+
     if is_timeout_error(exc):
         return SMTP_TIMEOUT_HINT_EL
-    return f"SMTP σύνδεση: {exc}"
+    if is_gmail_app_password_error(exc):
+        return GMAIL_APP_PASSWORD_HINT_EL
+    raw = str(exc).strip()
+    if raw.startswith("b'") and raw.endswith("'"):
+        raw = raw[2:-1]
+    return f"SMTP σύνδεση: {raw}"
 
 
 def settings_to_imap_config(account: dict) -> dict[str, Any]:

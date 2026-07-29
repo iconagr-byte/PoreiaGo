@@ -24,6 +24,12 @@ AUTH_HINT_EL = (
     "Χρησιμοποιήστε τον κωδικό του email (webmail), όχι τον κωδικό εισόδου στο γραφείο."
 )
 
+GMAIL_APP_PASSWORD_HINT_EL = (
+    "Gmail απαιτεί App Password (κωδικό εφαρμογής), όχι τον κανονικό κωδικό Google. "
+    "Βήματα: Google Account → Ασφάλεια → Επαλήθευση σε 2 βήματα → Κωδικοί εφαρμογών → "
+    "Δημιουργία για Mail → επικολλήστε τον 16ψήφιο κωδικό εδώ. Username = το πλήρες @gmail.com."
+)
+
 IMAP_CONNECT_TIMEOUT_SEC = 20
 
 
@@ -45,6 +51,16 @@ def is_timeout_error(exc: BaseException | str) -> bool:
     )
 
 
+def is_gmail_app_password_error(exc: BaseException | str) -> bool:
+    msg = str(exc).lower()
+    return (
+        "application-specific password required" in msg
+        or ("app password" in msg and ("required" in msg or "invalid" in msg or "incorrect" in msg))
+        or "please log in with your web browser" in msg
+        or "support.google.com/accounts/answer/185833" in msg
+    )
+
+
 def is_auth_error(exc: BaseException | str) -> bool:
     msg = str(exc)
     return "AUTHENTICATIONFAILED" in msg or "Authentication failed" in msg
@@ -55,15 +71,23 @@ def format_imap_connect_error(exc: BaseException) -> str:
         return ENCODING_HINT_EL
     if is_timeout_error(exc):
         return TIMEOUT_HINT_EL
+    if is_gmail_app_password_error(exc):
+        return GMAIL_APP_PASSWORD_HINT_EL
     if is_auth_error(exc):
         return AUTH_HINT_EL
-    return f"IMAP σύνδεση: {exc}"
+    # Strip ugly bytes-literal wrappers from imaplib alerts.
+    raw = str(exc).strip()
+    if raw.startswith("b'") and raw.endswith("'"):
+        raw = raw[2:-1]
+    elif raw.startswith('b"') and raw.endswith('"'):
+        raw = raw[2:-1]
+    return f"IMAP σύνδεση: {raw}"
 
 
 def sanitize_stored_imap_error(message: str | None) -> str | None:
     """Rewrite legacy platform-branded IMAP errors for tenant UI.
 
-    Older deploys stored messages that named PoreiaGo / VPS IP / Intechs / Gmail.
+    Older deploys stored messages that named PoreiaGo / VPS IP / Intechs.
     Those must never surface on office email settings.
     """
     if message is None:
@@ -72,20 +96,20 @@ def sanitize_stored_imap_error(message: str | None) -> str | None:
     if not text:
         return None
     lower = text.lower()
-    branded = (
-        "poreiago" in lower
-        or "intechs" in lower
-        or "34.141.98.145" in text
-        or "imap.gmail.com" in lower
-        or "whitelist" in lower
-        or "app password" in lower
-        or "forward του mailbox" in lower
-        or "forwarders" in lower
-    )
+    if is_gmail_app_password_error(text):
+        return GMAIL_APP_PASSWORD_HINT_EL
     if is_auth_error(text):
         return AUTH_HINT_EL
     if is_ascii_codec_error(text):
         return ENCODING_HINT_EL
+    branded = (
+        "poreiago" in lower
+        or "intechs" in lower
+        or "34.141.98.145" in text
+        or "whitelist" in lower
+        or "forward του mailbox" in lower
+        or "forwarders" in lower
+    )
     if branded or is_timeout_error(text):
         return TIMEOUT_HINT_EL
     return text
