@@ -164,60 +164,60 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             onRequireLogin={onRequireLogin}
           />
 
-          <div className="rent-home-stack">
-            <section
-              id="rent-guest-fleet"
-              className="rent-apple-block rent-apple-fleet"
-              aria-label="Στόλος ενοικίασης"
-            >
-              <p className="rent-apple-eyebrow">Στόλος</p>
-              <h2 className="rent-apple-title">Επιλέξτε όχημα</h2>
-              <p className="rent-apple-lead">
-                {carCount} επιβατικά · {vanCount} van. Η κράτηση ανοίγει μετά τη σύνδεση.
-              </p>
+          <div className="rent-home-stack rent-home-stack--landing">
+            <section id="rent-guest-fleet" className="rent-land-band rent-land-band--mist" aria-label="Στόλος ενοικίασης">
+              <div className="rent-land-inner">
+                <header className="rent-land-head">
+                  <p className="rent-land-eyebrow">Στόλος</p>
+                  <h2 className="rent-land-title">Επιλέξτε όχημα</h2>
+                  <p className="rent-land-sub">
+                    {carCount} επιβατικά · {vanCount} van. Η κράτηση ανοίγει μετά τη σύνδεση.
+                  </p>
+                </header>
 
-              <div className="rent-home-fleet-tools rent-apple-tools">
-                <input
-                  type="search"
-                  value={homeQuery}
-                  onChange={(e) => setHomeQuery(e.target.value)}
-                  placeholder="Αναζήτηση…"
-                />
-                <div className="rent-home-fleet-cats rent-apple-cats">
-                  {HOME_CATEGORIES.map((c) => (
-                    <button
-                      key={c || 'all'}
-                      type="button"
-                      className={homeCategory === c ? 'is-active' : ''}
-                      onClick={() => setHomeCategory(c)}
-                    >
-                      {homeCategoryLabel(c)}
-                    </button>
-                  ))}
+                <div className="rent-home-fleet-tools rent-apple-tools rent-land-tools">
+                  <input
+                    type="search"
+                    value={homeQuery}
+                    onChange={(e) => setHomeQuery(e.target.value)}
+                    placeholder="Αναζήτηση…"
+                  />
+                  <div className="rent-home-fleet-cats rent-apple-cats">
+                    {HOME_CATEGORIES.map((c) => (
+                      <button
+                        key={c || 'all'}
+                        type="button"
+                        className={homeCategory === c ? 'is-active' : ''}
+                        onClick={() => setHomeCategory(c)}
+                      >
+                        {homeCategoryLabel(c)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {fleetLoading ? (
+                  <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
+                ) : filteredHomeFleet.length ? (
+                  <div className="rent-fleet-rail rent-fleet-rail--land">
+                    {filteredHomeFleet.map((v) => (
+                      <RentHomeFleetCard
+                        key={v.id}
+                        vehicle={v}
+                        favorite={favorites.includes(v.id)}
+                        onToggleFavorite={() => toggleFavorite(v.id)}
+                        onSelect={() => {
+                          rememberPreferredVehicle(v);
+                          onPickVehicle?.(v);
+                          onRequireLogin?.();
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rent-home-fleet-empty">Δεν βρέθηκαν οχήματα για τα φίλτρα.</p>
+                )}
               </div>
-
-              {fleetLoading ? (
-                <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
-              ) : filteredHomeFleet.length ? (
-                <div className="rent-fleet-rail">
-                  {filteredHomeFleet.map((v) => (
-                    <RentHomeFleetCard
-                      key={v.id}
-                      vehicle={v}
-                      favorite={favorites.includes(v.id)}
-                      onToggleFavorite={() => toggleFavorite(v.id)}
-                      onSelect={() => {
-                        rememberPreferredVehicle(v);
-                        onPickVehicle?.(v);
-                        onRequireLogin?.();
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="rent-home-fleet-empty">Δεν βρέθηκαν οχήματα για τα φίλτρα.</p>
-              )}
             </section>
 
             <RentGuestLandingExtras brandLabel={branding.brandLabel} onRequireLogin={onRequireLogin} />

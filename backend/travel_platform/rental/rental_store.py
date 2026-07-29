@@ -85,7 +85,7 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "one_way_surcharge_eur": 50,
         "with_driver_daily_eur": 140,
         "current_mileage": 31200,
-        "photo_url": "https://images.unsplash.com/photo-1527786356903-a4b4c4f0ad83?auto=format&fit=crop&w=1200&q=80",
+        "photo_url": "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=1200&q=80",
         "description": (
             "Ευρύχωρο van 9 θέσεων για ομάδες, εκδρομές και μεταφορές με αποσκευές. "
             "Σταθερό στον δρόμο, με χώρο για επιβάτες και εξοπλισμό — ιδανικό για τουριστικά ή εταιρικά γκρουπ."
@@ -101,7 +101,7 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "one_way_surcharge_eur": 55,
         "with_driver_daily_eur": 150,
         "current_mileage": 27800,
-        "photo_url": "https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?auto=format&fit=crop&w=1200&q=80",
+        "photo_url": "https://images.unsplash.com/photo-1559416523-140ddc3d238c?auto=format&fit=crop&w=1200&q=80",
         "description": (
             "Premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. "
             "Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης."
@@ -151,10 +151,19 @@ def _refresh_demo_fleet_copy(data: dict[str, Any], tenant_id: str) -> int:
         if not suffix:
             continue
         spec = by_suffix[suffix]
+        changed = False
         new_desc = str(spec.get("description") or "").strip()
         old_desc = str(row.get("description") or "").strip()
         if new_desc and old_desc != new_desc:
             row["description"] = new_desc
+            changed = True
+        new_photo = str(spec.get("photo_url") or "").strip()
+        old_photo = str(row.get("photo_url") or "").strip()
+        if new_photo and old_photo != new_photo:
+            row["photo_url"] = new_photo
+            row["photo_urls"] = [new_photo]
+            changed = True
+        if changed:
             row["updated_at"] = now
             updated += 1
     return updated
