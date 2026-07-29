@@ -212,9 +212,7 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
             Συνδέστε το προσωπικό σας email
           </h3>
           <p className="mt-1 text-body-sm text-on-surface-variant">
-            Μετά την αγορά συμβολαίου, καταχωρείτε μόνοι σας το email — χωρίς ticket σε
-            hosting. Προτείνονται Gmail / Outlook / Yahoo (δουλεύουν αυτόνομα από το
-            PoreiaGo).
+            Καταχωρήστε το email του γραφείου και τον κωδικό mailbox για συγχρονισμό IMAP/SMTP.
           </p>
           <div className="mt-3 flex gap-2">
             {[1, 2, 3].map((n) => (

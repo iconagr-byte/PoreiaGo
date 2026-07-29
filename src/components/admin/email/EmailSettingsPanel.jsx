@@ -55,8 +55,8 @@ function syncErrorHint(error) {
   if (/AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(msg)) {
     return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login).';
   }
-  if (/timed out|timeout|Errno 110|δεν φτάνει τον mail host|δεν μπορεί να φτάσει τον mail host/i.test(msg)) {
-    return 'Το PoreiaGo δεν φτάνει τον mail server (firewall). Δοκιμάστε IMAP 143 STARTTLS, ή forward σε Gmail (imap.gmail.com), ή whitelist IP 34.141.98.145 από Intechs.';
+  if (/timed out|timeout|Errno 110|δεν ήταν δυνατή η σύνδεση στον mail server/i.test(msg)) {
+    return 'Δεν ανοίγει σύνδεση στον mail server. Ελέγξτε host/port και ότι το IMAP επιτρέπεται από τον πάροχο email.';
   }
   if (/ascii codec|ordinal not in range|encoding/i.test(msg)) {
     return 'Πρόβλημα encoding — δοκιμάστε ξανά μετά από αποθήκευση κωδικού.';
@@ -396,9 +396,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       : Number(form.imap_port) === 993 && form.imap_secure
         ? '993'
         : 'custom';
-  const showTimeoutHelp =
-    Boolean(testResult && !testResult.ok && /timed out|timeout|Errno 110|δεν φτάνει τον mail host/i.test(testResult.message || '')) ||
-    accounts.some((a) => /timed out|timeout|Errno 110|δεν φτάνει τον mail host/i.test(String(a.last_sync_error || '')));
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -560,38 +557,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             );
           })}
         </ul>
-      )}
-
-      {showTimeoutHelp && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-amber-950 shadow-sm">
-          <p className="text-label-md font-bold">Εναλλακτικές για Connection timeout</p>
-          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-body-sm">
-            <li>
-              <strong>Επεξεργασία</strong> → IMAP <strong>143 · STARTTLS</strong> → Αποθήκευση → Έλεγχος
-              (μερικοί hosts ανοίγουν μόνο τη 143).
-            </li>
-            <li>
-              <strong>Gmail bridge:</strong> cPanel → Forwarders → forward το mailbox στο Gmail → Google
-              App Password → στο form πάτα «Προεπιλογές Gmail» → βάλε App Password → Αποθήκευση.
-            </li>
-            <li>
-              Ticket Intechs: whitelist IP <code className="rounded bg-amber-100 px-1">34.141.98.145</code>{' '}
-              στις θύρες 993 και 587.
-            </li>
-          </ol>
-          {!editingId && accounts[0] && (
-            <button
-              type="button"
-              onClick={() => {
-                startEdit(accounts[0]);
-                requestAnimationFrame(() => applyGmailFallback());
-              }}
-              className="mt-3 rounded-xl border border-amber-300 bg-white px-3 py-2 text-label-sm font-bold text-amber-950 hover:bg-amber-100/60"
-            >
-              Άνοιγμα επεξεργασίας + προεπιλογές Gmail
-            </button>
-          )}
-        </div>
       )}
 
       {editingId && (
