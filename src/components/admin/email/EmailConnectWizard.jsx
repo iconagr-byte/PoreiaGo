@@ -5,7 +5,6 @@ import {
   testEmailConnection,
 } from '../../../services/emailSettingsApi.js';
 import {
-  PROVIDERS,
   buildAccountFromWizard,
   detectProvider,
 } from '../../../lib/email/emailProviderPresets.js';
@@ -14,24 +13,20 @@ const fieldClass =
   'mt-1.5 w-full rounded-xl border border-outline-variant/80 bg-surface px-3.5 py-2.5 text-body-md text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15';
 
 /**
- * Autonomous personal-email onboarding for new offices after contract purchase.
- * Steers Gmail/Outlook/Yahoo (works from PoreiaGo servers) and offers a Gmail
- * forward path for custom cPanel domains that block datacenter IPs.
+ * Personal-email onboarding for offices after contract purchase.
+ * Detects Gmail / Outlook / Yahoo presets; other domains use mail.{domain}.
  */
 export default function EmailConnectWizard({ onConnected, onCancel, compact = false }) {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [customMode, setCustomMode] = useState('gmail_bridge'); // or 'direct'
   const [busy, setBusy] = useState(false);
   const [testMsg, setTestMsg] = useState(null);
 
   const provider = useMemo(() => detectProvider(email), [email]);
   const isCustom = provider.id === 'custom';
-  const effectiveMode = isCustom ? customMode : 'direct';
-  const activeProvider =
-    effectiveMode === 'gmail_bridge' ? PROVIDERS.gmail : provider;
+  const activeProvider = provider;
 
   const canNextEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const canSave = canNextEmail && Boolean(password.trim());
@@ -41,7 +36,7 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
       email: email.trim(),
       password,
       provider: activeProvider,
-      mode: effectiveMode,
+      mode: 'direct',
       label: email.trim(),
     });
 
@@ -154,21 +149,11 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
               type="email"
               autoComplete="email"
               className={fieldClass}
-              placeholder="π.χ. name@gmail.com"
+              placeholder="π.χ. name@gmail.com ή info@το-domain.gr"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          {canNextEmail && (
-            <div className="rounded-xl border border-outline-variant/70 bg-surface-container-low/50 px-4 py-3 text-body-sm">
-              <p className="font-semibold text-on-surface">Ανιχνεύτηκε: {provider.label}</p>
-              <p className="mt-1 text-on-surface-variant">
-                {provider.autonomous
-                  ? 'Αυτός ο πάροχος συνδέεται αυτόνομα από το PoreiaGo — δεν χρειάζεται whitelist.'
-                  : 'Custom domain / cPanel συχνά μπλοκάρει το server IP. Προτείνεται σύνδεση μέσω Gmail forward.'}
-              </p>
-            </div>
-          )}
           <div className="flex flex-wrap justify-end gap-2 pt-3 sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pb-1">
             {onCancel && (
               <button
@@ -193,75 +178,29 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
 
       {step === 2 && (
         <div className="space-y-4">
-          {isCustom && (
-            <div className="space-y-2">
-              <p className="text-label-sm font-semibold text-on-surface-variant">Πώς θα συνδεθεί;</p>
-              <label className="flex cursor-pointer gap-3 rounded-xl border border-outline-variant/80 bg-surface p-3">
-                <input
-                  type="radio"
-                  name="customMode"
-                  checked={customMode === 'gmail_bridge'}
-                  onChange={() => setCustomMode('gmail_bridge')}
-                  className="mt-1 accent-primary"
-                />
-                <span>
-                  <span className="font-semibold text-on-surface">Μέσω Gmail (προτείνεται)</span>
-                  <span className="mt-0.5 block text-body-sm text-on-surface-variant">
-                    Στο cPanel βάλτε Forwarder από το domain email → Gmail. Εδώ συνδέετε το Gmail με
-                    App Password. Αυτόνομο, χωρίς whitelist.
-                  </span>
-                </span>
-              </label>
-              <label className="flex cursor-pointer gap-3 rounded-xl border border-outline-variant/80 bg-surface p-3">
-                <input
-                  type="radio"
-                  name="customMode"
-                  checked={customMode === 'direct'}
-                  onChange={() => setCustomMode('direct')}
-                  className="mt-1 accent-primary"
-                />
-                <span>
-                  <span className="font-semibold text-on-surface">Απευθείας IMAP (mail.{email.split('@')[1]})</span>
-                  <span className="mt-0.5 block text-body-sm text-on-surface-variant">
-                    Μπορεί να εμφανίσει Connection timed out αν το hosting μπλοκάρει το PoreiaGo.
-                  </span>
-                </span>
-              </label>
-            </div>
-          )}
-
-          {effectiveMode === 'gmail_bridge' && (
-            <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-body-sm text-on-surface">
-              <p className="font-semibold">Βήματα Gmail bridge</p>
-              <ol className="mt-1 list-decimal space-y-1 pl-5 text-on-surface-variant">
-                <li>cPanel → Forwarders → forward του mailbox στο Gmail σας</li>
-                <li>Αλλάξτε το email παρακάτω στο <strong>Gmail</strong> που λαμβάνει</li>
-                <li>Google → App Password → επικόλληση κωδικού στο επόμενο βήμα</li>
-              </ol>
-              <label className="mt-3 block text-label-sm font-semibold text-on-surface-variant">
-                Gmail που λαμβάνει τα forward *
-              </label>
-              <input
-                type="email"
-                className={fieldClass}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@gmail.com"
-              />
-            </div>
-          )}
-
           <div className="rounded-xl border border-outline-variant/70 bg-surface-container-low/40 px-4 py-3">
-            <p className="text-label-sm font-bold text-on-surface">{activeProvider.label}</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-body-sm text-on-surface-variant">
-              {(activeProvider.help || []).map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-            <p className="mt-2 text-label-sm text-on-surface-variant/80">
-              IMAP {activeProvider.imap_host}:{activeProvider.imap_port} · SMTP{' '}
-              {activeProvider.smtp_host}:{activeProvider.smtp_port}
+            <p className="text-label-sm font-bold text-on-surface">
+              {isCustom ? `IMAP · mail.${email.split('@')[1] || 'domain.gr'}` : activeProvider.label}
             </p>
+            {!isCustom && (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-body-sm text-on-surface-variant">
+                {(activeProvider.help || []).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
+            {isCustom && (
+              <p className="mt-1 text-body-sm text-on-surface-variant">
+                Host: <strong>{activeProvider.imap_host}</strong> · Port {activeProvider.imap_port} ·
+                SMTP {activeProvider.smtp_host}:{activeProvider.smtp_port}
+              </p>
+            )}
+            {!isCustom && (
+              <p className="mt-2 text-label-sm text-on-surface-variant/80">
+                IMAP {activeProvider.imap_host}:{activeProvider.imap_port} · SMTP{' '}
+                {activeProvider.smtp_host}:{activeProvider.smtp_port}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap justify-between gap-2 pt-2">
