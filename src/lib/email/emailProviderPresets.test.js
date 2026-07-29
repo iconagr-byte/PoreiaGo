@@ -12,7 +12,7 @@ const yahoo = detectProvider('x@yahoo.gr');
 console.assert(yahoo.id === 'yahoo', 'yahoo.gr detect');
 
 const custom = detectProvider('info@achilliotravel.com');
-console.assert(custom.id === 'custom', 'custom detect');
+console.assert(custom.id === 'achillio', 'achillio detect');
 console.assert(custom.imap_host === 'mail.achilliotravel.com', 'custom imap host');
 console.assert(custom.smtp_host === 'mail.achilliotravel.com', 'custom smtp host');
 console.assert(custom.imap_port === 993, 'cPanel IMAP 993');

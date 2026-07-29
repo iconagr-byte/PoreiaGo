@@ -587,6 +587,13 @@ export default function OfficeSetupWizard({
                 <div className="office-setup-email-wrap">
                   <EmailConnectWizard
                     compact
+                    initialEmail={
+                      (office.support_email || office.smtp_from_email || '').trim() ||
+                      (typeof window !== 'undefined' &&
+                      /(?:^|\.)achilliotravel\.com$/i.test(window.location.hostname)
+                        ? 'info@achilliotravel.com'
+                        : '')
+                    }
                     onCancel={() => setStep(4)}
                     onConnected={() => {
                       setEmailConnected(true);

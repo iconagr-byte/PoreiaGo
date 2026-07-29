@@ -81,6 +81,24 @@ export function detectProvider(email) {
   }
   if (domain.endsWith('.onmicrosoft.com')) return PROVIDERS.outlook;
   if (['yahoo.com', 'yahoo.gr', 'ymail.com'].includes(domain)) return PROVIDERS.yahoo;
+  // Known cPanel offices — pin Secure SSL/TLS ports from Mail Client.
+  if (domain === 'achilliotravel.com') {
+    return {
+      ...PROVIDERS.custom,
+      id: 'achillio',
+      label: 'Achillio Travel (cPanel)',
+      imap_host: 'mail.achilliotravel.com',
+      smtp_host: 'mail.achilliotravel.com',
+      imap_port: 993,
+      imap_secure: true,
+      smtp_port: 465,
+      smtp_secure: false,
+      help: [
+        'cPanel Secure SSL/TLS: IMAP 993 · SMTP 465',
+        'Username: info@achilliotravel.com · κωδικός webmail',
+      ],
+    };
+  }
   return {
     ...PROVIDERS.custom,
     imap_host: `mail.${domain}`,

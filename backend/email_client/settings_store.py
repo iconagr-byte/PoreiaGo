@@ -92,6 +92,7 @@ async def init_email_settings_tables() -> None:
     await _migrate_auto_responder_fk(db)
     await _migrate_campaigns_account_fk(db)
     await _scrub_branded_sync_errors(db)
+    await _pin_cpanel_ssl_ports(db)
     await db.commit()
 
 
@@ -113,6 +114,24 @@ async def _scrub_branded_sync_errors(db) -> None:
                 "UPDATE email_settings SET last_sync_error=? WHERE id=?",
                 (cleaned, sid),
             )
+
+
+async def _pin_cpanel_ssl_ports(db) -> None:
+    """Align Achillio mailbox rows to cPanel Secure SSL/TLS (IMAP 993 · SMTP 465)."""
+    await db.execute(
+        """
+        UPDATE email_settings
+        SET
+          imap_host = 'mail.achilliotravel.com',
+          smtp_host = 'mail.achilliotravel.com',
+          imap_port = 993,
+          imap_secure = 1,
+          smtp_port = 465,
+          smtp_secure = 0,
+          updated_at = datetime('now')
+        WHERE lower(email_address) LIKE '%@achilliotravel.com'
+        """
+    )
 
 
 async def _migrate_messages_account_fk(db) -> None:

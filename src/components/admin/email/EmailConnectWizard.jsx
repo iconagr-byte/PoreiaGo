@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   createEmailSettings,
@@ -30,16 +30,23 @@ function serverFromProvider(prov) {
  * Detects Gmail / Outlook / Yahoo presets; other domains use mail.{domain}.
  * Host/port are editable so cPanel Secure SSL (993/465) can be set exactly.
  */
-export default function EmailConnectWizard({ onConnected, onCancel, compact = false }) {
+export default function EmailConnectWizard({
+  onConnected,
+  onCancel,
+  compact = false,
+  initialEmail = '',
+}) {
   const [step, setStep] = useState(1);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => String(initialEmail || '').trim());
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState(null);
   const [checks, setChecks] = useState([]);
-  const [server, setServer] = useState(() => serverFromProvider(detectProvider('')));
+  const [server, setServer] = useState(() =>
+    serverFromProvider(detectProvider(String(initialEmail || '').trim())),
+  );
 
   const detected = useMemo(() => detectProvider(email), [email]);
   const isCustom = detected.id === 'custom';
@@ -66,6 +73,13 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
     setServer(serverFromProvider(detectProvider(email)));
     setStep(2);
   };
+
+  useEffect(() => {
+    const next = String(initialEmail || '').trim();
+    if (!next) return;
+    setEmail(next);
+    setServer(serverFromProvider(detectProvider(next)));
+  }, [initialEmail]);
 
   const patchServer = (patch) => {
     setServer((s) => {
@@ -532,6 +546,11 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
             <label htmlFor="wiz-pass" className="text-label-sm font-semibold text-on-surface-variant">
               {activeProvider.passwordLabel} *
             </label>
+            <p className="mt-1 text-label-sm text-on-surface-variant/80">
+              IMAP {server.imap_host}:{server.imap_port}
+              {server.imap_secure ? ' SSL' : ''} · SMTP {server.smtp_host}:{server.smtp_port}
+              {Number(server.smtp_port) === 465 ? ' SSL' : server.smtp_secure ? ' STARTTLS' : ''}
+            </p>
             <div className="relative">
               <input
                 id="wiz-pass"
