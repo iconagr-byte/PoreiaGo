@@ -116,6 +116,10 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
       const smtpOk = Boolean(r.smtp?.ok);
       const imapErr = r.imap?.error || (!imapOk ? 'Αποτυχία IMAP' : '');
       const smtpErr = r.smtp?.error || (!smtpOk ? 'Αποτυχία SMTP' : '');
+      const isTimeout = (msg) =>
+        /timeout|timed out|δεν ήταν δυνατή η σύνδεση|Errno 110/i.test(String(msg || ''));
+      const imapHostFail = !imapOk && isTimeout(imapErr);
+      const smtpHostFail = !smtpOk && isTimeout(smtpErr);
 
       setChecks([
         {
@@ -127,8 +131,12 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
         {
           id: 'imap_auth',
           label: `IMAP login · ${account.mail_username || account.email_address}`,
-          status: imapOk ? 'ok' : 'fail',
-          detail: imapOk ? 'Ταυτοποίηση OK' : imapErr,
+          status: imapOk ? 'ok' : imapHostFail ? 'skip' : 'fail',
+          detail: imapOk
+            ? 'Ταυτοποίηση OK'
+            : imapHostFail
+              ? 'Παραλείφθηκε — δεν ανοίγει πρώτα ο διακομιστής'
+              : imapErr,
         },
         {
           id: 'smtp_host',
@@ -139,14 +147,23 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
         {
           id: 'smtp_auth',
           label: `SMTP login · ${account.mail_username || account.email_address}`,
-          status: smtpOk ? 'ok' : 'fail',
-          detail: smtpOk ? 'Ταυτοποίηση OK' : smtpErr,
+          status: smtpOk ? 'ok' : smtpHostFail ? 'skip' : 'fail',
+          detail: smtpOk
+            ? 'Ταυτοποίηση OK'
+            : smtpHostFail
+              ? 'Παραλείφθηκε — δεν ανοίγει πρώτα ο διακομιστής'
+              : smtpErr,
         },
       ]);
 
       if (r.ok) {
         setTestMsg({ ok: true, text: 'IMAP & SMTP επιτυχία — μπορείτε να αποθηκεύσετε' });
         toast.success('IMAP & SMTP OK');
+      } else if (imapHostFail && smtpHostFail) {
+        const text =
+          'Ένα πρόβλημα δικτύου: ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός). Ζητήστε από τον πάροχο hosting να επιτρέψει εξωτερικές συνδέσεις IMAP/SMTP (θύρες 993/587 ή 143/465).';
+        setTestMsg({ ok: false, text });
+        toast.error('Mail server μη προσβάσιμος');
       } else {
         const text = [imapOk ? null : `IMAP: ${imapErr}`, smtpOk ? null : `SMTP: ${smtpErr}`]
           .filter(Boolean)
