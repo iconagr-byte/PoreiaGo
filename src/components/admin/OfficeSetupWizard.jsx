@@ -587,6 +587,7 @@ export default function OfficeSetupWizard({
                 </p>
                 <div className="office-setup-email-wrap">
                   <EmailConnectWizard
+                    compact
                     onCancel={() => setStep(4)}
                     onConnected={() => {
                       setEmailConnected(true);
