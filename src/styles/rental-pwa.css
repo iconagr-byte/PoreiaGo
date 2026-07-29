@@ -1164,7 +1164,7 @@
 .rent-pick-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: 1.65rem;
 }
 
 .rent-pick {
@@ -3506,11 +3506,12 @@
 
 .rent-phone-stage--desktop .rent-pick-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.25rem;
+  gap: 2.15rem 1.85rem;
 }
 
 .rent-phone-stage--desktop .rent-pick-grid--home {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem 1.75rem;
 }
 
 .rent-phone-stage--desktop .rent-pick {
