@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   getCustomerEmail,
   getCustomerName,
@@ -19,6 +19,8 @@ import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { fetchCustomerRentalCatalog, fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
 import { withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
 import { enrichRentFleet, homeCategoryLabel } from '../lib/rental/rentFleetEnrichment.js';
+import { rememberRentVehicle } from '../lib/rental/rentBookingExtras.js';
+import { writeRentBookingPrefs } from '../lib/rental/rentBookingSearch.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
@@ -61,6 +63,7 @@ function useRentFavorites() {
 }
 
 function rememberPreferredVehicle(vehicle) {
+  rememberRentVehicle(vehicle);
   try {
     localStorage.setItem(PREFERRED_VEHICLE_ID_KEY, String(vehicle.id));
   } catch {
@@ -70,6 +73,7 @@ function rememberPreferredVehicle(vehicle) {
 
 function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const isMobile = useRentMobile();
+  const navigate = useNavigate();
   const [branding, setBranding] = useState(() => resolveRentAppBranding({}, { guest: true }));
   const [footerAddress, setFooterAddress] = useState('');
   const [homeFleet, setHomeFleet] = useState([]);
@@ -77,6 +81,16 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const [homeCategory, setHomeCategory] = useState('');
   const [homeQuery, setHomeQuery] = useState('');
   const { favorites, toggleFavorite } = useRentFavorites();
+
+  const goToServicesStep = (vehicle) => {
+    rememberPreferredVehicle(vehicle);
+    writeRentBookingPrefs({
+      vehicle_id: vehicle?.id || '',
+      wizard_step: 'services',
+    });
+    onPickVehicle?.(vehicle);
+    navigate('/rent/book/services');
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -157,7 +171,9 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               brandLabel={branding.brandLabel}
               footerAddress={footerAddress}
               onSearch={() => {
-                onRequireLogin?.();
+                writeRentBookingPrefs({ wizard_step: 'vehicle' });
+                const el = document.getElementById('rent-guest-fleet');
+                el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
             />
           </div>
@@ -228,11 +244,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                         vehicle={v}
                         favorite={favorites.includes(v.id)}
                         onToggleFavorite={() => toggleFavorite(v.id)}
-                        onSelect={() => {
-                          rememberPreferredVehicle(v);
-                          onPickVehicle?.(v);
-                          onRequireLogin?.();
-                        }}
+                        onSelect={() => goToServicesStep(v)}
                       />
                     ))}
                   </div>
@@ -253,20 +265,46 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
 function RentalAuthGate() {
   // Re-check auth after in-place login (same URL /rent).
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useRentMobile();
+  const continueToServices = Boolean(
+    location.state?.rentContinue || location.state?.from === '/rent/book/services',
+  );
   // Mobile app = Wallet entrance. Desktop guests may browse fleet first.
-  const [showLogin, setShowLogin] = useState(() => isRentMobileViewport());
+  const [showLogin, setShowLogin] = useState(
+    () => isRentMobileViewport() || continueToServices,
+  );
   useEffect(() => setupRentalPwa(), []);
 
   useEffect(() => {
     if (isMobile) setShowLogin(true);
   }, [isMobile]);
 
+  useEffect(() => {
+    if (continueToServices) setShowLogin(true);
+  }, [continueToServices]);
+
+  useEffect(() => {
+    if (getCustomerToken() && continueToServices) {
+      navigate('/rent/book/services', { replace: true });
+    }
+  }, [continueToServices, navigate, location.key]);
+
   if (isCustomer() && !getCustomerToken()) logoutCustomer();
 
-  if (getCustomerToken()) return <RentalAuthenticatedApp key={location.key} />;
+  if (getCustomerToken()) {
+    if (continueToServices) return null;
+    return <RentalAuthenticatedApp key={location.key} />;
+  }
 
-  if (showLogin || isMobile) return <LoginPage rentEntrance />;
+  if (showLogin || isMobile) {
+    return (
+      <LoginPage
+        rentEntrance
+        key={continueToServices ? 'rent-continue' : 'rent-login'}
+      />
+    );
+  }
 
   return (
     <RentalGuestPreviewApp
@@ -372,14 +410,15 @@ function RentalAuthenticatedApp() {
     requestAnimationFrame(() => scrollToSection('rent-wallet'));
   };
 
+  const navigate = useNavigate();
   const pickVehicle = (v) => {
     setFeaturedVehicle(v);
-    try {
-      localStorage.setItem(PREFERRED_VEHICLE_ID_KEY, String(v.id));
-    } catch {
-      /* ignore */
-    }
-    requestAnimationFrame(() => scrollToSection('rent-book'));
+    rememberPreferredVehicle(v);
+    writeRentBookingPrefs({
+      vehicle_id: v?.id || '',
+      wizard_step: 'services',
+    });
+    navigate('/rent/book/services');
   };
 
   return (
