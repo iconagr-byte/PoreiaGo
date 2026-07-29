@@ -77,6 +77,7 @@ class CustomerBookingBody(BaseModel):
 def _public_booking(row: dict) -> dict:
     return {
         "id": row["id"],
+        "reference_code": row.get("reference_code"),
         "vehicle_id": row.get("vehicle_id"),
         "client_id": row.get("client_id"),
         "vehicle_plate": row.get("vehicle_plate"),
@@ -91,8 +92,38 @@ def _public_booking(row: dict) -> dict:
         "rental_status": row.get("rental_status"),
         "driver_mode": row.get("driver_mode"),
         "channel": row.get("channel"),
+        "online_checkin_ready": bool(row.get("online_checkin_ready")),
+        "online_checkin_at": row.get("online_checkin_at"),
         "created_at": row.get("created_at"),
     }
+
+
+def _guest_booking_view(row: dict) -> dict:
+    """Safe public check-in card — no email/phone."""
+    return {
+        "reference_code": row.get("reference_code"),
+        "vehicle_model": row.get("vehicle_model"),
+        "vehicle_category": row.get("vehicle_category"),
+        "start_time": row.get("start_time"),
+        "end_time": row.get("end_time"),
+        "pickup_location": row.get("pickup_location"),
+        "dropoff_location": row.get("dropoff_location"),
+        "rental_status": row.get("rental_status"),
+        "driver_mode": row.get("driver_mode"),
+        "online_checkin_ready": bool(row.get("online_checkin_ready")),
+        "online_checkin_at": row.get("online_checkin_at"),
+        "client_name_masked": _mask_name(row.get("client_name")),
+    }
+
+
+def _mask_name(name: str | None) -> str:
+    raw = str(name or "").strip()
+    if not raw:
+        return "—"
+    parts = raw.split()
+    if len(parts) == 1:
+        return f"{parts[0][:1]}***"
+    return f"{parts[0][:1]}*** {parts[-1]}"
 
 
 @router.get("/catalog")
@@ -187,6 +218,41 @@ async def rental_availability(
             }
         )
     return {"vehicles": public, "count": len(public)}
+
+
+class GuestCheckinBody(BaseModel):
+    surname: str = Field(min_length=2, max_length=120)
+    reference_code: str = Field(min_length=4, max_length=40)
+
+
+@router.post("/public/lookup")
+async def guest_rental_lookup(body: GuestCheckinBody, request: Request):
+    """Guest online check-in lookup — surname + RN- code, office tenant from Host."""
+    row = store.guest_lookup_booking(
+        await _tenant_id(request),
+        surname=body.surname,
+        reference_code=body.reference_code,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Δεν βρέθηκε κράτηση με αυτά τα στοιχεία")
+    return {"booking": _guest_booking_view(row)}
+
+
+@router.post("/public/check-in")
+async def guest_rental_checkin(body: GuestCheckinBody, request: Request):
+    """Confirm online check-in for a rental booking (desk sees ready flag)."""
+    try:
+        row = store.guest_online_checkin(
+            await _tenant_id(request),
+            surname=body.surname,
+            reference_code=body.reference_code,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "δεν βρέθηκε" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+    return {"ok": True, "booking": _guest_booking_view(row)}
 
 
 @router.get("/bookings")

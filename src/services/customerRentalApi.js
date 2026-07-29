@@ -91,3 +91,27 @@ export async function cancelCustomerRentalBooking(bookingId) {
     method: 'POST',
   });
 }
+
+export async function guestRentalLookup({ surname, referenceCode }) {
+  const data = await publicRentalFetch('/public/lookup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      surname: String(surname || '').trim(),
+      reference_code: String(referenceCode || '').trim(),
+    }),
+  });
+  return data.booking || null;
+}
+
+export async function guestRentalCheckIn({ surname, referenceCode }) {
+  const data = await publicRentalFetch('/public/check-in', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      surname: String(surname || '').trim(),
+      reference_code: String(referenceCode || '').trim(),
+    }),
+  });
+  return data.booking || null;
+}

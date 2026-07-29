@@ -1296,6 +1296,270 @@
   color: rgba(255, 255, 255, 0.65);
 }
 
+/* —— Online check-in band (distinct from Hertz lookup) —— */
+.rent-checkin {
+  padding: 1.25rem 1rem 0.25rem;
+  background: linear-gradient(180deg, #eef5f3 0%, #f5f5f7 100%);
+}
+
+.rent-checkin-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.rent-checkin-intro {
+  padding: 0.35rem 0.15rem 0;
+}
+
+.rent-checkin-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rent-teal);
+}
+
+.rent-checkin-title {
+  margin: 0;
+  font-size: clamp(1.45rem, 3.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--rent-ink);
+  line-height: 1.15;
+}
+
+.rent-checkin-copy {
+  margin: 0.45rem 0 0;
+  max-width: 36ch;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--rent-secondary);
+}
+
+.rent-checkin-tips {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rent-checkin-tips li {
+  position: relative;
+  padding-left: 1.05rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--rent-ink);
+}
+
+.rent-checkin-tips li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.45rem;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--rent-teal);
+}
+
+.rent-checkin-card {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 24px;
+  padding: 1.15rem 1.1rem 1.2rem;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.06);
+}
+
+.rent-checkin-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.rent-checkin-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rent-checkin-field > span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rent-secondary);
+}
+
+.rent-checkin-input {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 3.15rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 14px;
+  background: rgba(120, 120, 128, 0.1);
+}
+
+.rent-checkin-input .material-symbols-outlined {
+  color: var(--rent-teal);
+  font-size: 1.25rem;
+}
+
+.rent-checkin-input input {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--rent-ink);
+  outline: none;
+  width: 100%;
+}
+
+.rent-checkin-submit {
+  appearance: none;
+  border: 0;
+  margin-top: 0.15rem;
+  min-height: 3.15rem;
+  border-radius: 999px;
+  background: var(--rent-deep);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.rent-checkin-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.rent-checkin-submit .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.rent-checkin-help {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--rent-secondary);
+  text-align: center;
+}
+
+.rent-checkin-result-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rent-teal);
+}
+
+.rent-checkin-result h3 {
+  margin: 0.35rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--rent-ink);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.rent-checkin-code {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--rent-deep);
+  background: rgba(10, 122, 108, 0.1);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+}
+
+.rent-checkin-meta {
+  margin: 0.9rem 0 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-checkin-meta div {
+  display: grid;
+  gap: 0.12rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.rent-checkin-meta dt {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rent-secondary);
+}
+
+.rent-checkin-meta dd {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--rent-ink);
+}
+
+.rent-checkin-success {
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 14px;
+  background: rgba(10, 122, 108, 0.1);
+  color: var(--rent-deep);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.rent-checkin-reset {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  margin-top: 0.75rem;
+  color: var(--rent-teal);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rent-checkin-error {
+  margin: 0.75rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #c41e3a;
+}
+
+.rent-checkin-footnote {
+  max-width: 1120px;
+  margin: 0.75rem auto 0;
+  padding: 0 0.15rem 0.35rem;
+  font-size: 0.72rem;
+  color: var(--rent-secondary);
+  line-height: 1.4;
+}
+
+.rent-phone-stage--desktop .rent-checkin {
+  padding: 1.75rem max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem)) 0.5rem;
+}
+
+.rent-phone-stage--desktop .rent-checkin-shell {
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 1.75rem;
+  align-items: center;
+}
+
 /* —— Hertz-like booking search bar (rent theme) —— */
 .rent-search-wrap {
   position: relative;

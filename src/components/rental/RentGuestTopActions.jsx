@@ -54,6 +54,17 @@ export default function RentGuestTopActions({ onAccount } = {}) {
         </button>
         {bookingOpen ? (
           <div className="rent-top-menu" role="menu">
+            <a
+              href="#rent-online-checkin"
+              role="menuitem"
+              className="rent-top-menu-item"
+              onClick={() => setBookingOpen(false)}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                fact_check
+              </span>
+              {el ? 'Online check-in' : 'Online check-in'}
+            </a>
             <Link
               to="/my-booking"
               role="menuitem"
