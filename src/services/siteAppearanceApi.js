@@ -39,6 +39,7 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_guest_hero_copy:
     'Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.',
   rent_cta_label: 'Βρες όχημα',
+  rent_pickup_locations: [],
   ...HOMEPAGE_LAYOUT_DEFAULTS,
   updated_at: null,
 };

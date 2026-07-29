@@ -71,6 +71,8 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
     "rent_guest_hero_copy": "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.",
     "rent_cta_label": "Βρες όχημα",
+    # Extra pickup/dropoff points for /rent search (office address is always included).
+    "rent_pickup_locations": [],
     "homepage_theme_id": "aegean_classic",
     "accent_color": "#0ea5e9",
     "secondary_color": "#1e3a5f",
@@ -129,6 +131,7 @@ class SiteAppearanceResponse(BaseModel):
         "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος."
     )
     rent_cta_label: str = "Βρες όχημα"
+    rent_pickup_locations: list[str] = []
     homepage_theme_id: str = "aegean_classic"
     accent_color: str = "#0ea5e9"
     secondary_color: str = "#1e3a5f"
@@ -194,6 +197,7 @@ class SiteAppearanceUpdate(BaseModel):
     rent_guest_hero_title: str | None = None
     rent_guest_hero_copy: str | None = None
     rent_cta_label: str | None = None
+    rent_pickup_locations: list[str] | None = None
     homepage_theme_id: str | None = None
     accent_color: str | None = None
     secondary_color: str | None = None

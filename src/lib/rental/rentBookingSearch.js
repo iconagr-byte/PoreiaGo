@@ -4,21 +4,41 @@ export const RENT_BOOKING_PREFS_KEY = 'rent_booking_prefs_v1';
 
 /**
  * Office-linked pickup options from site appearance / brand.
- * @param {{ brandLabel?: string, footerAddress?: string }} office
+ * Always includes the office; extra points come from rent_pickup_locations.
+ * @param {{
+ *   brandLabel?: string,
+ *   officeName?: string,
+ *   footerAddress?: string,
+ *   pickupLocations?: string[],
+ * }} office
  */
 export function buildRentLocationOptions(office = {}) {
   const brand = String(office.brandLabel || office.officeName || 'Γραφείο').trim() || 'Γραφείο';
   const address = String(office.footerAddress || '').trim();
   const officeLabel = address ? `${brand} — ${address}` : brand;
+  const officeValue = address || brand;
 
   const options = [
-    { id: 'office', label: officeLabel, value: brand, kind: 'office' },
-    { id: 'airport', label: 'Αεροδρόμιο', value: 'Αεροδρόμιο', kind: 'airport' },
-    { id: 'port', label: 'Λιμάνι / Πειραιάς', value: 'Πειραιάς', kind: 'port' },
-    { id: 'athens', label: 'Αθήνα κέντρο', value: 'Αθήνα', kind: 'city' },
+    { id: 'office', label: officeLabel, value: officeValue, kind: 'office' },
   ];
 
-  // Deduplicate by value
+  const extras = Array.isArray(office.pickupLocations)
+    ? office.pickupLocations
+    : Array.isArray(office.rent_pickup_locations)
+      ? office.rent_pickup_locations
+      : [];
+
+  extras.forEach((raw, idx) => {
+    const label = String(raw || '').trim();
+    if (!label) return;
+    options.push({
+      id: `extra-${idx}`,
+      label,
+      value: label,
+      kind: 'extra',
+    });
+  });
+
   const seen = new Set();
   return options.filter((o) => {
     const key = o.value.toLowerCase();

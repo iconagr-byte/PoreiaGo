@@ -52,7 +52,7 @@ export async function fetchPublicRentalCatalog(category) {
   return data.vehicles || [];
 }
 
-export async function fetchCustomerRentalAvailability({
+function availabilityParams({
   startTime,
   endTime,
   category,
@@ -70,6 +70,17 @@ export async function fetchCustomerRentalAvailability({
   if (pickupLocation) params.set('pickup_location', pickupLocation);
   if (dropoffLocation) params.set('dropoff_location', dropoffLocation);
   if (driverMode) params.set('driver_mode', driverMode);
+  return params;
+}
+
+export async function fetchPublicRentalAvailability(args) {
+  const params = availabilityParams(args);
+  const data = await publicRentalFetch(`/public/availability?${params}`);
+  return data.vehicles || [];
+}
+
+export async function fetchCustomerRentalAvailability(args) {
+  const params = availabilityParams(args);
   const data = await customerRentalFetch(`/availability?${params}`);
   return data.vehicles || [];
 }

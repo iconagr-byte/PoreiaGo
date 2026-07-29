@@ -54,6 +54,9 @@ const FIELDS = [
 ];
 
 function formFromAppearance(data) {
+  const locs = Array.isArray(data?.rent_pickup_locations)
+    ? data.rent_pickup_locations.map((x) => String(x || '').trim()).filter(Boolean)
+    : [];
   return {
     rent_office_name: data?.rent_office_name || data?.footer_brand_name || data?.display_name || '',
     rent_hero_title: data?.rent_hero_title || DEFAULT_RENT_APP_BRANDING.rent_hero_title,
@@ -63,6 +66,7 @@ function formFromAppearance(data) {
       data?.rent_guest_hero_title || DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title,
     rent_guest_hero_copy:
       data?.rent_guest_hero_copy || DEFAULT_RENT_APP_BRANDING.rent_guest_hero_copy,
+    rent_pickup_locations_text: locs.join('\n'),
   };
 }
 
@@ -101,6 +105,11 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
     e?.preventDefault?.();
     setSaving(true);
     try {
+      const pickupLocations = String(form.rent_pickup_locations_text || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 20);
       const payload = {
         rent_office_name: form.rent_office_name.trim(),
         rent_hero_title: form.rent_hero_title.trim(),
@@ -108,6 +117,7 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
         rent_cta_label: form.rent_cta_label.trim(),
         rent_guest_hero_title: form.rent_guest_hero_title.trim(),
         rent_guest_hero_copy: form.rent_guest_hero_copy.trim(),
+        rent_pickup_locations: pickupLocations,
       };
       // Keep storefront brand in sync when rent office name is set.
       if (payload.rent_office_name) {
@@ -182,6 +192,22 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
               )}
             </label>
           ))}
+
+          <label className="rent-brand-field">
+            <span className="rent-brand-field-label">Επιπλέον σημεία παραλαβής</span>
+            <span className="rent-brand-field-hint">
+              Ένα ανά γραμμή (π.χ. Αεροδρόμιο, Λιμάνι). Το γραφείο + διεύθυνση προστίθεται αυτόματα.
+            </span>
+            <textarea
+              rows={4}
+              className="rent-brand-input"
+              value={form.rent_pickup_locations_text || ''}
+              placeholder={'Αεροδρόμιο\nΛιμάνι\nΞενοδοχείο …'}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, rent_pickup_locations_text: e.target.value }))
+              }
+            />
+          </label>
 
           <div className="rent-brand-actions">
             <p className="text-sm text-gray-500">
