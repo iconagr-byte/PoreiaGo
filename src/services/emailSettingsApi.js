@@ -1,8 +1,16 @@
 import { adminAuthHeaders, adminFetch } from './adminApi.js';
+import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
+import { isSaasTokenExpired } from '../lib/saasJwt.js';
+import { getSaasToken } from './saasApi.js';
 
 function parseError(data, status) {
   const d = data?.detail;
-  if (typeof d === 'string' && d.trim()) return d;
+  if (typeof d === 'string' && d.trim()) {
+    if (/invalid token|expired|έληξε|μη έγκυρη|missing bearer/i.test(d) || status === 401) {
+      return 'Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο';
+    }
+    return d;
+  }
   if (Array.isArray(d)) {
     const joined = d.map((x) => x.msg || x).filter(Boolean).join(', ');
     if (joined) return joined;
@@ -11,7 +19,7 @@ function parseError(data, status) {
     const nested = d.msg || d.message || d.error;
     if (typeof nested === 'string' && nested.trim()) return nested;
   }
-  if (status === 401) return 'Απαιτείται σύνδεση διαχείρισης — κάντε login ξανά';
+  if (status === 401) return 'Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο';
   if (status === 403) return 'Δεν έχετε δικαίωμα στις ρυθμίσεις email';
   if (status === 502 || status === 503 || status === 504) {
     return 'Ο server είναι προσωρινά εκτός (deploy). Περιμένετε λίγο και δοκιμάστε ξανά';
@@ -21,6 +29,10 @@ function parseError(data, status) {
 }
 
 async function request(path, options = {}) {
+  if (!getSaasToken() || isSaasTokenExpired()) {
+    handleAuthFailure('Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο');
+    throw new Error('Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο');
+  }
   let res;
   try {
     res = await adminFetch(path, {
@@ -39,6 +51,10 @@ async function request(path, options = {}) {
   }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
+  if (isAuthFailureStatus(res.status)) {
+    handleAuthFailure(parseError(data, res.status));
+    throw new Error(parseError(data, res.status));
+  }
   if (!res.ok) throw new Error(parseError(data, res.status));
   return data;
 }
