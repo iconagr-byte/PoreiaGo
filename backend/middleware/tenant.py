@@ -187,9 +187,23 @@ async def _require_admin_bearer(
     if not jwt_secret:
         return JSONResponse(status_code=503, content={"detail": "Auth not configured"})
     try:
-        payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
+        payload = jwt.decode(
+            token,
+            jwt_secret,
+            algorithms=[jwt_algorithm],
+            options={"require": ["exp", "sub"]},
+            leeway=60,
+        )
+    except jwt.ExpiredSignatureError:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο"},
+        )
     except jwt.PyJWTError:
-        return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Η σύνδεση δεν είναι έγκυρη — συνδεθείτε ξανά στο γραφείο"},
+        )
     raw_tid = payload.get("tenant_id")
     if not raw_tid:
         return JSONResponse(status_code=403, content={"detail": "tenant_id required"})
@@ -331,9 +345,23 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
 
         token = auth[7:].strip()
         try:
-            payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
+            payload = jwt.decode(
+                token,
+                jwt_secret,
+                algorithms=[jwt_algorithm],
+                options={"require": ["exp", "sub"]},
+                leeway=60,
+            )
+        except jwt.ExpiredSignatureError:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο"},
+            )
         except jwt.PyJWTError:
-            return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Η σύνδεση δεν είναι έγκυρη — συνδεθείτε ξανά στο γραφείο"},
+            )
 
         tenant_id = payload.get("tenant_id")
         if not tenant_id:
