@@ -11,7 +11,6 @@ import HybridTimelineBuilder from './hybrid/HybridTimelineBuilder.jsx';
 import HybridCostCalculator from './hybrid/HybridCostCalculator.jsx';
 import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
-import AirportBufferEditor from './hybrid/AirportBufferEditor.jsx';
 import HybridChangeLogPanel from './hybrid/HybridChangeLogPanel.jsx';
 import HybridRoomingExtras from './hybrid/HybridRoomingExtras.jsx';
 import HybridSupplierCosts from './hybrid/HybridSupplierCosts.jsx';
@@ -963,14 +962,6 @@ export default function TripForm({
         hint="Tour leader, οδηγός και ξεναγός για το hybrid πρόγραμμα."
       >
         <HybridCrewEditor formData={formData} setFormData={setFormData} />
-      </Section>
-
-      <Section
-        icon="flight_land"
-        title="Airport buffer rules"
-        hint="Ελάχιστα λεπτά buffer ανά αεροδρόμιο για connection risk."
-      >
-        <AirportBufferEditor formData={formData} setFormData={setFormData} />
       </Section>
 
       <Section
