@@ -17,6 +17,11 @@ from app.models.subscription import Subscription, SubscriptionStatus, UsageSnaps
 from app.models.tenant import Tenant, TenantPlan
 from app.services.auth_service import hash_password
 from app.services.tenant_provisioning_service import TenantProvisioningServiceFacade
+from app.services.tenant_modules import (
+    enable_rent_addon_in_settings,
+    initial_settings_for_plan,
+    parse_tenant_settings,
+)
 from app.services.usage_metering_service import UsageMeteringService
 
 logger = logging.getLogger(__name__)
@@ -174,9 +179,11 @@ class BillingService:
         *,
         plan: TenantPlan | None = None,
         billing_interval: str = "month",
+        rent_addon: bool = False,
     ) -> dict:
         target_plan = plan or tenant.plan
         interval = billing_interval if billing_interval in ("month", "year") else "month"
+        rent_addon_effective = bool(rent_addon) and target_plan != TenantPlan.RENT
         price_id = _plan_price_id(target_plan, billing_interval=interval)
         customer_id = await self.ensure_stripe_customer(tenant)
         sub = await self.get_or_create_subscription(tenant)
@@ -192,6 +199,10 @@ class BillingService:
                 line_items.append({"price": settings.stripe_price_metered_bus})
             if settings.stripe_price_metered_trip:
                 line_items.append({"price": settings.stripe_price_metered_trip})
+            if rent_addon_effective:
+                if not settings.stripe_price_rent_addon:
+                    raise ValueError("Stripe price not configured for rent add-on")
+                line_items.append({"price": settings.stripe_price_rent_addon, "quantity": 1})
 
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -204,12 +215,14 @@ class BillingService:
                 "tenant_id": str(tenant.id),
                 "plan": target_plan.value,
                 "billing_interval": interval,
+                "rent_addon": "true" if rent_addon_effective else "false",
             },
             subscription_data={
                 "metadata": {
                     "tenant_id": str(tenant.id),
                     "plan": target_plan.value,
                     "billing_interval": interval,
+                    "rent_addon": "true" if rent_addon_effective else "false",
                 }
             },
         )
@@ -223,10 +236,12 @@ class BillingService:
         subdomain: str,
         password: str,
         plan: TenantPlan = TenantPlan.STARTER,
+        rent_addon: bool = False,
         billing_interval: str = "month",
     ) -> dict:
         """Public SaaS signup — creates provisioning job + Stripe Checkout (no existing tenant)."""
         subdomain_norm = subdomain.strip().lower()
+        rent_addon_effective = bool(rent_addon) and plan != TenantPlan.RENT
         taken = await self._session.execute(
             select(Tenant.id).where(
                 or_(Tenant.slug == subdomain_norm, Tenant.subdomain == subdomain_norm),
@@ -256,6 +271,7 @@ class BillingService:
                 "plan": plan.value,
                 "billing_interval": interval,
                 "admin_password_hash": hash_password(password),
+                "rent_addon": rent_addon_effective,
             },
         )
         self._session.add(job)
@@ -269,6 +285,10 @@ class BillingService:
                 line_items.append({"price": settings.stripe_price_metered_bus})
             if settings.stripe_price_metered_trip:
                 line_items.append({"price": settings.stripe_price_metered_trip})
+            if rent_addon_effective:
+                if not settings.stripe_price_rent_addon:
+                    raise ValueError("Stripe price not configured for rent add-on")
+                line_items.append({"price": settings.stripe_price_rent_addon, "quantity": 1})
 
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -281,6 +301,7 @@ class BillingService:
                 "signup_flow": "true",
                 "provisioning_job_id": str(job.id),
                 "plan": plan.value,
+                "rent_addon": "true" if rent_addon_effective else "false",
                 "billing_interval": interval,
                 "subdomain": subdomain_norm,
             },
@@ -288,6 +309,7 @@ class BillingService:
                 "metadata": {
                     "provisioning_job_id": str(job.id),
                     "plan": plan.value,
+                    "rent_addon": "true" if rent_addon_effective else "false",
                     "billing_interval": interval,
                     "subdomain": subdomain_norm,
                 }
@@ -306,6 +328,7 @@ class BillingService:
         subdomain: str,
         password: str,
         plan: TenantPlan = TenantPlan.STARTER,
+        rent_addon: bool = False,
         billing_interval: str = "month",
     ) -> dict:
         """Provision a new office without Stripe charge (demo / trial signup)."""
@@ -361,6 +384,7 @@ class BillingService:
             admin_email=admin_email.lower().strip(),
             admin_password_hash=password_hash,
             subdomain_hint=subdomain_norm,
+            rent_addon=bool(rent_addon) and plan != TenantPlan.RENT,
         )
 
         job.tenant_id = tenant.id
@@ -395,6 +419,7 @@ class BillingService:
         *,
         plan: TenantPlan,
         billing_interval: str = "month",
+        rent_addon: bool = False,
     ) -> Subscription:
         """14-day trial without Stripe — when demo mode is on or Stripe is not configured."""
         readiness = stripe_readiness()
@@ -415,9 +440,45 @@ class BillingService:
         sub.base_amount_cents = _plan_base_cents(plan, billing_interval=interval)
         tenant.plan = plan
         tenant.is_active = True
+        await self._apply_plan_module_settings(
+            tenant,
+            plan=plan,
+            rent_addon=bool(rent_addon) and plan != TenantPlan.RENT,
+        )
         await self._session.flush()
-        logger.info("Local trial started: tenant=%s plan=%s", tenant.slug, plan.value)
+        logger.info(
+            "Local trial started: tenant=%s plan=%s rent_addon=%s",
+            tenant.slug,
+            plan.value,
+            bool(rent_addon) and plan != TenantPlan.RENT,
+        )
         return sub
+
+    async def _apply_plan_module_settings(
+        self,
+        tenant: Tenant,
+        *,
+        plan: TenantPlan,
+        rent_addon: bool = False,
+    ) -> None:
+        """Keep tenants.settings_json modules/addons in sync with purchased plan."""
+        import json
+
+        bag = parse_tenant_settings(tenant.settings_json)
+        if plan == TenantPlan.RENT:
+            seeded = initial_settings_for_plan(plan, office_name=tenant.legal_name)
+            # Preserve unrelated keys (platform, branding, …) while applying rent-only seed.
+            for key, value in seeded.items():
+                if key in ("addons", "modules", "site_appearance"):
+                    if key == "site_appearance" and isinstance(bag.get("site_appearance"), dict):
+                        bag["site_appearance"] = {**bag["site_appearance"], **value}
+                    else:
+                        bag[key] = value
+                elif key not in bag:
+                    bag[key] = value
+        elif rent_addon:
+            bag = enable_rent_addon_in_settings(bag)
+        tenant.settings_json = json.dumps(bag, ensure_ascii=False)
 
     async def suspend_tenant(self, tenant_id: UUID, *, reason: str) -> None:
         result = await self._session.execute(
@@ -473,6 +534,22 @@ class BillingService:
         items = (stripe_sub.get("items") or {}).get("data") or []
         if items:
             sub.stripe_price_id = items[0].get("price", {}).get("id")
+
+        rent_addon_meta = (stripe_sub.get("metadata") or {}).get("rent_addon")
+        rent_addon = str(rent_addon_meta or "").strip().lower() in ("1", "true", "yes", "on")
+        # Also detect rent add-on price id on the subscription items.
+        if not rent_addon and self._settings.stripe_price_rent_addon:
+            for item in items:
+                price_id = (item.get("price") or {}).get("id")
+                if price_id == self._settings.stripe_price_rent_addon:
+                    rent_addon = True
+                    break
+        if rent_addon or tenant.plan == TenantPlan.RENT:
+            await self._apply_plan_module_settings(
+                tenant,
+                plan=tenant.plan,
+                rent_addon=rent_addon and tenant.plan != TenantPlan.RENT,
+            )
 
         if sub.status in ACTIVE_SUBSCRIPTION_STATUSES:
             await self.reactivate_tenant(tenant_id)
@@ -604,6 +681,22 @@ class BillingService:
         plan_hint = meta.get("plan")
         await self.sync_subscription_from_stripe(tenant_id, stripe_sub, plan_hint=plan_hint)
 
+        rent_addon_raw = meta.get("rent_addon")
+        rent_addon = str(rent_addon_raw or "").strip().lower() in ("1", "true", "yes", "on")
+        if rent_addon or str(plan_hint or "").strip().lower() == TenantPlan.RENT.value:
+            result = await self._session.execute(select(Tenant).where(Tenant.id == tenant_id))
+            tenant = result.scalar_one_or_none()
+            if tenant:
+                try:
+                    plan = TenantPlan(plan_hint) if plan_hint else tenant.plan
+                except ValueError:
+                    plan = tenant.plan
+                await self._apply_plan_module_settings(
+                    tenant,
+                    plan=plan,
+                    rent_addon=rent_addon and plan != TenantPlan.RENT,
+                )
+
     async def _on_signup_checkout_completed(self, session: dict) -> None:
         meta = session.get("metadata") or {}
         job_id_raw = meta.get("provisioning_job_id") or session.get("client_reference_id")
@@ -667,6 +760,14 @@ class BillingService:
         except ValueError:
             plan = TenantPlan.STARTER
 
+        rent_addon_raw = meta.get("rent_addon")
+        if rent_addon_raw is None:
+            rent_addon_raw = payload.get("rent_addon", False)
+        if isinstance(rent_addon_raw, bool):
+            rent_addon = rent_addon_raw
+        else:
+            rent_addon = str(rent_addon_raw).strip().lower() in ("1", "true", "yes", "on", "rent")
+
         provisioning = TenantProvisioningServiceFacade(self._session)
         try:
             tenant = await provisioning.provision_from_stripe_checkout(
@@ -677,6 +778,7 @@ class BillingService:
                 admin_email=payload.get("admin_email") or session.get("customer_email", ""),
                 admin_password_hash=payload.get("admin_password_hash", ""),
                 subdomain_hint=payload.get("subdomain") or meta.get("subdomain"),
+                rent_addon=rent_addon and plan != TenantPlan.RENT,
             )
         except ValueError as exc:
             job.status = ProvisioningJobStatus.FAILED.value

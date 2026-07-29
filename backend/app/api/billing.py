@@ -94,6 +94,7 @@ async def create_checkout(
             tenant,
             plan=plan,
             billing_interval=body.billing_interval,
+            rent_addon=bool(body.rent_addon),
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
@@ -118,6 +119,7 @@ async def start_trial(
             tenant,
             plan=plan,
             billing_interval=body.billing_interval,
+            rent_addon=bool(body.rent_addon),
         )
         await db.commit()
     except ValueError as exc:
@@ -158,6 +160,7 @@ async def signup_checkout(body: BillingSignupCheckoutRequest):
                     subdomain=body.subdomain,
                     password=body.password,
                     plan=plan,
+                    rent_addon=bool(body.rent_addon),
                     billing_interval=body.billing_interval,
                 )
             else:
@@ -167,6 +170,7 @@ async def signup_checkout(body: BillingSignupCheckoutRequest):
                     subdomain=body.subdomain,
                     password=body.password,
                     plan=plan,
+                    rent_addon=bool(body.rent_addon),
                     billing_interval=body.billing_interval,
                 )
             await db.commit()

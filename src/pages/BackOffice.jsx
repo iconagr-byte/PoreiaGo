@@ -2366,6 +2366,7 @@ export default function BackOffice() {
                   contractPrefs={{
                     plan: location.state?.plan,
                     interval: location.state?.interval,
+                    focusRentModule: Boolean(location.state?.focusRentModule),
                   }}
                 />
               </div>
