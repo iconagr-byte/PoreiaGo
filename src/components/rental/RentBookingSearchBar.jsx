@@ -221,7 +221,10 @@ export default function RentBookingSearchBar({
           </div>
 
           <button type="submit" className="rent-search-submit">
-            Βρίσκω αυτοκίνητο
+            Αναζήτηση
+            <span className="material-symbols-outlined" aria-hidden>
+              arrow_forward
+            </span>
           </button>
         </div>
 
