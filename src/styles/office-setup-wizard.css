@@ -1,0 +1,473 @@
+/* Full-office onboarding — Apple aesthetic */
+
+.office-setup-root {
+  --os-ink: #1d1d1f;
+  --os-secondary: #6e6e73;
+  --os-tertiary: #86868b;
+  --os-fill: #f5f5f7;
+  --os-card: rgba(255, 255, 255, 0.72);
+  --os-stroke: rgba(0, 0, 0, 0.08);
+  --os-blue: #0071e3;
+  --os-blue-soft: rgba(0, 113, 227, 0.12);
+  --os-teal: #0a7a6c;
+  --os-teal-soft: rgba(10, 122, 108, 0.12);
+  --os-green: #34c759;
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI',
+    system-ui, sans-serif;
+  color: var(--os-ink);
+  background:
+    radial-gradient(1200px 520px at 12% -10%, rgba(0, 113, 227, 0.16), transparent 55%),
+    radial-gradient(900px 480px at 88% 8%, rgba(10, 122, 108, 0.14), transparent 50%),
+    radial-gradient(700px 400px at 50% 110%, rgba(255, 149, 0, 0.08), transparent 45%),
+    linear-gradient(165deg, #fbfbfd 0%, #f2f2f7 48%, #eef0f5 100%);
+  overflow: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+.office-setup-shell {
+  width: min(920px, 100%);
+  margin: 0 auto;
+  padding: clamp(1.25rem, 3vw, 2.5rem) clamp(1rem, 3vw, 2rem) 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: 100%;
+}
+
+.office-setup-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.office-setup-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.office-setup-mark {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.85rem;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(145deg, #3d9bff 0%, #0071e3 45%, #0a7a6c 100%);
+  box-shadow: 0 10px 28px rgba(0, 113, 227, 0.28);
+}
+
+.office-setup-mark svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.office-setup-brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.office-setup-brand-copy strong {
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.office-setup-brand-copy span {
+  font-size: 0.78rem;
+  color: var(--os-secondary);
+}
+
+.office-setup-skip {
+  border: 0;
+  background: transparent;
+  color: var(--os-blue);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.45rem 0.7rem;
+  border-radius: 980px;
+}
+
+.office-setup-skip:hover {
+  background: var(--os-blue-soft);
+}
+
+.office-setup-progress {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.office-setup-progress span {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  transition: background 0.35s ease, transform 0.35s ease;
+}
+
+.office-setup-progress span.is-done,
+.office-setup-progress span.is-active {
+  background: linear-gradient(90deg, #0071e3, #0a7a6c);
+}
+
+.office-setup-progress span.is-active {
+  transform: scaleY(1.35);
+}
+
+.office-setup-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--os-stroke);
+  background: var(--os-card);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 24px 60px rgba(15, 23, 42, 0.08);
+  padding: clamp(1.35rem, 3vw, 2.1rem);
+  animation: officeSetupIn 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.office-setup-card::before {
+  content: '';
+  position: absolute;
+  right: -4rem;
+  top: -5rem;
+  width: 16rem;
+  height: 16rem;
+  border-radius: 999px;
+  background: rgba(0, 113, 227, 0.1);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.office-setup-card::after {
+  content: '';
+  position: absolute;
+  left: 20%;
+  bottom: -6rem;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 999px;
+  background: rgba(10, 122, 108, 0.1);
+  filter: blur(42px);
+  pointer-events: none;
+}
+
+@keyframes officeSetupIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.office-setup-card-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.office-setup-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--os-blue);
+  margin-bottom: 0.65rem;
+}
+
+.office-setup-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 3.4vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+}
+
+.office-setup-subtitle {
+  margin: 0.65rem 0 0;
+  font-size: 1.02rem;
+  line-height: 1.45;
+  color: var(--os-secondary);
+  max-width: 36rem;
+}
+
+.office-setup-grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+@media (min-width: 720px) {
+  .office-setup-grid.cols-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.office-setup-field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--os-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.office-setup-field input,
+.office-setup-field select,
+.office-setup-field textarea {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  font-size: 1rem;
+  color: var(--os-ink);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.office-setup-field input:focus,
+.office-setup-field select:focus,
+.office-setup-field textarea:focus {
+  border-color: rgba(0, 113, 227, 0.55);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.14);
+}
+
+.office-setup-hint {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--os-tertiary);
+}
+
+.office-setup-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+}
+
+.office-setup-swatch {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.office-setup-swatch.is-active {
+  border-color: var(--os-ink);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
+
+.office-setup-feature-row {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.35rem;
+}
+
+@media (min-width: 720px) {
+  .office-setup-feature-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.office-setup-feature {
+  border-radius: 18px;
+  border: 1px solid var(--os-stroke);
+  background: rgba(255, 255, 255, 0.55);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 7.5rem;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.office-setup-feature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.office-setup-feature-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.8rem;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(145deg, #5ac8fa, #0071e3);
+  margin-bottom: 0.25rem;
+}
+
+.office-setup-feature strong {
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.office-setup-feature p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--os-secondary);
+  line-height: 1.35;
+}
+
+.office-setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.office-setup-actions-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-left: auto;
+}
+
+.office-setup-btn {
+  border: 0;
+  cursor: pointer;
+  border-radius: 980px;
+  padding: 0.8rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.office-setup-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.office-setup-btn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.office-setup-btn-ghost {
+  background: transparent;
+  color: var(--os-blue);
+}
+
+.office-setup-btn-ghost:hover:not(:disabled) {
+  background: var(--os-blue-soft);
+}
+
+.office-setup-btn-secondary {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--os-ink);
+}
+
+.office-setup-btn-secondary:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+.office-setup-btn-primary {
+  background: var(--os-blue);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(0, 113, 227, 0.28);
+}
+
+.office-setup-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.office-setup-done {
+  text-align: center;
+  padding: 1rem 0 0.5rem;
+}
+
+.office-setup-done-orb {
+  width: 4.5rem;
+  height: 4.5rem;
+  margin: 0 auto 1rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(145deg, #32d74b, #0a7a6c);
+  box-shadow: 0 16px 36px rgba(10, 122, 108, 0.3);
+  animation: officeSetupPop 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes officeSetupPop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.office-setup-checklist {
+  list-style: none;
+  margin: 1.25rem auto 0;
+  padding: 0;
+  max-width: 22rem;
+  text-align: left;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.office-setup-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.92rem;
+  color: var(--os-secondary);
+}
+
+.office-setup-checklist li i {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--os-teal-soft);
+  color: var(--os-teal);
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.office-setup-email-wrap {
+  margin-top: 1rem;
+}
+
+.office-setup-email-wrap > div {
+  max-width: none !important;
+  box-shadow: none !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  background: rgba(255, 255, 255, 0.55) !important;
+}
+
+@media (max-width: 640px) {
+  .office-setup-shell {
+    padding-bottom: 2rem;
+  }
+
+  .office-setup-card {
+    border-radius: 22px;
+  }
+}

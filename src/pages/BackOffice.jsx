@@ -71,6 +71,9 @@ import FleetExpensesPanel from '../components/admin/fleet/FleetExpensesPanel.jsx
 import FleetDigestPanel from '../components/admin/fleet/FleetDigestPanel.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
+import OfficeSetupWizard, {
+  isOfficeSetupComplete,
+} from '../components/admin/OfficeSetupWizard.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
 import DriversHub from '../components/admin/DriversHub.jsx';
 import SortableSidebarNav from '../components/admin/SortableSidebarNav.jsx';
@@ -144,9 +147,11 @@ export default function BackOffice() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   const [rentSummary, setRentSummary] = useState(null);
+  const [showOfficeSetup, setShowOfficeSetup] = useState(
+    () => Boolean(location.state?.officeSetup) || !isOfficeSetupComplete(),
+  );
   const officeMode = officeModeFromModules(officeModules);
   const rentOnly = officeMode === 'rent_only';
-
   useEffect(() => {
     let cancelled = false;
     fetchAdminOfficeModules().then((mods) => {
@@ -258,6 +263,9 @@ export default function BackOffice() {
         ...(location.state?.connectEmail ? { connectEmail: true } : {}),
         ...(location.state?.emailCompose ? { compose: location.state.emailCompose } : {}),
       });
+    }
+    if (location.state?.officeSetup) {
+      setShowOfficeSetup(true);
     }
     if (
       location.state?.routesMarket === MARKET_DOMESTIC ||
@@ -2225,6 +2233,14 @@ export default function BackOffice() {
 
   return (
     <FleetTelemetryProvider>
+      {showOfficeSetup && (
+        <OfficeSetupWizard
+          rentEnabled={Boolean(officeModules?.rent_enabled)}
+          forceOpen={Boolean(location.state?.officeSetup)}
+          onFinished={() => setShowOfficeSetup(false)}
+          onDismiss={() => setShowOfficeSetup(false)}
+        />
+      )}
     <div className="bg-surface text-on-surface h-screen flex overflow-hidden relative">
       <aside className="w-[17.5rem] xl:w-80 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0 relative z-20">
         <div className="px-4 pt-4 pb-2">

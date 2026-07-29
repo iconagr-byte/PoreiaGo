@@ -63,12 +63,13 @@ export default function AdminLoginPage() {
       navigate(postLogin.from || '/admin', {
         replace: true,
         state: {
-          activeTab,
+          activeTab: postLogin.officeSetup ? 'dashboard' : activeTab,
           ...(settingsSubTab ? { settingsSubTab } : {}),
           plan: postLogin.plan,
           interval: postLogin.interval,
           ...(postLogin.emailHubTab ? { emailHubTab: postLogin.emailHubTab } : {}),
           ...(postLogin.connectEmail ? { connectEmail: true } : {}),
+          ...(postLogin.officeSetup ? { officeSetup: true } : {}),
           ...(postLogin.afterLogin || {}),
         },
       });
