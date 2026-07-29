@@ -371,26 +371,6 @@ export default function DriverFormPage() {
                 className={inputClass}
               />
             </label>
-            <label className="block text-sm">
-              <span className="font-bold text-gray-700">€/km</span>
-              <input
-                type="number"
-                step="0.01"
-                value={form.salary_per_km}
-                onChange={setField('salary_per_km')}
-                className={inputClass}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-bold text-gray-700">€/εκδρομή</span>
-              <input
-                type="number"
-                step="0.01"
-                value={form.salary_per_trip}
-                onChange={setField('salary_per_trip')}
-                className={inputClass}
-              />
-            </label>
             <div className="sm:col-span-2">
               <ImageDropField
                 label="Φωτογραφία οδηγού"

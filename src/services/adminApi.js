@@ -39,13 +39,17 @@ function networkAdminError() {
 export async function adminFetch(path, options = {}) {
   const attempts = Math.max(1, Number(options.retries) || 3);
   const { retries: _ignored, ...fetchOpts } = options;
+  const isFormData =
+    typeof FormData !== 'undefined' && fetchOpts.body instanceof FormData;
+  // FormData must not send Content-Type: application/json (breaks multipart + auth proxies).
+  const baseHeaders = isFormData ? adminBearerHeaders() : adminAuthHeaders();
   let lastErr;
 
   for (let i = 0; i < attempts; i += 1) {
     try {
       const res = await fetch(`${API_BASE}${path}`, {
         ...fetchOpts,
-        headers: { ...adminAuthHeaders(), ...(fetchOpts.headers || {}) },
+        headers: { ...baseHeaders, ...(fetchOpts.headers || {}) },
       });
       if ([502, 503, 504].includes(res.status) && i < attempts - 1) {
         await new Promise((r) => setTimeout(r, 450 * (i + 1)));

@@ -1,5 +1,6 @@
 import { API_BASE } from '../config/api.js';
 import { mockFleet } from '../data/mockData.js';
+import { fileToDriverPhotoDataUrl } from '../lib/drivers/driverPhoto.js';
 import { adminBearerHeaders, adminFetch } from './adminApi.js';
 import { getSaasToken, issueSaasMasterQr, saasFetch } from './saasApi.js';
 import { normalizeCheckoutSettings } from './checkoutSettingsApi.js';
@@ -399,17 +400,29 @@ export async function deleteFleetDriver(driverId) {
   invalidateFleetDriversCache();
 }
 
-/** Upload driver headshot — returns relative `/api/site/driver-photos/...` URL. */
+/** Upload driver headshot — returns relative URL or compressed data URL for photo_url. */
 export async function uploadDriverPhoto(file) {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch(`${API_BASE}/api/admin/platform/drivers/photo-upload`, {
-    method: 'POST',
-    headers: adminBearerHeaders(),
-    body: form,
-  });
-  if (!res.ok) await parseError(res);
-  return res.json();
+  // Prefer server upload when authenticated; fall back to local compress so
+  // offices are never blocked by "Invalid token" on the multipart endpoint.
+  if (getSaasToken()) {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await adminFetch('/api/admin/platform/drivers/photo-upload', {
+        method: 'POST',
+        body: form,
+      });
+      if (res.ok) {
+        return res.json();
+      }
+      // 401/403/5xx → data-URL path below (saved with create/update).
+    } catch {
+      /* network / deploy bounce — use data URL */
+    }
+  }
+
+  const url = await fileToDriverPhotoDataUrl(file);
+  return { ok: true, url, local: true };
 }
 
 export async function fetchFleetPlateAvailability(plate) {
