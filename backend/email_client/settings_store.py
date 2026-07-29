@@ -121,15 +121,49 @@ async def list_settings(
     *,
     owner_key: str = "default",
     active_only: bool = False,
+    include_legacy_default: bool = False,
 ) -> list[dict]:
     db = get_db()
-    q = "SELECT * FROM email_settings WHERE owner_key = ?"
-    params: list = [owner_key]
+    if include_legacy_default and owner_key != "default":
+        q = "SELECT * FROM email_settings WHERE owner_key IN (?, ?)"
+        params: list = [owner_key, "default"]
+    else:
+        q = "SELECT * FROM email_settings WHERE owner_key = ?"
+        params = [owner_key]
     if active_only:
         q += " AND is_active = 1"
     q += " ORDER BY created_at ASC"
     cur = await db.execute(q, params)
-    return [_row_settings(r) for r in await cur.fetchall()]
+    rows = [_row_settings(r) for r in await cur.fetchall()]
+    # Adopt legacy owner_key=default rows into the logged-in office once.
+    if include_legacy_default and owner_key != "default":
+        for row in rows:
+            if row.get("owner_key") == "default":
+                await db.execute(
+                    "UPDATE email_settings SET owner_key = ?, updated_at = ? WHERE id = ?",
+                    (owner_key, _now(), row["id"]),
+                )
+                row["owner_key"] = owner_key
+        await db.commit()
+    return rows
+
+
+async def claim_legacy_owner(settings_id: str, owner_key: str) -> dict | None:
+    """Move owner_key=default → tenant:* for the logged-in office."""
+    row = await get_settings(settings_id)
+    if not row:
+        return None
+    if row.get("owner_key") == owner_key:
+        return row
+    if row.get("owner_key") != "default":
+        return None
+    db = get_db()
+    await db.execute(
+        "UPDATE email_settings SET owner_key = ?, updated_at = ? WHERE id = ?",
+        (owner_key, _now(), settings_id),
+    )
+    await db.commit()
+    return await get_settings(settings_id)
 
 
 async def get_settings(settings_id: str, *, with_password: bool = False) -> dict | None:

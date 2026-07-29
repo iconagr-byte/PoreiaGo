@@ -1,11 +1,20 @@
 import { API_BASE } from '../config/api.js';
 import { adminAuthHeaders } from './adminApi.js';
 
-function parseError(data) {
+function parseError(data, status) {
   const d = data?.detail;
-  if (typeof d === 'string') return d;
-  if (Array.isArray(d)) return d.map((x) => x.msg || x).join(', ');
-  return data?.message || 'Αποτυχία αιτήματος';
+  if (typeof d === 'string' && d.trim()) return d;
+  if (Array.isArray(d)) {
+    const joined = d.map((x) => x.msg || x).filter(Boolean).join(', ');
+    if (joined) return joined;
+  }
+  if (status === 401) return 'Απαιτείται σύνδεση διαχείρισης — κάντε login ξανά';
+  if (status === 403) return 'Δεν έχετε δικαίωμα στις ρυθμίσεις email';
+  if (status === 502 || status === 503 || status === 504) {
+    return 'Ο server είναι προσωρινά εκτός (deploy). Περιμένετε λίγο και δοκιμάστε ξανά';
+  }
+  if (typeof data?.message === 'string' && data.message.trim()) return data.message;
+  return status ? `Αποτυχία αιτήματος (${status})` : 'Αποτυχία αιτήματος';
 }
 
 async function request(path, options = {}) {
@@ -24,7 +33,7 @@ async function request(path, options = {}) {
   }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseError(data));
+  if (!res.ok) throw new Error(parseError(data, res.status));
   return data;
 }
 

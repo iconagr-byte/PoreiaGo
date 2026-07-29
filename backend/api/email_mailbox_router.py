@@ -32,9 +32,43 @@ from email_client.schemas import (
 router = APIRouter(tags=["Email Mailbox"])
 
 
+@router.post("/api/mailbox/sync", response_model=ImapSyncResult)
+async def trigger_imap_sync(email_settings_id: str | None = Query(default=None)):
+    try:
+        from email_client.store import init_email_client_tables
+
+        await init_email_client_tables()
+    except Exception:
+        pass
+    try:
+        result = await sync_imap_to_database_async(email_settings_id=email_settings_id)
+        # Ensure response matches schema even when sync returns sparse dicts.
+        return ImapSyncResult(
+            ok=bool(result.get("ok")),
+            synced=int(result.get("synced") or 0),
+            folders=result.get("folders") or {},
+            errors=list(result.get("errors") or []),
+            error=result.get("error"),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Αποτυχία IMAP: {exc}",
+        ) from exc
+
+
 @router.get("/api/mailbox/folders", response_model=FolderCounts)
 async def mailbox_folders(email_settings_id: str | None = Query(default=None)):
-    counts = await mailbox_store.folder_unread_counts(email_settings_id=email_settings_id)
+    try:
+        from email_client.store import init_email_client_tables
+
+        await init_email_client_tables()
+    except Exception:
+        pass
+    try:
+        counts = await mailbox_store.folder_unread_counts(email_settings_id=email_settings_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Mailbox: {exc}") from exc
     folders = []
     total = 0
     for name in MAILBOX_FOLDERS:
@@ -54,14 +88,31 @@ async def list_mailbox_messages(
 ):
     if folder not in MAILBOX_FOLDERS:
         raise HTTPException(status_code=400, detail="Invalid folder")
-    rows = await mailbox_store.list_messages(
-        folder=folder,
-        email_settings_id=email_settings_id,
-        limit=limit,
-        offset=offset,
-        search=search,
-    )
-    return [EmailMessageOut(**{k: r[k] for k in EmailMessageOut.model_fields if k in r}) for r in rows]
+    try:
+        rows = await mailbox_store.list_messages(
+            folder=folder,
+            email_settings_id=email_settings_id,
+            limit=limit,
+            offset=offset,
+            search=search,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Mailbox: {exc}") from exc
+    out = []
+    for r in rows:
+        payload = {k: r[k] for k in EmailMessageOut.model_fields if k in r}
+        if payload.get("body_html") is None:
+            payload["body_html"] = ""
+        if payload.get("subject") is None:
+            payload["subject"] = ""
+        if payload.get("sender") is None:
+            payload["sender"] = ""
+        if payload.get("recipient") is None:
+            payload["recipient"] = ""
+        if not payload.get("date"):
+            payload["date"] = ""
+        out.append(EmailMessageOut(**payload))
+    return out
 
 
 @router.get("/api/mailbox/messages/{message_id}", response_model=EmailMessageDetail)
@@ -145,12 +196,6 @@ async def save_draft(
         payload["email_settings_id"] = email_settings_id
     saved = await save_compose_draft(payload)
     return EmailMessageOut(**{k: saved[k] for k in EmailMessageOut.model_fields})
-
-
-@router.post("/api/mailbox/sync", response_model=ImapSyncResult)
-async def trigger_imap_sync(email_settings_id: str | None = Query(default=None)):
-    result = await sync_imap_to_database_async(email_settings_id=email_settings_id)
-    return ImapSyncResult(**result)
 
 
 @router.get("/api/mailbox/subscribers", response_model=list[SubscriberOut])
