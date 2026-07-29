@@ -33,14 +33,30 @@ def settings_to_imap_config(account: dict) -> dict[str, Any]:
 
 
 def settings_to_smtp_config(account: dict) -> dict[str, Any]:
+    port = int(account.get("smtp_port") or 587)
+    # Port 465 = implicit SSL (SMTPS). STARTTLS checkbox applies to 587/25.
+    use_ssl = port == 465 or bool(account.get("smtp_ssl"))
+    use_tls = (not use_ssl) and bool(account.get("smtp_secure", True))
     return {
         "host": (account.get("smtp_host") or "").strip(),
-        "port": int(account.get("smtp_port") or 587),
+        "port": port,
         "user": (account.get("mail_username") or account.get("email_address") or "").strip(),
         "password": account.get("mail_password") or "",
-        "use_tls": bool(account.get("smtp_secure", True)),
+        "use_ssl": use_ssl,
+        "use_tls": use_tls,
         "from_addr": (account.get("email_address") or "").strip(),
     }
+
+
+def _open_smtp(cfg: dict):
+    """Return connected SMTP / SMTP_SSL client (caller must quit/close)."""
+    if cfg.get("use_ssl"):
+        smtp = smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=20)
+    else:
+        smtp = smtplib.SMTP(cfg["host"], cfg["port"], timeout=20)
+        if cfg.get("use_tls"):
+            smtp.starttls()
+    return smtp
 
 
 def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
@@ -67,9 +83,7 @@ def test_smtp_connection(account: dict) -> dict:
     if not cfg["host"] or not cfg["user"]:
         return {"ok": False, "error": "Συμπληρώστε SMTP host και username"}
     try:
-        with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as smtp:
-            if cfg["use_tls"]:
-                smtp.starttls()
+        with _open_smtp(cfg) as smtp:
             if cfg["password"]:
                 smtp.login(cfg["user"], cfg["password"])
         return {"ok": True, "message": "SMTP σύνδεση επιτυχής"}
@@ -208,9 +222,7 @@ def send_email_smtp(
     if not recipients:
         raise ValueError("Δεν βρέθηκε έγκυρος παραλήπτης")
 
-    with smtplib.SMTP(cfg["host"], cfg["port"], timeout=20) as smtp:
-        if cfg["use_tls"]:
-            smtp.starttls()
+    with _open_smtp(cfg) as smtp:
         if cfg["user"] and cfg["password"]:
             smtp.login(cfg["user"], cfg["password"])
         smtp.sendmail(from_addr, recipients, msg.as_string())
