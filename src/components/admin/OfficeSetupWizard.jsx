@@ -389,7 +389,7 @@ export default function OfficeSetupWizard({
               <MarkIcon />
             </div>
             <div className="office-setup-brand-copy">
-              <strong>PoreiaGo Setup</strong>
+              <strong>Ρύθμιση γραφείου</strong>
               <span>
                 Βήμα {step + 1} από {STEPS.length} · {stepMeta.title}
               </span>

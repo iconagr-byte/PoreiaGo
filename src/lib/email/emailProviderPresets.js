@@ -52,8 +52,8 @@ export const PROVIDERS = {
   },
   custom: {
     id: 'custom',
-    label: 'Δικό μου domain (cPanel / hosting)',
-    autonomous: false,
+    label: 'Εταιρικό email',
+    autonomous: true,
     imap_host: '',
     imap_port: 993,
     imap_secure: true,
@@ -62,9 +62,8 @@ export const PROVIDERS = {
     smtp_secure: true,
     passwordLabel: 'Κωδικός mailbox',
     help: [
-      'Πολλοί shared hosts μπλοκάρουν το IP του PoreiaGo → Connection timeout',
-      'Για αυτόνομη λειτουργία χωρίς ticket: forward το mailbox σε Gmail και συνδέστε Gmail',
-      'Εναλλακτικά δοκιμάστε απευθείας IMAP (mail.το-domain.gr)',
+      'Host συνήθως: mail.το-domain.gr',
+      'Χρησιμοποιήστε τον κωδικό του webmail',
     ],
   },
 };

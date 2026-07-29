@@ -10,19 +10,18 @@ from typing import Any
 
 ENCODING_HINT_EL = (
     "IMAP σύνδεση απέτυχε λόγω encoding — πιθανό μη ASCII σε username/password "
-    "ή IMAP mailbox. Δοκιμάστε τον κωδικό όπως δίνεται από τον πάροχο και "
-    "ελέγξτε το IMAP Mailbox."
+    "ή IMAP mailbox. Ελέγξτε τον κωδικό και το IMAP Mailbox."
 )
 
 TIMEOUT_HINT_EL = (
-    "IMAP σύνδεση: timeout — το PoreiaGo (IP 34.141.98.145) δεν φτάνει τον mail host. "
-    "Εναλλακτικές: (1) whitelist 993/587 από Intechs, (2) δοκιμή IMAP port 143 STARTTLS, "
-    "(3) forward του mailbox σε Gmail και IMAP host=imap.gmail.com με App Password."
+    "IMAP σύνδεση: timeout — δεν ήταν δυνατή η σύνδεση στον mail server "
+    "(θύρα 993/143). Ελέγξτε host, ότι ο λογαριασμός IMAP είναι ενεργός, "
+    "και ότι ο πάροχος email επιτρέπει εξωτερικές συνδέσεις."
 )
 
 AUTH_HINT_EL = (
     "IMAP σύνδεση: λάθος username ή κωδικός mailbox. "
-    "Χρησιμοποιήστε τον κωδικό του email (cPanel/webmail), όχι του admin login."
+    "Χρησιμοποιήστε τον κωδικό του email (webmail), όχι τον κωδικό εισόδου στο γραφείο."
 )
 
 IMAP_CONNECT_TIMEOUT_SEC = 20
@@ -86,7 +85,7 @@ def _resolve_ipv4(host: str) -> str:
     return host
 
 
-def connect_imap(cfg: dict[str, Any]) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
+def _connect_imap_once(cfg: dict[str, Any]) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
     host = (cfg.get("host") or "").strip()
     use_ssl = bool(cfg.get("use_ssl", True))
     port = int(cfg.get("port") or (993 if use_ssl else 143))
@@ -94,7 +93,6 @@ def connect_imap(cfg: dict[str, Any]) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
     ipv4 = _resolve_ipv4(host)
 
     if use_ssl:
-        # Connect by IPv4 address but keep SNI/hostname as the configured host.
         context = ssl.create_default_context()
         # Shared cPanel certs often omit mail.customer-domain — still allow login.
         context.check_hostname = False
@@ -105,9 +103,25 @@ def connect_imap(cfg: dict[str, Any]) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
         try:
             client.starttls()
         except Exception:
-            # Some servers already expect plain 143 without STARTTLS.
             pass
 
     enable_imap_utf8(client)
     client.login(cfg["user"], cfg["password"])
     return client
+
+
+def connect_imap(cfg: dict[str, Any]) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
+    """Connect with optional fallback 993 SSL → 143 STARTTLS on timeout."""
+    try:
+        return _connect_imap_once(cfg)
+    except Exception as exc:
+        use_ssl = bool(cfg.get("use_ssl", True))
+        port = int(cfg.get("port") or (993 if use_ssl else 143))
+        if is_timeout_error(exc) and use_ssl and port == 993:
+            alt = {**cfg, "use_ssl": False, "port": 143}
+            try:
+                return _connect_imap_once(alt)
+            except Exception as alt_exc:
+                # Prefer original timeout message for UX consistency.
+                raise exc from alt_exc
+        raise

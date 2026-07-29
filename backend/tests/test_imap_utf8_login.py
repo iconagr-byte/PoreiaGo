@@ -67,7 +67,9 @@ class ImapUtf8LoginTests(unittest.TestCase):
         exc = OSError(110, "Connection timed out")
         msg = format_imap_connect_error(exc)
         self.assertEqual(msg, TIMEOUT_HINT_EL)
-        self.assertIn("imap.gmail.com", msg)
+        self.assertIn("mail server", msg)
+        self.assertNotIn("PoreiaGo", msg)
+        self.assertNotIn("34.141.98.145", msg)
 
     def test_format_imap_connect_error_greek_hint(self):
         from email_client.imap_utf8 import ENCODING_HINT_EL, format_imap_connect_error
@@ -81,7 +83,7 @@ class ImapUtf8LoginTests(unittest.TestCase):
 
         exc = OSError(110, "Connection timed out")
         self.assertEqual(format_imap_connect_error(exc), TIMEOUT_HINT_EL)
-        self.assertIn("34.141.98.145", format_imap_connect_error(exc))
+        self.assertNotIn("34.141.98.145", format_imap_connect_error(exc))
 
     def test_format_auth_hint(self):
         from email_client.imap_utf8 import AUTH_HINT_EL, format_imap_connect_error
