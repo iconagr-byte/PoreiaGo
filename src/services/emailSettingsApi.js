@@ -52,6 +52,14 @@ export const updateEmailSettings = (id, body) =>
 export const deleteEmailSettings = (id) =>
   request(`/api/email/settings/${id}`, { method: 'DELETE' });
 export const testEmailConnection = (body) =>
-  request('/api/email/settings/test-connection', { method: 'POST', body: JSON.stringify(body) });
+  request('/api/email/settings/test-connection', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    // IMAP+SMTP can take ~40s; give deploy bounces more retries.
+    retries: 5,
+  });
 export const testSavedEmailConnection = (id) =>
-  request(`/api/email/settings/${id}/test-connection`, { method: 'POST' });
+  request(`/api/email/settings/${id}/test-connection`, {
+    method: 'POST',
+    retries: 5,
+  });
