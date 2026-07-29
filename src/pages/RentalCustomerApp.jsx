@@ -177,41 +177,51 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           />
 
           <div className="rent-home-stack rent-home-stack--landing">
-            <section id="rent-guest-fleet" className="rent-land-band rent-land-band--mist" aria-label="Στόλος ενοικίασης">
+            <section id="rent-guest-fleet" className="rent-land-band rent-land-band--pick" aria-label="Στόλος ενοικίασης">
               <div className="rent-land-inner">
-                <header className="rent-land-head">
-                  <p className="rent-land-eyebrow">Στόλος</p>
-                  <h2 className="rent-land-title">Επιλέξτε όχημα</h2>
-                  <p className="rent-land-sub">
-                    {carCount} επιβατικά · {vanCount} van. Η κράτηση ανοίγει μετά τη σύνδεση.
-                  </p>
-                </header>
-
-                <div className="rent-home-fleet-tools rent-apple-tools rent-land-tools">
-                  <input
-                    type="search"
-                    value={homeQuery}
-                    onChange={(e) => setHomeQuery(e.target.value)}
-                    placeholder="Αναζήτηση…"
-                  />
-                  <div className="rent-home-fleet-cats rent-apple-cats">
-                    {HOME_CATEGORIES.map((c) => (
-                      <button
-                        key={c || 'all'}
-                        type="button"
-                        className={homeCategory === c ? 'is-active' : ''}
-                        onClick={() => setHomeCategory(c)}
-                      >
-                        {homeCategoryLabel(c)}
-                      </button>
-                    ))}
+                <header className="rent-pick-head">
+                  <div className="rent-pick-head-main">
+                    <h2 className="rent-pick-head-title">
+                      Επιλογές ενοικίασης οχήματος
+                      <span className="rent-pick-head-where">
+                        για
+                        <span className="rent-pick-loc">{branding.brandLabel || 'το γραφείο'}</span>
+                      </span>
+                    </h2>
+                    <p className="rent-pick-head-sub">
+                      {carCount} επιβατικά · {vanCount} van · παρόμοια κατηγορία στην παραλαβή
+                    </p>
                   </div>
-                </div>
+                  <div className="rent-pick-filters">
+                    <label className="rent-pick-filter">
+                      <span>Φίλτρα</span>
+                      <select
+                        value={homeCategory}
+                        onChange={(e) => setHomeCategory(e.target.value)}
+                      >
+                        {HOME_CATEGORIES.map((c) => (
+                          <option key={c || 'all'} value={c}>
+                            {homeCategoryLabel(c) || 'Επίλεξε'}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="rent-pick-filter rent-pick-filter--search">
+                      <span>Αναζήτηση</span>
+                      <input
+                        type="search"
+                        value={homeQuery}
+                        onChange={(e) => setHomeQuery(e.target.value)}
+                        placeholder="Μοντέλο…"
+                      />
+                    </label>
+                  </div>
+                </header>
 
                 {fleetLoading ? (
                   <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
                 ) : filteredHomeFleet.length ? (
-                  <div className="rent-fleet-rail rent-fleet-rail--land">
+                  <div className="rent-pick-grid">
                     {filteredHomeFleet.map((v) => (
                       <RentHomeFleetCard
                         key={v.id}
@@ -446,7 +456,7 @@ function RentalAuthenticatedApp() {
                   {fleetLoading ? (
                     <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
                   ) : filteredHomeFleet.length ? (
-                    <div className="rent-fleet-rail">
+                    <div className="rent-pick-grid rent-pick-grid--home">
                       {filteredHomeFleet.map((v) => (
                         <RentHomeFleetCard
                           key={v.id}

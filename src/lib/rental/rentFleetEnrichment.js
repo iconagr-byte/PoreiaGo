@@ -90,6 +90,39 @@ function modelKey(model) {
     .replace(/\s+/g, ' ');
 }
 
+function luggageCount(luggage) {
+  const m = String(luggage || '').match(/(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+function sizeAndGroup(category, seats, model, known) {
+  const cat = String(category || '').toUpperCase();
+  const name = modelKey(model);
+  if (cat === 'VAN' || cat === 'MINIBUS' || (seats && seats >= 8)) {
+    return {
+      group_code: cat === 'MINIBUS' ? 'Ομάδα M' : 'Ομάδα V',
+      size_label: cat === 'MINIBUS' ? 'Minibus' : 'Van',
+    };
+  }
+  if (name.includes('tucson') || known?.headline?.toLowerCase().includes('suv')) {
+    return { group_code: 'Ομάδα D', size_label: 'SUV' };
+  }
+  if (seats && seats <= 4) {
+    return { group_code: 'Ομάδα A', size_label: 'Μικρά' };
+  }
+  if (name.includes('corolla') || (seats && seats >= 5 && known?.doors === 4)) {
+    return { group_code: 'Ομάδα C', size_label: 'Μεσαία' };
+  }
+  return { group_code: 'Ομάδα B', size_label: 'Συμπαγή' };
+}
+
+function transmissionLabel(raw) {
+  const t = String(raw || '').trim();
+  if (!t) return 'Με ταχύτητες';
+  if (/αυτόματο|automatic/i.test(t)) return 'Αυτόματο';
+  return 'Με ταχύτητες';
+}
+
 /**
  * @param {object} vehicle
  * @returns {object} vehicle + display enrichment fields
@@ -113,6 +146,11 @@ export function enrichRentVehicle(vehicle) {
       ? [photoUrl]
       : [];
 
+  const luggage = known?.luggage || '';
+  const bags = luggageCount(luggage);
+  const { group_code, size_label } = sizeAndGroup(v.category, seats, v.model, known);
+  const transmission = transmissionLabel(known?.transmission);
+
   return {
     ...v,
     photo_url: photoUrl,
@@ -120,12 +158,17 @@ export function enrichRentVehicle(vehicle) {
     category_label: category,
     display_headline: known?.headline || category || 'Όχημα',
     display_blurb: description,
-    transmission: known?.transmission || '',
+    transmission,
     fuel: known?.fuel || '',
     doors: known?.doors || null,
-    luggage: known?.luggage || '',
+    luggage,
+    luggage_label: bags ? `x${bags}` : luggage || 'Αποσκευές',
     highlights: known?.highlights || [],
-    seats_label: seats ? `${seats} θέσεις` : '',
+    seats_label: seats ? `${seats} επιβάτες` : '',
+    group_code,
+    size_label,
+    ac_label: 'Με κλιματισμό',
+    similar_label: 'ή παρόμοιο',
     price_label:
       v.daily_rate_eur != null && v.daily_rate_eur !== ''
         ? `από €${Number(v.daily_rate_eur).toFixed(0)}/ημέρα`
