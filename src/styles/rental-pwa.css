@@ -1130,9 +1130,16 @@
 /* —— Hertz-like booking search bar (rent theme) —— */
 .rent-search-wrap {
   position: relative;
-  z-index: 5;
-  margin-top: -1.75rem;
-  padding: 0 1rem;
+  z-index: 6;
+  padding: 0;
+}
+
+/* Top strip under header — full-bleed like Hertz yellow bar */
+.rent-search-wrap--top {
+  margin: 0;
+  background: linear-gradient(180deg, #0b3d4a 0%, #0a7a6c 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.85rem 1rem 1rem;
 }
 
 .rent-search {
@@ -1142,12 +1149,16 @@
 }
 
 .rent-search-panel {
-  background: linear-gradient(180deg, #0b3d4a 0%, #0a7a6c 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 22px;
-  padding: 1rem 1rem 0.95rem;
-  box-shadow: 0 18px 48px rgba(2, 6, 23, 0.28);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
   color: #fff;
+}
+
+.rent-search-wrap--top .rent-search-panel {
+  background: transparent;
 }
 
 .rent-search-toggle {
@@ -3037,9 +3048,9 @@
   grid-auto-columns: minmax(240px, 270px);
 }
 
-.rent-phone-stage--desktop .rent-search-wrap {
-  margin-top: -2.75rem;
-  padding: 0 max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem)) 0;
+.rent-phone-stage--desktop .rent-search-wrap--top {
+  margin-top: 0;
+  padding: 1rem max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem)) 1.15rem;
 }
 
 .rent-phone-stage--desktop .rent-search-row {
@@ -3054,6 +3065,33 @@
 .rent-phone-stage--desktop .rent-search-submit {
   min-width: 11.5rem;
   align-self: stretch;
+}
+
+/* Guest: solid header above search (Hertz order), not overlaid on hero */
+.rent-phone-stage--desktop .rent-app--guest .rent-topbar {
+  position: relative;
+  z-index: 8;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--rent-ink);
+  padding: 0.85rem max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+}
+
+.rent-phone-stage--desktop .rent-app--guest .rent-topbar-brand {
+  color: var(--rent-ink);
+}
+
+.rent-phone-stage--desktop .rent-app--guest .rent-btn-ghost {
+  background: rgba(10, 122, 108, 0.1);
+  color: var(--rent-deep);
+  border: 1px solid rgba(10, 122, 108, 0.18);
+}
+
+.rent-phone-stage--desktop .rent-hero--landing {
+  min-height: min(72dvh, 720px);
+  padding-top: 4.5rem;
 }
 
 .rent-phone-stage--desktop .rent-nav {
