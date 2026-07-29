@@ -253,14 +253,50 @@ export default function EmailConnectWizard({
     } catch (err) {
       window.clearTimeout(tick);
       const msg = err.message || 'Αποτυχία αιτήματος';
-      setChecks((prev) =>
-        prev.map((c) => ({
-          ...c,
-          status: 'fail',
-          detail: c.status === 'pending' ? 'Δεν ολοκληρώθηκε' : msg,
-        })),
-      );
-      if (isMailTimeoutMessage(msg)) {
+      const isDeploy =
+        /deploy|προσωρινά εκτός|Δεν υπάρχει σύνδεση με τον server|Failed to fetch|network/i.test(
+          msg,
+        );
+      if (isDeploy) {
+        setChecks([
+          {
+            id: 'imap_host',
+            label: `IMAP host · ${account.imap_host}:${account.imap_port}`,
+            status: 'skip',
+            detail: 'Ο server αναβαθμίζεται — δοκιμάστε σε ~1 λεπτό',
+          },
+          {
+            id: 'imap_auth',
+            label: `IMAP login · ${account.mail_username || account.email_address}`,
+            status: 'skip',
+            detail: 'Αναμονή…',
+          },
+          {
+            id: 'smtp_host',
+            label: `SMTP host · ${account.smtp_host}:${account.smtp_port}`,
+            status: 'skip',
+            detail: 'Αναμονή…',
+          },
+          {
+            id: 'smtp_auth',
+            label: `SMTP login · ${account.mail_username || account.email_address}`,
+            status: 'skip',
+            detail: 'Αναμονή…',
+          },
+        ]);
+        setTestMsg({
+          ok: false,
+          text: 'Ο server είναι προσωρινά εκτός (deploy). Περιμένετε ~1 λεπτό και πατήστε ξανά «Έλεγχος σύνδεσης». Δεν είναι λάθος App Password.',
+        });
+        toast.error('Server σε deploy — δοκιμάστε σε λίγο', { id: 'email-conn-test' });
+      } else if (isMailTimeoutMessage(msg)) {
+        setChecks((prev) =>
+          prev.map((c) => ({
+            ...c,
+            status: 'fail',
+            detail: c.status === 'pending' ? 'Δεν ολοκληρώθηκε' : msg,
+          })),
+        );
         setTestMsg({
           ok: false,
           timeout: true,
@@ -272,6 +308,13 @@ export default function EmailConnectWizard({
         });
         toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test' });
       } else {
+        setChecks((prev) =>
+          prev.map((c) => ({
+            ...c,
+            status: 'fail',
+            detail: c.status === 'pending' ? 'Δεν ολοκληρώθηκε' : msg,
+          })),
+        );
         setTestMsg({ ok: false, text: msg });
         toast.error(msg, { id: 'email-conn-test' });
       }
