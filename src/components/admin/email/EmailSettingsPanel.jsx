@@ -406,8 +406,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         <div className="min-w-0">
           <h2 className="font-headline-md text-headline-md text-on-surface">Ρυθμίσεις Email</h2>
           <p className="mt-1 max-w-xl text-body-sm text-on-surface-variant">
-            Συνδέστε προσωπικό ή εταιρικό mailbox αυτόνομα μετά την αγορά συμβολαίου. Gmail /
-            Outlook / Yahoo δουλεύουν απευθείας· για cPanel domain προτείνεται Gmail forward.
+            Συνδέστε προσωπικό ή εταιρικό mailbox (IMAP/SMTP) μετά την αγορά συμβολαίου.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
