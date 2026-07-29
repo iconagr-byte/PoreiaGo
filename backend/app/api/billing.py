@@ -158,6 +158,7 @@ async def signup_checkout(body: BillingSignupCheckoutRequest):
                     subdomain=body.subdomain,
                     password=body.password,
                     plan=plan,
+                    rent_addon=bool(body.rent_addon),
                     billing_interval=body.billing_interval,
                 )
             else:
@@ -167,6 +168,7 @@ async def signup_checkout(body: BillingSignupCheckoutRequest):
                     subdomain=body.subdomain,
                     password=body.password,
                     plan=plan,
+                    rent_addon=bool(body.rent_addon),
                     billing_interval=body.billing_interval,
                 )
             await db.commit()

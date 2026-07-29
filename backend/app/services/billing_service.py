@@ -223,10 +223,12 @@ class BillingService:
         subdomain: str,
         password: str,
         plan: TenantPlan = TenantPlan.STARTER,
+        rent_addon: bool = False,
         billing_interval: str = "month",
     ) -> dict:
         """Public SaaS signup — creates provisioning job + Stripe Checkout (no existing tenant)."""
         subdomain_norm = subdomain.strip().lower()
+        rent_addon_effective = bool(rent_addon) and plan != TenantPlan.RENT
         taken = await self._session.execute(
             select(Tenant.id).where(
                 or_(Tenant.slug == subdomain_norm, Tenant.subdomain == subdomain_norm),
@@ -256,6 +258,7 @@ class BillingService:
                 "plan": plan.value,
                 "billing_interval": interval,
                 "admin_password_hash": hash_password(password),
+                "rent_addon": rent_addon_effective,
             },
         )
         self._session.add(job)
@@ -269,6 +272,10 @@ class BillingService:
                 line_items.append({"price": settings.stripe_price_metered_bus})
             if settings.stripe_price_metered_trip:
                 line_items.append({"price": settings.stripe_price_metered_trip})
+            if rent_addon_effective:
+                if not settings.stripe_price_rent_addon:
+                    raise ValueError("Stripe price not configured for rent add-on")
+                line_items.append({"price": settings.stripe_price_rent_addon, "quantity": 1})
 
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -281,6 +288,7 @@ class BillingService:
                 "signup_flow": "true",
                 "provisioning_job_id": str(job.id),
                 "plan": plan.value,
+                "rent_addon": "true" if rent_addon_effective else "false",
                 "billing_interval": interval,
                 "subdomain": subdomain_norm,
             },
@@ -288,6 +296,7 @@ class BillingService:
                 "metadata": {
                     "provisioning_job_id": str(job.id),
                     "plan": plan.value,
+                    "rent_addon": "true" if rent_addon_effective else "false",
                     "billing_interval": interval,
                     "subdomain": subdomain_norm,
                 }
@@ -306,6 +315,7 @@ class BillingService:
         subdomain: str,
         password: str,
         plan: TenantPlan = TenantPlan.STARTER,
+        rent_addon: bool = False,
         billing_interval: str = "month",
     ) -> dict:
         """Provision a new office without Stripe charge (demo / trial signup)."""
@@ -361,6 +371,7 @@ class BillingService:
             admin_email=admin_email.lower().strip(),
             admin_password_hash=password_hash,
             subdomain_hint=subdomain_norm,
+            rent_addon=bool(rent_addon) and plan != TenantPlan.RENT,
         )
 
         job.tenant_id = tenant.id
@@ -667,6 +678,14 @@ class BillingService:
         except ValueError:
             plan = TenantPlan.STARTER
 
+        rent_addon_raw = meta.get("rent_addon")
+        if rent_addon_raw is None:
+            rent_addon_raw = payload.get("rent_addon", False)
+        if isinstance(rent_addon_raw, bool):
+            rent_addon = rent_addon_raw
+        else:
+            rent_addon = str(rent_addon_raw).strip().lower() in ("1", "true", "yes", "on", "rent")
+
         provisioning = TenantProvisioningServiceFacade(self._session)
         try:
             tenant = await provisioning.provision_from_stripe_checkout(
@@ -677,6 +696,7 @@ class BillingService:
                 admin_email=payload.get("admin_email") or session.get("customer_email", ""),
                 admin_password_hash=payload.get("admin_password_hash", ""),
                 subdomain_hint=payload.get("subdomain") or meta.get("subdomain"),
+                rent_addon=rent_addon and plan != TenantPlan.RENT,
             )
         except ValueError as exc:
             job.status = ProvisioningJobStatus.FAILED.value

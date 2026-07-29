@@ -28,6 +28,7 @@ export default function AgencySignupPage() {
   const [searchParams] = useSearchParams();
   const initialPlan = searchParams.get('plan') || 'professional';
   const initialInterval = searchParams.get('interval') || 'month';
+  const initialAddon = searchParams.get('addon') || null;
 
   const [planId, setPlanId] = useState(initialPlan);
   const [interval, setInterval] = useState(
@@ -108,6 +109,7 @@ export default function AgencySignupPage() {
         password,
         plan: planId,
         billingInterval: interval,
+        rent_addon: initialAddon === 'rent' && planId !== 'rent',
       });
       if (result?.checkout_url) {
         if (result.demo) {

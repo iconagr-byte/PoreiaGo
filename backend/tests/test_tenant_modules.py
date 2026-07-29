@@ -35,6 +35,17 @@ def test_bus_plan_with_rent_addon():
     assert mods["mode"] == "both"
 
 
+def test_initial_settings_for_bus_plan_with_rent_addon():
+    seed = initial_settings_for_plan(
+        TenantPlan.PROFESSIONAL,
+        office_name="Achillio Travel",
+        rent_addon=True,
+    )
+    assert seed["addons"]["rent"] is True
+    assert seed["modules"]["rent_enabled"] is True
+    assert seed["modules"]["trips_enabled"] is True
+
+
 def test_explicit_modules_override():
     mods = modules_for_settings(
         plan=TenantPlan.STARTER,

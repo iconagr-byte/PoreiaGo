@@ -146,6 +146,9 @@ class BillingSignupCheckoutRequest(BaseModel):
         default="starter",
         pattern="^(starter|professional|enterprise|rent)$",
     )
+    # Optional: for bus plans, enable the Rent module as an add-on without switching
+    # the core plan type (TenantPlan).
+    rent_addon: bool = False
     billing_interval: str = Field(default="month", pattern="^(month|year)$")
 
 

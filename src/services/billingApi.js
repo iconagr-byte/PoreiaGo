@@ -31,6 +31,7 @@ export async function createSignupCheckout({
   password,
   plan = 'starter',
   billingInterval = 'month',
+  rent_addon = false,
 }) {
   const res = await fetch(`${API_BASE}/api/v1/billing/signup-checkout`, {
     method: 'POST',
@@ -42,6 +43,7 @@ export async function createSignupCheckout({
       password,
       plan,
       billing_interval: billingInterval,
+      rent_addon: Boolean(rent_addon),
     }),
   });
   if (!res.ok) {

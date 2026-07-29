@@ -18,7 +18,12 @@ def parse_tenant_settings(raw: str | None) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def initial_settings_for_plan(plan: TenantPlan | str, *, office_name: str | None = None) -> dict[str, Any]:
+def initial_settings_for_plan(
+    plan: TenantPlan | str,
+    *,
+    office_name: str | None = None,
+    rent_addon: bool = False,
+) -> dict[str, Any]:
     """Seed settings_json when provisioning a new office."""
     plan_value = plan.value if isinstance(plan, TenantPlan) else str(plan or "starter")
     settings: dict[str, Any] = {"theme": {"primary": "#005d90"}}
@@ -41,6 +46,11 @@ def initial_settings_for_plan(plan: TenantPlan | str, *, office_name: str | None
             "show_fleet_section": False,
             "show_why_us_section": False,
         }
+    elif rent_addon:
+        # Bus plan + Rent add-on — keep trips enabled, enable rent.
+        # Server-side module wiring is derived from tenants.settings_json.addons/modules.
+        settings["addons"] = {"rent": True}
+        settings["modules"] = {"trips_enabled": True, "rent_enabled": True}
     return settings
 
 
