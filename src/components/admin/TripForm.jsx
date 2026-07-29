@@ -254,6 +254,12 @@ export default function TripForm({
     setQuickAddFor(additionalFleet.length);
   };
 
+  /** Extra coach/plate row without opening the quick-add driver form. */
+  const addVehicleUnit = () => {
+    setAdditionalFleet([...additionalFleet, emptyFleetRow()]);
+    setQuickAddFor(null);
+  };
+
   const onQuickDriverCreated = async (created, target) => {
     let list = drivers;
     try {
@@ -744,7 +750,7 @@ export default function TripForm({
       <Section
         icon="badge"
         title="Οδηγοί & λεωφορεία"
-        hint="Προσθέστε οδηγό με ένα όνομα — το λεωφορείο είναι προαιρετικό."
+        hint="Προσθέστε οδηγό ή όχημα — το ένα δεν απαιτεί το άλλο."
         action={
           <Link
             to="/admin"
@@ -836,7 +842,7 @@ export default function TripForm({
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Επιπλέον οδηγός
+                  {row.driverId || row.driverName ? 'Επιπλέον οδηγός' : 'Επιπλέον όχημα'}
                 </p>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -922,14 +928,24 @@ export default function TripForm({
             </article>
           ))}
 
-          <button
-            type="button"
-            onClick={addFleetUnit}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-sm font-bold text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50"
-          >
-            <span className="material-symbols-outlined text-[18px]">person_add</span>
-            Προσθήκη οδηγού
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={addFleetUnit}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-sm font-bold text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50"
+            >
+              <span className="material-symbols-outlined text-[18px]">person_add</span>
+              Προσθήκη οδηγού
+            </button>
+            <button
+              type="button"
+              onClick={addVehicleUnit}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-sm font-bold text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50"
+            >
+              <span className="material-symbols-outlined text-[18px]">directions_bus</span>
+              Προσθήκη οχήματος
+            </button>
+          </div>
         </div>
       </Section>
 
