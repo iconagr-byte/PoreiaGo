@@ -731,6 +731,12 @@ export default function RentalCatalogPanel({
                   <h3>
                     {b.vehicle_model || 'Όχημα'} · {b.vehicle_plate || '—'}
                   </h3>
+                  {b.reference_code ? (
+                    <p className="wallet-booking-mono" style={{ fontWeight: 700 }}>
+                      Κωδικός: {b.reference_code}
+                      {b.online_checkin_ready ? ' · Online check-in έτοιμο' : ''}
+                    </p>
+                  ) : null}
                   <p>
                     {formatWhen(b.start_time)} → {formatWhen(b.end_time)}
                   </p>

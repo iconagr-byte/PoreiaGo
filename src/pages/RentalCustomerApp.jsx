@@ -27,6 +27,7 @@ import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.
 import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
+import RentOnlineCheckinBand from '../components/rental/RentOnlineCheckinBand.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
@@ -161,6 +162,8 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               }}
             />
           </div>
+
+          <RentOnlineCheckinBand brandLabel={branding.brandLabel} />
 
           <RentGuestHero
             brandLabel={branding.brandLabel}

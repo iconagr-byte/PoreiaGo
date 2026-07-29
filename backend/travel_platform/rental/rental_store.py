@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import threading
+import unicodedata
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -517,6 +518,116 @@ def check_availability(
     return out
 
 
+def _normalize_surname(value: str | None) -> str:
+    raw = unicodedata.normalize("NFD", str(value or "").strip().lower())
+    return "".join(ch for ch in raw if unicodedata.category(ch) != "Mn").replace(" ", "")
+
+
+def _normalize_ref_code(value: str | None) -> str:
+    raw = str(value or "").strip().upper().replace(" ", "")
+    if raw.startswith("RN-"):
+        return raw
+    if raw.startswith("RN"):
+        return f"RN-{raw[2:].lstrip('-')}"
+    return raw
+
+
+def _ensure_reference_code(row: dict[str, Any]) -> str:
+    existing = _normalize_ref_code(row.get("reference_code"))
+    if existing:
+        row["reference_code"] = existing
+        return existing
+    code = f"RN-{uuid4().hex[:8].upper()}"
+    row["reference_code"] = code
+    return code
+
+
+def _surname_matches(client_name: str | None, surname: str | None) -> bool:
+    full = _normalize_surname(client_name)
+    needle = _normalize_surname(surname)
+    if not full or not needle:
+        return False
+    if full == needle:
+        return True
+    # Match last token of "First Last" or whole string contains
+    parts = [p for p in str(client_name or "").strip().lower().split() if p]
+    if parts and _normalize_surname(parts[-1]) == needle:
+        return True
+    return needle in full
+
+
+def guest_lookup_booking(
+    tenant_id: str | None,
+    *,
+    surname: str,
+    reference_code: str,
+) -> dict[str, Any] | None:
+    """Public lookup by surname + RN- code (office-scoped)."""
+    tid = _normalize_tenant(tenant_id)
+    code = _normalize_ref_code(reference_code)
+    if not code or not str(surname or "").strip():
+        return None
+    with _LOCK:
+        data = _read()
+        dirty = False
+        hit = None
+        for row in data.get("bookings") or []:
+            if row.get("tenant_id") != tid:
+                continue
+            before = row.get("reference_code")
+            ref = _ensure_reference_code(row)
+            if before != ref:
+                dirty = True
+            if ref != code:
+                continue
+            if not _surname_matches(row.get("client_name"), surname):
+                continue
+            hit = row
+            break
+        if dirty:
+            _write(data)
+        return deepcopy(hit) if hit else None
+
+
+def guest_online_checkin(
+    tenant_id: str | None,
+    *,
+    surname: str,
+    reference_code: str,
+) -> dict[str, Any]:
+    """Mark booking ready for pickup (online check-in) after surname+code verify."""
+    tid = _normalize_tenant(tenant_id)
+    code = _normalize_ref_code(reference_code)
+    if not code or not str(surname or "").strip():
+        raise ValueError("Συμπληρώστε επώνυμο και κωδικό κράτησης")
+    with _LOCK:
+        data = _read()
+        booking = None
+        for row in data.get("bookings") or []:
+            if row.get("tenant_id") != tid:
+                continue
+            ref = _ensure_reference_code(row)
+            if ref != code:
+                continue
+            if not _surname_matches(row.get("client_name"), surname):
+                continue
+            booking = row
+            break
+        if not booking:
+            raise ValueError("Δεν βρέθηκε κράτηση με αυτά τα στοιχεία")
+        status = str(booking.get("rental_status") or "").upper()
+        if status == "CANCELLED":
+            raise ValueError("Η κράτηση έχει ακυρωθεί")
+        if status == "COMPLETED":
+            raise ValueError("Η ενοικίαση έχει ολοκληρωθεί")
+        now = _now()
+        booking["online_checkin_at"] = now
+        booking["online_checkin_ready"] = True
+        booking["updated_at"] = now
+        _write(data)
+        return deepcopy(booking)
+
+
 def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
     tid = _normalize_tenant(tenant_id)
     vehicle_id = str(body.get("vehicle_id") or "").strip()
@@ -579,6 +690,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "client_email": (str(body.get("client_email") or "").strip().lower() or None),
             "client_phone": (str(body.get("client_phone") or "").strip() or None),
             "channel": channel,
+            "reference_code": f"RN-{uuid4().hex[:8].upper()}",
             "start_time": start.isoformat(),
             "end_time": end.isoformat(),
             "pickup_location": pickup,
@@ -596,6 +708,8 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "assigned_driver_id": (str(body.get("assigned_driver_id") or "").strip() or None),
             "notes": (str(body.get("notes") or "").strip() or None),
             "legal_doc_signatures": {},
+            "online_checkin_ready": False,
+            "online_checkin_at": None,
             "created_at": now,
             "updated_at": now,
             "vehicle_plate": vehicle.get("plate_number"),
