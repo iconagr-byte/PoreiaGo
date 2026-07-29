@@ -18,7 +18,7 @@ const fieldClass =
  * Steers Gmail/Outlook/Yahoo (works from PoreiaGo servers) and offers a Gmail
  * forward path for custom cPanel domains that block datacenter IPs.
  */
-export default function EmailConnectWizard({ onConnected, onCancel }) {
+export default function EmailConnectWizard({ onConnected, onCancel, compact = false }) {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -97,20 +97,41 @@ export default function EmailConnectWizard({ onConnected, onCancel }) {
   };
 
   return (
-    <div className="rounded-2xl border border-outline-variant/80 bg-surface p-5 shadow-sm sm:p-6 space-y-5 max-w-2xl">
-      <div className="border-b border-outline-variant/50 pb-4">
-        <p className="text-label-sm font-bold uppercase tracking-wide text-primary">
-          Αυτόματη σύνδεση
-        </p>
-        <h3 className="mt-1 font-title-md text-title-md text-on-surface">
-          Συνδέστε το προσωπικό σας email
-        </h3>
-        <p className="mt-1 text-body-sm text-on-surface-variant">
-          Μετά την αγορά συμβολαίου, καταχωρείτε μόνοι σας το email — χωρίς ticket σε
-          hosting. Προτείνονται Gmail / Outlook / Yahoo (δουλεύουν αυτόνομα από το
-          PoreiaGo).
-        </p>
-        <div className="mt-3 flex gap-2">
+    <div
+      className={
+        compact
+          ? 'email-connect-compact space-y-4'
+          : 'rounded-2xl border border-outline-variant/80 bg-surface p-5 shadow-sm sm:p-6 space-y-5 max-w-2xl'
+      }
+    >
+      {!compact && (
+        <div className="border-b border-outline-variant/50 pb-4">
+          <p className="text-label-sm font-bold uppercase tracking-wide text-primary">
+            Αυτόματη σύνδεση
+          </p>
+          <h3 className="mt-1 font-title-md text-title-md text-on-surface">
+            Συνδέστε το προσωπικό σας email
+          </h3>
+          <p className="mt-1 text-body-sm text-on-surface-variant">
+            Μετά την αγορά συμβολαίου, καταχωρείτε μόνοι σας το email — χωρίς ticket σε
+            hosting. Προτείνονται Gmail / Outlook / Yahoo (δουλεύουν αυτόνομα από το
+            PoreiaGo).
+          </p>
+          <div className="mt-3 flex gap-2">
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className={`h-1.5 flex-1 rounded-full ${
+                  step >= n ? 'bg-primary' : 'bg-surface-container-high'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {compact && (
+        <div className="flex gap-2" aria-hidden>
           {[1, 2, 3].map((n) => (
             <div
               key={n}
@@ -120,7 +141,7 @@ export default function EmailConnectWizard({ onConnected, onCancel }) {
             />
           ))}
         </div>
-      </div>
+      )}
 
       {step === 1 && (
         <div className="space-y-4">
@@ -148,12 +169,12 @@ export default function EmailConnectWizard({ onConnected, onCancel }) {
               </p>
             </div>
           )}
-          <div className="flex flex-wrap justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-3 sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pb-1">
             {onCancel && (
               <button
                 type="button"
                 onClick={onCancel}
-                className="rounded-xl border border-outline-variant px-4 py-2.5 text-label-md font-semibold"
+                className="rounded-xl border border-outline-variant px-4 py-2.5 text-label-md font-semibold bg-white"
               >
                 Αργότερα
               </button>
@@ -162,7 +183,7 @@ export default function EmailConnectWizard({ onConnected, onCancel }) {
               type="button"
               disabled={!canNextEmail}
               onClick={() => setStep(2)}
-              className="rounded-xl bg-primary px-5 py-2.5 text-label-md font-bold text-on-primary disabled:opacity-50"
+              className="rounded-xl bg-primary px-5 py-2.5 text-label-md font-bold text-on-primary disabled:opacity-50 shadow-sm"
             >
               Συνέχεια
             </button>
