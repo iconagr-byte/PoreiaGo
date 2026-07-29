@@ -1,44 +1,69 @@
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 
 /**
- * Apple-clean fleet card — photo, name, one meta line, price.
+ * Vehicle pick card — Hertz-like structure, rent teal brand (not yellow clone).
  */
 export default function RentHomeFleetCard({
   vehicle,
   favorite = false,
   onToggleFavorite,
   onSelect,
+  ctaLabel = 'Το θέλω',
 }) {
   const v = enrichRentVehicle(vehicle);
   const cover = v.photo_urls?.[0] || v.photo_url || '';
-  const meta = [v.category_label, v.seats_label, v.transmission].filter(Boolean).join(' · ');
+  const groupLine = [v.group_code, v.size_label].filter(Boolean).join(' · ');
+
+  const specs = [
+    { icon: 'group', label: v.seats_label || 'Επιβάτες' },
+    { icon: 'luggage', label: v.luggage_label || 'Αποσκευές' },
+    { icon: 'ac_unit', label: v.ac_label || 'Με κλιματισμό' },
+    { icon: 'settings', label: v.transmission || 'Με ταχύτητες' },
+  ];
 
   return (
-    <button type="button" className="rent-fleet-tile" onClick={onSelect}>
-      <span
-        className="rent-fleet-tile-fav"
-        role="button"
-        tabIndex={0}
+    <article className="rent-pick">
+      <button
+        type="button"
+        className="rent-pick-fav"
         aria-label={favorite ? 'Αφαίρεση από αγαπημένα' : 'Προσθήκη στα αγαπημένα'}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
           onToggleFavorite?.();
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            e.stopPropagation();
-            onToggleFavorite?.();
-          }
-        }}
       >
         <span className="material-symbols-outlined" aria-hidden>
           {favorite ? 'favorite' : 'favorite_border'}
         </span>
-      </span>
+      </button>
 
-      <div className="rent-fleet-tile-media">
+      <div className="rent-pick-top">
+        <h3 className="rent-pick-title">
+          <span>{v.model || 'Όχημα'}</span>
+          {v.similar_label ? <em>{v.similar_label}</em> : null}
+        </h3>
+        {groupLine ? (
+          <p className="rent-pick-group">
+            {groupLine}
+            <span className="material-symbols-outlined" aria-hidden>
+              info
+            </span>
+          </p>
+        ) : null}
+        <ul className="rent-pick-specs">
+          {specs.map((s) => (
+            <li key={s.icon}>
+              <span className="material-symbols-outlined" aria-hidden>
+                {s.icon}
+              </span>
+              <span>{s.label}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="rent-pick-media">
         {cover ? (
           <img src={cover} alt={v.model || 'Όχημα'} loading="lazy" />
         ) : (
@@ -46,13 +71,12 @@ export default function RentHomeFleetCard({
         )}
       </div>
 
-      <div className="rent-fleet-tile-body">
-        <strong className="rent-fleet-tile-name">{v.model || 'Όχημα'}</strong>
-        {meta ? <span className="rent-fleet-tile-meta">{meta}</span> : null}
-        <span className="rent-fleet-tile-price">
-          {v.price_label || 'Τιμή κατόπιν επικοινωνίας'}
-        </span>
+      <div className="rent-pick-foot">
+        {v.price_label ? <p className="rent-pick-price">{v.price_label}</p> : null}
+        <button type="button" className="rent-pick-cta" onClick={onSelect}>
+          {ctaLabel}
+        </button>
       </div>
-    </button>
+    </article>
   );
 }
