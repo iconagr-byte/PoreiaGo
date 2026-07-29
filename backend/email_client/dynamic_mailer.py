@@ -12,7 +12,7 @@ from email.mime.text import MIMEText
 from typing import Any
 
 from .attachment_utils import normalize_attachments
-from .imap_utf8 import ENCODING_HINT_EL, connect_imap, is_ascii_codec_error
+from .imap_utf8 import connect_imap, format_imap_connect_error
 from .settings_store import get_settings
 
 logger = logging.getLogger(__name__)
@@ -73,9 +73,7 @@ def test_imap_connection(account: dict) -> dict:
         client.logout()
         return {"ok": True, "message": "IMAP σύνδεση επιτυχής"}
     except Exception as exc:
-        if is_ascii_codec_error(exc):
-            return {"ok": False, "error": ENCODING_HINT_EL}
-        return {"ok": False, "error": str(exc)}
+        return {"ok": False, "error": format_imap_connect_error(exc)}
 
 
 def test_smtp_connection(account: dict) -> dict:
