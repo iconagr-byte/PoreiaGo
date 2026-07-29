@@ -17,6 +17,7 @@ export default function AdminMobileNavDrawer({
   onEmailClick,
   onNavigate,
   officeMode = 'trips_only',
+  rentEnabled = true,
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -69,6 +70,7 @@ export default function AdminMobileNavDrawer({
           onEmailClick={go(onEmailClick)}
           onNavigate={go(onNavigate)}
           officeMode={officeMode}
+          rentEnabled={rentEnabled}
         />
       </aside>
     </div>

@@ -165,6 +165,15 @@ export default function BackOffice() {
   }, [rentOnly, officeMode, activeTab]);
 
   useEffect(() => {
+    // If Rent is not enabled for this office, never stay on rent desk tab.
+    if (officeModules?.rent_enabled) return;
+    if (activeTab === 'fleet_rental') {
+      toast.error('Το Rent δεν είναι ενεργό για αυτό το γραφείο');
+      setActiveTab('dashboard');
+    }
+  }, [officeModules?.rent_enabled, activeTab]);
+
+  useEffect(() => {
     if (!rentOnly || activeTab !== 'dashboard') return undefined;
     let cancelled = false;
     fetchRentalSummary()
@@ -2242,6 +2251,7 @@ export default function BackOffice() {
           onEmailClick={goToEmailMailbox}
           onNavigate={(path) => navigate(path)}
           officeMode={officeMode}
+          rentEnabled={Boolean(officeModules?.rent_enabled)}
         />
       </aside>
 
@@ -2257,6 +2267,7 @@ export default function BackOffice() {
         onEmailClick={goToEmailMailbox}
         onNavigate={(path) => navigate(path)}
         officeMode={officeMode}
+        rentEnabled={Boolean(officeModules?.rent_enabled)}
       />
 
       <AddCustomerModal
