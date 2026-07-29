@@ -8,6 +8,11 @@ import {
   buildAccountFromWizard,
   detectProvider,
 } from '../../../lib/email/emailProviderPresets.js';
+import {
+  isMailTimeoutMessage,
+  MAIL_TIMEOUT_TOAST_EL,
+  mailTimeoutHintEl,
+} from '../../../lib/email/mailReachability.js';
 
 const fieldClass =
   'mt-1.5 w-full rounded-xl border border-outline-variant/80 bg-surface px-3.5 py-2.5 text-body-md text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15';
@@ -229,18 +234,21 @@ export default function EmailConnectWizard({
 
       if (r.ok) {
         setTestMsg({ ok: true, text: 'IMAP & SMTP επιτυχία — μπορείτε να αποθηκεύσετε' });
-        toast.success('IMAP & SMTP OK');
-      } else if (imapHostFail && smtpHostFail) {
-        const text =
-          'Ένα πρόβλημα δικτύου: ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός). Ζητήστε από τον πάροχο hosting να επιτρέψει εξωτερικές συνδέσεις IMAP/SMTP (θύρες 993 και 465, όπως στο cPanel Secure SSL/TLS).';
-        setTestMsg({ ok: false, text });
-        toast.error('Mail server μη προσβάσιμος');
+        toast.success('IMAP & SMTP OK', { id: 'email-conn-test' });
+      } else if (imapHostFail || smtpHostFail) {
+        const text = mailTimeoutHintEl({
+          mailHost: account.imap_host || account.smtp_host,
+          imapPort: Number(account.imap_port) || 993,
+          smtpPort: Number(account.smtp_port) || 465,
+        });
+        setTestMsg({ ok: false, text, timeout: true });
+        toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
       } else {
         const text = [imapOk ? null : `IMAP: ${imapErr}`, smtpOk ? null : `SMTP: ${smtpErr}`]
           .filter(Boolean)
           .join(' · ');
         setTestMsg({ ok: false, text: text || 'Αποτυχία σύνδεσης' });
-        toast.error(text || 'Αποτυχία σύνδεσης');
+        toast.error(text || 'Αποτυχία σύνδεσης', { id: 'email-conn-test' });
       }
     } catch (err) {
       window.clearTimeout(tick);
@@ -252,8 +260,21 @@ export default function EmailConnectWizard({
           detail: c.status === 'pending' ? 'Δεν ολοκληρώθηκε' : msg,
         })),
       );
-      setTestMsg({ ok: false, text: msg });
-      toast.error(msg);
+      if (isMailTimeoutMessage(msg)) {
+        setTestMsg({
+          ok: false,
+          timeout: true,
+          text: mailTimeoutHintEl({
+            mailHost: account.imap_host,
+            imapPort: Number(account.imap_port) || 993,
+            smtpPort: Number(account.smtp_port) || 465,
+          }),
+        });
+        toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test' });
+      } else {
+        setTestMsg({ ok: false, text: msg });
+        toast.error(msg, { id: 'email-conn-test' });
+      }
     } finally {
       setBusy(false);
       setTesting(false);
@@ -623,13 +644,31 @@ export default function EmailConnectWizard({
 
           {testMsg && (
             <div
-              className={`rounded-xl border px-3 py-2 text-body-sm ${
+              className={`rounded-xl border px-3 py-2 text-body-sm whitespace-pre-wrap ${
                 testMsg.ok
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                   : 'border-rose-200 bg-rose-50 text-rose-900'
               }`}
             >
               {testMsg.text}
+              {testMsg.timeout ? (
+                <button
+                  type="button"
+                  className="mt-2 block text-label-sm font-bold underline"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(testMsg.text);
+                      toast.success('Αντιγράφηκε για τον πάροχο hosting', {
+                        id: 'email-conn-copy',
+                      });
+                    } catch {
+                      toast.error('Αποτυχία αντιγραφής', { id: 'email-conn-copy' });
+                    }
+                  }}
+                >
+                  Αντιγραφή κειμένου για hosting
+                </button>
+              ) : null}
             </div>
           )}
 
