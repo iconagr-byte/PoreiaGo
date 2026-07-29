@@ -12,6 +12,7 @@ from email.mime.text import MIMEText
 from typing import Any
 
 from .attachment_utils import normalize_attachments
+from .imap_utf8 import ENCODING_HINT_EL, connect_imap, is_ascii_codec_error
 from .settings_store import get_settings
 
 logger = logging.getLogger(__name__)
@@ -43,12 +44,7 @@ def settings_to_smtp_config(account: dict) -> dict[str, Any]:
 
 
 def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
-    if cfg["use_ssl"]:
-        client = imaplib.IMAP4_SSL(cfg["host"], cfg["port"])
-    else:
-        client = imaplib.IMAP4(cfg["host"], cfg["port"])
-    client.login(cfg["user"], cfg["password"])
-    return client
+    return connect_imap(cfg)
 
 
 def test_imap_connection(account: dict) -> dict:
@@ -61,6 +57,8 @@ def test_imap_connection(account: dict) -> dict:
         client.logout()
         return {"ok": True, "message": "IMAP σύνδεση επιτυχής"}
     except Exception as exc:
+        if is_ascii_codec_error(exc):
+            return {"ok": False, "error": ENCODING_HINT_EL}
         return {"ok": False, "error": str(exc)}
 
 
