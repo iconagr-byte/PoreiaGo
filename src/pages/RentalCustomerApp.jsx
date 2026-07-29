@@ -25,6 +25,7 @@ import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.
 import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
 import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.jsx';
 import RentGuestHero from '../components/rental/RentGuestHero.jsx';
+import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
@@ -69,6 +70,7 @@ function rememberPreferredVehicle(vehicle) {
 function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const isMobile = useRentMobile();
   const [branding, setBranding] = useState(() => resolveRentAppBranding({}, { guest: true }));
+  const [footerAddress, setFooterAddress] = useState('');
   const [homeFleet, setHomeFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [homeCategory, setHomeCategory] = useState('');
@@ -101,6 +103,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       .then((data) => {
         if (cancelled) return;
         const brand = resolveOfficeBrand(data || {});
+        setFooterAddress(String(data?.footer_address || '').trim());
         setBranding(
           resolveRentAppBranding(
             {
@@ -158,11 +161,21 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             carCount={carCount}
             vanCount={vanCount}
             onBrowseFleet={() => {
-              const el = document.getElementById('rent-guest-fleet');
+              const el = document.getElementById('rent-guest-search');
               el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }}
             onRequireLogin={onRequireLogin}
           />
+
+          <div id="rent-guest-search" className="rent-search-wrap">
+            <RentBookingSearchBar
+              brandLabel={branding.brandLabel}
+              footerAddress={footerAddress}
+              onSearch={() => {
+                onRequireLogin?.();
+              }}
+            />
+          </div>
 
           <div className="rent-home-stack rent-home-stack--landing">
             <section id="rent-guest-fleet" className="rent-land-band rent-land-band--mist" aria-label="Στόλος ενοικίασης">

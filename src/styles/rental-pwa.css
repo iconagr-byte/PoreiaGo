@@ -1127,6 +1127,226 @@
   color: rgba(255, 255, 255, 0.65);
 }
 
+/* —— Hertz-like booking search bar (rent theme) —— */
+.rent-search-wrap {
+  position: relative;
+  z-index: 5;
+  margin-top: -1.75rem;
+  padding: 0 1rem;
+}
+
+.rent-search {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.rent-search-panel {
+  background: linear-gradient(180deg, #0b3d4a 0%, #0a7a6c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  padding: 1rem 1rem 0.95rem;
+  box-shadow: 0 18px 48px rgba(2, 6, 23, 0.28);
+  color: #fff;
+}
+
+.rent-search-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rent-search-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rent-search-switch {
+  width: 2.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.18s ease;
+}
+
+.rent-search-switch::after {
+  content: '';
+  position: absolute;
+  top: 0.16rem;
+  left: 0.16rem;
+  width: 1.02rem;
+  height: 1.02rem;
+  border-radius: 999px;
+  background: #fff;
+  transition: transform 0.18s ease;
+}
+
+.rent-search-toggle input:checked + .rent-search-switch {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.rent-search-toggle input:checked + .rent-search-switch::after {
+  transform: translateX(1rem);
+  background: var(--rent-deep);
+}
+
+.rent-search-row {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-search-field {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: center;
+  background: #fff;
+  color: var(--rent-ink);
+  border-radius: 14px;
+  padding: 0.65rem 0.8rem;
+  min-height: 4.1rem;
+}
+
+.rent-search-field--place {
+  grid-template-columns: auto 1fr auto;
+}
+
+.rent-search-field-icon {
+  font-size: 1.35rem;
+  color: var(--rent-teal);
+}
+
+.rent-search-field-body {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.rent-search-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--rent-secondary);
+}
+
+.rent-search-field select,
+.rent-search-field input[type='date'],
+.rent-search-field input[type='time'] {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--rent-ink);
+  outline: none;
+}
+
+.rent-search-datetime {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 0.35rem;
+}
+
+.rent-search-network {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  align-self: start;
+  margin-top: 0.1rem;
+  padding: 0.22rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(10, 122, 108, 0.12);
+  color: var(--rent-deep);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.rent-search-network .material-symbols-outlined {
+  font-size: 0.85rem;
+}
+
+.rent-search-submit {
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  min-height: 4.1rem;
+  padding: 0.85rem 1.15rem;
+  background: #ff9f0a;
+  color: #1d1d1f;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.rent-search-submit:hover {
+  filter: brightness(1.03);
+}
+
+.rent-search-submit:active {
+  transform: scale(0.985);
+}
+
+.rent-search-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin-top: 0.85rem;
+}
+
+.rent-search-promo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rent-search-promo input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #fff;
+}
+
+.rent-search-promo-input {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--rent-ink);
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.rent-search-error {
+  margin: 0.65rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffe8a3;
+}
+
 /* —— Apple-clean guest landing (legacy helpers) —— */
 .rent-apple-block {
   background: rgba(255, 255, 255, 0.72);
@@ -2783,6 +3003,57 @@
 
 .rent-phone-stage--desktop .rent-home-stack {
   gap: 1rem;
+}
+
+.rent-phone-stage--desktop .rent-home-stack--landing {
+  gap: 0;
+}
+
+.rent-phone-stage--desktop .rent-land-band {
+  padding: 4.5rem 1.5rem;
+}
+
+.rent-phone-stage--desktop .rent-land-cards {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.rent-phone-stage--desktop .rent-land-cards--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rent-phone-stage--desktop .rent-land-steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+}
+
+.rent-phone-stage--desktop .rent-land-teal-grid {
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.rent-phone-stage--desktop .rent-fleet-rail--land {
+  grid-auto-columns: minmax(240px, 270px);
+}
+
+.rent-phone-stage--desktop .rent-search-wrap {
+  margin-top: -2.75rem;
+  padding: 0 max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem)) 0;
+}
+
+.rent-phone-stage--desktop .rent-search-row {
+  grid-template-columns: minmax(220px, 1.4fr) minmax(160px, 1fr) minmax(160px, 1fr) auto;
+  align-items: stretch;
+}
+
+.rent-phone-stage--desktop .rent-search-row--split {
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) auto;
+}
+
+.rent-phone-stage--desktop .rent-search-submit {
+  min-width: 11.5rem;
+  align-self: stretch;
 }
 
 .rent-phone-stage--desktop .rent-nav {

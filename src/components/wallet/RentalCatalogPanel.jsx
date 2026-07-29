@@ -176,6 +176,8 @@ export default function RentalCatalogPanel({
         dropoff_location: raw.dropoff_location || f.dropoff_location,
         driver_mode: raw.driver_mode || f.driver_mode,
         client_phone: raw.client_phone || f.client_phone,
+        start_time: raw.start_time || f.start_time,
+        end_time: raw.end_time || f.end_time,
       }));
       if (raw.sortBy) setSortBy(raw.sortBy);
       if (raw.priceCap) setPriceCap(Number(raw.priceCap));
@@ -186,15 +188,19 @@ export default function RentalCatalogPanel({
 
   useEffect(() => {
     try {
+      const prev = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
       localStorage.setItem(
         PREFS_KEY,
         JSON.stringify({
+          ...prev,
           category: form.category,
           min_seats: form.min_seats,
           pickup_location: form.pickup_location,
           dropoff_location: form.dropoff_location,
           driver_mode: form.driver_mode,
           client_phone: form.client_phone,
+          start_time: form.start_time,
+          end_time: form.end_time,
           sortBy,
           priceCap,
         }),
