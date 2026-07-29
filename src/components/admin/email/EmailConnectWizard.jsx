@@ -22,7 +22,9 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState(null);
+  const [checks, setChecks] = useState([]);
 
   const provider = useMemo(() => detectProvider(email), [email]);
   const isCustom = provider.id === 'custom';
@@ -40,31 +42,133 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
       label: email.trim(),
     });
 
+  const buildPendingChecks = (account) => [
+    {
+      id: 'imap_host',
+      label: `IMAP host · ${account.imap_host}:${account.imap_port}`,
+      status: 'pending',
+      detail: '',
+    },
+    {
+      id: 'imap_auth',
+      label: `IMAP login · ${account.mail_username || account.email_address}`,
+      status: 'pending',
+      detail: '',
+    },
+    {
+      id: 'smtp_host',
+      label: `SMTP host · ${account.smtp_host}:${account.smtp_port}`,
+      status: 'pending',
+      detail: '',
+    },
+    {
+      id: 'smtp_auth',
+      label: `SMTP login · ${account.mail_username || account.email_address}`,
+      status: 'pending',
+      detail: '',
+    },
+  ];
+
+  const patchChecks = (updater) => {
+    setChecks((prev) => updater(prev.map((c) => ({ ...c }))));
+  };
+
   const runTest = async () => {
+    if (!canSave) {
+      toast.error('Συμπληρώστε email και κωδικό');
+      return;
+    }
+    const account = draftAccount();
     setBusy(true);
+    setTesting(true);
     setTestMsg(null);
+    setChecks(buildPendingChecks(account));
+
+    // Progressive UI while the API runs both IMAP + SMTP.
+    patchChecks((rows) => {
+      rows[0].status = 'running';
+      rows[0].detail = 'Σύνδεση στον διακομιστή…';
+      return rows;
+    });
+
+    const tick = window.setTimeout(() => {
+      patchChecks((rows) => {
+        if (rows[0].status === 'running') {
+          rows[0].detail = 'Αναμονή απάντησης IMAP…';
+        }
+        if (rows[1].status === 'pending') {
+          rows[1].status = 'running';
+          rows[1].detail = 'Έλεγχος κωδικού…';
+        }
+        return rows;
+      });
+    }, 600);
+
     try {
-      const account = draftAccount();
-      // Gmail bridge: username must be the Gmail address after forward —
-      // for wizard we ask them to enter the Gmail they forward TO when in bridge mode.
       const r = await testEmailConnection({
         ...account,
         imap_port: Number(account.imap_port),
         smtp_port: Number(account.smtp_port),
       });
+
+      window.clearTimeout(tick);
+      const imapOk = Boolean(r.imap?.ok);
+      const smtpOk = Boolean(r.smtp?.ok);
+      const imapErr = r.imap?.error || (!imapOk ? 'Αποτυχία IMAP' : '');
+      const smtpErr = r.smtp?.error || (!smtpOk ? 'Αποτυχία SMTP' : '');
+
+      setChecks([
+        {
+          id: 'imap_host',
+          label: `IMAP host · ${account.imap_host}:${account.imap_port}`,
+          status: imapOk ? 'ok' : 'fail',
+          detail: imapOk ? 'Σύνδεση OK' : imapErr,
+        },
+        {
+          id: 'imap_auth',
+          label: `IMAP login · ${account.mail_username || account.email_address}`,
+          status: imapOk ? 'ok' : 'fail',
+          detail: imapOk ? 'Ταυτοποίηση OK' : imapErr,
+        },
+        {
+          id: 'smtp_host',
+          label: `SMTP host · ${account.smtp_host}:${account.smtp_port}`,
+          status: smtpOk ? 'ok' : 'fail',
+          detail: smtpOk ? 'Σύνδεση OK' : smtpErr,
+        },
+        {
+          id: 'smtp_auth',
+          label: `SMTP login · ${account.mail_username || account.email_address}`,
+          status: smtpOk ? 'ok' : 'fail',
+          detail: smtpOk ? 'Ταυτοποίηση OK' : smtpErr,
+        },
+      ]);
+
       if (r.ok) {
-        setTestMsg({ ok: true, text: 'Σύνδεση OK — μπορείτε να αποθηκεύσετε' });
+        setTestMsg({ ok: true, text: 'IMAP & SMTP επιτυχία — μπορείτε να αποθηκεύσετε' });
         toast.success('IMAP & SMTP OK');
       } else {
-        const text = r.imap?.error || r.smtp?.error || 'Αποτυχία σύνδεσης';
-        setTestMsg({ ok: false, text });
-        toast.error(text);
+        const text = [imapOk ? null : `IMAP: ${imapErr}`, smtpOk ? null : `SMTP: ${smtpErr}`]
+          .filter(Boolean)
+          .join(' · ');
+        setTestMsg({ ok: false, text: text || 'Αποτυχία σύνδεσης' });
+        toast.error(text || 'Αποτυχία σύνδεσης');
       }
     } catch (err) {
-      setTestMsg({ ok: false, text: err.message });
-      toast.error(err.message);
+      window.clearTimeout(tick);
+      const msg = err.message || 'Αποτυχία αιτήματος';
+      setChecks((prev) =>
+        prev.map((c) => ({
+          ...c,
+          status: 'fail',
+          detail: c.status === 'pending' ? 'Δεν ολοκληρώθηκε' : msg,
+        })),
+      );
+      setTestMsg({ ok: false, text: msg });
+      toast.error(msg);
     } finally {
       setBusy(false);
+      setTesting(false);
     }
   };
 
@@ -248,6 +352,46 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
             </div>
           </div>
 
+          {(testing || checks.length > 0) && (
+            <div
+              className="rounded-2xl border border-black/[0.08] bg-white/90 px-3.5 py-3 shadow-sm"
+              role="status"
+              aria-live="polite"
+            >
+              <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#0071e3]">
+                {testing ? 'Έλεγχος σε εξέλιξη' : 'Αποτέλεσμα ελέγχου'}
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {checks.map((c) => {
+                  const icon =
+                    c.status === 'ok' ? '✓' : c.status === 'fail' ? '✕' : c.status === 'running' ? '●' : '○';
+                  const color =
+                    c.status === 'ok'
+                      ? 'text-emerald-700'
+                      : c.status === 'fail'
+                        ? 'text-rose-700'
+                        : c.status === 'running'
+                          ? 'text-[#0071e3]'
+                          : 'text-[#86868b]';
+                  return (
+                    <li
+                      key={c.id}
+                      className="flex items-start gap-2 rounded-xl bg-[#f5f5f7]/80 px-2.5 py-2 text-[13px]"
+                    >
+                      <span className={`mt-0.5 w-4 shrink-0 text-center font-bold ${color}`}>{icon}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-[#1d1d1f]">{c.label}</span>
+                        {c.detail ? (
+                          <span className={`mt-0.5 block text-[12px] leading-snug ${color}`}>{c.detail}</span>
+                        ) : null}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
           {testMsg && (
             <div
               className={`rounded-xl border px-3 py-2 text-body-sm ${
@@ -275,7 +419,7 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
                 onClick={runTest}
                 className="rounded-xl border border-primary/40 bg-primary/5 px-4 py-2.5 text-label-md font-bold text-primary disabled:opacity-50"
               >
-                {busy ? 'Έλεγχος…' : 'Έλεγχος σύνδεσης'}
+                {testing ? 'Έλεγχος…' : 'Έλεγχος σύνδεσης'}
               </button>
               <button
                 type="button"
