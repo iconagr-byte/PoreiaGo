@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import {
   loadNavLayout,
   moveNavItem,
@@ -28,6 +29,7 @@ export default function SortableSidebarNav({
   onEmailClick,
   onNavigate,
   officeMode = 'trips_only',
+  rentEnabled = true,
 }) {
   const superAdmin = isSaasSuperAdmin();
   const rentOnly = officeMode === 'rent_only';
@@ -52,6 +54,7 @@ export default function SortableSidebarNav({
     const visible = SECTIONS.filter((s) => {
       if (s.superOnly && !superAdmin) return false;
       if (rentOnly && s.id === 'fleet_ops') return false;
+      if (!rentEnabled && s.id === 'rent') return false;
       return true;
     });
     return visible
@@ -135,6 +138,10 @@ export default function SortableSidebarNav({
       return;
     }
     if (item.type === 'fleet_rental_subtab') {
+      if (!rentEnabled) {
+        toast.error('Το Rent δεν είναι ενεργό για αυτό το γραφείο');
+        return;
+      }
       openRentDesk(item.fleetRentalTab || DEFAULT_RENT_DESK_TAB);
       return;
     }
