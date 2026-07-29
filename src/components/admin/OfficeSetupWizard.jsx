@@ -582,8 +582,7 @@ export default function OfficeSetupWizard({
                 <p className="office-setup-eyebrow">Email</p>
                 <h2 className="office-setup-title">Συνδέστε το προσωπικό σας mailbox</h2>
                 <p className="office-setup-subtitle">
-                  Gmail / Outlook / Yahoo δουλεύουν αυτόνομα. Για domain σε cPanel προτείνεται
-                  forward σε Gmail.
+                  Καταχωρήστε το email του γραφείου και τον κωδικό mailbox για συγχρονισμό.
                 </p>
                 <div className="office-setup-email-wrap">
                   <EmailConnectWizard
