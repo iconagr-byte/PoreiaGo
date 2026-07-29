@@ -796,20 +796,22 @@ export default function OfficeSetupWizard({
                     Παράλειψη στόλου
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="office-setup-btn office-setup-btn-primary"
-                  disabled={busy}
-                  onClick={next}
-                >
-                  {busy
-                    ? 'Αποθήκευση…'
-                    : STEPS[step].id === 'welcome'
-                      ? 'Ας ξεκινήσουμε'
-                      : STEPS[step].id === 'done'
-                        ? 'Μετάβαση στο Control Panel'
-                        : 'Συνέχεια'}
-                </button>
+                {STEPS[step].id !== 'email' && (
+                  <button
+                    type="button"
+                    className="office-setup-btn office-setup-btn-primary"
+                    disabled={busy}
+                    onClick={next}
+                  >
+                    {busy
+                      ? 'Αποθήκευση…'
+                      : STEPS[step].id === 'welcome'
+                        ? 'Ας ξεκινήσουμε'
+                        : STEPS[step].id === 'done'
+                          ? 'Μετάβαση στο Control Panel'
+                          : 'Συνέχεια'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
