@@ -91,6 +91,18 @@ class ImapUtf8LoginTests(unittest.TestCase):
         exc = Exception("b'[AUTHENTICATIONFAILED] Authentication failed.'")
         self.assertEqual(format_imap_connect_error(exc), AUTH_HINT_EL)
 
+    def test_format_gmail_app_password_hint(self):
+        from email_client.imap_utf8 import GMAIL_APP_PASSWORD_HINT_EL, format_imap_connect_error
+
+        exc = Exception(
+            "b'[ALERT] Application-specific password required: "
+            "https://support.google.com/accounts/answer/185833 (Failure)'"
+        )
+        msg = format_imap_connect_error(exc)
+        self.assertEqual(msg, GMAIL_APP_PASSWORD_HINT_EL)
+        self.assertNotIn("b'[ALERT]", msg)
+        self.assertIn("App Password", msg)
+
     def test_sanitize_legacy_poreiago_timeout(self):
         from email_client.imap_utf8 import TIMEOUT_HINT_EL, sanitize_stored_imap_error
 

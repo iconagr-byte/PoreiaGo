@@ -66,6 +66,9 @@ function syncErrorDisplay(error) {
 
 function syncErrorHint(error) {
   const msg = String(error || '');
+  if (/application-specific password|app password|185833/i.test(msg)) {
+    return 'Gmail: δημιουργήστε App Password (Google Account → Ασφάλεια → Κωδικοί εφαρμογών) και χρησιμοποιήστε αυτόν, όχι τον κανονικό κωδικό.';
+  }
   if (/AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(msg)) {
     return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login).';
   }
