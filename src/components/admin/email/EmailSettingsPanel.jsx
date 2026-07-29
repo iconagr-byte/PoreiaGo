@@ -25,8 +25,8 @@ const EMPTY = {
   imap_folder_sent: 'Sent',
   imap_folder_spam: 'Spam',
   smtp_host: '',
-  smtp_port: 587,
-  smtp_secure: true,
+  smtp_port: 465,
+  smtp_secure: false,
   mail_username: '',
   mail_password: '',
   is_active: true,
@@ -560,7 +560,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                 {isNew ? 'Νέος λογαριασμός' : 'Επεξεργασία λογαριασμού'}
               </h3>
               <p className="mt-0.5 text-body-sm text-on-surface-variant">
-                Συμπληρώστε τα πεδία με labels — προτιμήστε SMTP 587 + STARTTLS.
+                Συμπληρώστε όπως στο cPanel Mail Client: IMAP 993 SSL · SMTP 465 SSL.
               </p>
             </div>
           </div>
@@ -713,17 +713,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                 <div className="mt-1.5 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => applySmtpPreset('587')}
-                    className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
-                      smtpPreset === '587'
-                        ? 'bg-primary text-on-primary'
-                        : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
-                    }`}
-                  >
-                    587 · STARTTLS
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => applySmtpPreset('465')}
                     className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
                       smtpPreset === '465'
@@ -733,9 +722,20 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                   >
                     465 · SSL
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => applySmtpPreset('587')}
+                    className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
+                      smtpPreset === '587'
+                        ? 'bg-primary text-on-primary'
+                        : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    587 · STARTTLS
+                  </button>
                 </div>
                 <p className="mt-1.5 text-label-sm text-on-surface-variant/80">
-                  Προτείνεται 587 · STARTTLS. Το 465 χρησιμοποιεί άμεσο SSL (χωρίς STARTTLS).
+                  Για cPanel Secure SSL/TLS προτείνεται 465 · SSL. Εναλλακτικά 587 · STARTTLS.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">

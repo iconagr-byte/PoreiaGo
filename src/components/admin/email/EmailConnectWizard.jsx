@@ -161,7 +161,7 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
         toast.success('IMAP & SMTP OK');
       } else if (imapHostFail && smtpHostFail) {
         const text =
-          'Ένα πρόβλημα δικτύου: ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός). Ζητήστε από τον πάροχο hosting να επιτρέψει εξωτερικές συνδέσεις IMAP/SMTP (θύρες 993/587 ή 143/465).';
+          'Ένα πρόβλημα δικτύου: ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός). Ζητήστε από τον πάροχο hosting να επιτρέψει εξωτερικές συνδέσεις IMAP/SMTP (θύρες 993 και 465, όπως στο cPanel Secure SSL/TLS).';
         setTestMsg({ ok: false, text });
         toast.error('Mail server μη προσβάσιμος');
       } else {
@@ -379,15 +379,25 @@ export default function EmailConnectWizard({ onConnected, onCancel, compact = fa
               <ul className="mt-2 space-y-1.5">
                 {checks.map((c) => {
                   const icon =
-                    c.status === 'ok' ? '✓' : c.status === 'fail' ? '✕' : c.status === 'running' ? '●' : '○';
+                    c.status === 'ok'
+                      ? '✓'
+                      : c.status === 'fail'
+                        ? '✕'
+                        : c.status === 'skip'
+                          ? '–'
+                          : c.status === 'running'
+                            ? '●'
+                            : '○';
                   const color =
                     c.status === 'ok'
                       ? 'text-emerald-700'
                       : c.status === 'fail'
                         ? 'text-rose-700'
-                        : c.status === 'running'
-                          ? 'text-[#0071e3]'
-                          : 'text-[#86868b]';
+                        : c.status === 'skip'
+                          ? 'text-[#86868b]'
+                          : c.status === 'running'
+                            ? 'text-[#0071e3]'
+                            : 'text-[#86868b]';
                   return (
                     <li
                       key={c.id}

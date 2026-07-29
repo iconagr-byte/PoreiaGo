@@ -52,18 +52,19 @@ export const PROVIDERS = {
   },
   custom: {
     id: 'custom',
-    label: 'Εταιρικό email',
+    label: 'Εταιρικό email (cPanel)',
     autonomous: true,
     imap_host: '',
     imap_port: 993,
     imap_secure: true,
     smtp_host: '',
-    smtp_port: 587,
-    smtp_secure: true,
+    // cPanel Secure SSL/TLS: SMTP 465 implicit SSL (not 587 STARTTLS).
+    smtp_port: 465,
+    smtp_secure: false,
     passwordLabel: 'Κωδικός mailbox',
     help: [
-      'Host συνήθως: mail.το-domain.gr',
-      'Χρησιμοποιήστε τον κωδικό του webmail',
+      'Όπως στο cPanel → Mail Client: host mail.το-domain.gr',
+      'IMAP 993 SSL · SMTP 465 SSL · κωδικός webmail',
     ],
   },
 };
