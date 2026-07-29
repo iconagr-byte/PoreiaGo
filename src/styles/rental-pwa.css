@@ -642,8 +642,16 @@
   text-decoration: none;
 }
 
+.rent-app--guest {
+  position: relative;
+}
+
 .rent-app--guest .rent-nav {
   display: none;
+}
+
+.rent-app--guest .rent-home {
+  padding-bottom: 2rem;
 }
 
 .rent-install-title {
@@ -769,7 +777,357 @@
   display: none;
 }
 
-/* —— Apple-clean guest landing —— */
+/* —— Platform-form landing bands (guest /rent body) —— */
+.rent-home-stack--landing {
+  padding: 0;
+  gap: 0;
+  background: #f5f5f7;
+}
+
+.rent-land {
+  display: grid;
+  gap: 0;
+}
+
+.rent-land-band {
+  position: relative;
+  padding: 2.75rem 1.15rem;
+}
+
+.rent-land-band--mist {
+  background: #f5f5f7;
+}
+
+.rent-land-band--dark {
+  background: #0f172a;
+  color: #fff;
+}
+
+.rent-land-band--teal {
+  background: linear-gradient(180deg, #062a30 0%, #0b3d4a 48%, #020617 100%);
+  color: #fff;
+  overflow: hidden;
+}
+
+.rent-land-band--teal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 20%, rgba(45, 212, 191, 0.22), transparent),
+    radial-gradient(ellipse 50% 40% at 90% 80%, rgba(56, 189, 248, 0.12), transparent);
+}
+
+.rent-land-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.rent-land-head {
+  margin-bottom: 1.35rem;
+}
+
+.rent-land-head--center {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.rent-land-eyebrow {
+  margin: 0 0 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6e6e73;
+}
+
+.rent-land-title {
+  margin: 0;
+  font-size: clamp(1.55rem, 4vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  color: #1d1d1f;
+}
+
+.rent-land-title--light {
+  color: #fff;
+}
+
+.rent-land-muted {
+  color: #6e6e73;
+}
+
+.rent-land-sub {
+  margin: 0.55rem 0 0;
+  max-width: 40ch;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: #6e6e73;
+}
+
+.rent-land-sub--light {
+  color: rgba(255, 255, 255, 0.6);
+  margin-inline: auto;
+}
+
+.rent-land-sub--teal {
+  color: rgba(240, 253, 250, 0.72);
+  max-width: 36ch;
+}
+
+.rent-land-tools {
+  margin-top: 0.25rem;
+  margin-bottom: 0.35rem;
+}
+
+.rent-fleet-rail--land {
+  margin-top: 1.25rem;
+  grid-auto-columns: minmax(70%, 250px);
+}
+
+.rent-fleet-rail--land .rent-fleet-tile {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 22px;
+  padding: 0.55rem 0.55rem 0.85rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+}
+
+.rent-fleet-rail--land .rent-fleet-tile-media {
+  border-radius: 16px;
+}
+
+.rent-fleet-rail--land .rent-fleet-tile-body {
+  padding: 0.15rem 0.35rem 0;
+}
+
+.rent-land-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.rent-land-cards--2 {
+  grid-template-columns: 1fr;
+}
+
+.rent-land-card {
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 22px;
+  padding: 1.35rem 1.25rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.rent-land-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+.rent-land-card-icon {
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.35rem;
+  background: rgba(10, 122, 108, 0.12);
+  color: var(--rent-teal);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.rent-land-card-icon .material-symbols-outlined {
+  font-size: 1.45rem;
+  font-weight: 300;
+}
+
+.rent-land-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+}
+
+.rent-land-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #6e6e73;
+}
+
+.rent-land-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.rent-land-steps li {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rent-land-step-num {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: rgba(255, 255, 255, 0.2);
+  line-height: 1;
+}
+
+.rent-land-steps h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.rent-land-steps p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+  max-width: 28ch;
+}
+
+.rent-land-center {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.rent-land-btn {
+  appearance: none;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 3.1rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.rent-land-btn:active {
+  transform: scale(0.98);
+}
+
+.rent-land-btn .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.rent-land-btn--sky {
+  background: #0ea5e9;
+  color: #fff;
+}
+
+.rent-land-btn--white {
+  background: #fff;
+  color: #042f2e;
+}
+
+.rent-land-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  background: rgba(45, 212, 191, 0.12);
+  color: #99f6e4;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rent-land-chip .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.rent-land-checks {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-land-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: rgba(240, 253, 250, 0.92);
+  line-height: 1.35;
+}
+
+.rent-land-checks .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: #5eead4;
+  margin-top: 0.05rem;
+}
+
+.rent-land-actions {
+  margin-top: 1.5rem;
+}
+
+.rent-land-teal-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.rent-land-aside {
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 1.35rem 1.25rem;
+}
+
+.rent-land-aside-kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #99f6e4;
+}
+
+.rent-land-aside h3 {
+  margin: 0.45rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.rent-land-aside p {
+  margin: 0.45rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* —— Apple-clean guest landing (legacy helpers) —— */
 .rent-apple-block {
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(0, 0, 0, 0.06);

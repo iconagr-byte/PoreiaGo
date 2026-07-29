@@ -51,7 +51,7 @@ export const DEMO_RENT_FLEET = [
     one_way_surcharge_eur: 50,
     with_driver_daily_eur: 140,
     photo_url:
-      'https://images.unsplash.com/photo-1527786356903-a4b4c4f0ad83?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=1200&q=80',
     description:
       'Ευρύχωρο van 9 θέσεων για ομάδες, εκδρομές και μεταφορές με αποσκευές. Σταθερό στον δρόμο, με χώρο για επιβάτες και εξοπλισμό — ιδανικό για τουριστικά ή εταιρικά γκρουπ.',
   },
@@ -64,7 +64,7 @@ export const DEMO_RENT_FLEET = [
     one_way_surcharge_eur: 55,
     with_driver_daily_eur: 150,
     photo_url:
-      'https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1559416523-140ddc3d238c?auto=format&fit=crop&w=1200&q=80',
     description:
       'Premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης.',
   },

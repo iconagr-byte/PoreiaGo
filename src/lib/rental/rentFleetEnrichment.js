@@ -3,7 +3,11 @@
  * Matches known demo models; falls back gracefully for custom vehicles.
  */
 
-import { rentCategoryLabel } from './demoRentFleet.js';
+import { DEMO_RENT_FLEET, rentCategoryLabel } from './demoRentFleet.js';
+
+const DEMO_PHOTO_BY_MODEL = Object.fromEntries(
+  DEMO_RENT_FLEET.map((v) => [String(v.model || '').trim().toLowerCase(), v.photo_url]),
+);
 
 /** @typedef {{
  *   headline: string,
@@ -101,8 +105,18 @@ export function enrichRentVehicle(vehicle) {
     known?.blurb ||
     `${category || 'Όχημα'} έτοιμο για ενοικίαση — κράτηση online σε λίγα βήματα.`;
 
+  const fallbackPhoto = DEMO_PHOTO_BY_MODEL[modelKey(v.model)] || '';
+  const photoUrl = String(v.photo_url || v.photo_urls?.[0] || '').trim() || fallbackPhoto;
+  const photoUrls = Array.isArray(v.photo_urls) && v.photo_urls.length
+    ? v.photo_urls
+    : photoUrl
+      ? [photoUrl]
+      : [];
+
   return {
     ...v,
+    photo_url: photoUrl,
+    photo_urls: photoUrls,
     category_label: category,
     display_headline: known?.headline || category || 'Όχημα',
     display_blurb: description,
