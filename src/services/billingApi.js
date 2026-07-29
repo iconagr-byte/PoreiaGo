@@ -13,12 +13,13 @@ export async function fetchBillingConfig() {
   return res.json();
 }
 
-export async function startBillingTrial(plan, billingInterval = 'month') {
+export async function startBillingTrial(plan, billingInterval = 'month', rentAddon = false) {
   return saasFetch('/api/v1/billing/start-trial', {
     method: 'POST',
     body: JSON.stringify({
       plan: plan || 'professional',
       billing_interval: billingInterval,
+      rent_addon: Boolean(rentAddon),
     }),
   });
 }
@@ -59,12 +60,13 @@ export async function createSignupCheckout({
   return res.json();
 }
 
-export async function createBillingCheckout(plan, billingInterval = 'month') {
+export async function createBillingCheckout(plan, billingInterval = 'month', rentAddon = false) {
   return saasFetch('/api/v1/billing/checkout-session', {
     method: 'POST',
     body: JSON.stringify({
       plan: plan || undefined,
       billing_interval: billingInterval,
+      rent_addon: Boolean(rentAddon),
     }),
   });
 }

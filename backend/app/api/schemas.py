@@ -135,6 +135,8 @@ class TelemetryAcceptedResponse(BaseModel):
 class BillingCheckoutRequest(BaseModel):
     plan: str | None = None
     billing_interval: str = Field(default="month", pattern="^(month|year)$")
+    # Existing bus office: add Rent module without switching to plan=rent.
+    rent_addon: bool = False
 
 
 class BillingSignupCheckoutRequest(BaseModel):
@@ -193,8 +195,9 @@ class BillingConfigResponse(BaseModel):
 
 
 class BillingTrialRequest(BaseModel):
-    plan: str = Field(default="professional", pattern="^(starter|professional)$")
+    plan: str = Field(default="professional", pattern="^(starter|professional|rent)$")
     billing_interval: str = Field(default="month", pattern="^(month|year)$")
+    rent_addon: bool = False
 
 
 class BillingUsageReportResponse(BaseModel):

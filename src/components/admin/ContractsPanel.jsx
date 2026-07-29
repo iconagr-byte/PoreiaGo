@@ -4,7 +4,10 @@ import toast from 'react-hot-toast';
 import {
   AGENCY_PLANS,
   BILLING_INTERVALS,
+  RENT_ADDON,
+  RENT_STANDALONE_PLAN,
   displayPrice,
+  rentAddonDisplayPrice,
 } from '../../lib/billing/planCatalog.js';
 import {
   createBillingCheckout,
@@ -13,13 +16,17 @@ import {
   fetchBillingSubscription,
   startBillingTrial,
 } from '../../services/billingApi.js';
+import { fetchAdminOfficeModules } from '../../services/officeModulesApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
 
 const PLAN_ICONS = {
   starter: 'storefront',
   professional: 'apartment',
   enterprise: 'domain',
+  rent: 'directions_car',
 };
+
+const CONTRACT_PLANS = [...AGENCY_PLANS, RENT_STANDALONE_PLAN];
 
 const STATUS_META = {
   active: {
@@ -65,16 +72,22 @@ function daysUntil(iso) {
 }
 
 function planDisplayName(planId) {
-  return AGENCY_PLANS.find((p) => p.id === planId)?.name || planId || '—';
+  return CONTRACT_PLANS.find((p) => p.id === planId)?.name || planId || '—';
 }
 
-export default function ContractsPanel({ initialPlan, initialInterval = 'month' }) {
+export default function ContractsPanel({
+  initialPlan,
+  initialInterval = 'month',
+  focusRentModule = false,
+}) {
   const [sub, setSub] = useState(null);
   const [billingConfig, setBillingConfig] = useState(null);
+  const [officeModules, setOfficeModules] = useState(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [interval, setInterval] = useState(initialInterval);
   const [selectedPlan, setSelectedPlan] = useState(initialPlan || 'professional');
+  const [wantRentAddon, setWantRentAddon] = useState(Boolean(focusRentModule));
 
   const load = useCallback(async () => {
     if (!getSaasToken()) {
@@ -84,15 +97,20 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     }
     setLoading(true);
     try {
-      const [subscription, config] = await Promise.all([
+      const [subscription, config, modules] = await Promise.all([
         fetchBillingSubscription(),
         fetchBillingConfig().catch(() => null),
+        fetchAdminOfficeModules().catch(() => null),
       ]);
       setSub(subscription);
       setBillingConfig(config);
+      setOfficeModules(modules);
       if (subscription?.plan) setSelectedPlan(subscription.plan);
       if (subscription?.interval === 'year' || subscription?.interval === 'month') {
         setInterval(subscription.interval);
+      }
+      if (modules?.rent_enabled && modules?.trips_enabled) {
+        setWantRentAddon(true);
       }
     } catch (e) {
       toast.error(e.message || 'Αποτυχία φόρτωσης συνδρομής');
@@ -114,17 +132,40 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
   }, [load]);
 
   // Sync parent-provided plan/interval during render (avoids setState-in-effect).
-  const [propSeed, setPropSeed] = useState({ plan: initialPlan, interval: initialInterval });
-  if (initialPlan !== propSeed.plan || initialInterval !== propSeed.interval) {
-    setPropSeed({ plan: initialPlan, interval: initialInterval });
+  const [propSeed, setPropSeed] = useState({
+    plan: initialPlan,
+    interval: initialInterval,
+    focusRent: focusRentModule,
+  });
+  if (
+    initialPlan !== propSeed.plan ||
+    initialInterval !== propSeed.interval ||
+    focusRentModule !== propSeed.focusRent
+  ) {
+    setPropSeed({
+      plan: initialPlan,
+      interval: initialInterval,
+      focusRent: focusRentModule,
+    });
     if (initialPlan) setSelectedPlan(initialPlan);
     if (initialInterval) setInterval(initialInterval);
+    if (focusRentModule) setWantRentAddon(true);
   }
+
+  const rentAlreadyOn = Boolean(officeModules?.rent_enabled);
+  const rentOnlySelected = selectedPlan === 'rent';
+  const canAddRentAddon = !rentOnlySelected;
+  const rentAddonEffective = canAddRentAddon && wantRentAddon && !rentAlreadyOn;
+  const rentAddonPrice = rentAddonDisplayPrice(interval, RENT_ADDON);
 
   const startCheckout = async () => {
     setWorking(true);
     try {
-      const { checkout_url: url } = await createBillingCheckout(selectedPlan, interval);
+      const { checkout_url: url } = await createBillingCheckout(
+        selectedPlan,
+        interval,
+        rentAddonEffective,
+      );
       if (url) window.location.href = url;
       else toast.error('Δεν επιστράφηκε checkout URL');
     } catch (e) {
@@ -137,9 +178,19 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
   const startTrial = async () => {
     setWorking(true);
     try {
-      const updated = await startBillingTrial(selectedPlan, interval);
+      const updated = await startBillingTrial(
+        selectedPlan,
+        interval,
+        rentAddonEffective || (rentAlreadyOn && canAddRentAddon),
+      );
       setSub(updated);
-      toast.success(`Δωρεάν δοκιμή ${billingConfig?.trial_days || 14} ημερών ενεργοποιήθηκε`);
+      const modules = await fetchAdminOfficeModules().catch(() => null);
+      if (modules) setOfficeModules(modules);
+      toast.success(
+        rentAddonEffective || rentOnlySelected
+          ? `Δοκιμή ενεργή — Ενοικιάσεις ενσωματωμένες (${billingConfig?.trial_days || 14} ημέρες)`
+          : `Δωρεάν δοκιμή ${billingConfig?.trial_days || 14} ημερών ενεργοποιήθηκε`,
+      );
     } catch (e) {
       toast.error(e.message || 'Αποτυχία ενεργοποίησης δοκιμής');
     } finally {
@@ -159,7 +210,8 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     }
   };
 
-  const catalogPlan = AGENCY_PLANS.find((p) => p.id === selectedPlan) || AGENCY_PLANS[1];
+  const catalogPlan =
+    CONTRACT_PLANS.find((p) => p.id === selectedPlan) || AGENCY_PLANS[1];
   const quote = displayPrice(catalogPlan, interval);
   const checkoutReady = billingConfig?.checkout_ready === true;
   const demoMode = billingConfig?.demo_mode === true;
@@ -172,7 +224,10 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     icon: 'info',
     className: 'bg-slate-50 text-slate-700 border-slate-200',
   };
-  const sameTrialPlan = onTrial && sub?.plan === selectedPlan;
+  const sameTrialPlan =
+    onTrial &&
+    sub?.plan === selectedPlan &&
+    !(rentAddonEffective && !rentAlreadyOn);
   const hasToken = Boolean(getSaasToken());
   const trialProgress =
     onTrial && remaining != null && trialDays > 0
@@ -313,11 +368,12 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {AGENCY_PLANS.map((plan) => {
+            <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              {CONTRACT_PLANS.map((plan) => {
                 const p = displayPrice(plan, interval);
                 const active = selectedPlan === plan.id;
                 const isCurrent = sub?.plan === plan.id;
+                const isRent = plan.id === 'rent';
                 return (
                   <button
                     key={plan.id}
@@ -325,7 +381,9 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                     onClick={() => !plan.contactSales && setSelectedPlan(plan.id)}
                     className={`text-left rounded-[22px] border p-5 transition ${
                       active && !plan.contactSales
-                        ? 'border-primary/40 bg-gradient-to-b from-primary/[0.07] to-white ring-2 ring-primary/15 shadow-sm'
+                        ? isRent
+                          ? 'border-teal-400/50 bg-gradient-to-b from-teal-50 to-white ring-2 ring-teal-500/15 shadow-sm'
+                          : 'border-primary/40 bg-gradient-to-b from-primary/[0.07] to-white ring-2 ring-primary/15 shadow-sm'
                         : 'border-slate-200/90 bg-gradient-to-b from-slate-50/50 to-white hover:border-primary/25'
                     }`}
                   >
@@ -334,7 +392,9 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                         <span
                           className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
                             active && !plan.contactSales
-                              ? 'bg-primary/15 text-primary'
+                              ? isRent
+                                ? 'bg-teal-100 text-teal-800'
+                                : 'bg-primary/15 text-primary'
                               : 'bg-slate-100 text-slate-500'
                           }`}
                         >
@@ -354,12 +414,24 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                           </span>
                         )}
                         {plan.highlighted && !isCurrent && (
-                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                            Προτεινόμενο
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                              isRent
+                                ? 'bg-teal-50 text-teal-800 border-teal-200'
+                                : 'bg-primary/10 text-primary border-primary/20'
+                            }`}
+                          >
+                            {isRent ? 'Rent' : 'Προτεινόμενο'}
                           </span>
                         )}
                         {active && !plan.contactSales && (
-                          <span className="material-symbols-outlined text-primary text-[22px]">check_circle</span>
+                          <span
+                            className={`material-symbols-outlined text-[22px] ${
+                              isRent ? 'text-teal-700' : 'text-primary'
+                            }`}
+                          >
+                            check_circle
+                          </span>
                         )}
                       </div>
                     </div>
@@ -375,9 +447,15 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                     )}
 
                     <ul className="mt-4 space-y-1.5">
-                      {(plan.features || []).map((f) => (
+                      {(plan.features || []).slice(0, 4).map((f) => (
                         <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
-                          <span className="material-symbols-outlined text-[14px] text-primary mt-0.5">check</span>
+                          <span
+                            className={`material-symbols-outlined text-[14px] mt-0.5 ${
+                              isRent ? 'text-teal-700' : 'text-primary'
+                            }`}
+                          >
+                            check
+                          </span>
                           <span>{f}</span>
                         </li>
                       ))}
@@ -397,12 +475,61 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
               })}
             </div>
 
+            {canAddRentAddon ? (
+              <div
+                id="rent-addon"
+                className={`rounded-[22px] border px-5 py-4 flex flex-wrap items-center justify-between gap-4 ${
+                  wantRentAddon || rentAlreadyOn
+                    ? 'border-teal-300 bg-gradient-to-r from-teal-50 to-white'
+                    : 'border-slate-200 bg-slate-50/70'
+                }`}
+              >
+                <div className="min-w-0 flex items-start gap-3">
+                  <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-100 text-teal-800">
+                    <span className="material-symbols-outlined text-[22px]">add_circle</span>
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900">{RENT_ADDON.name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                      {RENT_ADDON.tagline} · {rentAddonPrice.label}
+                      {rentAddonPrice.suffix}
+                    </p>
+                    {rentAlreadyOn ? (
+                      <p className="mt-1 text-xs font-bold text-teal-800">
+                        Ενεργό στο γραφείο σας — εμφανίζεται το μενού Ενοικιάσεις
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                <label
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold ${
+                    rentAlreadyOn
+                      ? 'border-teal-200 bg-teal-50 text-teal-900 opacity-80 cursor-default'
+                      : 'cursor-pointer border-slate-200 bg-white text-slate-700'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="accent-teal-700"
+                    checked={rentAlreadyOn || wantRentAddon}
+                    disabled={rentAlreadyOn}
+                    onChange={(e) => setWantRentAddon(e.target.checked)}
+                  />
+                  {rentAlreadyOn ? 'Rent ενεργό' : 'Προσθήκη Ενοικιάσεων'}
+                </label>
+              </div>
+            ) : null}
+
             <div className="sticky bottom-3 z-10 rounded-[22px] border border-primary/15 bg-gradient-to-r from-primary/[0.06] to-white backdrop-blur shadow-lg px-4 py-3.5 flex flex-wrap items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Επιλεγμένο</p>
                 <p className="font-bold text-slate-900 truncate">
-                  {catalogPlan.name} · {BILLING_INTERVALS[interval]?.label} — {quote.label}
+                  {catalogPlan.name}
+                  {rentAddonEffective ? ` + ${RENT_ADDON.name}` : ''}
+                  {' · '}
+                  {BILLING_INTERVALS[interval]?.label} — {quote.label}
                   {quote.suffix || ''}
+                  {rentAddonEffective ? ` + ${rentAddonPrice.label}${rentAddonPrice.suffix || ''}` : ''}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -413,7 +540,11 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                     onClick={startCheckout}
                     className="px-5 py-2.5 bg-primary text-white rounded-full text-sm font-bold shadow-sm hover:opacity-95 disabled:opacity-50"
                   >
-                    {working ? 'Αναμονή…' : 'Ενεργοποίηση / αναβάθμιση'}
+                    {working
+                      ? 'Αναμονή…'
+                      : rentAddonEffective
+                        ? 'Ενεργοποίηση με Ενοικιάσεις'
+                        : 'Ενεργοποίηση / αναβάθμιση'}
                   </button>
                 ) : (
                   <button
@@ -424,7 +555,9 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   >
                     {sameTrialPlan
                       ? `Δοκιμή ενεργή (${trialDays} ημέρες)`
-                      : `Ξεκινήστε δωρεάν δοκιμή ${trialDays} ημερών`}
+                      : rentAddonEffective
+                        ? `Δοκιμή με Ενοικιάσεις (${trialDays} ημ.)`
+                        : `Ξεκινήστε δωρεάν δοκιμή ${trialDays} ημερών`}
                   </button>
                 )}
                 {checkoutReady && billingConfig?.portal_ready && (
