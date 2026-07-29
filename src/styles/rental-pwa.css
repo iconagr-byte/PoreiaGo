@@ -3596,3 +3596,576 @@
     bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* —— Booking wizard: services / coverage step —— */
+.rent-wiz-stage {
+  min-height: 100dvh;
+  background:
+    radial-gradient(80% 50% at 0% 0%, rgba(10, 122, 108, 0.1), transparent 55%),
+    linear-gradient(180deg, #eef5f3 0%, #f5f5f7 100%);
+  color: var(--rent-ink, #1d1d1f);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+}
+
+.rent-wiz-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1rem 1rem 2.5rem;
+}
+
+.rent-wiz-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.rent-wiz-brand {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--rent-deep, #0b3d4a);
+  text-decoration: none;
+  font-size: 1.05rem;
+}
+
+.rent-wiz-back {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--rent-teal, #0a7a6c);
+  text-decoration: none;
+}
+
+.rent-wiz-head {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.rent-wiz-eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-head h1 {
+  margin: 0;
+  font-size: clamp(1.55rem, 3.5vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.rent-wiz-steps {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  position: relative;
+}
+
+.rent-wiz-steps::before {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 0.72rem;
+  height: 2px;
+  background: rgba(60, 60, 67, 0.16);
+  z-index: 0;
+}
+
+.rent-wiz-step {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.rent-wiz-step-dot {
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  background: #d1d1d6;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.rent-wiz-step.is-done .rent-wiz-step-dot {
+  background: linear-gradient(180deg, #0c8a7a 0%, #0b3d4a 100%);
+}
+
+.rent-wiz-step.is-done .rent-wiz-step-dot .material-symbols-outlined {
+  font-size: 0.95rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-wiz-step.is-active .rent-wiz-step-dot {
+  background: #fff;
+  border: 3px solid var(--rent-teal, #0a7a6c);
+  box-shadow: 0 0 0 3px rgba(10, 122, 108, 0.15);
+}
+
+.rent-wiz-step-pulse {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-step-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--rent-secondary, #6e6e73);
+  line-height: 1.25;
+  max-width: 12ch;
+}
+
+.rent-wiz-step.is-active .rent-wiz-step-label,
+.rent-wiz-step.is-done .rent-wiz-step-label {
+  color: var(--rent-ink, #1d1d1f);
+  font-weight: 700;
+}
+
+.rent-wiz-trip {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.75rem;
+}
+
+.rent-wiz-trip-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.rent-wiz-trip-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: start;
+  padding: 0.95rem 1rem;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+}
+
+.rent-wiz-trip-card .material-symbols-outlined {
+  color: var(--rent-teal, #0a7a6c);
+  font-size: 1.35rem;
+  margin-top: 0.1rem;
+}
+
+.rent-wiz-trip-card p {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-trip-card strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.rent-wiz-edit {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-deep, #0b3d4a);
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  justify-self: end;
+}
+
+.rent-wiz-layout {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.rent-wiz-main h2,
+.rent-wiz-side-top h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.rent-wiz-lead {
+  margin: 0.4rem 0 1.1rem;
+  font-size: 0.92rem;
+  color: var(--rent-secondary, #6e6e73);
+  max-width: 48ch;
+}
+
+.rent-wiz-coverages {
+  display: grid;
+  gap: 1rem;
+}
+
+.rent-wiz-cover {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.9rem;
+  padding: 1.15rem 1.1rem;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rent-wiz-cover.is-on {
+  border-color: rgba(10, 122, 108, 0.45);
+  box-shadow: 0 10px 28px rgba(10, 122, 108, 0.1);
+}
+
+.rent-wiz-cover-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: rgba(10, 122, 108, 0.12);
+  color: var(--rent-deep, #0b3d4a);
+  display: grid;
+  place-items: center;
+}
+
+.rent-wiz-cover-body h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.rent-wiz-cover-body > p {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-cover-flags {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.rent-wiz-cover-flags li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rent-wiz-cover-flags .is-yes {
+  color: #0a7a6c;
+}
+
+.rent-wiz-cover-flags .is-no {
+  color: #c41e3a;
+}
+
+.rent-wiz-cover-flags .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.rent-wiz-cover-foot {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.rent-wiz-cover-foot strong {
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.rent-wiz-cover-foot span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-cover-btn {
+  appearance: none;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--rent-deep, #0b3d4a);
+  background: #fff;
+  color: var(--rent-deep, #0b3d4a);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rent-wiz-cover.is-on .rent-wiz-cover-btn {
+  background: linear-gradient(180deg, #0c8a7a 0%, #0b3d4a 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+.rent-wiz-side-card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 20px;
+  padding: 1.15rem 1.1rem 1.25rem;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+  display: grid;
+  gap: 1.1rem;
+}
+
+.rent-wiz-side-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  margin: -1.15rem -1.1rem 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--rent-deep, #0b3d4a);
+  color: #fff;
+}
+
+.rent-wiz-side-top h2 {
+  color: #fff;
+  font-size: 1rem;
+}
+
+.rent-wiz-side-top button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+
+.rent-wiz-vehicle {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-wiz-vehicle h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.rent-wiz-vehicle h3 em {
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-vehicle > div > p {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-vehicle img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  background: #f4f7f6;
+  border-radius: 14px;
+}
+
+.rent-wiz-vehicle-specs {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.rent-wiz-vehicle-specs li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rent-wiz-vehicle-specs .material-symbols-outlined {
+  font-size: 1rem;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-includes h4,
+.rent-wiz-selected h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rent-wiz-includes ul,
+.rent-wiz-selected ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.rent-wiz-includes li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.rent-wiz-includes .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-selected p,
+.rent-wiz-selected li {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-selected li {
+  font-weight: 700;
+  color: var(--rent-ink, #1d1d1f);
+}
+
+.rent-wiz-total {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.rent-wiz-total span {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rent-wiz-total small {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-total strong {
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
+  color: var(--rent-deep, #0b3d4a);
+}
+
+.rent-wiz-next {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  min-height: 3.15rem;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #0c8a7a 0%, #0b3d4a 100%);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.rent-wiz-next:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.rent-wiz-note {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-empty {
+  padding: 2rem 1.25rem;
+  text-align: center;
+  background: #fff;
+  border-radius: 18px;
+}
+
+.rent-wiz-cta-link {
+  display: inline-flex;
+  margin-top: 0.75rem;
+  font-weight: 700;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-stage--desktop .rent-wiz-shell {
+  padding: 1.5rem 1.5rem 3.5rem;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-steps {
+  max-width: 720px;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-step-label {
+  font-size: 0.78rem;
+  max-width: 16ch;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-trip-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-layout {
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-side {
+  position: sticky;
+  top: 1.25rem;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-coverages {
+  gap: 1.25rem;
+}
+
+@media (max-width: 720px) {
+  .rent-wiz-step-label {
+    max-width: 8ch;
+    font-size: 0.62rem;
+  }
+}
