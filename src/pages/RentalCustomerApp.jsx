@@ -24,6 +24,7 @@ import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
 import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
 import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.jsx';
+import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
@@ -149,20 +150,26 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         </header>
 
         <main className="rent-home">
-          <section className="rent-hero" aria-label="Ενοικίαση">
-            <p className="rent-hero-brand">{branding.brandLabel}</p>
-            <h1 className="rent-hero-title">{branding.title}</h1>
-            <p className="rent-hero-copy">{branding.copy}</p>
-            <button type="button" className="rent-hero-cta" onClick={onRequireLogin}>
-              <span className="material-symbols-outlined" aria-hidden>
-                lock
-              </span>
-              Σύνδεση για κράτηση
-            </button>
-          </section>
+          <RentGuestHero
+            brandLabel={branding.brandLabel}
+            title={branding.title}
+            titleAccent={branding.titleAccent}
+            copy={branding.copy}
+            carCount={carCount}
+            vanCount={vanCount}
+            onBrowseFleet={() => {
+              const el = document.getElementById('rent-guest-fleet');
+              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            onRequireLogin={onRequireLogin}
+          />
 
           <div className="rent-home-stack">
-            <section className="rent-apple-block rent-apple-fleet" aria-label="Στόλος ενοικίασης">
+            <section
+              id="rent-guest-fleet"
+              className="rent-apple-block rent-apple-fleet"
+              aria-label="Στόλος ενοικίασης"
+            >
               <p className="rent-apple-eyebrow">Στόλος</p>
               <h2 className="rent-apple-title">Επιλέξτε όχημα</h2>
               <p className="rent-apple-lead">
