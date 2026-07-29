@@ -16,8 +16,11 @@ import {
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { resolveRentAppBranding } from '../lib/rental/rentAppBranding.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
-import { fetchCustomerRentalCatalog, fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
-import { withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
+import {
+  fetchCustomerRentalCatalog,
+  fetchPublicRentalAvailability,
+  fetchPublicRentalCatalog,
+} from '../services/customerRentalApi.js';
 import { enrichRentFleet, homeCategoryLabel } from '../lib/rental/rentFleetEnrichment.js';
 import { rememberRentVehicle } from '../lib/rental/rentBookingExtras.js';
 import { writeRentBookingPrefs } from '../lib/rental/rentBookingSearch.js';
@@ -76,10 +79,12 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const navigate = useNavigate();
   const [branding, setBranding] = useState(() => resolveRentAppBranding({}, { guest: true }));
   const [footerAddress, setFooterAddress] = useState('');
+  const [pickupLocations, setPickupLocations] = useState([]);
   const [homeFleet, setHomeFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [homeCategory, setHomeCategory] = useState('');
   const [homeQuery, setHomeQuery] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
   const { favorites, toggleFavorite } = useRentFavorites();
 
   const goToServicesStep = (vehicle) => {
@@ -98,11 +103,12 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
     fetchPublicRentalCatalog()
       .then((rows) => {
         if (cancelled) return;
-        setHomeFleet(enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 12)));
+        // Office fleet only — no client demo mask.
+        setHomeFleet(enrichRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24));
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet(enrichRentFleet(withDemoRentFleet([])));
+        setHomeFleet([]);
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);
@@ -119,6 +125,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         if (cancelled) return;
         const brand = resolveOfficeBrand(data || {});
         setFooterAddress(String(data?.footer_address || '').trim());
+        setPickupLocations(
+          Array.isArray(data?.rent_pickup_locations)
+            ? data.rent_pickup_locations.map((x) => String(x || '').trim()).filter(Boolean)
+            : [],
+        );
         setBranding(
           resolveRentAppBranding(
             {
@@ -170,10 +181,27 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             <RentBookingSearchBar
               brandLabel={branding.brandLabel}
               footerAddress={footerAddress}
-              onSearch={() => {
-                writeRentBookingPrefs({ wizard_step: 'vehicle' });
-                const el = document.getElementById('rent-guest-fleet');
-                el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              pickupLocations={pickupLocations}
+              onSearch={async (prefs) => {
+                writeRentBookingPrefs({ ...(prefs || {}), wizard_step: 'vehicle' });
+                setSearchActive(true);
+                setFleetLoading(true);
+                try {
+                  const rows = await fetchPublicRentalAvailability({
+                    startTime: new Date(prefs.start_time).toISOString(),
+                    endTime: new Date(prefs.end_time).toISOString(),
+                    pickupLocation: prefs.pickup_location,
+                    dropoffLocation: prefs.dropoff_location || prefs.pickup_location,
+                  });
+                  setHomeFleet(enrichRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24));
+                } catch {
+                  /* keep current catalog if availability fails */
+                } finally {
+                  setFleetLoading(false);
+                  document
+                    .getElementById('rent-guest-fleet')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
               }}
             />
           </div>
@@ -205,7 +233,9 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                       </span>
                     </h2>
                     <p className="rent-pick-head-sub">
-                      {carCount} επιβατικά · {vanCount} van · παρόμοια κατηγορία στην παραλαβή
+                      {searchActive
+                        ? `${filteredHomeFleet.length} διαθέσιμα για τις ημερομηνίες σου`
+                        : `${carCount} επιβατικά · ${vanCount} van · στόλος γραφείου`}
                     </p>
                   </div>
                   <div className="rent-pick-filters">
@@ -249,7 +279,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                     ))}
                   </div>
                 ) : (
-                  <p className="rent-home-fleet-empty">Δεν βρέθηκαν οχήματα για τα φίλτρα.</p>
+                  <p className="rent-home-fleet-empty">
+                    {searchActive
+                      ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες στο γραφείο.'
+                      : 'Δεν υπάρχουν οχήματα στον στόλο του γραφείου ακόμα. Ρώτησε το desk ή δοκίμασε αργότερα.'}
+                  </p>
                 )}
               </div>
             </section>
@@ -366,7 +400,7 @@ function RentalAuthenticatedApp() {
     fetchCustomerRentalCatalog()
       .then((rows) => {
         if (cancelled) return;
-        const sliced = enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 12));
+        const sliced = enrichRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24);
         setHomeFleet(sliced);
         try {
           const preferredId = localStorage.getItem(PREFERRED_VEHICLE_ID_KEY);
@@ -380,7 +414,7 @@ function RentalAuthenticatedApp() {
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet(enrichRentFleet(withDemoRentFleet([])));
+        setHomeFleet([]);
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);

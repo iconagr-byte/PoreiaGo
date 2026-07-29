@@ -14,7 +14,6 @@ import {
   RENT_INCLUDED_DEFAULTS,
   estimateBookingTotals,
   euroLabel,
-  extrasNotesLine,
   formatRentWhen,
   readExtrasSelection,
   readRentVehicleSnapshot,
@@ -150,10 +149,11 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
       return;
     }
 
-    if (String(vehicle.id).startsWith('demo-')) {
+    // Client-only fake cards (never hit the office store).
+    if (/^demo-rent-(car|van)-/i.test(String(vehicle.id))) {
       writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'details' });
-      toast.success('Επιλογές αποθηκεύτηκαν — ολοκλήρωσε την κράτηση όταν ο στόλος είναι live.');
-      navigate('/rent');
+      toast.error('Αυτό το όχημα δεν ανήκει στον στόλο του γραφείου.');
+      navigate('/rent#rent-guest-fleet');
       return;
     }
 
@@ -164,7 +164,9 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
         name: getCustomerName(),
       }).catch(() => null);
 
-      const notes = extrasNotesLine(selection);
+      const extras = Object.entries(selection)
+        .filter(([, on]) => on)
+        .map(([key]) => key);
       const booking = await createCustomerRentalBooking({
         vehicle_id: vehicle.id,
         start_time: new Date(prefs.start_time).toISOString(),
@@ -173,7 +175,7 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
         dropoff_location: prefs.dropoff_location || prefs.pickup_location,
         driver_mode: prefs.driver_mode || 'SELF_DRIVE',
         client_phone: prefs.client_phone || undefined,
-        notes: notes || undefined,
+        extras,
       });
       writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'done' });
       toast.success(
@@ -361,8 +363,7 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
                 {busy ? 'Καταχώρηση…' : 'Επόμενο βήμα'}
               </button>
               <p className="rent-wiz-note">
-                Τα extras περνούν ως σημείωση στην κράτηση· το ποσό οχήματος επιβεβαιώνεται από το
-                γραφείο.
+                Το σύνολο (όχημα + extras) καταχωρείται στην κράτηση του γραφείου.
               </p>
             </div>
           </aside>

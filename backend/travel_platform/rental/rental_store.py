@@ -24,6 +24,45 @@ ACTIVE_BOOKING_STATUSES = frozenset({"CONFIRMED", "ACTIVE"})
 INSPECTION_TYPES = ("PICKUP_CHECK", "RETURN_CHECK")
 SERVICE_MILEAGE_EVERY = 15_000
 
+# Bookable extras (customer wizard + wallet) — priced into booking.total_cost.
+EXTRAS_CATALOG: dict[str, dict[str, Any]] = {
+    "extra_insurance": {"title": "SCDW Plus", "eur_per_day": 13.5},
+    "super_cover": {"title": "Super Cover", "eur_per_day": 9.5},
+    "extra_driver": {"title": "Επιπλέον οδηγός", "eur_per_day": 8.0},
+    "child_seat": {"title": "Παιδικό κάθισμα", "eur_per_day": 7.0},
+    "gps_pack": {"title": "GPS pack", "eur_per_day": 5.0},
+}
+
+
+def quote_extras(extra_ids: list[str] | None, *, days: int) -> dict[str, Any]:
+    """Price selected extras for N rental days."""
+    d = max(1, int(days or 1))
+    lines: list[dict[str, Any]] = []
+    total = 0.0
+    seen: set[str] = set()
+    for raw in extra_ids or []:
+        key = str(raw or "").strip()
+        if not key or key in seen:
+            continue
+        spec = EXTRAS_CATALOG.get(key)
+        if not spec:
+            continue
+        seen.add(key)
+        per_day = float(spec["eur_per_day"])
+        line_total = round(per_day * d, 2)
+        total += line_total
+        lines.append(
+            {
+                "id": key,
+                "title": spec["title"],
+                "eur_per_day": per_day,
+                "days": d,
+                "total": line_total,
+            }
+        )
+    return {"lines": lines, "total": round(total, 2), "days": d}
+
+
 # Stable demo fleet (3 passenger cars + 3 vans) — seeded when a tenant has no vehicles.
 _DEMO_FLEET_MARKER = "demo_rent_fleet_v1"
 _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
@@ -559,15 +598,24 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             dropoff_location=dropoff,
             driver_mode=driver_mode,
         )
+        extras_quote = quote_extras(body.get("extras"), days=quote["suggested_days"])
+        vehicle_total = float(quote["suggested_total"])
+        extras_total = float(extras_quote["total"])
         total = body.get("total_cost")
         if total is None:
-            total = quote["suggested_total"]
+            total = round(vehicle_total + extras_total, 2)
         else:
             total = round(float(total), 2)
 
         channel = str(body.get("channel") or "DESK").strip().upper() or "DESK"
         if channel not in ("DESK", "WALLET"):
             channel = "DESK"
+
+        extra_titles = [line["title"] for line in extras_quote["lines"]]
+        notes = str(body.get("notes") or "").strip() or None
+        if extra_titles:
+            extras_note = f"Extras: {', '.join(extra_titles)}"
+            notes = f"{notes} · {extras_note}" if notes else extras_note
 
         now = _now()
         row = {
@@ -590,11 +638,15 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
                 "driver_surcharge": quote["driver_surcharge"],
                 "one_way_surcharge": quote["one_way_surcharge"],
                 "is_one_way": quote["is_one_way"],
+                "vehicle_total": vehicle_total,
+                "extras_total": extras_total,
+                "extras": extras_quote["lines"],
             },
+            "extras": [line["id"] for line in extras_quote["lines"]],
             "rental_status": "CONFIRMED",
             "driver_mode": driver_mode,
             "assigned_driver_id": (str(body.get("assigned_driver_id") or "").strip() or None),
-            "notes": (str(body.get("notes") or "").strip() or None),
+            "notes": notes,
             "legal_doc_signatures": {},
             "created_at": now,
             "updated_at": now,
@@ -957,8 +1009,7 @@ def cancel_booking_for_customer(
 
 
 def public_catalog(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
-    """Customer-facing vehicle cards (no internal notes). Seeds demo fleet if empty."""
-    ensure_demo_rental_fleet(tenant_id)
+    """Customer-facing vehicle cards for this office (no auto-seed, no internal notes)."""
     rows = list_vehicles(tenant_id, category=category)
     out = []
     for v in rows:

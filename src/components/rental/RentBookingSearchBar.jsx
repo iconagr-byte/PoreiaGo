@@ -13,12 +13,13 @@ import {
 export default function RentBookingSearchBar({
   brandLabel = 'Γραφείο',
   footerAddress = '',
+  pickupLocations = [],
   onSearch,
   compact = false,
 } = {}) {
   const locations = useMemo(
-    () => buildRentLocationOptions({ brandLabel, footerAddress }),
-    [brandLabel, footerAddress],
+    () => buildRentLocationOptions({ brandLabel, footerAddress, pickupLocations }),
+    [brandLabel, footerAddress, pickupLocations],
   );
 
   const [differentDropoff, setDifferentDropoff] = useState(false);

@@ -44,6 +44,7 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
     "rent_guest_hero_copy": "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.",
     "rent_cta_label": "Βρες όχημα",
+    "rent_pickup_locations": [],
     "homepage_theme_id": "aegean_classic",
     "accent_color": "#0ea5e9",
     "show_fleet_section": True,
