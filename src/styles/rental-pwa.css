@@ -109,6 +109,83 @@
   pointer-events: none;
 }
 
+/* Platform-style photo hero (guest /rent) */
+.rent-hero--landing {
+  justify-content: center;
+  min-height: min(92dvh, 820px);
+  padding: 5.5rem 1.25rem 2rem;
+  background: #020617;
+}
+
+.rent-hero--landing::before {
+  display: none;
+}
+
+.rent-hero-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.rent-hero-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.rent-hero-shade {
+  position: absolute;
+  inset: 0;
+}
+
+.rent-hero-shade--x {
+  background: linear-gradient(
+    90deg,
+    rgba(2, 6, 23, 0.94) 0%,
+    rgba(2, 6, 23, 0.78) 42%,
+    rgba(2, 6, 23, 0.35) 100%
+  );
+}
+
+.rent-hero-shade--y {
+  background: linear-gradient(
+    180deg,
+    rgba(2, 6, 23, 0.55) 0%,
+    rgba(2, 6, 23, 0.28) 40%,
+    rgba(2, 6, 23, 0.88) 100%
+  );
+}
+
+.rent-hero-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 50% at 15% 20%, rgba(56, 189, 248, 0.14), transparent 58%);
+  pointer-events: none;
+}
+
+.rent-hero-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.14;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.rent-hero-landing-inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 40rem;
+  display: grid;
+  gap: 0;
+}
+
 .rent-hero-brand {
   position: relative;
   margin: 0 0 0.75rem;
@@ -118,6 +195,13 @@
   line-height: 0.95;
   max-width: 11ch;
   animation: rent-rise 780ms 60ms ease-out both;
+}
+
+.rent-hero-brand--landing {
+  max-width: none;
+  font-size: clamp(2.4rem, 8vw, 3.4rem);
+  margin-bottom: 1rem;
+  text-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
 }
 
 .rent-hero-title {
@@ -130,6 +214,26 @@
   animation: rent-rise 780ms 140ms ease-out both;
 }
 
+.rent-hero-landing-title {
+  position: relative;
+  margin: 0 0 1rem;
+  font-size: clamp(1.65rem, 4.8vw, 2.65rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  color: #fff;
+  max-width: 18ch;
+  animation: rent-rise 780ms 120ms ease-out both;
+}
+
+.rent-hero-accent {
+  display: inline;
+  background: linear-gradient(90deg, #7dd3fc, #a5f3fc 45%, #a5b4fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 .rent-hero-copy {
   position: relative;
   margin: 0.5rem 0 1.15rem;
@@ -138,6 +242,25 @@
   font-size: 0.9rem;
   line-height: 1.45;
   animation: rent-rise 780ms 200ms ease-out both;
+}
+
+.rent-hero-landing-copy {
+  position: relative;
+  margin: 0 0 1.35rem;
+  max-width: 38ch;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(0.95rem, 2.2vw, 1.12rem);
+  line-height: 1.5;
+  animation: rent-rise 780ms 180ms ease-out both;
+}
+
+.rent-hero-actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  animation: rent-rise 780ms 240ms ease-out both;
 }
 
 .rent-hero-cta {
@@ -172,6 +295,87 @@
 
 .rent-hero-cta:active {
   transform: scale(0.98);
+}
+
+.rent-hero-actions .rent-hero-cta {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: min(100%, 11rem);
+  justify-content: center;
+  font-weight: 700;
+  animation: none;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.rent-hero-cta--primary {
+  background: #fff;
+  color: #0f172a;
+}
+
+.rent-hero-cta--primary .material-symbols-outlined {
+  opacity: 0.85;
+  color: #0f172a;
+}
+
+.rent-hero-cta--teal {
+  background: rgba(20, 184, 166, 0.16);
+  border: 1px solid rgba(94, 234, 212, 0.45);
+  color: #ecfdf5;
+  box-shadow: none;
+}
+
+.rent-hero-cta--teal .material-symbols-outlined {
+  opacity: 0.95;
+  color: #99f6e4;
+}
+
+.rent-hero-tagline {
+  position: relative;
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: -0.01em;
+  animation: rent-rise 780ms 280ms ease-out both;
+}
+
+.rent-hero-stats {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: 1.75rem;
+  max-width: 36rem;
+  animation: rent-rise 780ms 320ms ease-out both;
+}
+
+.rent-hero-stat {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 0.85rem 0.9rem;
+}
+
+.rent-hero-stat--accent {
+  background: rgba(20, 184, 166, 0.16);
+  border-color: rgba(94, 234, 212, 0.32);
+}
+
+.rent-hero-stat strong {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.rent-hero-stat span {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .rent-topbar {
@@ -2146,6 +2350,48 @@
   min-height: min(52dvh, 560px);
   padding-left: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
   padding-right: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+}
+
+.rent-phone-stage--desktop .rent-hero--landing {
+  min-height: min(92dvh, 880px);
+  padding-top: 7rem;
+  padding-bottom: 3.5rem;
+  padding-left: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+  padding-right: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+}
+
+.rent-phone-stage--desktop .rent-hero-landing-inner {
+  max-width: 42rem;
+}
+
+.rent-phone-stage--desktop .rent-hero-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 48rem;
+  margin-top: 2.5rem;
+  gap: 0.85rem;
+}
+
+.rent-phone-stage--desktop .rent-app--guest .rent-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  width: 100%;
+  max-width: none;
+  padding: 1.1rem max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0.55), transparent);
+  color: #fff;
+}
+
+.rent-phone-stage--desktop .rent-app--guest .rent-topbar-brand {
+  color: #fff;
+}
+
+.rent-phone-stage--desktop .rent-app--guest .rent-btn-ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .rent-phone-stage--desktop .rent-home-fleet-strip {

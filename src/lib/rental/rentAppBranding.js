@@ -8,9 +8,10 @@ export const DEFAULT_RENT_APP_BRANDING = {
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
-  rent_guest_hero_title: 'Δες τον στόλο πριν κλείσεις',
+  rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου & van',
+  rent_guest_hero_title_accent: 'για όλο το ταξίδι σας',
   rent_guest_hero_copy:
-    'Επιβατικά και van με τιμές, θέσεις και περιγραφή — σύνδεση μόνο όταν είσαι έτοιμος για κράτηση.',
+    'Δες τον στόλο, διάλεξε ημερομηνίες και κλείσε online — με ασφάλεια CDW, οδική βοήθεια και Rent Wallet.',
   rent_cta_label: 'Βρες όχημα',
 };
 
@@ -38,6 +39,11 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     : String(appearance.rent_hero_copy || '').trim() ||
       DEFAULT_RENT_APP_BRANDING.rent_hero_copy;
 
+  const titleAccent = guest
+    ? String(appearance.rent_guest_hero_title_accent || '').trim() ||
+      DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent
+    : '';
+
   const cta =
     String(appearance.rent_cta_label || '').trim() ||
     DEFAULT_RENT_APP_BRANDING.rent_cta_label;
@@ -46,6 +52,7 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     officeName: office,
     brandLabel: office,
     title,
+    titleAccent,
     copy,
     ctaLabel: cta,
     isCustomized: Boolean(
