@@ -24,6 +24,34 @@ SMTP_TIMEOUT_HINT_EL = (
 )
 
 
+def normalize_mail_password(password: str | None, *, host: str = "", email: str = "") -> str:
+    """Strip spaces from Google/Yahoo/Outlook app passwords (shown as 'xxxx xxxx xxxx xxxx')."""
+    raw = str(password or "")
+    if not raw:
+        return ""
+    blob = f"{host} {email}".lower()
+    app_pwd_provider = any(
+        x in blob
+        for x in (
+            "gmail.com",
+            "googlemail.com",
+            "imap.gmail.com",
+            "smtp.gmail.com",
+            "yahoo.",
+            "ymail.com",
+            "imap.mail.yahoo.com",
+            "smtp.mail.yahoo.com",
+            "outlook.",
+            "hotmail.",
+            "live.com",
+            "office365.com",
+        )
+    )
+    if app_pwd_provider or (len(raw.replace(" ", "")) == 16 and " " in raw):
+        return "".join(raw.split())
+    return raw.strip()
+
+
 def _format_smtp_error(exc: BaseException) -> str:
     from .imap_utf8 import GMAIL_APP_PASSWORD_HINT_EL, is_gmail_app_password_error
 
@@ -38,11 +66,15 @@ def _format_smtp_error(exc: BaseException) -> str:
 
 
 def settings_to_imap_config(account: dict) -> dict[str, Any]:
+    host = (account.get("imap_host") or "").strip()
+    email = (account.get("email_address") or account.get("mail_username") or "").strip()
     return {
-        "host": (account.get("imap_host") or "").strip(),
+        "host": host,
         "port": int(account.get("imap_port") or 993),
         "user": (account.get("mail_username") or account.get("email_address") or "").strip(),
-        "password": account.get("mail_password") or "",
+        "password": normalize_mail_password(
+            account.get("mail_password"), host=host, email=email
+        ),
         "use_ssl": bool(account.get("imap_secure", True)),
         "store_email": (account.get("email_address") or "").strip().lower(),
         "imap_mailbox": account.get("imap_mailbox") or "INBOX",
@@ -56,11 +88,15 @@ def settings_to_smtp_config(account: dict) -> dict[str, Any]:
     # Port 465 = implicit SSL (SMTPS). STARTTLS checkbox applies to 587/25.
     use_ssl = port == 465 or bool(account.get("smtp_ssl"))
     use_tls = (not use_ssl) and bool(account.get("smtp_secure", True))
+    host = (account.get("smtp_host") or "").strip()
+    email = (account.get("email_address") or account.get("mail_username") or "").strip()
     return {
-        "host": (account.get("smtp_host") or "").strip(),
+        "host": host,
         "port": port,
         "user": (account.get("mail_username") or account.get("email_address") or "").strip(),
-        "password": account.get("mail_password") or "",
+        "password": normalize_mail_password(
+            account.get("mail_password"), host=host, email=email
+        ),
         "use_ssl": use_ssl,
         "use_tls": use_tls,
         "from_addr": (account.get("email_address") or "").strip(),

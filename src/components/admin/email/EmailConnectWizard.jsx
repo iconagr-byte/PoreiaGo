@@ -109,14 +109,17 @@ export default function EmailConnectWizard({
     });
   };
 
-  const draftAccount = () =>
-    buildAccountFromWizard({
+  const draftAccount = () => {
+    const account = buildAccountFromWizard({
       email: email.trim(),
-      password,
+      // Google shows App Passwords with spaces — strip before IMAP/SMTP.
+      password: String(password || '').replace(/\s+/g, ''),
       provider: activeProvider,
       mode: 'direct',
       label: email.trim(),
     });
+    return account;
+  };
 
   const buildPendingChecks = (account) => [
     {

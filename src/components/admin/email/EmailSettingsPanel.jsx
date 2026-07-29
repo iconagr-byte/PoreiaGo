@@ -269,6 +269,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         imap_port: Number(form.imap_port),
         smtp_port: Number(form.smtp_port),
         mail_username: form.mail_username || form.email_address,
+        mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
       });
       if (r.ok) {
         const msg = 'IMAP & SMTP: επιτυχής σύνδεση';
@@ -339,6 +340,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         imap_port: Number(form.imap_port),
         smtp_port: Number(form.smtp_port),
         mail_username: form.mail_username || form.email_address,
+        // Gmail/Yahoo App Passwords are shown with spaces — strip before save/test.
+        mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
       };
       if (editingId === 'new') {
         if (!form.mail_password) {
