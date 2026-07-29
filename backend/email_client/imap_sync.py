@@ -229,11 +229,12 @@ async def sync_account_imap(
     await record_sync_result(settings_id, error=err_text)
 
     return {
-        "ok": True,
+        "ok": bool(messages) or not errors,
         "email_settings_id": settings_id,
         "synced": len(messages),
         "folders": folder_counts,
         "errors": errors,
+        "error": ("; ".join(errors) if errors and not messages else None),
     }
 
 

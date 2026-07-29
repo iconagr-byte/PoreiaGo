@@ -155,7 +155,14 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
     setSyncing(true);
     try {
       const r = await syncMailbox(emailSettingsId || undefined);
-      toast.success(`Συγχρονίστηκαν ${r.synced || 0} μηνύματα`);
+      if (!r?.ok) {
+        throw new Error(r?.error || 'Αποτυχία συγχρονισμού IMAP');
+      }
+      const n = r.synced || 0;
+      toast.success(n ? `Συγχρονίστηκαν ${n} μηνύματα` : 'Συγχρονισμός OK — δεν βρέθηκαν νέα');
+      if (Array.isArray(r.errors) && r.errors.length) {
+        toast.error(r.errors[0], { duration: 6000 });
+      }
       await loadFolders();
       await loadMessages();
     } catch (err) {
