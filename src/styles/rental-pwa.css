@@ -2325,3 +2325,89 @@
     min-height: min(70dvh, 580px);
   }
 }
+
+/* ── Office /rent/services detail page ─────────────────────────────── */
+.rent-services-page {
+  min-height: 100dvh;
+  background: #eef3f2;
+}
+
+.rent-services-detail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.15rem;
+}
+
+.rent-services-detail {
+  padding: 1.25rem 1.35rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 1.35rem;
+  background: #fff;
+}
+
+.rent-services-detail-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.95rem;
+  align-items: start;
+}
+
+.rent-services-detail-head h3 {
+  margin: 0 0 0.3rem;
+  font-size: 1.12rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.rent-services-detail-head p {
+  margin: 0;
+  color: var(--rent-secondary);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.rent-services-detail-bullets {
+  list-style: none;
+  margin: 0.95rem 0 0;
+  padding: 0 0 0 3.7rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rent-services-detail-bullets li {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  color: var(--rent-ink);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.rent-services-detail-bullets .material-symbols-outlined {
+  color: var(--rent-teal);
+  font-size: 1.1rem;
+  margin-top: 0.1rem;
+}
+
+.rent-landing-services-more {
+  margin-top: 1.75rem;
+}
+
+.rent-landing-secondary-cta--ink {
+  border-color: rgba(11, 61, 74, 0.18);
+  background: rgba(10, 122, 108, 0.08);
+  color: var(--rent-deep);
+  text-decoration: none;
+}
+
+.rent-landing-secondary-cta--ink:hover {
+  background: rgba(10, 122, 108, 0.14);
+}
+
+@media (max-width: 700px) {
+  .rent-services-detail-bullets {
+    padding-left: 0;
+  }
+}

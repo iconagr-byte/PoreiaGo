@@ -110,11 +110,9 @@ export default function RentalGuestLanding({
             <button type="button" className="rent-landing-link" onClick={scrollToFleet}>
               Στόλος
             </button>
-            <button type="button" className="rent-landing-link" onClick={() => {
-              document.getElementById('rent-services')?.scrollIntoView({ behavior: 'smooth' });
-            }}>
+            <a href="/rent/services" className="rent-landing-link">
               Υπηρεσίες
-            </button>
+            </a>
             <button type="button" className="rent-btn rent-btn-ghost" onClick={onRequireLogin}>
               Κράτηση
             </button>
@@ -198,6 +196,14 @@ export default function RentalGuestLanding({
               );
             })}
           </ul>
+          <div className="rent-landing-services-more">
+            <a href="/rent/services" className="rent-landing-secondary-cta rent-landing-secondary-cta--ink">
+              Όλες οι λεπτομέρειες υπηρεσιών
+              <span className="material-symbols-outlined" aria-hidden>
+                arrow_forward
+              </span>
+            </a>
+          </div>
         </div>
       </section>
 

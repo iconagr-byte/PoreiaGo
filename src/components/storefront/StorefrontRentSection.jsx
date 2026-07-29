@@ -120,7 +120,7 @@ export default function StorefrontRentSection({
                 Υποστήριξη στο δρόμο, ασφάλεια και εργαλεία ταξιδιού — μέσα από το Rent Wallet.
               </p>
             </div>
-            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0">
+            <ul className="grid grid-cols-1 lg:grid-cols-2 gap-6 list-none p-0 m-0">
               {RENT_SERVICE_FEATURES.map((feature) => {
                 const copy = rentServiceCopy(feature, 'el');
                 return (
@@ -128,17 +128,52 @@ export default function StorefrontRentSection({
                     key={feature.id}
                     className="rounded-3xl border border-black/[0.06] bg-surface-bright p-6"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-teal-700/10 text-teal-800 flex items-center justify-center mb-4">
-                      <span className="material-symbols-outlined text-[26px]" aria-hidden>
-                        {feature.icon}
-                      </span>
+                    <div className="flex gap-4 items-start">
+                      <div className="w-12 h-12 shrink-0 rounded-2xl bg-teal-700/10 text-teal-800 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[26px]" aria-hidden>
+                          {feature.icon}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-headline-sm font-bold text-on-surface mb-2">
+                          {copy.title}
+                        </h3>
+                        <p className="text-sm text-on-surface-variant leading-relaxed">{copy.copy}</p>
+                        {copy.details?.length ? (
+                          <ul className="mt-3 space-y-1.5 list-none p-0 m-0">
+                            {copy.details.slice(0, 2).map((line) => (
+                              <li
+                                key={line}
+                                className="flex gap-2 text-sm text-on-surface-variant"
+                              >
+                                <span
+                                  className="material-symbols-outlined text-teal-700 text-[16px] mt-0.5"
+                                  aria-hidden
+                                >
+                                  check_circle
+                                </span>
+                                {line}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
                     </div>
-                    <h3 className="font-headline-sm font-bold text-on-surface mb-2">{copy.title}</h3>
-                    <p className="text-sm text-on-surface-variant leading-relaxed">{copy.copy}</p>
                   </li>
                 );
               })}
             </ul>
+            <div className="mt-10">
+              <Link
+                to="/rent/services"
+                className="inline-flex items-center gap-2 text-sm font-bold text-teal-800 hover:underline"
+              >
+                Όλες οι λεπτομέρειες υπηρεσιών
+                <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                  arrow_forward
+                </span>
+              </Link>
+            </div>
           </div>
         </section>
       ) : null}
