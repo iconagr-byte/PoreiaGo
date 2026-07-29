@@ -47,6 +47,13 @@ def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
         client = imaplib.IMAP4_SSL(cfg["host"], cfg["port"])
     else:
         client = imaplib.IMAP4(cfg["host"], cfg["port"])
+    # Some providers/localized mailbox names include non-ascii chars.
+    # imaplib defaults to ascii mode and can crash before sending the LOGIN/SELECT.
+    if hasattr(client, "_mode_utf8"):
+        try:
+            client._mode_utf8()
+        except Exception:
+            pass
     client.login(cfg["user"], cfg["password"])
     return client
 
@@ -61,7 +68,13 @@ def test_imap_connection(account: dict) -> dict:
         client.logout()
         return {"ok": True, "message": "IMAP σύνδεση επιτυχής"}
     except Exception as exc:
-        return {"ok": False, "error": str(exc)}
+        msg = str(exc)
+        if "ascii codec can't encode characters" in msg or "ordinal not in range" in msg:
+            return {
+                "ok": False,
+                "error": "IMAP σύνδεση απέτυχε λόγω encoding — πιθανό μη ASCII σε username/password ή IMAP mailbox. Δοκιμάστε τον κωδικό όπως δίνεται από τον πάροχο και ελέγξτε το IMAP Mailbox.",
+            }
+        return {"ok": False, "error": msg}
 
 
 def test_smtp_connection(account: dict) -> dict:
