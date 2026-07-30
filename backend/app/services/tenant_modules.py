@@ -229,24 +229,55 @@ def apply_known_office_rent_policy(tenant: Any) -> dict[str, Any] | None:
         return disable_rent_addon_in_settings(current)
 
     if is_poreiago_platform_office(tenant):
-        if mods["rent_enabled"]:
-            return None
-        updated = enable_rent_addon_in_settings(current)
-        if not isinstance(updated.get("site_appearance"), dict):
-            seeded = initial_settings_for_plan(
-                TenantPlan.RENT,
-                office_name=str(getattr(tenant, "legal_name", None) or "PoreiaGo"),
-            )
+        updated = enable_rent_addon_in_settings(current) if not mods["rent_enabled"] else dict(current)
+        changed = not mods["rent_enabled"]
+
+        # Never seed Achillio Travel legal_name into PoreiaGo platform appearance.
+        office_name = "PoreiaGo"
+        legal = str(getattr(tenant, "legal_name", None) or "").strip()
+        if legal and "achillio" not in legal.lower() and "poreiago" in legal.lower():
+            office_name = legal
+
+        appearance = updated.get("site_appearance")
+        if not isinstance(appearance, dict):
+            seeded = initial_settings_for_plan(TenantPlan.RENT, office_name=office_name)
             appearance = seeded.get("site_appearance")
             if isinstance(appearance, dict):
-                # Platform keeps trips + rent (both), not rent-only appearance wipe.
                 updated["site_appearance"] = appearance
+                changed = True
+        else:
+            appearance = dict(appearance)
+            brand_was_achillio = any(
+                "achillio" in str(appearance.get(k) or "").lower()
+                for k in ("footer_brand_name", "rent_office_name")
+            ) or ("achillio" in legal.lower())
+            for key in ("footer_brand_name", "rent_office_name"):
+                val = str(appearance.get(key) or "")
+                if not val.strip() or "achillio" in val.lower():
+                    appearance[key] = office_name
+                    changed = True
+            logo = str(appearance.get("logo_url") or "").strip()
+            # Clear Achillio-named URLs and opaque uploads left from brand drift.
+            if logo and (
+                "achillio" in logo.lower()
+                or brand_was_achillio
+            ):
+                appearance["logo_url"] = ""
+                changed = True
+            if "achillio" in str(appearance.get("hero_image_url") or "").lower():
+                appearance["hero_image_url"] = ""
+                changed = True
+            updated["site_appearance"] = appearance
+
         # Platform is hybrid: trips + rent.
         modules = dict(updated.get("modules") or {})
-        modules["trips_enabled"] = True
-        modules["rent_enabled"] = True
-        updated["modules"] = modules
-        return updated
+        if not modules.get("trips_enabled") or not modules.get("rent_enabled"):
+            modules["trips_enabled"] = True
+            modules["rent_enabled"] = True
+            updated["modules"] = modules
+            changed = True
+
+        return updated if changed else None
 
     return None
 
@@ -264,6 +295,17 @@ async def ensure_known_office_rent_modules(session: Any) -> dict[str, int]:
     disabled = 0
     enabled = 0
     for tenant in tenants:
+        # Heal drifted Achillio legal_name on the PoreiaGo platform seed.
+        if is_poreiago_platform_office(tenant):
+            legal = str(getattr(tenant, "legal_name", None) or "").strip()
+            if (not legal) or ("achillio" in legal.lower()) or legal.lower() == "achillio":
+                tenant.legal_name = "PoreiaGo"
+                logger.info(
+                    "Healed PoreiaGo platform legal_name (was %r) slug=%s",
+                    legal or "",
+                    _tenant_slug(tenant),
+                )
+
         updated = apply_known_office_rent_policy(tenant)
         if updated is None:
             continue

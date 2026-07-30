@@ -47,9 +47,24 @@ describe('platformStorefrontGuard', () => {
     expect(next.hero_title).toBe('Η Ελλάδα');
   });
 
-  it('leaves appearance untouched off marketing host', () => {
+  it('scrubs opaque Achillio logo on platform seed slug even off marketing host', () => {
     isPlatformMarketingHost.mockReturnValue(false);
-    const raw = { footer_brand_name: 'Achillio Travel' };
+    const next = scrubAchillioBrandForPlatformHost({
+      tenant_slug: 'achillio',
+      footer_brand_name: 'Achillio Travel',
+      logo_url: 'data:image/png;base64,AAA',
+    });
+    expect(next.footer_brand_name).toBe('PoreiaGo');
+    expect(next.logo_url).toBe('');
+  });
+
+  it('leaves Achillio Travel office appearance untouched off marketing host', () => {
+    isPlatformMarketingHost.mockReturnValue(false);
+    const raw = {
+      tenant_slug: 'admin-achillio-gr',
+      footer_brand_name: 'Achillio Travel',
+      logo_url: 'data:image/png;base64,AAA',
+    };
     expect(scrubAchillioBrandForPlatformHost(raw)).toEqual(raw);
   });
 

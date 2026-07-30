@@ -128,6 +128,19 @@ def _looks_like_achillio_brand(value: str | None) -> bool:
     return bool(_ACHILLIO_BRAND_RE.search(str(value or "").strip()))
 
 
+def _is_opaque_uploaded_logo(url: str | None) -> bool:
+    """data:/assets logos have no Achillio keyword — still poison when brand drifted."""
+    value = str(url or "").strip()
+    if not value:
+        return False
+    return (
+        value.startswith("data:image/")
+        or value.startswith("/api/site/assets/")
+        or "/uploads/site/" in value
+        or value.startswith("uploads/site/")
+    )
+
+
 def _sanitize_poreiago_platform_appearance(
     data: dict[str, Any],
     tenant: Tenant,
@@ -136,7 +149,7 @@ def _sanitize_poreiago_platform_appearance(
     PoreiaGo platform / demo office must never surface Achillio Travel branding.
 
     Historic seed used slug=achillio; appearance/legal_name sometimes drifted to
-    Achillio Travel and leaked onto www.poreiago.com storefront preview.
+    Achillio Travel and leaked onto www.poreiago.com + admin sidebar.
     """
     from app.services.tenant_modules import is_poreiago_platform_office
 
@@ -146,10 +159,15 @@ def _sanitize_poreiago_platform_appearance(
     out = {**data}
     office_name = "PoreiaGo"
     legal = str(getattr(tenant, "legal_name", None) or "").strip()
-    if legal and not _looks_like_achillio_brand(legal) and "poreiago" in legal.lower():
+    legal_poisoned = _looks_like_achillio_brand(legal) or legal.lower() == "achillio"
+    if legal and not legal_poisoned and "poreiago" in legal.lower():
         office_name = legal
 
-    for key in ("footer_brand_name", "rent_office_name", "display_name"):
+    brand_keys = ("footer_brand_name", "rent_office_name", "display_name")
+    brand_poisoned = any(_looks_like_achillio_brand(out.get(key)) for key in brand_keys)
+    brand_poisoned = brand_poisoned or legal_poisoned
+
+    for key in brand_keys:
         if _looks_like_achillio_brand(out.get(key)) or not str(out.get(key) or "").strip():
             out[key] = office_name
 
@@ -157,7 +175,12 @@ def _sanitize_poreiago_platform_appearance(
         out["footer_copyright"] = f"© {datetime.utcnow().year} {office_name}"
 
     logo = str(out.get("logo_url") or "").strip()
-    if _looks_like_achillio_brand(logo):
+    # Keyword match OR opaque upload while brand/legal drifted to Achillio Travel.
+    if (
+        _looks_like_achillio_brand(logo)
+        or brand_poisoned
+        or (legal_poisoned and _is_opaque_uploaded_logo(logo))
+    ):
         out["logo_url"] = ""
 
     hero = str(out.get("hero_image_url") or "").strip()
@@ -165,6 +188,36 @@ def _sanitize_poreiago_platform_appearance(
         out["hero_image_url"] = ""
 
     return out
+
+
+def _platform_appearance_needs_persist(
+    stored: dict[str, Any] | None,
+    cleaned: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Fields to write back so Achillio poison does not resurrect on next read."""
+    if not isinstance(stored, dict):
+        return None
+    patch: dict[str, Any] = {}
+    for key in (
+        "footer_brand_name",
+        "rent_office_name",
+        "footer_copyright",
+        "logo_url",
+        "hero_image_url",
+    ):
+        old = stored.get(key)
+        new = cleaned.get(key)
+        if old == new:
+            continue
+        if key == "logo_url" and not str(new or "").strip() and str(old or "").strip():
+            patch[key] = ""
+        elif _looks_like_achillio_brand(old) or (
+            key == "hero_image_url" and _looks_like_achillio_brand(old)
+        ):
+            patch[key] = new if new is not None else ""
+        elif key in ("footer_brand_name", "rent_office_name") and _looks_like_achillio_brand(old):
+            patch[key] = new
+    return patch or None
 
 
 def _enrich_from_tenant(data: dict[str, Any], tenant: Tenant, settings: dict[str, Any]) -> dict[str, Any]:
@@ -219,6 +272,23 @@ class TenantSiteAppearanceService:
         merged = _scrub_platform_placeholders(merged)
         merged = _enrich_from_tenant(merged, tenant, settings)
         merged = _sanitize_poreiago_platform_appearance(merged, tenant)
+
+        # One-shot heal: persist scrubbed Achillio leftovers so admin sidebar
+        # and public hosts stop reloading poison from Postgres.
+        from app.services.tenant_modules import is_poreiago_platform_office
+
+        if is_poreiago_platform_office(tenant):
+            persist = _platform_appearance_needs_persist(
+                stored if isinstance(stored, dict) else None,
+                merged,
+            )
+            if persist:
+                base = dict(stored) if isinstance(stored, dict) else {}
+                base.update(persist)
+                settings["site_appearance"] = base
+                tenant.settings_json = json.dumps(settings, ensure_ascii=False)
+                await self._session.flush()
+
         merged["storage_source"] = "postgres"
         merged["tenant_slug"] = tenant.slug
         return merged
@@ -235,6 +305,12 @@ class TenantSiteAppearanceService:
         current = settings.get("site_appearance")
         base = current if isinstance(current, dict) else {}
         updated = _scrub_platform_placeholders({**DEFAULT_SITE_APPEARANCE, **base, **patch})
+        updated = _sanitize_poreiago_platform_appearance(updated, tenant)
+        # Keep an explicit non-Achillio upload even if legal_name still drifted.
+        if "logo_url" in patch:
+            explicit = str(patch.get("logo_url") or "").strip()
+            if explicit and not _looks_like_achillio_brand(explicit):
+                updated["logo_url"] = explicit
         # Clamp logo sizing if present.
         try:
             if "logo_height_px" in updated:

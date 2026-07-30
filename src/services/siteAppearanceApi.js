@@ -4,11 +4,25 @@ import { getSaasToken, saasFetch } from './saasApi.js';
 import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
 import { HOMEPAGE_LAYOUT_DEFAULTS } from '../lib/homepage/homepageTemplates.js';
 import { scrubSiteAppearancePlaceholders } from '../lib/branding/officeBrand.js';
+import {
+  scrubAchillioBrandForPlatformHost,
+} from '../lib/branding/platformStorefrontGuard.js';
+import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 import { fileToLogoDataUrl } from '../lib/branding/logoImage.js';
 import { fileToTripCoverDataUrl } from '../lib/trips/tripImage.js';
 
-// v2: drop cached Achillion Travel logo that was incorrectly served on PoreiaGo.
-const STORAGE_KEY = 'aerostride_site_appearance_v2';
+// v3: tenant-scoped cache — never reuse Achillio Travel brand across offices.
+const STORAGE_KEY_BASE = 'aerostride_site_appearance_v3';
+
+function appearanceStorageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
+
+function finalizeAppearance(data = {}) {
+  const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
+  // Scrubs Achillio Travel only on PoreiaGo marketing host or platform seed slug.
+  return scrubAchillioBrandForPlatformHost(merged);
+}
 
 export const DEFAULT_SITE_APPEARANCE = {
   logo_url: '',
@@ -76,7 +90,7 @@ async function parseError(res) {
 
 function cacheLocally(data) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(scrubSiteAppearancePlaceholders(data)));
+    localStorage.setItem(appearanceStorageKey(), JSON.stringify(finalizeAppearance(data)));
   } catch {
     /* quota */
   }
@@ -84,10 +98,8 @@ function cacheLocally(data) {
 
 function loadCached() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw
-      ? scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...JSON.parse(raw) })
-      : null;
+    const raw = localStorage.getItem(appearanceStorageKey());
+    return raw ? finalizeAppearance(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
@@ -96,8 +108,7 @@ function loadCached() {
 export { loadCached as loadCachedSiteAppearance };
 
 function mergeAppearance(patch = {}) {
-  return scrubSiteAppearancePlaceholders({
-    ...DEFAULT_SITE_APPEARANCE,
+  return finalizeAppearance({
     ...loadCached(),
     ...patch,
   });
@@ -121,14 +132,14 @@ export async function fetchSiteAppearance(host = typeof window !== 'undefined' ?
     const res = await fetch(`${API_BASE}/api/site/appearance${qs}`);
     if (res.ok) {
       const data = await res.json();
-      const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
+      const merged = finalizeAppearance(data);
       cacheLocally(merged);
       return merged;
     }
   } catch {
     /* offline */
   }
-  return loadCached() || { ...DEFAULT_SITE_APPEARANCE };
+  return loadCached() || finalizeAppearance({});
 }
 
 /** Admin panel — SaaS Postgres when JWT present, else file store. */
@@ -136,7 +147,7 @@ export async function fetchAdminSiteAppearance() {
   if (getSaasToken()) {
     try {
       const data = await saasFetch('/api/v1/branding/site-appearance');
-      const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
+      const merged = finalizeAppearance(data);
       cacheLocally(merged);
       return merged;
     } catch {
@@ -156,7 +167,7 @@ export async function updateSiteAppearance(patch) {
         method: 'PUT',
         body: JSON.stringify(patch),
       });
-      const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
+      const merged = finalizeAppearance(data);
       cacheLocally(merged);
       return { data: merged, source: data.storage_source === 'postgres' ? 'postgres' : 'server', offline: false };
     } catch (saasErr) {
