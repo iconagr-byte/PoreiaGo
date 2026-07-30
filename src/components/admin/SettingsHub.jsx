@@ -41,7 +41,12 @@ export default function SettingsHub({ initialTab, onSubTabChange, contractPrefs,
       fiscal: 'ΑΑΔΕ / myDATA και φορολογικές ρυθμίσεις',
       contracts: 'Πλάνο συνδρομής και συμβόλαιο γραφείου',
       compliance: 'GDPR, audit trail και δικαιώματα υποκειμένων',
-      homepage: 'Αρχική ή Ενοικιάσεις — διάλεξε σελίδα, θέμα, hero και κείμενα',
+      homepage:
+        officeMode === 'rent_only'
+          ? 'Σχεδιασμός σελίδας /rent — από το συμβόλαιο Ενοικιάσεις'
+          : officeMode === 'both'
+            ? 'Διάλεξε Λεωφορεία ή Ενοικιάσεις και σχεδίασε τη σελίδα'
+            : 'Σχεδιασμός αρχικής εκδρομών — θέμα, hero και κάρτες',
       domain: 'Domain ιστοσελίδας, επωνυμία, χρώμα και λογότυπο',
       users: 'Λογαριασμοί διαχειριστών του γραφείου',
       tenants: 'Διαχείριση γραφείων / tenants της πλατφόρμας',
@@ -51,7 +56,7 @@ export default function SettingsHub({ initialTab, onSubTabChange, contractPrefs,
       growth: 'Partner webhooks και growth εργαλεία',
     };
     return hints[tab] || 'Επιλέξτε ενότητα από το μενού στα αριστερά';
-  }, [tab]);
+  }, [tab, officeMode]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
