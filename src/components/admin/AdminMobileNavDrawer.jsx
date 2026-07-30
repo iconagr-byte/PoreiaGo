@@ -18,6 +18,8 @@ export default function AdminMobileNavDrawer({
   onNavigate,
   officeMode = 'trips_only',
   rentEnabled = true,
+  brandRefreshKey = 0,
+  onEditLogo,
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -50,7 +52,24 @@ export default function AdminMobileNavDrawer({
       />
       <aside className="absolute inset-y-0 left-0 w-[min(100%,22rem)] bg-surface-container-lowest shadow-2xl border-r border-black/[0.06] flex flex-col animate-in slide-in-from-left duration-200">
         <div className="flex items-center justify-between gap-3 p-4 border-b border-black/[0.05]">
-          <OfficeBrandMark className="h-8" variant="light" asLink={false} fallbackLabel="Γραφείο" />
+          <button
+            type="button"
+            className="group flex items-center gap-2 min-w-0 text-left rounded-xl hover:bg-slate-50 p-1 -m-1"
+            onClick={() => onEditLogo?.()}
+            aria-label="Αλλαγή λογοτύπου εταιρείας"
+            title="Αλλαγή λογοτύπου"
+          >
+            <OfficeBrandMark
+              className="h-8"
+              variant="light"
+              asLink={false}
+              fallbackLabel="Γραφείο"
+              refreshKey={brandRefreshKey}
+            />
+            <span className="material-symbols-outlined text-[18px] text-slate-300 group-hover:text-primary shrink-0">
+              edit
+            </span>
+          </button>
           <button
             type="button"
             onClick={onClose}
