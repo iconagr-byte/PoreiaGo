@@ -106,7 +106,7 @@ export default function RentGuestLandingExtras({ brandLabel = 'Γραφείο', 
             </span>
             <h2 className="rent-land-title rent-land-title--light">Έτοιμοι για το δρόμο</h2>
             <p className="rent-land-sub rent-land-sub--teal">
-              Παραλαβή από το γραφείο, προαιρετικό one-way και έλεγχος πριν την αναχώρηση.
+              Παραλαβή από τα σημεία του γραφείου, προαιρετικό one-way και έλεγχος πριν την αναχώρηση.
             </p>
             <ul className="rent-land-checks">
               <li>
