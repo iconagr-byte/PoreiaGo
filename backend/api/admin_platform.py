@@ -1222,7 +1222,7 @@ async def admin_chat_threads(
 
 @router.get("/driver-chat/unread")
 async def admin_chat_unread(request: Request):
-    from travel_platform.driver.chat_store import unread_counts
+    from travel_platform.driver.chat_store import list_threads
 
     tenant_id, allow_legacy = await _chat_office_scope(request)
     if allow_legacy:
@@ -1234,8 +1234,6 @@ async def admin_chat_unread(request: Request):
     allowed = _office_chat_driver_ids(tenant_id, allow_demo_legacy=allow_legacy)
     _sync_chat_after_driver_claim(tenant_id, allowed)
     # Count only this office's drivers — never sum another γραφείο's unread.
-    from travel_platform.driver.chat_store import list_threads
-
     office = 0
     for t in list_threads(tenant_id=tenant_id, allowed_driver_ids=allowed):
         office += int(t.get("unread_office") or 0)
