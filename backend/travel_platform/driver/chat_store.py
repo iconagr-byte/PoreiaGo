@@ -230,10 +230,66 @@ def mark_thread_read(
     return changed
 
 
-def list_threads(*, tenant_id: str, limit: int = 50) -> list[dict[str, Any]]:
+def reassign_messages_tenant(
+    *,
+    driver_ids: set[str] | list[str],
+    to_tenant: str,
+    from_tenant: str | None = None,
+) -> int:
+    """
+    Move chat rows for the given drivers onto ``to_tenant``.
+
+    Used when Achillio claims DEMO drivers so office Chat shows the same
+    history the driver already sent under the legacy DEMO tenant.
+    """
+    dest = str(to_tenant or "").strip()
+    src = str(from_tenant or "").strip() or None
+    ids = {str(d).strip() for d in (driver_ids or []) if str(d).strip()}
+    if not dest or not ids:
+        return 0
+    changed = 0
+    with _lock:
+        data = _load()
+        for row in data.get("messages") or []:
+            did = str(row.get("driver_id") or "")
+            if did not in ids:
+                continue
+            cur = str(row.get("tenant_id") or "")
+            if cur == dest:
+                continue
+            if src is not None and cur != src:
+                continue
+            row["tenant_id"] = dest
+            changed += 1
+        if changed:
+            _save(data)
+            logger.info(
+                "Reassigned %s chat message(s) → tenant %s (drivers=%s)",
+                changed,
+                dest,
+                len(ids),
+            )
+    return changed
+
+
+def list_threads(
+    *,
+    tenant_id: str,
+    limit: int = 50,
+    allowed_driver_ids: set[str] | list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Threads for one office tenant.
+
+    When ``allowed_driver_ids`` is set, only those drivers appear — never
+    another office's conversations that share the JSON file.
+    """
     tid = str(tenant_id or "").strip()
     if not tid:
         return []
+    allow = None
+    if allowed_driver_ids is not None:
+        allow = {str(d).strip() for d in allowed_driver_ids if str(d).strip()}
     cap = max(1, min(int(limit), 200))
     with _lock:
         rows = [
@@ -246,6 +302,8 @@ def list_threads(*, tenant_id: str, limit: int = 50) -> list[dict[str, Any]]:
     for m in rows:
         did = str(m.get("driver_id") or "")
         if not did:
+            continue
+        if allow is not None and did not in allow:
             continue
         prev = by_driver.get(did)
         if not prev or str(m.get("created_at") or "") >= str(prev.get("last_at") or ""):
