@@ -31,6 +31,7 @@ import RentAppShareBanner from './RentAppShareBanner.jsx';
 import RentPlanCardsEditor from './RentPlanCardsEditor.jsx';
 import RentalPaperworkDesk from './RentalPaperworkDesk.jsx';
 import RentAppBrandingEditor from './RentAppBrandingEditor.jsx';
+import RentPickupLocationsEditor from './RentPickupLocationsEditor.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../../../services/siteAppearanceApi.js';
@@ -605,6 +606,7 @@ export default function FleetRentalPanel({
               { id: 'clients', label: 'Πελάτες ενοικίασης', copy: `${clients.length} πελάτες · γραφείο + Wallet`, icon: 'groups' },
               { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
               { id: 'paperwork', label: 'Χαρτούρα συμβολαίων', copy: 'Συμβάσεις · υπογραφές · εκτύπωση PDF', icon: 'description' },
+              { id: 'pickups', label: 'Σημεία παραλαβής', copy: 'Γραφείο · αεροδρόμιο · λιμάνι στο /rent', icon: 'location_on' },
               { id: 'branding', label: 'Εμφάνιση /rent', copy: 'Σχεδιασμός σελίδων → Ενοικιάσεις', icon: 'palette', designHref: '/admin?tab=settings&sub=homepage&page=rent' },
               { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
@@ -1204,8 +1206,18 @@ export default function FleetRentalPanel({
 
       {tab === 'plans' && <RentPlanCardsEditor />}
 
+      {tab === 'pickups' && <RentPickupLocationsEditor />}
+
       {tab === 'branding' && (
         <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setTab('pickups')}
+            className="w-full sm:w-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-teal-200 bg-teal-50 text-teal-900 text-sm font-bold hover:bg-teal-100"
+          >
+            <span className="material-symbols-outlined text-[18px]">location_on</span>
+            Σημεία παραλαβής →
+          </button>
           <button
             type="button"
             onClick={() => navigate('/admin?tab=settings&sub=homepage&page=rent')}
