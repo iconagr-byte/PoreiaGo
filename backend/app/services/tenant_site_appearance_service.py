@@ -85,6 +85,7 @@ _PLATFORM_COPY_RE = re.compile(r"aerostride|poreiago", re.I)
 # Only legacy PoreiaGo/AeroStride brand marks — uploaded logos use
 # /api/site/assets/logo or data: URLs and must not be scrubbed.
 _PLATFORM_LOGO_RE = re.compile(r"poreiago|aerostride", re.I)
+_ACHILLIO_BRAND_RE = re.compile(r"achillio|achillion", re.I)
 _OBSOLETE_RENT_GUEST_HERO_COPY = (
     "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος."
 )
@@ -123,18 +124,69 @@ def _scrub_platform_placeholders(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _looks_like_achillio_brand(value: str | None) -> bool:
+    return bool(_ACHILLIO_BRAND_RE.search(str(value or "").strip()))
+
+
+def _sanitize_poreiago_platform_appearance(
+    data: dict[str, Any],
+    tenant: Tenant,
+) -> dict[str, Any]:
+    """
+    PoreiaGo platform / demo office must never surface Achillio Travel branding.
+
+    Historic seed used slug=achillio; appearance/legal_name sometimes drifted to
+    Achillio Travel and leaked onto www.poreiago.com storefront preview.
+    """
+    from app.services.tenant_modules import is_poreiago_platform_office
+
+    if not is_poreiago_platform_office(tenant):
+        return data
+
+    out = {**data}
+    office_name = "PoreiaGo"
+    legal = str(getattr(tenant, "legal_name", None) or "").strip()
+    if legal and not _looks_like_achillio_brand(legal) and "poreiago" in legal.lower():
+        office_name = legal
+
+    for key in ("footer_brand_name", "rent_office_name", "display_name"):
+        if _looks_like_achillio_brand(out.get(key)) or not str(out.get(key) or "").strip():
+            out[key] = office_name
+
+    if _looks_like_achillio_brand(out.get("footer_copyright")):
+        out["footer_copyright"] = f"© {datetime.utcnow().year} {office_name}"
+
+    logo = str(out.get("logo_url") or "").strip()
+    if _looks_like_achillio_brand(logo):
+        out["logo_url"] = ""
+
+    hero = str(out.get("hero_image_url") or "").strip()
+    if _looks_like_achillio_brand(hero):
+        out["hero_image_url"] = ""
+
+    return out
+
+
 def _enrich_from_tenant(data: dict[str, Any], tenant: Tenant, settings: dict[str, Any]) -> dict[str, Any]:
     """Fill empty brand/logo from office legal name + branding settings."""
+    from app.services.tenant_modules import is_poreiago_platform_office
+
     out = {**data}
     branding = settings.get("branding") if isinstance(settings.get("branding"), dict) else {}
     theme_cfg = tenant.theme_config if isinstance(tenant.theme_config, dict) else {}
     office_name = (tenant.legal_name or tenant.slug or "").strip()
+    # Platform seed slug=achillio must not publish as Achillio Travel.
+    if is_poreiago_platform_office(tenant) and (
+        not office_name or _looks_like_achillio_brand(office_name) or office_name.lower() == "achillio"
+    ):
+        office_name = "PoreiaGo"
+
     branding_logo = str(theme_cfg.get("logoUrl") or branding.get("logo_url") or "").strip()
-    if _is_platform_logo(branding_logo):
+    if _is_platform_logo(branding_logo) or _looks_like_achillio_brand(branding_logo):
         branding_logo = ""
 
     current_logo = str(out.get("logo_url") or "").strip()
-    if _is_platform_logo(current_logo):
+    if _is_platform_logo(current_logo) or _looks_like_achillio_brand(current_logo):
         out["logo_url"] = ""
         current_logo = ""
 
@@ -166,6 +218,7 @@ class TenantSiteAppearanceService:
         merged = {**DEFAULT_SITE_APPEARANCE, **(stored if isinstance(stored, dict) else {})}
         merged = _scrub_platform_placeholders(merged)
         merged = _enrich_from_tenant(merged, tenant, settings)
+        merged = _sanitize_poreiago_platform_appearance(merged, tenant)
         merged["storage_source"] = "postgres"
         merged["tenant_slug"] = tenant.slug
         return merged

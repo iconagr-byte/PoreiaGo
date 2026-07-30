@@ -123,6 +123,26 @@ def test_poreiago_seed_slug_keeps_rent_even_if_legal_or_domain_drift():
     assert updated["modules"]["rent_enabled"] is True
 
 
+def test_poreiago_seed_slug_not_confused_with_achillio_travel():
+    seed = SimpleNamespace(
+        slug="achillio",
+        custom_domain=None,
+        legal_name="Achillio Travel",
+        subdomain="achillio",
+    )
+    assert is_achillio_travel_office(seed) is False
+    assert is_poreiago_platform_office(seed) is True
+
+    travel = SimpleNamespace(
+        slug="admin-achillio-gr",
+        custom_domain="achilliotravel.com",
+        legal_name="Achillio Travel",
+        subdomain="admin-achillio-gr",
+    )
+    assert is_achillio_travel_office(travel) is True
+    assert is_poreiago_platform_office(travel) is False
+
+
 def test_poreiago_platform_detected_by_domain():
     tenant = SimpleNamespace(
         slug="office-main",
