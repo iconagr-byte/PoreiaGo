@@ -178,6 +178,8 @@ class OfficeModulesResponse(BaseModel):
     rent_enabled: bool = False
     plan: str = "starter"
     mode: str = "trips_only"
+    tenant_slug: str | None = None
+    office_kind: str = "customer"  # achillio_travel | poreiago_platform | customer
 
 
 class BillingConfigResponse(BaseModel):

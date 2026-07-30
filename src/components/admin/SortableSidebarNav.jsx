@@ -67,7 +67,7 @@ export default function SortableSidebarNav({
         ),
       }))
       .filter((section) => section.items.length > 0 || (!rentOnly && section.id !== 'fleet_ops'));
-  }, [displayLayout, superAdmin, rentOnly]);
+  }, [displayLayout, superAdmin, rentOnly, rentEnabled]);
 
   const persistLayout = useCallback(
     (next) => {

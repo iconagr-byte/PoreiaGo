@@ -90,6 +90,7 @@ import {
   DEFAULT_OFFICE_MODULES,
   fetchAdminOfficeModules,
   officeModeFromModules,
+  shouldShowRentMenu,
 } from '../services/officeModulesApi.js';
 
 function bookingStatusBadgeClass(status) {
@@ -152,6 +153,7 @@ export default function BackOffice() {
     () => Boolean(location.state?.officeSetup) || !isOfficeSetupComplete(),
   );
   const officeMode = officeModeFromModules(officeModules);
+  const rentMenuVisible = shouldShowRentMenu(officeModules);
   const rentOnly = officeMode === 'rent_only';
   useEffect(() => {
     let cancelled = false;
@@ -176,13 +178,14 @@ export default function BackOffice() {
   }, [rentOnly, officeMode, activeTab]);
 
   useEffect(() => {
-    // If Rent is not enabled for this office, never stay on rent desk tab.
-    if (officeModules?.rent_enabled) return;
+    // If Rent is not available for this session, never stay on rent desk tab.
+    // Achillio Travel stays blocked; PoreiaGo Super Admin / platform keeps access.
+    if (rentMenuVisible) return;
     if (activeTab === 'fleet_rental') {
       toast.error('Το Rent δεν είναι ενεργό για αυτό το γραφείο');
       setActiveTab('dashboard');
     }
-  }, [officeModules?.rent_enabled, activeTab]);
+  }, [rentMenuVisible, activeTab]);
 
   useEffect(() => {
     if (!rentOnly || activeTab !== 'dashboard') return undefined;
@@ -2241,7 +2244,7 @@ export default function BackOffice() {
     <FleetTelemetryProvider>
       {showOfficeSetup && (
         <OfficeSetupWizard
-          rentEnabled={Boolean(officeModules?.rent_enabled)}
+          rentEnabled={rentMenuVisible}
           forceOpen={Boolean(location.state?.officeSetup)}
           onFinished={() => setShowOfficeSetup(false)}
           onDismiss={() => setShowOfficeSetup(false)}
@@ -2274,7 +2277,7 @@ export default function BackOffice() {
           onEmailClick={goToEmailMailbox}
           onNavigate={(path) => navigate(path)}
           officeMode={officeMode}
-          rentEnabled={Boolean(officeModules?.rent_enabled)}
+          rentEnabled={rentMenuVisible}
         />
       </aside>
 
@@ -2290,7 +2293,7 @@ export default function BackOffice() {
         onEmailClick={goToEmailMailbox}
         onNavigate={(path) => navigate(path)}
         officeMode={officeMode}
-        rentEnabled={Boolean(officeModules?.rent_enabled)}
+        rentEnabled={rentMenuVisible}
       />
 
       <AddCustomerModal
