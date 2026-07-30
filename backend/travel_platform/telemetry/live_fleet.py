@@ -204,91 +204,80 @@ class LiveFleetService:
                     seen_codes.add(v.vehicle_code)
         return merged
 
+    def _legacy_merge_allowed(self) -> bool:
+        import os
+
+        return os.getenv("ALLOW_CROSS_TENANT_FLEET_MERGE", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+
     def list_active_for_admin(self, tenant_id: UUID) -> list[LiveVehicleState]:
         """
         Active vehicles for the admin map.
 
         Cross-tenant demo/platform merge is OFF by default (tenant isolation).
-        Enable only with ALLOW_CROSS_TENANT_FLEET_MERGE=1 for legacy single-office
-        migrations.
+        When ALLOW_CROSS_TENANT_FLEET_MERGE=1, only the platform/Achillio office
+        (and DEMO JWT) may merge DEMO↔platform GPS — never PoreiaGo / other
+        SaaS offices (that was the dual-office pin bleed).
         """
         import os
 
         primary = self.list_active(tenant_id)
-        allow_merge = os.getenv("ALLOW_CROSS_TENANT_FLEET_MERGE", "").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
-        if not allow_merge:
+        if not self._legacy_merge_allowed():
             return primary
 
         from travel_platform.operations.master_qr_local import DEFAULT_TENANT
 
-        demo = UUID(DEFAULT_TENANT)
-        extras: list[list[LiveVehicleState]] = []
+        demo = str(DEFAULT_TENANT)
+        tid = str(tenant_id)
+        platform_raw = (
+            os.getenv("SAAS_DEFAULT_TENANT_ID")
+            or os.getenv("DEFAULT_TENANT_ID")
+            or ""
+        ).strip()
 
-        if str(tenant_id) != str(demo):
-            extras.append(self.list_active(demo))
-        else:
-            try:
-                platform_raw = (
-                    os.getenv("SAAS_DEFAULT_TENANT_ID")
-                    or os.getenv("DEFAULT_TENANT_ID")
-                    or ""
-                ).strip()
-                if platform_raw and platform_raw != str(demo):
-                    extras.append(self.list_active(UUID(platform_raw)))
-            except Exception:
-                pass
+        # PoreiaGo / customer offices must never inherit Achillio or DEMO pins.
+        if tid != demo and (not platform_raw or tid != platform_raw):
+            return primary
+
+        extras: list[list[LiveVehicleState]] = []
+        if tid == platform_raw and tid != demo:
+            extras.append(self.list_active(UUID(demo)))
+        elif tid == demo and platform_raw and platform_raw != demo:
+            extras.append(self.list_active(UUID(platform_raw)))
 
         return self._merge_admin_fleets(primary, *extras)
 
     async def list_active_for_admin_async(self, tenant_id: UUID) -> list[LiveVehicleState]:
-        import os
-
         primary = await self.list_active_async(tenant_id)
-        allow_merge = os.getenv("ALLOW_CROSS_TENANT_FLEET_MERGE", "").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
-        if not allow_merge:
+        if not self._legacy_merge_allowed():
             return primary
 
         from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
         from travel_platform.operations.master_qr_local import DEFAULT_TENANT
 
-        demo = UUID(DEFAULT_TENANT)
-        extras: list[list[LiveVehicleState]] = []
-        seen_tenants = {str(tenant_id)}
-
-        if str(tenant_id) != str(demo):
-            extras.append(await self.list_active_async(demo))
-            seen_tenants.add(str(demo))
-        else:
-            try:
-                platform = str(await resolve_platform_tenant_id())
-                if platform not in seen_tenants:
-                    extras.append(await self.list_active_async(UUID(platform)))
-                    seen_tenants.add(platform)
-            except Exception:
-                pass
-
+        demo = str(DEFAULT_TENANT)
+        tid = str(tenant_id)
+        platform = ""
         try:
-            from sqlalchemy import select
-
-            from app.core.database import AsyncSessionLocal
-            from app.models.tenant import Tenant
-
-            seed_slug = (os.getenv("DEFAULT_TENANT_SLUG") or "achillio").strip().lower()
-            async with AsyncSessionLocal() as db:
-                result = await db.execute(select(Tenant).where(Tenant.slug == seed_slug).limit(1))
-                seed = result.scalar_one_or_none()
-                if seed and str(seed.id) not in seen_tenants:
-                    extras.append(await self.list_active_async(seed.id))
+            platform = str(await resolve_platform_tenant_id() or "").strip()
         except Exception:
             pass
+
+        # PoreiaGo / customer offices must never inherit Achillio or DEMO pins.
+        if tid != demo and (not platform or tid != platform):
+            return primary
+
+        extras: list[list[LiveVehicleState]] = []
+        seen = {tid}
+        if tid == platform and demo not in seen:
+            extras.append(await self.list_active_async(UUID(demo)))
+            seen.add(demo)
+        elif tid == demo and platform and platform not in seen:
+            extras.append(await self.list_active_async(UUID(platform)))
+            seen.add(platform)
 
         return self._merge_admin_fleets(primary, *extras)
 
@@ -300,14 +289,13 @@ class LiveFleetService:
         want = str(tenant_id)
         if meta_tid == want:
             return meta
-        # Admin map merges legacy demo ↔ platform GPS — still return enrichment meta.
-        if meta_tid == DEFAULT_TENANT and want != DEFAULT_TENANT:
-            return meta
-        if want == DEFAULT_TENANT and meta_tid and meta_tid != DEFAULT_TENANT:
-            return meta
-        # Merged pin from another tenant id (same vehicle_id lookup).
-        if meta.get("lat") is not None:
-            return meta
+        # Only when legacy merge is on: allow DEMO ↔ same vehicle enrichment.
+        # Never return a pin belonging to an unrelated SaaS office.
+        if self._legacy_merge_allowed():
+            if meta_tid == DEFAULT_TENANT and want != DEFAULT_TENANT:
+                return meta
+            if want == DEFAULT_TENANT and meta_tid and meta_tid != DEFAULT_TENANT:
+                return meta
         return {}
 
     async def vehicle_meta_async(self, tenant_id: UUID, vehicle_id: str) -> dict:
@@ -319,15 +307,16 @@ class LiveFleetService:
         from travel_platform.telemetry.live_fleet_redis import load_live_vehicle
 
         candidates = [str(tenant_id)]
-        if str(tenant_id) != DEFAULT_TENANT:
-            candidates.append(DEFAULT_TENANT)
-        else:
-            try:
-                platform = str(await resolve_platform_tenant_id())
-                if platform and platform not in candidates:
-                    candidates.append(platform)
-            except Exception:
-                pass
+        if self._legacy_merge_allowed():
+            if str(tenant_id) != DEFAULT_TENANT:
+                candidates.append(DEFAULT_TENANT)
+            else:
+                try:
+                    platform = str(await resolve_platform_tenant_id())
+                    if platform and platform not in candidates:
+                        candidates.append(platform)
+                except Exception:
+                    pass
 
         remote: dict = {}
         for tid in candidates:
