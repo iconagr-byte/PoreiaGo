@@ -1,9 +1,11 @@
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { readPageSlider } from '../../lib/homepage/pageSlider.js';
+import { heroFocalCss } from '../../lib/homepage/heroFocal.js';
 import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
 
 function HeroMedia({ siteAppearance, heroUrl }) {
   const slider = readPageSlider(siteAppearance, 'home');
+  const focal = heroFocalCss(siteAppearance?.hero_image_focal || 'center');
   if (slider.enabled) {
     return (
       <SiteHeroSlider
@@ -18,8 +20,8 @@ function HeroMedia({ siteAppearance, heroUrl }) {
   }
   return (
     <div
-      className="absolute inset-0 bg-cover bg-[center_40%] bg-no-repeat"
-      style={{ backgroundImage: `url('${heroUrl}')` }}
+      className="absolute inset-0 bg-cover bg-no-repeat"
+      style={{ backgroundImage: `url('${heroUrl}')`, backgroundPosition: focal }}
       aria-hidden
     />
   );

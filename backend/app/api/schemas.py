@@ -404,6 +404,7 @@ class TenantSiteAppearanceResponse(BaseModel):
     logo_max_width_px: int = 180
     logo_show_name: bool = True
     hero_image_url: str = ""
+    hero_image_focal: str = "center"
     hero_badge: str = ""
     hero_title: str = ""
     hero_title_accent: str = ""
@@ -437,6 +438,7 @@ class TenantSiteAppearanceUpdate(BaseModel):
     logo_max_width_px: int | None = Field(default=None, ge=60, le=400)
     logo_show_name: bool | None = None
     hero_image_url: str | None = None
+    hero_image_focal: str | None = None
     hero_badge: str | None = None
     hero_title: str | None = None
     hero_title_accent: str | None = None

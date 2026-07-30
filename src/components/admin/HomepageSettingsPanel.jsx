@@ -6,6 +6,7 @@ import ThemeGallery from './homepage/ThemeGallery.jsx';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
 import PageSliderEditor from './homepage/PageSliderEditor.jsx';
+import HeroImageBlock from './homepage/HeroImageBlock.jsx';
 import {
   FOOTER_TEMPLATES,
   HEADER_TEMPLATES,
@@ -105,51 +106,6 @@ function PanelCard({ title, description, children, action }) {
         {action}
       </div>
       <div className="p-6">{children}</div>
-    </div>
-  );
-}
-
-function ImageBlock({ title, hint, previewUrl, uploading, onUpload, onClear, hasCustom }) {
-  return (
-    <div className="rounded-2xl border border-black/[0.06] bg-surface-container-lowest p-5 space-y-4">
-      <div>
-        <h5 className="font-bold text-gray-900">{title}</h5>
-        <p className="text-xs text-gray-500 mt-1">{hint}</p>
-      </div>
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative w-full sm:w-64 h-36 rounded-2xl overflow-hidden bg-gray-100 border border-dashed border-gray-200 shrink-0">
-          {previewUrl ? (
-            <img src={previewUrl} alt="" className="w-full h-full object-contain bg-slate-900/5" />
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 gap-1">
-              <span className="material-symbols-outlined text-[32px] opacity-40">image</span>
-              <span className="text-xs font-medium">Προεπιλογή</span>
-            </div>
-          )}
-          {uploading && (
-            <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-              <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-2">
-          <label className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-white text-sm font-bold cursor-pointer hover:opacity-90 w-fit">
-            <span className="material-symbols-outlined text-[20px]">upload</span>
-            {hasCustom ? 'Αλλαγή' : 'Ανέβασμα'}
-            <input type="file" accept={TRIP_COVER_ACCEPT} className="hidden" disabled={uploading} onChange={onUpload} />
-          </label>
-          {hasCustom && (
-            <button
-              type="button"
-              onClick={onClear}
-              disabled={uploading}
-              className="text-sm font-bold text-rose-600 hover:text-rose-800 w-fit disabled:opacity-50"
-            >
-              Επαναφορά προεπιλογής
-            </button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
@@ -1291,6 +1247,8 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 logo_height_px: clampLogoHeight(form.logo_height_px),
                 logo_max_width_px: clampLogoMaxWidth(form.logo_max_width_px),
                 logo_show_name: form.logo_show_name !== false,
+                hero_image_url: form.hero_image_url,
+                hero_image_focal: form.hero_image_focal || 'center',
               },
               'Οι ρυθμίσεις λογοτύπου αποθηκεύτηκαν',
             )}
@@ -1314,14 +1272,20 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                     toast.success('Το URL ορίστηκε — πατήστε Αποθήκευση');
                   }}
                 />
-                <ImageBlock
-                  title="Hero φωτογραφία"
-                  hint="Φόντο πίσω από τον τίτλο. Συμπιέζεται αυτόματα (JPG)."
+                <HeroImageBlock
                   previewUrl={heroPreview}
                   uploading={uploadingHero}
                   hasCustom={hasCustomHero}
+                  focal={form.hero_image_focal || 'center'}
+                  heroTitle={form.hero_title}
+                  heroAccent={form.hero_title_accent}
                   onUpload={(e) => handleImageUpload('hero', e)}
                   onClear={() => handleClearAsset('hero')}
+                  onFocalChange={(id) => setForm((p) => ({ ...p, hero_image_focal: id }))}
+                  onApplyUrl={(url) => {
+                    setForm((p) => ({ ...p, hero_image_url: url }));
+                    toast.success('Το URL ορίστηκε — πατήστε Αποθήκευση λογοτύπου');
+                  }}
                 />
               </div>
             </PanelCard>
