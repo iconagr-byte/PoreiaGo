@@ -503,7 +503,6 @@ export function getDaySummaryStats(manifest) {
     totalKm: session?.totalKm ?? 142,
     passengersBoarded: boarded,
     boardedPassengers: boardedList,
-    dailyEarnings: session?.dailyEarnings ?? boarded * 12.5,
     tripId: session?.tripId,
   };
 }
