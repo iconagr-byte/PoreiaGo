@@ -51,7 +51,7 @@ export default function AgencyPlansHook({ variant = 'hero' }) {
               to="/grafeia"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full font-bold border border-white/30 hover:bg-white/10 transition-colors"
             >
-              Συμβόλαια & τιμές
+              Συμβόλαια λεωφορείων
             </Link>
           </div>
         </div>

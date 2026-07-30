@@ -81,7 +81,8 @@ function App() {
             <Route path="/rent/*" element={<RentalCustomerApp />} />
             <Route path="/" element={<HomePage />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />
-            <Route path="/grafeia" element={<AgencyPlansPage />} />
+            <Route path="/grafeia" element={<AgencyPlansPage product="buses" />} />
+            <Route path="/grafeia/rent" element={<AgencyPlansPage product="rent" />} />
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />
             <Route path="/grafeia/signup/success" element={<AgencySignupSuccessPage />} />
             <Route path="/login" element={<LoginPage />} />

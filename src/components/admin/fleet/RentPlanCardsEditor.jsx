@@ -1,5 +1,5 @@
 /**
- * Edit marketing cards for PoreiaGo Rent (standalone + add-on) shown on /grafeia.
+ * Edit marketing cards for PoreiaGo Rent (standalone + add-on) shown on /grafeia/rent.
  * Polished editor: live preview, feature rows, sticky save.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -163,7 +163,7 @@ function PlanPreview({ form, tone = 'teal' }) {
   return (
     <div className={`rent-plan-preview rent-plan-preview--${tone}${card.visible ? '' : ' is-hidden'}`}>
       {!card.visible ? (
-        <p className="rent-plan-preview-hidden">Κρυφή στο /grafeia</p>
+        <p className="rent-plan-preview-hidden">Κρυφή στο /grafeia/rent</p>
       ) : null}
       <span className="rent-plan-preview-badge">{card.badge || 'Badge'}</span>
       <h4 className="rent-plan-preview-title">{card.name || 'Τίτλος'}</h4>
@@ -380,7 +380,7 @@ export default function RentPlanCardsEditor() {
           <p className="rent-plan-editor-kicker">Marketing · σελίδα συμβολαίων SaaS</p>
           <h3 className="rent-plan-editor-hero-title">Κάρτες τιμών ενοικιάσεων</h3>
           <p className="rent-plan-editor-hero-copy">
-            Τιμές και κείμενα για τη δημόσια σελίδα /grafeia. Η χαρτούρα κάθε κράτησης (υπογραφές,
+            Τιμές και κείμενα για τη δημόσια σελίδα /grafeia/rent. Η χαρτούρα κάθε κράτησης (υπογραφές,
             σύμβαση) είναι στο μενού «Χαρτούρα».
           </p>
         </div>
@@ -395,12 +395,12 @@ export default function RentPlanCardsEditor() {
             Επαναφόρτωση
           </button>
           <a
-            href="/grafeia"
+            href="/grafeia/rent"
             target="_blank"
             rel="noreferrer"
             className="rent-plan-secondary-btn"
           >
-            Άνοιγμα /grafeia
+            Άνοιγμα /grafeia/rent
             <span className="material-symbols-outlined text-[16px]" aria-hidden>
               open_in_new
             </span>

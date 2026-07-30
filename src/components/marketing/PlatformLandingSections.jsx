@@ -67,15 +67,15 @@ export function HeroSection() {
               to="/grafeia"
               className="inline-flex items-center gap-2 px-8 py-4 bg-white text-slate-900 rounded-full font-bold text-base hover:scale-[1.02] shadow-xl shadow-black/20 transition-transform"
             >
-              Δείτε τα συμβόλαια
+              Συμβόλαια λεωφορείων
               <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
             <Link
-              to="/rent/services"
+              to="/grafeia/rent"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-teal-300/50 bg-teal-500/15 text-teal-50 hover:bg-teal-400/25 transition-colors"
             >
               <span className="material-symbols-outlined text-[20px]">car_rental</span>
-              Ενοικιάσεις
+              Συμβόλαια ενοικιάσεων
             </Link>
             <Link
               to="/admin/login"
@@ -271,7 +271,7 @@ export function HowItWorksSection() {
             to="/grafeia"
             className="inline-flex items-center gap-2 px-8 py-3.5 bg-sky-500 hover:bg-sky-400 text-white rounded-full font-bold transition-colors"
           >
-            Δείτε συμβόλαια & τιμές
+            Συμβόλαια λεωφορείων
             <span className="material-symbols-outlined">payments</span>
           </Link>
         </div>
@@ -350,17 +350,17 @@ export function RentProductSection() {
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                to="/rent/services"
+                to="/grafeia/rent"
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white text-teal-950 font-bold hover:bg-teal-50"
               >
-                Δες την υπηρεσία
+                Συμβόλαια ενοικιάσεων
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </Link>
               <Link
-                to="/grafeia"
+                to="/rent/services"
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
               >
-                Συμβόλαια Rent
+                Υπηρεσίες πελάτη
               </Link>
             </div>
           </div>

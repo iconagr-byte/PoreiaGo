@@ -140,8 +140,11 @@ export default function AgencySignupPage() {
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <PlatformBrand variant="light" />
           <nav className="flex items-center gap-3">
-            <Link to="/grafeia" className="text-sm font-semibold text-gray-600 hover:text-primary">
-              Συμβόλαια
+            <Link
+              to={planId === 'rent' || wantsRentAddon ? '/grafeia/rent' : '/grafeia'}
+              className="text-sm font-semibold text-gray-600 hover:text-primary"
+            >
+              {planId === 'rent' || wantsRentAddon ? 'Συμβόλαια ενοικιάσεων' : 'Συμβόλαια λεωφορείων'}
             </Link>
             <Link
               to="/admin/login"
