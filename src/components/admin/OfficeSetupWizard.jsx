@@ -142,6 +142,7 @@ export default function OfficeSetupWizard({
     brand: false,
     email: false,
     payments: false,
+    fiscal: false,
     fleet: false,
   });
 
