@@ -15,11 +15,13 @@ import {
 const WEEKDAYS = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
 
 const STATUS_TONE = {
+  RESERVED: { chip: 'bg-indigo-100 text-indigo-800', dot: '#6366f1', label: 'Κράτηση' },
   CONFIRMED: { chip: 'bg-sky-100 text-sky-800', dot: '#0ea5e9', label: 'Επιβεβαιωμένη' },
   ACTIVE: { chip: 'bg-emerald-100 text-emerald-800', dot: '#10b981', label: 'Ενεργή' },
   COMPLETED: { chip: 'bg-slate-100 text-slate-700', dot: '#64748b', label: 'Ολοκληρωμένη' },
   CANCELLED: { chip: 'bg-rose-100 text-rose-700', dot: '#f43f5e', label: 'Ακυρωμένη' },
   MAINTENANCE: { chip: 'bg-amber-100 text-amber-800', dot: '#f59e0b', label: 'Συντήρηση' },
+  CLEANING: { chip: 'bg-cyan-100 text-cyan-800', dot: '#06b6d4', label: 'Καθαρισμός' },
   SERVICE_DUE: { chip: 'bg-orange-100 text-orange-800', dot: '#f97316', label: 'Service' },
 };
 

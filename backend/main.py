@@ -359,6 +359,12 @@ except ImportError:
     fleet_rental_router = None
 if fleet_rental_router:
     app.include_router(fleet_rental_router)
+try:
+    from api.loyalty_router import router as loyalty_router
+except ImportError:
+    loyalty_router = None
+if loyalty_router:
+    app.include_router(loyalty_router)
 if email_settings_router:
     app.include_router(email_settings_router)
 if email_campaigns_router:

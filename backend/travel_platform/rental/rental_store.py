@@ -17,11 +17,11 @@ DATA_DIR = Path(__file__).resolve().parent
 STORE_FILE = DATA_DIR / "rental_store.json"
 _LOCK = threading.RLock()
 
-VEHICLE_CATEGORIES = ("CAR", "VAN", "MINIBUS")
-VEHICLE_STATUSES = ("AVAILABLE", "RENTED", "MAINTENANCE", "IN_TRANSIT")
-BOOKING_STATUSES = ("CONFIRMED", "ACTIVE", "COMPLETED", "CANCELLED")
-ACTIVE_BOOKING_STATUSES = frozenset({"CONFIRMED", "ACTIVE"})
-INSPECTION_TYPES = ("PICKUP_CHECK", "RETURN_CHECK")
+VEHICLE_CATEGORIES = ("CAR", "VAN", "MINIBUS", "SUV")
+VEHICLE_STATUSES = ("AVAILABLE", "RENTED", "MAINTENANCE", "CLEANING", "IN_TRANSIT")
+BOOKING_STATUSES = ("RESERVED", "CONFIRMED", "ACTIVE", "COMPLETED", "CANCELLED")
+ACTIVE_BOOKING_STATUSES = frozenset({"RESERVED", "CONFIRMED", "ACTIVE"})
+INSPECTION_TYPES = ("PICKUP_CHECK", "RETURN_CHECK", "PICKUP", "RETURN")
 SERVICE_MILEAGE_EVERY = 15_000
 
 # Bookable extras (customer wizard + wallet) — priced into booking.total_cost.
@@ -391,6 +391,14 @@ def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: s
     with_driver = float(body.get("with_driver_daily_eur") or 0)
     if one_way < 0 or with_driver < 0:
         raise ValueError("Μη έγκυρη επιπλέον χρέωση")
+    year_val = None
+    if body.get("year") not in (None, ""):
+        try:
+            year_val = int(body.get("year"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Μη έγκυρο έτος μοντέλου") from exc
+        if year_val < 1980 or year_val > 2100:
+            raise ValueError("Μη έγκυρο έτος μοντέλου")
 
     with _LOCK:
         data = _read()
@@ -419,6 +427,7 @@ def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: s
                 "plate_number": plate,
                 "category": category,
                 "model": model,
+                "year": year_val,
                 "seating_capacity": seats,
                 "current_status": status,
                 "current_mileage": mileage,
@@ -888,7 +897,8 @@ def create_inspection(tenant_id: str | None, body: dict[str, Any]) -> dict[str, 
     tid = _normalize_tenant(tenant_id)
     booking_id = str(body.get("rental_booking_id") or "").strip()
     itype = str(body.get("inspection_type") or "").strip().upper()
-    if itype not in INSPECTION_TYPES:
+    itype = {"PICKUP": "PICKUP_CHECK", "RETURN": "RETURN_CHECK"}.get(itype, itype)
+    if itype not in ("PICKUP_CHECK", "RETURN_CHECK"):
         raise ValueError("Μη έγκυρος τύπος επιθεώρησης")
     with _LOCK:
         data = _read()

@@ -39,6 +39,7 @@ import '../../../styles/rental-admin-apple.css';
 
 const CATEGORIES = [
   { value: 'CAR', label: 'Αυτοκίνητο' },
+  { value: 'SUV', label: 'SUV' },
   { value: 'VAN', label: 'Van' },
   { value: 'MINIBUS', label: 'Μινιμπάς' },
 ];
@@ -76,7 +77,9 @@ function statusChip(status) {
     AVAILABLE: 'bg-emerald-100 text-emerald-800',
     RENTED: 'bg-sky-100 text-sky-800',
     MAINTENANCE: 'bg-amber-100 text-amber-800',
+    CLEANING: 'bg-cyan-100 text-cyan-800',
     IN_TRANSIT: 'bg-violet-100 text-violet-800',
+    RESERVED: 'bg-indigo-100 text-indigo-800',
     CONFIRMED: 'bg-sky-100 text-sky-800',
     ACTIVE: 'bg-emerald-100 text-emerald-800',
     COMPLETED: 'bg-gray-100 text-gray-700',

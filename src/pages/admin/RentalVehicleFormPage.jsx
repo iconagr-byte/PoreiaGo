@@ -11,6 +11,7 @@ import {
 
 const CATEGORIES = [
   { value: 'CAR', label: 'Αυτοκίνητο' },
+  { value: 'SUV', label: 'SUV' },
   { value: 'VAN', label: 'Van' },
   { value: 'MINIBUS', label: 'Μινιμπάς' },
 ];
@@ -19,6 +20,7 @@ const STATUSES = [
   { value: 'AVAILABLE', label: 'Διαθέσιμο' },
   { value: 'RENTED', label: 'Σε ενοικίαση' },
   { value: 'MAINTENANCE', label: 'Συντήρηση' },
+  { value: 'CLEANING', label: 'Καθαρισμός' },
   { value: 'IN_TRANSIT', label: 'Μετακίνηση' },
 ];
 
@@ -26,6 +28,7 @@ const EMPTY = {
   plate_number: '',
   category: 'VAN',
   model: '',
+  year: '',
   seating_capacity: 9,
   current_status: 'AVAILABLE',
   current_mileage: 0,
@@ -82,6 +85,7 @@ export default function RentalVehicleFormPage() {
           plate_number: v.plate_number || '',
           category: v.category || 'VAN',
           model: v.model || '',
+          year: v.year ?? '',
           seating_capacity: v.seating_capacity ?? 9,
           current_status: v.current_status || 'AVAILABLE',
           current_mileage: v.current_mileage ?? 0,
@@ -131,6 +135,7 @@ export default function RentalVehicleFormPage() {
       ...form,
       plate_number: String(form.plate_number).trim().toUpperCase(),
       model: String(form.model).trim(),
+      year: form.year === '' || form.year == null ? null : Number(form.year),
       seating_capacity: Number(form.seating_capacity) || 0,
       current_mileage: Number(form.current_mileage) || 0,
       daily_rate_eur: Number(form.daily_rate_eur) || 0,
@@ -277,7 +282,7 @@ export default function RentalVehicleFormPage() {
                 ))}
               </select>
             </label>
-            <label className="block text-sm sm:col-span-2">
+            <label className="block text-sm sm:col-span-1">
               <span className="font-bold text-gray-800">Μοντέλο *</span>
               <input
                 required
@@ -285,6 +290,18 @@ export default function RentalVehicleFormPage() {
                 value={form.model}
                 onChange={setField('model')}
                 placeholder="π.χ. Mercedes Sprinter"
+              />
+            </label>
+            <label className="block text-sm sm:col-span-1">
+              <span className="font-bold text-gray-800">Έτος</span>
+              <input
+                type="number"
+                min={1980}
+                max={2100}
+                className={inputClass}
+                value={form.year}
+                onChange={setField('year')}
+                placeholder="2026"
               />
             </label>
             <label className="block text-sm">

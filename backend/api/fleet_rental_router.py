@@ -47,6 +47,7 @@ class VehicleBody(BaseModel):
     plate_number: str = Field(min_length=2, max_length=32)
     category: str = Field(min_length=2, max_length=32)
     model: str = Field(min_length=1, max_length=120)
+    year: int | None = Field(default=None, ge=1980, le=2100)
     seating_capacity: int = Field(default=5, ge=2, le=80)
     current_status: str = "AVAILABLE"
     current_mileage: int = Field(default=0, ge=0)
