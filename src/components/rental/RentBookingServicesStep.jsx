@@ -7,12 +7,15 @@ import {
   RENT_COVERAGE_OPTIONS,
   estimateBookingTotals,
   euroLabel,
+  readCoverageCatalog,
   readExtrasSelection,
   readRentVehicleSnapshot,
   rentalDayCount,
   selectedExtrasLabels,
+  visibleCoverageOptions,
 } from '../../lib/rental/rentBookingExtras.js';
 import { readRentBookingPrefs, writeRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
+import { fetchSiteAppearance } from '../../services/siteAppearanceApi.js';
 import RentBookingStepper from './RentBookingStepper.jsx';
 import RentBookingTripSummary from './RentBookingTripSummary.jsx';
 import RentBookingVehicleSidebar from './RentBookingVehicleSidebar.jsx';
@@ -20,22 +23,43 @@ import RentBookingVehicleSidebar from './RentBookingVehicleSidebar.jsx';
 /**
  * Services / coverage step after vehicle pick — teal brand, Hertz-like structure.
  * Next step navigates to /rent/book/details (does not book yet).
+ * Catalog comes from office site appearance (admin: Ενοικιάσεις → Υπηρεσίες).
  */
 export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' } = {}) {
   const navigate = useNavigate();
   const prefs = useMemo(() => readRentBookingPrefs(), []);
   const snap = useMemo(() => readRentVehicleSnapshot(), []);
   const vehicle = useMemo(() => (snap ? enrichRentVehicle(snap) : null), [snap]);
+  const [catalog, setCatalog] = useState(RENT_COVERAGE_OPTIONS);
+  const [included, setIncluded] = useState([]);
   const [selection, setSelection] = useState(() => readExtrasSelection(prefs));
   const resumed = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSiteAppearance()
+      .then((data) => {
+        if (cancelled) return;
+        const { options, included: inc } = readCoverageCatalog(data);
+        setCatalog(options);
+        setIncluded(inc);
+        setSelection(readExtrasSelection(readRentBookingPrefs(), options));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const dayCount = rentalDayCount(prefs.start_time, prefs.end_time);
   const totals = estimateBookingTotals({
     dailyRate: vehicle?.daily_rate_eur,
     days: dayCount,
     selection,
+    catalog,
   });
-  const selectedLabels = selectedExtrasLabels(selection);
+  const selectedLabels = selectedExtrasLabels(selection, catalog);
+  const visible = visibleCoverageOptions(catalog);
 
   const toggle = (formKey) => {
     setSelection((s) => {
@@ -101,8 +125,20 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
             <p className="rent-wiz-lead">
               Πρόσθεσε ό,τι χρειάζεσαι για το ταξίδι. Το σύνολο ενημερώνεται ζωντανά δίπλα.
             </p>
+            {included.length ? (
+              <ul className="rent-wiz-included" aria-label="Πάντα συμπεριλαμβάνονται">
+                {included.map((item) => (
+                  <li key={item}>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      check_circle
+                    </span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <div className="rent-wiz-coverages">
-              {RENT_COVERAGE_OPTIONS.map((opt) => {
+              {visible.map((opt) => {
                 const on = Boolean(selection[opt.formKey]);
                 return (
                   <article key={opt.id} className={`rent-wiz-cover${on ? ' is-on' : ''}`}>

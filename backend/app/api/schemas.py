@@ -418,6 +418,8 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_guest_hero_title: str = ""
     rent_guest_hero_copy: str = ""
     rent_cta_label: str = ""
+    rent_coverage_options: list[dict] = []
+    rent_included_defaults: list[str] = []
     home_slider_enabled: bool = False
     home_slider_autoplay: bool = True
     home_slider_interval_sec: int = 5
@@ -454,6 +456,8 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_guest_hero_title: str | None = None
     rent_guest_hero_copy: str | None = None
     rent_cta_label: str | None = None
+    rent_coverage_options: list[dict] | None = None
+    rent_included_defaults: list[str] | None = None
     home_slider_enabled: bool | None = None
     home_slider_autoplay: bool | None = None
     home_slider_interval_sec: int | None = Field(default=None, ge=3, le=20)

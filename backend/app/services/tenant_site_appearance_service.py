@@ -46,6 +46,8 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_guest_hero_copy": "",
     "rent_cta_label": "Βρες όχημα",
     "rent_pickup_locations": [],
+    "rent_coverage_options": [],
+    "rent_included_defaults": [],
     "home_slider_enabled": False,
     "home_slider_autoplay": True,
     "home_slider_interval_sec": 5,
