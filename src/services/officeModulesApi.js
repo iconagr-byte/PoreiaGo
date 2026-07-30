@@ -7,7 +7,6 @@ import {
   resolveDesignPageForModules,
 } from '../lib/admin/officeDesignPages.js';
 import { canAccessPlatformOperatorUi } from '../lib/saasJwt.js';
-import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 
 export {
   contractDesignLabel,
@@ -72,22 +71,18 @@ export async function fetchAdminOfficeModules() {
 /**
  * Whether the Back Office «Ενοικιάσεις» menu should show.
  *
+ * - PoreiaGo Super Admin (not impersonating) → always yes
+ * - Achillio Travel office → no (bus-only policy)
  * - Office with rent_enabled → yes
- * - Achillio Travel on its own office context → no
  * - PoreiaGo platform office → yes
- * - Super Admin on www.poreiago.com (not impersonating) → yes
- *   so hiding Rent for Achillio never removes it from our platform UI
  */
-export function shouldShowRentMenu(modules, { hostname } = {}) {
-  const platformSuper =
-    canAccessPlatformOperatorUi() && isPlatformMarketingHost(hostname);
+export function shouldShowRentMenu(modules, _opts = {}) {
+  // Super Admin platform UI — always keep Ενοικιάσεις (host-agnostic).
+  // Impersonation clears canAccessPlatformOperatorUi so Achillio stays Rent-off.
+  if (canAccessPlatformOperatorUi()) return true;
 
-  if (modules?.office_kind === 'achillio_travel') {
-    // Bus-only customer office — keep Rent off unless we are on PoreiaGo platform Super Admin.
-    return platformSuper;
-  }
+  if (modules?.office_kind === 'achillio_travel') return false;
   if (modules?.rent_enabled) return true;
   if (modules?.office_kind === 'poreiago_platform') return true;
-  if (platformSuper) return true;
   return false;
 }
