@@ -10,6 +10,9 @@ const LEGACY_KEYS = [
   'aerostride_customers_v1',
   'aerostride_trips_v1',
   'aerostride_bookings_v1',
+  'aerostride_site_appearance_v1',
+  'aerostride_site_appearance_v2',
+  'aerostride_site_appearance_v3',
 ];
 
 /** True when BackOffice is using a SaaS JWT (real office session). */
@@ -51,6 +54,20 @@ export function resetOfficeLocalCachesForTenant(previousTenantId, nextTenantId) 
       localStorage.removeItem(key);
     } catch {
       /* ignore */
+    }
+  }
+
+  // Drop previous tenant's scoped appearance cache (logo/name bleed).
+  if (prev) {
+    for (const base of [
+      'aerostride_site_appearance_v2',
+      'aerostride_site_appearance_v3',
+    ]) {
+      try {
+        localStorage.removeItem(`${base}::${prev}`);
+      } catch {
+        /* ignore */
+      }
     }
   }
 }

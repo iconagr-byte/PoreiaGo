@@ -364,10 +364,13 @@ def _scrub_achillio_from_platform_appearance(data: dict) -> dict:
     """Never serve Achillio Travel identity from the shared PoreiaGo file store."""
     out = dict(data or {})
     ach_re = re.compile(r"achillio|achillion", re.I)
+    brand_poisoned = False
     for key in ("footer_brand_name", "rent_office_name", "display_name", "footer_copyright"):
         if ach_re.search(str(out.get(key) or "")):
+            brand_poisoned = True
             out[key] = "PoreiaGo" if key != "footer_copyright" else ""
-    if ach_re.search(str(out.get("logo_url") or "")):
+    logo = str(out.get("logo_url") or "")
+    if ach_re.search(logo) or brand_poisoned:
         out["logo_url"] = ""
     if ach_re.search(str(out.get("hero_image_url") or "")):
         out["hero_image_url"] = ""
