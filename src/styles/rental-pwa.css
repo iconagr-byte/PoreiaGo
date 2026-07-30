@@ -112,8 +112,8 @@
 /* Platform-style photo hero (guest /rent) */
 .rent-hero--landing {
   justify-content: center;
-  min-height: min(92dvh, 820px);
-  padding: 5.5rem 1.25rem 2rem;
+  min-height: min(62dvh, 560px);
+  padding: 5.5rem 1.25rem 3.25rem;
   background: #020617;
 }
 
@@ -1567,12 +1567,23 @@
   padding: 0;
 }
 
-/* Top strip under header — full-bleed like Hertz yellow bar */
+/* Booking strip — full-bleed teal like Hertz yellow bar */
 .rent-search-wrap--top {
   margin: 0;
   background: linear-gradient(180deg, #0b3d4a 0%, #0a7a6c 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding: 0.85rem 1rem 1rem;
+}
+
+/* Sit below the hero (not under the header) — lower in the first viewport */
+.rent-search-wrap--below-hero {
+  position: relative;
+  z-index: 7;
+  margin-top: -2.75rem;
+  padding-top: 1.35rem;
+  padding-bottom: 1.25rem;
+  border-radius: 1.15rem 1.15rem 0 0;
+  box-shadow: 0 -12px 36px rgba(2, 6, 23, 0.18);
 }
 
 .rent-search {
@@ -3366,9 +3377,9 @@
 }
 
 .rent-phone-stage--desktop .rent-hero--landing {
-  min-height: min(72dvh, 720px);
+  min-height: min(58dvh, 560px);
   padding-top: 4.5rem;
-  padding-bottom: 3.5rem;
+  padding-bottom: 4.25rem;
   padding-left: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
   padding-right: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
 }
@@ -3384,7 +3395,7 @@
   gap: 0.85rem;
 }
 
-/* Guest: white header → teal search → hero (Hertz order) */
+/* Guest: white header → hero → teal search (lower booking strip) */
 .rent-phone-stage--desktop .rent-app--guest .rent-topbar {
   position: relative;
   z-index: 8;
@@ -3506,6 +3517,13 @@
 .rent-phone-stage--desktop .rent-search-wrap--top {
   margin-top: 0;
   padding: 1rem max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem)) 1.15rem;
+}
+
+.rent-phone-stage--desktop .rent-search-wrap--below-hero {
+  margin-top: -3.5rem;
+  padding-top: 1.55rem;
+  padding-bottom: 1.45rem;
+  border-radius: 1.35rem 1.35rem 0 0;
 }
 
 .rent-phone-stage--desktop .rent-search-row {
