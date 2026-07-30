@@ -27,11 +27,17 @@ def test_ensure_demo_rental_fleet_seeds_six_vehicles():
             assert len(store.list_vehicles(tid)) == 6
 
 
-def test_public_catalog_does_not_auto_seed():
+def test_public_catalog_auto_seeds_demo():
     with TemporaryDirectory() as tmp:
         path = Path(tmp) / "rental_store.json"
         with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(store, "DATA_DIR", Path(tmp)):
             tid = "11111111-2222-3333-4444-555555555555"
             catalog = store.public_catalog(tid)
-            assert catalog == []
-            assert not path.is_file() or json.loads(path.read_text(encoding="utf-8")).get("vehicles") in (None, [])
+            assert len(catalog) == 6
+            assert {v["category"] for v in catalog} == {"CAR", "VAN"}
+            models = {v["model"] for v in catalog}
+            assert "Hyundai i10" in models
+            assert "Citroen C3" in models
+            assert "Toyota Yaris" in models
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            assert len(raw["vehicles"]) == 6

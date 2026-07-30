@@ -63,55 +63,55 @@ def quote_extras(extra_ids: list[str] | None, *, days: int) -> dict[str, Any]:
     return {"lines": lines, "total": round(total, 2), "days": d}
 
 
-# Stable demo fleet (3 passenger cars + 3 vans) — seeded when a tenant has no vehicles.
+# Stable demo fleet (Hertz-like compact cars + vans) — seeded for empty demo offices.
 _DEMO_FLEET_MARKER = "demo_rent_fleet_v1"
 _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
     {
-        "id_suffix": "car-yaris",
+        "id_suffix": "car-i10",
         "plate_number": "DEMO-C01",
+        "category": "CAR",
+        "model": "Hyundai i10",
+        "seating_capacity": 4,
+        "daily_rate_eur": 32,
+        "one_way_surcharge_eur": 25,
+        "with_driver_daily_eur": 80,
+        "current_mileage": 12400,
+        "photo_url": "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=1200&q=80",
+        "description": (
+            "Μικρό city car — ιδανικό για πόλη και εύκολο πάρκινγκ. "
+            "Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες."
+        ),
+    },
+    {
+        "id_suffix": "car-c3",
+        "plate_number": "DEMO-C02",
+        "category": "CAR",
+        "model": "Citroen C3",
+        "seating_capacity": 5,
+        "daily_rate_eur": 38,
+        "one_way_surcharge_eur": 28,
+        "with_driver_daily_eur": 85,
+        "current_mileage": 15600,
+        "photo_url": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=1200&q=80",
+        "description": (
+            "Συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. "
+            "Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση."
+        ),
+    },
+    {
+        "id_suffix": "car-yaris",
+        "plate_number": "DEMO-C03",
         "category": "CAR",
         "model": "Toyota Yaris",
         "seating_capacity": 5,
-        "daily_rate_eur": 35,
-        "one_way_surcharge_eur": 25,
-        "with_driver_daily_eur": 80,
+        "daily_rate_eur": 42,
+        "one_way_surcharge_eur": 30,
+        "with_driver_daily_eur": 90,
         "current_mileage": 18200,
         "photo_url": "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=1200&q=80",
         "description": (
             "Συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και "
             "κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες."
-        ),
-    },
-    {
-        "id_suffix": "car-corolla",
-        "plate_number": "DEMO-C02",
-        "category": "CAR",
-        "model": "Toyota Corolla",
-        "seating_capacity": 5,
-        "daily_rate_eur": 48,
-        "one_way_surcharge_eur": 30,
-        "with_driver_daily_eur": 90,
-        "current_mileage": 24100,
-        "photo_url": "https://images.unsplash.com/photo-1623869675781-80aa31012a5a?auto=format&fit=crop&w=1200&q=80",
-        "description": (
-            "Άνετο οικογενειακό sedan με χώρο για αποσκευές και σταθερή οδήγηση στον αυτοκινητόδρομο. "
-            "Ιδανικό για πολυήμερες διακοπές ή επαγγελματικά ταξίδια με άνεση και οικονομία."
-        ),
-    },
-    {
-        "id_suffix": "car-tucson",
-        "plate_number": "DEMO-C03",
-        "category": "CAR",
-        "model": "Hyundai Tucson",
-        "seating_capacity": 5,
-        "daily_rate_eur": 65,
-        "one_way_surcharge_eur": 40,
-        "with_driver_daily_eur": 110,
-        "current_mileage": 15600,
-        "photo_url": "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=1200&q=80",
-        "description": (
-            "SUV με ψηλή ορατότητα, χώρο για οικοσκευή και άνεση σε μεγαλύτερες αποστάσεις. "
-            "Κατάλληλο για οικογένειες, ορεινές διαδρομές και ταξίδια με περισσότερες αποσκευές."
         ),
     },
     {
@@ -166,8 +166,9 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
 
 
 def _refresh_demo_fleet_copy(data: dict[str, Any], tenant_id: str) -> int:
-    """Refresh marketing descriptions on seeded demo vehicles (short → rich copy)."""
+    """Refresh marketing copy + models on seeded demo vehicles (incl. plate remap)."""
     by_suffix = {spec["id_suffix"]: spec for spec in _DEMO_VEHICLE_SPECS}
+    by_plate = {str(spec["plate_number"]).upper(): spec for spec in _DEMO_VEHICLE_SPECS}
     updated = 0
     now = _now()
     for row in data.get("vehicles") or []:
@@ -176,26 +177,51 @@ def _refresh_demo_fleet_copy(data: dict[str, Any], tenant_id: str) -> int:
         if str(row.get("notes") or "") != _DEMO_FLEET_MARKER:
             continue
         vid = str(row.get("id") or "")
-        suffix = None
-        for key in by_suffix:
-            if vid.endswith(key) or key in vid:
-                suffix = key
-                break
-        if not suffix:
-            model = str(row.get("model") or "").strip().lower()
-            for key, spec in by_suffix.items():
-                if str(spec.get("model") or "").strip().lower() == model:
+        plate = str(row.get("plate_number") or "").strip().upper()
+        spec = by_plate.get(plate)
+        if not spec:
+            suffix = None
+            for key in by_suffix:
+                if vid.endswith(key) or key in vid:
                     suffix = key
                     break
-        if not suffix:
+            if not suffix:
+                model = str(row.get("model") or "").strip().lower()
+                for key, candidate in by_suffix.items():
+                    if str(candidate.get("model") or "").strip().lower() == model:
+                        suffix = key
+                        break
+            spec = by_suffix.get(suffix) if suffix else None
+        if not spec:
             continue
-        spec = by_suffix[suffix]
         changed = False
-        new_desc = str(spec.get("description") or "").strip()
-        old_desc = str(row.get("description") or "").strip()
-        if new_desc and old_desc != new_desc:
-            row["description"] = new_desc
-            changed = True
+        for field, cast in (
+            ("model", str),
+            ("category", str),
+            ("seating_capacity", int),
+            ("daily_rate_eur", float),
+            ("one_way_surcharge_eur", float),
+            ("with_driver_daily_eur", float),
+            ("description", str),
+        ):
+            new_val = cast(spec.get(field))
+            old_val = row.get(field)
+            if field in ("daily_rate_eur", "one_way_surcharge_eur", "with_driver_daily_eur"):
+                try:
+                    if float(old_val or 0) != float(new_val):
+                        row[field] = float(new_val)
+                        changed = True
+                except (TypeError, ValueError):
+                    row[field] = float(new_val)
+                    changed = True
+            elif field == "seating_capacity":
+                if int(old_val or 0) != int(new_val):
+                    row[field] = int(new_val)
+                    changed = True
+            else:
+                if str(old_val or "").strip() != str(new_val or "").strip():
+                    row[field] = new_val
+                    changed = True
         new_photo = str(spec.get("photo_url") or "").strip()
         old_photo = str(row.get("photo_url") or "").strip()
         if new_photo and old_photo != new_photo:
@@ -1009,7 +1035,8 @@ def cancel_booking_for_customer(
 
 
 def public_catalog(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
-    """Customer-facing vehicle cards for this office (no auto-seed, no internal notes)."""
+    """Customer-facing vehicle cards for this office. Seeds demo fleet when empty (showcase)."""
+    ensure_demo_rental_fleet(tenant_id)
     rows = list_vehicles(tenant_id, category=category)
     out = []
     for v in rows:
