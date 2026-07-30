@@ -398,7 +398,7 @@ export const ADMIN_NAV_ITEMS = {
   },
   bookings: {
     id: 'bookings',
-    label: 'Κρατήσεις',
+    label: 'Κρατήσεις λεωφορείων',
     icon: 'book_online',
     filled: false,
     type: 'tab',
