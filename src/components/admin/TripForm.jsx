@@ -786,7 +786,9 @@ export default function TripForm({
                       .map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name}
-                          {d.license_plate ? ` · ${d.license_plate}` : ''}
+                          {d.license_plate || d.vehicle_code
+                            ? ` · ${d.license_plate || d.vehicle_code}`
+                            : ''}
                           {d.status === 'on_leave' ? ' (άδεια)' : ''}
                         </option>
                       ))}
@@ -878,7 +880,9 @@ export default function TripForm({
                         .map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name}
-                            {d.license_plate ? ` · ${d.license_plate}` : ''}
+                            {d.license_plate || d.vehicle_code
+                              ? ` · ${d.license_plate || d.vehicle_code}`
+                              : ''}
                             {d.status === 'on_leave' ? ' (άδεια)' : ''}
                           </option>
                         ))}
