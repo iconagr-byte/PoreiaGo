@@ -289,100 +289,183 @@ export function PricingTeaserSection() {
 }
 
 export function RentProductSection() {
-  const [standalone, setStandalone] = useState(() => mergeRentPlanCatalog(null).standalone);
+  const [catalog, setCatalog] = useState(() => mergeRentPlanCatalog(null));
 
   useEffect(() => {
     let cancelled = false;
     fetchPublicRentPlanCatalog().then((data) => {
-      if (!cancelled) setStandalone(data.standalone);
+      if (!cancelled) setCatalog(data);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (standalone.visible === false) return null;
+  const { standalone, addon } = catalog;
+  const showStandalone = standalone.visible !== false;
+  const showAddon = addon.visible !== false;
+  if (!showStandalone && !showAddon) return null;
 
   return (
-    <section
-      id="rent"
-      className="relative py-20 md:py-28 overflow-hidden border-y border-teal-900/20 bg-gradient-to-b from-[#062a30] via-[#0b3d4a] to-slate-950"
-    >
-      <div
-        className="absolute inset-0 pointer-events-none opacity-40"
-        aria-hidden
-        style={{
-          backgroundImage:
-            'radial-gradient(ellipse 70% 50% at 15% 20%, rgba(45,212,191,0.25), transparent), radial-gradient(ellipse 50% 40% at 90% 80%, rgba(56,189,248,0.12), transparent)',
-        }}
-      />
-      <div className="relative max-w-6xl mx-auto px-4 md:px-8">
-        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-14 items-center">
-          <div>
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-400/15 border border-teal-300/25 text-xs font-bold uppercase tracking-wider text-teal-200 mb-5">
-              <span className="material-symbols-outlined text-[16px]">car_rental</span>
-              Νέα υπηρεσία · Rent
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight">
-              Ενοικιάσεις οχημάτων με SOS, οδική βοήθεια και καθαρή ασφάλεια
-            </h2>
-            <p className="mt-4 text-base md:text-lg text-teal-50/75 leading-relaxed max-w-xl">
-              Ξεχωριστό συμβόλαιο μόνο για Rent, ή add-on πάνω στο πλάνο λεωφορείων. Ο πελάτης
-              βλέπει τις υπηρεσίες στο <span className="text-white font-semibold">/rent/services</span>{' '}
-              — χωρίς σύνδεση.
-            </p>
-            <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-teal-50/90">
-              {[
-                'SOS + live τοποθεσία',
-                'Οδική βοήθεια 24/7',
-                'CDW / SCDW πριν την υπογραφή',
-                'Share trip στην οικογένεια',
-                'Checklist πριν την αναχώρηση',
-                'Desk Ενοικιάσεις στο panel',
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2">
-                  <span className="material-symbols-outlined text-teal-300 text-[18px] mt-0.5">
-                    check_circle
-                  </span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/rent/services"
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white text-teal-950 font-bold hover:bg-teal-50"
-              >
-                Δες την υπηρεσία
-                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-              </Link>
-              <Link
-                to="/grafeia"
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
-              >
-                Συμβόλαια Rent
-              </Link>
+    <>
+      {showStandalone ? (
+        <section
+          id="rent"
+          className="relative py-20 md:py-28 overflow-hidden border-y border-teal-900/20 bg-gradient-to-b from-[#062a30] via-[#0b3d4a] to-slate-950"
+        >
+          <div
+            className="absolute inset-0 pointer-events-none opacity-40"
+            aria-hidden
+            style={{
+              backgroundImage:
+                'radial-gradient(ellipse 70% 50% at 15% 20%, rgba(45,212,191,0.25), transparent), radial-gradient(ellipse 50% 40% at 90% 80%, rgba(56,189,248,0.12), transparent)',
+            }}
+          />
+          <div className="relative max-w-6xl mx-auto px-4 md:px-8">
+            <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-14 items-center">
+              <div>
+                <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-400/15 border border-teal-300/25 text-xs font-bold uppercase tracking-wider text-teal-200 mb-5">
+                  <span className="material-symbols-outlined text-[16px]">car_rental</span>
+                  Νέα υπηρεσία · Ενοικιάσεις
+                </span>
+                <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight">
+                  Ενοικιάσεις οχημάτων με έκτακτη ανάγκη, οδική βοήθεια και καθαρή ασφάλεια
+                </h2>
+                <p className="mt-4 text-base md:text-lg text-teal-50/75 leading-relaxed max-w-xl">
+                  Ξεχωριστό συμβόλαιο μόνο για ενοικιάσεις, ή πρόσθετο πάνω στο πλάνο λεωφορείων. Ο
+                  πελάτης βλέπει τις υπηρεσίες στη δημόσια σελίδα ενοικιάσεων — χωρίς σύνδεση.
+                </p>
+                <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-teal-50/90">
+                  {[
+                    'Έκτακτη ανάγκη και ζωντανή τοποθεσία',
+                    'Οδική βοήθεια όλο το εικοσιτετράωρο',
+                    'Κάλυψη ζημιών πριν την υπογραφή',
+                    'Κοινοποίηση διαδρομής στην οικογένεια',
+                    'Λίστα ελέγχου πριν την αναχώρηση',
+                    'Γραφείο ενοικιάσεων στο πάνελ',
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-teal-300 text-[18px] mt-0.5">
+                        check_circle
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <Link
+                    to="/rent/services"
+                    className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white text-teal-950 font-bold hover:bg-teal-50"
+                  >
+                    Δες την υπηρεσία
+                    <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  </Link>
+                  <Link
+                    to="/grafeia"
+                    className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
+                  >
+                    Συμβόλαια ενοικιάσεων
+                  </Link>
+                </div>
+              </div>
+
+              <div className="grid gap-4">
+                <article className="rounded-[24px] border border-white/15 bg-white/10 backdrop-blur-md p-6 text-white">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-teal-200">
+                    {standalone.badge}
+                  </p>
+                  <h3 className="mt-2 text-xl font-bold">{standalone.name}</h3>
+                  <p className="mt-1 text-sm text-white/65">{standalone.tagline}</p>
+                  <p className="mt-4 text-2xl font-bold tabular-nums">
+                    από €{standalone.monthlyEur}
+                    <span className="text-sm font-semibold text-white/55">/μήνα</span>
+                  </p>
+                </article>
+              </div>
             </div>
           </div>
+        </section>
+      ) : null}
 
-          <div className="grid gap-4">
-            <article className="rounded-[24px] border border-white/15 bg-white/10 backdrop-blur-md p-6 text-white">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-teal-200">
-                {standalone.badge}
-              </p>
-              <h3 className="mt-2 text-xl font-bold">{standalone.name}</h3>
-              <p className="mt-1 text-sm text-white/65">
-                {standalone.tagline}
-              </p>
-              <p className="mt-4 text-2xl font-bold tabular-nums">
-                από €{standalone.monthlyEur}
-                <span className="text-sm font-semibold text-white/55">/μήνα</span>
-              </p>
-            </article>
+      {showAddon ? (
+        <section
+          id="rent-fleet"
+          className="relative py-20 md:py-28 overflow-hidden border-b border-slate-200/80 bg-white"
+        >
+          <div
+            className="absolute inset-0 pointer-events-none opacity-70"
+            aria-hidden
+            style={{
+              backgroundImage:
+                'radial-gradient(ellipse 65% 45% at 10% 15%, rgba(13,148,136,0.08), transparent), radial-gradient(ellipse 45% 35% at 92% 85%, rgba(14,165,233,0.06), transparent)',
+            }}
+          />
+          <div className="relative max-w-6xl mx-auto px-4 md:px-8">
+            <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-14 items-center">
+              <div>
+                <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-50 border border-teal-200/80 text-xs font-bold uppercase tracking-wider text-teal-800 mb-5">
+                  <span className="material-symbols-outlined text-[16px]">directions_car</span>
+                  Στόλος για ενοικίαση · Πρόσθετο
+                </span>
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
+                  Προσθέστε στόλο ενοικίασης πάνω στο συμβόλαιο λεωφορείων
+                </h2>
+                <p className="mt-4 text-base md:text-lg text-slate-600 leading-relaxed max-w-xl">
+                  Ιδανικό για γραφεία που ήδη τρέχουν εκδρομές — κρατήσεις ενοικίασης, έλεγχος με
+                  κωδικό QR και ζωντανό εντοπισμό, χωρίς να αλλάξετε το βασικό πλάνο λεωφορείων.
+                </p>
+                <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-slate-700">
+                  {[
+                    'Όλο το module ενοικιάσεων στο υπάρχον πλάνο',
+                    'Ίδια εφαρμογή και πορτοφόλι για πελάτες',
+                    'Έκτακτη ανάγκη, οδική βοήθεια και ασφάλεια',
+                    'Κοινοποίηση διαδρομής και λίστα ελέγχου',
+                    'Στόλος, κρατήσεις και γραφείο ενοικιάσεων',
+                    'Χωρίς αλλαγή του βασικού συμβολαίου λεωφορείων',
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-teal-600 text-[18px] mt-0.5">
+                        check_circle
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <Link
+                    to="/grafeia"
+                    className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-teal-700 text-white font-bold hover:bg-teal-800"
+                  >
+                    Θέλω λεωφορεία και ενοικιάσεις
+                    <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  </Link>
+                  <Link
+                    to="/rent/services"
+                    className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-slate-300 text-slate-800 font-bold hover:bg-slate-50"
+                  >
+                    Δες δημόσια σελίδα υπηρεσιών
+                  </Link>
+                </div>
+              </div>
+
+              <div className="grid gap-4">
+                <article className="rounded-[24px] border border-slate-200 bg-slate-50/90 shadow-sm p-6 text-slate-900">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">
+                    {addon.badge}
+                  </p>
+                  <h3 className="mt-2 text-xl font-bold">{addon.name}</h3>
+                  <p className="mt-1 text-sm text-slate-600">{addon.tagline}</p>
+                  <p className="mt-4 text-2xl font-bold tabular-nums text-slate-900">
+                    από €{addon.monthlyEur}
+                    <span className="text-sm font-semibold text-slate-500">/μήνα</span>
+                  </p>
+                </article>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </section>
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -394,7 +477,7 @@ export function FinalCtaSection() {
           Έτοιμοι να ξεκινήσετε;
         </h2>
         <p className="text-white/80 mb-8 max-w-lg mx-auto">
-          Συνδεθείτε στο panel του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
+          Συνδεθείτε στο πάνελ του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link
