@@ -109,6 +109,8 @@ FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/drivers",
     # Fleet coaches/vans — JSON file store (same isolation model as drivers).
     "/api/admin/platform/fleet",
+    # Driver ↔ office chat — JSON file store, must stay office-scoped.
+    "/api/admin/platform/driver-chat",
 )
 
 
