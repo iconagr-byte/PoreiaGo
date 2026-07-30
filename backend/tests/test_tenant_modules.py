@@ -106,6 +106,23 @@ def test_poreiago_platform_seed_slug_keeps_rent():
     assert updated["modules"]["trips_enabled"] is True
 
 
+def test_poreiago_seed_slug_keeps_rent_even_if_legal_or_domain_drift():
+    """Production seed slug=achillio must stay PoreiaGo platform (not bus-only)."""
+    tenant = SimpleNamespace(
+        slug="achillio",
+        custom_domain="panel.example.com",
+        legal_name="Office Main",
+        subdomain="achillio",
+        plan=TenantPlan.PROFESSIONAL,
+        settings_json='{"modules":{"rent_enabled":false,"trips_enabled":true}}',
+    )
+    assert is_achillio_travel_office(tenant) is False
+    assert is_poreiago_platform_office(tenant) is True
+    updated = apply_known_office_rent_policy(tenant)
+    assert updated is not None
+    assert updated["modules"]["rent_enabled"] is True
+
+
 def test_poreiago_platform_detected_by_domain():
     tenant = SimpleNamespace(
         slug="office-main",

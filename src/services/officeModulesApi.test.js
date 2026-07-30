@@ -83,6 +83,27 @@ describe('shouldShowRentMenu', () => {
     ).toBe(true);
   });
 
+  it('shows Rent for historic PoreiaGo seed slug even when mis-tagged customer', () => {
+    expect(
+      shouldShowRentMenu({
+        rent_enabled: false,
+        office_kind: 'customer',
+        tenant_slug: 'achillio',
+      }),
+    ).toBe(true);
+  });
+
+  it('shows Rent while impersonating PoreiaGo seed office', () => {
+    isImpersonating.mockReturnValue(true);
+    expect(
+      shouldShowRentMenu({
+        rent_enabled: false,
+        office_kind: 'customer',
+        tenant_slug: 'achillio',
+      }),
+    ).toBe(true);
+  });
+
   it('shows Rent for Super Admin regardless of hostname', () => {
     canAccessPlatformOperatorUi.mockReturnValue(true);
     expect(
@@ -101,6 +122,7 @@ describe('shouldShowRentMenu', () => {
       shouldShowRentMenu({
         rent_enabled: false,
         office_kind: 'customer',
+        tenant_slug: 'sunny-buses',
       }),
     ).toBe(false);
   });
