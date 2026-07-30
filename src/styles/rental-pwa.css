@@ -1215,7 +1215,7 @@
 
 .rent-pick-title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.22rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--rent-ink);
@@ -1271,8 +1271,8 @@
 }
 
 .rent-pick-media {
-  aspect-ratio: 16 / 10;
-  border-radius: 14px;
+  aspect-ratio: 16 / 9.5;
+  border-radius: 18px;
   background:
     radial-gradient(70% 80% at 50% 80%, rgba(10, 122, 108, 0.08), transparent 70%),
     #f4f7f6;
@@ -1318,11 +1318,11 @@
   appearance: none;
   border: 0;
   width: 100%;
-  min-height: 2.85rem;
-  border-radius: 12px;
+  min-height: 3.15rem;
+  border-radius: 14px;
   background: linear-gradient(180deg, #0c8a7a 0%, var(--rent-deep) 100%);
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   cursor: pointer;
@@ -3487,20 +3487,20 @@
 
 .rent-phone-stage--desktop .rent-pick-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2.15rem 1.85rem;
+  gap: 2.35rem 2rem;
 }
 
 .rent-phone-stage--desktop .rent-pick-grid--home {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2rem 1.75rem;
+  gap: 2.25rem 1.95rem;
 }
 
 .rent-phone-stage--desktop .rent-pick {
-  padding: 1.25rem 1.15rem 1.1rem;
+  padding: 1.45rem 1.3rem 1.25rem;
 }
 
 .rent-phone-stage--desktop .rent-pick-title {
-  font-size: 1.22rem;
+  font-size: 1.28rem;
 }
 
 .rent-phone-stage--desktop .rent-search-wrap--top {
