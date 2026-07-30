@@ -49,12 +49,22 @@ def _token_response(
 
 
 @router.post("/dev-login", response_model=TokenResponse)
-async def dev_login(body: LoginRequest):
+async def dev_login(request: Request, body: LoginRequest):
     """Local dev only — JWT with superadmin when Postgres/seed is unavailable."""
     if not _dev_login_allowed():
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not found")
     email = body.email.strip().lower()
     if email not in DEV_ADMIN_EMAILS or body.password != DEV_ADMIN_PASSWORD:
+        from travel_platform.settings.login_audit_store import record_login_from_request
+
+        record_login_from_request(
+            request,
+            actor_type="admin",
+            identity=email,
+            success=False,
+            method="dev-login",
+            detail="Λάθος email ή κωδικός",
+        )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Λάθος email ή κωδικός")
     settings = get_settings()
     if not settings.auth_jwt_secret and not settings.auth_jwt_private_key:
@@ -92,6 +102,18 @@ async def dev_login(body: LoginRequest):
         mfa_verified=True,
         extra={"tenant_slug": tenant_slug},
     )
+    from travel_platform.settings.login_audit_store import record_login_from_request
+
+    record_login_from_request(
+        request,
+        actor_type="admin",
+        identity=email,
+        success=True,
+        actor_id=str(user_id),
+        method="dev-login",
+        tenant_id=str(tenant_id),
+        detail=f"dev · {tenant_slug}",
+    )
     return _token_response(
         access_token=token,
         refresh_token=refresh_token,
@@ -102,8 +124,11 @@ async def dev_login(body: LoginRequest):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest):
+async def login(request: Request, body: LoginRequest):
     """Login with email + password. Tenant is resolved automatically (optional tenant_slug)."""
+    from travel_platform.settings.login_audit_store import record_login_from_request
+
+    email = (body.email or "").strip().lower()
     async with AsyncSessionLocal() as db:
         try:
             token, refresh, user, tenant = await AuthService(db).login(
@@ -116,8 +141,27 @@ async def login(body: LoginRequest):
             await db.commit()
         except ValueError as exc:
             await db.rollback()
+            record_login_from_request(
+                request,
+                actor_type="admin",
+                identity=email,
+                success=False,
+                method="password",
+                detail=str(exc),
+            )
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
         role_values = [r for r in (user.roles or []) if r in {e.value for e in UserRole}]
+        record_login_from_request(
+            request,
+            actor_type="admin",
+            identity=getattr(user, "email", None) or email,
+            success=True,
+            actor_id=str(user.id),
+            actor_name=getattr(user, "full_name", None) or getattr(user, "name", None),
+            method="password",
+            tenant_id=str(tenant.id),
+            detail=tenant.slug,
+        )
         return _token_response(
             access_token=token,
             refresh_token=refresh,

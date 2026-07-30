@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from ticketing.email_dispatch import send_email
@@ -24,6 +24,7 @@ from ticketing.wallet_magic import (
     consume_wallet_magic_token,
     create_wallet_magic_token,
 )
+from travel_platform.settings.login_audit_store import record_login_from_request
 
 router = APIRouter(prefix="/api/auth", tags=["Customer Auth"])
 
@@ -122,15 +123,32 @@ async def register_customer(body: RegisterRequest):
 
 
 @router.post("/login")
-async def login_customer(body: LoginRequest):
+async def login_customer(request: Request, body: LoginRequest):
     email = body.email.strip().lower()
     if email in STAFF_EMAILS:
         raise HTTPException(status_code=403, detail="Use Admin Login for staff accounts")
 
     account = await authenticate_account(email, body.password)
     if not account:
+        record_login_from_request(
+            request,
+            actor_type="customer",
+            identity=email,
+            success=False,
+            method="password",
+            detail="Λάθος email ή κωδικός",
+        )
         raise HTTPException(status_code=401, detail="Λάθος email ή κωδικός")
     token = create_customer_token(email)
+    record_login_from_request(
+        request,
+        actor_type="customer",
+        identity=email,
+        success=True,
+        actor_id=str(account.get("customer_id") or email),
+        actor_name=account.get("name"),
+        method="password",
+    )
     return _profile_response(account, token)
 
 
@@ -208,7 +226,7 @@ async def google_auth_config():
 
 
 @router.post("/google")
-async def verify_google_token(body: GoogleTokenRequest):
+async def verify_google_token(request: Request, body: GoogleTokenRequest):
     """Verify Google ID token, upsert account, return JWT."""
     client_id = _google_client_id()
     if not client_id:
@@ -225,6 +243,14 @@ async def verify_google_token(body: GoogleTokenRequest):
         )
 
     if response.status_code != 200:
+        record_login_from_request(
+            request,
+            actor_type="customer",
+            identity="google",
+            success=False,
+            method="google",
+            detail="Invalid Google token",
+        )
         raise HTTPException(status_code=401, detail="Invalid Google token")
 
     data = response.json()
@@ -244,6 +270,15 @@ async def verify_google_token(body: GoogleTokenRequest):
 
     account = await upsert_google_account(email, data.get("name"), data.get("picture"))
     token = create_customer_token(email, extra={"provider": "google"})
+    record_login_from_request(
+        request,
+        actor_type="customer",
+        identity=email,
+        success=True,
+        actor_id=str(account.get("customer_id") or email),
+        actor_name=account.get("name") or data.get("name"),
+        method="google",
+    )
     return _profile_response(account, token)
 
 
