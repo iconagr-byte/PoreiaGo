@@ -380,6 +380,13 @@ if seat_pricing_router:
 if rent_plan_catalog_router:
     app.include_router(rent_plan_catalog_router)
 try:
+    from api.payment_settings_router import router as payment_settings_router
+except ImportError:
+    payment_settings_router = None
+if payment_settings_router:
+    # Rent desk Πληρωμές + Ρυθμίσεις → Πληρωμές (was only mounted on wallet_main).
+    app.include_router(payment_settings_router)
+try:
     from api.fleet_rental_router import router as fleet_rental_router
 except ImportError:
     fleet_rental_router = None

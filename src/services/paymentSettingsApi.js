@@ -27,7 +27,21 @@ function loadCached() {
 
 async function parseError(res) {
   const err = await res.json().catch(() => ({}));
-  throw new Error(err.detail || res.statusText || 'Request failed');
+  const detail = err.detail;
+  let message = res.statusText || 'Request failed';
+  if (typeof detail === 'string' && detail.trim()) {
+    message = detail;
+  } else if (Array.isArray(detail) && detail.length) {
+    message = detail
+      .map((d) => d?.msg || d?.message || JSON.stringify(d))
+      .filter(Boolean)
+      .join(' · ');
+  }
+  if (res.status === 404) {
+    message =
+      'Το API πληρωμών δεν είναι διαθέσιμο σε αυτό το περιβάλλον — δοκίμασε refresh ή επικοινώνησε με υποστήριξη';
+  }
+  throw new Error(message);
 }
 
 export async function fetchPublicPaymentSettings() {
