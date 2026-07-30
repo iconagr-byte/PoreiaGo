@@ -302,12 +302,6 @@ export default function RentBookingLookupPage() {
             </div>
           ) : null}
 
-          <p className="booking-lookup-note">
-            Για λόγους απορρήτου χρειάζονται και τα δύο στοιχεία — δεν εμφανίζονται όλες οι κρατήσεις του
-            email. Τα εισιτήρια λεωφορείου είναι στο{' '}
-            <Link to="/my-booking">My Wallet λεωφορείων</Link>.
-          </p>
-
           <div className="booking-lookup-footer-links">
             <Link
               to="/rent/login"
