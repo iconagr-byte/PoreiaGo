@@ -16,6 +16,7 @@ export const DEFAULT_SITE_APPEARANCE = {
   logo_max_width_px: 180,
   logo_show_name: true,
   hero_image_url: '/images/hero-bus-achillio.png',
+  hero_image_focal: 'center',
   hero_badge: 'Premium Ταξιδιωτική Εμπειρία',
   hero_title: 'Η Ελλάδα, όπως δεν την έχεις ξαναδεί:',
   hero_title_accent: 'Άνεση, ασφάλεια & θέση εξασφαλισμένη.',
