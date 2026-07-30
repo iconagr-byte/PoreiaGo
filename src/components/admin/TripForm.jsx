@@ -8,7 +8,6 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import LocationPicker from './LocationPicker.jsx';
 import HybridTimelineBuilder from './hybrid/HybridTimelineBuilder.jsx';
-import HybridCostCalculator from './hybrid/HybridCostCalculator.jsx';
 import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
 import HybridChangeLogPanel from './hybrid/HybridChangeLogPanel.jsx';
@@ -962,14 +961,6 @@ export default function TripForm({
         hint="Tour leader, οδηγός και ξεναγός για το hybrid πρόγραμμα."
       >
         <HybridCrewEditor formData={formData} setFormData={setFormData} />
-      </Section>
-
-      <Section
-        icon="calculate"
-        title="Αυτόματο κόστος & yield"
-        hint="Συγκεντρώνει fuel/rental ground + group PNR και προτείνει τιμή ανά άτομο."
-      >
-        <HybridCostCalculator formData={formData} setFormData={setFormData} />
       </Section>
 
       <Section
