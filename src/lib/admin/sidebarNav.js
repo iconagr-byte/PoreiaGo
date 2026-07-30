@@ -15,7 +15,6 @@ export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 /** Default ids under «Λειτουργίες Στόλου» (users can drag them anywhere). */
 export const FLEET_OPS_ONLY_IDS = [
   'fleet_kpis',
-  'hybrid_sla',
   'driver_chat',
   'fleet_route_playback',
   'fleet_calendar',
@@ -79,6 +78,7 @@ export const LEGACY_NAV_IDS = new Set([
   'fleet_active_drivers',
   'fleet_rental',
   'settings_telematics',
+  'hybrid_sla',
 ]);
 
 const PLATFORM_IDS = PLATFORM_NAV_IDS;
@@ -283,16 +283,6 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'fleet_kpis',
     navGroup: 'fleet_ops',
     accent: 'violet',
-  },
-  hybrid_sla: {
-    id: 'hybrid_sla',
-    label: 'Hybrid SLA',
-    icon: 'connecting_airports',
-    filled: true,
-    type: 'tab',
-    tab: 'hybrid_sla',
-    navGroup: 'fleet_ops',
-    accent: 'indigo',
   },
   driver_chat: {
     id: 'driver_chat',

@@ -2394,11 +2394,6 @@ export default function BackOffice() {
                 <FleetKpisDashboard />
               </div>
             )}
-            {activeTab === 'hybrid_sla' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300">
-                <HybridSlaDashboard />
-              </div>
-            )}
             {activeTab === 'driver_chat' && (
               <div className="pb-stack-lg animate-in fade-in duration-300">
                 <DriverChatInbox
