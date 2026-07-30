@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { QRCode } from 'react-qr-code';
 import toast from 'react-hot-toast';
 import { fetchTenantBrandingSettings } from '../../services/growthApi.js';
-import { getOfficeWalletUrl } from '../../lib/platform/officePublicUrl.js';
+import {
+  getOfficeShareDisplayName,
+  getOfficeWalletUrl,
+} from '../../lib/platform/officePublicUrl.js';
 
 /**
  * Dashboard card: per-office My Wallet QR + public link for customers.
@@ -21,7 +24,7 @@ export default function OfficeWalletShareCard() {
         if (cancelled) return;
         const office = branding || {};
         setWalletUrl(getOfficeWalletUrl(office));
-        setOfficeName(office.display_name || office.slug || office.subdomain || 'Γραφείο');
+        setOfficeName(getOfficeShareDisplayName(office));
       })
       .catch(() => {
         if (!cancelled) {

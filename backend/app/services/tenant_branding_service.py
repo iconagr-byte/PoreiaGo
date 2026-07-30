@@ -48,11 +48,58 @@ def _branding_from_settings(settings: dict[str, Any]) -> dict[str, Any]:
     return branding if isinstance(branding, dict) else {}
 
 
+def _is_achillio_travel_host(domain: str | None) -> bool:
+    host = normalize_custom_domain(domain) or ""
+    return bool(host) and (
+        host == "achilliotravel.com" or host.endswith(".achilliotravel.com")
+    )
+
+
 class TenantBrandingService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._audit = AuditService(session)
         self._olympus = get_olympus_settings()
+
+    async def _heal_foreign_achillio_domain(self, tenant: Tenant) -> bool:
+        """
+        Seal: achilliotravel.com belongs only to Achillio Travel office.
+        PoreiaGo platform seed (slug=achillio) must never keep that custom_domain
+        or legal_name — it poisons Rent Wallet / My Wallet share URLs.
+        """
+        from app.services.tenant_modules import (
+            is_achillio_travel_office,
+            is_poreiago_platform_office,
+        )
+
+        healed = False
+        domain = normalize_custom_domain(tenant.custom_domain)
+        if domain and _is_achillio_travel_host(domain) and not is_achillio_travel_office(tenant):
+            logger.warning(
+                "Cleared stolen Achillio Travel custom_domain=%s from tenant slug=%s",
+                domain,
+                tenant.slug,
+            )
+            tenant.custom_domain = None
+            healed = True
+
+        if is_poreiago_platform_office(tenant):
+            legal = str(tenant.legal_name or "").strip()
+            if (not legal) or ("achillio" in legal.lower()):
+                tenant.legal_name = "PoreiaGo"
+                healed = True
+            settings = _parse_settings_json(tenant.settings_json)
+            branding = _branding_from_settings(settings)
+            checkout = str(branding.get("checkout_base_url") or "")
+            if checkout and _is_achillio_travel_host(checkout):
+                branding["checkout_base_url"] = f"https://www.{self._olympus['base_domain']}"
+                settings["branding"] = branding
+                tenant.settings_json = json.dumps(settings, ensure_ascii=False)
+                healed = True
+
+        if healed:
+            await self._session.flush()
+        return healed
 
     async def get_settings(
         self,
@@ -62,6 +109,8 @@ class TenantBrandingService:
         tenant = await self._resolve_tenant(tenant_id, tenant_slug)
         if not tenant:
             return self._settings_from_file(tenant_slug or "achillio")
+
+        await self._heal_foreign_achillio_domain(tenant)
 
         settings = _parse_settings_json(tenant.settings_json)
         branding = _branding_from_settings(settings)
@@ -78,8 +127,25 @@ class TenantBrandingService:
         custom_domain = tenant.custom_domain
         subdomain_fqdn = f"{tenant.subdomain}.{base_domain}"
 
+        from app.services.tenant_modules import is_poreiago_platform_office
+
+        display_name = tenant.legal_name or ""
+        if is_poreiago_platform_office(tenant) and (
+            not display_name or "achillio" in display_name.lower()
+        ):
+            display_name = "PoreiaGo"
+
+        checkout_default = (
+            f"https://www.{base_domain}"
+            if is_poreiago_platform_office(tenant)
+            else f"https://{subdomain_fqdn}"
+        )
+        checkout = str(branding.get("checkout_base_url") or "").strip() or checkout_default
+        if checkout and _is_achillio_travel_host(checkout) and is_poreiago_platform_office(tenant):
+            checkout = checkout_default
+
         return {
-            "display_name": tenant.legal_name,
+            "display_name": display_name,
             "slug": tenant.slug,
             "subdomain": tenant.subdomain,
             "platform_domain": base_domain,
@@ -89,7 +155,7 @@ class TenantBrandingService:
             "logo_url": theme_cfg.get("logoUrl") or branding.get("logo_url") or "",
             "css_injection_url": branding.get("css_injection_url") or "",
             "css_injection_inline": branding.get("css_injection_inline") or "",
-            "checkout_base_url": branding.get("checkout_base_url") or f"https://{subdomain_fqdn}",
+            "checkout_base_url": checkout,
             "dns_instructions": self._dns_instructions(custom_domain, subdomain_fqdn),
         }
 
@@ -115,15 +181,32 @@ class TenantBrandingService:
 
         before_domain = tenant.custom_domain
 
+        from app.services.tenant_modules import (
+            is_achillio_travel_office,
+            is_poreiago_platform_office,
+        )
+
         if custom_domain is not None:
             normalized = normalize_custom_domain(custom_domain)
             if normalized and not _DOMAIN_RE.match(normalized):
                 raise ValueError("Invalid custom domain format (example: travel.agency.gr)")
+            # Seal: only Achillio Travel may own achilliotravel.com.
+            if normalized and _is_achillio_travel_host(normalized) and not is_achillio_travel_office(
+                tenant
+            ):
+                raise ValueError(
+                    "Το domain achilliotravel.com ανήκει μόνο στο γραφείο Achillio Travel"
+                )
             await self._ensure_domain_available(normalized, tenant_id)
             tenant.custom_domain = normalized
 
         if display_name is not None and display_name.strip():
-            tenant.legal_name = display_name.strip()
+            name = display_name.strip()
+            if is_poreiago_platform_office(tenant) and "achillio" in name.lower():
+                raise ValueError(
+                    "Το γραφείο PoreiaGo δεν μπορεί να ονομαστεί Achillio Travel"
+                )
+            tenant.legal_name = name
 
         settings = _parse_settings_json(tenant.settings_json)
         branding = _branding_from_settings(settings)
