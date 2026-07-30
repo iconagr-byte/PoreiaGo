@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
+import { markPreferRentLookup } from '../../lib/rental/preferRentLookup.js';
 
 /**
  * Guest header — booking / account / language.
@@ -12,11 +13,7 @@ export default function RentGuestTopActions({ onAccount } = {}) {
   const rootRef = useRef(null);
 
   useEffect(() => {
-    try {
-      sessionStorage.setItem('poreiago_prefer_rent_lookup_v1', '1');
-    } catch {
-      /* ignore */
-    }
+    markPreferRentLookup();
   }, []);
 
   useEffect(() => {

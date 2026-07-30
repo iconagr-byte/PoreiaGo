@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { Toaster } from 'react-hot-toast';
 import { captureRentalInstallPrompt, setupRentalPwa } from './lib/rental/registerRentalPwa.js';
+import { markPreferRentLookup } from './lib/rental/preferRentLookup.js';
 import HomePage from './pages/HomePage.jsx';
 import StorefrontDemoPage from './pages/StorefrontDemoPage';
 import BackOffice from './pages/BackOffice';
@@ -54,9 +55,20 @@ function RentalPwaBoot() {
     // Capture BIP as early as possible; register SW only on /rent so guests can install.
     captureRentalInstallPrompt();
     if (path === '/rent' || path.startsWith('/rent/')) {
+      markPreferRentLookup();
       setupRentalPwa();
     }
   }, []);
+  return null;
+}
+
+/** Any visit under /rent marks the session so /my-booking never sticks as bus lookup. */
+function PreferRentSessionBoot() {
+  const location = useLocation();
+  useEffect(() => {
+    const path = location.pathname || '';
+    if (path === '/rent' || path.startsWith('/rent/')) markPreferRentLookup();
+  }, [location.pathname]);
   return null;
 }
 
@@ -66,6 +78,7 @@ function App() {
       <Router>
         <BrandingBoot />
         <RentalPwaBoot />
+        <PreferRentSessionBoot />
         <MaintenanceGate>
           <Toaster position="top-center" />
           <Routes>
