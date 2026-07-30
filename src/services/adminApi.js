@@ -6,14 +6,27 @@ import { getSaasToken, saasAuthHeaders } from './saasApi.js';
 
 export { getSaasToken };
 
+function officeHostHeaders() {
+  // Lets the API recover Achillio DEMO drivers even when the request Host is
+  // api.* / an internal upstream name (nginx → api-blue).
+  try {
+    if (typeof window !== 'undefined' && window.location?.host) {
+      return { 'X-Poreiago-Office-Host': window.location.host };
+    }
+  } catch {
+    /* SSR / tests */
+  }
+  return {};
+}
+
 export function adminAuthHeaders(extra = {}) {
-  return { ...saasAuthHeaders(), ...extra };
+  return { ...saasAuthHeaders(), ...officeHostHeaders(), ...extra };
 }
 
 /** Bearer only (FormData uploads — no Content-Type). */
 export function adminBearerHeaders(extra = {}) {
   const token = getSaasToken();
-  const headers = { ...extra };
+  const headers = { ...officeHostHeaders(), ...extra };
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
@@ -38,7 +51,8 @@ function networkAdminError() {
  */
 export async function adminFetch(path, options = {}) {
   const attempts = Math.max(1, Number(options.retries) || 3);
-  const { retries: _ignored, ...fetchOpts } = options;
+  const { retries, ...fetchOpts } = options;
+  void retries;
   const isFormData =
     typeof FormData !== 'undefined' && fetchOpts.body instanceof FormData;
   // FormData must not send Content-Type: application/json (breaks multipart + auth proxies).
