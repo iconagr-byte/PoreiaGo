@@ -324,28 +324,32 @@ function RentalAuthGate() {
   const navigate = useNavigate();
   const path = location.pathname || '';
   const isWalletPath = path === '/rent/wallet' || path.startsWith('/rent/wallet/');
-  const continueToServices = Boolean(
-    location.state?.rentContinue || location.state?.from === '/rent/book/services',
+  const continueToBooking = Boolean(
+    location.state?.rentContinue ||
+      location.state?.from === '/rent/book/services' ||
+      location.state?.from === '/rent/book/details',
   );
+  const continueTarget =
+    location.state?.from === '/rent/book/details' ? '/rent/book/details' : '/rent/book/services';
   const fromLookup = Boolean(location.state?.rentLookup || location.state?.openRentWallet);
   // Guests always land on the /rent hero. Wallet / book continue open login.
-  const [showLogin, setShowLogin] = useState(() => continueToServices || isWalletPath || fromLookup);
+  const [showLogin, setShowLogin] = useState(() => continueToBooking || isWalletPath || fromLookup);
   useEffect(() => setupRentalPwa(), []);
 
   useEffect(() => {
-    if (continueToServices || isWalletPath || fromLookup) setShowLogin(true);
-  }, [continueToServices, isWalletPath, fromLookup]);
+    if (continueToBooking || isWalletPath || fromLookup) setShowLogin(true);
+  }, [continueToBooking, isWalletPath, fromLookup]);
 
   useEffect(() => {
-    if (getCustomerToken() && continueToServices) {
-      navigate('/rent/book/services', { replace: true });
+    if (getCustomerToken() && continueToBooking) {
+      navigate(continueTarget, { replace: true });
     }
-  }, [continueToServices, navigate, location.key]);
+  }, [continueToBooking, continueTarget, navigate, location.key]);
 
   if (isCustomer() && !getCustomerToken()) logoutCustomer();
 
   if (getCustomerToken()) {
-    if (continueToServices) return null;
+    if (continueToBooking) return null;
     return (
       <RentalAuthenticatedApp
         key={location.key}
@@ -372,7 +376,7 @@ function RentalAuthGate() {
     return (
       <LoginPage
         rentEntrance
-        key={continueToServices ? 'rent-continue' : 'rent-login'}
+        key={continueToBooking ? 'rent-continue' : 'rent-login'}
       />
     );
   }
