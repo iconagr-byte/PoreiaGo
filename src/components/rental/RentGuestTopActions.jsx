@@ -3,14 +3,22 @@ import { Link } from 'react-router-dom';
 import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
 
 /**
- * Guest header utilities — booking / account / language.
- * Soft chip design; account icon opens Είσοδος / Εγγραφή menu.
+ * Guest header — booking / account / language.
+ * Hard hrefs to green Rent URLs so we never land on bus /my-booking|/wallet.
  */
 export default function RentGuestTopActions({ onAccount } = {}) {
   const [lang, setLang] = useState(() => getRentLang());
   const [bookingOpen, setBookingOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const rootRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('poreiago_prefer_rent_lookup_v1', '1');
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (!bookingOpen && !accountOpen) return undefined;
@@ -26,7 +34,8 @@ export default function RentGuestTopActions({ onAccount } = {}) {
 
   const el = lang !== 'en';
   const bookingLabel = el ? 'Η κράτησή μου' : 'My booking';
-  const findLabel = el ? 'Εύρεση κράτησης' : 'Find booking';
+  const findLabel = el ? 'Εύρεση κράτησης Rent' : 'Find rent booking';
+  const walletLabel = 'Rent Wallet';
   const loginLabel = el ? 'Είσοδος' : 'Sign in';
   const registerLabel = el ? 'Εγγραφή' : 'Register';
   const accountAria = el ? 'Λογαριασμός' : 'Account';
@@ -54,8 +63,20 @@ export default function RentGuestTopActions({ onAccount } = {}) {
         </button>
         {bookingOpen ? (
           <div className="rent-top-menu" role="menu">
-            <Link
-              to="/my-booking"
+            {/* Plain <a href> — full navigation to green Rent routes only. */}
+            <a
+              href="/rent/wallet"
+              role="menuitem"
+              className="rent-top-menu-item"
+              onClick={() => setBookingOpen(false)}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                account_balance_wallet
+              </span>
+              {walletLabel}
+            </a>
+            <a
+              href="/rent/my-booking"
               role="menuitem"
               className="rent-top-menu-item"
               onClick={() => setBookingOpen(false)}
@@ -64,7 +85,7 @@ export default function RentGuestTopActions({ onAccount } = {}) {
                 search
               </span>
               {findLabel}
-            </Link>
+            </a>
           </div>
         ) : null}
       </div>
@@ -103,7 +124,7 @@ export default function RentGuestTopActions({ onAccount } = {}) {
               to="/rent/register"
               role="menuitem"
               className="rent-top-menu-item"
-              state={{ from: { pathname: '/rent' }, rentEntrance: true }}
+              state={{ from: { pathname: '/rent/wallet' }, rentEntrance: true }}
               onClick={() => setAccountOpen(false)}
             >
               {registerLabel}

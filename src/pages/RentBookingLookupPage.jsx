@@ -2,36 +2,38 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
-import { lookupGuestBooking, openBookingInWallet, referenceVariants } from '../lib/bookingLookup.js';
-import {
-  walletClaimAuthPath,
-  walletClaimNavState,
-  walletHomeNavState,
-} from '../lib/wallet/walletClaim.js';
+import { getCustomerToken } from '../lib/auth.js';
+import { lookupPublicRentalBooking } from '../services/customerRentalApi.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import '../styles/booking-lookup.css';
 
-const EMAIL_KEY = 'poreiago_lookup_email_v1';
+const EMAIL_KEY = 'poreiago_rent_lookup_email_v1';
 
 function normalizeReference(raw) {
-  const variants = referenceVariants(raw);
-  const withBk = variants.find((v) => v.startsWith('BK-'));
-  return withBk || variants[0] || String(raw || '').trim().toUpperCase();
+  let s = String(raw || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+  if (!s) return '';
+  s = s.replace(/^#/, '');
+  if (s.startsWith('BK-')) s = `RB-${s.slice(3)}`;
+  if (!s.startsWith('RB-') && /^[A-Z0-9]{6,}$/.test(s)) s = `RB-${s.slice(0, 8)}`;
+  return s;
 }
 
 function extractFromPaste(text) {
   const raw = String(text || '');
   const emailMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   const refMatch =
-    raw.match(/\bBK[-\s]?[A-Z0-9]{4,}\b/i) ||
-    raw.match(/\b(?:κωδικός|reference|ref|pnr)[:\s#]*([A-Z0-9-]{5,})\b/i);
+    raw.match(/\bRB[-\s]?[A-Z0-9]{4,}\b/i) ||
+    raw.match(/\b(?:κωδικός|reference|ref|booking)[:\s#]*([A-Z0-9-]{5,})\b/i);
   return {
     email: emailMatch ? emailMatch[0].toLowerCase() : '',
     reference: refMatch ? normalizeReference(refMatch[0].replace(/^.*?([A-Z0-9-]+)$/i, '$1')) : '',
   };
 }
 
-export default function BookingLookupPage() {
+export default function RentBookingLookupPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -43,30 +45,8 @@ export default function BookingLookupPage() {
 
   useEffect(() => {
     let cancelled = false;
-    // Rent deep-link / RB-… code landed on bus lookup → send to green Rent flow.
-    const qRef = (
-      searchParams.get('ref') ||
-      searchParams.get('reference') ||
-      searchParams.get('code') ||
-      ''
-    ).toUpperCase();
-    const fromRent =
-      searchParams.get('from') === 'rent' ||
-      (typeof document !== 'undefined' &&
-        /\/rent(\/|$|\?)/.test(String(document.referrer || '')));
-    let preferRent = fromRent;
-    try {
-      preferRent = preferRent || sessionStorage.getItem('poreiago_prefer_rent_lookup_v1') === '1';
-      if (preferRent) sessionStorage.removeItem('poreiago_prefer_rent_lookup_v1');
-    } catch {
-      /* ignore */
-    }
-    if (preferRent || qRef.startsWith('RB-')) {
-      const qs = searchParams.toString();
-      navigate(`/rent/my-booking${qs ? `?${qs}` : ''}`, { replace: true });
-      return undefined;
-    }
     const qEmail = searchParams.get('email') || '';
+    const qRef = searchParams.get('ref') || searchParams.get('reference') || searchParams.get('code') || '';
     let saved = '';
     try {
       saved = localStorage.getItem(EMAIL_KEY) || '';
@@ -85,7 +65,7 @@ export default function BookingLookupPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, navigate]);
+  }, [searchParams]);
 
   const canSubmit = useMemo(
     () => Boolean(email.trim() && reference.trim() && !loading),
@@ -95,10 +75,10 @@ export default function BookingLookupPage() {
   const validate = () => {
     const next = { email: '', reference: '' };
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      next.email = 'Βάλτε έγκυρο email από την κράτηση';
+      next.email = 'Βάλτε έγκυρο email από την κράτηση ενοικίασης';
     }
     if (!reference.trim() || reference.trim().length < 4) {
-      next.reference = 'Βάλτε τον κωδικό αναφοράς (π.χ. BK-AB12CD)';
+      next.reference = 'Βάλτε τον κωδικό αναφοράς (π.χ. RB-AB12CD34)';
     }
     setFieldError(next);
     return !next.email && !next.reference;
@@ -106,7 +86,7 @@ export default function BookingLookupPage() {
 
   const handlePasteReference = (e) => {
     const text = e.clipboardData?.getData('text') || '';
-    if (!text || (!text.includes('@') && !/BK/i.test(text) && text.length < 40)) return;
+    if (!text || (!text.includes('@') && !/RB/i.test(text) && text.length < 40)) return;
     const parsed = extractFromPaste(text);
     if (!parsed.email && !parsed.reference) return;
     e.preventDefault();
@@ -129,31 +109,41 @@ export default function BookingLookupPage() {
     }
 
     try {
-      const booking = await lookupGuestBooking({ email: cleanEmail, referenceCode: cleanRef });
+      const booking = await lookupPublicRentalBooking({
+        email: cleanEmail,
+        reference: cleanRef,
+      });
       if (!booking) {
         setFieldError({
           email: '',
-          reference: 'Δεν βρέθηκε κράτηση με αυτά τα στοιχεία',
+          reference: 'Δεν βρέθηκε κράτηση ενοικίασης με αυτά τα στοιχεία',
         });
-        toast.error('Δεν βρέθηκε κράτηση. Ελέγξτε email και κωδικό (π.χ. BK-…).');
+        toast.error('Δεν βρέθηκε κράτηση. Ελέγξτε email και κωδικό (π.χ. RB-…).');
         return;
       }
-      const { hasWalletSession, claim } = openBookingInWallet(booking, cleanEmail);
-      if (hasWalletSession) {
-        toast.success('Η κράτησή σας βρέθηκε');
-        navigate('/wallet', {
-          replace: true,
-          state: walletHomeNavState({
-            highlightBooking: booking.id,
-            fromClaim: true,
-          }),
-        });
+
+      const navState = {
+        rentLookup: true,
+        openRentWallet: true,
+        highlightRentalBooking: booking.id,
+        rentLookupEmail: cleanEmail,
+        rentLookupRef: booking.reference_code || cleanRef,
+      };
+
+      if (getCustomerToken()) {
+        toast.success('Η κράτηση ενοικίασης βρέθηκε');
+        navigate('/rent/wallet', { replace: true, state: navState });
         return;
       }
-      toast.success('Βρέθηκε η κράτηση — συνδεθείτε στο My Wallet');
-      navigate(walletClaimAuthPath({ preferLogin: false }), {
+
+      toast.success('Βρέθηκε η κράτηση — συνδεθείτε στο Rent Wallet');
+      navigate('/rent/login', {
         replace: true,
-        state: walletClaimNavState(claim),
+        state: {
+          ...navState,
+          from: '/rent/wallet',
+          rentEntrance: true,
+        },
       });
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αναζήτησης');
@@ -165,45 +155,39 @@ export default function BookingLookupPage() {
   const tel = phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : '';
 
   return (
-    <div className="booking-lookup-shell">
+    <div className="booking-lookup-shell booking-lookup-shell--rent">
       <div className="booking-lookup-glow booking-lookup-glow--a" aria-hidden />
       <div className="booking-lookup-glow booking-lookup-glow--b" aria-hidden />
       <div className="booking-lookup-grid" aria-hidden />
 
       <header className="booking-lookup-top">
-        <Link to="/" className="booking-lookup-back">
+        <Link to="/rent" className="booking-lookup-back">
           <span className="material-symbols-outlined" aria-hidden>
             arrow_back
           </span>
-          Αρχική
+          Ενοικίαση
         </Link>
         <OfficeBrandMark className="h-8" variant="light" />
       </header>
 
       <main className="booking-lookup-main">
-        <section className="booking-lookup-card" aria-labelledby="booking-lookup-title">
+        <section className="booking-lookup-card" aria-labelledby="rent-booking-lookup-title">
           <div className="booking-lookup-steps" aria-hidden>
             <span className="is-active">1 · Στοιχεία</span>
             <span className="booking-lookup-steps-line" />
-            <span>2 · Εισιτήριο</span>
+            <span>2 · Κράτηση</span>
           </div>
 
           <div className="booking-lookup-icon" aria-hidden>
-            <span className="material-symbols-outlined">confirmation_number</span>
+            <span className="material-symbols-outlined">directions_car</span>
           </div>
 
-          <h1 id="booking-lookup-title" className="booking-lookup-title">
-            Εύρεση κράτησης
+          <h1 id="rent-booking-lookup-title" className="booking-lookup-title">
+            Εύρεση κράτησης ενοικίασης
           </h1>
           <p className="booking-lookup-lead">
-            Συμπλήρωσε το email και τον κωδικό από το μήνυμα επιβεβαίωσης για να ανοίξεις το εισιτήριό σου.
-          </p>
-
-          <p className="booking-lookup-note" style={{ marginTop: 0, marginBottom: '1rem' }}>
-            Ψάχνεις <strong>ενοικίαση οχήματος</strong>;{' '}
-            <Link to="/rent/my-booking">Εύρεση κράτησης Rent</Link>
-            {' · '}
-            <Link to="/rent/wallet">Rent Wallet</Link>
+            Συμπλήρωσε το email και τον κωδικό από το μήνυμα επιβεβαίωσης για να ανοίξεις την κράτηση
+            οχήματος στο Rent Wallet.
           </p>
 
           <form onSubmit={handleSubmit} className="booking-lookup-form" noValidate>
@@ -248,7 +232,7 @@ export default function BookingLookupPage() {
                   autoComplete="off"
                   spellCheck={false}
                   className="is-mono"
-                  placeholder="BK-XXXXXXXX"
+                  placeholder="RB-XXXXXXXX"
                   value={reference}
                   onPaste={handlePasteReference}
                   onChange={(e) => {
@@ -277,7 +261,7 @@ export default function BookingLookupPage() {
                 </>
               ) : (
                 <>
-                  Εμφάνιση εισιτηρίου
+                  Εμφάνιση κράτησης
                   <span className="material-symbols-outlined" aria-hidden>
                     arrow_forward
                   </span>
@@ -301,9 +285,9 @@ export default function BookingLookupPage() {
           {helpOpen ? (
             <div className="booking-lookup-help">
               <ol>
-                <li>Άνοιξε το email επιβεβαίωσης κράτησης.</li>
+                <li>Άνοιξε το email επιβεβαίωσης ενοικίασης.</li>
                 <li>
-                  Ψάξε για κωδικό τύπου <strong>BK-…</strong> (ή PNR / αναφορά).
+                  Ψάξε για κωδικό τύπου <strong>RB-…</strong> (αναφορά κράτησης οχήματος).
                 </li>
                 <li>Χρησιμοποίησε το ίδιο email με την κράτηση.</li>
               </ol>
@@ -320,12 +304,17 @@ export default function BookingLookupPage() {
 
           <p className="booking-lookup-note">
             Για λόγους απορρήτου χρειάζονται και τα δύο στοιχεία — δεν εμφανίζονται όλες οι κρατήσεις του
-            email.
+            email. Τα εισιτήρια λεωφορείου είναι στο{' '}
+            <Link to="/my-booking">My Wallet λεωφορείων</Link>.
           </p>
 
           <div className="booking-lookup-footer-links">
-            <Link to="/login" className="booking-lookup-wallet">
-              Σύνδεση στο My Wallet
+            <Link
+              to="/rent/login"
+              state={{ from: '/rent/wallet', rentEntrance: true }}
+              className="booking-lookup-wallet"
+            >
+              Σύνδεση στο Rent Wallet
             </Link>
             {tel ? (
               <a href={tel} className="booking-lookup-phone">
