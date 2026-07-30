@@ -117,7 +117,8 @@ class DriverLoginOfficeLockTests(unittest.TestCase):
         self.assertEqual(res.json().get("tenant_id"), OFFICE_A)
         self.assertEqual(res.json().get("driver_id"), self.driver_a.id)
 
-    def test_login_without_host_uses_driver_home_tenant(self):
+    def test_login_without_host_is_rejected(self):
+        """Bare api Host must not first-match across offices."""
         with patch(
             "api.driver_portal.resolve_platform_tenant_id",
             new=AsyncMock(return_value=OFFICE_A),
@@ -126,9 +127,8 @@ class DriverLoginOfficeLockTests(unittest.TestCase):
                 "/api/driver/session/login",
                 json={"username": self.driver_b.email, "password": "driver123"},
             )
-        self.assertEqual(res.status_code, 200, res.text)
-        # Must NOT stamp Achillio/platform — home office of driver B.
-        self.assertEqual(res.json().get("tenant_id"), OFFICE_B)
+        self.assertEqual(res.status_code, 401)
+        self.assertIn("γραφείου", res.json().get("detail", ""))
 
     def test_authenticate_scoped_by_tenant(self):
         found = self.store.authenticate_driver(

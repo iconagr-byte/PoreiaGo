@@ -9,10 +9,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 TEST_JWT_SECRET = "dev-jwt-secret-change-in-prod-32bytes!!"
+OFFICE = "00000000-0000-0000-0000-000000000001"  # DEMO home for seed-less creates
 
 
 class DriverSessionLoginApiTests(unittest.TestCase):
@@ -24,6 +25,13 @@ class DriverSessionLoginApiTests(unittest.TestCase):
         portal._jwt_secret = lambda: TEST_JWT_SECRET
         cls.portal = portal
         cls.app = FastAPI()
+
+        @cls.app.middleware("http")
+        async def inject_office(request: Request, call_next):
+            # Simulate Host-scoped /driver on an office domain.
+            request.state.tenant_id = OFFICE
+            return await call_next(request)
+
         cls.app.include_router(portal.router)
         cls.client = TestClient(cls.app)
 
@@ -86,12 +94,10 @@ class DriverSessionLoginApiTests(unittest.TestCase):
         self.assertIn("vehicle_plate", data)
         self.assertTrue(data.get("expires_at"))
 
-    def test_login_uses_driver_home_tenant_not_platform(self):
+    def test_login_stays_on_host_office_not_platform(self):
         from unittest.mock import AsyncMock
 
         platform = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-        # Driver created without explicit tenant → DEMO home office.
-        home = self.store.DEMO_TENANT_ID
         with patch(
             "api.driver_portal.resolve_platform_tenant_id",
             new=AsyncMock(return_value=platform),
@@ -101,7 +107,8 @@ class DriverSessionLoginApiTests(unittest.TestCase):
                 json={"username": self.driver.email, "password": "driver123"},
             )
         self.assertEqual(res.status_code, 200, res.text)
-        self.assertEqual(res.json().get("tenant_id"), home)
+        # Session is locked to Host office (DEMO here), never remapped to platform.
+        self.assertEqual(res.json().get("tenant_id"), OFFICE)
         self.assertNotEqual(res.json().get("tenant_id"), platform)
 
     def test_login_rejects_bad_password(self):

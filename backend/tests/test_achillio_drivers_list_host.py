@@ -1,4 +1,4 @@
-"""AchillioTravel Host must list + claim DEMO legacy drivers on Οδηγοί."""
+"""Strict office isolation for Achillio DEMO claim — no header spoofing."""
 
 from __future__ import annotations
 
@@ -11,48 +11,79 @@ from api import admin_platform as ap
 
 
 class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
-    def test_host_detection_uses_office_header_and_origin(self):
+    def test_spoofable_office_header_ignored(self):
+        """X-Poreiago-Office-Host / Origin must not authorize Achillio claim."""
         req = SimpleNamespace(
             headers={
-                "host": "api-blue:8000",
+                "host": "api.poreiago.com",
                 "x-poreiago-office-host": "www.achilliotravel.com",
+                "origin": "https://www.achilliotravel.com",
             }
         )
-        self.assertTrue(ap._host_looks_like_achillio(req))
+        self.assertFalse(ap._host_looks_like_achillio(req))
 
+    def test_proxied_achillio_host_trusted(self):
+        req = SimpleNamespace(headers={"host": "www.achilliotravel.com"})
+        self.assertTrue(ap._host_looks_like_achillio(req))
         req2 = SimpleNamespace(
             headers={
-                "host": "api.poreiago.com",
-                "origin": "https://www.achilliotravel.com",
+                "host": "api-blue:8000",
+                "x-forwarded-host": "www.achilliotravel.com",
             }
         )
         self.assertTrue(ap._host_looks_like_achillio(req2))
 
-        req3 = SimpleNamespace(headers={"host": "api.poreiago.com"})
-        self.assertFalse(ap._host_looks_like_achillio(req3))
-
-    async def test_drivers_list_tenant_prefers_achillio_host_mapping(self):
-        achillio_tid = str(uuid4())
+    async def test_poreiago_jwt_cannot_switch_to_achillio_via_host(self):
+        poreiago = str(uuid4())
+        achillio = str(uuid4())
         req = SimpleNamespace(
-            headers={
-                "host": "www.achilliotravel.com",
-                "x-poreiago-office-host": "www.achilliotravel.com",
-            },
-            state=SimpleNamespace(tenant_id=ap.DEMO_TENANT_ID),
+            headers={"host": "www.achilliotravel.com"},
+            state=SimpleNamespace(tenant_id=poreiago),
         )
+        with patch.object(ap, "_tenant_is_achillio_office", new=AsyncMock(return_value=False)):
+            with patch.object(
+                ap,
+                "_resolve_achillio_tenant_id_from_request",
+                new=AsyncMock(return_value=achillio),
+            ):
+                tid, include, claim = await ap._drivers_list_tenant_id(req)
 
-        with patch.object(
-            ap,
-            "_resolve_achillio_tenant_id_from_request",
-            new=AsyncMock(return_value=achillio_tid),
-        ):
+        self.assertEqual(tid, poreiago)
+        self.assertFalse(include)
+        self.assertFalse(claim)
+
+    async def test_achillio_jwt_may_claim_demo_legacy(self):
+        achillio = str(uuid4())
+        req = SimpleNamespace(
+            headers={"host": "www.poreiago.com"},
+            state=SimpleNamespace(tenant_id=achillio),
+        )
+        with patch.object(ap, "_tenant_is_achillio_office", new=AsyncMock(return_value=True)):
             tid, include, claim = await ap._drivers_list_tenant_id(req)
 
-        self.assertEqual(tid, achillio_tid)
+        self.assertEqual(tid, achillio)
         self.assertTrue(include)
         self.assertTrue(claim)
 
-    async def test_poreiago_host_does_not_auto_claim(self):
+    async def test_demo_jwt_on_proxied_achillio_host_remaps(self):
+        achillio = str(uuid4())
+        req = SimpleNamespace(
+            headers={"host": "www.achilliotravel.com"},
+            state=SimpleNamespace(tenant_id=ap.DEMO_TENANT_ID),
+        )
+        with patch.object(
+            ap,
+            "_resolve_achillio_tenant_id_from_request",
+            new=AsyncMock(return_value=achillio),
+        ):
+            with patch.object(ap, "_tenant_is_achillio_office", new=AsyncMock(return_value=True)):
+                tid, include, claim = await ap._drivers_list_tenant_id(req)
+
+        self.assertEqual(tid, achillio)
+        self.assertTrue(include)
+        self.assertTrue(claim)
+
+    async def test_fail_closed_when_not_achillio(self):
         other = str(uuid4())
         platform = str(uuid4())
         req = SimpleNamespace(

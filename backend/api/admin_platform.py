@@ -160,10 +160,15 @@ def _request_tenant_id(request: Request) -> str:
     return DEMO_TENANT_ID
 
 
-def _driver_for_tenant(driver_id: str, tenant_id: str):
-    """Resolve driver for office — includes non-seed DEMO legacy rows."""
+def _driver_for_tenant(
+    driver_id: str,
+    tenant_id: str,
+    *,
+    allow_demo_legacy: bool = False,
+):
+    """Resolve driver for office — DEMO orphans only when claim is allowed."""
     d = get_driver(driver_id)
-    if not driver_visible_to_office(d, tenant_id):
+    if not driver_visible_to_office(d, tenant_id, allow_demo_legacy=allow_demo_legacy):
         return None
     return d
 
@@ -172,7 +177,6 @@ def _normalize_request_host(value: str | None) -> str:
     raw = (value or "").strip().lower()
     if not raw:
         return ""
-    # origin/referer URLs → hostname
     if "://" in raw:
         try:
             from urllib.parse import urlparse
@@ -185,17 +189,17 @@ def _normalize_request_host(value: str | None) -> str:
     return raw
 
 
-def _request_office_hosts(request: Request | None) -> list[str]:
-    """Hostnames that identify which office UI called the API."""
+def _trusted_proxy_hosts(request: Request | None) -> list[str]:
+    """
+    Hostnames from the reverse proxy only — never client-spoofable
+    X-Poreiago-Office-Host / Origin / Referer.
+    """
     if request is None:
         return []
     headers = request.headers
     candidates = [
-        headers.get("x-poreiago-office-host"),
         headers.get("x-forwarded-host"),
         headers.get("host"),
-        headers.get("origin"),
-        headers.get("referer"),
     ]
     out: list[str] = []
     seen: set[str] = set()
@@ -208,11 +212,10 @@ def _request_office_hosts(request: Request | None) -> list[str]:
 
 
 def _host_looks_like_achillio(request: Request | None) -> bool:
-    """True when the admin UI is Achillio Travel (custom domain / subdomain)."""
-    for host in _request_office_hosts(request):
+    """True when the proxied Host is Achillio Travel (custom domain / subdomain)."""
+    for host in _trusted_proxy_hosts(request):
         if "achilliotravel" in host or host.endswith(".achillio.gr") or host == "achillio.gr":
             return True
-        # Local / preview hosts used for the Achillio office.
         if host.startswith("admin-achillio"):
             return True
     return False
@@ -242,19 +245,18 @@ async def _tenant_is_achillio_office(tenant_id: str) -> bool:
 
 
 async def _resolve_achillio_tenant_id_from_request(request: Request | None) -> str | None:
-    """Map Achillio custom-domain Host → office tenant UUID (for claim/list)."""
+    """Map Achillio custom-domain Host → office tenant UUID (proxy Host only)."""
     if request is None or not _host_looks_like_achillio(request):
         return None
     try:
         from middleware.domain_tenant import _resolve_host_cached
 
-        for host in _request_office_hosts(request):
+        for host in _trusted_proxy_hosts(request):
             if not host or host.startswith("api."):
                 continue
             resolved = await _resolve_host_cached(host)
             if resolved and getattr(resolved, "tenant_id", None):
                 return str(resolved.tenant_id)
-            # Try with www. prefix when only apex was sent.
             if not host.startswith("www."):
                 resolved = await _resolve_host_cached(f"www.{host}")
                 if resolved and getattr(resolved, "tenant_id", None):
@@ -264,69 +266,67 @@ async def _resolve_achillio_tenant_id_from_request(request: Request | None) -> s
     return None
 
 
-async def _demo_legacy_flags(
-    tenant_id: str,
-    request: Request | None = None,
-) -> tuple[bool, bool]:
+async def _office_may_claim_demo_legacy(tenant_id: str) -> tuple[bool, bool]:
     """
-    (include, claim) for DEMO-tenant drivers that are not seed demos.
+    (include, claim) for non-seed DEMO drivers — Achillio Travel JWT only.
 
-    Achillio Travel (custom domain Host / platform tenant / Achillio office JWT)
-    may see + permanently claim them. Other SaaS offices stay strictly scoped.
+    Fail closed when platform resolve fails: never let PoreiaGo / random offices
+    inherit Achilleas-style orphans.
     """
-    # Host/Origin from Achillio admin UI always wins — even when JWT still carries
-    # DEMO / platform tenant from an older login.
-    if _host_looks_like_achillio(request):
-        return True, True
-
     tid = str(tenant_id or "").strip()
     if not tid or tid == str(DEMO_TENANT_ID):
         return False, False
 
-    platform_tid = ""
+    if await _tenant_is_achillio_office(tid):
+        return True, True
+
+    # Optional: platform tenant equals Achillio in some deploys.
     try:
         from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
 
         platform_tid = str(await resolve_platform_tenant_id() or "").strip()
     except Exception:
-        logger.debug("resolve_platform_tenant_id failed for drivers list", exc_info=True)
-
-    if platform_tid and tid == platform_tid:
-        return True, True
-
-    if await _tenant_is_achillio_office(tid):
-        return True, True
-
-    if platform_tid:
-        # Known multi-office deploy — do not leak Achilleas to PoreiaGo/etc.
+        logger.debug("resolve_platform_tenant_id failed for drivers claim gate", exc_info=True)
         return False, False
 
-    # DB unavailable / single-office deploy — recover Achilleas-style orphans.
-    return True, True
+    if platform_tid and tid == platform_tid and await _tenant_is_achillio_office(platform_tid):
+        return True, True
+    return False, False
+
+
+async def _demo_legacy_flags(
+    tenant_id: str,
+    request: Request | None = None,
+) -> tuple[bool, bool]:
+    """Backward-compatible wrapper — Host headers must not grant claim alone."""
+    del request  # never authorize from client-controlled Host/Origin
+    return await _office_may_claim_demo_legacy(tenant_id)
 
 
 async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
     """
-    Tenant + legacy flags for GET /drivers.
+    Tenant + legacy flags for driver CRUD / list.
 
-    On Achillio Travel Host, prefer the domain-mapped office tenant so DEMO
-    orphans (Achilleas / Δαφνής) are claimed onto Achillio and appear under Οδηγοί
-    — not only in the trip-form dropdown after a partial cache hit.
+    Isolation rules:
+    1. Real office JWT always wins — never switch tenant via spoofable headers.
+    2. DEMO JWT on a *proxied* Achillio Host may remap to the Achillio office
+       (recovers broken Achillio sessions only).
+    3. DEMO legacy claim is Achillio-only (DB), fail-closed otherwise.
     """
-    jwt_tid = _request_tenant_id(request)
-    include_legacy, claim_legacy = await _demo_legacy_flags(jwt_tid, request)
+    jwt_tid = str(_request_tenant_id(request) or "").strip() or str(DEMO_TENANT_ID)
 
+    # Customer / PoreiaGo / Achillio JWT — scope strictly to that tenant.
+    if jwt_tid != str(DEMO_TENANT_ID):
+        include, claim = await _office_may_claim_demo_legacy(jwt_tid)
+        return jwt_tid, include, claim
+
+    # DEMO JWT: only remap when the reverse-proxy Host is Achillio Travel.
     if _host_looks_like_achillio(request):
         host_tid = await _resolve_achillio_tenant_id_from_request(request)
-        if host_tid and host_tid != str(DEMO_TENANT_ID):
+        if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
             return host_tid, True, True
-        if await _tenant_is_achillio_office(jwt_tid):
-            return jwt_tid, True, True
-        # Host says Achillio but we could not resolve a better tenant — still
-        # include legacy rows under the JWT tenant so the list is not empty.
-        return jwt_tid, True, True
 
-    return jwt_tid, include_legacy, claim_legacy
+    return jwt_tid, False, False
 
 
 def _user_response(u) -> PlatformUserResponse:
@@ -468,7 +468,7 @@ async def upload_driver_photo(file: UploadFile = File(...)):
 @router.post("/drivers", response_model=FleetDriverResponse, status_code=201)
 async def post_driver(request: Request, body: FleetDriverCreate):
     data = body.model_dump()
-    tenant_id, _, _ = await _drivers_list_tenant_id(request)
+    tenant_id, _include, _claim = await _drivers_list_tenant_id(request)
     data["tenant_id"] = tenant_id
     try:
         d = create_driver(data)
@@ -481,8 +481,8 @@ async def post_driver(request: Request, body: FleetDriverCreate):
 
 @router.get("/drivers/{driver_id}", response_model=FleetDriverResponse)
 async def get_driver_api(request: Request, driver_id: str):
-    tenant_id, _, _ = await _drivers_list_tenant_id(request)
-    d = _driver_for_tenant(driver_id, tenant_id)
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
+    d = _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=include_legacy)
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
     return _driver_response(d, enrich_safety=True)
@@ -490,8 +490,8 @@ async def get_driver_api(request: Request, driver_id: str):
 
 @router.patch("/drivers/{driver_id}", response_model=FleetDriverResponse)
 async def patch_driver(request: Request, driver_id: str, body: FleetDriverUpdate):
-    tenant_id, _, _ = await _drivers_list_tenant_id(request)
-    if not _driver_for_tenant(driver_id, tenant_id):
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
+    if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=include_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
     try:
         d = update_driver(driver_id, body.model_dump(exclude_unset=True))
@@ -506,8 +506,8 @@ async def patch_driver(request: Request, driver_id: str, body: FleetDriverUpdate
 
 @router.delete("/drivers/{driver_id}", status_code=204)
 async def remove_driver(request: Request, driver_id: str):
-    tenant_id, _, _ = await _drivers_list_tenant_id(request)
-    if not _driver_for_tenant(driver_id, tenant_id):
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
+    if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=include_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
     try:
         delete_driver(driver_id)
@@ -807,8 +807,19 @@ async def delete_fleet_expense(request: Request, expense_id: str):
     return {"ok": True}
 
 
+def _require_superadmin(request: Request) -> None:
+    """Full-store backups include every office's drivers — superadmin only."""
+    roles = set(getattr(request.state, "roles", None) or [])
+    if "superadmin" not in roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Μόνο superadmin — τα backup περιέχουν οδηγούς όλων των γραφείων",
+        )
+
+
 @router.get("/backups", response_model=list[BackupInfoResponse])
-async def get_backups():
+async def get_backups(request: Request):
+    _require_superadmin(request)
     return [
         BackupInfoResponse(
             id=b["id"],
@@ -822,7 +833,8 @@ async def get_backups():
 
 
 @router.post("/backups", response_model=BackupCreateResponse)
-async def post_backup():
+async def post_backup(request: Request):
+    _require_superadmin(request)
     b = create_backup()
     return BackupCreateResponse(
         backup=BackupInfoResponse(
@@ -837,7 +849,8 @@ async def post_backup():
 
 
 @router.post("/backups/{backup_id}/restore", response_model=BackupRestoreResponse)
-async def post_restore(backup_id: str):
+async def post_restore(request: Request, backup_id: str):
+    _require_superadmin(request)
     try:
         result = restore_backup(backup_id)
     except FileNotFoundError:
@@ -846,7 +859,8 @@ async def post_restore(backup_id: str):
 
 
 @router.get("/backups/{backup_id}/download")
-async def download_backup(backup_id: str):
+async def download_backup(request: Request, backup_id: str):
+    _require_superadmin(request)
     path = BACKUP_DIR / f"{backup_id}.json"
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Backup not found")
@@ -854,7 +868,8 @@ async def download_backup(backup_id: str):
 
 
 @router.delete("/backups/{backup_id}", status_code=204)
-async def remove_backup(backup_id: str):
+async def remove_backup(request: Request, backup_id: str):
+    _require_superadmin(request)
     try:
         delete_backup(backup_id)
     except FileNotFoundError:
@@ -889,9 +904,13 @@ async def issue_master_qr(body: MasterQrIssueRequest, request: Request):
         resolve_platform_tenant_id,
     )
 
-    tenant_id = _request_tenant_id(request)
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
     if tenant_id == DEMO_TENANT_ID:
         tenant_id = await resolve_platform_tenant_id()
+    if body.driver_id and not _driver_for_tenant(
+        body.driver_id, str(tenant_id), allow_demo_legacy=include_legacy
+    ):
+        raise HTTPException(status_code=404, detail="Ο οδηγός δεν ανήκει σε αυτό το γραφείο")
     result = await issue_master_qr_hybrid(
         body.trip_id,
         driver_id=body.driver_id,
@@ -920,9 +939,13 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest, request: Reques
     )
     from travel_platform.operations.master_qr_normalize import build_driver_auth_url, driver_app_public_base
 
-    tenant_id = _request_tenant_id(request)
+    tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
     if tenant_id == DEMO_TENANT_ID:
         tenant_id = await resolve_platform_tenant_id()
+    if body.driver_id and not _driver_for_tenant(
+        body.driver_id, str(tenant_id), allow_demo_legacy=include_legacy
+    ):
+        raise HTTPException(status_code=404, detail="Ο οδηγός δεν ανήκει σε αυτό το γραφείο")
     result = await issue_master_qr_hybrid(
         body.trip_id,
         driver_id=body.driver_id,
