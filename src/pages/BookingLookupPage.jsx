@@ -43,8 +43,23 @@ export default function BookingLookupPage() {
 
   useEffect(() => {
     let cancelled = false;
+    // Rent deep-link / RB-… code landed on bus lookup → send to green Rent flow.
+    const qRef = (
+      searchParams.get('ref') ||
+      searchParams.get('reference') ||
+      searchParams.get('code') ||
+      ''
+    ).toUpperCase();
+    const fromRent =
+      searchParams.get('from') === 'rent' ||
+      (typeof document !== 'undefined' &&
+        /\/rent(\/|$|\?)/.test(String(document.referrer || '')));
+    if (fromRent || qRef.startsWith('RB-')) {
+      const qs = searchParams.toString();
+      navigate(`/rent/my-booking${qs ? `?${qs}` : ''}`, { replace: true });
+      return undefined;
+    }
     const qEmail = searchParams.get('email') || '';
-    const qRef = searchParams.get('ref') || searchParams.get('reference') || searchParams.get('code') || '';
     let saved = '';
     try {
       saved = localStorage.getItem(EMAIL_KEY) || '';
@@ -63,7 +78,7 @@ export default function BookingLookupPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   const canSubmit = useMemo(
     () => Boolean(email.trim() && reference.trim() && !loading),
