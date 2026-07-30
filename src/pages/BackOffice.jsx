@@ -23,6 +23,7 @@ import HybridSlaDashboard from '../components/admin/HybridSlaDashboard.jsx';
 import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
 import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
 import AdminNotificationBell from '../components/admin/AdminNotificationBell.jsx';
+import AdminAccountMenu from '../components/admin/AdminAccountMenu.jsx';
 import OfficeWalletShareCard from '../components/admin/OfficeWalletShareCard.jsx';
 import { FleetTelemetryProvider } from '../context/FleetTelemetryContext.jsx';
 import ImpersonationBanner from '../components/admin/ImpersonationBanner.jsx';
@@ -2318,14 +2319,18 @@ export default function BackOffice() {
                 if (extra.driverId) setChatFocusDriverId(extra.driverId);
               }}
             />
-            <div className="flex items-center gap-3 pl-3 sm:pl-4 border-l border-black/[0.05]">
-              <div className="hidden sm:block">
-                <p className="font-label-md text-label-md text-on-surface cursor-pointer hover:text-primary" onClick={() => {
-                  localStorage.removeItem('userRole');
-                  clearSaasSession();
-                  navigate('/admin/login');
-                }}>Admin User (Logout)</p>
-              </div>
+            <div className="pl-2 sm:pl-3 border-l border-black/[0.06]">
+              <AdminAccountMenu
+                onOpenSettings={() => {
+                  setActiveTab('settings');
+                  setSettingsSubTab(
+                    sanitizeSettingsSubTab(
+                      settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB,
+                      isSaasSuperAdmin(),
+                    ),
+                  );
+                }}
+              />
             </div>
           </div>
         </header>
