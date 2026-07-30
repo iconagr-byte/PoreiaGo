@@ -1,4 +1,29 @@
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import { readPageSlider } from '../../lib/homepage/pageSlider.js';
+import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
+
+function HeroMedia({ siteAppearance, heroUrl }) {
+  const slider = readPageSlider(siteAppearance, 'home');
+  if (slider.enabled) {
+    return (
+      <SiteHeroSlider
+        slides={slider.slides}
+        autoplay={slider.autoplay}
+        intervalSec={slider.interval_sec}
+        variant="media"
+        accent="bus"
+        ariaLabel="Hero slider εκδρομών"
+      />
+    );
+  }
+  return (
+    <div
+      className="absolute inset-0 bg-cover bg-[center_40%] bg-no-repeat"
+      style={{ backgroundImage: `url('${heroUrl}')` }}
+      aria-hidden
+    />
+  );
+}
 
 export default function StorefrontHero({
   siteAppearance,
@@ -7,6 +32,7 @@ export default function StorefrontHero({
 }) {
   const heroUrl =
     resolveSiteAssetUrl(siteAppearance.hero_image_url) || '/images/hero-bus-achillio.png';
+  const sliderOn = readPageSlider(siteAppearance, 'home').enabled;
 
   const badge = siteAppearance.hero_badge ? (
     <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 text-white/95 font-bold text-[11px] uppercase tracking-[0.2em] rounded-full mb-6 border border-white/20 backdrop-blur-md">
@@ -44,10 +70,16 @@ export default function StorefrontHero({
             {searchForm}
           </div>
         </div>
-        <div
-          className="min-h-[40vh] md:min-h-full bg-cover bg-center order-1 md:order-2"
-          style={{ backgroundImage: `url('${heroUrl}')` }}
-        />
+        <div className="relative min-h-[40vh] md:min-h-full order-1 md:order-2 overflow-hidden">
+          {sliderOn ? (
+            <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+          ) : (
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url('${heroUrl}')` }}
+            />
+          )}
+        </div>
       </section>
     );
   }
@@ -55,10 +87,9 @@ export default function StorefrontHero({
   if (templateId === 'centered_compact') {
     return (
       <section className="relative min-h-[min(70vh,640px)] flex items-center justify-center px-margin-desktop overflow-hidden bg-slate-900">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-40"
-          style={{ backgroundImage: `url('${heroUrl}')` }}
-        />
+        <div className="absolute inset-0 opacity-40">
+          <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+        </div>
         <div className="absolute inset-0 bg-slate-950/70" />
         <div className="relative z-10 w-full max-w-3xl mx-auto text-center py-32 pt-40">
           <div className="flex flex-col items-center">
@@ -82,10 +113,7 @@ export default function StorefrontHero({
   if (templateId === 'bottom_search') {
     return (
       <section className="relative min-h-[min(92vh,880px)] flex flex-col justify-end px-margin-desktop overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-[center_40%]"
-          style={{ backgroundImage: `url('${heroUrl}')` }}
-        />
+        <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-900/30" />
         <div className="relative z-10 w-full max-w-container-max mx-auto pb-12 pt-36">
           <div className="max-w-2xl mb-8">
@@ -101,10 +129,9 @@ export default function StorefrontHero({
   if (templateId === 'gradient_mesh') {
     return (
       <section className="relative min-h-[min(80vh,760px)] flex items-center px-margin-desktop overflow-hidden bg-gradient-to-br from-indigo-950 via-violet-900 to-sky-900">
-        <div
-          className="absolute inset-0 opacity-20 bg-cover bg-center mix-blend-overlay"
-          style={{ backgroundImage: `url('${heroUrl}')` }}
-        />
+        <div className="absolute inset-0 opacity-20 mix-blend-overlay">
+          <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+        </div>
         <div className="absolute top-1/4 -left-20 w-96 h-96 bg-sky-400/30 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-0 w-[28rem] h-[28rem] bg-violet-500/25 rounded-full blur-3xl" />
         <div className="relative z-10 w-full max-w-container-max mx-auto py-32 pt-40">
@@ -122,10 +149,7 @@ export default function StorefrontHero({
     return (
       <section className="relative px-margin-desktop py-28 lg:py-32 pt-36 bg-slate-100">
         <div className="max-w-container-max mx-auto rounded-[40px] overflow-hidden shadow-2xl border border-black/[0.06] min-h-[min(72vh,680px)] flex items-center relative">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url('${heroUrl}')` }}
-          />
+          <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/70 to-transparent" />
           <div className="relative z-10 p-8 md:p-14 max-w-2xl">
             {badge}
@@ -140,12 +164,9 @@ export default function StorefrontHero({
   // fullscreen_overlay (default)
   return (
     <section className="relative w-full min-h-[min(88vh,820px)] flex items-center justify-center px-margin-desktop overflow-hidden">
-      <div
-        className="absolute inset-0 bg-cover bg-[center_40%] bg-no-repeat"
-        style={{ backgroundImage: `url('${heroUrl}')` }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/92 via-slate-900/75 to-slate-900/40" />
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-900/30" />
+      <HeroMedia siteAppearance={siteAppearance} heroUrl={heroUrl} />
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/92 via-slate-900/75 to-slate-900/40 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-900/30 pointer-events-none" />
       <div className="relative z-10 w-full max-w-container-max mx-auto py-28 lg:py-32 pt-36">
         <div className="max-w-2xl">
           {badge}
