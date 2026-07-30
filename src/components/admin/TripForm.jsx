@@ -11,7 +11,6 @@ import HybridTimelineBuilder from './hybrid/HybridTimelineBuilder.jsx';
 import HybridCostCalculator from './hybrid/HybridCostCalculator.jsx';
 import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
-import HybridChangeLogPanel from './hybrid/HybridChangeLogPanel.jsx';
 import HybridRoomingExtras from './hybrid/HybridRoomingExtras.jsx';
 import HybridSupplierCosts from './hybrid/HybridSupplierCosts.jsx';
 import HybridRebookWhatsApp from './hybrid/HybridRebookWhatsApp.jsx';
@@ -991,14 +990,6 @@ export default function TripForm({
         }
       >
         <HybridPassengerManifest formData={formData} setFormData={setFormData} tripId={tripId} />
-      </Section>
-
-      <Section
-        icon="history"
-        title="Hybrid change log"
-        hint="Ποιος άλλαξε πτήσεις / pickup / manifest και πότε."
-      >
-        <HybridChangeLogPanel formData={formData} />
       </Section>
 
       <Section
