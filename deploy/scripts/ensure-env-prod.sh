@@ -148,6 +148,20 @@ set_kv "TWILIO_AUTH_TOKEN" ""
 set_kv "TWILIO_FROM_NUMBER" ""
 set_kv "TWILIO_WHATSAPP_FROM" ""
 
+# Fiscal — Fernet key for Prosvasis/Epsilon secrets in tenants.settings_json
+echo "==> Ensuring FISCAL_ENCRYPTION_KEY"
+if ! grep -q "^FISCAL_ENCRYPTION_KEY=.\+" "$ENV_FILE" 2>/dev/null; then
+  if python3 -c "from cryptography.fernet import Fernet" 2>/dev/null; then
+    _fkey="$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+  else
+    _fkey="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+  fi
+  replace_kv "FISCAL_ENCRYPTION_KEY" "$_fkey"
+  echo "  + generated FISCAL_ENCRYPTION_KEY"
+fi
+set_kv "AADE_MODE" "stub"
+set_kv "AADE_SECRETS_BACKEND" "env"
+
 # My Wallet Google Sign-In — see deploy/GOOGLE-SIGNIN.md
 echo "==> Ensuring Google Sign-In env keys"
 set_kv "GOOGLE_CLIENT_ID" ""

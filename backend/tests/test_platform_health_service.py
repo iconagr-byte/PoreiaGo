@@ -46,6 +46,15 @@ class PlatformHealthServiceTests(unittest.IsolatedAsyncioTestCase):
             resolve_overall_status(db_status="ok", redis_status="ok", fiscal_health="degraded"),
             "degraded",
         )
+        self.assertEqual(
+            resolve_overall_status(
+                db_status="ok",
+                redis_status="ok",
+                fiscal_health="ok",
+                celery_status="fail",
+            ),
+            "degraded",
+        )
 
 
 if __name__ == "__main__":
