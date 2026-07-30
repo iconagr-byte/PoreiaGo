@@ -12,6 +12,7 @@ function HeroMedia({ siteAppearance, heroUrl }) {
         slides={slider.slides}
         autoplay={slider.autoplay}
         intervalSec={slider.interval_sec}
+        options={slider.options}
         variant="media"
         accent="bus"
         ariaLabel="Hero slider εκδρομών"
