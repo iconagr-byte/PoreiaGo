@@ -693,7 +693,11 @@ async def get_public_office_modules(
         try:
             from app.core.database import AsyncSessionLocal
             from olympus.tenant.domain_resolver import DomainResolver
-            from app.services.tenant_modules import modules_for_tenant
+            from app.services.tenant_modules import (
+                apply_known_office_rent_policy,
+                is_poreiago_platform_office,
+                modules_for_tenant,
+            )
             from sqlalchemy import select
             from app.models.tenant import Tenant
 
@@ -705,11 +709,42 @@ async def get_public_office_modules(
                     )
                     tenant = row.scalar_one_or_none()
                     if tenant:
-                        return OfficeModulesResponse(**modules_for_tenant(tenant))
+                        try:
+                            updated = apply_known_office_rent_policy(tenant)
+                            if updated is not None:
+                                tenant.settings_json = json.dumps(
+                                    updated, ensure_ascii=False
+                                )
+                                await session.commit()
+                                await session.refresh(tenant)
+                        except Exception:
+                            logger.debug(
+                                "apply_known_office_rent_policy skipped on /site/modules",
+                                exc_info=True,
+                            )
+                        mods = modules_for_tenant(tenant)
+                        if is_poreiago_platform_office(tenant):
+                            mods = {
+                                **mods,
+                                "rent_enabled": True,
+                                "trips_enabled": True,
+                                "mode": "both",
+                            }
+                        return OfficeModulesResponse(**mods)
         except Exception:
             logger.exception("office modules resolve failed for host=%s", effective_host)
 
-    # Platform / unknown host — default bus storefront shape.
+    host_l = str(effective_host or "").strip().lower().split(":")[0].removeprefix("www.")
+    # PoreiaGo marketing apex — Rent + trips (platform product), not bus-only.
+    if host_l in {"", "poreiago.com", "localhost", "127.0.0.1"}:
+        return OfficeModulesResponse(
+            trips_enabled=True,
+            rent_enabled=True,
+            plan="professional",
+            mode="both",
+        )
+
+    # Unknown tenant host — default bus storefront shape.
     return OfficeModulesResponse(
         trips_enabled=True,
         rent_enabled=False,
