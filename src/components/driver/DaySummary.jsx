@@ -38,12 +38,6 @@ export default function DaySummary() {
       icon: 'groups',
       names: boardedList,
     },
-    {
-      label: 'Ημερήσια αμοιβή',
-      value: `€${stats.dailyEarnings.toFixed(2)}`,
-      tone: 'green',
-      icon: 'payments',
-    },
   ];
 
   return (

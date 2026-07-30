@@ -193,7 +193,8 @@ export async function fetchDriverManifest() {
     if (res.ok) {
       const data = await res.json();
       await cacheManifestForOffline(tripId, data);
-      window.dispatchEvent(new CustomEvent('driver-manifest-updated', { detail: { tripId } }));
+      // Do not dispatch here — polling listeners would recurse. Mutating
+      // flows (e.g. Scanner check-in) dispatch `driver-manifest-updated`.
       return data;
     }
   } catch {
@@ -276,11 +277,20 @@ export async function driverCheckin({ qrRaw, ticketId, tripId } = {}) {
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok) return data;
+    if (res.ok) {
+      window.dispatchEvent(
+        new CustomEvent('driver-manifest-updated', { detail: { tripId: activeTrip } }),
+      );
+      return data;
+    }
     return { ...data, result: data.result || 'FAILURE', ok: false };
   } catch {
     if (import.meta.env.DEV && qrRaw) {
-      return adminScanTicket({ qr: qrRaw, tripId: activeTrip });
+      const data = await adminScanTicket({ qr: qrRaw, tripId: activeTrip });
+      window.dispatchEvent(
+        new CustomEvent('driver-manifest-updated', { detail: { tripId: activeTrip } }),
+      );
+      return data;
     }
     throw new Error('Δεν υπάρχει σύνδεση με τον server');
   }
@@ -493,7 +503,6 @@ export function getDaySummaryStats(manifest) {
     totalKm: session?.totalKm ?? 142,
     passengersBoarded: boarded,
     boardedPassengers: boardedList,
-    dailyEarnings: session?.dailyEarnings ?? boarded * 12.5,
     tripId: session?.tripId,
   };
 }
