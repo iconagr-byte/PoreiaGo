@@ -6,6 +6,7 @@ import {
   normalizeIncludedDefaults,
   extrasDayTotal,
   readExtrasSelection,
+  resolveUpsellCoverage,
   visibleCoverageOptions,
 } from './rentBookingExtras.js';
 
@@ -38,5 +39,15 @@ describe('rentBookingExtras catalog', () => {
   it('normalizes included bullets', () => {
     expect(normalizeIncludedDefaults(['  a ', '', 'b'])).toEqual(['a', 'b']);
     expect(normalizeIncludedDefaults([])).toContain('Basic CDW');
+  });
+
+  it('resolves preferred upsell when not selected', () => {
+    const opts = normalizeCoverageOptions(RENT_COVERAGE_OPTIONS);
+    const preferred = opts.find((o) => o.id === 'super_cover') || opts[1];
+    const hit = resolveUpsellCoverage(opts, {}, preferred.id);
+    expect(hit?.id).toBe(preferred.id);
+    const afterPick = resolveUpsellCoverage(opts, { [preferred.formKey]: true }, preferred.id);
+    expect(afterPick?.id).not.toBe(preferred.id);
+    expect(afterPick).toBeTruthy();
   });
 });

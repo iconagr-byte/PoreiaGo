@@ -163,7 +163,25 @@ export function readCoverageCatalog(appearance) {
   return {
     options: normalizeCoverageOptions(appearance?.rent_coverage_options),
     included: normalizeIncludedDefaults(appearance?.rent_included_defaults),
+    upsellId: String(appearance?.rent_upsell_coverage_id || '').trim(),
   };
+}
+
+/**
+ * Preferred upsell card on details step when the customer has not selected it yet.
+ * Falls back to the first visible unselected option.
+ */
+export function resolveUpsellCoverage(catalog, selection = {}, preferredId = '') {
+  const visible = visibleCoverageOptions(catalog);
+  if (!visible.length) return null;
+  const unselected = visible.filter((opt) => !selection?.[opt.formKey]);
+  if (!unselected.length) return null;
+  const want = String(preferredId || '').trim();
+  if (want) {
+    const hit = unselected.find((opt) => opt.id === want || opt.formKey === want);
+    if (hit) return hit;
+  }
+  return unselected[0];
 }
 
 export function rentalDayCount(startTime, endTime) {

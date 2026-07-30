@@ -48,6 +48,7 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_pickup_locations": [],
     "rent_coverage_options": [],
     "rent_included_defaults": [],
+    "rent_upsell_coverage_id": "",
     "home_slider_enabled": False,
     "home_slider_autoplay": True,
     "home_slider_interval_sec": 5,
