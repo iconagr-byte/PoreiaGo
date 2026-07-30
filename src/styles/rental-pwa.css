@@ -136,9 +136,18 @@
   object-position: center;
 }
 
+.rent-hero-media .rent-hero-slider,
+.rent-hero-media .site-hero-slider {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
 .rent-hero-shade {
   position: absolute;
   inset: 0;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .rent-hero-shade--x {

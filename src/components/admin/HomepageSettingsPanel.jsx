@@ -5,6 +5,7 @@ import TemplatePicker from './homepage/TemplatePicker.jsx';
 import ThemeGallery from './homepage/ThemeGallery.jsx';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
+import PageSliderEditor from './homepage/PageSliderEditor.jsx';
 import {
   FOOTER_TEMPLATES,
   HEADER_TEMPLATES,
@@ -18,6 +19,7 @@ import {
   themeToAppearancePatch,
 } from '../../lib/homepage/homepageThemes.js';
 import { pushHomepagePreviewDraft } from '../../lib/homepage/homepagePreview.js';
+import { pageSliderPatch } from '../../lib/homepage/pageSlider.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
 import {
   clearSiteAsset,
@@ -48,7 +50,7 @@ const DESIGN_PAGES = [
     id: 'home',
     label: 'Λεωφορεία',
     title: 'Αρχική · εκδρομές',
-    blurb: 'Θέματα, hero και κάρτες εκδρομών της αρχικής σελίδας.',
+    blurb: 'Θέματα, hero, slider και κάρτες εκδρομών της αρχικής σελίδας.',
     previewTo: '/storefront?preview=1',
     previewLabel: 'Προεπισκόπηση σε νέο tab',
     icon: 'directions_bus',
@@ -60,7 +62,7 @@ const DESIGN_PAGES = [
     id: 'rent',
     label: 'Ενοικιάσεις',
     title: 'Σελίδα /rent',
-    blurb: 'Όνομα γραφείου, τίτλοι και κείμενα για την εφαρμογή ενοικίασης.',
+    blurb: 'Όνομα γραφείου, κείμενα και hero slider για την εφαρμογή ενοικίασης.',
     previewTo: '/rent',
     previewLabel: 'Άνοιγμα /rent',
     icon: 'car_rental',
@@ -76,6 +78,7 @@ const HOME_SECTIONS = [
   { id: 'general', label: 'Γενικά', icon: 'tune', accent: 'bg-slate-600' },
   { id: 'header', label: 'Header', icon: 'web_asset', accent: 'bg-sky-500' },
   { id: 'hero', label: 'Hero', icon: 'panorama', accent: 'bg-indigo-500' },
+  { id: 'slider', label: 'Slider', icon: 'slideshow', accent: 'bg-cyan-600' },
   { id: 'trips', label: 'Καρτέλες εκδρομών', icon: 'view_carousel', accent: 'bg-emerald-500' },
   { id: 'branding', label: 'Λογότυπο & εικόνες', icon: 'image', accent: 'bg-amber-500' },
   { id: 'footer', label: 'Footer', icon: 'vertical_align_bottom', accent: 'bg-rose-500' },
@@ -84,6 +87,7 @@ const HOME_SECTIONS = [
 const RENT_SECTIONS = [
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-teal-600' },
   { id: 'copy', label: 'Όνομα & κείμενα', icon: 'edit_note', accent: 'bg-cyan-600' },
+  { id: 'slider', label: 'Slider', icon: 'slideshow', accent: 'bg-emerald-600' },
 ];
 
 function sanitizeDesignPage(value) {
@@ -812,21 +816,36 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 </PanelCard>
                 <PanelCard
                   title="Γρήγορη εκκίνηση"
-                  description="Επεξεργαστείτε όνομα, τίτλους και κείμενα — με ζωντανή προεπισκόπηση κινητού."
+                  description="Επεξεργαστείτε όνομα, τίτλους, κείμενα και hero slider."
                 >
-                  <button
-                    type="button"
-                    onClick={() => setSection('copy')}
-                    className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full sm:max-w-md"
-                  >
-                    <span className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <span className="material-symbols-outlined">edit_note</span>
-                    </span>
-                    <span>
-                      <span className="font-bold text-gray-900 block">Όνομα & κείμενα</span>
-                      <span className="text-xs text-gray-500">Συνδεδεμένος / επισκέπτης · CTA</span>
-                    </span>
-                  </button>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSection('copy')}
+                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
+                    >
+                      <span className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <span className="material-symbols-outlined">edit_note</span>
+                      </span>
+                      <span>
+                        <span className="font-bold text-gray-900 block">Όνομα & κείμενα</span>
+                        <span className="text-xs text-gray-500">Συνδεδεμένος / επισκέπτης · CTA</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSection('slider')}
+                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
+                    >
+                      <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <span className="material-symbols-outlined">slideshow</span>
+                      </span>
+                      <span>
+                        <span className="font-bold text-gray-900 block">Slider</span>
+                        <span className="text-xs text-gray-500">Hero φωτογραφίες · autoplay</span>
+                      </span>
+                    </button>
+                  </div>
                 </PanelCard>
               </>
             )}
@@ -840,6 +859,38 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   onSaved={(appearance) => {
                     if (appearance) setForm((p) => ({ ...p, ...appearance }));
                   }}
+                />
+              </PanelCard>
+            )}
+            {section === 'slider' && (
+              <PanelCard
+                title="Hero Slider · Ενοικιάσεις"
+                description="Ισχυρό carousel στο /rent — βέλη, dots, swipe και αυτόματη εναλλαγή."
+              >
+                <PageSliderEditor
+                  page="rent"
+                  enabled={Boolean(form.rent_slider_enabled)}
+                  autoplay={form.rent_slider_autoplay !== false}
+                  intervalSec={form.rent_slider_interval_sec}
+                  slides={form.rent_slider_slides}
+                  saving={saving}
+                  onChange={(next) =>
+                    setForm((p) => ({
+                      ...p,
+                      ...pageSliderPatch('rent', next),
+                    }))
+                  }
+                  onSave={() =>
+                    patchForm(
+                      pageSliderPatch('rent', {
+                        enabled: Boolean(form.rent_slider_enabled),
+                        autoplay: form.rent_slider_autoplay !== false,
+                        interval_sec: form.rent_slider_interval_sec,
+                        slides: form.rent_slider_slides,
+                      }),
+                      'Το slider ενοικιάσεων αποθηκεύτηκε',
+                    )()
+                  }
                 />
               </PanelCard>
             )}
@@ -1110,6 +1161,39 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               </div>
             </PanelCard>
           </form>
+        )}
+
+        {designPage === 'home' && section === 'slider' && (
+          <PanelCard
+            title="Hero Slider · Λεωφορεία"
+            description="Ισχυρό carousel στην αρχική — βέλη, dots, swipe και αυτόματη εναλλαγή. Αντικαθιστά τη σταθερή hero εικόνα όταν είναι ενεργό."
+          >
+            <PageSliderEditor
+              page="home"
+              enabled={Boolean(form.home_slider_enabled)}
+              autoplay={form.home_slider_autoplay !== false}
+              intervalSec={form.home_slider_interval_sec}
+              slides={form.home_slider_slides}
+              saving={saving}
+              onChange={(next) =>
+                setForm((p) => ({
+                  ...p,
+                  ...pageSliderPatch('home', next),
+                }))
+              }
+              onSave={() =>
+                patchForm(
+                  pageSliderPatch('home', {
+                    enabled: Boolean(form.home_slider_enabled),
+                    autoplay: form.home_slider_autoplay !== false,
+                    interval_sec: form.home_slider_interval_sec,
+                    slides: form.home_slider_slides,
+                  }),
+                  'Το slider λεωφορείων αποθηκεύτηκε',
+                )()
+              }
+            />
+          </PanelCard>
         )}
 
         {designPage === 'home' && section === 'trips' && (

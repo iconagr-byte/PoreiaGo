@@ -417,6 +417,14 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_guest_hero_title: str = ""
     rent_guest_hero_copy: str = ""
     rent_cta_label: str = ""
+    home_slider_enabled: bool = False
+    home_slider_autoplay: bool = True
+    home_slider_interval_sec: int = 5
+    home_slider_slides: list[dict] = []
+    rent_slider_enabled: bool = False
+    rent_slider_autoplay: bool = True
+    rent_slider_interval_sec: int = 5
+    rent_slider_slides: list[dict] = []
     homepage_theme_id: str = "aegean_classic"
     accent_color: str = "#0ea5e9"
     show_fleet_section: bool = True
@@ -442,6 +450,14 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_guest_hero_title: str | None = None
     rent_guest_hero_copy: str | None = None
     rent_cta_label: str | None = None
+    home_slider_enabled: bool | None = None
+    home_slider_autoplay: bool | None = None
+    home_slider_interval_sec: int | None = Field(default=None, ge=3, le=20)
+    home_slider_slides: list[dict] | None = None
+    rent_slider_enabled: bool | None = None
+    rent_slider_autoplay: bool | None = None
+    rent_slider_interval_sec: int | None = Field(default=None, ge=3, le=20)
+    rent_slider_slides: list[dict] | None = None
     homepage_theme_id: str | None = None
     accent_color: str | None = None
     show_fleet_section: bool | None = None

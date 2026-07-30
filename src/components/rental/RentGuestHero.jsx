@@ -3,9 +3,12 @@ import {
   RENT_GUEST_HERO_IMAGE,
   rentGuestHeroStats,
 } from '../../lib/rental/rentGuestHero.js';
+import { readPageSlider } from '../../lib/homepage/pageSlider.js';
+import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
 
 /**
  * Full-bleed photo hero for guest /rent — mirrors platform bus landing form.
+ * Uses page slider when rent_slider_* is enabled in site appearance.
  */
 export default function RentGuestHero({
   brandLabel = 'Ενοικίαση',
@@ -14,6 +17,7 @@ export default function RentGuestHero({
   copy,
   carCount = 0,
   vanCount = 0,
+  siteAppearance,
   onBrowseFleet,
   onStartSearch,
   onRequireLogin,
@@ -22,6 +26,7 @@ export default function RentGuestHero({
   const accent = String(titleAccent || '').trim() || RENT_GUEST_HERO.titleAccent;
   const subtitle = String(copy || '').trim();
   const stats = rentGuestHeroStats({ carCount, vanCount });
+  const slider = readPageSlider(siteAppearance, 'rent');
   const startSearch =
     typeof onStartSearch === 'function'
       ? onStartSearch
@@ -31,8 +36,20 @@ export default function RentGuestHero({
 
   return (
     <section className="rent-hero rent-hero--landing" aria-label="Ενοικίαση">
-      <div className="rent-hero-media" aria-hidden>
-        <img src={RENT_GUEST_HERO_IMAGE} alt="" />
+      <div className="rent-hero-media" aria-hidden={!slider.enabled}>
+        {slider.enabled ? (
+          <SiteHeroSlider
+            slides={slider.slides}
+            autoplay={slider.autoplay}
+            intervalSec={slider.interval_sec}
+            variant="media"
+            accent="rent"
+            ariaLabel="Hero slider ενοικιάσεων"
+            className="rent-hero-slider"
+          />
+        ) : (
+          <img src={RENT_GUEST_HERO_IMAGE} alt="" />
+        )}
         <div className="rent-hero-shade rent-hero-shade--x" />
         <div className="rent-hero-shade rent-hero-shade--y" />
         <div className="rent-hero-glow" />

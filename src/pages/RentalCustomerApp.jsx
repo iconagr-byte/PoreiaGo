@@ -78,6 +78,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const navigate = useNavigate();
   const [branding, setBranding] = useState(() => resolveRentAppBranding({}, { guest: true }));
   const [footerAddress, setFooterAddress] = useState('');
+  const [siteAppearance, setSiteAppearance] = useState(null);
   const [pickupLocations, setPickupLocations] = useState([]);
   const [homeFleet, setHomeFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
@@ -125,6 +126,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         if (cancelled) return;
         const brand = resolveOfficeBrand(data || {});
         setFooterAddress(String(data?.footer_address || '').trim());
+        setSiteAppearance(data || null);
         setPickupLocations(
           Array.isArray(data?.rent_pickup_locations)
             ? data.rent_pickup_locations.map((x) => String(x || '').trim()).filter(Boolean)
@@ -184,6 +186,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             copy={branding.copy}
             carCount={carCount}
             vanCount={vanCount}
+            siteAppearance={siteAppearance}
             onBrowseFleet={() => {
               const el = document.getElementById('rent-guest-fleet');
               el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
