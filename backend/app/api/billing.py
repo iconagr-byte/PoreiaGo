@@ -31,6 +31,8 @@ from app.services.billing_service import BillingService, stripe_readiness
 from app.services.tenant_modules import (
     enable_rent_addon_in_settings,
     initial_settings_for_plan,
+    is_achillio_travel_office,
+    is_poreiago_platform_office,
     modules_for_tenant,
     parse_tenant_settings,
 )
@@ -84,8 +86,18 @@ async def get_office_modules(
 ):
     """Authenticated office product modules — drives Back Office nav for Rent-only."""
     tenant = await _load_tenant(db, tenant_id)
-    return OfficeModulesResponse(**modules_for_tenant(tenant))
-
+    mods = modules_for_tenant(tenant)
+    if is_achillio_travel_office(tenant):
+        kind = "achillio_travel"
+    elif is_poreiago_platform_office(tenant):
+        kind = "poreiago_platform"
+    else:
+        kind = "customer"
+    return OfficeModulesResponse(
+        **mods,
+        tenant_slug=tenant.slug,
+        office_kind=kind,
+    )
 
 def _dump_settings(settings: dict[str, Any]) -> str:
     return json.dumps(settings, ensure_ascii=False)

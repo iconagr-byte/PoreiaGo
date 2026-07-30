@@ -196,6 +196,20 @@ async def lifespan(app: FastAPI):
         logger.warning("Web Push VAPID bootstrap failed: %s", exc)
     try:
         from app.core.database import AsyncSessionLocal
+        from app.services.tenant_modules import ensure_known_office_rent_modules
+
+        async with AsyncSessionLocal() as session:
+            rent_sync = await ensure_known_office_rent_modules(session)
+            if rent_sync.get("achillio_rent_disabled") or rent_sync.get("poreiago_rent_enabled"):
+                __import__("logging").getLogger("poreiago.startup").info(
+                    "Office Rent policy synced: %s", rent_sync
+                )
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Office Rent policy sync skipped: %s", exc
+        )
+    try:
+        from app.core.database import AsyncSessionLocal
         from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
 
         async with AsyncSessionLocal() as session:

@@ -145,6 +145,21 @@ echo "==> DB migrations (alembic → hybrid flights/meta, trip_coordinates / Pos
 $COMPOSE exec -T api-blue alembic upgrade head \
   || echo "WARNING: alembic upgrade failed — will retry ensure on API lifespan"
 
+echo "==> Ensure Rent modules (Achillio off / PoreiaGo platform on — never global wipe)"
+$COMPOSE exec -T api-blue python - <<'PY' \
+  || echo "WARNING: rent module policy sync failed (API lifespan will retry)"
+from app.core.database import AsyncSessionLocal
+from app.services.tenant_modules import ensure_known_office_rent_modules
+import asyncio
+
+async def main():
+    async with AsyncSessionLocal() as session:
+        result = await ensure_known_office_rent_modules(session)
+        print(result)
+
+asyncio.run(main())
+PY
+
 echo "==> Waiting for API health"
 api_ok=0
 www_ok=0

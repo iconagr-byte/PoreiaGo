@@ -6,6 +6,8 @@ import {
   officeModeFromModules,
   resolveDesignPageForModules,
 } from '../lib/admin/officeDesignPages.js';
+import { canAccessPlatformOperatorUi } from '../lib/saasJwt.js';
+import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 
 export {
   contractDesignLabel,
@@ -20,6 +22,8 @@ export const DEFAULT_OFFICE_MODULES = {
   rent_enabled: false,
   plan: 'starter',
   mode: 'trips_only',
+  tenant_slug: null,
+  office_kind: 'customer',
 };
 
 function normalizeModules(data = {}) {
@@ -28,6 +32,8 @@ function normalizeModules(data = {}) {
     rent_enabled: Boolean(data.rent_enabled),
     plan: String(data.plan || 'starter'),
     mode: String(data.mode || 'trips_only'),
+    tenant_slug: data.tenant_slug ? String(data.tenant_slug) : null,
+    office_kind: String(data.office_kind || 'customer'),
   };
 }
 
@@ -61,4 +67,27 @@ export async function fetchAdminOfficeModules() {
   } catch {
     return { ...DEFAULT_OFFICE_MODULES };
   }
+}
+
+/**
+ * Whether the Back Office «Ενοικιάσεις» menu should show.
+ *
+ * - Office with rent_enabled → yes
+ * - Achillio Travel on its own office context → no
+ * - PoreiaGo platform office → yes
+ * - Super Admin on www.poreiago.com (not impersonating) → yes
+ *   so hiding Rent for Achillio never removes it from our platform UI
+ */
+export function shouldShowRentMenu(modules, { hostname } = {}) {
+  const platformSuper =
+    canAccessPlatformOperatorUi() && isPlatformMarketingHost(hostname);
+
+  if (modules?.office_kind === 'achillio_travel') {
+    // Bus-only customer office — keep Rent off unless we are on PoreiaGo platform Super Admin.
+    return platformSuper;
+  }
+  if (modules?.rent_enabled) return true;
+  if (modules?.office_kind === 'poreiago_platform') return true;
+  if (platformSuper) return true;
+  return false;
 }

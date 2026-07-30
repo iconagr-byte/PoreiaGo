@@ -1,11 +1,33 @@
-"""Office product modules — trips (buses) vs Rent — derived from plan + settings."""
+"""Office product modules — trips (buses) vs Rent — derived from plan + settings.
+
+IMPORTANT — never disable Rent globally:
+- Hiding Rent for one office (e.g. Achillio Travel) MUST be per-tenant only.
+- PoreiaGo platform / demo offices keep Rent so Super Admin can operate the product.
+- Use ``apply_known_office_rent_policy`` / ``ensure_known_office_rent_modules`` —
+  never a global flag or mass update without slug/domain filters.
+"""
 
 from __future__ import annotations
 
 import json
+import logging
+import re
 from typing import Any
 
 from app.models.tenant import Tenant, TenantPlan
+
+logger = logging.getLogger(__name__)
+
+# Achillio Travel bus-only offices (custom domain / known slugs).
+_ACHILLIO_TRAVEL_SLUGS = frozenset(
+    {
+        "admin-achillio-gr",
+        "achillio-travel",
+        "achilliotravel",
+    }
+)
+_ACHILLIO_DOMAIN_RE = re.compile(r"(^|\.)achilliotravel\.com$", re.I)
+_POREIAGO_PLATFORM_SLUGS = frozenset({"poreiago", "platform", "demo"})
 
 
 def parse_tenant_settings(raw: str | None) -> dict[str, Any]:
@@ -114,3 +136,136 @@ def enable_rent_addon_in_settings(settings: dict[str, Any] | None = None) -> dic
         modules["trips_enabled"] = True
     bag["modules"] = modules
     return bag
+
+
+def disable_rent_addon_in_settings(settings: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Turn off Rent for a SINGLE office (keeps trips).
+
+    Call only with an explicit tenant target — never for all rows.
+    """
+    bag = dict(settings or {})
+    addons = dict(bag.get("addons") or {})
+    addons["rent"] = False
+    addons.pop("rent_addon", None)
+    bag["addons"] = addons
+    modules = dict(bag.get("modules") or {})
+    modules["rent_enabled"] = False
+    modules["trips_enabled"] = True
+    bag["modules"] = modules
+    return bag
+
+
+def _tenant_domain(tenant: Any) -> str:
+    return str(getattr(tenant, "custom_domain", None) or "").strip().lower().removeprefix("www.")
+
+
+def _tenant_slug(tenant: Any) -> str:
+    return str(getattr(tenant, "slug", None) or "").strip().lower()
+
+
+def is_achillio_travel_office(tenant: Any) -> bool:
+    """True for Achillio Travel bus office — Rent stays off by policy."""
+    slug = _tenant_slug(tenant)
+    domain = _tenant_domain(tenant)
+    if domain and _ACHILLIO_DOMAIN_RE.search(domain):
+        return True
+    if slug in _ACHILLIO_TRAVEL_SLUGS:
+        return True
+    # Legacy seed slug ``achillio`` only counts as Achillio Travel when bound to that domain.
+    if slug == "achillio" and domain and "achillio" in domain:
+        return True
+    return False
+
+
+def is_poreiago_platform_office(tenant: Any) -> bool:
+    """True for PoreiaGo platform / demo office that must keep Rent visible."""
+    if is_achillio_travel_office(tenant):
+        return False
+    slug = _tenant_slug(tenant)
+    if slug in _POREIAGO_PLATFORM_SLUGS:
+        return True
+    subdomain = str(getattr(tenant, "subdomain", None) or "").strip().lower()
+    if subdomain in _POREIAGO_PLATFORM_SLUGS:
+        return True
+    legal = str(getattr(tenant, "legal_name", None) or "").strip().lower()
+    domain = _tenant_domain(tenant)
+    # Seed often used slug=achillio + legal_name=PoreiaGo without Achillio domain.
+    if slug == "achillio" and "poreiago" in legal and not domain:
+        return True
+    if legal in {"poreiago", "poreiago saas", "poreiago platform"} and not domain:
+        return True
+    return False
+
+
+def apply_known_office_rent_policy(tenant: Any) -> dict[str, Any] | None:
+    """
+    Per-office Rent policy for known platform / Achillio tenants.
+
+    Returns updated settings dict when a change is required, else None.
+    Never touches unrelated customer offices.
+    """
+    current = parse_tenant_settings(getattr(tenant, "settings_json", None))
+    mods = modules_for_settings(plan=getattr(tenant, "plan", None), settings=current)
+
+    if is_achillio_travel_office(tenant):
+        if not mods["rent_enabled"]:
+            return None
+        return disable_rent_addon_in_settings(current)
+
+    if is_poreiago_platform_office(tenant):
+        if mods["rent_enabled"]:
+            return None
+        updated = enable_rent_addon_in_settings(current)
+        if not isinstance(updated.get("site_appearance"), dict):
+            seeded = initial_settings_for_plan(
+                TenantPlan.RENT,
+                office_name=str(getattr(tenant, "legal_name", None) or "PoreiaGo"),
+            )
+            appearance = seeded.get("site_appearance")
+            if isinstance(appearance, dict):
+                # Platform keeps trips + rent (both), not rent-only appearance wipe.
+                updated["site_appearance"] = appearance
+        # Platform is hybrid: trips + rent.
+        modules = dict(updated.get("modules") or {})
+        modules["trips_enabled"] = True
+        modules["rent_enabled"] = True
+        updated["modules"] = modules
+        return updated
+
+    return None
+
+
+async def ensure_known_office_rent_modules(session: Any) -> dict[str, int]:
+    """
+    Idempotent: Achillio Travel → Rent off; PoreiaGo platform → Rent on.
+
+    Scoped to known offices only — never mass-disables Rent.
+    """
+    from sqlalchemy import select
+
+    result = await session.execute(select(Tenant))
+    tenants = list(result.scalars().all())
+    disabled = 0
+    enabled = 0
+    for tenant in tenants:
+        updated = apply_known_office_rent_policy(tenant)
+        if updated is None:
+            continue
+        tenant.settings_json = json.dumps(updated, ensure_ascii=False)
+        if is_achillio_travel_office(tenant):
+            disabled += 1
+            logger.info(
+                "Rent disabled for Achillio Travel office slug=%s domain=%s",
+                _tenant_slug(tenant),
+                _tenant_domain(tenant) or "—",
+            )
+        else:
+            enabled += 1
+            logger.info(
+                "Rent enabled for PoreiaGo platform office slug=%s",
+                _tenant_slug(tenant),
+            )
+    if disabled or enabled:
+        await session.commit()
+    return {"achillio_rent_disabled": disabled, "poreiago_rent_enabled": enabled}
