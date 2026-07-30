@@ -21,6 +21,36 @@ const DEMO_PHOTO_BY_MODEL = Object.fromEntries(
 
 /** @type {Record<string, RentFleetCopy>} */
 const BY_MODEL = {
+  'toyota aygo x': {
+    headline: 'City crossover 2026',
+    blurb:
+      'Μοντέλο 2026 — μικρό city crossover, ιδανικό για πόλη και εύκολο πάρκινγκ. Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Βενζίνη',
+    doors: 5,
+    luggage: '1 βαλίτσα',
+    highlights: ['Εύκολο πάρκινγκ', 'Χαμηλή κατανάλωση', 'A/C'],
+  },
+  'peugeot 208': {
+    headline: 'Συμπαγές hatchback 2026',
+    blurb:
+      'Μοντέλο 2026 — συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Βενζίνη',
+    doors: 5,
+    luggage: '2 βαλίτσες',
+    highlights: ['A/C', 'Bluetooth', 'Οικονομικό'],
+  },
+  'renault clio': {
+    headline: 'Ιδανικό για πόλη 2026',
+    blurb:
+      'Μοντέλο 2026 — συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Βενζίνη',
+    doors: 5,
+    luggage: '2 βαλίτσες',
+    highlights: ['Χαμηλή κατανάλωση', 'Εύκολο πάρκινγκ', 'A/C'],
+  },
   'hyundai i10': {
     headline: 'City car',
     blurb:
@@ -71,6 +101,26 @@ const BY_MODEL = {
     luggage: '4 βαλίτσες',
     highlights: ['Υψηλή θέση οδήγησης', 'Μεγάλος χώρος', 'Cruise control'],
   },
+  'vw multivan': {
+    headline: 'Multivan 2026',
+    blurb:
+      'Μοντέλο 2026 — ευρύχωρο Multivan για οικογένειες, εκδρομές και μεταφορές με αποσκευές. Άνετη καμπίνα και χώρος για επιβάτες και εξοπλισμό.',
+    transmission: 'Αυτόματο',
+    fuel: 'Ντίζελ',
+    doors: 5,
+    luggage: '4 βαλίτσες',
+    highlights: ['7 θέσεις', 'Οικογενειακό', 'Ευρύχωρο'],
+  },
+  'volkswagen multivan': {
+    headline: 'Multivan 2026',
+    blurb:
+      'Μοντέλο 2026 — ευρύχωρο Multivan για οικογένειες, εκδρομές και μεταφορές με αποσκευές. Άνετη καμπίνα και χώρος για επιβάτες και εξοπλισμό.',
+    transmission: 'Αυτόματο',
+    fuel: 'Ντίζελ',
+    doors: 5,
+    luggage: '4 βαλίτσες',
+    highlights: ['7 θέσεις', 'Οικογενειακό', 'Ευρύχωρο'],
+  },
   'vw transporter': {
     headline: 'Van 9 θέσεων',
     blurb:
@@ -82,14 +132,24 @@ const BY_MODEL = {
     highlights: ['9 θέσεις', 'Ομαδικές μετακινήσεις', 'Ευρύχωρο'],
   },
   'mercedes vito': {
-    headline: 'Premium van',
+    headline: 'Premium van 2026',
     blurb:
-      'Premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης.',
+      'Μοντέλο 2026 — premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης.',
     transmission: 'Αυτόματο',
     fuel: 'Ντίζελ',
     doors: 4,
     luggage: 'Μεγάλος χώρος φόρτωσης',
     highlights: ['Premium άνεση', '8 θέσεις', 'Ήσυχη καμπίνα'],
+  },
+  'ford transit custom': {
+    headline: 'Tour van 2026',
+    blurb:
+      'Μοντέλο 2026 — ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις. Ισορροπία χώρου, οικονομίας και ευελιξίας — ιδανικό για αεροδρόμιο, ξενοδοχεία και ημερήσιες εκδρομές με ομάδα.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Ντίζελ',
+    doors: 4,
+    luggage: 'Μεγάλος χώρος φόρτωσης',
+    highlights: ['9 θέσεις', 'Airport transfers', 'Οικονομικό van'],
   },
   'renault trafic': {
     headline: 'Ευέλικτο tour van',

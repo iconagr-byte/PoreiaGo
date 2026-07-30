@@ -72,18 +72,18 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "id_suffix": "car-i10",
         "plate_number": "DEMO-C01",
         "category": "CAR",
-        "model": "Hyundai i10",
+        "model": "Toyota Aygo X",
         "seating_capacity": 4,
         "daily_rate_eur": 32,
         "one_way_surcharge_eur": 25,
         "with_driver_daily_eur": 80,
         "current_mileage": 12400,
         "photo_url": (
-            f"{_WM}thumb/7/79/Hyundai_i10_2015_by-RaBoe_002.jpg/"
-            "1280px-Hyundai_i10_2015_by-RaBoe_002.jpg"
+            f"{_WM}thumb/a/a2/Toyota_Aygo_X_1X7A0063.jpg/"
+            "1280px-Toyota_Aygo_X_1X7A0063.jpg"
         ),
         "description": (
-            "Μικρό city car — ιδανικό για πόλη και εύκολο πάρκινγκ. "
+            "Μοντέλο 2026 — μικρό city crossover, ιδανικό για πόλη και εύκολο πάρκινγκ. "
             "Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες."
         ),
     },
@@ -91,18 +91,18 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "id_suffix": "car-c3",
         "plate_number": "DEMO-C02",
         "category": "CAR",
-        "model": "Citroen C3",
+        "model": "Peugeot 208",
         "seating_capacity": 5,
         "daily_rate_eur": 38,
         "one_way_surcharge_eur": 28,
         "with_driver_daily_eur": 85,
         "current_mileage": 15600,
         "photo_url": (
-            f"{_WM}thumb/d/d8/Citro%C3%ABn_C3_front.jpg/"
-            "1280px-Citro%C3%ABn_C3_front.jpg"
+            f"{_WM}thumb/d/d8/Peugeot_208_B_facelift_DSC_7227.jpg/"
+            "1280px-Peugeot_208_B_facelift_DSC_7227.jpg"
         ),
         "description": (
-            "Συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. "
+            "Μοντέλο 2026 — συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. "
             "Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση."
         ),
     },
@@ -110,18 +110,18 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "id_suffix": "car-yaris",
         "plate_number": "DEMO-C03",
         "category": "CAR",
-        "model": "Toyota Yaris",
+        "model": "Renault Clio",
         "seating_capacity": 5,
         "daily_rate_eur": 42,
         "one_way_surcharge_eur": 30,
         "with_driver_daily_eur": 90,
         "current_mileage": 18200,
         "photo_url": (
-            f"{_WM}thumb/f/f2/Toyota_Yaris_XP130_3-Door.jpg/"
-            "1280px-Toyota_Yaris_XP130_3-Door.jpg"
+            f"{_WM}thumb/c/c6/Renault_Clio_V_%282023%29_1X7A1577.jpg/"
+            "1280px-Renault_Clio_V_%282023%29_1X7A1577.jpg"
         ),
         "description": (
-            "Συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και "
+            "Μοντέλο 2026 — συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και "
             "κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες."
         ),
     },
@@ -129,19 +129,19 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "id_suffix": "van-transporter",
         "plate_number": "DEMO-V01",
         "category": "VAN",
-        "model": "VW Transporter",
-        "seating_capacity": 9,
+        "model": "VW Multivan",
+        "seating_capacity": 7,
         "daily_rate_eur": 95,
         "one_way_surcharge_eur": 50,
         "with_driver_daily_eur": 140,
         "current_mileage": 31200,
         "photo_url": (
-            f"{_WM}thumb/6/62/Volkswagen_Transporter_T6_EDITION_30.jpg/"
-            "1280px-Volkswagen_Transporter_T6_EDITION_30.jpg"
+            f"{_WM}thumb/c/c5/Volkswagen_T7_Multivan_1X7A0297.jpg/"
+            "1280px-Volkswagen_T7_Multivan_1X7A0297.jpg"
         ),
         "description": (
-            "Ευρύχωρο van 9 θέσεων για ομάδες, εκδρομές και μεταφορές με αποσκευές. "
-            "Σταθερό στον δρόμο, με χώρο για επιβάτες και εξοπλισμό — ιδανικό για τουριστικά ή εταιρικά γκρουπ."
+            "Μοντέλο 2026 — ευρύχωρο Multivan για οικογένειες, εκδρομές και μεταφορές με αποσκευές. "
+            "Άνετη καμπίνα και χώρος για επιβάτες και εξοπλισμό."
         ),
     },
     {
@@ -159,7 +159,7 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
             "1280px-MERCEDES-BENZ_VITO_%28W447%29_China.jpg"
         ),
         "description": (
-            "Premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. "
+            "Μοντέλο 2026 — premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. "
             "Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης."
         ),
     },
@@ -167,18 +167,18 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "id_suffix": "van-trafic",
         "plate_number": "DEMO-V03",
         "category": "VAN",
-        "model": "Renault Trafic",
+        "model": "Ford Transit Custom",
         "seating_capacity": 9,
         "daily_rate_eur": 88,
         "one_way_surcharge_eur": 45,
         "with_driver_daily_eur": 130,
         "current_mileage": 33400,
         "photo_url": (
-            f"{_WM}thumb/5/57/Renault_Trafic_III_buses_Facelift_IMG_7691.jpg/"
-            "1280px-Renault_Trafic_III_buses_Facelift_IMG_7691.jpg"
+            f"{_WM}thumb/e/e4/Ford_Transit_Custom_%282023%29_1X7A1605.jpg/"
+            "1280px-Ford_Transit_Custom_%282023%29_1X7A1605.jpg"
         ),
         "description": (
-            "Ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις. "
+            "Μοντέλο 2026 — ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις. "
             "Ισορροπία χώρου, οικονομίας και ευελιξίας — ιδανικό για αεροδρόμιο, ξενοδοχεία και ημερήσιες εκδρομές με ομάδα."
         ),
     },
