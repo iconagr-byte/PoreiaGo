@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -14,6 +15,7 @@ from app.api.schemas import (
     BillingCheckoutRequest,
     BillingCheckoutResponse,
     BillingConfigResponse,
+    BillingEnableRentAddonResponse,
     BillingPortalResponse,
     BillingSignupCheckoutRequest,
     BillingSubscriptionResponse,
@@ -26,7 +28,12 @@ from app.core.database import AsyncSessionLocal
 from app.models.tenant import Tenant, TenantPlan
 from app.models.user import UserRole
 from app.services.billing_service import BillingService, stripe_readiness
-from app.services.tenant_modules import modules_for_tenant
+from app.services.tenant_modules import (
+    enable_rent_addon_in_settings,
+    initial_settings_for_plan,
+    modules_for_tenant,
+    parse_tenant_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +87,43 @@ async def get_office_modules(
     return OfficeModulesResponse(**modules_for_tenant(tenant))
 
 
+def _dump_settings(settings: dict[str, Any]) -> str:
+    return json.dumps(settings, ensure_ascii=False)
+
+
+@router.post("/enable-rent-addon", response_model=BillingEnableRentAddonResponse)
+async def enable_rent_addon(
+    db: Annotated[AsyncSession, Depends(get_tenant_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
+):
+    """Enable Rent module as add-on on the current bus office plan (keeps trips)."""
+    tenant = await _load_tenant(db, tenant_id)
+    if tenant.plan == TenantPlan.RENT:
+        mods = modules_for_tenant(tenant)
+        return BillingEnableRentAddonResponse(
+            **mods,
+            message="Το γραφείο είναι ήδη σε αυτόνομο Rent συμβόλαιο",
+        )
+
+    current = parse_tenant_settings(tenant.settings_json)
+    updated = enable_rent_addon_in_settings(current)
+    # Seed rent appearance defaults if missing.
+    if not isinstance(updated.get("site_appearance"), dict):
+        seeded = initial_settings_for_plan(TenantPlan.RENT, office_name=tenant.legal_name)
+        appearance = seeded.get("site_appearance")
+        if isinstance(appearance, dict):
+            updated["site_appearance"] = appearance
+    tenant.settings_json = _dump_settings(updated)
+    await db.commit()
+    await db.refresh(tenant)
+    mods = modules_for_tenant(tenant)
+    return BillingEnableRentAddonResponse(
+        **mods,
+        message="Το Rent add-on ενεργοποιήθηκε — εμφανίζεται το μενού Ενοικιάσεις",
+    )
+
+
 @router.post("/checkout-session", response_model=BillingCheckoutResponse)
 async def create_checkout(
     body: BillingCheckoutRequest,
@@ -119,6 +163,15 @@ async def start_trial(
             plan=plan,
             billing_interval=body.billing_interval,
         )
+        if plan == TenantPlan.RENT:
+            current = parse_tenant_settings(tenant.settings_json)
+            seeded = initial_settings_for_plan(TenantPlan.RENT, office_name=tenant.legal_name)
+            merged = {**current, **seeded}
+            # Keep existing site_appearance keys; fill gaps from rent seed.
+            cur_app = current.get("site_appearance") if isinstance(current.get("site_appearance"), dict) else {}
+            seed_app = seeded.get("site_appearance") if isinstance(seeded.get("site_appearance"), dict) else {}
+            merged["site_appearance"] = {**seed_app, **cur_app}
+            tenant.settings_json = _dump_settings(merged)
         await db.commit()
     except ValueError as exc:
         await db.rollback()
