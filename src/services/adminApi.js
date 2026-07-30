@@ -6,27 +6,16 @@ import { getSaasToken, saasAuthHeaders } from './saasApi.js';
 
 export { getSaasToken };
 
-function officeHostHeaders() {
-  // Lets the API recover Achillio DEMO drivers even when the request Host is
-  // api.* / an internal upstream name (nginx → api-blue).
-  try {
-    if (typeof window !== 'undefined' && window.location?.host) {
-      return { 'X-Poreiago-Office-Host': window.location.host };
-    }
-  } catch {
-    /* SSR / tests */
-  }
-  return {};
-}
-
 export function adminAuthHeaders(extra = {}) {
-  return { ...saasAuthHeaders(), ...officeHostHeaders(), ...extra };
+  // Tenant scope comes from JWT only — never send a client Host override
+  // (spoofable). Achillio recovery uses proxied Host + Achillio JWT.
+  return { ...saasAuthHeaders(), ...extra };
 }
 
 /** Bearer only (FormData uploads — no Content-Type). */
 export function adminBearerHeaders(extra = {}) {
   const token = getSaasToken();
-  const headers = { ...officeHostHeaders(), ...extra };
+  const headers = { ...extra };
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }

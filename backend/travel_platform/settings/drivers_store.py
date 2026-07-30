@@ -370,15 +370,30 @@ def list_drivers_for_office(
     return sorted(matched, key=lambda d: d.name)
 
 
-def driver_visible_to_office(driver: FleetDriver | None, tenant_id: str) -> bool:
-    """True when the office may view/edit this driver (incl. claimed DEMO legacy)."""
+def driver_visible_to_office(
+    driver: FleetDriver | None,
+    tenant_id: str,
+    *,
+    allow_demo_legacy: bool = False,
+) -> bool:
+    """
+    True when the office may view/edit this driver.
+
+    DEMO orphans are visible only when the caller explicitly allows legacy
+    recovery (Achillio claim path) — never for arbitrary SaaS offices.
+    """
     if not driver:
         return False
     tid = _normalize_tenant_id(tenant_id)
     dtid = _driver_tenant_id(driver)
     if dtid == tid:
         return True
-    if tid != DEMO_TENANT_ID and dtid == DEMO_TENANT_ID and not is_seed_driver(driver):
+    if (
+        allow_demo_legacy
+        and tid != DEMO_TENANT_ID
+        and dtid == DEMO_TENANT_ID
+        and not is_seed_driver(driver)
+    ):
         return True
     return False
 

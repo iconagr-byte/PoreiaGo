@@ -113,10 +113,14 @@ class ListDriversForOfficeTests(unittest.TestCase):
             email="a@example.com",
             tenant_id=store.DEMO_TENANT_ID,
         )
-        self.assertTrue(store.driver_visible_to_office(orphan, OFFICE))
+        # Arbitrary offices must not IDOR DEMO orphans.
+        self.assertFalse(store.driver_visible_to_office(orphan, OFFICE))
+        self.assertTrue(
+            store.driver_visible_to_office(orphan, OFFICE, allow_demo_legacy=True)
+        )
         seed_id = self._inject_seed()
         seed = store.get_driver(seed_id)
-        self.assertFalse(store.driver_visible_to_office(seed, OFFICE))
+        self.assertFalse(store.driver_visible_to_office(seed, OFFICE, allow_demo_legacy=True))
 
 
 if __name__ == "__main__":

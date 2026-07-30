@@ -250,8 +250,26 @@ async def login_with_password(request: Request, body: DriverLoginBody):
         platform_tid = ""
 
     if office_tid:
-        # Legacy DEMO rows only for the primary SaaS office (Achillio), never PoreiaGo.
-        allow_demo_legacy = bool(platform_tid and office_tid == platform_tid)
+        # Legacy DEMO rows only for Achillio Travel — never PoreiaGo / other SaaS.
+        allow_demo_legacy = False
+        try:
+            from uuid import UUID
+
+            from sqlalchemy import select
+
+            from app.core.database import AsyncSessionLocal
+            from app.models.tenant import Tenant
+            from app.services.tenant_modules import is_achillio_travel_office
+
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(Tenant).where(Tenant.id == UUID(str(office_tid))).limit(1)
+                )
+                tenant = result.scalar_one_or_none()
+                allow_demo_legacy = bool(tenant and is_achillio_travel_office(tenant))
+        except Exception:
+            # Tests / DB down: only when Host office == resolved Achillio platform.
+            allow_demo_legacy = bool(platform_tid and office_tid == platform_tid)
         driver = authenticate_driver(
             body.username,
             body.password,
@@ -287,20 +305,20 @@ async def login_with_password(request: Request, body: DriverLoginBody):
             except Exception:
                 pass
     else:
-        # Platform host without office Host (rare) — still bind JWT to the
-        # driver's home tenant, never force the global Achillio platform id.
-        driver = authenticate_driver(body.username, body.password)
-        if not driver:
-            record_login_from_request(
-                request,
-                actor_type="driver",
-                identity=username,
-                success=False,
-                method="password",
-                detail="Λάθος όνομα χρήστη ή κωδικός",
-            )
-            raise HTTPException(status_code=401, detail="Λάθος όνομα χρήστη ή κωδικός")
-        tenant_id = str(getattr(driver, "tenant_id", None) or DEMO_TENANT_ID)
+        # Bare platform/api Host — refuse unscoped login so the same email
+        # cannot open another office's session by first-match.
+        record_login_from_request(
+            request,
+            actor_type="driver",
+            identity=username,
+            success=False,
+            method="password",
+            detail="Συνδεθείτε από το domain του γραφείου σας",
+        )
+        raise HTTPException(
+            status_code=401,
+            detail="Συνδεθείτε από το domain του γραφείου σας (π.χ. www.achilliotravel.com)",
+        )
 
     trip_id = _resolve_trip_for_driver(driver.id, tenant_id)
     record_login_from_request(

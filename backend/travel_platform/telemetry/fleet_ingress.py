@@ -159,18 +159,37 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         tenant_id = coerce_driver_tenant_id(raw_tid, platform_tenant_id=platform_tid)
 
     # Never paint a pin for a driver that is not on this office's Οδηγοί list.
-    # Claim non-seed DEMO orphans onto the session office so Achilleas can appear
-    # once (and only once) under that γραφείο.
+    # DEMO orphans may be claimed onto Achillio Travel only — never onto a
+    # random SaaS office that happened to authenticate the session.
     if driver_id and tenant_id and tenant_id != str(DEMO_TENANT_ID):
         bound = get_driver(driver_id)
         if bound and not is_seed_driver(bound):
             home = str(getattr(bound, "tenant_id", None) or DEMO_TENANT_ID)
             if home == str(DEMO_TENANT_ID):
+                may_claim = False
                 try:
-                    update_driver(driver_id, {"tenant_id": tenant_id})
-                    home = tenant_id
+                    from app.core.database import AsyncSessionLocal
+                    from app.models.tenant import Tenant
+                    from app.services.tenant_modules import is_achillio_travel_office
+                    from sqlalchemy import select
+                    from uuid import UUID
+
+                    async with AsyncSessionLocal() as db:
+                        result = await db.execute(
+                            select(Tenant).where(Tenant.id == UUID(str(tenant_id))).limit(1)
+                        )
+                        tenant = result.scalar_one_or_none()
+                        may_claim = bool(tenant and is_achillio_travel_office(tenant))
                 except Exception:
-                    logger.debug("legacy DEMO claim on GPS failed driver=%s", driver_id, exc_info=True)
+                    may_claim = False
+                if may_claim:
+                    try:
+                        update_driver(driver_id, {"tenant_id": tenant_id})
+                        home = tenant_id
+                    except Exception:
+                        logger.debug(
+                            "legacy DEMO claim on GPS failed driver=%s", driver_id, exc_info=True
+                        )
             if home != tenant_id:
                 logger.info(
                     "Rejecting GPS — driver=%s home=%s session=%s (not on office list)",
