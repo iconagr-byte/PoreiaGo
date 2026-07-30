@@ -30,7 +30,12 @@ export function isPlatformPlaceholderLogo(url) {
 export function resolveOfficeBrand(siteAppearance = {}) {
   const rawLogo = siteAppearance.logo_url || '';
   const logoUrl = isPlatformPlaceholderLogo(rawLogo) ? '' : rawLogo;
-  const rawName = (siteAppearance.footer_brand_name || siteAppearance.display_name || '').trim();
+  const rawName = (
+    siteAppearance.footer_brand_name ||
+    siteAppearance.rent_office_name ||
+    siteAppearance.display_name ||
+    ''
+  ).trim();
   const name = isPlatformPlaceholderBrand(rawName) ? '' : rawName;
   const rawCopy = (siteAppearance.footer_copyright || '').trim();
   const year = new Date().getFullYear();

@@ -65,6 +65,7 @@ export default function AdminMobileNavDrawer({
               asLink={false}
               fallbackLabel="Γραφείο"
               refreshKey={brandRefreshKey}
+              preferAdmin
             />
             <span className="material-symbols-outlined text-[18px] text-slate-300 group-hover:text-primary shrink-0">
               edit

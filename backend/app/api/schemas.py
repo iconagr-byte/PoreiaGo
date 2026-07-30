@@ -399,6 +399,7 @@ class TenantBrandingSettingsUpdate(BaseModel):
 class TenantSiteAppearanceResponse(BaseModel):
     storage_source: str = "postgres"
     tenant_slug: str | None = None
+    display_name: str = ""
     logo_url: str = ""
     logo_height_px: int = 40
     logo_max_width_px: int = 180
