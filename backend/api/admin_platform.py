@@ -33,8 +33,10 @@ from travel_platform.settings.drivers_store import (
     DEMO_TENANT_ID,
     create_driver,
     delete_driver,
+    driver_visible_to_office,
     get_driver,
     list_drivers,
+    list_drivers_for_office,
     update_driver,
 )
 from travel_platform.settings.users_store import (
@@ -159,13 +161,35 @@ def _request_tenant_id(request: Request) -> str:
 
 
 def _driver_for_tenant(driver_id: str, tenant_id: str):
+    """Resolve driver for office — includes non-seed DEMO legacy rows."""
     d = get_driver(driver_id)
-    if not d:
-        return None
-    driver_tid = getattr(d, "tenant_id", None) or DEMO_TENANT_ID
-    if str(driver_tid) != str(tenant_id):
+    if not driver_visible_to_office(d, tenant_id):
         return None
     return d
+
+
+async def _demo_legacy_flags(tenant_id: str) -> tuple[bool, bool]:
+    """
+    (include, claim) for DEMO-tenant drivers that are not seed demos.
+
+    Primary SaaS office may see + permanently claim them. Other offices stay
+    strictly scoped once the platform tenant is known.
+    """
+    tid = str(tenant_id or "").strip()
+    if not tid or tid == str(DEMO_TENANT_ID):
+        return False, False
+    try:
+        from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
+
+        platform_tid = str(await resolve_platform_tenant_id() or "").strip()
+        if platform_tid:
+            if tid == platform_tid:
+                return True, True
+            return False, False
+    except Exception:
+        logger.debug("resolve_platform_tenant_id failed for drivers list", exc_info=True)
+    # DB unavailable / single-office deploy — recover Achilleas-style orphans.
+    return True, True
 
 
 def _user_response(u) -> PlatformUserResponse:
@@ -240,10 +264,14 @@ async def remove_user(user_id: str):
 @router.get("/drivers", response_model=list[FleetDriverResponse])
 async def get_drivers(request: Request, status: str | None = None):
     tenant_id = _request_tenant_id(request)
-    return [
-        _driver_response(d, enrich_safety=False)
-        for d in list_drivers(status, tenant_id=tenant_id)
-    ]
+    include_legacy, claim_legacy = await _demo_legacy_flags(tenant_id)
+    rows = list_drivers_for_office(
+        tenant_id,
+        status,
+        include_demo_legacy=include_legacy,
+        claim_demo_legacy=claim_legacy,
+    )
+    return [_driver_response(d, enrich_safety=False) for d in rows]
 
 
 _DRIVER_PHOTO_DIR = Path(
