@@ -34,9 +34,7 @@ def initial_settings_for_plan(plan: TenantPlan | str, *, office_name: str | None
                 "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
             ),
             "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
-            "rent_guest_hero_copy": (
-                "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος."
-            ),
+            "rent_guest_hero_copy": "",
             "rent_cta_label": "Βρες όχημα",
             "show_fleet_section": False,
             "show_why_us_section": False,

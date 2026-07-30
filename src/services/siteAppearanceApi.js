@@ -36,8 +36,7 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
   rent_guest_hero_title: 'Δες τον στόλο πριν κλείσεις',
-  rent_guest_hero_copy:
-    'Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.',
+  rent_guest_hero_copy: '',
   rent_cta_label: 'Βρες όχημα',
   rent_pickup_locations: [],
   ...HOMEPAGE_LAYOUT_DEFAULTS,

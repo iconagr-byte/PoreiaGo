@@ -42,7 +42,7 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
     "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
-    "rent_guest_hero_copy": "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.",
+    "rent_guest_hero_copy": "",
     "rent_cta_label": "Βρες όχημα",
     "rent_pickup_locations": [],
     "homepage_theme_id": "aegean_classic",
@@ -56,6 +56,9 @@ _PLATFORM_COPY_RE = re.compile(r"aerostride|poreiago", re.I)
 # Only legacy PoreiaGo/AeroStride brand marks — uploaded logos use
 # /api/site/assets/logo or data: URLs and must not be scrubbed.
 _PLATFORM_LOGO_RE = re.compile(r"poreiago|aerostride", re.I)
+_OBSOLETE_RENT_GUEST_HERO_COPY = (
+    "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος."
+)
 
 
 def _parse_settings(raw: str | None) -> dict[str, Any]:

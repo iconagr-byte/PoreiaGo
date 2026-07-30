@@ -21,6 +21,16 @@ const guest = resolveRentAppBranding(
   { guest: true },
 );
 console.assert(guest.title === 'Δες στόλο', 'guest title');
+console.assert(guest.copy === '', 'guest copy empty by default');
+
+const obsolete = resolveRentAppBranding(
+  {
+    rent_guest_hero_copy:
+      'Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.',
+  },
+  { guest: true },
+);
+console.assert(obsolete.copy === '', 'obsolete guest copy stripped');
 
 const fromFooter = resolveRentAppBranding({ footer_brand_name: 'Poreia Office' });
 console.assert(fromFooter.brandLabel === 'Poreia Office', 'footer fallback');

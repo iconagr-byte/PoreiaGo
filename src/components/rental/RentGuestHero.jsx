@@ -19,7 +19,7 @@ export default function RentGuestHero({
 } = {}) {
   const headline = String(title || '').trim() || RENT_GUEST_HERO.title;
   const accent = String(titleAccent || '').trim() || RENT_GUEST_HERO.titleAccent;
-  const subtitle = String(copy || '').trim() || RENT_GUEST_HERO.subtitle;
+  const subtitle = String(copy || '').trim();
   const stats = rentGuestHeroStats({ carCount, vanCount });
 
   return (
@@ -40,7 +40,7 @@ export default function RentGuestHero({
           <span className="rent-hero-accent">{accent}</span>
         </h1>
 
-        <p className="rent-hero-landing-copy">{subtitle}</p>
+        {subtitle ? <p className="rent-hero-landing-copy">{subtitle}</p> : null}
 
         <div className="rent-hero-actions">
           <button type="button" className="rent-hero-cta rent-hero-cta--primary" onClick={onBrowseFleet}>
