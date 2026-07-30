@@ -55,7 +55,7 @@ export default function RentGuestTopActions({ onAccount } = {}) {
         {bookingOpen ? (
           <div className="rent-top-menu" role="menu">
             <Link
-              to="/my-booking"
+              to="/rent/my-booking"
               role="menuitem"
               className="rent-top-menu-item"
               onClick={() => setBookingOpen(false)}

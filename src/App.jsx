@@ -37,6 +37,7 @@ import AgencySignupPage from './pages/AgencySignupPage';
 import AgencySignupSuccessPage from './pages/AgencySignupSuccessPage';
 import CheckoutPage from './pages/CheckoutPage';
 import BookingLookupPage from './pages/BookingLookupPage';
+import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
 import CheckoutResumePage from './pages/CheckoutResumePage';
 import TicketPrintPage from './pages/TicketPrintPage.jsx';
 import FiscalReceiptPrintPage from './pages/FiscalReceiptPrintPage.jsx';
@@ -75,6 +76,7 @@ function App() {
             {/* Rent auth lives on /rent (share URL). /rent/login is an alias only. */}
             <Route path="/rent/login" element={<Navigate to="/rent" replace />} />
             <Route path="/rent/register" element={<RegisterPage />} />
+            <Route path="/rent/my-booking" element={<RentBookingLookupPage />} />
             <Route path="/rent/services" element={<RentalServicesPage />} />
             <Route path="/rent/book/services" element={<RentBookingWizardPage />} />
             <Route path="/rent" element={<RentalCustomerApp />} />

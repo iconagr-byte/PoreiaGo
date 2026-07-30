@@ -326,9 +326,10 @@ function RentalAuthGate() {
   const continueToServices = Boolean(
     location.state?.rentContinue || location.state?.from === '/rent/book/services',
   );
+  const fromLookup = Boolean(location.state?.rentLookup || location.state?.openRentWallet);
   // Mobile app = Wallet entrance. Desktop guests may browse fleet first.
   const [showLogin, setShowLogin] = useState(
-    () => isRentMobileViewport() || continueToServices,
+    () => isRentMobileViewport() || continueToServices || fromLookup,
   );
   useEffect(() => setupRentalPwa(), []);
 
@@ -337,8 +338,8 @@ function RentalAuthGate() {
   }, [isMobile]);
 
   useEffect(() => {
-    if (continueToServices) setShowLogin(true);
-  }, [continueToServices]);
+    if (continueToServices || fromLookup) setShowLogin(true);
+  }, [continueToServices, fromLookup]);
 
   useEffect(() => {
     if (getCustomerToken() && continueToServices) {
@@ -357,7 +358,7 @@ function RentalAuthGate() {
     return (
       <LoginPage
         rentEntrance
-        key={continueToServices ? 'rent-continue' : 'rent-login'}
+        key={continueToServices ? 'rent-continue' : fromLookup ? 'rent-lookup' : 'rent-login'}
       />
     );
   }
@@ -374,9 +375,12 @@ function RentalAuthGate() {
 
 function RentalAuthenticatedApp() {
   const isMobile = useRentMobile();
+  const location = useLocation();
   const [branding, setBranding] = useState(() => resolveRentAppBranding({}));
   const [calKey, setCalKey] = useState(0);
   const [walletKey, setWalletKey] = useState(0);
+  const highlightBookingId = String(location.state?.highlightRentalBooking || '').trim();
+  const openWalletFromLookup = Boolean(location.state?.openRentWallet || highlightBookingId);
   const [homeFleet, setHomeFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [featuredVehicle, setFeaturedVehicle] = useState(null);
@@ -386,6 +390,16 @@ function RentalAuthenticatedApp() {
   const { favorites, toggleFavorite } = useRentFavorites();
 
   useEffect(() => setupRentalPwa(), []);
+
+  useEffect(() => {
+    if (!openWalletFromLookup) return undefined;
+    const t = window.setTimeout(() => {
+      setWalletKey((k) => k + 1);
+      const el = document.getElementById('rent-wallet');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [openWalletFromLookup, highlightBookingId, location.key]);
 
   useEffect(() => {
     let cancelled = false;
@@ -584,6 +598,7 @@ function RentalAuthenticatedApp() {
                 brandLabel={branding.brandLabel}
                 passengerName={profile.name}
                 refreshKey={walletKey}
+                highlightBookingId={highlightBookingId}
                 onBookVehicle={() => scrollToSection('rent-book')}
               />
             </div>

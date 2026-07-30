@@ -307,7 +307,13 @@ export default function RegisterPage() {
               Εύρεση κράτησης χωρίς λογαριασμό
             </Link>
           </p>
-        ) : null}
+        ) : (
+          <p className="text-xs text-center mt-4">
+            <Link to="/rent/my-booking" className={linkClass}>
+              Εύρεση κράτησης ενοικίασης
+            </Link>
+          </p>
+        )}
           </div>
         </div>
       </div>

@@ -115,11 +115,24 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       fromClaim: hadClaim,
     });
     // Rent: always bump location state so /rent gate remounts into the app.
+    const rentLookupState = rentIntent
+      ? {
+          rentAuthedAt: Date.now(),
+          ...(location.state?.highlightRentalBooking
+            ? {
+                highlightRentalBooking: location.state.highlightRentalBooking,
+                openRentWallet: true,
+                rentLookup: true,
+              }
+            : {}),
+          ...(highlightBooking ? homeState : {}),
+        }
+      : undefined;
     const nextState =
       redirectTo === '/wallet' || redirectTo.startsWith('/wallet')
         ? homeState
         : rentIntent
-          ? { rentAuthedAt: Date.now(), ...(highlightBooking ? homeState : {}) }
+          ? rentLookupState
           : highlightBooking
             ? homeState
             : undefined;
@@ -339,7 +352,13 @@ export default function LoginPage({ rentEntrance = false } = {}) {
             Εύρεση κράτησης
           </Link>
         </p>
-      ) : null}
+      ) : (
+        <p className="text-xs text-center mt-3">
+          <Link to="/rent/my-booking" className={linkClass}>
+            Εύρεση κράτησης ενοικίασης
+          </Link>
+        </p>
+      )}
     </>
   );
 
