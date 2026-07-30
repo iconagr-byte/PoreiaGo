@@ -94,8 +94,7 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
 
   const pushItem = useCallback((raw, { silent = false, upsert = false } = {}) => {
     const item = normalizeItem(raw);
-    const already = seenRef.current.has(item.id);
-    if (!upsert && already) return;
+    if (!upsert && seenRef.current.has(item.id)) return;
     seenRef.current.add(item.id);
     setItems((prev) => {
       const next = [item, ...prev.filter((x) => x.id !== item.id)].slice(0, MAX_ITEMS);
