@@ -248,6 +248,25 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         ),
     )
 
+    # Full live path ring — admin map draws this; shift-end flushes to history.
+    if vehicle_id:
+        try:
+            from travel_platform.telemetry.live_fleet_trail_redis import append_trail_point
+
+            await append_trail_point(
+                tenant_id,
+                vehicle_id,
+                lat=float(payload["latitude"]),
+                lng=float(payload["longitude"]),
+                speed_kmh=float(payload["speed_kmh"] or 0),
+                heading_deg=payload.get("heading_deg"),
+                recorded_at=recorded_dt,
+                trip_id=payload.get("trip_id"),
+                driver_id=str(payload.get("driver_id")) if payload.get("driver_id") else None,
+            )
+        except Exception:
+            logger.exception("live trail append failed vehicle=%s", vehicle_id)
+
     from travel_platform.telemetry.fleet_metrics import record_gps_ingress
 
     record_gps_ingress(tenant_id)

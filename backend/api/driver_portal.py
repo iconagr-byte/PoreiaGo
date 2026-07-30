@@ -551,6 +551,29 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
         except Exception:
             removed = []
 
+    # Persist full GPS path into route history before the live pin disappears.
+    trail_points = 0
+    if tenant_id and removed:
+        try:
+            from travel_platform.telemetry.trail_history_flush import persist_trails_for_vehicles
+
+            def _safe_int(value):
+                if value in (None, "", "0"):
+                    return None
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return None
+
+            trail_points = await persist_trails_for_vehicles(
+                tenant_id,
+                removed,
+                trip_id=_safe_int(trip_id),
+                driver_id=driver_id,
+            )
+        except Exception:
+            trail_points = 0
+
     if tenant_id:
         try:
             await get_fleet_egress_hub().broadcast(
@@ -581,5 +604,6 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
         "ok": True,
         "was_online": was_online,
         "removed_vehicles": removed,
+        "trail_points_saved": trail_points,
         "notify": notify_result,
     }

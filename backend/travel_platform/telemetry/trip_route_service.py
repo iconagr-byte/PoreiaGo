@@ -124,11 +124,80 @@ async def fetch_trip_route(
                         "source": "live_buffer",
                     },
                 )
+                existing_keys.add(key)
             points.sort(key=lambda p: p.get("recorded_at") or "")
             if len(points) > cap:
                 points = points[-cap:]
     except Exception as exc:
         logger.debug("live buffer merge skipped: %s", exc)
+
+    # Active-shift Redis trail (authoritative path while the bus is live).
+    try:
+        from travel_platform.telemetry.live_fleet_trail_redis import load_trails_for_tenant
+        from travel_platform.telemetry.processor import get_live_fleet
+
+        live = get_live_fleet()
+        vehicles = await live.list_active_for_admin_async(tenant_id)
+        vehicle_ids: list[str] = []
+        for v in vehicles:
+            vid = str(getattr(v, "vehicle_id", "") or "")
+            if not vid:
+                continue
+            if getattr(v, "trip_id", None) == trip_id:
+                vehicle_ids.append(vid)
+                continue
+            if driver_key:
+                meta = await live.vehicle_meta_async(tenant_id, v.vehicle_id) or {}
+                if str(meta.get("driver_id") or "") == driver_key:
+                    vehicle_ids.append(vid)
+        vehicle_ids = list(dict.fromkeys(vehicle_ids))
+
+        if vehicle_ids:
+            trails = await load_trails_for_tenant(str(tenant_id), vehicle_ids)
+            existing_keys = {
+                (p.get("recorded_at"), round(p["lat"], 6), round(p["lng"], 6)) for p in points
+            }
+            added = 0
+            for vid, trail in trails.items():
+                for p in trail:
+                    recorded_at = str(p.get("t") or "")
+                    try:
+                        lat, lng = float(p["lat"]), float(p["lng"])
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    key = (recorded_at, round(lat, 6), round(lng, 6))
+                    if key in existing_keys:
+                        continue
+                    if from_time or to_time:
+                        try:
+                            ts = datetime.fromisoformat(recorded_at.replace("Z", "+00:00"))
+                            if from_time is not None and ts < from_time:
+                                continue
+                            if to_time is not None and ts > to_time:
+                                continue
+                        except Exception:
+                            pass
+                    added += 1
+                    points.append(
+                        {
+                            "id": -(10_000 + added),
+                            "trip_id": trip_id,
+                            "driver_id": driver_key,
+                            "vehicle_id": vid,
+                            "lat": lat,
+                            "lng": lng,
+                            "speed_kmh": float(p.get("s") or 0),
+                            "heading_deg": float(p["h"]) if p.get("h") is not None else None,
+                            "recorded_at": recorded_at or None,
+                            "source": "live_trail",
+                        },
+                    )
+                    existing_keys.add(key)
+            points.sort(key=lambda p: p.get("recorded_at") or "")
+            if len(points) > cap:
+                points = points[-cap:]
+    except Exception as exc:
+        logger.debug("live trail merge skipped: %s", exc)
 
     payload: dict[str, Any] = {
         "trip_id": trip_id,

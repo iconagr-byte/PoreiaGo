@@ -102,7 +102,7 @@ export default function FleetLiveMapWebSocket() {
             aria-pressed={showTrails}
           >
             <span className="material-symbols-outlined text-[16px]">route</span>
-            Ίχνος διαδρομής
+            Πλήρης πορεία
           </button>
           <button
             type="button"
