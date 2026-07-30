@@ -257,7 +257,7 @@ export const ADMIN_NAV_ITEMS = {
   },
   fleet: {
     id: 'fleet',
-    label: 'Στόλος',
+    label: 'Στόλος λεωφορείων',
     icon: 'directions_bus',
     filled: true,
     type: 'tab',
