@@ -1,35 +1,65 @@
 import { saasFetch } from './saasApi.js';
 
+/**
+ * Fiscal issuance channels.
+ *
+ * AADE "πάροχοι ΥΠΑΗΕΣ" = licensed e-invoicing providers (SoftOne EINVOICING, Impact, …).
+ * Native AADE = direct myDATA (NOT a provider).
+ * Prosvasis GO / Epsilon Smart = ERP/API channels (not the ΥΠΑΗΕΣ product names).
+ */
 export const FISCAL_PROVIDERS = [
   {
-    id: 'native_aade',
-    label: 'myDATA (Native AADE)',
-    icon: 'verified_user',
-    description: 'Απευθείας έκδοση ΑΠΥ/τιμολογίων μέσω AADE myDATA',
-  },
-  {
-    id: 'prosvasis',
-    label: 'Prosvasis GO',
-    icon: 'cloud_sync',
-    description: 'Έκδοση μέσω SoftOne S1 Cloud / Prosvasis',
-  },
-  {
-    id: 'epsilon',
-    label: 'Epsilon Smart',
-    icon: 'hub',
-    description: 'Έκδοση μέσω Epsilon Smart API',
-  },
-  {
     id: 'softone',
-    label: 'SoftOne eINVOICING',
+    group: 'ypahes',
+    label: 'SoftOne EINVOICING',
     icon: 'apartment',
-    description: 'Πιστοποιημένος πάροχος SoftOne ECOS (Invoice/json)',
+    description: 'Αδειοδοτημένος πάροχος ΑΑΔΕ (ENTERSOFTONE) · Invoice/json',
   },
   {
     id: 'impact',
-    label: 'Impact EINVOICING',
+    group: 'ypahes',
+    label: 'Impact eINVOICING',
     icon: 'receipt_long',
-    description: 'Πιστοποιημένος πάροχος Impact / SoftOne Impact',
+    description: 'Αδειοδοτημένος πάροχος ΑΑΔΕ (IMPACT) · Invoice/json',
+  },
+  {
+    id: 'native_aade',
+    group: 'direct',
+    label: 'myDATA απευθείας',
+    icon: 'verified_user',
+    description: 'Απευθείας διαβίβαση στην ΑΑΔΕ · δεν είναι πάροχος ΥΠΑΗΕΣ',
+  },
+  {
+    id: 'prosvasis',
+    group: 'erp',
+    label: 'Prosvasis GO (ERP)',
+    icon: 'cloud_sync',
+    description: 'Κανάλι SoftOne S1 Cloud / Prosvasis ERP — όχι το προϊόν ΥΠΑΗΕΣ',
+  },
+  {
+    id: 'epsilon',
+    group: 'erp',
+    label: 'Epsilon Smart (ERP)',
+    icon: 'hub',
+    description: 'Κανάλι Epsilon Smart API — όχι το EPSILONDIGITAL πάροχος',
+  },
+];
+
+export const FISCAL_PROVIDER_GROUPS = [
+  {
+    id: 'ypahes',
+    title: 'Πιστοποιημένοι πάροχοι (ΥΠΑΗΕΣ)',
+    subtitle: 'Αδειοδοτημένα λογισμικά παρόχου ηλεκτρονικής τιμολόγησης ΑΑΔΕ.',
+  },
+  {
+    id: 'direct',
+    title: 'Απευθείας myDATA',
+    subtitle: 'Χωρίς πάροχο — διαβίβαση με δικά σας credentials ΑΑΔΕ.',
+  },
+  {
+    id: 'erp',
+    title: 'ERP / εναλλακτικά κανάλια',
+    subtitle: 'Τεχνικές διασυνδέσεις ERP· δεν αντιστοιχούν στα προϊόντα ΥΠΑΗΕΣ.',
   },
 ];
 
