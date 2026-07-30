@@ -705,6 +705,8 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             "driver_mode": driver_mode,
             "assigned_driver_id": (str(body.get("assigned_driver_id") or "").strip() or None),
             "notes": notes,
+            "marketing_email": bool(body.get("marketing_email")),
+            "marketing_sms": bool(body.get("marketing_sms")),
             "legal_doc_signatures": {},
             "created_at": now,
             "updated_at": now,

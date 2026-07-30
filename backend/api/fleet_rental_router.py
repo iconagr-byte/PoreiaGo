@@ -238,6 +238,14 @@ async def patch_booking_status(
         msg = str(exc)
         code = 404 if "δεν βρέθηκε" in msg else 400
         raise HTTPException(status_code=code, detail=msg) from exc
+    try:
+        from travel_platform.notifications.rental_customer_notify import (
+            notify_rental_customer_status,
+        )
+
+        await notify_rental_customer_status(row)
+    except Exception:
+        pass
     return row
 
 

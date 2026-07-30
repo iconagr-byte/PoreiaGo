@@ -20,6 +20,7 @@ import {
   selectedExtrasLabels,
 } from '../../lib/rental/rentBookingExtras.js';
 import { readRentBookingPrefs, writeRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
+import { readRentNotifySettings } from '../../lib/rental/rentNotify.js';
 import { createCustomerRentalBooking } from '../../services/customerRentalApi.js';
 import { fetchSiteAppearance } from '../../services/siteAppearanceApi.js';
 import RentBookingStepper from './RentBookingStepper.jsx';
@@ -59,23 +60,8 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
   const [upsellId, setUpsellId] = useState('');
   const [selection, setSelection] = useState(() => readExtrasSelection(prefs));
   const [busy, setBusy] = useState(false);
+  const [notify, setNotify] = useState(() => readRentNotifySettings(null));
   const named = splitName(prefs.client_first_name ? `${prefs.client_first_name} ${prefs.client_last_name || ''}` : getCustomerName());
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchSiteAppearance()
-      .then((data) => {
-        if (cancelled) return;
-        const { options, upsellId: preferred } = readCoverageCatalog(data);
-        setCatalog(options);
-        setUpsellId(preferred || '');
-        setSelection(readExtrasSelection(readRentBookingPrefs(), options));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const [form, setForm] = useState({
     first_name: prefs.client_first_name || named.first,
@@ -95,6 +81,36 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
     marketing_sms: Boolean(prefs.marketing_sms),
   });
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSiteAppearance()
+      .then((data) => {
+        if (cancelled) return;
+        const { options, upsellId: preferred } = readCoverageCatalog(data);
+        setCatalog(options);
+        setUpsellId(preferred || '');
+        setSelection(readExtrasSelection(readRentBookingPrefs(), options));
+        const ns = readRentNotifySettings(data);
+        setNotify(ns);
+        const prefsNow = readRentBookingPrefs();
+        const emailChosen = Object.prototype.hasOwnProperty.call(prefsNow, 'marketing_email');
+        const smsChosen = Object.prototype.hasOwnProperty.call(prefsNow, 'marketing_sms');
+        setForm((f) => ({
+          ...f,
+          marketing_email: emailChosen
+            ? Boolean(prefsNow.marketing_email)
+            : Boolean(ns.emailDefault && ns.emailEnabled),
+          marketing_sms: smsChosen
+            ? Boolean(prefsNow.marketing_sms)
+            : Boolean(ns.smsDefault && ns.smsEnabled),
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const dayCount = rentalDayCount(prefs.start_time, prefs.end_time);
   const totals = estimateBookingTotals({
@@ -224,7 +240,10 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
         client_phone: form.phone.trim(),
         notes: addressLine ? `Διεύθυνση: ${addressLine}` : undefined,
         extras,
+        marketing_email: Boolean(form.marketing_email && notify.emailEnabled),
+        marketing_sms: Boolean(form.marketing_sms && notify.smsEnabled),
       });
+
       writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'done' });
       toast.success(
         booking?.reference_code
@@ -344,30 +363,36 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
                   />
                 </label>
               </div>
-              <div className="rent-wiz-checks">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={form.marketing_email}
-                    onChange={(e) => {
-                      setField('marketing_email', e.target.checked);
-                      persistForm({ ...form, marketing_email: e.target.checked });
-                    }}
-                  />
-                  Θέλω προσφορές στο email
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={form.marketing_sms}
-                    onChange={(e) => {
-                      setField('marketing_sms', e.target.checked);
-                      persistForm({ ...form, marketing_sms: e.target.checked });
-                    }}
-                  />
-                  Θέλω ενημερώσεις SMS για την κράτηση
-                </label>
-              </div>
+              {notify.emailEnabled || notify.smsEnabled ? (
+                <div className="rent-wiz-checks">
+                  {notify.emailEnabled ? (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={form.marketing_email}
+                        onChange={(e) => {
+                          setField('marketing_email', e.target.checked);
+                          persistForm({ ...form, marketing_email: e.target.checked });
+                        }}
+                      />
+                      {notify.emailLabel || 'Θέλω προσφορές στο email'}
+                    </label>
+                  ) : null}
+                  {notify.smsEnabled ? (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={form.marketing_sms}
+                        onChange={(e) => {
+                          setField('marketing_sms', e.target.checked);
+                          persistForm({ ...form, marketing_sms: e.target.checked });
+                        }}
+                      />
+                      {notify.smsLabel || 'Θέλω ενημερώσεις SMS για την κράτηση'}
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="rent-wiz-form-card">

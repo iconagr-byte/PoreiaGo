@@ -423,6 +423,62 @@ async def set_subscription(email: str, is_subscribed: bool) -> dict | None:
     return await get_subscriber_by_email(email)
 
 
+async def ensure_subscriber(
+    *,
+    email: str,
+    name: str = "",
+    customer_id: str | None = None,
+    is_subscribed: bool = True,
+) -> dict | None:
+    """Create or update a marketing subscriber (used by rent opt-in)."""
+    key = (email or "").strip().lower()
+    if not key or "@" not in key:
+        return None
+    existing = await get_subscriber_by_email(key)
+    now = _now()
+    db = get_db()
+    if existing:
+        await db.execute(
+            """
+            UPDATE email_subscribers
+            SET name=COALESCE(NULLIF(?, ''), name),
+                customer_id=COALESCE(?, customer_id),
+                is_subscribed=?,
+                unsubscribed_at=?,
+                updated_at=?
+            WHERE email=?
+            """,
+            (
+                (name or "").strip(),
+                customer_id,
+                1 if is_subscribed else 0,
+                None if is_subscribed else now,
+                now,
+                key,
+            ),
+        )
+        await db.commit()
+        return await get_subscriber_by_email(key)
+
+    await db.execute(
+        """
+        INSERT INTO email_subscribers (id, email, customer_id, name, is_subscribed, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            _new_id("SUB"),
+            key,
+            customer_id,
+            (name or "").strip(),
+            1 if is_subscribed else 0,
+            now,
+            now,
+        ),
+    )
+    await db.commit()
+    return await get_subscriber_by_email(key)
+
+
 async def unsubscribe_by_token(token: str) -> bool:
     db = get_db()
     cur = await db.execute(

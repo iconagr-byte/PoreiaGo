@@ -77,6 +77,21 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_coverage_options": [],
     "rent_included_defaults": [],
     "rent_upsell_coverage_id": "",
+    "rent_notify_email_enabled": True,
+    "rent_notify_sms_enabled": True,
+    "rent_notify_email_label": "Θέλω προσφορές στο email",
+    "rent_notify_sms_label": "Θέλω ενημερώσεις SMS για την κράτηση",
+    "rent_notify_email_default": False,
+    "rent_notify_sms_default": False,
+    "rent_notify_sms_template_confirmed": (
+        "Κράτηση {ref} επιβεβαιώθηκε. Παραλαβή: {pickup} · {start}. {office}"
+    ),
+    "rent_notify_sms_template_status": "Κράτηση {ref}: νέα κατάσταση {status}. {office}",
+    "rent_notify_email_subject": "Κράτηση {ref} — επιβεβαίωση",
+    "rent_notify_email_body": (
+        "Γεια σου {name},<br/><br/>Η κράτησή σου <strong>{ref}</strong> επιβεβαιώθηκε."
+        "<br/>Παραλαβή: {pickup}<br/>Έναρξη: {start}<br/><br/>Ευχαριστούμε,<br/>{office}"
+    ),
     "home_slider_enabled": False,
     "home_slider_autoplay": True,
     "home_slider_interval_sec": 5,
@@ -148,6 +163,16 @@ class SiteAppearanceResponse(BaseModel):
     rent_coverage_options: list[dict] = []
     rent_included_defaults: list[str] = []
     rent_upsell_coverage_id: str = ""
+    rent_notify_email_enabled: bool = True
+    rent_notify_sms_enabled: bool = True
+    rent_notify_email_label: str = "Θέλω προσφορές στο email"
+    rent_notify_sms_label: str = "Θέλω ενημερώσεις SMS για την κράτηση"
+    rent_notify_email_default: bool = False
+    rent_notify_sms_default: bool = False
+    rent_notify_sms_template_confirmed: str = ""
+    rent_notify_sms_template_status: str = ""
+    rent_notify_email_subject: str = ""
+    rent_notify_email_body: str = ""
     home_slider_enabled: bool = False
     home_slider_autoplay: bool = True
     home_slider_interval_sec: int = 5
@@ -228,6 +253,16 @@ class SiteAppearanceUpdate(BaseModel):
     rent_coverage_options: list[dict] | None = None
     rent_included_defaults: list[str] | None = None
     rent_upsell_coverage_id: str | None = None
+    rent_notify_email_enabled: bool | None = None
+    rent_notify_sms_enabled: bool | None = None
+    rent_notify_email_label: str | None = None
+    rent_notify_sms_label: str | None = None
+    rent_notify_email_default: bool | None = None
+    rent_notify_sms_default: bool | None = None
+    rent_notify_sms_template_confirmed: str | None = None
+    rent_notify_sms_template_status: str | None = None
+    rent_notify_email_subject: str | None = None
+    rent_notify_email_body: str | None = None
     home_slider_enabled: bool | None = None
     home_slider_autoplay: bool | None = None
     home_slider_interval_sec: int | None = None
