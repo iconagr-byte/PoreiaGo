@@ -525,6 +525,14 @@ class EpsilonFiscalSettingsPublic(BaseModel):
     subscription_key_configured: bool = False
 
 
+class EinvoicingFiscalSettingsPublic(BaseModel):
+    api_url: str = ""
+    issuer_name: str = ""
+    branch_code: int = 0
+    item_code: str = ""
+    api_key_configured: bool = False
+
+
 class TenantFiscalSettingsResponse(BaseModel):
     storage_source: str = "postgres"
     tenant_slug: str | None = None
@@ -534,6 +542,12 @@ class TenantFiscalSettingsResponse(BaseModel):
     series_invoice: str = "ΤΠΥ"
     prosvasis: ProsvasisFiscalSettingsPublic = Field(default_factory=ProsvasisFiscalSettingsPublic)
     epsilon: EpsilonFiscalSettingsPublic = Field(default_factory=EpsilonFiscalSettingsPublic)
+    softone: EinvoicingFiscalSettingsPublic = Field(
+        default_factory=lambda: EinvoicingFiscalSettingsPublic(api_url="https://einvoice.s1ecos.gr")
+    )
+    impact: EinvoicingFiscalSettingsPublic = Field(
+        default_factory=lambda: EinvoicingFiscalSettingsPublic(api_url="https://einvoiceapi.impact.gr")
+    )
 
 
 class ProsvasisFiscalSettingsUpdate(BaseModel):
@@ -557,6 +571,14 @@ class EpsilonFiscalSettingsUpdate(BaseModel):
     wholesale_item_code: str | None = None
 
 
+class EinvoicingFiscalSettingsUpdate(BaseModel):
+    api_url: str | None = None
+    api_key: str | None = None
+    issuer_name: str | None = None
+    branch_code: int | None = None
+    item_code: str | None = None
+
+
 class TenantFiscalSettingsUpdate(BaseModel):
     provider: str | None = None
     issuer_vat: str | None = None
@@ -564,3 +586,5 @@ class TenantFiscalSettingsUpdate(BaseModel):
     series_invoice: str | None = None
     prosvasis: ProsvasisFiscalSettingsUpdate | None = None
     epsilon: EpsilonFiscalSettingsUpdate | None = None
+    softone: EinvoicingFiscalSettingsUpdate | None = None
+    impact: EinvoicingFiscalSettingsUpdate | None = None
