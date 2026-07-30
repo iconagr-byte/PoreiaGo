@@ -178,7 +178,21 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         </header>
 
         <main className="rent-home rent-home--guest-land">
-          <div id="rent-guest-search" className="rent-search-wrap rent-search-wrap--top">
+          <RentGuestHero
+            brandLabel={branding.brandLabel}
+            title={branding.title}
+            titleAccent={branding.titleAccent}
+            copy={branding.copy}
+            carCount={carCount}
+            vanCount={vanCount}
+            onBrowseFleet={() => {
+              const el = document.getElementById('rent-guest-fleet');
+              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            onRequireLogin={onRequireLogin}
+          />
+
+          <div id="rent-guest-search" className="rent-search-wrap rent-search-wrap--top rent-search-wrap--below-hero">
             <RentBookingSearchBar
               brandLabel={branding.brandLabel}
               footerAddress={footerAddress}
@@ -206,20 +220,6 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               }}
             />
           </div>
-
-          <RentGuestHero
-            brandLabel={branding.brandLabel}
-            title={branding.title}
-            titleAccent={branding.titleAccent}
-            copy={branding.copy}
-            carCount={carCount}
-            vanCount={vanCount}
-            onBrowseFleet={() => {
-              const el = document.getElementById('rent-guest-fleet');
-              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }}
-            onRequireLogin={onRequireLogin}
-          />
 
           <div className="rent-home-stack rent-home-stack--landing">
             <section id="rent-guest-fleet" className="rent-land-band rent-land-band--pick" aria-label="Στόλος ενοικίασης">
