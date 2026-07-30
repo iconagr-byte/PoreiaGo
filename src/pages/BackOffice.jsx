@@ -2271,6 +2271,7 @@ export default function BackOffice() {
                 asLink={false}
                 fallbackLabel="Γραφείο"
                 refreshKey={brandRefreshKey}
+                preferAdmin
               />
               <span className="material-symbols-outlined text-[18px] text-slate-300 group-hover:text-primary transition-colors shrink-0">
                 edit
