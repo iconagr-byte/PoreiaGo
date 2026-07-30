@@ -8,6 +8,7 @@ export const RENT_DESK_TABS = [
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'paperwork', label: 'Χαρτούρα', icon: 'description' },
   { id: 'services', label: 'Υπηρεσίες', icon: 'health_and_safety' },
+  { id: 'payments', label: 'Πληρωμές', icon: 'payments' },
   { id: 'pickups', label: 'Σημεία παραλαβής', icon: 'location_on' },
   { id: 'branding', label: 'Εμφάνιση /rent', icon: 'palette' },
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard' },

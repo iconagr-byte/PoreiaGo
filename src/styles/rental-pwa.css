@@ -4588,3 +4588,248 @@
     font-size: 0.62rem;
   }
 }
+
+/* —— Payment step —— */
+.rent-pay-plans {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rent-pay-plan {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  text-align: left;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1.5px solid rgba(10, 122, 108, 0.16);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.rent-pay-plan .material-symbols-outlined {
+  color: var(--rent-teal, #0a7a6c);
+  font-size: 1.4rem;
+  margin-top: 0.1rem;
+}
+
+.rent-pay-plan.is-active {
+  border-color: var(--rent-teal, #0a7a6c);
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.08), rgba(10, 122, 108, 0.02));
+  box-shadow: 0 0 0 1px rgba(10, 122, 108, 0.2);
+}
+
+.rent-pay-plan-copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.rent-pay-plan-copy strong {
+  font-size: 0.95rem;
+  color: var(--rent-ink, #1d1d1f);
+}
+
+.rent-pay-plan-copy em {
+  font-style: normal;
+  font-size: 0.8rem;
+  color: #6e6e73;
+}
+
+.rent-pay-plan-copy small {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-pay-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.rent-pay-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.95rem;
+  border-radius: 999px;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #3a3a3c;
+  cursor: pointer;
+}
+
+.rent-pay-method .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.rent-pay-method.is-active {
+  background: linear-gradient(180deg, #1aa896 0%, #0a7a6c 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(10, 122, 108, 0.28);
+}
+
+.rent-pay-card-fields {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border-radius: 1rem;
+  background: rgba(10, 122, 108, 0.04);
+  border: 1px solid rgba(10, 122, 108, 0.12);
+}
+
+.rent-pay-card-fields label,
+.rent-pay-bank-select {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+}
+
+.rent-pay-card-fields label span,
+.rent-pay-bank-select span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6e6e73;
+}
+
+.rent-pay-card-fields input,
+.rent-pay-bank-select select {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.65rem 0.8rem;
+  font-size: 0.92rem;
+  background: #fff;
+}
+
+.rent-pay-card-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.rent-pay-secure,
+.rent-pay-soft,
+.rent-pay-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #6e6e73;
+}
+
+.rent-pay-hint {
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 196, 70, 0.15);
+  border: 1px solid rgba(200, 140, 20, 0.25);
+  color: #7a4e00;
+}
+
+.rent-pay-bank {
+  margin-top: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: rgba(10, 122, 108, 0.06);
+  border: 1px solid rgba(10, 122, 108, 0.18);
+}
+
+.rent-pay-bank-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 800;
+  color: #0a5c52;
+  margin-bottom: 0.65rem;
+}
+
+.rent-pay-bank dl {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.65rem 0 0;
+}
+
+.rent-pay-bank dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.rent-pay-bank dt {
+  color: #5a7a74;
+}
+
+.rent-pay-bank dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  color: #123;
+}
+
+.rent-pay-iban,
+.rent-pay-ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.rent-pay-bank-note {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(10, 122, 108, 0.15);
+  font-size: 0.75rem;
+  color: #3d5c56;
+  line-height: 1.45;
+}
+
+.rent-pay-due {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.rent-pay-due-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6e6e73;
+  margin: 0 0 0.2rem;
+}
+
+.rent-pay-due-amount {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--rent-teal, #0a7a6c);
+  margin: 0;
+}
+
+.rent-pay-due-balance {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--rent-ink, #1d1d1f);
+  margin: 0;
+}
+
+.rent-wiz-next--pay {
+  background: linear-gradient(180deg, #1aa896 0%, #0a7a6c 100%);
+  border: none;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  box-shadow: 0 8px 22px rgba(10, 122, 108, 0.32);
+}

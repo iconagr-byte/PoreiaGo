@@ -331,10 +331,15 @@ function RentalAuthGate() {
   const continueToBooking = Boolean(
     location.state?.rentContinue ||
       location.state?.from === '/rent/book/services' ||
-      location.state?.from === '/rent/book/details',
+      location.state?.from === '/rent/book/details' ||
+      location.state?.from === '/rent/book/payment',
   );
   const continueTarget =
-    location.state?.from === '/rent/book/details' ? '/rent/book/details' : '/rent/book/services';
+    location.state?.from === '/rent/book/payment'
+      ? '/rent/book/payment'
+      : location.state?.from === '/rent/book/details'
+        ? '/rent/book/details'
+        : '/rent/book/services';
   const fromLookup = Boolean(location.state?.rentLookup || location.state?.openRentWallet);
   // Guests always land on the /rent hero. Wallet / book continue open login.
   const [showLogin, setShowLogin] = useState(() => continueToBooking || isWalletPath || fromLookup);

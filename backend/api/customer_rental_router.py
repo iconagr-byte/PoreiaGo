@@ -73,6 +73,13 @@ class CustomerBookingBody(BaseModel):
     client_phone: str | None = None
     notes: str | None = None
     extras: list[str] = Field(default_factory=list)
+    payment_method: str | None = None
+    payment_plan: str | None = None
+    deposit_percent: int | None = None
+    amount_paid: float | None = None
+    balance_due: float | None = None
+    payment_status: str | None = None
+    total_cost: float | None = None
 
 
 class GuestRentalLookupBody(BaseModel):
@@ -101,6 +108,12 @@ def _public_booking(row: dict) -> dict:
         "rental_status": row.get("rental_status"),
         "driver_mode": row.get("driver_mode"),
         "channel": row.get("channel"),
+        "payment_method": row.get("payment_method"),
+        "payment_plan": row.get("payment_plan"),
+        "deposit_percent": row.get("deposit_percent"),
+        "amount_paid": row.get("amount_paid"),
+        "balance_due": row.get("balance_due"),
+        "payment_status": row.get("payment_status"),
         "created_at": row.get("created_at"),
     }
 
@@ -308,6 +321,13 @@ async def book_rental(
         "notes": body.notes,
         "extras": list(body.extras or []),
         "channel": "WALLET",
+        "payment_method": body.payment_method,
+        "payment_plan": body.payment_plan,
+        "deposit_percent": body.deposit_percent,
+        "amount_paid": body.amount_paid,
+        "balance_due": body.balance_due,
+        "payment_status": body.payment_status,
+        "total_cost": body.total_cost,
     }
     try:
         row = store.create_booking(await _tenant_id(request), payload)
