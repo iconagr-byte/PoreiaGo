@@ -10,7 +10,7 @@ const WM = (path) =>
 export const DEMO_RENT_FLEET = [
   {
     id: 'demo-rent-car-i10',
-    category: 'CAR',
+    category: 'MINI',
     model: 'Toyota Aygo X',
     seating_capacity: 4,
     daily_rate_eur: 32,
@@ -22,7 +22,7 @@ export const DEMO_RENT_FLEET = [
   },
   {
     id: 'demo-rent-car-c3',
-    category: 'CAR',
+    category: 'COMPACT',
     model: 'Peugeot 208',
     seating_capacity: 5,
     daily_rate_eur: 38,
@@ -36,7 +36,7 @@ export const DEMO_RENT_FLEET = [
   },
   {
     id: 'demo-rent-car-yaris',
-    category: 'CAR',
+    category: 'COMPACT',
     model: 'Renault Clio',
     seating_capacity: 5,
     daily_rate_eur: 42,
@@ -78,7 +78,7 @@ export const DEMO_RENT_FLEET = [
   },
   {
     id: 'demo-rent-van-trafic',
-    category: 'VAN',
+    category: 'MINIBUS',
     model: 'Ford Transit Custom',
     seating_capacity: 9,
     daily_rate_eur: 88,
@@ -92,13 +92,7 @@ export const DEMO_RENT_FLEET = [
   },
 ];
 
-export function rentCategoryLabel(category) {
-  const c = String(category || '').toUpperCase();
-  if (c === 'VAN') return 'Van';
-  if (c === 'MINIBUS') return 'Minibus';
-  if (c === 'CAR') return 'Επιβατικό';
-  return category || '';
-}
+export { rentCategoryLabel } from './rentVehicleCategories.js';
 
 export function withDemoRentFleet(vehicles) {
   if (Array.isArray(vehicles) && vehicles.length > 0) return vehicles;

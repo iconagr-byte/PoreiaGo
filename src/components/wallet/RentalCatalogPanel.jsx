@@ -8,13 +8,9 @@ import {
 } from '../../services/customerRentalApi.js';
 import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { getCustomerEmail, getCustomerName } from '../../lib/auth.js';
+import { RENT_CATEGORY_OPTIONS } from '../../lib/rental/rentVehicleCategories.js';
 
-const CATEGORIES = [
-  { value: '', label: 'Όλες' },
-  { value: 'CAR', label: 'Αυτοκίνητο' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'MINIBUS', label: 'Μινιμπάς' },
-];
+const CATEGORIES = [{ value: '', label: 'Όλες' }, ...RENT_CATEGORY_OPTIONS];
 
 function euro(n) {
   return `€${Number(n || 0).toFixed(2)}`;
