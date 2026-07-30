@@ -12,13 +12,11 @@ vi.mock('../lib/platform/tenantHost.js', () => ({
 }));
 
 import { canAccessPlatformOperatorUi } from '../lib/saasJwt.js';
-import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import { shouldShowRentMenu } from './officeModulesApi.js';
 
 describe('shouldShowRentMenu', () => {
   beforeEach(() => {
     canAccessPlatformOperatorUi.mockReturnValue(false);
-    isPlatformMarketingHost.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -34,9 +32,8 @@ describe('shouldShowRentMenu', () => {
     ).toBe(false);
   });
 
-  it('shows Rent for Achillio JWT only when Super Admin is on poreiago.com', () => {
+  it('shows Rent for PoreiaGo Super Admin even when modules look like Achillio', () => {
     canAccessPlatformOperatorUi.mockReturnValue(true);
-    isPlatformMarketingHost.mockReturnValue(true);
     expect(
       shouldShowRentMenu({
         rent_enabled: false,
@@ -58,14 +55,25 @@ describe('shouldShowRentMenu', () => {
     ).toBe(true);
   });
 
-  it('shows Rent for Super Admin on poreiago.com host', () => {
+  it('shows Rent for Super Admin regardless of hostname', () => {
     canAccessPlatformOperatorUi.mockReturnValue(true);
-    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentMenu(
+        {
+          rent_enabled: false,
+          office_kind: 'customer',
+        },
+        { hostname: 'demo.example.com' },
+      ),
+    ).toBe(true);
+  });
+
+  it('hides Rent for regular offices without rent', () => {
     expect(
       shouldShowRentMenu({
         rent_enabled: false,
         office_kind: 'customer',
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
