@@ -73,6 +73,7 @@ export default function AgencyPlansPage() {
       });
       return;
     }
+    // Guests must start a bus plan first — add-on is enabled later from Συμβόλαιο.
     navigate(`/grafeia/signup?plan=professional&interval=${interval}&addon=rent`);
   };
 

@@ -91,8 +91,8 @@ export const RENT_ADDON = {
   kind: 'addon',
   monthlyEur: 79,
   features: [
-    'Όλα του Rent module πάνω στο υπάρχον πλάνο',
-    'Ίδιο /rent app & wallet για πελάτες',
+    'Όλα του Rent module πάνω στο υπάρχον πλάνο λεωφορείων',
+    'Ξεχωριστό Rent Wallet (/rent/wallet) — πράσινο, όχι το My Wallet λεωφορείων',
     'SOS · οδική · ασφάλεια · share · checklist',
     'Χωρίς αλλαγή του core συμβολαίου λεωφορείων',
   ],

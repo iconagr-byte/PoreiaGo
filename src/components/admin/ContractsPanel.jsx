@@ -226,6 +226,28 @@ export default function ContractsPanel({
   const hasToken = Boolean(getSaasToken());
   const rentEnabled = Boolean(modules?.rent_enabled);
   const rentOnly = rentEnabled && modules?.trips_enabled === false;
+  const busPlanIds = new Set(['starter', 'professional', 'enterprise']);
+  const currentPlanId = String(sub?.plan || modules?.plan || '').toLowerCase();
+  const hasBusPlan = busPlanIds.has(currentPlanId);
+  const subStatus = String(sub?.status || '').toLowerCase();
+  const busContractActive =
+    Boolean(sub?.is_active) &&
+    hasBusPlan &&
+    !['canceled', 'cancelled', 'unpaid', 'incomplete'].includes(subStatus);
+  const addonAlreadyOn = rentEnabled && !rentOnly;
+  const canEnableRentAddon = busContractActive && !rentOnly && !addonAlreadyOn;
+  let rentAddonBlockedReason = '';
+  if (rentOnly) {
+    rentAddonBlockedReason = 'Είστε ήδη σε αυτόνομο Rent — το add-on είναι για συμβόλαια λεωφορείων.';
+  } else if (addonAlreadyOn) {
+    rentAddonBlockedReason = '';
+  } else if (!hasBusPlan) {
+    rentAddonBlockedReason =
+      'Το add-on δουλεύει μόνο αν έχετε συμβόλαιο λεωφορείων (Starter / Professional / Enterprise).';
+  } else if (!busContractActive) {
+    rentAddonBlockedReason =
+      'Ενεργοποιήστε πρώτα δοκιμή ή πληρωμένο συμβόλαιο λεωφορείων, μετά το Rent add-on.';
+  }
   const trialProgress =
     onTrial && remaining != null && trialDays > 0
       ? Math.max(0, Math.min(100, Math.round(((trialDays - Math.max(remaining, 0)) / trialDays) * 100)))
@@ -465,8 +487,8 @@ export default function ContractsPanel({
                   <p className="text-[11px] font-bold uppercase tracking-wide text-teal-800/80">Ενοικιάσεις</p>
                   <h4 className="text-lg font-bold text-slate-900 mt-0.5">Προσθήκη συμβολαίου Rent</h4>
                   <p className="text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                    Ενεργοποίησε το Rent ως add-on πάνω στο τρέχον πλάνο λεωφορείων, ή διάλεξε αυτόνομο
-                    συμβόλαιο μόνο για ενοικιάσεις.
+                    Το <strong>add-on</strong> προσθέτει Rent πάνω σε ενεργό συμβόλαιο λεωφορείων. Αν δεν
+                    έχετε λεωφορεία, επιλέξτε το αυτόνομο συμβόλαιο Rent.
                   </p>
                 </div>
                 {rentEnabled ? (
@@ -513,18 +535,29 @@ export default function ContractsPanel({
                       </li>
                     ))}
                   </ul>
+                  {rentAddonBlockedReason ? (
+                    <p className="mt-3 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
+                      {rentAddonBlockedReason}
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+                      Απαιτεί ενεργό συμβόλαιο λεωφορείων · κρατάει trips/My Wallet και ανοίγει το Rent.
+                    </p>
+                  )}
                   <button
                     type="button"
-                    disabled={working || (rentEnabled && !rentOnly) || rentOnly}
+                    disabled={working || !canEnableRentAddon}
                     onClick={enableRentAddon}
                     className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-full bg-teal-700 text-white px-4 py-2.5 text-sm font-bold hover:bg-teal-800 disabled:opacity-50"
                   >
                     <span className="material-symbols-outlined text-[18px]">car_rental</span>
                     {rentOnly
                       ? 'Ήδη σε αυτόνομο Rent'
-                      : rentEnabled
+                      : addonAlreadyOn
                         ? 'Rent add-on ενεργό'
-                        : 'Ενεργοποίηση Rent add-on'}
+                        : canEnableRentAddon
+                          ? 'Ενεργοποίηση Rent add-on'
+                          : 'Απαιτεί συμβόλαιο λεωφορείων'}
                   </button>
                 </div>
 

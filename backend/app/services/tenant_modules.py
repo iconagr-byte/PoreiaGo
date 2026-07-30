@@ -125,17 +125,76 @@ def modules_for_tenant(tenant: Tenant) -> dict[str, Any]:
 
 
 def enable_rent_addon_in_settings(settings: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Merge Rent add-on onto an existing bus office settings bag."""
+    """Merge Rent add-on onto an existing bus office settings bag (keeps trips on)."""
     bag = dict(settings or {})
     addons = dict(bag.get("addons") or {})
     addons["rent"] = True
     bag["addons"] = addons
     modules = dict(bag.get("modules") or {})
     modules["rent_enabled"] = True
-    if "trips_enabled" not in modules:
-        modules["trips_enabled"] = True
+    # Add-on is always on top of buses — never drop trips.
+    modules["trips_enabled"] = True
     bag["modules"] = modules
     return bag
+
+
+_BUS_PLANS = frozenset(
+    {
+        TenantPlan.STARTER,
+        TenantPlan.PROFESSIONAL,
+        TenantPlan.ENTERPRISE,
+        TenantPlan.STARTER.value,
+        TenantPlan.PROFESSIONAL.value,
+        TenantPlan.ENTERPRISE.value,
+    }
+)
+
+
+def rent_addon_eligibility(
+    tenant: Tenant,
+    *,
+    subscription_status: str | None = None,
+) -> tuple[bool, str]:
+    """
+    Rent add-on is only for offices with an active bus contract.
+
+    Returns (ok, greek_error_message).
+    """
+    if is_achillio_travel_office(tenant):
+        return (
+            False,
+            "Το γραφείο Achillio Travel είναι μόνο λεωφορεία — χωρίς Rent add-on.",
+        )
+
+    plan = tenant.plan
+    plan_value = plan.value if isinstance(plan, TenantPlan) else str(plan or "").strip().lower()
+    if plan_value == TenantPlan.RENT.value or plan == TenantPlan.RENT:
+        return False, "Το γραφείο είναι ήδη σε αυτόνομο Rent συμβόλαιο (όχι add-on)."
+
+    if plan not in _BUS_PLANS and plan_value not in _BUS_PLANS:
+        return (
+            False,
+            "Το Rent add-on απαιτεί συμβόλαιο λεωφορείων (Starter / Professional / Enterprise).",
+        )
+
+    if not bool(getattr(tenant, "is_active", True)):
+        return (
+            False,
+            "Το γραφείο δεν είναι ενεργό. Ενεργοποιήστε πρώτα το συμβόλαιο λεωφορείων.",
+        )
+
+    status = str(subscription_status or "").strip().lower()
+    if status in ("canceled", "cancelled", "unpaid", "incomplete"):
+        return (
+            False,
+            "Απαιτείται ενεργό συμβόλαιο λεωφορείων (δοκιμή ή πληρωμένο) πριν το Rent add-on.",
+        )
+
+    mods = modules_for_tenant(tenant)
+    if mods.get("mode") == "rent_only":
+        return False, "Το γραφείο είναι ήδη σε λειτουργία μόνο ενοικιάσεων."
+
+    return True, ""
 
 
 def disable_rent_addon_in_settings(settings: dict[str, Any] | None = None) -> dict[str, Any]:
