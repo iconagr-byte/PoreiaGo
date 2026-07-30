@@ -175,15 +175,23 @@ def _tenant_slug(tenant: Any) -> str:
 
 
 def is_achillio_travel_office(tenant: Any) -> bool:
-    """True for Achillio Travel bus office — Rent stays off by policy."""
+    """True for Achillio Travel bus office — Rent stays off by policy.
+
+    Historic platform seed slug ``achillio`` is NEVER Achillio Travel — even when
+    ``custom_domain`` was wrongly set to achilliotravel.com (that poison caused
+    Rent Wallet share URLs to point at the wrong office).
+    """
     slug = _tenant_slug(tenant)
+    subdomain = str(getattr(tenant, "subdomain", None) or "").strip().lower()
+    # Platform / demo seed wins over a stolen Achillio Travel domain.
+    if slug in _POREIAGO_PLATFORM_SLUGS or slug == "achillio":
+        return False
+    if subdomain in _POREIAGO_PLATFORM_SLUGS or subdomain == "achillio":
+        return False
+    if slug in _ACHILLIO_TRAVEL_SLUGS or subdomain in _ACHILLIO_TRAVEL_SLUGS:
+        return True
     domain = _tenant_domain(tenant)
     if domain and _ACHILLIO_DOMAIN_RE.search(domain):
-        return True
-    if slug in _ACHILLIO_TRAVEL_SLUGS:
-        return True
-    # Legacy seed slug ``achillio`` only counts as Achillio Travel when bound to that domain.
-    if slug == "achillio" and domain and "achillio" in domain:
         return True
     return False
 
@@ -192,10 +200,8 @@ def is_poreiago_platform_office(tenant: Any) -> bool:
     """True for PoreiaGo platform / demo office that must keep Rent visible.
 
     The historic seed uses slug/subdomain ``achillio`` with legal_name PoreiaGo.
-    That is NOT Achillio Travel (which requires achilliotravel.com / travel slugs).
+    That is NOT Achillio Travel (which requires travel slugs like admin-achillio-gr).
     """
-    if is_achillio_travel_office(tenant):
-        return False
     slug = _tenant_slug(tenant)
     # Legacy demo/platform seed slug — keep Rent even if legal_name/domain drifted.
     if slug in _POREIAGO_PLATFORM_SLUGS or slug == "achillio":
@@ -203,6 +209,8 @@ def is_poreiago_platform_office(tenant: Any) -> bool:
     subdomain = str(getattr(tenant, "subdomain", None) or "").strip().lower()
     if subdomain in _POREIAGO_PLATFORM_SLUGS or subdomain == "achillio":
         return True
+    if is_achillio_travel_office(tenant):
+        return False
     legal = str(getattr(tenant, "legal_name", None) or "").strip().lower()
     domain = _tenant_domain(tenant)
     if domain and _POREIAGO_DOMAIN_RE.search(domain):
@@ -295,7 +303,7 @@ async def ensure_known_office_rent_modules(session: Any) -> dict[str, int]:
     disabled = 0
     enabled = 0
     for tenant in tenants:
-        # Heal drifted Achillio legal_name on the PoreiaGo platform seed.
+        # Heal drifted Achillio legal_name / stolen custom_domain on PoreiaGo seed.
         if is_poreiago_platform_office(tenant):
             legal = str(getattr(tenant, "legal_name", None) or "").strip()
             if (not legal) or ("achillio" in legal.lower()) or legal.lower() == "achillio":
@@ -303,6 +311,13 @@ async def ensure_known_office_rent_modules(session: Any) -> dict[str, int]:
                 logger.info(
                     "Healed PoreiaGo platform legal_name (was %r) slug=%s",
                     legal or "",
+                    _tenant_slug(tenant),
+                )
+            domain = _tenant_domain(tenant)
+            if domain and "achilliotravel.com" in domain:
+                tenant.custom_domain = None
+                logger.info(
+                    "Cleared Achillio Travel custom_domain from PoreiaGo platform slug=%s",
                     _tenant_slug(tenant),
                 )
 

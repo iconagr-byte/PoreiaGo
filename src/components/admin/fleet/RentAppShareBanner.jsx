@@ -5,7 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { QRCode } from 'react-qr-code';
 import toast from 'react-hot-toast';
 import { fetchTenantBrandingSettings } from '../../../services/growthApi.js';
-import { getOfficeRentWalletUrl } from '../../../lib/platform/officePublicUrl.js';
+import {
+  getOfficeRentWalletUrl,
+  getOfficeShareDisplayName,
+} from '../../../lib/platform/officePublicUrl.js';
 
 export default function RentAppShareBanner() {
   const [rentUrl, setRentUrl] = useState('');
@@ -20,7 +23,7 @@ export default function RentAppShareBanner() {
       .then((branding) => {
         if (cancelled) return;
         const office = branding || {};
-        setOfficeName(office.display_name || office.slug || office.subdomain || 'Γραφείο');
+        setOfficeName(getOfficeShareDisplayName(office));
         setRentUrl(getOfficeRentWalletUrl(office));
       })
       .catch(() => {

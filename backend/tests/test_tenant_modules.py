@@ -133,6 +133,16 @@ def test_poreiago_seed_slug_not_confused_with_achillio_travel():
     assert is_achillio_travel_office(seed) is False
     assert is_poreiago_platform_office(seed) is True
 
+    # Stolen domain on platform seed must still count as PoreiaGo (not Travel).
+    poisoned = SimpleNamespace(
+        slug="achillio",
+        custom_domain="www.achilliotravel.com",
+        legal_name="Achillio Travel",
+        subdomain="achillio",
+    )
+    assert is_achillio_travel_office(poisoned) is False
+    assert is_poreiago_platform_office(poisoned) is True
+
     travel = SimpleNamespace(
         slug="admin-achillio-gr",
         custom_domain="achilliotravel.com",
