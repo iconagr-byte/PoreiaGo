@@ -41,7 +41,7 @@ function actorBadgeClass(type) {
 export default function LoginAuditPanel() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actorType, setActorType] = useState('');
+  const [actorType, setActorType] = useState('driver');
   const [result, setResult] = useState('');
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
@@ -83,7 +83,8 @@ export default function LoginAuditPanel() {
               Καταγραφές συνδέσεων
             </h3>
             <p className="text-sm text-on-surface-variant">
-              Χρόνος, IP και συσκευή για διαχειριστές, πελάτες και οδηγούς (επιτυχείς &amp; αποτυχημένες).
+              Σιωπηλή καταγραφή στο σύστημα — πότε συνδέθηκε οδηγός (κωδικός ή Master QR), με
+              ώρα, IP και συσκευή. Χωρίς ειδοποιήσεις στον οδηγό.
             </p>
           </div>
           <button

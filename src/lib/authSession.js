@@ -30,8 +30,20 @@ export function handleAuthFailure(message = 'Η σύνδεσή σας έληξε
   if (authFailureHandled) return;
   authFailureHandled = true;
   clearLocalAuthSession();
-  toast.error(message, { id: 'auth-expired' });
+
+  const path = typeof window !== 'undefined' ? window.location.pathname || '' : '';
+  const onDriverApp = path === '/driver' || path.startsWith('/driver/');
+  // Driver PWA: silent session clear — connection events are audited server-side.
+  // Do not show the office «σύνδεση έληξε» banner on the driver surface.
+  if (!onDriverApp) {
+    toast.error(message, { id: 'auth-expired' });
+  }
+
   window.setTimeout(() => {
+    if (onDriverApp) {
+      window.location.assign('/driver');
+      return;
+    }
     window.location.assign('/admin/login');
-  }, 400);
+  }, onDriverApp ? 0 : 400);
 }

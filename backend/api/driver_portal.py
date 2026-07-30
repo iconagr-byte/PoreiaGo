@@ -252,7 +252,7 @@ async def login_with_password(request: Request, body: DriverLoginBody):
 
 
 @router.post("/session/master-qr", response_model=DriverSessionResponse)
-async def exchange_master_qr(body: MasterQrExchangeBody):
+async def exchange_master_qr(request: Request, body: MasterQrExchangeBody):
     """Scan bus dashboard QR → day session (secondary login path)."""
     from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
     from travel_platform.operations.master_qr_bridge import (
@@ -276,6 +276,20 @@ async def exchange_master_qr(body: MasterQrExchangeBody):
             await sync_trip_passengers_to_ticketing(trip_id, tenant_id=tenant_id)
         except Exception:
             pass
+        driver = get_driver(driver_id) if driver_id and driver_id != "master-qr-driver" else None
+        record_login_from_request(
+            request,
+            actor_type="driver",
+            identity=(driver.email if driver else None)
+            or (driver.license_no if driver else None)
+            or str(driver_id or "master-qr"),
+            success=True,
+            actor_id=str(driver_id) if driver_id else None,
+            actor_name=(driver.name if driver else None) or "Master QR",
+            method="master_qr",
+            tenant_id=str(tenant_id) if tenant_id else None,
+            detail=f"trip:{trip_id}",
+        )
         # Re-issue JWT with the coerced SaaS tenant so GPS ingest matches the live map.
         return _issue_driver_session(
             driver_id=driver_id,
@@ -286,7 +300,23 @@ async def exchange_master_qr(body: MasterQrExchangeBody):
 
     preview = preview_master_qr_payload(body.qr_raw)
     if not preview or preview.get("typ") != "master_qr":
+        record_login_from_request(
+            request,
+            actor_type="driver",
+            identity="master-qr",
+            success=False,
+            method="master_qr",
+            detail="Not a Master QR code",
+        )
         raise HTTPException(status_code=400, detail="Not a Master QR code")
+    record_login_from_request(
+        request,
+        actor_type="driver",
+        identity="master-qr",
+        success=False,
+        method="master_qr",
+        detail="Invalid or expired Master QR",
+    )
     raise HTTPException(status_code=401, detail="Invalid or expired Master QR")
 
 
