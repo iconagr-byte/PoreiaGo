@@ -32,6 +32,7 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'fleet_live_map',
   'routes',
   'customers',
+  'loyalty',
   'fleet',
   'drivers',
   'lost_found',
@@ -47,6 +48,7 @@ export const DEFAULT_RENT_NAV_ORDER = [...RENT_DESK_NAV_IDS];
 export const RENT_ONLY_MAIN_NAV_ORDER = [
   'dashboard',
   'customers',
+  'loyalty',
   'fleet_live_map',
   'email',
   'email_templates',
@@ -242,6 +244,16 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'customers',
     navGroup: 'main',
     accent: 'violet',
+  },
+  loyalty: {
+    id: 'loyalty',
+    label: 'Επιβραβεύσεις',
+    icon: 'stars',
+    filled: true,
+    type: 'tab',
+    tab: 'loyalty',
+    navGroup: 'main',
+    accent: 'amber',
   },
   fleet: {
     id: 'fleet',
