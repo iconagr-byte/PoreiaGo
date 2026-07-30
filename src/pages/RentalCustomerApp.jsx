@@ -9,10 +9,7 @@ import {
   logoutCustomer,
 } from '../lib/auth.js';
 import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
-import {
-  isRentMobileViewport,
-  useRentMobile,
-} from '../lib/rental/rentDevice.js';
+import { useRentMobile } from '../lib/rental/rentDevice.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { resolveRentAppBranding } from '../lib/rental/rentAppBranding.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
@@ -322,19 +319,12 @@ function RentalAuthGate() {
   // Re-check auth after in-place login (same URL /rent).
   const location = useLocation();
   const navigate = useNavigate();
-  const isMobile = useRentMobile();
   const continueToServices = Boolean(
     location.state?.rentContinue || location.state?.from === '/rent/book/services',
   );
-  // Mobile app = Wallet entrance. Desktop guests may browse fleet first.
-  const [showLogin, setShowLogin] = useState(
-    () => isRentMobileViewport() || continueToServices,
-  );
+  // Guests always land on the /rent hero (fleet preview). Login opens from account.
+  const [showLogin, setShowLogin] = useState(() => continueToServices);
   useEffect(() => setupRentalPwa(), []);
-
-  useEffect(() => {
-    if (isMobile) setShowLogin(true);
-  }, [isMobile]);
 
   useEffect(() => {
     if (continueToServices) setShowLogin(true);
@@ -353,7 +343,7 @@ function RentalAuthGate() {
     return <RentalAuthenticatedApp key={location.key} />;
   }
 
-  if (showLogin || isMobile) {
+  if (showLogin) {
     return (
       <LoginPage
         rentEntrance
