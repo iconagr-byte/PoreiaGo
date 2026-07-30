@@ -360,6 +360,20 @@ def _is_platform_host(host: str | None) -> bool:
     return bool(_PLATFORM_HOST_RE.match(value))
 
 
+def _scrub_achillio_from_platform_appearance(data: dict) -> dict:
+    """Never serve Achillio Travel identity from the shared PoreiaGo file store."""
+    out = dict(data or {})
+    ach_re = re.compile(r"achillio|achillion", re.I)
+    for key in ("footer_brand_name", "rent_office_name", "display_name", "footer_copyright"):
+        if ach_re.search(str(out.get(key) or "")):
+            out[key] = "PoreiaGo" if key != "footer_copyright" else ""
+    if ach_re.search(str(out.get("logo_url") or "")):
+        out["logo_url"] = ""
+    if ach_re.search(str(out.get("hero_image_url") or "")):
+        out["hero_image_url"] = ""
+    return out
+
+
 def purge_mistaken_platform_logo(*, force: bool = False) -> bool:
     """Remove Achillion Travel logo from the PoreiaGo platform appearance store.
 
@@ -516,6 +530,8 @@ async def get_public_site_appearance(host: str | None = Query(default=None)):
         api_hero = _asset_api_url("hero")
         if api_hero:
             data["hero_image_url"] = api_hero
+    if _is_platform_host(host):
+        data = _scrub_achillio_from_platform_appearance(data)
     return SiteAppearanceResponse(**data)
 
 

@@ -65,6 +65,22 @@ class PlatformLogoPurgeTests(unittest.TestCase):
                 self.assertTrue(mod._is_platform_host(None))
                 self.assertFalse(mod._is_platform_host("www.achilliontravel.gr"))
 
+    def test_scrub_achillio_from_platform_appearance(self):
+        import api.site_appearance_router as mod
+
+        cleaned = mod._scrub_achillio_from_platform_appearance(
+            {
+                "footer_brand_name": "Achillio Travel",
+                "logo_url": "/images/achillio-logo.png",
+                "hero_image_url": "/images/hero-bus-achillio.png",
+                "hero_title": "Keep me",
+            }
+        )
+        self.assertEqual(cleaned["footer_brand_name"], "PoreiaGo")
+        self.assertEqual(cleaned["logo_url"], "")
+        self.assertEqual(cleaned["hero_image_url"], "")
+        self.assertEqual(cleaned["hero_title"], "Keep me")
+
 
 if __name__ == "__main__":
     unittest.main()

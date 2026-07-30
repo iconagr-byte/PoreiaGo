@@ -189,23 +189,24 @@ def is_achillio_travel_office(tenant: Any) -> bool:
 
 
 def is_poreiago_platform_office(tenant: Any) -> bool:
-    """True for PoreiaGo platform / demo office that must keep Rent visible."""
+    """True for PoreiaGo platform / demo office that must keep Rent visible.
+
+    Historic seed uses slug/subdomain ``achillio`` — that is NOT Achillio Travel
+    (Travel requires achilliotravel.com / travel slugs).
+    """
     if is_achillio_travel_office(tenant):
         return False
     slug = _tenant_slug(tenant)
-    if slug in _POREIAGO_PLATFORM_SLUGS:
+    if slug in _POREIAGO_PLATFORM_SLUGS or slug == "achillio":
         return True
     subdomain = str(getattr(tenant, "subdomain", None) or "").strip().lower()
-    if subdomain in _POREIAGO_PLATFORM_SLUGS:
+    if subdomain in _POREIAGO_PLATFORM_SLUGS or subdomain == "achillio":
         return True
     legal = str(getattr(tenant, "legal_name", None) or "").strip().lower()
     domain = _tenant_domain(tenant)
     if domain and _POREIAGO_DOMAIN_RE.search(domain):
         return True
-    # Seed often used slug=achillio + legal_name=PoreiaGo without Achillio domain.
-    if slug == "achillio" and "poreiago" in legal and not domain:
-        return True
-    if legal in {"poreiago", "poreiago saas", "poreiago platform"} and not domain:
+    if "poreiago" in legal:
         return True
     return False
 
