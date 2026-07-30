@@ -62,8 +62,9 @@ export default function DriversManagementPanel() {
     try {
       const rows = await fetchFleetDrivers(filter || undefined);
       setDrivers(Array.isArray(rows) ? rows : []);
+      setLoadError('');
     } catch (err) {
-      setDrivers([]);
+      // Keep last good rows when a deploy bounce hits — empty wipe hides Achilleas.
       const msg = err.message || 'Αποτυχία φόρτωσης οδηγών';
       setLoadError(msg);
       if (!quiet) toast.error(msg);
@@ -75,36 +76,33 @@ export default function DriversManagementPanel() {
   useEffect(() => {
     let cancelled = false;
     let retryTimer;
-    (async () => {
-      setLoading(true);
-      setLoadError('');
+    const attempt = async (isRetry) => {
+      if (!isRetry) {
+        setLoading(true);
+        setLoadError('');
+      }
       try {
         const rows = await fetchFleetDrivers(filter || undefined);
         if (cancelled) return;
         setDrivers(Array.isArray(rows) ? rows : []);
+        setLoadError('');
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
-        // Quiet first failure — often mid-deploy. Retry once before showing error.
-        retryTimer = window.setTimeout(async () => {
-          if (cancelled) return;
-          try {
-            const rows = await fetchFleetDrivers(filter || undefined);
-            if (cancelled) return;
-            setDrivers(Array.isArray(rows) ? rows : []);
-            setLoadError('');
-          } catch (retryErr) {
-            if (cancelled) return;
-            setDrivers([]);
-            const msg = retryErr.message || 'Αποτυχία φόρτωσης οδηγών';
-            setLoadError(msg);
-            toast.error(msg);
-          } finally {
-            if (!cancelled) setLoading(false);
-          }
-        }, 1600);
+        if (!isRetry) {
+          // Quiet first failure — often mid-deploy. Retry before showing error.
+          retryTimer = window.setTimeout(() => {
+            void attempt(true);
+          }, 1200);
+          return;
+        }
+        const msg = err.message || 'Αποτυχία φόρτωσης οδηγών';
+        setLoadError(msg);
+        toast.error(msg);
+        setLoading(false);
       }
-    })();
+    };
+    void attempt(false);
     return () => {
       cancelled = true;
       if (retryTimer) window.clearTimeout(retryTimer);
