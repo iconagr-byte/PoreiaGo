@@ -14,6 +14,7 @@ from travel_platform.settings.drivers_store import DEMO_TENANT_ID
 def isolated_fleet(tmp_path, monkeypatch):
     store = tmp_path / "fleet_store.json"
     monkeypatch.setattr(fleet_mod, "STORE_FILE", store)
+    monkeypatch.setattr(fleet_mod, "_LEGACY_STORE", tmp_path / "no-legacy.json")
     monkeypatch.setattr(fleet_mod, "UPLOAD_DIR", tmp_path / "uploads")
     fleet_mod.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     return fleet_mod.ServiceService()
