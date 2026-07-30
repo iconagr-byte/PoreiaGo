@@ -5,6 +5,7 @@ import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
 /**
  * Guest header utilities — booking / account / language.
  * Soft chip design; account icon opens Είσοδος / Εγγραφή menu.
+ * Find booking + wallet stay on green Rent URLs (never bus /my-booking|/wallet).
  */
 export default function RentGuestTopActions({ onAccount } = {}) {
   const [lang, setLang] = useState(() => getRentLang());
@@ -27,6 +28,7 @@ export default function RentGuestTopActions({ onAccount } = {}) {
   const el = lang !== 'en';
   const bookingLabel = el ? 'Η κράτησή μου' : 'My booking';
   const findLabel = el ? 'Εύρεση κράτησης' : 'Find booking';
+  const walletLabel = el ? 'Rent Wallet' : 'Rent Wallet';
   const loginLabel = el ? 'Είσοδος' : 'Sign in';
   const registerLabel = el ? 'Εγγραφή' : 'Register';
   const accountAria = el ? 'Λογαριασμός' : 'Account';
@@ -55,7 +57,7 @@ export default function RentGuestTopActions({ onAccount } = {}) {
         {bookingOpen ? (
           <div className="rent-top-menu" role="menu">
             <Link
-              to="/my-booking"
+              to="/rent/my-booking"
               role="menuitem"
               className="rent-top-menu-item"
               onClick={() => setBookingOpen(false)}
@@ -64,6 +66,17 @@ export default function RentGuestTopActions({ onAccount } = {}) {
                 search
               </span>
               {findLabel}
+            </Link>
+            <Link
+              to="/rent/wallet"
+              role="menuitem"
+              className="rent-top-menu-item"
+              onClick={() => setBookingOpen(false)}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                account_balance_wallet
+              </span>
+              {walletLabel}
             </Link>
           </div>
         ) : null}
@@ -103,7 +116,7 @@ export default function RentGuestTopActions({ onAccount } = {}) {
               to="/rent/register"
               role="menuitem"
               className="rent-top-menu-item"
-              state={{ from: { pathname: '/rent' }, rentEntrance: true }}
+              state={{ from: { pathname: '/rent/wallet' }, rentEntrance: true }}
               onClick={() => setAccountOpen(false)}
             >
               {registerLabel}

@@ -673,8 +673,11 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             notes = f"{notes} · {extras_note}" if notes else extras_note
 
         now = _now()
+        booking_id = str(uuid4())
+        ref_code = f"RB-{booking_id.replace('-', '')[:8].upper()}"
         row = {
-            "id": str(uuid4()),
+            "id": booking_id,
+            "reference_code": ref_code,
             "tenant_id": tid,
             "vehicle_id": vehicle_id,
             "client_id": (str(body.get("client_id") or "").strip() or None),
@@ -973,6 +976,42 @@ def list_bookings_for_email(tenant_id: str | None, email: str) -> list[dict[str,
         if str(b.get("client_email") or "").strip().lower() == needle
     ]
     return rows
+
+
+def _booking_reference_code(row: dict[str, Any]) -> str:
+    existing = str(row.get("reference_code") or "").strip().upper()
+    if existing:
+        return existing
+    bid = str(row.get("id") or "").replace("-", "")
+    if len(bid) >= 8:
+        return f"RB-{bid[:8].upper()}"
+    return str(row.get("id") or "").upper()
+
+
+def lookup_booking_for_guest(
+    tenant_id: str | None,
+    *,
+    email: str,
+    reference: str,
+) -> dict[str, Any] | None:
+    """Match rental booking by client email + reference_code / id (guest lookup)."""
+    needle = str(email or "").strip().lower()
+    raw_ref = str(reference or "").strip().upper().replace(" ", "")
+    if not needle or len(raw_ref) < 4:
+        return None
+    variants = {raw_ref, raw_ref.removeprefix("RB-"), raw_ref.removeprefix("BK-")}
+    if not raw_ref.startswith("RB-") and len(raw_ref) >= 4:
+        variants.add(f"RB-{raw_ref}")
+    for row in list_bookings_for_email(tenant_id, needle):
+        code = _booking_reference_code(row)
+        bid = str(row.get("id") or "").upper()
+        compact = bid.replace("-", "")
+        candidates = {code, code.removeprefix("RB-"), bid, compact, compact[:8]}
+        if variants & {c for c in candidates if c}:
+            out = deepcopy(row)
+            out["reference_code"] = code
+            return out
+    return None
 
 
 def list_clients(tenant_id: str | None) -> list[dict[str, Any]]:

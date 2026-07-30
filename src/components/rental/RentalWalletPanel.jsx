@@ -51,6 +51,7 @@ export default function RentalWalletPanel({
   brandLabel = 'Rent Wallet',
   passengerName = '',
   refreshKey = 0,
+  highlightBookingId = '',
   onBookVehicle,
 }) {
   const [rows, setRows] = useState([]);
@@ -66,6 +67,8 @@ export default function RentalWalletPanel({
       const sorted = sortBookings(list || []);
       setRows(sorted);
       setSelectedId((prev) => {
+        const want = String(highlightBookingId || '').trim();
+        if (want && sorted.some((b) => b.id === want)) return want;
         if (prev && sorted.some((b) => b.id === prev)) return prev;
         return sorted[0]?.id || '';
       });
@@ -75,7 +78,7 @@ export default function RentalWalletPanel({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [highlightBookingId]);
 
   useEffect(() => {
     load();

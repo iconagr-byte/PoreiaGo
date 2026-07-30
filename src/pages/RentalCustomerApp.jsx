@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   getCustomerEmail,
   getCustomerName,
@@ -319,16 +319,19 @@ function RentalAuthGate() {
   // Re-check auth after in-place login (same URL /rent).
   const location = useLocation();
   const navigate = useNavigate();
+  const path = location.pathname || '';
+  const isWalletPath = path === '/rent/wallet' || path.startsWith('/rent/wallet/');
   const continueToServices = Boolean(
     location.state?.rentContinue || location.state?.from === '/rent/book/services',
   );
-  // Guests always land on the /rent hero (fleet preview). Login opens from account.
-  const [showLogin, setShowLogin] = useState(() => continueToServices);
+  const fromLookup = Boolean(location.state?.rentLookup || location.state?.openRentWallet);
+  // Guests always land on the /rent hero. Wallet / book continue open login.
+  const [showLogin, setShowLogin] = useState(() => continueToServices || isWalletPath || fromLookup);
   useEffect(() => setupRentalPwa(), []);
 
   useEffect(() => {
-    if (continueToServices) setShowLogin(true);
-  }, [continueToServices]);
+    if (continueToServices || isWalletPath || fromLookup) setShowLogin(true);
+  }, [continueToServices, isWalletPath, fromLookup]);
 
   useEffect(() => {
     if (getCustomerToken() && continueToServices) {
@@ -340,10 +343,29 @@ function RentalAuthGate() {
 
   if (getCustomerToken()) {
     if (continueToServices) return null;
-    return <RentalAuthenticatedApp key={location.key} />;
+    return (
+      <RentalAuthenticatedApp
+        key={location.key}
+        walletFocus={isWalletPath || fromLookup}
+      />
+    );
   }
 
   if (showLogin) {
+    // Prefer dedicated green /rent/login for wallet/lookup deep-links.
+    if (isWalletPath || fromLookup) {
+      return (
+        <Navigate
+          to="/rent/login"
+          replace
+          state={{
+            ...(location.state || {}),
+            from: '/rent/wallet',
+            rentEntrance: true,
+          }}
+        />
+      );
+    }
     return (
       <LoginPage
         rentEntrance
@@ -354,7 +376,9 @@ function RentalAuthGate() {
 
   return (
     <RentalGuestPreviewApp
-      onRequireLogin={() => setShowLogin(true)}
+      onRequireLogin={() =>
+        navigate('/rent/login', { state: { from: '/rent/wallet', rentEntrance: true } })
+      }
       onPickVehicle={() => {
         /* handled in guest */
       }}
@@ -362,11 +386,16 @@ function RentalAuthGate() {
   );
 }
 
-function RentalAuthenticatedApp() {
+function RentalAuthenticatedApp({ walletFocus = false } = {}) {
   const isMobile = useRentMobile();
+  const location = useLocation();
   const [branding, setBranding] = useState(() => resolveRentAppBranding({}));
   const [calKey, setCalKey] = useState(0);
   const [walletKey, setWalletKey] = useState(0);
+  const highlightBookingId = String(location.state?.highlightRentalBooking || '').trim();
+  const openWalletFromLookup = Boolean(
+    walletFocus || location.state?.openRentWallet || highlightBookingId,
+  );
   const [homeFleet, setHomeFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [featuredVehicle, setFeaturedVehicle] = useState(null);
@@ -376,6 +405,16 @@ function RentalAuthenticatedApp() {
   const { favorites, toggleFavorite } = useRentFavorites();
 
   useEffect(() => setupRentalPwa(), []);
+
+  useEffect(() => {
+    if (!openWalletFromLookup) return undefined;
+    const t = window.setTimeout(() => {
+      setWalletKey((k) => k + 1);
+      const el = document.getElementById('rent-wallet');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [openWalletFromLookup, highlightBookingId, location.key, walletFocus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -446,6 +485,8 @@ function RentalAuthenticatedApp() {
     };
   }, []);
 
+  const navigate = useNavigate();
+
   const scrollToSection = (id) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -453,11 +494,19 @@ function RentalAuthenticatedApp() {
   };
 
   const openWallet = () => {
+    if (location.pathname !== '/rent/wallet') {
+      navigate('/rent/wallet', {
+        state: {
+          ...(location.state || {}),
+          openRentWallet: true,
+        },
+      });
+      return;
+    }
     setWalletKey((k) => k + 1);
     requestAnimationFrame(() => scrollToSection('rent-wallet'));
   };
 
-  const navigate = useNavigate();
   const pickVehicle = (v) => {
     setFeaturedVehicle(v);
     rememberPreferredVehicle(v);
@@ -487,7 +536,7 @@ function RentalAuthenticatedApp() {
             <span className="material-symbols-outlined" aria-hidden>
               account_balance_wallet
             </span>
-            My Wallet
+            Rent Wallet
           </button>
         </header>
 
@@ -566,7 +615,7 @@ function RentalAuthenticatedApp() {
 
           <section id="rent-wallet" className="rent-inline-section">
             <div className="rent-panel rent-panel--wallet">
-              <h2>My Wallet</h2>
+              <h2>Rent Wallet</h2>
               <p className="rent-panel-lead">
                 Οι κάρτες ενοικίασής σας — χωριστά από το My Wallet των λεωφορείων.
               </p>
@@ -574,6 +623,7 @@ function RentalAuthenticatedApp() {
                 brandLabel={branding.brandLabel}
                 passengerName={profile.name}
                 refreshKey={walletKey}
+                highlightBookingId={highlightBookingId}
                 onBookVehicle={() => scrollToSection('rent-book')}
               />
             </div>
