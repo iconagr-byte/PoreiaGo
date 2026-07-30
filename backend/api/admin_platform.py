@@ -168,6 +168,29 @@ def _driver_for_tenant(driver_id: str, tenant_id: str):
     return d
 
 
+def _driver_for_chat(driver_id: str, tenant_id: str):
+    """
+    Resolve a driver for office chat.
+
+    Driver portal coerces demo-tenant sessions onto the live SaaS tenant so GPS
+    and chat land in the office inbox. Drivers themselves may still be stored
+    under DEMO_TENANT_ID — allow that pairing here so threads stay readable.
+    """
+    did = str(driver_id or "").strip()
+    if not did:
+        return None
+    d = get_driver(did)
+    if not d:
+        return None
+    driver_tid = str(getattr(d, "tenant_id", None) or DEMO_TENANT_ID)
+    office_tid = str(tenant_id or "")
+    if driver_tid == office_tid:
+        return d
+    if driver_tid == str(DEMO_TENANT_ID) and office_tid and office_tid != str(DEMO_TENANT_ID):
+        return d
+    return None
+
+
 def _user_response(u) -> PlatformUserResponse:
     return PlatformUserResponse(
         id=u.id,
@@ -966,9 +989,13 @@ async def admin_chat_threads(
     tenant_id = await _chat_tenant_id(request)
     threads = list_threads(tenant_id=tenant_id, limit=limit)
     for t in threads:
-        d = _driver_for_tenant(t.get("driver_id"), tenant_id)
-        t["driver_name"] = d.name if d else None
+        d = _driver_for_chat(t.get("driver_id"), tenant_id)
+        fallback_name = None
+        if t.get("last_sender") == "driver" and t.get("sender_name"):
+            fallback_name = t.get("sender_name")
+        t["driver_name"] = (d.name if d else None) or fallback_name
         t["vehicle_plate"] = (d.license_plate or d.vehicle_code) if d else None
+        t["driver_missing"] = d is None
     return {"tenant_id": tenant_id, "threads": threads}
 
 
@@ -991,8 +1018,8 @@ async def admin_chat_messages(
     from travel_platform.driver.chat_store import list_messages, unread_counts
 
     tenant_id = await _chat_tenant_id(request)
-    if not _driver_for_tenant(driver_id, tenant_id):
-        raise HTTPException(status_code=404, detail="Driver not found")
+    driver = _driver_for_chat(driver_id, tenant_id)
+    # Allow reading historical threads even if the driver row was removed.
     messages = list_messages(
         tenant_id=tenant_id,
         driver_id=driver_id,
@@ -1000,9 +1027,13 @@ async def admin_chat_messages(
         limit=limit,
         viewer="office",
     )
+    if driver is None and not messages:
+        raise HTTPException(status_code=404, detail="Ο οδηγός δεν βρέθηκε")
     counts = unread_counts(tenant_id=tenant_id, driver_id=driver_id)
     return {
         "driver_id": driver_id,
+        "driver_name": driver.name if driver else None,
+        "driver_missing": driver is None,
         "messages": messages,
         "unread": counts.get("office", 0),
     }
@@ -1013,9 +1044,19 @@ async def admin_chat_send(driver_id: str, body: DriverChatSendBody, request: Req
     from travel_platform.driver.chat_store import append_message
 
     tenant_id = await _chat_tenant_id(request)
-    driver = _driver_for_tenant(driver_id, tenant_id)
+    driver = _driver_for_chat(driver_id, tenant_id)
     if not driver:
-        raise HTTPException(status_code=404, detail="Driver not found")
+        # Still allow office reply on an existing thread (driver may be demo-tenant).
+        from travel_platform.driver.chat_store import list_messages
+
+        existing = list_messages(
+            tenant_id=tenant_id,
+            driver_id=driver_id,
+            limit=1,
+            viewer="office",
+        )
+        if not existing and not get_driver(driver_id):
+            raise HTTPException(status_code=404, detail="Ο οδηγός δεν βρέθηκε")
     try:
         row = append_message(
             tenant_id=tenant_id,
@@ -1050,7 +1091,16 @@ async def admin_chat_read(driver_id: str, request: Request):
     from travel_platform.driver.chat_store import mark_thread_read
 
     tenant_id = await _chat_tenant_id(request)
-    if not _driver_for_tenant(driver_id, tenant_id):
-        raise HTTPException(status_code=404, detail="Driver not found")
+    # Mark read even when the driver row is missing / demo-tenant mismatched.
+    from travel_platform.driver.chat_store import list_messages
+
+    existing = list_messages(
+        tenant_id=tenant_id,
+        driver_id=driver_id,
+        limit=1,
+        viewer="office",
+    )
+    if not existing and not _driver_for_chat(driver_id, tenant_id):
+        raise HTTPException(status_code=404, detail="Ο οδηγός δεν βρέθηκε")
     changed = mark_thread_read(tenant_id=tenant_id, driver_id=driver_id, reader="office")
     return {"ok": True, "marked": changed, "driver_id": driver_id}

@@ -38,8 +38,11 @@ export default function DriverOfficeChatPanel({
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [resolvedName, setResolvedName] = useState(driverName || '');
   const bottomRef = useRef(null);
   const seenIdsRef = useRef(new Set());
+  const toastedErrorRef = useRef('');
 
   const scrollBottom = () => {
     window.requestAnimationFrame(() => {
@@ -52,6 +55,7 @@ export default function DriverOfficeChatPanel({
       if (!driverId) {
         setMessages([]);
         setLoading(false);
+        setLoadError('');
         return;
       }
       try {
@@ -59,11 +63,13 @@ export default function DriverOfficeChatPanel({
         const rows = Array.isArray(data.messages) ? data.messages : [];
         setMessages(rows);
         setUnread(Number(data.unread || 0));
+        setLoadError('');
+        if (data.driver_name) setResolvedName(data.driver_name);
         if (!silent) setLoading(false);
         for (const m of rows) {
           if (m.sender === 'driver' && m.id && !seenIdsRef.current.has(m.id)) {
             if (seenIdsRef.current.size > 0) {
-              toast(`Μήνυμα από ${driverName || 'οδηγό'}`, {
+              toast(`Μήνυμα από ${driverName || data.driver_name || 'οδηγό'}`, {
                 icon: '💬',
                 id: `office-chat-${m.id}`,
               });
@@ -78,9 +84,15 @@ export default function DriverOfficeChatPanel({
           markAdminDriverChatRead(driverId).catch(() => {});
         }
       } catch (err) {
+        const msg = err.message || 'Αποτυχία chat';
+        setLoadError(msg);
         if (!silent) {
           setLoading(false);
-          toast.error(err.message || 'Αποτυχία chat');
+          // Toast once per driver — polling must not spam "Driver not found".
+          if (toastedErrorRef.current !== `${driverId}:${msg}`) {
+            toastedErrorRef.current = `${driverId}:${msg}`;
+            toast.error(msg, { id: `office-chat-err-${driverId}` });
+          }
         }
       }
     },
@@ -89,11 +101,14 @@ export default function DriverOfficeChatPanel({
 
   useEffect(() => {
     seenIdsRef.current = new Set();
+    toastedErrorRef.current = '';
+    setResolvedName(driverName || '');
+    setLoadError('');
     setLoading(true);
     load();
     const id = window.setInterval(() => load({ silent: true }), POLL_MS);
     return () => window.clearInterval(id);
-  }, [load]);
+  }, [load, driverName]);
 
   const send = async (e) => {
     e.preventDefault();
@@ -136,7 +151,7 @@ export default function DriverOfficeChatPanel({
   }
 
   const lastMineId = [...messages].reverse().find((m) => m.sender === 'office')?.id;
-  const title = driverName || 'Οδηγός';
+  const title = resolvedName || driverName || 'Οδηγός';
 
   return (
     <div
@@ -160,12 +175,18 @@ export default function DriverOfficeChatPanel({
         {unread > 0 ? <span className="office-chat-unread">{unread}</span> : null}
       </div>
 
+      {loadError ? (
+        <p className="office-chat-loading" role="alert" style={{ color: '#b42318' }}>
+          {loadError}
+        </p>
+      ) : null}
+
       <div
         className={`office-chat-thread ${compact ? 'max-h-[240px] min-h-[200px]' : 'max-h-[320px] min-h-[260px]'}`}
       >
         {loading ? (
           <p className="office-chat-loading">Φόρτωση…</p>
-        ) : messages.length === 0 ? (
+        ) : messages.length === 0 && !loadError ? (
           <div className="office-chat-empty">
             <div className="office-chat-empty-icon">
               <span className="material-symbols-outlined">chat_bubble</span>
