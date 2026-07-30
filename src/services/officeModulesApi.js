@@ -69,6 +69,27 @@ export async function fetchAdminOfficeModules() {
   }
 }
 
+/** Slugs used by the PoreiaGo platform / demo office (not Achillio Travel). */
+const POREIAGO_PLATFORM_SLUGS = new Set([
+  'poreiago',
+  'platform',
+  'demo',
+  'admin-poreiago',
+  'poreiago-saas',
+  'poreiago-platform',
+  // Historic seed slug — Achillio Travel uses domain/slugs like admin-achillio-gr.
+  'achillio',
+]);
+
+function isPoreiagoPlatformModules(modules) {
+  if (!modules || modules.office_kind === 'achillio_travel') return false;
+  if (modules.office_kind === 'poreiago_platform') return true;
+  const slug = String(modules.tenant_slug || '')
+    .trim()
+    .toLowerCase();
+  return Boolean(slug) && POREIAGO_PLATFORM_SLUGS.has(slug);
+}
+
 /**
  * Whether the Back Office «Ενοικιάσεις» menu should show.
  *
@@ -76,13 +97,15 @@ export async function fetchAdminOfficeModules() {
  * - PoreiaGo marketing host (poreiago.com / localhost) → always yes
  * - Achillio Travel office → no (bus-only policy)
  * - Office with rent_enabled → yes
- * - PoreiaGo platform office → yes
+ * - PoreiaGo platform office (incl. seed slug achillio) → yes
  */
 export function shouldShowRentMenu(modules, opts = {}) {
   // Impersonating a tenant office → match that office (Achillio stays Rent-off).
   if (isImpersonating()) {
     if (modules?.office_kind === 'achillio_travel') return false;
-    return Boolean(modules?.rent_enabled) || modules?.office_kind === 'poreiago_platform';
+    return (
+      Boolean(modules?.rent_enabled) || isPoreiagoPlatformModules(modules)
+    );
   }
 
   // Super Admin platform UI — always keep Ενοικιάσεις (host-agnostic).
@@ -97,6 +120,6 @@ export function shouldShowRentMenu(modules, opts = {}) {
 
   if (modules?.office_kind === 'achillio_travel') return false;
   if (modules?.rent_enabled) return true;
-  if (modules?.office_kind === 'poreiago_platform') return true;
+  if (isPoreiagoPlatformModules(modules)) return true;
   return false;
 }

@@ -257,7 +257,7 @@ export const ADMIN_NAV_ITEMS = {
   },
   fleet: {
     id: 'fleet',
-    label: 'Στόλος',
+    label: 'Στόλος λεωφορείων',
     icon: 'directions_bus',
     filled: true,
     type: 'tab',
@@ -398,7 +398,7 @@ export const ADMIN_NAV_ITEMS = {
   },
   bookings: {
     id: 'bookings',
-    label: 'Κρατήσεις',
+    label: 'Κρατήσεις λεωφορείων',
     icon: 'book_online',
     filled: false,
     type: 'tab',

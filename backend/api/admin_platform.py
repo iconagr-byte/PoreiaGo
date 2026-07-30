@@ -1155,12 +1155,38 @@ class DriverChatSendBody(BaseModel):
     sender_name: str | None = None
 
 
-async def _chat_tenant_id(request: Request) -> str:
-    """Office scope for driver chat — JWT / request tenant, never global platform id."""
-    tid = _request_tenant_id(request)
-    if tid:
-        return str(tid)
-    raise HTTPException(status_code=401, detail="Tenant required")
+async def _chat_office_scope(request: Request) -> tuple[str, bool]:
+    """
+    Same office resolution as Οδηγοί — JWT tenant (+ Achillio DEMO claim).
+
+    Returns (tenant_id, allow_demo_legacy).
+    """
+    tenant_id, include_legacy, claim_legacy = await _drivers_list_tenant_id(request)
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Tenant required")
+    return str(tenant_id), bool(include_legacy or claim_legacy)
+
+
+def _office_chat_driver_ids(tenant_id: str, *, allow_demo_legacy: bool) -> set[str]:
+    from travel_platform.settings.drivers_store import office_driver_id_set
+
+    return office_driver_id_set(tenant_id, include_demo_legacy=allow_demo_legacy)
+
+
+def _sync_chat_after_driver_claim(tenant_id: str, allowed: set[str]) -> None:
+    """Pull DEMO-tagged history for this office's drivers onto the office tenant."""
+    if not allowed or str(tenant_id) == str(DEMO_TENANT_ID):
+        return
+    try:
+        from travel_platform.driver.chat_store import reassign_messages_tenant
+
+        reassign_messages_tenant(
+            driver_ids=allowed,
+            to_tenant=tenant_id,
+            from_tenant=str(DEMO_TENANT_ID),
+        )
+    except Exception:
+        logger.debug("chat DEMO→office reassign failed for %s", tenant_id, exc_info=True)
 
 
 @router.get("/driver-chat/threads")
@@ -1170,10 +1196,25 @@ async def admin_chat_threads(
 ):
     from travel_platform.driver.chat_store import list_threads
 
-    tenant_id = await _chat_tenant_id(request)
-    threads = list_threads(tenant_id=tenant_id, limit=limit)
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    # Ensure DEMO drivers are claimed onto this office first (Achillio only).
+    if allow_legacy:
+        list_drivers_for_office(
+            tenant_id,
+            include_demo_legacy=True,
+            claim_demo_legacy=True,
+        )
+    allowed = _office_chat_driver_ids(tenant_id, allow_demo_legacy=allow_legacy)
+    _sync_chat_after_driver_claim(tenant_id, allowed)
+    threads = list_threads(
+        tenant_id=tenant_id,
+        limit=limit,
+        allowed_driver_ids=allowed,
+    )
     for t in threads:
-        d = _driver_for_tenant(t.get("driver_id"), tenant_id)
+        d = _driver_for_tenant(
+            t.get("driver_id"), tenant_id, allow_demo_legacy=allow_legacy
+        )
         t["driver_name"] = d.name if d else None
         t["vehicle_plate"] = (d.license_plate or d.vehicle_code) if d else None
     return {"tenant_id": tenant_id, "threads": threads}
@@ -1181,11 +1222,22 @@ async def admin_chat_threads(
 
 @router.get("/driver-chat/unread")
 async def admin_chat_unread(request: Request):
-    from travel_platform.driver.chat_store import unread_counts
+    from travel_platform.driver.chat_store import list_threads
 
-    tenant_id = await _chat_tenant_id(request)
-    counts = unread_counts(tenant_id=tenant_id)
-    return {"tenant_id": tenant_id, "unread": counts.get("office", 0)}
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    if allow_legacy:
+        list_drivers_for_office(
+            tenant_id,
+            include_demo_legacy=True,
+            claim_demo_legacy=True,
+        )
+    allowed = _office_chat_driver_ids(tenant_id, allow_demo_legacy=allow_legacy)
+    _sync_chat_after_driver_claim(tenant_id, allowed)
+    # Count only this office's drivers — never sum another γραφείο's unread.
+    office = 0
+    for t in list_threads(tenant_id=tenant_id, allowed_driver_ids=allowed):
+        office += int(t.get("unread_office") or 0)
+    return {"tenant_id": tenant_id, "unread": office}
 
 
 @router.get("/driver-chat/{driver_id}/messages")
@@ -1197,9 +1249,10 @@ async def admin_chat_messages(
 ):
     from travel_platform.driver.chat_store import list_messages, unread_counts
 
-    tenant_id = await _chat_tenant_id(request)
-    if not _driver_for_tenant(driver_id, tenant_id):
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=allow_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
+    _sync_chat_after_driver_claim(tenant_id, {str(driver_id)})
     messages = list_messages(
         tenant_id=tenant_id,
         driver_id=driver_id,
@@ -1219,8 +1272,8 @@ async def admin_chat_messages(
 async def admin_chat_send(driver_id: str, body: DriverChatSendBody, request: Request):
     from travel_platform.driver.chat_store import append_message
 
-    tenant_id = await _chat_tenant_id(request)
-    driver = _driver_for_tenant(driver_id, tenant_id)
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    driver = _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=allow_legacy)
     if not driver:
         raise HTTPException(status_code=404, detail="Driver not found")
     try:
@@ -1256,8 +1309,9 @@ async def admin_chat_send(driver_id: str, body: DriverChatSendBody, request: Req
 async def admin_chat_read(driver_id: str, request: Request):
     from travel_platform.driver.chat_store import mark_thread_read
 
-    tenant_id = await _chat_tenant_id(request)
-    if not _driver_for_tenant(driver_id, tenant_id):
+    tenant_id, allow_legacy = await _chat_office_scope(request)
+    if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=allow_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
+    _sync_chat_after_driver_claim(tenant_id, {str(driver_id)})
     changed = mark_thread_read(tenant_id=tenant_id, driver_id=driver_id, reader="office")
     return {"ok": True, "marked": changed, "driver_id": driver_id}

@@ -8,13 +8,10 @@ import {
   updateRentalVehicle,
   uploadRentalInspectionPhoto,
 } from '../../services/fleetRentalApi.js';
-
-const CATEGORIES = [
-  { value: 'CAR', label: 'Αυτοκίνητο' },
-  { value: 'SUV', label: 'SUV' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'MINIBUS', label: 'Μινιμπάς' },
-];
+import {
+  normalizeRentVehicleCategory,
+  RENT_CATEGORY_OPTIONS,
+} from '../../lib/rental/rentVehicleCategories.js';
 
 const STATUSES = [
   { value: 'AVAILABLE', label: 'Διαθέσιμο' },
@@ -26,10 +23,10 @@ const STATUSES = [
 
 const EMPTY = {
   plate_number: '',
-  category: 'VAN',
+  category: 'COMPACT',
   model: '',
   year: '',
-  seating_capacity: 9,
+  seating_capacity: 5,
   current_status: 'AVAILABLE',
   current_mileage: 0,
   daily_rate_eur: 80,
@@ -83,10 +80,13 @@ export default function RentalVehicleFormPage() {
         }
         setForm({
           plate_number: v.plate_number || '',
-          category: v.category || 'VAN',
+          category: normalizeRentVehicleCategory(v.category, {
+            seats: v.seating_capacity,
+            model: v.model,
+          }),
           model: v.model || '',
           year: v.year ?? '',
-          seating_capacity: v.seating_capacity ?? 9,
+          seating_capacity: v.seating_capacity ?? 5,
           current_status: v.current_status || 'AVAILABLE',
           current_mileage: v.current_mileage ?? 0,
           daily_rate_eur: v.daily_rate_eur ?? 80,
@@ -215,7 +215,7 @@ export default function RentalVehicleFormPage() {
 
   if (loading) {
     return (
-      <AdminLayout activeTab="fleet" title={header}>
+      <AdminLayout activeTab="fleet_rental" fleetRentalTab="vehicles" title={header}>
         <p className="text-on-surface-variant">Φόρτωση…</p>
       </AdminLayout>
     );
@@ -242,7 +242,12 @@ export default function RentalVehicleFormPage() {
   );
 
   return (
-    <AdminLayout activeTab="fleet" title={header} footer={actions}>
+    <AdminLayout
+      activeTab="fleet_rental"
+      fleetRentalTab="vehicles"
+      title={header}
+      footer={actions}
+    >
       <form
         id="rental-vehicle-form"
         onSubmit={save}
@@ -275,12 +280,15 @@ export default function RentalVehicleFormPage() {
             <label className="block text-sm">
               <span className="font-bold text-gray-800">Κατηγορία *</span>
               <select className={inputClass} value={form.category} onChange={setField('category')}>
-                {CATEGORIES.map((c) => (
+                {RENT_CATEGORY_OPTIONS.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
                   </option>
                 ))}
               </select>
+              <span className="mt-1 block text-xs text-gray-500">
+                Όπως στα μεγάλα rent-a-car: Mini, Economy, Compact, SUV, Van…
+              </span>
             </label>
             <label className="block text-sm sm:col-span-1">
               <span className="font-bold text-gray-800">Μοντέλο *</span>

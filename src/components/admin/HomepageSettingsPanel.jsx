@@ -45,6 +45,7 @@ import {
   officeModeFromModules,
   resolveDesignPageForModules,
 } from '../../services/officeModulesApi.js';
+import { isPlatformMarketingHost } from '../../lib/platform/tenantHost.js';
 
 const DESIGN_PAGES = [
   {
@@ -52,8 +53,11 @@ const DESIGN_PAGES = [
     label: 'Λεωφορεία',
     title: 'Αρχική · εκδρομές',
     blurb: 'Θέματα, hero, slider και κάρτες εκδρομών της αρχικής σελίδας.',
+    // Storefront shell only on office domains — never on www.poreiago.com.
     previewTo: '/storefront?preview=1',
     previewLabel: 'Προεπισκόπηση σε νέο tab',
+    platformPreviewTo: '/',
+    platformPreviewLabel: 'Αρχική PoreiaGo (χωρίς storefront γραφείου)',
     icon: 'directions_bus',
     accentFrom: 'from-sky-700',
     accentVia: 'via-indigo-700',
@@ -472,6 +476,15 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   const canSwitchPages = availablePages.length > 1;
   const navSections = designPage === 'rent' ? RENT_SECTIONS : HOME_SECTIONS;
   const activePageMeta = DESIGN_PAGES.find((p) => p.id === designPage) || availablePages[0] || DESIGN_PAGES[0];
+  const onPlatformHost = isPlatformMarketingHost();
+  const previewTo =
+    onPlatformHost && activePageMeta.platformPreviewTo
+      ? activePageMeta.platformPreviewTo
+      : activePageMeta.previewTo;
+  const previewLabel =
+    onPlatformHost && activePageMeta.platformPreviewLabel
+      ? activePageMeta.platformPreviewLabel
+      : activePageMeta.previewLabel;
   const rentPreview = resolveRentAppBranding(form, { guest: false });
   const contractBadge = contractDesignLabel(officeMode);
 
@@ -706,12 +719,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             )}
 
             <Link
-              to={activePageMeta.previewTo}
+              to={previewTo}
               target="_blank"
               className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-2 rounded-full transition-colors"
             >
               <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-              {activePageMeta.previewLabel}
+              {previewLabel}
             </Link>
           </div>
 

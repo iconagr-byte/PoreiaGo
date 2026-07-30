@@ -7,28 +7,31 @@ import { fetchTelemetryAlerts } from '../services/telemetryApi.js';
 import { getSaasToken } from '../services/saasApi.js';
 
 const STORAGE_KEY = 'admin_notif_inbox_v1';
+const CHAT_BASELINE_KEY = 'admin_notif_chat_baseline_v1';
 const MAX_ITEMS = 40;
 const DEMO_TENANT = '00000000-0000-0000-0000-000000000001';
 
-function loadStored() {
+function readChatBaseline() {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    const raw = sessionStorage.getItem(CHAT_BASELINE_KEY);
+    if (raw == null || raw === '') return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
   } catch {
-    return [];
+    return null;
   }
 }
 
-function persist(items) {
+function writeChatBaseline(value) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_ITEMS)));
+    if (value == null) sessionStorage.removeItem(CHAT_BASELINE_KEY);
+    else sessionStorage.setItem(CHAT_BASELINE_KEY, String(value));
   } catch {
     /* ignore */
   }
 }
 
-function normalizeItem( partial ) {
+function normalizeItem(partial) {
   const id = String(partial.id || `${partial.type || 'n'}-${partial.at || Date.now()}`);
   return {
     id,
@@ -41,6 +44,44 @@ function normalizeItem( partial ) {
     at: partial.at || new Date().toISOString(),
     read: Boolean(partial.read),
   };
+}
+
+/** Collapse legacy chat-${Date.now()} duplicates into one row per driver. */
+export function dedupeStoredItems(items) {
+  if (!Array.isArray(items) || !items.length) return [];
+  const out = [];
+  const chatSeen = new Set();
+  for (const raw of items) {
+    const item = normalizeItem(raw);
+    if (String(item.type || '') === 'driver_office_chat') {
+      const driverKey = item.driverId || 'office';
+      const stableId = `chat-${driverKey}`;
+      if (chatSeen.has(stableId)) continue;
+      chatSeen.add(stableId);
+      out.push({ ...item, id: stableId });
+      continue;
+    }
+    out.push(item);
+  }
+  return out.slice(0, MAX_ITEMS);
+}
+
+function loadStored() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return dedupeStoredItems(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return [];
+  }
+}
+
+function persist(items) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_ITEMS)));
+  } catch {
+    /* ignore */
+  }
 }
 
 function alertToItem(row) {
@@ -67,17 +108,28 @@ function alertToItem(row) {
 }
 
 export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true } = {}) {
-  const [items, setItems] = useState(() => loadStored());
+  const [items, setItems] = useState(() => {
+    const cleaned = loadStored();
+    // Rewrite session inbox so legacy chat-${Date.now()} spam collapses immediately.
+    persist(cleaned);
+    return cleaned;
+  });
   const [open, setOpen] = useState(false);
   const seenRef = useRef(new Set(loadStored().map((i) => i.id)));
   const wsRef = useRef(null);
 
-  const pushItem = useCallback((raw, { silent = false } = {}) => {
+  const pushItem = useCallback((raw, { silent = false, upsert = false } = {}) => {
     const item = normalizeItem(raw);
-    if (seenRef.current.has(item.id)) return;
+    // Chat rows always upsert on a stable id — never stack duplicates.
+    const forceUpsert =
+      upsert || String(item.type || '') === 'driver_office_chat' || String(item.id).startsWith('chat-');
+    if (!forceUpsert && seenRef.current.has(item.id)) return;
     seenRef.current.add(item.id);
     setItems((prev) => {
-      const next = [item, ...prev.filter((x) => x.id !== item.id)].slice(0, MAX_ITEMS);
+      const next = dedupeStoredItems([item, ...prev.filter((x) => x.id !== item.id)]).slice(
+        0,
+        MAX_ITEMS,
+      );
       persist(next);
       return next;
     });
@@ -107,6 +159,8 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
     setItems([]);
     persist([]);
     seenRef.current = new Set();
+    // Keep chat baseline at current unread so clearing the bell does not
+    // immediately recreate «Νέο μήνυμα οδηγού» on the next poll.
   }, []);
 
   // Seed from recent telemetry alerts (silent).
@@ -170,37 +224,62 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
     };
   }, [enabled, tenantId, pushItem]);
 
-  // Chat unread → bell item when count rises.
-  const chatUnreadRef = useRef(0);
+  // Chat unread → one bell item when count rises after login baseline.
+  // null = not baselined yet (office connect must NOT re-fire existing unread).
+  // Persist baseline in sessionStorage so remount / StrictMode does not reset to 0
+  // and re-spam. Never treat a failed poll as unread=0 (that re-fires on recovery).
+  const chatUnreadRef = useRef(readChatBaseline());
   useEffect(() => {
     if (!enabled) return undefined;
     let cancelled = false;
     const poll = async () => {
+      let u;
+      let t;
       try {
-        const [u, t] = await Promise.all([
-          fetchDriverChatUnread().catch(() => ({ unread: 0 })),
-          fetchDriverChatThreads().catch(() => ({ threads: [] })),
-        ]);
-        if (cancelled) return;
-        const unread = Number(u.unread || 0);
-        const prev = chatUnreadRef.current;
+        u = await fetchDriverChatUnread();
+      } catch {
+        // Keep previous baseline — flaky API must not look like unread dropped to 0.
+        return;
+      }
+      try {
+        t = await fetchDriverChatThreads();
+      } catch {
+        t = { threads: [] };
+      }
+      if (cancelled) return;
+      const unread = Math.max(0, Number(u?.unread || 0));
+      if (chatUnreadRef.current === null) {
+        // First successful poll after office login — baseline only, no fresh row.
         chatUnreadRef.current = unread;
-        if (unread > prev) {
-          const top = (t.threads || []).find((x) => Number(x.unread_office || 0) > 0);
-          pushItem({
-            id: `chat-${Date.now()}`,
+        writeChatBaseline(unread);
+        return;
+      }
+      const prev = Number(chatUnreadRef.current) || 0;
+      chatUnreadRef.current = unread;
+      writeChatBaseline(unread);
+      if (unread > prev) {
+        const top = (t.threads || []).find((x) => Number(x.unread_office || 0) > 0);
+        const driverId = top?.driver_id || 'office';
+        pushItem(
+          {
+            id: `chat-${driverId}`,
             title: 'Νέο μήνυμα οδηγού',
-            body: top?.last_body || top?.driver_name || `${unread} μη αναγνωσμένα`,
+            body:
+              top?.last_message ||
+              top?.last_body ||
+              top?.driver_name ||
+              `${unread} μη αναγνωσμένα`,
             type: 'driver_office_chat',
             tab: 'driver_chat',
             driverId: top?.driver_id || null,
             url: top?.driver_id
               ? `/admin?tab=driver_chat&driverId=${encodeURIComponent(top.driver_id)}`
               : '/admin?tab=driver_chat',
-          });
-        }
-      } catch {
-        /* ignore */
+            at: top?.last_at || new Date().toISOString(),
+            read: false,
+          },
+          { upsert: true },
+        );
       }
     };
     poll();
@@ -220,15 +299,27 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
       const data = event.data;
       if (!data || data.type !== 'ADMIN_PUSH_RECEIVED') return;
       const payload = data.payload || {};
-      pushItem({
-        id: payload.tag || `push-${Date.now()}`,
-        title: payload.title || 'Ειδοποίηση',
-        body: payload.body || '',
-        type: payload.data?.type || 'push',
-        tab: payload.data?.tab || null,
-        driverId: payload.data?.driver_id || null,
-        url: payload.url || payload.data?.url || null,
-      });
+      const pushType = String(payload.data?.type || payload.type || 'push');
+      // Chat pushes use a stable tag/id so login redelivery does not stack rows.
+      const driverId = payload.data?.driver_id || null;
+      const stableChatId =
+        pushType.includes('chat') || /μήνυμα οδηγού/i.test(String(payload.title || ''))
+          ? `chat-${driverId || 'office'}`
+          : null;
+      pushItem(
+        {
+          id: stableChatId || payload.tag || payload.data?.message_id || `push-${Date.now()}`,
+          title: payload.title || 'Ειδοποίηση',
+          body: payload.body || '',
+          type: pushType,
+          tab: payload.data?.tab || (stableChatId ? 'driver_chat' : null),
+          driverId,
+          url: payload.url || payload.data?.url || null,
+          read: false,
+        },
+        // OS/Web Push already alerted — update the bell row without stacking or click noise.
+        { upsert: true, silent: true },
+      );
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);

@@ -20,6 +20,10 @@ import {
 } from '../services/customerRentalApi.js';
 import { withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
 import { enrichRentFleet, homeCategoryLabel } from '../lib/rental/rentFleetEnrichment.js';
+import {
+  countRentFleetByBody,
+  rentHomeCategoryFilters,
+} from '../lib/rental/rentVehicleCategories.js';
 import { rememberRentVehicle } from '../lib/rental/rentBookingExtras.js';
 import { writeRentBookingPrefs } from '../lib/rental/rentBookingSearch.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
@@ -37,8 +41,6 @@ import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
-
-const HOME_CATEGORIES = ['', 'CAR', 'VAN', 'MINIBUS'];
 
 const PREFERRED_VEHICLE_ID_KEY = 'rent_preferred_vehicle_id_v1';
 
@@ -151,15 +153,18 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
     };
   }, []);
 
-  const carCount = homeFleet.filter((v) => String(v.category || '').toUpperCase() === 'CAR').length;
-  const vanCount = homeFleet.filter((v) => String(v.category || '').toUpperCase() === 'VAN').length;
+  const { cars: carCount, vans: vanCount } = useMemo(
+    () => countRentFleetByBody(homeFleet),
+    [homeFleet],
+  );
+  const homeCategories = useMemo(() => rentHomeCategoryFilters(homeFleet), [homeFleet]);
 
   const filteredHomeFleet = homeFleet
     .filter((v) => (homeCategory ? v.category === homeCategory : true))
     .filter((v) => {
       const q = homeQuery.trim().toLowerCase();
       if (!q) return true;
-      return `${v.model || ''} ${v.category || ''} ${v.display_blurb || v.description || ''}`
+      return `${v.model || ''} ${v.category || ''} ${v.category_label || ''} ${v.display_blurb || v.description || ''}`
         .toLowerCase()
         .includes(q);
     });
@@ -255,7 +260,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                         value={homeCategory}
                         onChange={(e) => setHomeCategory(e.target.value)}
                       >
-                        {HOME_CATEGORIES.map((c) => (
+                        {homeCategories.map((c) => (
                           <option key={c || 'all'} value={c}>
                             {homeCategoryLabel(c) || 'Επίλεξε'}
                           </option>
@@ -452,12 +457,14 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
     };
   }, []);
 
+  const homeCategories = useMemo(() => rentHomeCategoryFilters(homeFleet), [homeFleet]);
+
   const filteredHomeFleet = homeFleet
     .filter((v) => (homeCategory ? v.category === homeCategory : true))
     .filter((v) => {
       const q = homeQuery.trim().toLowerCase();
       if (!q) return true;
-      return `${v.model || ''} ${v.category || ''} ${v.display_blurb || v.description || ''}`
+      return `${v.model || ''} ${v.category || ''} ${v.category_label || ''} ${v.display_blurb || v.description || ''}`
         .toLowerCase()
         .includes(q);
     });
@@ -592,7 +599,7 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
                       placeholder="Αναζήτηση μοντέλου ή περιγραφής…"
                     />
                     <div className="rent-home-fleet-cats">
-                      {HOME_CATEGORIES.map((c) => (
+                      {homeCategories.map((c) => (
                         <button
                           key={c || 'all'}
                           type="button"

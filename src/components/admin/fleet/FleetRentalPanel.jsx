@@ -38,14 +38,14 @@ import RentPaymentsPanel from './RentPaymentsPanel.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../../../services/siteAppearanceApi.js';
+import {
+  groupVehiclesByRentCategory,
+  rentCategoryLabel,
+  RENT_CATEGORY_OPTIONS,
+} from '../../../lib/rental/rentVehicleCategories.js';
 import '../../../styles/rental-admin-apple.css';
 
-const CATEGORIES = [
-  { value: 'CAR', label: 'Αυτοκίνητο' },
-  { value: 'SUV', label: 'SUV' },
-  { value: 'VAN', label: 'Van' },
-  { value: 'MINIBUS', label: 'Μινιμπάς' },
-];
+const CATEGORIES = RENT_CATEGORY_OPTIONS;
 
 const TABS = RENT_DESK_TABS;
 
@@ -121,8 +121,15 @@ export default function FleetRentalPanel({
   const [overlays, setOverlays] = useState([]);
   const [bookingFilter, setBookingFilter] = useState('ALL');
   const [clientQuery, setClientQuery] = useState('');
+  const [vehicleCategoryFilter, setVehicleCategoryFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  const vehicleGroups = useMemo(() => {
+    const groups = groupVehiclesByRentCategory(vehicles);
+    if (vehicleCategoryFilter === 'ALL') return groups;
+    return groups.filter((g) => g.id === vehicleCategoryFilter);
+  }, [vehicles, vehicleCategoryFilter]);
 
   useEffect(() => {
     if (isControlled) return;
@@ -615,7 +622,7 @@ export default function FleetRentalPanel({
               { id: 'payments', label: 'Πληρωμές /rent', copy: 'Προκαταβολή · κάρτα · τράπεζα · μετρητά', icon: 'payments' },
               { id: 'pickups', label: 'Σημεία παραλαβής', copy: 'Γραφείο · αεροδρόμιο · λιμάνι στο /rent', icon: 'location_on' },
               { id: 'branding', label: 'Εμφάνιση /rent', copy: 'Σχεδιασμός σελίδων → Ενοικιάσεις', icon: 'palette', designHref: '/admin?tab=settings&sub=homepage&page=rent' },
-              { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
+              { id: 'vehicles', label: 'Οχήματα ενοικίασης', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
               { id: 'live_gps', label: 'Ζωντανά GPS', copy: `${overlays.length} ενεργά για χάρτη`, icon: 'my_location' },
@@ -702,7 +709,7 @@ export default function FleetRentalPanel({
             <div className="min-w-0">
               <h3 className="font-bold text-gray-900">Στόλος ενοικίασης</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Ανοίξτε κανονική σελίδα για όλα τα στοιχεία, περιγραφή και φωτογραφίες.
+                Κατηγορίες όπως στα μεγάλα γραφεία (Mini · Economy · Compact · SUV · Van…).
               </p>
             </div>
             <button
@@ -728,86 +735,139 @@ export default function FleetRentalPanel({
               </button>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {vehicles.map((v) => (
-                <article
-                  key={v.id}
-                  className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden flex flex-col"
+            <>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVehicleCategoryFilter('ALL')}
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold border transition-colors ${
+                    vehicleCategoryFilter === 'ALL'
+                      ? 'bg-teal-700 text-white border-teal-700'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'
+                  }`}
                 >
-                  {(v.photo_url || v.photo_urls?.[0]) ? (
-                    <img
-                      src={v.photo_url || v.photo_urls[0]}
-                      alt=""
-                      className="w-full h-36 object-cover bg-gray-50"
-                    />
-                  ) : (
-                    <div className="w-full h-36 bg-slate-50 flex items-center justify-center text-slate-300">
-                      <span className="material-symbols-outlined text-4xl">directions_car</span>
-                    </div>
-                  )}
-                  <div className="p-4 flex flex-col gap-3 flex-1">
+                  Όλες ({vehicles.length})
+                </button>
+                {groupVehiclesByRentCategory(vehicles).map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setVehicleCategoryFilter(g.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold border transition-colors ${
+                      vehicleCategoryFilter === g.id
+                        ? 'bg-teal-700 text-white border-teal-700'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'
+                    }`}
+                  >
+                    {g.label} ({g.count})
+                  </button>
+                ))}
+              </div>
+
+              {vehicleGroups.map((group) => (
+                <section key={group.id} className="space-y-3">
+                  <div className="flex items-start gap-3 px-1">
+                    <span className="material-symbols-outlined text-teal-700 mt-0.5">
+                      {group.icon}
+                    </span>
                     <div className="min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-bold text-gray-900 truncate">
-                          {v.plate_number}{' '}
-                          <span className="text-gray-400 font-semibold">· {v.model}</span>
-                        </p>
-                        <span
-                          className={`shrink-0 text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(v.current_status)}`}
-                        >
-                          {v.current_status}
+                      <h4 className="font-bold text-slate-900">
+                        {group.label}{' '}
+                        <span className="text-slate-400 font-semibold text-sm">
+                          · {group.shortLabel}
                         </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                        {v.category} · {v.seating_capacity} θέσεις · {euro(v.daily_rate_eur)}/ημέρα
-                        {Number(v.one_way_surcharge_eur) > 0
-                          ? ` · one-way ${euro(v.one_way_surcharge_eur)}`
-                          : ''}
-                        {Number(v.with_driver_daily_eur) > 0
-                          ? ` · οδηγός ${euro(v.with_driver_daily_eur)}/ημ`
-                          : ''}
-                        {` · ${v.current_mileage} km`}
-                      </p>
-                      {v.description ? (
-                        <p className="text-xs text-gray-600 mt-2 line-clamp-2">{v.description}</p>
-                      ) : (
-                        <p className="text-xs text-amber-700/80 mt-2">Χωρίς περιγραφή για πελάτες</p>
-                      )}
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        {v.photo_urls?.length || (v.photo_url ? 1 : 0)} φωτογραφίες
-                      </p>
-                    </div>
-                    <div className="mt-auto flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="flex-1 min-w-[7rem] text-xs font-bold text-white bg-primary rounded-xl px-3 py-2.5"
-                        onClick={() =>
-                          navigate(`/admin/fleet-rental/vehicles/${encodeURIComponent(v.id)}/edit`)
-                        }
-                      >
-                        Επεξεργασία
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs font-bold text-rose-600 border border-rose-100 rounded-xl px-3 py-2.5"
-                        onClick={async () => {
-                          if (!window.confirm('Διαγραφή οχήματος;')) return;
-                          try {
-                            await deleteRentalVehicle(v.id);
-                            toast.success('Διαγράφηκε');
-                            await reload();
-                          } catch (err) {
-                            toast.error(err.message);
-                          }
-                        }}
-                      >
-                        Διαγραφή
-                      </button>
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-0.5">{group.blurb}</p>
                     </div>
                   </div>
-                </article>
+                  <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {group.vehicles.map((v) => (
+                      <article
+                        key={v.id}
+                        className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden flex flex-col"
+                      >
+                        {v.photo_url || v.photo_urls?.[0] ? (
+                          <img
+                            src={v.photo_url || v.photo_urls[0]}
+                            alt=""
+                            className="w-full h-36 object-cover bg-gray-50"
+                          />
+                        ) : (
+                          <div className="w-full h-36 bg-slate-50 flex items-center justify-center text-slate-300">
+                            <span className="material-symbols-outlined text-4xl">directions_car</span>
+                          </div>
+                        )}
+                        <div className="p-4 flex flex-col gap-3 flex-1">
+                          <div className="min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-bold text-gray-900 truncate">
+                                {v.plate_number}{' '}
+                                <span className="text-gray-400 font-semibold">· {v.model}</span>
+                              </p>
+                              <span
+                                className={`shrink-0 text-[11px] font-bold px-2 py-1 rounded-full ${statusChip(v.current_status)}`}
+                              >
+                                {v.current_status}
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-teal-800/80 mt-1">
+                              {rentCategoryLabel(v.category)}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                              {v.seating_capacity} θέσεις · {euro(v.daily_rate_eur)}/ημέρα
+                              {Number(v.one_way_surcharge_eur) > 0
+                                ? ` · one-way ${euro(v.one_way_surcharge_eur)}`
+                                : ''}
+                              {Number(v.with_driver_daily_eur) > 0
+                                ? ` · οδηγός ${euro(v.with_driver_daily_eur)}/ημ`
+                                : ''}
+                              {` · ${v.current_mileage} km`}
+                            </p>
+                            {v.description ? (
+                              <p className="text-xs text-gray-600 mt-2 line-clamp-2">{v.description}</p>
+                            ) : (
+                              <p className="text-xs text-amber-700/80 mt-2">Χωρίς περιγραφή για πελάτες</p>
+                            )}
+                            <p className="text-[11px] text-gray-400 mt-1">
+                              {v.photo_urls?.length || (v.photo_url ? 1 : 0)} φωτογραφίες
+                            </p>
+                          </div>
+                          <div className="mt-auto flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className="flex-1 min-w-[7rem] text-xs font-bold text-white bg-primary rounded-xl px-3 py-2.5"
+                              onClick={() =>
+                                navigate(
+                                  `/admin/fleet-rental/vehicles/${encodeURIComponent(v.id)}/edit`,
+                                )
+                              }
+                            >
+                              Επεξεργασία
+                            </button>
+                            <button
+                              type="button"
+                              className="text-xs font-bold text-rose-600 border border-rose-100 rounded-xl px-3 py-2.5"
+                              onClick={async () => {
+                                if (!window.confirm('Διαγραφή οχήματος;')) return;
+                                try {
+                                  await deleteRentalVehicle(v.id);
+                                  toast.success('Διαγράφηκε');
+                                  await reload();
+                                } catch (err) {
+                                  toast.error(err.message);
+                                }
+                              }}
+                            >
+                              Διαγραφή
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
               ))}
-            </div>
+            </>
           )}
         </div>
       )}

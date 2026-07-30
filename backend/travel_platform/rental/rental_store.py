@@ -17,8 +17,78 @@ DATA_DIR = Path(__file__).resolve().parent
 STORE_FILE = DATA_DIR / "rental_store.json"
 _LOCK = threading.RLock()
 
-VEHICLE_CATEGORIES = ("CAR", "VAN", "MINIBUS", "SUV")
+# ACRISS-inspired classes (Hertz / Sixt style) + legacy aliases.
+VEHICLE_CATEGORIES = (
+    "MINI",
+    "ECONOMY",
+    "COMPACT",
+    "INTERMEDIATE",
+    "STANDARD",
+    "FULLSIZE",
+    "PREMIUM",
+    "LUXURY",
+    "SUV",
+    "VAN",
+    "MINIBUS",
+    # Legacy flat body types — normalized on write.
+    "CAR",
+)
 VEHICLE_STATUSES = ("AVAILABLE", "RENTED", "MAINTENANCE", "CLEANING", "IN_TRANSIT")
+
+
+def normalize_vehicle_category(
+    category: str | None,
+    *,
+    seats: int | None = None,
+    model: str | None = None,
+) -> str:
+    """Map legacy CAR/… (and model/seats hints) to a canonical rent class."""
+    raw = str(category or "").strip().upper()
+    canonical = {
+        "MINI",
+        "ECONOMY",
+        "COMPACT",
+        "INTERMEDIATE",
+        "STANDARD",
+        "FULLSIZE",
+        "PREMIUM",
+        "LUXURY",
+        "SUV",
+        "VAN",
+        "MINIBUS",
+    }
+    name = str(model or "").strip().lower()
+    try:
+        seat_n = int(seats) if seats is not None else None
+    except (TypeError, ValueError):
+        seat_n = None
+    if raw in canonical:
+        if raw == "VAN" and seat_n is not None and seat_n >= 9:
+            return "MINIBUS"
+        return raw
+    if raw == "SUV" or any(x in name for x in ("tucson", "kuga", "qashqai", "rav4", "sportage")):
+        return "SUV"
+    if raw == "MINIBUS" or (seat_n is not None and seat_n >= 9):
+        return "MINIBUS"
+    if raw == "VAN" or any(
+        x in name for x in ("vito", "transporter", "multivan", "trafic", "transit", "custom")
+    ):
+        return "MINIBUS" if seat_n is not None and seat_n >= 9 else "VAN"
+    if raw in {"CAR", ""}:
+        if any(x in name for x in ("aygo", "i10", "twingo", "picanto")) or (
+            seat_n is not None and seat_n <= 4
+        ):
+            return "MINI"
+        if any(x in name for x in ("208", "clio", "yaris", "c3", "polo", "fiesta", "corsa")):
+            return "COMPACT"
+        if any(x in name for x in ("corolla", "civic", "focus", "golf", "octavia", "astra")):
+            return "INTERMEDIATE"
+        if seat_n is not None and seat_n <= 4:
+            return "MINI"
+        return "COMPACT"
+    return "COMPACT"
+
+
 BOOKING_STATUSES = ("RESERVED", "CONFIRMED", "ACTIVE", "COMPLETED", "CANCELLED")
 ACTIVE_BOOKING_STATUSES = frozenset({"RESERVED", "CONFIRMED", "ACTIVE"})
 INSPECTION_TYPES = ("PICKUP_CHECK", "RETURN_CHECK", "PICKUP", "RETURN")
@@ -71,7 +141,7 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
     {
         "id_suffix": "car-i10",
         "plate_number": "DEMO-C01",
-        "category": "CAR",
+        "category": "MINI",
         "model": "Toyota Aygo X",
         "seating_capacity": 4,
         "daily_rate_eur": 32,
@@ -90,7 +160,7 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
     {
         "id_suffix": "car-c3",
         "plate_number": "DEMO-C02",
-        "category": "CAR",
+        "category": "COMPACT",
         "model": "Peugeot 208",
         "seating_capacity": 5,
         "daily_rate_eur": 38,
@@ -109,7 +179,7 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
     {
         "id_suffix": "car-yaris",
         "plate_number": "DEMO-C03",
-        "category": "CAR",
+        "category": "COMPACT",
         "model": "Renault Clio",
         "seating_capacity": 5,
         "daily_rate_eur": 42,
@@ -166,7 +236,7 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
     {
         "id_suffix": "van-trafic",
         "plate_number": "DEMO-V03",
-        "category": "VAN",
+        "category": "MINIBUS",
         "model": "Ford Transit Custom",
         "seating_capacity": 9,
         "daily_rate_eur": 88,
@@ -352,10 +422,30 @@ def _ranges_overlap(a_start: datetime, a_end: datetime, b_start: datetime, b_end
 def list_vehicles(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
     tid = _normalize_tenant(tenant_id)
     with _LOCK:
-        rows = [v for v in _read()["vehicles"] if v.get("tenant_id") == tid]
+        rows = [deepcopy(v) for v in _read()["vehicles"] if v.get("tenant_id") == tid]
+    for v in rows:
+        v["category"] = normalize_vehicle_category(
+            v.get("category"),
+            seats=v.get("seating_capacity"),
+            model=v.get("model"),
+        )
     if category:
-        cat = category.strip().upper()
-        rows = [v for v in rows if str(v.get("category") or "").upper() == cat]
+        raw_filter = str(category).strip().upper()
+        if raw_filter == "CAR":
+            passenger = {
+                "MINI",
+                "ECONOMY",
+                "COMPACT",
+                "INTERMEDIATE",
+                "STANDARD",
+                "FULLSIZE",
+                "PREMIUM",
+                "LUXURY",
+            }
+            rows = [v for v in rows if str(v.get("category") or "") in passenger]
+        else:
+            want = normalize_vehicle_category(raw_filter)
+            rows = [v for v in rows if str(v.get("category") or "").upper() == want]
     return sorted(rows, key=lambda v: (v.get("category") or "", v.get("plate_number") or ""))
 
 
@@ -371,15 +461,19 @@ def get_vehicle(tenant_id: str | None, vehicle_id: str) -> dict[str, Any] | None
 def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: str | None = None) -> dict[str, Any]:
     tid = _normalize_tenant(tenant_id)
     plate = str(body.get("plate_number") or "").strip().upper()
-    category = str(body.get("category") or "CAR").strip().upper()
     model = str(body.get("model") or "").strip()
     if not plate or not model:
         raise ValueError("Απαιτούνται πινακίδα και μοντέλο")
-    if category not in VEHICLE_CATEGORIES:
-        raise ValueError("Μη έγκυρη κατηγορία")
     seats = int(body.get("seating_capacity") or 5)
     if seats < 2 or seats > 80:
         raise ValueError("Μη έγκυρη χωρητικότητα")
+    category = normalize_vehicle_category(
+        body.get("category") or "COMPACT",
+        seats=seats,
+        model=model,
+    )
+    if category not in VEHICLE_CATEGORIES:
+        raise ValueError("Μη έγκυρη κατηγορία")
     status = str(body.get("current_status") or "AVAILABLE").strip().upper()
     if status not in VEHICLE_STATUSES:
         raise ValueError("Μη έγκυρη κατάσταση οχήματος")

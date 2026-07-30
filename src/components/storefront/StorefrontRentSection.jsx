@@ -3,6 +3,7 @@ import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { RENT_SERVICE_FEATURES, rentServiceCopy } from '../../lib/rental/rentServicesCatalog.js';
 import { rentCategoryLabel, withDemoRentFleet } from '../../lib/rental/demoRentFleet.js';
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
+import { countRentFleetByBody } from '../../lib/rental/rentVehicleCategories.js';
 
 /**
  * Homepage Rent block for office storefronts that have rent_enabled.
@@ -23,8 +24,7 @@ export default function StorefrontRentSection({
     : 'Διαθέσιμος στόλος για ημερήσια ή πολυήμερη ενοικίαση, δίπλα στις εκδρομές μας.';
 
   const preview = withDemoRentFleet(vehicles).slice(0, 6);
-  const cars = preview.filter((v) => String(v.category || '').toUpperCase() === 'CAR');
-  const vans = preview.filter((v) => String(v.category || '').toUpperCase() === 'VAN');
+  const { cars, vans } = countRentFleetByBody(preview);
 
   return (
     <>
@@ -38,7 +38,7 @@ export default function StorefrontRentSection({
               <h2 className="font-headline-lg font-bold text-on-surface mb-3">{title}</h2>
               <p className="font-body-lg text-on-surface-variant leading-relaxed">{subtitle}</p>
               <p className="mt-3 text-sm font-semibold text-on-surface-variant">
-                {cars.length} επιβατικά · {vans.length} van
+                {cars} επιβατικά · {vans} van
               </p>
             </div>
             <Link

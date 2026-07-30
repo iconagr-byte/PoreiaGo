@@ -3,21 +3,25 @@
  * One BackOffice panel (`fleet_rental`) + controlled sub-tab.
  */
 
+/**
+ * Labels must stay distinct from bus left-nav (Στόλος λεωφορείων, Πελάτες,
+ * Κρατήσεις, Ημερολόγιο στόλου) — always read as Rent desk items.
+ */
 export const RENT_DESK_TABS = [
-  { id: 'clients', label: 'Πελάτες', icon: 'groups' },
-  { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
+  { id: 'clients', label: 'Πελάτες /rent', icon: 'groups' },
+  { id: 'bookings', label: 'Κρατήσεις /rent', icon: 'event_note' },
   { id: 'paperwork', label: 'Χαρτούρα', icon: 'description' },
   { id: 'services', label: 'Υπηρεσίες', icon: 'health_and_safety' },
-  { id: 'notifications', label: 'Ειδοποιήσεις', icon: 'notifications_active' },
-  { id: 'payments', label: 'Πληρωμές', icon: 'payments' },
+  { id: 'notifications', label: 'Ειδοποιήσεις /rent', icon: 'notifications_active' },
+  { id: 'payments', label: 'Πληρωμές /rent', icon: 'payments' },
   { id: 'pickups', label: 'Σημεία παραλαβής', icon: 'location_on' },
   { id: 'branding', label: 'Εμφάνιση /rent', icon: 'palette' },
-  { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard' },
-  { id: 'vehicles', label: 'Στόλος', icon: 'directions_car' },
-  { id: 'wizard', label: 'Νέα κράτηση', icon: 'add_circle' },
-  { id: 'calendar', label: 'Ημερολόγιο', icon: 'calendar_month' },
+  { id: 'overview', label: 'Επισκόπηση /rent', icon: 'dashboard' },
+  { id: 'vehicles', label: 'Οχήματα ενοικίασης', icon: 'directions_car' },
+  { id: 'wizard', label: 'Νέα κράτηση /rent', icon: 'add_circle' },
+  { id: 'calendar', label: 'Ημερολόγιο /rent', icon: 'calendar_month' },
   { id: 'inspections', label: 'Check-in / out', icon: 'fact_check' },
-  { id: 'live_gps', label: 'Ζωντανά GPS', icon: 'my_location' },
+  { id: 'live_gps', label: 'GPS ενοικίασης', icon: 'my_location' },
   { id: 'plans', label: 'Κάρτες τιμών', icon: 'sell' },
 ];
 

@@ -68,7 +68,14 @@ export function normalizePaymentSettings(raw = {}) {
   let pct = parseInt(String(merged.deposit.percent ?? 30), 10);
   if (!Number.isFinite(pct)) pct = 30;
   merged.deposit.percent = Math.max(5, Math.min(90, pct));
-  merged.deposit.enabled = merged.deposit.enabled !== false;
+  // Preserve explicit false (user turned deposit off). Default only when missing.
+  if (raw?.deposit && Object.prototype.hasOwnProperty.call(raw.deposit, 'enabled')) {
+    merged.deposit.enabled = Boolean(raw.deposit.enabled);
+  } else if (merged.deposit.enabled == null) {
+    merged.deposit.enabled = true;
+  } else {
+    merged.deposit.enabled = Boolean(merged.deposit.enabled);
+  }
 
   return merged;
 }

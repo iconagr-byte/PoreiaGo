@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { listPublishedTrips } from '../lib/trips/tripStore.js';
 import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
 import { getTripMarket, MARKET_DOMESTIC, MARKET_INTERNATIONAL } from '../lib/trips/tripMarket.js';
 import {
@@ -25,7 +24,7 @@ import {
   isStorefrontPreviewMode,
   readHomepagePreviewDraft,
 } from '../lib/homepage/homepagePreview.js';
-import { isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
+import { isPlatformMarketingHost, isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
 import { fetchPublicFleet } from '../services/fleetPublicApi.js';
 import {
   DEFAULT_OFFICE_MODULES,
@@ -52,10 +51,12 @@ const RENT_ONLY_HERO = {
 
 export default function StorefrontDemoPage() {
   const navigate = useNavigate();
-  const isPreview = isStorefrontPreviewMode();
   const isLiveTenantSite = isTenantStorefrontHost();
-  // Preview from admin OR live office domain/subdomain.
-  const allowStorefront = isPreview || isLiveTenantSite;
+  // PoreiaGo SaaS host is marketing only — never a white-label office storefront
+  // (blocks Achillio Travel leftovers on www.poreiago.com/storefront?preview=1).
+  const blockOnMarketingHost = isPlatformMarketingHost();
+  // Live office domain/subdomain only. Preview on poreiago.com is not allowed.
+  const allowStorefront = isLiveTenantSite && !blockOnMarketingHost;
 
   const [trips, setTrips] = useState([]);
   const domesticTrips = useMemo(
@@ -135,6 +136,9 @@ export default function StorefrontDemoPage() {
   }, [rentOnly, siteAppearance]);
 
   useEffect(() => {
+    // Marketing host redirects away — do not load office storefront data there.
+    if (!allowStorefront) return undefined;
+
     const applyPreviewAppearance = () => {
       const draft = readHomepagePreviewDraft();
       if (draft) {
@@ -151,7 +155,7 @@ export default function StorefrontDemoPage() {
 
     if (isStorefrontPreviewMode()) {
       if (!applyPreviewAppearance()) {
-        fetchSiteAppearance().then(setSiteAppearance);
+        fetchSiteAppearance().then(setSiteAppearance).catch(() => {});
       }
       const onStorage = (e) => {
         if (e.key === 'aerostride_homepage_preview_v1' || e.key === 'aerostride_site_appearance_v1') {
@@ -164,32 +168,19 @@ export default function StorefrontDemoPage() {
       fetchPublicFleet()
         .then(setFleetShowcase)
         .finally(() => setFleetLoading(false));
-      // Preview on a live office domain must still be Host-scoped.
-      if (isLiveTenantSite) {
-        fetchPublicOfficeTrips().then(setTrips);
-      } else {
-        setTrips(listPublishedTrips());
-      }
+      fetchPublicOfficeTrips().then(setTrips);
       return () => window.removeEventListener('storage', onStorage);
     }
 
-    fetchSiteAppearance().then(setSiteAppearance);
+    fetchSiteAppearance().then(setSiteAppearance).catch(() => {});
     loadCommon();
     setFleetLoading(true);
     fetchPublicFleet()
       .then(setFleetShowcase)
       .finally(() => setFleetLoading(false));
-
-    // Live office domains: Host-scoped API only (never shared localStorage/mocks).
-    // Admin preview on platform host may still use the logged-in office's local list.
-    if (isLiveTenantSite) {
-      fetchPublicOfficeTrips().then(setTrips);
-    } else if (isPreview) {
-      setTrips(listPublishedTrips());
-    } else {
-      setTrips([]);
-    }
-  }, []);
+    fetchPublicOfficeTrips().then(setTrips);
+    return undefined;
+  }, [allowStorefront]);
 
   useEffect(() => {
     if (!rentEnabled) {
