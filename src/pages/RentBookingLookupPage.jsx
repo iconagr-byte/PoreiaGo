@@ -132,17 +132,16 @@ export default function RentBookingLookupPage() {
 
       if (getCustomerToken()) {
         toast.success('Η κράτηση ενοικίασης βρέθηκε');
-        navigate('/rent', { replace: true, state: navState });
+        navigate('/rent/wallet', { replace: true, state: navState });
         return;
       }
 
       toast.success('Βρέθηκε η κράτηση — συνδεθείτε στο Rent Wallet');
-      navigate('/rent', {
+      navigate('/rent/login', {
         replace: true,
         state: {
           ...navState,
-          rentContinue: false,
-          from: '/rent',
+          from: '/rent/wallet',
           rentEntrance: true,
         },
       });
@@ -311,8 +310,8 @@ export default function RentBookingLookupPage() {
 
           <div className="booking-lookup-footer-links">
             <Link
-              to="/rent"
-              state={{ from: '/rent', rentEntrance: true }}
+              to="/rent/login"
+              state={{ from: '/rent/wallet', rentEntrance: true }}
               className="booking-lookup-wallet"
             >
               Σύνδεση στο Rent Wallet

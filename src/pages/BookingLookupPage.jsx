@@ -296,7 +296,7 @@ export default function BookingLookupPage() {
 
           <div className="booking-lookup-footer-links">
             <Link to="/login" className="booking-lookup-wallet">
-              Σύνδεση στο My Wallet
+              Σύνδεση στο My Wallet (λεωφορεία)
             </Link>
             {tel ? (
               <a href={tel} className="booking-lookup-phone">

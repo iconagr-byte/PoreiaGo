@@ -48,7 +48,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const redirectTo = pathRent
     ? isRentReturn(location.state?.from)
       ? location.state.from
-      : '/rent'
+      : '/rent/wallet'
     : location.state?.from || '/wallet';
   const rentIntent = pathRent || isRentReturn(redirectTo);
   const walletIntent =
@@ -80,12 +80,12 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   }, []);
 
   useEffect(() => {
-    // Old deep-links used /login?state.from=/rent — stay on /rent (share URL), not /rent/login.
+    // Bus /login must never host rent — send rent deep-links to green /rent/login.
     if (
       location.pathname === '/login' &&
       isRentReturn(location.state?.from)
     ) {
-      navigate('/rent', { replace: true, state: location.state });
+      navigate('/rent/login', { replace: true, state: location.state });
     }
   }, [location.pathname, location.state, navigate]);
 
@@ -242,18 +242,32 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         <span className={iconClass} aria-hidden>
           {rentIntent ? 'directions_car' : 'account_balance_wallet'}
         </span>
-        <h1>{rentIntent ? 'Ενοικίαση' : 'My Wallet'}</h1>
+        <h1>{rentIntent ? 'Rent Wallet' : 'My Wallet'}</h1>
         <p className={leadClass}>
           {rentIntent
-            ? 'Σύνδεση για κράτηση οχήματος. Νέος πελάτης; Δημιουργήστε λογαριασμό πρώτα.'
+            ? 'Σύνδεση για ενοικίαση οχήματος — ξεχωριστή εφαρμογή από τα λεωφορεία.'
             : claim
               ? 'Συνδεθείτε για να δείτε το εισιτήριο της κράτησής σας'
-              : 'Σύνδεση για ταξίδια με λεωφορείο — ο λογαριασμός αποθηκεύεται στον server'}
+              : 'Σύνδεση μόνο για ταξίδια με λεωφορείο — εισιτήρια & QR επιβίβασης'}
         </p>
         <p className={hintClass}>
-          {rentIntent
-            ? 'Τα ταξίδια με λεωφορείο είναι στο My Wallet (μπλε) — εδώ είναι η ενοικίαση.'
-            : 'Η ενοικίαση οχήματος είναι στην εφαρμογή Rent (πράσινο).'}
+          {rentIntent ? (
+            <>
+              Τα λεωφορεία είναι στο{' '}
+              <Link to="/login" className={linkClass}>
+                My Wallet
+              </Link>{' '}
+              (μπλε) — διεύθυνση <span className="font-mono text-[0.85em]">/login</span>.
+            </>
+          ) : (
+            <>
+              Η ενοικίαση είναι στο{' '}
+              <Link to="/rent/login" className={linkClass}>
+                Rent Wallet
+              </Link>{' '}
+              (πράσινο) — διεύθυνση <span className="font-mono text-[0.85em]">/rent/login</span>.
+            </>
+          )}
         </p>
       </div>
 
@@ -340,7 +354,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         Δεν έχετε λογαριασμό;{' '}
         <Link
           to={rentIntent ? '/rent/register' : '/register'}
-          state={rentIntent ? { from: '/rent' } : registerState}
+          state={rentIntent ? { from: '/rent/wallet' } : registerState}
           className={linkClass}
         >
           {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
@@ -349,7 +363,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       {!rentIntent ? (
         <p className="text-xs text-center mt-3">
           <Link to="/my-booking" className={linkClass}>
-            Εύρεση κράτησης
+            Εύρεση κράτησης λεωφορείου
           </Link>
         </p>
       ) : (
@@ -383,8 +397,8 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       <div className="wallet-auth-shell">
         <div className="wallet-auth-scroll">
           {!isMobile ? (
-            <aside className="wallet-auth-aside" aria-label="Σχετικά με το My Wallet">
-              <p className="wallet-auth-aside-kicker">My Wallet</p>
+            <aside className="wallet-auth-aside" aria-label="Σχετικά με το My Wallet λεωφορείων">
+              <p className="wallet-auth-aside-kicker">My Wallet · Λεωφορεία</p>
               <h2 className="wallet-auth-aside-title">
                 Τα εισιτήριά σας,<br />πάντα στο κινητό
               </h2>
@@ -431,8 +445,12 @@ export default function LoginPage({ rentEntrance = false } = {}) {
                 </li>
               </ul>
               <p className="wallet-auth-aside-note">
-                Η ενοικίαση οχήματος γίνεται στην εφαρμογή <strong>Rent</strong> (πράσινο) — χωριστά
-                από το My Wallet.
+                Μόνο λεωφορεία — διεύθυνση <strong>/login</strong> και <strong>/wallet</strong>.
+                Ενοικίαση οχήματος:{' '}
+                <Link to="/rent/login" className="wallet-auth-link">
+                  Rent Wallet
+                </Link>{' '}
+                (πράσινο, <strong>/rent/login</strong>).
               </p>
             </aside>
           ) : null}
