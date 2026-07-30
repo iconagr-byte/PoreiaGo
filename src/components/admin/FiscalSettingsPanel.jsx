@@ -7,10 +7,30 @@ import {
   updateFiscalSettings,
 } from '../../services/fiscalSettingsApi.js';
 import FiscalPipelineHelp from './FiscalPipelineHelp.jsx';
+import { API_BASE } from '../../config/api.js';
 
 const INPUT_CLASS =
   'mt-1.5 w-full rounded-xl border border-gray-200/90 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-primary/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20';
 
+function readinessTone(ok) {
+  if (ok === true) return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+  if (ok === false) return 'bg-rose-50 text-rose-800 border-rose-200';
+  return 'bg-amber-50 text-amber-900 border-amber-200';
+}
+
+function ReadinessChip({ label, ok, detail }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${readinessTone(ok)}`}
+      title={detail || ''}
+    >
+      <span className="material-symbols-outlined text-[14px]">
+        {ok === true ? 'check_circle' : ok === false ? 'error' : 'pending'}
+      </span>
+      {label}
+    </span>
+  );
+}
 function SectionHeader({ icon, title, subtitle }) {
   return (
     <div className="mb-5">
@@ -119,8 +139,19 @@ export default function FiscalSettingsPanel() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pipeline, setPipeline] = useState(null);
 
   const activeProvider = FISCAL_PROVIDERS.find((p) => p.id === form.provider);
+
+  const loadPipeline = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/health`, { credentials: 'omit' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setPipeline(await res.json());
+    } catch {
+      setPipeline(null);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -132,17 +163,32 @@ export default function FiscalSettingsPanel() {
         epsilon_jwt: '',
         epsilon_subscription_key: '',
       });
+      await loadPipeline();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία φόρτωσης ρυθμίσεων φορολογίας');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadPipeline]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  const providerReady =
+    form.provider === 'native_aade'
+      ? Boolean(String(form.issuer_vat || '').trim())
+      : form.provider === 'prosvasis'
+        ? Boolean(
+            form.prosvasis?.app_id &&
+              form.prosvasis?.s1code_configured &&
+              form.prosvasis?.bearer_token_configured,
+          )
+        : Boolean(form.epsilon?.jwt_configured);
+
+  const redisOk = pipeline?.redis?.status === 'ok';
+  const celeryOk = pipeline?.celery?.status === 'ok';
+  const fiscalHealth = pipeline?.fiscal?.health;
   const setProvider = (provider) => setForm((prev) => ({ ...prev, provider }));
   const setProsvasis = (patch) =>
     setForm((prev) => ({ ...prev, prosvasis: { ...prev.prosvasis, ...patch } }));
@@ -236,6 +282,58 @@ export default function FiscalSettingsPanel() {
       </div>
 
       <form onSubmit={onSave} className="p-6 space-y-8">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-bold text-slate-900">Κατάσταση pipeline</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Redis / Celery από `/health` · κλειδιά παρόχου από τις ρυθμίσεις γραφείου
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadPipeline}
+              className="text-xs font-bold text-primary hover:underline"
+            >
+              Ανανέωση
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ReadinessChip label="Redis" ok={pipeline ? redisOk : null} detail={pipeline?.redis?.detail} />
+            <ReadinessChip
+              label="Celery worker"
+              ok={pipeline?.celery ? celeryOk : null}
+              detail={
+                pipeline?.celery?.detail ||
+                (pipeline?.celery?.workers || []).join(', ') ||
+                'Μετά το deploy θα εμφανίζεται εδώ'
+              }
+            />
+            <ReadinessChip
+              label={`Fiscal ${fiscalHealth || '—'}`}
+              ok={fiscalHealth === 'ok' ? true : fiscalHealth === 'degraded' ? false : null}
+              detail={
+                pipeline?.fiscal
+                  ? `issued=${pipeline.fiscal.issued} pending=${pipeline.fiscal.pending} stuck=${pipeline.fiscal.stuck_candidates}`
+                  : ''
+              }
+            />
+            <ReadinessChip
+              label="Κλειδιά παρόχου"
+              ok={providerReady}
+              detail={
+                providerReady
+                  ? 'Τα απαραίτητα secrets/πεδία φαίνονται συμπληρωμένα'
+                  : 'Συμπλήρωσε Prosvasis/Epsilon secrets ή ΑΦΜ για native AADE'
+              }
+            />
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Οδηγός: <code className="text-[11px]">docs/FISCAL-PROVIDER-SETUP.md</code> · Προτεινόμενο:
+            Prosvasis GO. Χωρίς κλειδιά παρόχου δεν γίνεται live έκδοση MARK.
+          </p>
+        </div>
+
         <div>
           <SectionHeader
             icon="storefront"

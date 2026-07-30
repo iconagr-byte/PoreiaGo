@@ -1,16 +1,16 @@
-"""
-invoiceService — booking/payment success hook for AADE / myDATA e-invoicing.
-
-Python fiscal workers already handle native AADE, Prosvasis, and Epsilon.
-This module is the frontend-facing facade described in the enterprise brief.
-"""
+/**
+ * invoiceService — admin-facing hook to issue/retry fiscal receipt for a booking.
+ *
+ * Automatic issuance still runs from Python (payment webhook → Celery → provider).
+ * Use this for manual enqueue from UI tools.
+ */
+import { saasFetch } from '../../services/saasApi.js';
 
 /**
- * Enqueue fiscal transmission after a successful booking/payment.
- * Backend workers fetch PDF/QR + protocol number asynchronously.
+ * Issue missing fiscal receipt for a booking (admin JWT required).
  *
  * @param {{ bookingId: string, paymentIntentId?: string, kind?: string }} payload
- * @returns {Promise<{ queued: boolean, detail?: string }>}
+ * @returns {Promise<{ queued: boolean, detail?: string, data?: object }>}
  */
 export async function transmitInvoice(payload = {}) {
   const bookingId = String(payload.bookingId || '').trim();
@@ -18,25 +18,15 @@ export async function transmitInvoice(payload = {}) {
     return { queued: false, detail: 'missing bookingId' };
   }
   try {
-    const res = await fetch('/api/admin/platform/fiscal/enqueue', {
+    const data = await saasFetch(`/api/admin/platform/bookings/${encodeURIComponent(bookingId)}/issue-fiscal`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({
-        booking_id: bookingId,
         stripe_payment_intent_id: payload.paymentIntentId || null,
-        kind: payload.kind || 'RECEIPT',
+        kind: payload.kind || null,
       }),
     });
-    if (res.status === 404) {
-      // Endpoint may be worker-driven only — treat as accepted for UI flows.
-      return { queued: true, detail: 'fiscal-worker' };
-    }
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      return { queued: false, detail: text || `HTTP ${res.status}` };
-    }
-    return { queued: true, detail: 'enqueued' };
+    return { queued: true, detail: 'issued-or-enqueued', data };
   } catch (err) {
     return { queued: false, detail: err?.message || 'network' };
   }
