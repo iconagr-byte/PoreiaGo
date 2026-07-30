@@ -35,25 +35,38 @@ import {
 import {
   resolveRentAppBranding,
 } from '../../lib/rental/rentAppBranding.js';
+import {
+  DEFAULT_OFFICE_MODULES,
+  contractDesignLabel,
+  fetchAdminOfficeModules,
+  officeModeFromModules,
+  resolveDesignPageForModules,
+} from '../../services/officeModulesApi.js';
 
 const DESIGN_PAGES = [
   {
     id: 'home',
-    label: 'Αρχική',
-    title: 'Αρχική σελίδα',
-    blurb: '20 έτοιμα θέματα ή προσαρμογή κάθε τμήματος.',
+    label: 'Λεωφορεία',
+    title: 'Αρχική · εκδρομές',
+    blurb: 'Θέματα, hero και κάρτες εκδρομών της αρχικής σελίδας.',
     previewTo: '/storefront?preview=1',
     previewLabel: 'Προεπισκόπηση σε νέο tab',
-    icon: 'home',
+    icon: 'directions_bus',
+    accentFrom: 'from-sky-700',
+    accentVia: 'via-indigo-700',
+    accentTo: 'to-slate-800',
   },
   {
     id: 'rent',
     label: 'Ενοικιάσεις',
-    title: 'Σελίδα ενοικιάσεων',
-    blurb: 'Όνομα γραφείου, τίτλοι και κείμενα για την εφαρμογή /rent.',
+    title: 'Σελίδα /rent',
+    blurb: 'Όνομα γραφείου, τίτλοι και κείμενα για την εφαρμογή ενοικίασης.',
     previewTo: '/rent',
     previewLabel: 'Άνοιγμα /rent',
-    icon: 'key',
+    icon: 'car_rental',
+    accentFrom: 'from-teal-700',
+    accentVia: 'via-cyan-700',
+    accentTo: 'to-sky-900',
   },
 ];
 
@@ -436,6 +449,9 @@ function OverviewSummary({ form }) {
 export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromQuery = searchParams.get('page') || searchParams.get('designPage');
+  const [modules, setModules] = useState(DEFAULT_OFFICE_MODULES);
+  const [modulesReady, setModulesReady] = useState(false);
+  const officeMode = officeModeFromModules(modules);
   const [designPage, setDesignPage] = useState(() =>
     sanitizeDesignPage(initialDesignPage || pageFromQuery),
   );
@@ -447,12 +463,38 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   const [uploadingHero, setUploadingHero] = useState(false);
 
   useEffect(() => {
-    const next = sanitizeDesignPage(initialDesignPage || pageFromQuery);
-    setDesignPage(next);
-  }, [initialDesignPage, pageFromQuery]);
+    let cancelled = false;
+    fetchAdminOfficeModules().then((mods) => {
+      if (cancelled) return;
+      setModules(mods);
+      setModulesReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!modulesReady) return;
+    const requested = initialDesignPage || pageFromQuery;
+    const next = resolveDesignPageForModules(requested, modules);
+    setDesignPage((prev) => (prev === next ? prev : next));
+    const cur = pageFromQuery === 'rent' ? 'rent' : pageFromQuery === 'home' ? 'home' : '';
+    if (requested && resolveDesignPageForModules(requested, modules) !== sanitizeDesignPage(requested)) {
+      const params = new URLSearchParams(window.location.search);
+      if (next === 'rent') params.set('page', 'rent');
+      else params.delete('page');
+      params.delete('designPage');
+      setSearchParams(params, { replace: true });
+    } else if (!cur && next === 'rent' && officeMode === 'rent_only') {
+      const params = new URLSearchParams(window.location.search);
+      params.set('page', 'rent');
+      setSearchParams(params, { replace: true });
+    }
+  }, [modulesReady, modules, initialDesignPage, pageFromQuery, officeMode, setSearchParams]);
 
   const selectDesignPage = (id) => {
-    const next = sanitizeDesignPage(id);
+    const next = resolveDesignPageForModules(id, modules);
     setDesignPage(next);
     setSection('overview');
     const params = new URLSearchParams(searchParams);
@@ -462,9 +504,16 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     setSearchParams(params, { replace: true });
   };
 
+  const availablePages = DESIGN_PAGES.filter((p) => {
+    if (officeMode === 'rent_only') return p.id === 'rent';
+    if (officeMode === 'trips_only') return p.id === 'home';
+    return true;
+  });
+  const canSwitchPages = availablePages.length > 1;
   const navSections = designPage === 'rent' ? RENT_SECTIONS : HOME_SECTIONS;
-  const activePageMeta = DESIGN_PAGES.find((p) => p.id === designPage) || DESIGN_PAGES[0];
+  const activePageMeta = DESIGN_PAGES.find((p) => p.id === designPage) || availablePages[0] || DESIGN_PAGES[0];
   const rentPreview = resolveRentAppBranding(form, { guest: false });
+  const contractBadge = contractDesignLabel(officeMode);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -616,42 +665,85 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row gap-6 min-w-0">
-      <nav className="lg:w-60 shrink-0">
+      <nav className="lg:w-72 shrink-0">
         <div className="lg:sticky lg:top-4 space-y-2">
           <div
-            className={`rounded-2xl text-white p-4 mb-4 shadow-lg ${
+            className={`rounded-2xl text-white p-4 mb-4 shadow-lg bg-gradient-to-br ${
               designPage === 'rent'
-                ? 'bg-gradient-to-br from-teal-700 via-cyan-700 to-sky-800 shadow-teal-500/20'
-                : 'bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-700 shadow-violet-500/20'
+                ? 'from-teal-700 via-cyan-700 to-sky-900 shadow-teal-500/20'
+                : 'from-sky-700 via-indigo-700 to-slate-800 shadow-sky-500/20'
             }`}
           >
-            <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Διαμόρφωση</p>
-            <p className="font-bold text-lg mt-0.5">{activePageMeta.title}</p>
-            <p className="text-xs text-white/75 mt-2">{activePageMeta.blurb}</p>
-
-            <div
-              className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-black/20 p-1"
-              role="tablist"
-              aria-label="Σελίδα προς σχεδιασμό"
-            >
-              {DESIGN_PAGES.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={designPage === p.id}
-                  onClick={() => selectDesignPage(p.id)}
-                  className={`inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition-colors ${
-                    designPage === p.id
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-white/85 hover:bg-white/10'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">{p.icon}</span>
-                  {p.label}
-                </button>
-              ))}
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Διαμόρφωση</p>
+              <span className="inline-flex items-center gap-1 rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-bold text-white/90">
+                <span className="material-symbols-outlined text-[12px]">workspace_premium</span>
+                {officeMode === 'both' ? '2 σελίδες' : '1 σελίδα'}
+              </span>
             </div>
+            <p className="font-bold text-lg mt-0.5">{activePageMeta.title}</p>
+            <p className="text-xs text-white/75 mt-2 leading-relaxed">{activePageMeta.blurb}</p>
+            <p className="mt-2 text-[11px] font-semibold text-white/65">{contractBadge}</p>
+
+            {canSwitchPages ? (
+              <div className="mt-4 space-y-1.5" role="tablist" aria-label="Σελίδα προς σχεδιασμό">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-white/60 px-0.5">
+                  Ποια σελίδα σχεδιάζεις;
+                </p>
+                {availablePages.map((p) => {
+                  const active = designPage === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => selectDesignPage(p.id)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition ${
+                        active
+                          ? 'bg-white text-slate-900 shadow-md'
+                          : 'bg-white/10 text-white hover:bg-white/15'
+                      }`}
+                    >
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg shrink-0 ${
+                          active ? 'bg-slate-900 text-white' : 'bg-black/20 text-white'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">{p.icon}</span>
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold leading-tight">{p.label}</span>
+                        <span
+                          className={`block text-[11px] mt-0.5 leading-snug ${
+                            active ? 'text-slate-500' : 'text-white/70'
+                          }`}
+                        >
+                          {p.id === 'home' ? 'Αρχική εκδρομών' : 'App /rent'}
+                        </span>
+                      </span>
+                      {active ? (
+                        <span className="material-symbols-outlined text-[18px] text-emerald-600">
+                          check_circle
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl bg-black/20 border border-white/10 px-3 py-2.5 flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
+                  <span className="material-symbols-outlined text-[18px]">{activePageMeta.icon}</span>
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold">{activePageMeta.label}</p>
+                  <p className="text-[11px] text-white/70 mt-0.5">
+                    Μόνο αυτή η σελίδα στο συμβόλαιό σου
+                  </p>
+                </div>
+              </div>
+            )}
 
             <Link
               to={activePageMeta.previewTo}

@@ -1,4 +1,19 @@
 import { API_BASE } from '../config/api.js';
+import {
+  contractDesignLabel,
+  designPagesForModules,
+  isRentOnlyModules,
+  officeModeFromModules,
+  resolveDesignPageForModules,
+} from '../lib/admin/officeDesignPages.js';
+
+export {
+  contractDesignLabel,
+  designPagesForModules,
+  isRentOnlyModules,
+  officeModeFromModules,
+  resolveDesignPageForModules,
+};
 
 export const DEFAULT_OFFICE_MODULES = {
   trips_enabled: true,
@@ -46,14 +61,4 @@ export async function fetchAdminOfficeModules() {
   } catch {
     return { ...DEFAULT_OFFICE_MODULES };
   }
-}
-
-export function isRentOnlyModules(modules) {
-  return Boolean(modules?.rent_enabled) && !modules?.trips_enabled;
-}
-
-export function officeModeFromModules(modules) {
-  if (isRentOnlyModules(modules)) return 'rent_only';
-  if (modules?.rent_enabled && modules?.trips_enabled) return 'both';
-  return 'trips_only';
 }
