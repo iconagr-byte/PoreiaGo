@@ -189,16 +189,11 @@ async def list_settings(
     q += " ORDER BY created_at ASC"
     cur = await db.execute(q, params)
     rows = [_row_settings(r) for r in await cur.fetchall()]
-    # Adopt legacy owner_key=default rows into the logged-in office once.
+    # SEAL: never auto-claim owner_key=default into the logged-in office.
+    # First office to open Email settings used to steal IMAP/SMTP from another
+    # tenant. Legacy rows stay readable only via explicit claim_legacy_owner().
     if include_legacy_default and owner_key != "default":
-        for row in rows:
-            if row.get("owner_key") == "default":
-                await db.execute(
-                    "UPDATE email_settings SET owner_key = ?, updated_at = ? WHERE id = ?",
-                    (owner_key, _now(), row["id"]),
-                )
-                row["owner_key"] = owner_key
-        await db.commit()
+        rows = [r for r in rows if r.get("owner_key") == owner_key]
     return rows
 
 

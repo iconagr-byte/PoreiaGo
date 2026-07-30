@@ -36,7 +36,7 @@ import RentCoverageExtrasEditor from './RentCoverageExtrasEditor.jsx';
 import RentNotificationsEditor from './RentNotificationsEditor.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
-import { fetchSiteAppearance } from '../../../services/siteAppearanceApi.js';
+import { fetchAdminSiteAppearance } from '../../../services/siteAppearanceApi.js';
 import {
   groupVehiclesByRentCategory,
   rentCategoryLabel,
@@ -173,7 +173,7 @@ export default function FleetRentalPanel({
 
   useEffect(() => {
     let cancelled = false;
-    fetchSiteAppearance()
+    fetchAdminSiteAppearance()
       .then((appearance) => {
         if (cancelled) return;
         const brand = resolveOfficeBrand(appearance || {});

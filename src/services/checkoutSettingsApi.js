@@ -2,8 +2,9 @@ import { API_BASE } from '../config/api.js';
 
 import { DEFAULT_BANK_TRANSFER_SETTINGS, normalizeBankTransferSettings } from '../lib/payments/bankTransfer.js';
 import { fetchCheckoutPaymentBundle } from './paymentSettingsApi.js';
+import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'aerostride_checkout_settings_v1';
+const STORAGE_KEY_BASE = 'aerostride_checkout_settings_v1';
 
 export const DEFAULT_CHECKOUT_SETTINGS = {
   checkout_deposit_enabled: true,
@@ -11,9 +12,13 @@ export const DEFAULT_CHECKOUT_SETTINGS = {
   ...DEFAULT_BANK_TRANSFER_SETTINGS,
 };
 
+function storageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
+
 function cacheLocally(data) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(storageKey(), JSON.stringify(data));
   } catch {
     /* quota */
   }
@@ -21,7 +26,7 @@ function cacheLocally(data) {
 
 function loadCached() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     return raw ? { ...DEFAULT_CHECKOUT_SETTINGS, ...JSON.parse(raw) } : null;
   } catch {
     return null;

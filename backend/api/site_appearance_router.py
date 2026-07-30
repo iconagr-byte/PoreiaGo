@@ -47,7 +47,7 @@ DEFAULT_SITE_APPEARANCE = {
     "logo_height_px": 40,
     "logo_max_width_px": 180,
     "logo_show_name": True,
-    "hero_image_url": "/images/hero-bus-achillio.png",
+    "hero_image_url": "",
     "hero_image_focal": "center",
     "hero_badge": "Premium Ταξιδιωτική Εμπειρία",
     "hero_title": "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:",

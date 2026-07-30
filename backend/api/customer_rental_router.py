@@ -18,8 +18,9 @@ async def _tenant_id(request: Request) -> str:
     if tid:
         return str(tid)
 
+    # Only proxy Host — Origin/Referer must never switch office scope.
     hosts: list[str] = []
-    for header in ("x-forwarded-host", "host", "origin", "referer"):
+    for header in ("x-forwarded-host", "host"):
         raw = (request.headers.get(header) or "").strip()
         if not raw:
             continue
