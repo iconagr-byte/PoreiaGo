@@ -6,7 +6,7 @@ import {
   rentNotifyPatchFromForm,
 } from '../../../lib/rental/rentNotify.js';
 import {
-  fetchSiteAppearance,
+  fetchAdminSiteAppearance,
   updateSiteAppearance,
 } from '../../../services/siteAppearanceApi.js';
 
@@ -43,7 +43,7 @@ export default function RentNotificationsEditor() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchSiteAppearance();
+      const data = await fetchAdminSiteAppearance();
       const next = settingsToForm(data);
       setForm(next);
       setBaseline(JSON.stringify(rentNotifyPatchFromForm(next)));

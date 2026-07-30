@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from api.request_tenant import admin_tenant_id
 from email_client.dynamic_mailer import test_account_connection
 from email_client.settings_store import (
-    claim_legacy_owner,
     create_settings,
     delete_settings,
     get_settings,
@@ -28,7 +27,8 @@ async def _list_for_request(request: Request, *, active_only: bool = False):
     return await list_settings(
         owner_key=_owner_key(request),
         active_only=active_only,
-        include_legacy_default=True,
+        # Never pull / auto-adopt shared owner_key=default into another office.
+        include_legacy_default=False,
     )
 
 
@@ -39,9 +39,7 @@ async def _require_owned(settings_id: str, request: Request, *, with_password: b
         raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
     if row.get("owner_key") == owner:
         return row
-    claimed = await claim_legacy_owner(settings_id, owner)
-    if claimed:
-        return await get_settings(settings_id, with_password=with_password)
+    # Do not auto-claim foreign/legacy rows on read — prevents email credential theft.
     raise HTTPException(status_code=404, detail="Ρυθμίσεις δεν βρέθηκαν")
 
 

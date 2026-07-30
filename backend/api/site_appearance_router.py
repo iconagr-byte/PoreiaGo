@@ -47,7 +47,7 @@ DEFAULT_SITE_APPEARANCE = {
     "logo_height_px": 40,
     "logo_max_width_px": 180,
     "logo_show_name": True,
-    "hero_image_url": "/images/hero-bus-achillio.png",
+    "hero_image_url": "",
     "hero_image_focal": "center",
     "hero_badge": "Premium Ταξιδιωτική Εμπειρία",
     "hero_title": "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:",
@@ -132,7 +132,7 @@ class SiteAppearanceResponse(BaseModel):
     logo_height_px: int = 40
     logo_max_width_px: int = 180
     logo_show_name: bool = True
-    hero_image_url: str = "/images/hero-bus-achillio.png"
+    hero_image_url: str = ""
     hero_image_focal: str = "center"
     hero_badge: str = "Premium Ταξιδιωτική Εμπειρία"
     hero_title: str = "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:"

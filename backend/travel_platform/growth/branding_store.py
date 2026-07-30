@@ -81,7 +81,10 @@ def resolve_by_host(host: str) -> BrandingConfig | None:
     if not h or h in ("localhost", "127.0.0.1"):
         return get_branding("default")
     for key, row in _load_all().items():
+        if key in ("default",):
+            continue
         domain = (row.get("custom_domain") or "").lower().removeprefix("www.")
         if domain and domain == h and row.get("verified_domain", False):
             return BrandingConfig(**{**DEFAULT_BRANDING, **row})
-    return get_branding("default")
+    # Unknown hosts: do NOT fall back to poisoned "default" (last office writer).
+    return None

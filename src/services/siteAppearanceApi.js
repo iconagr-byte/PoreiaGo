@@ -29,7 +29,7 @@ export const DEFAULT_SITE_APPEARANCE = {
   logo_height_px: 40,
   logo_max_width_px: 180,
   logo_show_name: true,
-  hero_image_url: '/images/hero-bus-achillio.png',
+  hero_image_url: '',
   hero_image_focal: 'center',
   hero_badge: 'Premium Ταξιδιωτική Εμπειρία',
   hero_title: 'Η Ελλάδα, όπως δεν την έχεις ξαναδεί:',
@@ -151,7 +151,9 @@ export async function fetchAdminSiteAppearance() {
       cacheLocally(merged);
       return merged;
     } catch {
-      /* fall through to file store */
+      // Do NOT fall through to host-based fetchSiteAppearance — that would
+      // cache PoreiaGo marketing appearance under this office's tenant key.
+      return loadCached() || finalizeAppearance({});
     }
   }
   return fetchSiteAppearance();

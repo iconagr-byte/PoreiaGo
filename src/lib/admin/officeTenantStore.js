@@ -6,6 +6,7 @@
 const TOKEN_KEY = 'saas_access_token';
 const TENANT_KEY = 'saas_tenant_id';
 
+/** Unscoped keys that historically leaked across offices. */
 const LEGACY_KEYS = [
   'aerostride_customers_v1',
   'aerostride_trips_v1',
@@ -13,6 +14,37 @@ const LEGACY_KEYS = [
   'aerostride_site_appearance_v1',
   'aerostride_site_appearance_v2',
   'aerostride_site_appearance_v3',
+  'poreiago_branding_v1',
+  'poreiago_branding_v2',
+  'aerostride_branding_v1',
+  'aerostride_platform_settings',
+  'aerostride_payment_settings_v1',
+  'aerostride_checkout_settings_v1',
+  'aerostride_seat_pricing_v1',
+  'aerostride_telemetry_settings',
+  'poreiago_office_setup_v1',
+  'rent_favorites_v1',
+  'rent_preferred_vehicle_id_v1',
+  'rent_vehicle_snapshot_v1',
+  'rent_booking_prefs_v1',
+  'rent_funnel_events_v1',
+  'rent_reminders_enabled_v1',
+  'wallet_last_pass_v1',
+];
+
+/** Scoped base keys cleared for the previous tenant on switch. */
+const SCOPED_BASES = [
+  'aerostride_site_appearance_v2',
+  'aerostride_site_appearance_v3',
+  'poreiago_branding_v2',
+  'aerostride_customers_v1',
+  'aerostride_trips_v1',
+  'aerostride_bookings_v1',
+  'aerostride_payment_settings_v1',
+  'aerostride_checkout_settings_v1',
+  'aerostride_seat_pricing_v1',
+  'aerostride_platform_settings',
+  'aerostride_telemetry_settings',
 ];
 
 /** True when BackOffice is using a SaaS JWT (real office session). */
@@ -41,14 +73,13 @@ export function officeStorageKey(baseKey) {
 
 /**
  * Call after login / tenant switch so a new office never reuses another
- * tenant's cached customers / trips / bookings in the same browser.
+ * tenant's cached customers / trips / bookings / branding in the same browser.
  */
 export function resetOfficeLocalCachesForTenant(previousTenantId, nextTenantId) {
   const prev = (previousTenantId || '').trim();
   const next = (nextTenantId || '').trim();
   if (!next || prev === next) return;
 
-  // Drop unscoped legacy keys so they cannot leak across offices.
   for (const key of LEGACY_KEYS) {
     try {
       localStorage.removeItem(key);
@@ -57,12 +88,8 @@ export function resetOfficeLocalCachesForTenant(previousTenantId, nextTenantId) 
     }
   }
 
-  // Drop previous tenant's scoped appearance cache (logo/name bleed).
   if (prev) {
-    for (const base of [
-      'aerostride_site_appearance_v2',
-      'aerostride_site_appearance_v3',
-    ]) {
+    for (const base of SCOPED_BASES) {
       try {
         localStorage.removeItem(`${base}::${prev}`);
       } catch {

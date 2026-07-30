@@ -1,8 +1,13 @@
 import { PLATFORM_NAME } from '../marketing/platformCopy.js';
 import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
+import { officeStorageKey } from '../admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'poreiago_branding_v2';
-const LEGACY_STORAGE_KEYS = ['aerostride_branding_v1', 'poreiago_branding_v1'];
+const STORAGE_KEY_BASE = 'poreiago_branding_v2';
+const LEGACY_STORAGE_KEYS = ['aerostride_branding_v1', 'poreiago_branding_v1', 'poreiago_branding_v2'];
+
+function brandingStorageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
 
 /** Only obsolete platform QA leftovers — never real office names like «Achillio Travel». */
 const PLATFORM_PLACEHOLDER_NAME_RE = /^(aerostride|olympus|poreiago)(\s+(travel|platform))?$/i;
@@ -78,13 +83,17 @@ export function purgeLegacyBrandingCache() {
 export function cacheBranding(branding) {
   const clean = sanitizeBranding(branding);
   if (!clean) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+  try {
+    localStorage.setItem(brandingStorageKey(), JSON.stringify(clean));
+  } catch {
+    /* quota */
+  }
   applyBrandingToDocument(clean);
 }
 
 export function loadCachedBranding() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(brandingStorageKey());
     return raw ? sanitizeBranding(JSON.parse(raw)) : null;
   } catch {
     return null;

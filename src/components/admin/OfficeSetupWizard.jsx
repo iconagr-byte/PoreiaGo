@@ -11,7 +11,7 @@ import {
   createBankAccount,
 } from '../../services/paymentSettingsApi.js';
 import {
-  fetchSiteAppearance,
+  fetchAdminSiteAppearance,
   updateSiteAppearance,
 } from '../../services/siteAppearanceApi.js';
 import { createRentalVehicle } from '../../services/fleetRentalApi.js';
@@ -158,7 +158,7 @@ export default function OfficeSetupWizard({
       try {
         const [plat, appearance, payments] = await Promise.all([
           fetchPlatformSettings().catch(() => null),
-          fetchSiteAppearance().catch(() => null),
+          fetchAdminSiteAppearance().catch(() => null),
           fetchAdminPaymentSettings().catch(() => null),
         ]);
         if (cancelled) return;

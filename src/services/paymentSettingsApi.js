@@ -5,12 +5,17 @@ import {
   normalizePaymentSettings,
   toLegacyCheckoutShape,
 } from '../lib/payments/paymentSettings.js';
+import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'aerostride_payment_settings_v1';
+const STORAGE_KEY_BASE = 'aerostride_payment_settings_v1';
+
+function storageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
 
 function cache(data) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(storageKey(), JSON.stringify(data));
   } catch {
     /* quota */
   }
@@ -18,7 +23,7 @@ function cache(data) {
 
 function loadCached() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     return raw ? normalizePaymentSettings(JSON.parse(raw)) : null;
   } catch {
     return null;

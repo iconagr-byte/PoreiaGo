@@ -1040,18 +1040,46 @@ async def sync_trips_admin(request: Request, body: TripsSyncRequest):
 
 
 @router.get("/branding", response_model=BrandingAdminResponse)
-async def get_admin_branding():
+async def get_admin_branding(request: Request):
     from travel_platform.growth.branding_store import get_branding
+    from app.core.database import AsyncSessionLocal
+    from sqlalchemy import select
+    from app.models.tenant import Tenant
+    from app.services.tenant_modules import is_poreiago_platform_office
 
-    return BrandingAdminResponse(**get_branding().to_dict())
+    tid = _request_tenant_id(request)
+    key = "default"
+    try:
+        async with AsyncSessionLocal() as session:
+            row = await session.execute(select(Tenant).where(Tenant.id == tid).limit(1))
+            tenant = row.scalar_one_or_none()
+            if tenant and not is_poreiago_platform_office(tenant):
+                key = str(tenant.slug or tenant.subdomain or tid)
+    except Exception:
+        key = "default"
+    return BrandingAdminResponse(**get_branding(key).to_dict())
 
 
 @router.put("/branding", response_model=BrandingAdminResponse)
-async def put_admin_branding(body: BrandingAdminUpdate):
+async def put_admin_branding(request: Request, body: BrandingAdminUpdate):
     from travel_platform.growth.branding_store import update_branding
+    from app.core.database import AsyncSessionLocal
+    from sqlalchemy import select
+    from app.models.tenant import Tenant
+    from app.services.tenant_modules import is_poreiago_platform_office
 
     patch = body.model_dump(exclude_unset=True)
-    return BrandingAdminResponse(**update_branding("default", patch).to_dict())
+    tid = _request_tenant_id(request)
+    key = "default"
+    try:
+        async with AsyncSessionLocal() as session:
+            row = await session.execute(select(Tenant).where(Tenant.id == tid).limit(1))
+            tenant = row.scalar_one_or_none()
+            if tenant and not is_poreiago_platform_office(tenant):
+                key = str(tenant.slug or tenant.subdomain or tid)
+    except Exception:
+        key = "default"
+    return BrandingAdminResponse(**update_branding(key, patch).to_dict())
 
 
 @router.get("/partners/webhooks", response_model=list[PartnerWebhookResponse])

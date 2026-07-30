@@ -381,6 +381,7 @@ class TenantBrandingService:
     ) -> None:
         try:
             from travel_platform.growth.branding_store import update_branding
+            from app.services.tenant_modules import is_poreiago_platform_office
 
             payload = {
                 "slug": tenant.slug,
@@ -393,8 +394,11 @@ class TenantBrandingService:
                 "checkout_base_url": branding.get("checkout_base_url") or "",
                 "verified_domain": bool(tenant.custom_domain),
             }
-            update_branding("default", payload)
-            if slug != "default":
+            # Never let customer / Achillio Travel overwrite the shared "default"
+            # key — that poisoned PoreiaGo marketing + other offices' fallbacks.
+            if is_poreiago_platform_office(tenant) or slug in ("default", "poreiago"):
+                update_branding("default", payload)
+            if slug and slug != "default":
                 update_branding(slug, payload)
         except Exception:
             logger.debug("File branding sync skipped for %s", slug, exc_info=True)
@@ -439,7 +443,10 @@ def update_file_branding_settings(slug: str, patch: dict[str, Any]) -> dict[str,
         clean["verified_domain"] = False
     elif clean.get("custom_domain"):
         clean["verified_domain"] = True
-    update_branding("default", clean)
-    if slug != "default":
-        update_branding(slug, clean)
-    return get_file_branding_settings(slug)
+    key = (slug or "default").strip().lower() or "default"
+    # Only the platform slug may mutate the shared default branding bag.
+    if key in ("default", "poreiago", "achillio", "platform", "demo"):
+        update_branding("default", clean)
+    if key != "default":
+        update_branding(key, clean)
+    return get_file_branding_settings(key)
