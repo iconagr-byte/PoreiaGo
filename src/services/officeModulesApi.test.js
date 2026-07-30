@@ -5,18 +5,22 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../lib/saasJwt.js', () => ({
   canAccessPlatformOperatorUi: vi.fn(() => false),
+  isImpersonating: vi.fn(() => false),
 }));
 
 vi.mock('../lib/platform/tenantHost.js', () => ({
   isPlatformMarketingHost: vi.fn(() => false),
 }));
 
-import { canAccessPlatformOperatorUi } from '../lib/saasJwt.js';
+import { canAccessPlatformOperatorUi, isImpersonating } from '../lib/saasJwt.js';
+import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import { shouldShowRentMenu } from './officeModulesApi.js';
 
 describe('shouldShowRentMenu', () => {
   beforeEach(() => {
     canAccessPlatformOperatorUi.mockReturnValue(false);
+    isImpersonating.mockReturnValue(false);
+    isPlatformMarketingHost.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -40,6 +44,30 @@ describe('shouldShowRentMenu', () => {
         office_kind: 'achillio_travel',
       }),
     ).toBe(true);
+  });
+
+  it('shows Rent on PoreiaGo marketing host for Super Admin office', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentMenu(
+        {
+          rent_enabled: false,
+          office_kind: 'customer',
+        },
+        { hostname: 'www.poreiago.com' },
+      ),
+    ).toBe(true);
+  });
+
+  it('hides Rent while impersonating Achillio even on poreiago.com', () => {
+    isImpersonating.mockReturnValue(true);
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentMenu({
+        rent_enabled: false,
+        office_kind: 'achillio_travel',
+      }),
+    ).toBe(false);
   });
 
   it('shows Rent when office has rent_enabled', () => {

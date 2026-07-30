@@ -29,6 +29,7 @@ from app.models.tenant import Tenant, TenantPlan
 from app.models.user import UserRole
 from app.services.billing_service import BillingService, stripe_readiness
 from app.services.tenant_modules import (
+    apply_known_office_rent_policy,
     enable_rent_addon_in_settings,
     initial_settings_for_plan,
     is_achillio_travel_office,
@@ -86,11 +87,25 @@ async def get_office_modules(
 ):
     """Authenticated office product modules — drives Back Office nav for Rent-only."""
     tenant = await _load_tenant(db, tenant_id)
+    # Keep PoreiaGo platform Rent-on (and Achillio Rent-off) even if settings drifted.
+    try:
+        updated = apply_known_office_rent_policy(tenant)
+        if updated is not None:
+            tenant.settings_json = json.dumps(updated, ensure_ascii=False)
+            await db.commit()
+            await db.refresh(tenant)
+    except Exception:
+        logger.debug("apply_known_office_rent_policy skipped on /modules", exc_info=True)
+
     mods = modules_for_tenant(tenant)
     if is_achillio_travel_office(tenant):
         kind = "achillio_travel"
     elif is_poreiago_platform_office(tenant):
         kind = "poreiago_platform"
+        # Response must advertise Rent for the Super Admin sidebar.
+        mods = {**mods, "rent_enabled": True, "trips_enabled": True}
+        if mods.get("mode") == "trips_only":
+            mods["mode"] = "both"
     else:
         kind = "customer"
     return OfficeModulesResponse(
