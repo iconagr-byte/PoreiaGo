@@ -92,6 +92,7 @@ function App() {
             <Route path="/rent/my-booking" element={<RentBookingLookupPage />} />
             <Route path="/rent/services" element={<RentalServicesPage />} />
             <Route path="/rent/book/services" element={<RentBookingWizardPage />} />
+            <Route path="/rent/book/details" element={<RentBookingWizardPage />} />
             <Route path="/rent/wallet" element={<RentalCustomerApp />} />
             <Route path="/rent" element={<RentalCustomerApp />} />
             <Route path="/rent/*" element={<RentalCustomerApp />} />
