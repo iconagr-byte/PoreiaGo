@@ -6,6 +6,7 @@ import {
 } from '../../services/driverPortalApi.js';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
 import TelemetryStrip from './TelemetryStrip.jsx';
+import DriverBoardingSeatMap from './DriverBoardingSeatMap.jsx';
 import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
 const STATUS_LABEL = {
@@ -37,14 +38,17 @@ export default function DailyManifest() {
     };
 
     load();
-    const id = setInterval(() => {
+    const onManifest = () => {
       fetchDriverManifest().then((m) => {
         if (!cancelled) setManifest(m);
       });
-    }, LIVE_REFRESH_MS);
+    };
+    window.addEventListener('driver-manifest-updated', onManifest);
+    const id = setInterval(onManifest, LIVE_REFRESH_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
+      window.removeEventListener('driver-manifest-updated', onManifest);
     };
   }, [session?.tripId]);
 
@@ -102,20 +106,16 @@ export default function DailyManifest() {
         <div className="driver-boarding-bar">
           <div className="driver-boarding-fill" style={{ width: `${pct}%` }} />
         </div>
-        {(manifest?.boarded_passengers || []).length > 0 ? (
-          <ul className="mt-3 pt-3 border-t border-[var(--driver-border)] space-y-2">
-            {manifest.boarded_passengers.map((p) => (
-              <li key={`${p.booking_id}-${p.passenger_name}`} className="text-sm">
-                <p className="font-bold truncate">{p.passenger_name || 'Επιβάτης'}</p>
-                <p className="text-xs text-[var(--driver-muted)] mt-0.5">
-                  Κράτηση {p.booking_ref || p.booking_id || '—'}
-                  {p.seat_number ? ` · Θέση ${p.seat_number}` : ''}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
+
+      {manifest ? (
+        <div className="driver-card">
+          <DriverBoardingSeatMap
+            manifest={manifest}
+            vehicleType={session?.vehicleType || tripMeta?.vehicle_type || manifest?.vehicle_type}
+          />
+        </div>
+      ) : null}
 
       <div className="driver-card">
         <h3 className="font-bold text-base mb-1 flex items-center gap-2">
