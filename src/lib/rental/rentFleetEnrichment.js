@@ -159,8 +159,13 @@ export function enrichRentVehicle(vehicle) {
     `${category || 'Όχημα'} έτοιμο για ενοικίαση — κράτηση online σε λίγα βήματα.`;
 
   const fallbackPhoto = DEMO_PHOTO_BY_MODEL[modelKey(v.model)] || '';
-  const photoUrl = String(v.photo_url || v.photo_urls?.[0] || '').trim() || fallbackPhoto;
-  const photoUrls = Array.isArray(v.photo_urls) && v.photo_urls.length
+  const rawPhoto = String(v.photo_url || v.photo_urls?.[0] || '').trim();
+  // Prefer accurate model photo when catalog still has mismatched Unsplash stock.
+  const photoUrl =
+    fallbackPhoto && (!rawPhoto || /images\.unsplash\.com/i.test(rawPhoto))
+      ? fallbackPhoto
+      : rawPhoto || fallbackPhoto;
+  const photoUrls = Array.isArray(v.photo_urls) && v.photo_urls.length && !/images\.unsplash\.com/i.test(rawPhoto)
     ? v.photo_urls
     : photoUrl
       ? [photoUrl]
