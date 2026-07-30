@@ -1,24 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   AGENCY_PLANS,
   BILLING_INTERVALS,
+  RENT_ADDON,
+  RENT_STANDALONE_PLAN,
   displayPrice,
+  rentAddonDisplayPrice,
 } from '../../lib/billing/planCatalog.js';
 import {
   createBillingCheckout,
   createBillingPortal,
+  enableBillingRentAddon,
   fetchBillingConfig,
   fetchBillingSubscription,
   startBillingTrial,
 } from '../../services/billingApi.js';
+import { fetchAdminOfficeModules } from '../../services/officeModulesApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
 
 const PLAN_ICONS = {
   starter: 'storefront',
   professional: 'apartment',
   enterprise: 'domain',
+  rent: 'car_rental',
 };
 
 const STATUS_META = {
@@ -65,16 +71,28 @@ function daysUntil(iso) {
 }
 
 function planDisplayName(planId) {
+  if (planId === RENT_STANDALONE_PLAN.id) return RENT_STANDALONE_PLAN.name;
   return AGENCY_PLANS.find((p) => p.id === planId)?.name || planId || '—';
 }
 
-export default function ContractsPanel({ initialPlan, initialInterval = 'month' }) {
+function findCatalogPlan(planId) {
+  if (planId === RENT_STANDALONE_PLAN.id) return RENT_STANDALONE_PLAN;
+  return AGENCY_PLANS.find((p) => p.id === planId) || AGENCY_PLANS[1];
+}
+
+export default function ContractsPanel({
+  initialPlan,
+  initialInterval = 'month',
+  focusRentModule = false,
+} = {}) {
   const [sub, setSub] = useState(null);
   const [billingConfig, setBillingConfig] = useState(null);
+  const [modules, setModules] = useState(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [interval, setInterval] = useState(initialInterval);
   const [selectedPlan, setSelectedPlan] = useState(initialPlan || 'professional');
+  const rentSectionRef = useRef(null);
 
   const load = useCallback(async () => {
     if (!getSaasToken()) {
@@ -84,12 +102,14 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     }
     setLoading(true);
     try {
-      const [subscription, config] = await Promise.all([
+      const [subscription, config, officeModules] = await Promise.all([
         fetchBillingSubscription(),
         fetchBillingConfig().catch(() => null),
+        fetchAdminOfficeModules().catch(() => null),
       ]);
       setSub(subscription);
       setBillingConfig(config);
+      setModules(officeModules);
       if (subscription?.plan) setSelectedPlan(subscription.plan);
       if (subscription?.interval === 'year' || subscription?.interval === 'month') {
         setInterval(subscription.interval);
@@ -112,6 +132,11 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
       void load();
     }
   }, [load]);
+
+  useEffect(() => {
+    if (!focusRentModule || loading) return;
+    rentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focusRentModule, loading]);
 
   // Sync parent-provided plan/interval during render (avoids setState-in-effect).
   const [propSeed, setPropSeed] = useState({ plan: initialPlan, interval: initialInterval });
@@ -140,8 +165,32 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
       const updated = await startBillingTrial(selectedPlan, interval);
       setSub(updated);
       toast.success(`Δωρεάν δοκιμή ${billingConfig?.trial_days || 14} ημερών ενεργοποιήθηκε`);
+      const officeModules = await fetchAdminOfficeModules().catch(() => null);
+      if (officeModules) setModules(officeModules);
+      if (selectedPlan === 'rent') {
+        toast.success('Το μενού Ενοικιάσεις είναι πλέον διαθέσιμο — κάνε refresh αν δεν φαίνεται.');
+      }
     } catch (e) {
       toast.error(e.message || 'Αποτυχία ενεργοποίησης δοκιμής');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const enableRentAddon = async () => {
+    setWorking(true);
+    try {
+      const result = await enableBillingRentAddon();
+      setModules({
+        trips_enabled: result.trips_enabled !== false,
+        rent_enabled: Boolean(result.rent_enabled),
+        plan: String(result.plan || sub?.plan || 'starter'),
+        mode: String(result.mode || 'both'),
+      });
+      toast.success(result.message || 'Το Rent add-on ενεργοποιήθηκε');
+      window.dispatchEvent(new Event('saas-session-changed'));
+    } catch (e) {
+      toast.error(e.message || 'Αποτυχία ενεργοποίησης Rent');
     } finally {
       setWorking(false);
     }
@@ -159,8 +208,9 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
     }
   };
 
-  const catalogPlan = AGENCY_PLANS.find((p) => p.id === selectedPlan) || AGENCY_PLANS[1];
+  const catalogPlan = findCatalogPlan(selectedPlan);
   const quote = displayPrice(catalogPlan, interval);
+  const addonQuote = rentAddonDisplayPrice(interval, RENT_ADDON);
   const checkoutReady = billingConfig?.checkout_ready === true;
   const demoMode = billingConfig?.demo_mode === true;
   const trialDays = billingConfig?.trial_days || 14;
@@ -174,6 +224,8 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
   };
   const sameTrialPlan = onTrial && sub?.plan === selectedPlan;
   const hasToken = Boolean(getSaasToken());
+  const rentEnabled = Boolean(modules?.rent_enabled);
+  const rentOnly = rentEnabled && modules?.trips_enabled === false;
   const trialProgress =
     onTrial && remaining != null && trialDays > 0
       ? Math.max(0, Math.min(100, Math.round(((trialDays - Math.max(remaining, 0)) / trialDays) * 100)))
@@ -214,7 +266,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
             <div className="min-w-0">
               <h3 className="text-xl font-bold tracking-tight text-slate-900">Συμβόλαιο γραφείου</h3>
               <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
-                Κατάσταση, πλάνο και πληρωμή — όλα σε ένα σημείο
+                Κατάσταση, πλάνο λεωφορείων και Rent — όλα σε ένα σημείο
               </p>
             </div>
           </div>
@@ -223,6 +275,12 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
                 <span className="material-symbols-outlined text-[16px]">science</span>
                 Demo · {trialDays}η δοκιμή
+              </span>
+            )}
+            {rentEnabled && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-900">
+                <span className="material-symbols-outlined text-[16px]">car_rental</span>
+                {rentOnly ? 'Rent ενεργό' : 'Rent add-on ενεργό'}
               </span>
             )}
             {!checkoutReady && !demoMode && billingConfig && (
@@ -289,7 +347,7 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
 
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="text-sm font-bold text-slate-900">Επιλέξτε πλάνο</p>
+                <p className="text-sm font-bold text-slate-900">Επιλέξτε πλάνο λεωφορείων</p>
                 <p className="text-xs text-slate-500 mt-0.5">Ετήσιο = 2 μήνες δώρο</p>
               </div>
               <div className="inline-flex p-1 rounded-full bg-slate-100 border border-slate-200/80">
@@ -395,6 +453,138 @@ export default function ContractsPanel({ initialPlan, initialInterval = 'month' 
                   </button>
                 );
               })}
+            </div>
+
+            <div
+              ref={rentSectionRef}
+              id="contracts-rent"
+              className="scroll-mt-28 rounded-[22px] border border-teal-200/80 bg-gradient-to-b from-teal-50/70 to-white p-5 space-y-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-teal-800/80">Ενοικιάσεις</p>
+                  <h4 className="text-lg font-bold text-slate-900 mt-0.5">Προσθήκη συμβολαίου Rent</h4>
+                  <p className="text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
+                    Ενεργοποίησε το Rent ως add-on πάνω στο τρέχον πλάνο λεωφορείων, ή διάλεξε αυτόνομο
+                    συμβόλαιο μόνο για ενοικιάσεις.
+                  </p>
+                </div>
+                {rentEnabled ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-300 bg-white px-3 py-1.5 text-xs font-bold text-teal-900">
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    {rentOnly ? 'Αυτόνομο Rent ενεργό' : 'Add-on ενεργό'}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+                <div
+                  className={`rounded-[20px] border p-5 ${
+                    rentEnabled && !rentOnly
+                      ? 'border-teal-300 bg-white ring-2 ring-teal-100'
+                      : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">
+                        {RENT_ADDON.badge}
+                      </p>
+                      <p className="font-bold text-slate-900 text-lg mt-0.5">{RENT_ADDON.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{RENT_ADDON.tagline}</p>
+                    </div>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-100 text-teal-800">
+                      <span className="material-symbols-outlined text-[20px]">add_circle</span>
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900 mt-3 tabular-nums">
+                    {addonQuote.label}
+                    {addonQuote.suffix ? (
+                      <span className="text-sm font-semibold text-slate-500">{addonQuote.suffix}</span>
+                    ) : null}
+                  </p>
+                  <ul className="mt-3 space-y-1.5">
+                    {(RENT_ADDON.features || []).slice(0, 4).map((f) => (
+                      <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
+                        <span className="material-symbols-outlined text-[14px] text-teal-700 mt-0.5">
+                          check
+                        </span>
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    disabled={working || (rentEnabled && !rentOnly) || rentOnly}
+                    onClick={enableRentAddon}
+                    className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-full bg-teal-700 text-white px-4 py-2.5 text-sm font-bold hover:bg-teal-800 disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">car_rental</span>
+                    {rentOnly
+                      ? 'Ήδη σε αυτόνομο Rent'
+                      : rentEnabled
+                        ? 'Rent add-on ενεργό'
+                        : 'Ενεργοποίηση Rent add-on'}
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlan(RENT_STANDALONE_PLAN.id)}
+                  className={`text-left rounded-[20px] border p-5 transition ${
+                    selectedPlan === RENT_STANDALONE_PLAN.id
+                      ? 'border-teal-400 bg-white ring-2 ring-teal-100 shadow-sm'
+                      : 'border-slate-200 bg-white hover:border-teal-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">
+                        {RENT_STANDALONE_PLAN.badge}
+                      </p>
+                      <p className="font-bold text-slate-900 text-lg mt-0.5">{RENT_STANDALONE_PLAN.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{RENT_STANDALONE_PLAN.tagline}</p>
+                    </div>
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                        selectedPlan === RENT_STANDALONE_PLAN.id
+                          ? 'bg-teal-100 text-teal-800'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[20px]">directions_car</span>
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900 mt-3 tabular-nums">
+                    {displayPrice(RENT_STANDALONE_PLAN, interval).label}
+                    {displayPrice(RENT_STANDALONE_PLAN, interval).suffix ? (
+                      <span className="text-sm font-semibold text-slate-500">
+                        {displayPrice(RENT_STANDALONE_PLAN, interval).suffix}
+                      </span>
+                    ) : null}
+                  </p>
+                  {sub?.plan === 'rent' && (
+                    <span className="inline-flex mt-2 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Τρέχον
+                    </span>
+                  )}
+                  <ul className="mt-3 space-y-1.5">
+                    {(RENT_STANDALONE_PLAN.features || []).slice(0, 4).map((f) => (
+                      <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
+                        <span className="material-symbols-outlined text-[14px] text-teal-700 mt-0.5">
+                          check
+                        </span>
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-4 text-xs font-semibold text-teal-800">
+                    {selectedPlan === RENT_STANDALONE_PLAN.id
+                      ? 'Επιλεγμένο — πάτα δοκιμή / ενεργοποίηση κάτω'
+                      : 'Πάτα για επιλογή αυτόνομου Rent'}
+                  </p>
+                </button>
+              </div>
             </div>
 
             <div className="sticky bottom-3 z-10 rounded-[22px] border border-primary/15 bg-gradient-to-r from-primary/[0.06] to-white backdrop-blur shadow-lg px-4 py-3.5 flex flex-wrap items-center justify-between gap-4">

@@ -190,8 +190,16 @@ class BillingConfigResponse(BaseModel):
 
 
 class BillingTrialRequest(BaseModel):
-    plan: str = Field(default="professional", pattern="^(starter|professional)$")
+    plan: str = Field(default="professional", pattern="^(starter|professional|rent)$")
     billing_interval: str = Field(default="month", pattern="^(month|year)$")
+
+
+class BillingEnableRentAddonResponse(BaseModel):
+    trips_enabled: bool = True
+    rent_enabled: bool = True
+    plan: str = "starter"
+    mode: str = "both"
+    message: str = "Rent add-on ενεργοποιήθηκε"
 
 
 class BillingUsageReportResponse(BaseModel):

@@ -155,11 +155,16 @@ export default function BackOffice() {
   const rentOnly = officeMode === 'rent_only';
   useEffect(() => {
     let cancelled = false;
-    fetchAdminOfficeModules().then((mods) => {
-      if (!cancelled) setOfficeModules(mods);
-    });
+    const refresh = () => {
+      fetchAdminOfficeModules().then((mods) => {
+        if (!cancelled) setOfficeModules(mods);
+      });
+    };
+    refresh();
+    window.addEventListener('saas-session-changed', refresh);
     return () => {
       cancelled = true;
+      window.removeEventListener('saas-session-changed', refresh);
     };
   }, [location.key]);
 
@@ -2371,6 +2376,7 @@ export default function BackOffice() {
                   contractPrefs={{
                     plan: location.state?.plan,
                     interval: location.state?.interval,
+                    focusRentModule: Boolean(location.state?.focusRentModule),
                   }}
                 />
               </div>
