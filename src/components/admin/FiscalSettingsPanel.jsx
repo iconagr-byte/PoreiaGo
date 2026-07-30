@@ -8,6 +8,7 @@ import {
   updateFiscalSettings,
 } from '../../services/fiscalSettingsApi.js';
 import FiscalPipelineHelp from './FiscalPipelineHelp.jsx';
+import FiscalProviderActivateWizard from './FiscalProviderActivateWizard.jsx';
 import { API_BASE } from '../../config/api.js';
 
 const INPUT_CLASS =
@@ -143,6 +144,7 @@ export default function FiscalSettingsPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pipeline, setPipeline] = useState(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const activeProvider = FISCAL_PROVIDERS.find((p) => p.id === form.provider);
 
@@ -309,9 +311,40 @@ export default function FiscalSettingsPanel() {
               {activeProvider.label}
             </span>
           ) : null}
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-teal-700 text-white text-xs font-bold shadow-lg shadow-teal-700/20 hover:bg-teal-800 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[16px]">rocket_launch</span>
+            Ενεργοποίηση παρόχου
+          </button>
           <FiscalPipelineHelp className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-violet-200/80 bg-white text-violet-800 text-xs font-bold hover:bg-violet-50 shadow-sm transition-colors" />
         </div>
       </div>
+
+      {!providerReady || (form.provider !== 'softone' && form.provider !== 'impact') ? (
+        <div className="mx-6 mt-6 rounded-2xl border border-teal-200/80 bg-gradient-to-br from-teal-50 via-white to-emerald-50/50 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-600 text-white shadow-md shadow-teal-600/25">
+            <span className="material-symbols-outlined text-[26px]">verified</span>
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-gray-900">Οδηγός ενεργοποίησης ΥΠΑΗΕΣ</p>
+            <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+              SoftOne ή Impact σε λίγα βήματα: επιλογή παρόχου → API key → έλεγχος σύνδεσης →
+              ενεργοποίηση για το γραφείο.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-teal-700 text-white text-sm font-bold shrink-0 shadow-lg shadow-teal-700/20 hover:bg-teal-800"
+          >
+            Ξεκίνα wizard
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </button>
+        </div>
+      ) : null}
 
       <form onSubmit={onSave} className="p-6 space-y-8">
         <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5 space-y-3">
@@ -587,6 +620,16 @@ export default function FiscalSettingsPanel() {
           </button>
         </div>
       </form>
+
+      <FiscalProviderActivateWizard
+        open={wizardOpen}
+        initialSettings={form}
+        onCancel={() => setWizardOpen(false)}
+        onActivated={async () => {
+          setWizardOpen(false);
+          await load();
+        }}
+      />
     </section>
   );
 }

@@ -16,6 +16,7 @@ import {
 } from '../../services/siteAppearanceApi.js';
 import { createRentalVehicle } from '../../services/fleetRentalApi.js';
 import EmailConnectWizard from './email/EmailConnectWizard.jsx';
+import FiscalProviderActivateWizard from './FiscalProviderActivateWizard.jsx';
 import '../../styles/office-setup-wizard.css';
 
 const STORAGE_KEY = 'poreiago_office_setup_v1';
@@ -59,10 +60,14 @@ const STEPS = [
   { id: 'brand', title: 'Εμφάνιση' },
   { id: 'email', title: 'Email' },
   { id: 'payments', title: 'Πληρωμές' },
+  { id: 'fiscal', title: 'Πάροχος' },
   { id: 'fleet', title: 'Στόλος' },
   { id: 'done', title: 'Έτοιμοι' },
 ];
 
+function stepIndex(id) {
+  return STEPS.findIndex((s) => s.id === id);
+}
 function MarkIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -131,11 +136,13 @@ export default function OfficeSetupWizard({
   });
 
   const [emailConnected, setEmailConnected] = useState(false);
+  const [fiscalConnected, setFiscalConnected] = useState(false);
   const [completed, setCompleted] = useState({
     office: false,
     brand: false,
     email: false,
     payments: false,
+    fiscal: false,
     fleet: false,
   });
 
@@ -356,17 +363,21 @@ export default function OfficeSetupWizard({
       return;
     }
     if (id === 'email') {
-      setStep(4);
+      setStep(stepIndex('payments'));
       return;
     }
     if (id === 'payments') {
       if (!(await savePayments())) return;
-      setStep(5);
+      setStep(stepIndex('fiscal'));
+      return;
+    }
+    if (id === 'fiscal') {
+      setStep(stepIndex('fleet'));
       return;
     }
     if (id === 'fleet') {
       if (!(await saveFleet())) return;
-      setStep(6);
+      setStep(stepIndex('done'));
       return;
     }
     if (id === 'done') {
@@ -594,12 +605,12 @@ export default function OfficeSetupWizard({
                         ? 'info@achilliotravel.com'
                         : '')
                     }
-                    onCancel={() => setStep(4)}
+                    onCancel={() => setStep(stepIndex('payments'))}
                     onConnected={() => {
                       setEmailConnected(true);
                       setCompleted((c) => ({ ...c, email: true }));
                       toast.success('Email συνδέθηκε');
-                      setStep(4);
+                      setStep(stepIndex('payments'));
                     }}
                   />
                 </div>
@@ -662,6 +673,28 @@ export default function OfficeSetupWizard({
                     />
                     <p className="office-setup-hint">Συνήθως 30% για κρατήσεις.</p>
                   </div>
+                </div>
+              </>
+            )}
+
+            {STEPS[step].id === 'fiscal' && (
+              <>
+                <p className="office-setup-eyebrow">Φορολογία</p>
+                <h2 className="office-setup-title">Ενεργοποιήστε πάροχο τιμολόγησης</h2>
+                <p className="office-setup-subtitle">
+                  SoftOne ή Impact (ΥΠΑΗΕΣ) για αυτόματη έκδοση με MARK μετά την πληρωμή.
+                </p>
+                <div className="office-setup-email-wrap">
+                  <FiscalProviderActivateWizard
+                    compact
+                    onCancel={() => setStep(stepIndex('fleet'))}
+                    onActivated={() => {
+                      setFiscalConnected(true);
+                      setCompleted((c) => ({ ...c, fiscal: true }));
+                      toast.success('Πάροχος ενεργοποιήθηκε');
+                      setStep(stepIndex('fleet'));
+                    }}
+                  />
                 </div>
               </>
             )}
@@ -771,6 +804,12 @@ export default function OfficeSetupWizard({
                     <i>✓</i> Πληρωμές
                   </li>
                   <li>
+                    <i>✓</i>{' '}
+                    {completed.fiscal || fiscalConnected
+                      ? 'Πάροχος ενεργός'
+                      : 'Πάροχος — μπορείτε αργότερα'}
+                  </li>
+                  <li>
                     <i>✓</i> Στόλος
                   </li>
                 </ul>
@@ -788,21 +827,30 @@ export default function OfficeSetupWizard({
                   <button
                     type="button"
                     className="office-setup-btn office-setup-btn-secondary"
-                    onClick={() => setStep(4)}
+                    onClick={() => setStep(stepIndex('payments'))}
                   >
                     Παράλειψη email
+                  </button>
+                )}
+                {STEPS[step].id === 'fiscal' && (
+                  <button
+                    type="button"
+                    className="office-setup-btn office-setup-btn-secondary"
+                    onClick={() => setStep(stepIndex('fleet'))}
+                  >
+                    Παράλειψη παρόχου
                   </button>
                 )}
                 {STEPS[step].id === 'fleet' && (
                   <button
                     type="button"
                     className="office-setup-btn office-setup-btn-secondary"
-                    onClick={() => setStep(6)}
+                    onClick={() => setStep(stepIndex('done'))}
                   >
                     Παράλειψη στόλου
                   </button>
                 )}
-                {STEPS[step].id !== 'email' && (
+                {STEPS[step].id !== 'email' && STEPS[step].id !== 'fiscal' && (
                   <button
                     type="button"
                     className="office-setup-btn office-setup-btn-primary"

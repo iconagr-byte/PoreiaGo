@@ -287,6 +287,28 @@ class ProviderTransmitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(invoice_call.kwargs["headers"]["Authorization"], "Bearer tok-softone")
         self.assertEqual(invoice_call.kwargs["params"]["sendMethod"], "A")
 
+    async def test_softone_test_login_returns_ok(self):
+        login_response = MagicMock()
+        login_response.status_code = 200
+        login_response.json.return_value = {"accessToken": "tok-1"}
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=login_response)
+
+        config = EinvoicingTenantConfig(
+            api_url="https://einvoice.example",
+            api_key="api-key-1",
+        )
+        result = await SoftOneImpactStrategy(
+            provider=FiscalProvider.SOFTONE,
+            client=mock_client,
+        ).test_login(config, "123456789")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["provider"], "softone")
+        self.assertTrue(result["token_received"])
+        self.assertIn("/Authentication/login", mock_client.post.await_args.args[0])
+
 
 class TenantFiscalConfigTests(unittest.TestCase):
     def test_load_plaintext_tenant_config(self):

@@ -133,3 +133,25 @@ export async function updateFiscalSettings(patch) {
   });
   return normalizeFiscalSettings(data);
 }
+
+/** Login-only SoftOne/Impact check (no invoice). */
+export async function testFiscalConnection(body) {
+  return saasFetch('/api/v1/settings/fiscal/test-connection', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export const YPAHES_PROVIDERS = FISCAL_PROVIDERS.filter((p) => p.group === 'ypahes');
+
+export const PROVIDER_DEFAULT_URLS = {
+  softone: {
+    prod: 'https://einvoice.s1ecos.gr',
+    demo: 'https://einvoice-demo.s1ecos.gr',
+  },
+  impact: {
+    prod: 'https://einvoiceapi.impact.gr',
+    demo: 'https://einvoiceapiuat.impact.gr',
+  },
+};
