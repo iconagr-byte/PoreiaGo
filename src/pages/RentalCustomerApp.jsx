@@ -32,6 +32,8 @@ import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx'
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
+import { RentProductSection } from '../components/marketing/PlatformLandingSections.jsx';
+import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
@@ -306,6 +308,8 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }}
             />
+
+            {isPlatformMarketingHost() ? <RentProductSection /> : null}
           </div>
         </main>
       </div>
