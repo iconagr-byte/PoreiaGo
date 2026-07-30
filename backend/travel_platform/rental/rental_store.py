@@ -63,8 +63,10 @@ def quote_extras(extra_ids: list[str] | None, *, days: int) -> dict[str, Any]:
     return {"lines": lines, "total": round(total, 2), "days": d}
 
 
-# Stable demo fleet (Hertz-like compact cars + vans) — seeded for empty demo offices.
+# Stable demo fleet (compact cars + vans) — seeded for empty demo offices.
+# Photos are Wikimedia Commons shots of the named models (not mismatched stock cars).
 _DEMO_FLEET_MARKER = "demo_rent_fleet_v1"
+_WM = "https://upload.wikimedia.org/wikipedia/commons/"
 _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
     {
         "id_suffix": "car-i10",
@@ -76,7 +78,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "one_way_surcharge_eur": 25,
         "with_driver_daily_eur": 80,
         "current_mileage": 12400,
-        "photo_url": "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=1200&q=80",
+        "photo_url": (
+            f"{_WM}thumb/7/79/Hyundai_i10_2015_by-RaBoe_002.jpg/"
+            "1280px-Hyundai_i10_2015_by-RaBoe_002.jpg"
+        ),
         "description": (
             "Μικρό city car — ιδανικό για πόλη και εύκολο πάρκινγκ. "
             "Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες."
@@ -92,7 +97,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "one_way_surcharge_eur": 28,
         "with_driver_daily_eur": 85,
         "current_mileage": 15600,
-        "photo_url": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=1200&q=80",
+        "photo_url": (
+            f"{_WM}thumb/d/d8/Citro%C3%ABn_C3_front.jpg/"
+            "1280px-Citro%C3%ABn_C3_front.jpg"
+        ),
         "description": (
             "Συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. "
             "Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση."
@@ -108,7 +116,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "one_way_surcharge_eur": 30,
         "with_driver_daily_eur": 90,
         "current_mileage": 18200,
-        "photo_url": "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=1200&q=80",
+        "photo_url": (
+            f"{_WM}thumb/f/f2/Toyota_Yaris_XP130_3-Door.jpg/"
+            "1280px-Toyota_Yaris_XP130_3-Door.jpg"
+        ),
         "description": (
             "Συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και "
             "κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες."
@@ -124,7 +135,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "one_way_surcharge_eur": 50,
         "with_driver_daily_eur": 140,
         "current_mileage": 31200,
-        "photo_url": "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=1200&q=80",
+        "photo_url": (
+            f"{_WM}thumb/6/62/Volkswagen_Transporter_T6_EDITION_30.jpg/"
+            "1280px-Volkswagen_Transporter_T6_EDITION_30.jpg"
+        ),
         "description": (
             "Ευρύχωρο van 9 θέσεων για ομάδες, εκδρομές και μεταφορές με αποσκευές. "
             "Σταθερό στον δρόμο, με χώρο για επιβάτες και εξοπλισμό — ιδανικό για τουριστικά ή εταιρικά γκρουπ."
@@ -140,7 +154,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "one_way_surcharge_eur": 55,
         "with_driver_daily_eur": 150,
         "current_mileage": 27800,
-        "photo_url": "https://images.unsplash.com/photo-1559416523-140ddc3d238c?auto=format&fit=crop&w=1200&q=80",
+        "photo_url": (
+            f"{_WM}thumb/5/5c/MERCEDES-BENZ_VITO_%28W447%29_China.jpg/"
+            "1280px-MERCEDES-BENZ_VITO_%28W447%29_China.jpg"
+        ),
         "description": (
             "Premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. "
             "Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης."
@@ -156,7 +173,10 @@ _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
         "one_way_surcharge_eur": 45,
         "with_driver_daily_eur": 130,
         "current_mileage": 33400,
-        "photo_url": "https://images.unsplash.com/photo-1544620341-1adc1baa16c2?auto=format&fit=crop&w=1200&q=80",
+        "photo_url": (
+            f"{_WM}thumb/5/57/Renault_Trafic_III_buses_Facelift_IMG_7691.jpg/"
+            "1280px-Renault_Trafic_III_buses_Facelift_IMG_7691.jpg"
+        ),
         "description": (
             "Ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις. "
             "Ισορροπία χώρου, οικονομίας και ευελιξίας — ιδανικό για αεροδρόμιο, ξενοδοχεία και ημερήσιες εκδρομές με ομάδα."
