@@ -270,7 +270,7 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
                           className="rent-wiz-cover-btn"
                           onClick={() => toggle(opt.formKey)}
                         >
-                          {on ? 'Επιλεγμένο' : 'Το θέλω'}
+                          {on ? 'Επιλεγμένο' : 'Προσθήκη'}
                         </button>
                       </div>
                     </div>
