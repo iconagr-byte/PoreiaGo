@@ -18,9 +18,11 @@ def test_ensure_demo_rental_fleet_seeds_six_vehicles():
             added = store.ensure_demo_rental_fleet(tid)
             assert added == 6
             rows = store.list_vehicles(tid)
-            cats = sorted(v["category"] for v in rows)
-            assert cats.count("CAR") == 3
-            assert cats.count("VAN") == 3
+            cats = [v["category"] for v in rows]
+            assert cats.count("MINI") == 1
+            assert cats.count("COMPACT") == 2
+            assert cats.count("VAN") == 2
+            assert cats.count("MINIBUS") == 1
             assert all(v.get("photo_url") for v in rows)
             # Idempotent
             assert store.ensure_demo_rental_fleet(tid) == 0
@@ -34,7 +36,7 @@ def test_public_catalog_auto_seeds_demo():
             tid = "11111111-2222-3333-4444-555555555555"
             catalog = store.public_catalog(tid)
             assert len(catalog) == 6
-            assert {v["category"] for v in catalog} == {"CAR", "VAN"}
+            assert {v["category"] for v in catalog} == {"MINI", "COMPACT", "VAN", "MINIBUS"}
             models = {v["model"] for v in catalog}
             assert "Toyota Aygo X" in models
             assert "Peugeot 208" in models

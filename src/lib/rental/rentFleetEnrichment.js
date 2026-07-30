@@ -3,7 +3,12 @@
  * Matches known demo models; falls back gracefully for custom vehicles.
  */
 
-import { DEMO_RENT_FLEET, rentCategoryLabel } from './demoRentFleet.js';
+import { DEMO_RENT_FLEET } from './demoRentFleet.js';
+import {
+  normalizeRentVehicleCategory,
+  rentCategoryLabel,
+  rentCategoryMeta,
+} from './rentVehicleCategories.js';
 
 const DEMO_PHOTO_BY_MODEL = Object.fromEntries(
   DEMO_RENT_FLEET.map((v) => [String(v.model || '').trim().toLowerCase(), v.photo_url]),
@@ -175,25 +180,15 @@ function luggageCount(luggage) {
   return m ? Number(m[1]) : null;
 }
 
-function sizeAndGroup(category, seats, model, known) {
-  const cat = String(category || '').toUpperCase();
-  const name = modelKey(model);
-  if (cat === 'VAN' || cat === 'MINIBUS' || (seats && seats >= 8)) {
-    return {
-      group_code: cat === 'MINIBUS' ? 'Ομάδα M' : 'Ομάδα V',
-      size_label: cat === 'MINIBUS' ? 'Minibus' : 'Van',
-    };
-  }
-  if (name.includes('tucson') || known?.headline?.toLowerCase().includes('suv')) {
-    return { group_code: 'Ομάδα D', size_label: 'SUV' };
-  }
-  if (seats && seats <= 4) {
-    return { group_code: 'Ομάδα A', size_label: 'Μικρά' };
-  }
-  if (name.includes('corolla') || (seats && seats >= 5 && known?.doors === 4)) {
-    return { group_code: 'Ομάδα C', size_label: 'Μεσαία' };
-  }
-  return { group_code: 'Ομάδα B', size_label: 'Συμπαγή' };
+function sizeAndGroup(category, seats, model) {
+  const id = normalizeRentVehicleCategory(category, { seats, model });
+  const meta = rentCategoryMeta(id);
+  const letter = meta?.acrissHint || 'C';
+  return {
+    group_code: `Ομάδα ${letter}`,
+    size_label: meta?.shortLabel || meta?.label || id,
+    category_id: id,
+  };
 }
 
 function transmissionLabel(raw) {
@@ -211,7 +206,8 @@ export function enrichRentVehicle(vehicle) {
   const v = vehicle && typeof vehicle === 'object' ? vehicle : {};
   const known = BY_MODEL[modelKey(v.model)] || null;
   const seats = Number(v.seating_capacity) || null;
-  const category = rentCategoryLabel(v.category);
+  const { group_code, size_label, category_id } = sizeAndGroup(v.category, seats, v.model);
+  const category = rentCategoryLabel(category_id);
   const description =
     (known && String(v.description || '').trim().length < 40 ? known.blurb : null) ||
     String(v.description || '').trim() ||
@@ -233,11 +229,11 @@ export function enrichRentVehicle(vehicle) {
 
   const luggage = known?.luggage || '';
   const bags = luggageCount(luggage);
-  const { group_code, size_label } = sizeAndGroup(v.category, seats, v.model, known);
   const transmission = transmissionLabel(known?.transmission);
 
   return {
     ...v,
+    category: category_id,
     photo_url: photoUrl,
     photo_urls: photoUrls,
     category_label: category,
