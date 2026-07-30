@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import {
   DEFAULT_FISCAL_SETTINGS,
   FISCAL_PROVIDERS,
+  FISCAL_PROVIDER_GROUPS,
   fetchFiscalSettings,
   updateFiscalSettings,
 } from '../../services/fiscalSettingsApi.js';
@@ -360,27 +361,31 @@ export default function FiscalSettingsPanel() {
             />
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            Οδηγός: <code className="text-[11px]">docs/FISCAL-PROVIDER-SETUP.md</code> · Πάροχοι:
-            Native AADE, Prosvasis, Epsilon, SoftOne, Impact.
+            Οδηγός: <code className="text-[11px]">docs/FISCAL-PROVIDER-SETUP.md</code> · Πάροχοι
+            ΥΠΑΗΕΣ: SoftOne, Impact · Άλλα: myDATA απευθείας, Prosvasis/Epsilon ERP.
           </p>
         </div>
 
-        <div>
-          <SectionHeader
-            icon="storefront"
-            title="Πάροχος φορολογικής έκδοσης"
-            subtitle="Επιλέξτε πώς εκδίδονται ΑΠΥ/τιμολόγια μετά την πληρωμή."
-          />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FISCAL_PROVIDERS.map((p) => (
-              <ProviderCard
-                key={p.id}
-                provider={p}
-                active={form.provider === p.id}
-                onSelect={() => setProvider(p.id)}
-              />
-            ))}
-          </div>
+        <div className="space-y-8">
+          {FISCAL_PROVIDER_GROUPS.map((group) => {
+            const items = FISCAL_PROVIDERS.filter((p) => p.group === group.id);
+            if (!items.length) return null;
+            return (
+              <div key={group.id}>
+                <SectionHeader icon="storefront" title={group.title} subtitle={group.subtitle} />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {items.map((p) => (
+                    <ProviderCard
+                      key={p.id}
+                      provider={p}
+                      active={form.provider === p.id}
+                      onSelect={() => setProvider(p.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="rounded-2xl border border-gray-100 bg-gray-50/40 p-5 sm:p-6">
