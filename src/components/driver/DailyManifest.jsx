@@ -5,7 +5,6 @@ import {
   fetchDriverTrip,
 } from '../../services/driverPortalApi.js';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
-import TelemetryStrip from './TelemetryStrip.jsx';
 import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
 const STATUS_LABEL = {
@@ -63,8 +62,6 @@ export default function DailyManifest() {
 
   return (
     <div className="driver-stack">
-      <TelemetryStrip />
-
       <div className="driver-card driver-card-accent">
         <div className="flex items-start justify-between gap-3">
           <div>
