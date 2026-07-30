@@ -58,4 +58,23 @@ describe('admin notification chat dedupe', () => {
     ]);
     expect(rows.map((r) => r.id)).toEqual(['chat-d1', 'chat-d2']);
   });
+
+  it('collapses timestamp chat ids without driver into one office row', () => {
+    const rows = dedupeStoredItems([
+      {
+        id: 'chat-1785447000000',
+        type: 'driver_office_chat',
+        title: 'Νέο μήνυμα οδηγού',
+        body: '1 μη αναγνωσμένα',
+      },
+      {
+        id: 'chat-1785447060000',
+        type: 'driver_office_chat',
+        title: 'Νέο μήνυμα οδηγού',
+        body: '1 μη αναγνωσμένα',
+      },
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe('chat-office');
+  });
 });
