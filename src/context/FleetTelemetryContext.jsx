@@ -8,6 +8,9 @@ import { FLEET_LIVE_POLL_MS } from '../lib/admin/fleetLivePoll.js';
 
 export const DEMO_TENANT = import.meta.env.VITE_DEMO_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 
+/** Keep last pins through brief Redis blips — not through expired sessions. */
+const EMPTY_POLL_GRACE_MS = 12000;
+
 /** Tenant για fleet egress — JWT tenant πρώτα (όχι stale localStorage). */
 export function resolveFleetTenantId() {
   const impersonated = getImpersonationTarget();
@@ -20,6 +23,13 @@ export function resolveFleetTenantId() {
   const stored = getSaasTenantId();
   if (stored) return stored;
   return DEMO_TENANT;
+}
+
+function isFleetAuthError(err) {
+  const status = Number(err?.status);
+  if (status === 401 || status === 403) return true;
+  const raw = String(err?.message || '');
+  return /έληξε|συνδεθείτε|unauthorized|forbidden|401|403/i.test(raw);
 }
 
 const FleetTelemetryContext = createContext(null);
@@ -63,6 +73,37 @@ function vehicleIdFromRow(v) {
   return v.vehicle_id || v.driver_id || `${v.bus_plate || v.vehicle_code || 'bus'}-${v.trip_id || '0'}`;
 }
 
+function dropOfflineVehicles(prev, msg) {
+  const next = { ...prev };
+  let changed = false;
+  const removedIds = Array.isArray(msg.removed_vehicle_ids)
+    ? msg.removed_vehicle_ids.map(String)
+    : [];
+  for (const rid of removedIds) {
+    if (next[rid]) {
+      delete next[rid];
+      changed = true;
+    }
+  }
+  const did = msg.driver_id != null ? String(msg.driver_id) : '';
+  if (did) {
+    for (const [key, row] of Object.entries(next)) {
+      if (String(row.driver_id || '') === did) {
+        delete next[key];
+        changed = true;
+      }
+    }
+  }
+  if (!changed) {
+    const id = vehicleIdFromRow(msg);
+    if (next[id]) {
+      delete next[id];
+      changed = true;
+    }
+  }
+  return changed ? next : prev;
+}
+
 export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
   const [tenantId, setTenantId] = useState(() => tenantIdProp || resolveFleetTenantId());
 
@@ -95,18 +136,26 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
     let ws = null;
     let mode = 'poll';
 
-    const applyRows = (rows, { replace = true } = {}) => {
+    const wipeVehicles = () => {
+      lastNonEmptyAtRef.current = 0;
+      setVehicles({});
+    };
+
+    const applyRows = (rows, { replace = true, bypassEmptyGrace = false } = {}) => {
       if (!Array.isArray(rows)) return;
       setVehicles((prev) => {
-        // Never wipe a fresh pin with an empty poll (worker lag / brief Redis gap).
-        if (replace && rows.length === 0 && Object.keys(prev).length > 0) {
+        // Never wipe a fresh pin with an empty poll (worker lag / brief Redis gap),
+        // unless shift-end / auth recovery asked to bypass.
+        if (replace && rows.length === 0 && Object.keys(prev).length > 0 && !bypassEmptyGrace) {
           const ageMs = Date.now() - (lastNonEmptyAtRef.current || 0);
-          if (ageMs < 45000) {
+          if (ageMs < EMPTY_POLL_GRACE_MS) {
             return prev;
           }
         }
         if (rows.length > 0) {
           lastNonEmptyAtRef.current = Date.now();
+        } else if (replace) {
+          lastNonEmptyAtRef.current = 0;
         }
         const map = replace ? {} : { ...prev };
         rows.forEach((row) => {
@@ -121,6 +170,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
     const tick = () => {
       const headers = adminAuthHeaders();
       if (!headers.Authorization && !getSaasToken()) {
+        wipeVehicles();
         setPollError('Απαιτείται σύνδεση admin για τον live χάρτη');
         setConnected(false);
         return;
@@ -144,6 +194,17 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
         .catch((err) => {
           if (closed) return;
           const raw = String(err?.message || '');
+          if (isFleetAuthError(err)) {
+            // Expired JWT must not freeze the last pin forever as "1 ενεργά".
+            wipeVehicles();
+            setConnected(false);
+            setPollError(
+              /έληξε|συνδεθείτε/i.test(raw)
+                ? raw
+                : 'Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο',
+            );
+            return;
+          }
           const msg =
             raw === 'Failed to fetch' || /network|load failed|fetch/i.test(raw)
               ? 'Δεν συνδέει με το API (Failed to fetch). Ανανέωσε τη σελίδα· αν συνεχίζει, το api host είναι εκτός.'
@@ -198,28 +259,31 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
             setVehicles((prev) => {
               const normalized = normalizeVehicle(msg, id, prev[id]);
               if (!normalized) return prev;
+              lastNonEmptyAtRef.current = Date.now();
               return { ...prev, [id]: normalized };
             });
             return;
           }
           if (msg.type === 'fleet_driver_offline') {
-            const id = vehicleIdFromRow(msg);
-            setVehicles((prev) => {
-              if (!prev[id]) {
-                const matchKey = Object.keys(prev).find(
-                  (k) =>
-                    prev[k].driver_id === msg.driver_id &&
-                    String(prev[k].trip_id) === String(msg.trip_id),
-                );
-                if (!matchKey) return prev;
-                const next = { ...prev };
-                delete next[matchKey];
-                return next;
-              }
-              const next = { ...prev };
-              delete next[id];
-              return next;
-            });
+            // End-shift / stale: drop pins by removed ids or driver_id (not trip match).
+            setVehicles((prev) => dropOfflineVehicles(prev, msg));
+            lastNonEmptyAtRef.current = 0;
+            // Force a poll refresh so HTTP mode clears Redis-backed pins quickly.
+            fetchLiveFleet(adminAuthHeaders())
+              .then((rows) => {
+                if (closed || !Array.isArray(rows)) return;
+                applyRows(rows, { replace: true, bypassEmptyGrace: true });
+              })
+              .catch((err) => {
+                if (closed) return;
+                if (isFleetAuthError(err)) {
+                  wipeVehicles();
+                  setConnected(false);
+                  setPollError(
+                    String(err?.message || 'Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο'),
+                  );
+                }
+              });
           }
         } catch {
           // ignore malformed frames
