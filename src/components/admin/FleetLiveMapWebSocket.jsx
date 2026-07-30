@@ -22,7 +22,8 @@ import '../../styles/fleet-live-map.css';
 
 /** Ζωντανός χάρτης στόλου — Apple-like chrome, μαλακό basemap, ελληνικές ετικέτες. */
 export default function FleetLiveMapWebSocket() {
-  const { connected, vehicles, tenantId, transport, pollError, lastPollAt } = useFleetTelemetryEgress();
+  const { connected, vehicles, tenantId, transport, pollError, lastPollAt, pollIntervalMs } =
+    useFleetTelemetryEgress();
   const mapbox = isMapboxEnabled();
   const [fitNonce, setFitNonce] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
@@ -82,7 +83,9 @@ export default function FleetLiveMapWebSocket() {
           <p className="fleet-apple-subtitle">
             {mapVehicles.length} ενεργά · {connected ? 'ζωντανά' : 'εκτός'}
             {rentalLiveCount ? ` · ${rentalLiveCount} ενοικιάσεις` : ''}
-            {transport === 'poll' ? ' · ενημέρωση 5s' : ''}
+            {transport === 'poll'
+              ? ` · ενημέρωση ${Math.max(1, Math.round((pollIntervalMs || 5000) / 1000))}s`
+              : ''}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -616,7 +616,23 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
             )
             removed = []
 
-    # Persist full GPS path into route history before the live pin disappears.
+    # Broadcast offline FIRST — office map must drop the pin before trail/push work.
+    offline_payload = {
+        "type": "fleet_driver_offline",
+        "tenant_id": tenant_id,
+        "driver_id": driver_id,
+        "trip_id": trip_id,
+        "reason": "shift_end",
+        "removed_vehicle_ids": removed,
+    }
+    broadcast_tenants = {tid for tid in [tenant_id, *extra_tenants] if tid}
+    for tid in broadcast_tenants:
+        try:
+            await get_fleet_egress_hub().broadcast(tid, {**offline_payload, "tenant_id": tid})
+        except Exception:
+            pass
+
+    # Persist GPS path after map offline signal (must not delay pin clear).
     trail_points = 0
     if tenant_id and removed:
         try:
@@ -638,21 +654,6 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
             )
         except Exception:
             trail_points = 0
-
-    offline_payload = {
-        "type": "fleet_driver_offline",
-        "tenant_id": tenant_id,
-        "driver_id": driver_id,
-        "trip_id": trip_id,
-        "reason": "shift_end",
-        "removed_vehicle_ids": removed,
-    }
-    broadcast_tenants = {tid for tid in [tenant_id, *extra_tenants] if tid}
-    for tid in broadcast_tenants:
-        try:
-            await get_fleet_egress_hub().broadcast(tid, {**offline_payload, "tenant_id": tid})
-        except Exception:
-            pass
 
     notify_result: dict = {"skipped": True}
     try:
