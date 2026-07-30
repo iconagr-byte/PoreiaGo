@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
+import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../../lib/trips/tripImage.js';
 import {
   PAGE_SLIDER_MAX_SLIDES,
   clampSliderIntervalSec,
   createSliderSlide,
   normalizeSliderSlides,
-} from '../../lib/homepage/pageSlider.js';
-import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+} from '../../../lib/homepage/pageSlider.js';
+import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
 
 /**
  * Admin editor for bus or rent page hero slider.
