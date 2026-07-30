@@ -34,10 +34,23 @@ class EpsilonTenantConfig:
 
 
 @dataclass(frozen=True)
+class EinvoicingTenantConfig:
+    """SoftOne eINVOICING / Impact EINVOICING shared config."""
+
+    api_url: str
+    api_key: str
+    issuer_name: str | None = None
+    branch_code: int = 0
+    item_code: str | None = None
+
+
+@dataclass(frozen=True)
 class TenantFiscalConfig:
     provider: FiscalProvider
     prosvasis: ProsvasisTenantConfig | None = None
     epsilon: EpsilonTenantConfig | None = None
+    softone: EinvoicingTenantConfig | None = None
+    impact: EinvoicingTenantConfig | None = None
 
 
 def _parse_settings(raw: str | None) -> dict[str, Any]:
@@ -58,22 +71,19 @@ def _decrypt_field(blob: str | None) -> str:
     return blob
 
 
+def _parse_einvoicing_block(raw: dict[str, Any], *, default_url: str) -> EinvoicingTenantConfig:
+    return EinvoicingTenantConfig(
+        api_url=str(raw.get("api_url") or default_url).rstrip("/"),
+        api_key=_decrypt_field(raw.get("api_key_enc") or raw.get("api_key") or raw.get("key")),
+        issuer_name=(str(raw.get("issuer_name") or "").strip() or None),
+        branch_code=int(raw.get("branch_code") or 0),
+        item_code=(str(raw.get("item_code") or "").strip() or None),
+    )
+
+
 def load_tenant_fiscal_config(settings_json: str | None) -> TenantFiscalConfig | None:
     """
     Read tenants.settings_json.fiscal and decrypt provider secrets.
-
-    Example shape:
-    {
-      "provider": "prosvasis",
-      "prosvasis": {
-        "api_url": "https://go.s1cloud.net",
-        "app_id": "703",
-        "s1code_enc": "enc:...",
-        "bearer_token_enc": "enc:...",
-        "series_retail": 7001,
-        "series_invoice": 7021
-      }
-    }
     """
     settings = _parse_settings(settings_json)
     fiscal = settings.get("fiscal")
@@ -91,6 +101,8 @@ def load_tenant_fiscal_config(settings_json: str | None) -> TenantFiscalConfig |
 
     prosvasis_cfg = None
     epsilon_cfg = None
+    softone_cfg = None
+    impact_cfg = None
 
     prosvasis_raw = fiscal.get("prosvasis")
     if isinstance(prosvasis_raw, dict):
@@ -130,4 +142,24 @@ def load_tenant_fiscal_config(settings_json: str | None) -> TenantFiscalConfig |
             wholesale_item_code=epsilon_raw.get("wholesale_item_code"),
         )
 
-    return TenantFiscalConfig(provider=provider, prosvasis=prosvasis_cfg, epsilon=epsilon_cfg)
+    softone_raw = fiscal.get("softone")
+    if isinstance(softone_raw, dict):
+        softone_cfg = _parse_einvoicing_block(
+            softone_raw,
+            default_url="https://einvoice.s1ecos.gr",
+        )
+
+    impact_raw = fiscal.get("impact")
+    if isinstance(impact_raw, dict):
+        impact_cfg = _parse_einvoicing_block(
+            impact_raw,
+            default_url="https://einvoiceapi.impact.gr",
+        )
+
+    return TenantFiscalConfig(
+        provider=provider,
+        prosvasis=prosvasis_cfg,
+        epsilon=epsilon_cfg,
+        softone=softone_cfg,
+        impact=impact_cfg,
+    )

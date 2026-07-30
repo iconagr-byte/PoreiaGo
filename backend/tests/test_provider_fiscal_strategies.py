@@ -1,4 +1,4 @@
-"""Tests for ProsvasisStrategy and EpsilonStrategy."""
+"""Tests for Prosvasis, Epsilon, SoftOne and Impact fiscal strategies."""
 
 from __future__ import annotations
 
@@ -23,6 +23,8 @@ from travel_platform.compliance.fiscal_models import (
 )
 from travel_platform.compliance.fiscal_tenant_config import load_tenant_fiscal_config
 from travel_platform.compliance.prosvasis_strategy import ProsvasisStrategy
+from travel_platform.compliance.softone_impact_strategy import SoftOneImpactStrategy
+from travel_platform.compliance.fiscal_tenant_config import EinvoicingTenantConfig
 
 
 def _sample_data(**overrides):
@@ -141,6 +143,45 @@ class EpsilonPayloadTests(unittest.TestCase):
         self.assertIn("Invalid VAT status", str(ctx.exception))
 
 
+class SoftOneImpactPayloadTests(unittest.TestCase):
+    def setUp(self):
+        self.strategy = SoftOneImpactStrategy(provider=FiscalProvider.SOFTONE)
+        self.config = EinvoicingTenantConfig(
+            api_url="https://einvoice.s1ecos.gr",
+            api_key="key-1",
+            issuer_name="Demo Travel SA",
+            branch_code=0,
+            item_code="TRAVEL",
+        )
+
+    def test_build_json_payload_retail_receipt(self):
+        payload = self.strategy.build_json_payload(_sample_data(), self.config)
+        self.assertEqual(payload["DocumentTypeCode"], "RECEIPT")
+        self.assertEqual(payload["Series"], "ΑΠΥ")
+        self.assertEqual(payload["Number"], "7")
+        self.assertEqual(payload["Issuer"]["Vat"], "EL123456789")
+        self.assertEqual(payload["Details"][0]["Code"], "TRAVEL")
+        self.assertEqual(payload["PaymentDetails"]["PaymentMethods"][0]["PaymentMethodTypeCode"], 7)
+
+    def test_parse_success_response(self):
+        result = SoftOneImpactStrategy.parse_response_json(
+            {"success": True, "mark": "400000011122233", "uid": "uid-so-1"},
+            provider=FiscalProvider.SOFTONE.value,
+        )
+        self.assertTrue(result["success"])
+        self.assertEqual(result["provider"], FiscalProvider.SOFTONE.value)
+        self.assertEqual(result["mark"], "400000011122233")
+        self.assertEqual(result["uid"], "uid-so-1")
+
+    def test_parse_failure_raises(self):
+        with self.assertRaises(FiscalAPIError) as ctx:
+            SoftOneImpactStrategy.parse_response_json(
+                {"success": False, "message": "Invalid key"},
+                provider=FiscalProvider.IMPACT.value,
+            )
+        self.assertIn("Invalid key", str(ctx.exception))
+
+
 class ProviderTransmitTests(unittest.IsolatedAsyncioTestCase):
     async def test_prosvasis_transmit_uses_bearer_header(self):
         strategy = ProsvasisStrategy(api_url="https://example.test")
@@ -209,6 +250,43 @@ class ProviderTransmitTests(unittest.IsolatedAsyncioTestCase):
         posted_url = mock_client.post.await_args.args[0]
         self.assertIn("api/Eshop/InsertDocuments", posted_url)
 
+    async def test_softone_transmit_logs_in_then_posts_invoice(self):
+        login_response = MagicMock()
+        login_response.status_code = 200
+        login_response.json.return_value = {"accessToken": "tok-softone"}
+
+        invoice_response = MagicMock()
+        invoice_response.status_code = 200
+        invoice_response.json.return_value = {
+            "success": True,
+            "mark": "MARK-SO-1",
+            "uid": "UID-SO-1",
+        }
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(side_effect=[login_response, invoice_response])
+
+        config = EinvoicingTenantConfig(
+            api_url="https://einvoice.example",
+            api_key="api-key-1",
+            issuer_name="Issuer",
+            branch_code=0,
+            item_code="ITEM",
+        )
+        result = await SoftOneImpactStrategy(
+            provider=FiscalProvider.SOFTONE,
+            client=mock_client,
+        ).transmit(_sample_data(), config)
+
+        self.assertEqual(result["provider"], "softone")
+        self.assertEqual(result["mark"], "MARK-SO-1")
+        self.assertEqual(mock_client.post.await_count, 2)
+        login_call, invoice_call = mock_client.post.await_args_list
+        self.assertIn("/Authentication/login", login_call.args[0])
+        self.assertIn("/Invoice/json", invoice_call.args[0])
+        self.assertEqual(invoice_call.kwargs["headers"]["Authorization"], "Bearer tok-softone")
+        self.assertEqual(invoice_call.kwargs["params"]["sendMethod"], "A")
+
 
 class TenantFiscalConfigTests(unittest.TestCase):
     def test_load_plaintext_tenant_config(self):
@@ -228,6 +306,29 @@ class TenantFiscalConfigTests(unittest.TestCase):
         assert cfg is not None
         self.assertEqual(cfg.provider, FiscalProvider.PROSVASIS)
         self.assertEqual(cfg.prosvasis.bearer_token, "token")
+
+    def test_load_softone_and_impact_config(self):
+        settings = {
+            "fiscal": {
+                "provider": "impact",
+                "softone": {
+                    "api_url": "https://einvoice.s1ecos.gr",
+                    "api_key": "so-key",
+                    "issuer_name": "Soft Co",
+                },
+                "impact": {
+                    "api_url": "https://einvoiceapi.impact.gr",
+                    "api_key_enc": "plain-impact-key",
+                    "item_code": "SRV",
+                },
+            },
+        }
+        cfg = load_tenant_fiscal_config(json.dumps(settings))
+        assert cfg is not None
+        self.assertEqual(cfg.provider, FiscalProvider.IMPACT)
+        self.assertEqual(cfg.softone.api_key, "so-key")
+        self.assertEqual(cfg.impact.api_key, "plain-impact-key")
+        self.assertEqual(cfg.impact.item_code, "SRV")
 
 
 if __name__ == "__main__":

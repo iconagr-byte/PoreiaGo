@@ -1,119 +1,72 @@
-# Fiscal provider setup — Prosvasis / Epsilon / Native AADE
+# Fiscal provider setup — all supported providers
 
-Οδηγός ενεργοποίησης παρόχου τιμολόγησης στο PoreiaGo. Η έκδοση γίνεται από το **Python fiscal pipeline** (πληρωμή → Celery → provider → MARK), όχι από το frontend facade.
+Οδηγός ενεργοποίησης παρόχου τιμολόγησης στο PoreiaGo. Η έκδοση γίνεται από το **Python fiscal pipeline** (πληρωμή → Celery → provider → MARK).
+
+## Supported providers
+
+| Admin card | Provider id | Notes |
+|------------|-------------|--------|
+| myDATA (Native AADE) | `native_aade` | Server env credentials |
+| Prosvasis GO | `prosvasis` | SoftOne S1 Cloud (`go.s1cloud.net`) |
+| Epsilon Smart | `epsilon` | Epsilon InsertDocuments JWT |
+| SoftOne eINVOICING | `softone` | SoftOne ECOS Invoice/json |
+| Impact EINVOICING | `impact` | Impact / SoftOne Impact Invoice/json |
+
+Admin: **Ρυθμίσεις → Φορολογία**
 
 ---
 
-## Live VPS snapshot (checked 2026-07-30)
+## SoftOne eINVOICING / Impact
 
-| Check | Result |
-|-------|--------|
-| Redis | **ok** (`redis://redis:6379/0`) |
-| Database | **ok** |
-| Fiscal pipeline | **degraded** — 1 stuck `PENDING` invoice, 0 issued |
-| Celery workers | Verify with `diagnose-fiscal` / `/health` → `celery` block after this PR |
+Shared API family ([developers.s1ecos.com](https://developers.s1ecos.com/)):
 
-Endpoint: `GET https://api.poreiago.com/health`
+1. `POST /Authentication/login` with `{ vat, key }`
+2. `POST /Invoice/json?sendMethod=A` with Bearer token
+
+### SoftOne defaults
+- Prod: `https://einvoice.s1ecos.gr`
+- Demo: `https://einvoice-demo.s1ecos.gr`
+
+### Impact defaults
+- Prod: `https://einvoiceapi.impact.gr`
+- UAT: `https://einvoiceapiuat.impact.gr`
+
+### Fields in Admin
+API URL · API Key · Επωνυμία εκδότη · Branch · Κωδικός είδους · ΑΦΜ εκδότη
 
 ---
 
-## Recommended path: Prosvasis GO
+## Prosvasis GO
 
-### 1) VPS env (once)
+App ID, S1 code, Bearer, series, branch, MTRL — API `https://go.s1cloud.net`
 
-On the VPS (`deploy/.env.prod`), ensure:
+---
+
+## Epsilon Smart
+
+Smart URL, JWT, optional subscription key, item codes.
+
+---
+
+## Native AADE
+
+Admin: ΑΦΜ. Server env: `AADE_MODE=production`, `AADE_USER_ID`, `AADE_SUBSCRIPTION_KEY`, `AADE_VAT_NUMBER`.
+
+`AADE_MODE=stub` affects only native demo stubs.
+
+---
+
+## VPS
 
 ```bash
+FISCAL_ENCRYPTION_KEY=<fernet>
 CELERY_BROKER_URL=redis://redis:6379/0
-CELERY_RESULT_BACKEND=redis://redis:6379/1
-FISCAL_ENCRYPTION_KEY=<fernet-key>   # auto-added by ensure-env-prod.sh
-```
-
-`AADE_MODE=stub` affects **only** the legacy native gateway demo path.  
-For Prosvasis/Epsilon the tenant provider settings in Admin drive issuance.
-
-Restart after env changes:
-
-```bash
-cd /opt/poreiago
-docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml \
-  up -d --force-recreate --no-deps worker celery-beat api-blue
-```
-
-### 2) Prosvasis credentials (from SoftOne / Prosvasis portal)
-
-Enter in **Admin → Ρυθμίσεις → Φορολογία → Prosvasis GO**:
-
-| Field | Where |
-|-------|--------|
-| ΑΦΜ εκδότη | Company VAT |
-| API URL | usually `https://go.s1cloud.net` |
-| App ID | S1 application id |
-| S1 code | secret |
-| Bearer token | secret |
-| Series retail / invoice | numeric series ids |
-| Branch | e.g. `1000` |
-| Service MTRL code | service item code for travel/rent lines |
-| Payment codes | cash / card / bank |
-
-Save → confirm green «Ρυθμισμένο» on secrets.
-
-### 3) Smoke test
-
-1. Confirm `/health` shows `celery.status=ok` and workers listed.
-2. Take a paid booking (or cash at desk).
-3. Or: BackOffice → booking → **Έκδοση** fiscal.
-4. Expect MARK on booking + fiscal stats `issued` increments.
-5. If FAILED: check worker logs + retry from Πληρωμές reconciliation.
-
-```bash
-docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml logs --tail=100 worker
-```
-
----
-
-## Alternative: Epsilon Smart
-
-Same Admin panel → **Epsilon Smart**:
-
-- Smart URL (default `https://epsilonsmart.epsilonnet.gr/`)
-- JWT (+ optional subscription key)
-- Retail / wholesale item codes
-
-Requires `FISCAL_ENCRYPTION_KEY` on VPS (same as Prosvasis).
-
----
-
-## Alternative: Native AADE
-
-Admin selects **myDATA (Native AADE)** + issuer VAT.  
-Server env (not UI secrets):
-
-```bash
-AADE_MODE=production
-AADE_USER_ID=...
-AADE_SUBSCRIPTION_KEY=...
-AADE_VAT_NUMBER=...
-AADE_API_URL=https://mydataapi.aade.gr/myDATA/SendInvoices
-AADE_SECRETS_BACKEND=env
-```
-
-Sandbox E2E: `make fiscal-aade-e2e-live` (see `backend/scripts/fiscal_aade_e2e.py`).
-
----
-
-## Diagnose commands
-
-```bash
-# From repo on VPS
 bash deploy/scripts/diagnose-fiscal.sh
-
-# Or GitHub Actions → "Diagnose fiscal (VPS)"
 ```
 
----
+## Credentials needed for live MARK
 
-## What you must send to go live
-
-Για Prosvasis: **App ID + S1 code + Bearer + series/branch/MTRL + ΑΦΜ**.  
-Χωρίς αυτά δεν μπορεί να ολοκληρωθεί live δοκιμή παρόχου από το agent.
+- SoftOne / Impact: API key + ΑΦΜ
+- Prosvasis: App ID + S1 + Bearer + series
+- Epsilon: JWT
+- Native AADE: user id + subscription key + ΑΦΜ

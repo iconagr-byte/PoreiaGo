@@ -136,6 +136,8 @@ export default function FiscalSettingsPanel() {
     prosvasis_bearer: '',
     epsilon_jwt: '',
     epsilon_subscription_key: '',
+    softone_api_key: '',
+    impact_api_key: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -153,16 +155,20 @@ export default function FiscalSettingsPanel() {
     }
   }, []);
 
+  const blankSecrets = () => ({
+    prosvasis_s1code: '',
+    prosvasis_bearer: '',
+    epsilon_jwt: '',
+    epsilon_subscription_key: '',
+    softone_api_key: '',
+    impact_api_key: '',
+  });
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setForm(await fetchFiscalSettings());
-      setSecrets({
-        prosvasis_s1code: '',
-        prosvasis_bearer: '',
-        epsilon_jwt: '',
-        epsilon_subscription_key: '',
-      });
+      setSecrets(blankSecrets());
       await loadPipeline();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία φόρτωσης ρυθμίσεων φορολογίας');
@@ -184,7 +190,13 @@ export default function FiscalSettingsPanel() {
               form.prosvasis?.s1code_configured &&
               form.prosvasis?.bearer_token_configured,
           )
-        : Boolean(form.epsilon?.jwt_configured);
+        : form.provider === 'epsilon'
+          ? Boolean(form.epsilon?.jwt_configured)
+          : form.provider === 'softone'
+            ? Boolean(form.softone?.api_key_configured)
+            : form.provider === 'impact'
+              ? Boolean(form.impact?.api_key_configured)
+              : false;
 
   const redisOk = pipeline?.redis?.status === 'ok';
   const celeryOk = pipeline?.celery?.status === 'ok';
@@ -194,6 +206,10 @@ export default function FiscalSettingsPanel() {
     setForm((prev) => ({ ...prev, prosvasis: { ...prev.prosvasis, ...patch } }));
   const setEpsilon = (patch) =>
     setForm((prev) => ({ ...prev, epsilon: { ...prev.epsilon, ...patch } }));
+  const setSoftone = (patch) =>
+    setForm((prev) => ({ ...prev, softone: { ...prev.softone, ...patch } }));
+  const setImpact = (patch) =>
+    setForm((prev) => ({ ...prev, impact: { ...prev.impact, ...patch } }));
 
   const onSave = async (e) => {
     e.preventDefault();
@@ -233,14 +249,29 @@ export default function FiscalSettingsPanel() {
         }
       }
 
+      if (form.provider === 'softone') {
+        patch.softone = {
+          api_url: form.softone.api_url,
+          issuer_name: form.softone.issuer_name,
+          branch_code: form.softone.branch_code,
+          item_code: form.softone.item_code,
+        };
+        if (secrets.softone_api_key.trim()) patch.softone.api_key = secrets.softone_api_key.trim();
+      }
+
+      if (form.provider === 'impact') {
+        patch.impact = {
+          api_url: form.impact.api_url,
+          issuer_name: form.impact.issuer_name,
+          branch_code: form.impact.branch_code,
+          item_code: form.impact.item_code,
+        };
+        if (secrets.impact_api_key.trim()) patch.impact.api_key = secrets.impact_api_key.trim();
+      }
+
       const data = await updateFiscalSettings(patch);
       setForm(data);
-      setSecrets({
-        prosvasis_s1code: '',
-        prosvasis_bearer: '',
-        epsilon_jwt: '',
-        epsilon_subscription_key: '',
-      });
+      setSecrets(blankSecrets());
       toast.success('Οι ρυθμίσεις φορολογικής έκδοσης αποθηκεύτηκαν');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');
@@ -324,13 +355,13 @@ export default function FiscalSettingsPanel() {
               detail={
                 providerReady
                   ? 'Τα απαραίτητα secrets/πεδία φαίνονται συμπληρωμένα'
-                  : 'Συμπλήρωσε Prosvasis/Epsilon secrets ή ΑΦΜ για native AADE'
+                  : 'Συμπλήρωσε secrets παρόχου ή ΑΦΜ για native AADE'
               }
             />
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            Οδηγός: <code className="text-[11px]">docs/FISCAL-PROVIDER-SETUP.md</code> · Προτεινόμενο:
-            Prosvasis GO. Χωρίς κλειδιά παρόχου δεν γίνεται live έκδοση MARK.
+            Οδηγός: <code className="text-[11px]">docs/FISCAL-PROVIDER-SETUP.md</code> · Πάροχοι:
+            Native AADE, Prosvasis, Epsilon, SoftOne, Impact.
           </p>
         </div>
 
@@ -340,7 +371,7 @@ export default function FiscalSettingsPanel() {
             title="Πάροχος φορολογικής έκδοσης"
             subtitle="Επιλέξτε πώς εκδίδονται ΑΠΥ/τιμολόγια μετά την πληρωμή."
           />
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FISCAL_PROVIDERS.map((p) => (
               <ProviderCard
                 key={p.id}
@@ -465,6 +496,73 @@ export default function FiscalSettingsPanel() {
                 label="Κωδικός είδους χονδρικής"
                 value={form.epsilon.wholesale_item_code}
                 onChange={(v) => setEpsilon({ wholesale_item_code: v })}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {form.provider === 'softone' || form.provider === 'impact' ? (
+          <div
+            className={`rounded-2xl border p-5 sm:p-6 space-y-4 ${
+              form.provider === 'softone'
+                ? 'border-teal-100 bg-teal-50/25'
+                : 'border-indigo-100 bg-indigo-50/25'
+            }`}
+          >
+            <SectionHeader
+              icon={form.provider === 'softone' ? 'apartment' : 'receipt_long'}
+              title={form.provider === 'softone' ? 'SoftOne eINVOICING' : 'Impact EINVOICING'}
+              subtitle="Login με ΑΦΜ + API key · αποστολή μέσω /Invoice/json (EliseCore)."
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="API URL"
+                value={form[form.provider].api_url}
+                onChange={(v) =>
+                  form.provider === 'softone' ? setSoftone({ api_url: v }) : setImpact({ api_url: v })
+                }
+                hint={
+                  form.provider === 'softone'
+                    ? 'Prod: https://einvoice.s1ecos.gr · Demo: https://einvoice-demo.s1ecos.gr'
+                    : 'Prod: https://einvoiceapi.impact.gr · UAT: https://einvoiceapiuat.impact.gr'
+                }
+              />
+              <SecretField
+                label="API Key"
+                configured={form[form.provider].api_key_configured}
+                value={secrets[`${form.provider}_api_key`]}
+                onChange={(v) =>
+                  setSecrets((s) => ({
+                    ...s,
+                    [`${form.provider}_api_key`]: v,
+                  }))
+                }
+                placeholder="API key από portal παρόχου"
+              />
+              <TextField
+                label="Επωνυμία εκδότη"
+                value={form[form.provider].issuer_name}
+                onChange={(v) =>
+                  form.provider === 'softone'
+                    ? setSoftone({ issuer_name: v })
+                    : setImpact({ issuer_name: v })
+                }
+              />
+              <NumberField
+                label="Υποκατάστημα (branch code)"
+                value={form[form.provider].branch_code}
+                onChange={(v) =>
+                  form.provider === 'softone'
+                    ? setSoftone({ branch_code: v })
+                    : setImpact({ branch_code: v })
+                }
+              />
+              <TextField
+                label="Κωδικός είδους / υπηρεσίας"
+                value={form[form.provider].item_code}
+                onChange={(v) =>
+                  form.provider === 'softone' ? setSoftone({ item_code: v }) : setImpact({ item_code: v })
+                }
               />
             </div>
           </div>

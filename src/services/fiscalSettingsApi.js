@@ -11,7 +11,7 @@ export const FISCAL_PROVIDERS = [
     id: 'prosvasis',
     label: 'Prosvasis GO',
     icon: 'cloud_sync',
-    description: 'Έκδοση μέσω S1 Cloud / Prosvasis integration',
+    description: 'Έκδοση μέσω SoftOne S1 Cloud / Prosvasis',
   },
   {
     id: 'epsilon',
@@ -19,7 +19,27 @@ export const FISCAL_PROVIDERS = [
     icon: 'hub',
     description: 'Έκδοση μέσω Epsilon Smart API',
   },
+  {
+    id: 'softone',
+    label: 'SoftOne eINVOICING',
+    icon: 'apartment',
+    description: 'Πιστοποιημένος πάροχος SoftOne ECOS (Invoice/json)',
+  },
+  {
+    id: 'impact',
+    label: 'Impact EINVOICING',
+    icon: 'receipt_long',
+    description: 'Πιστοποιημένος πάροχος Impact / SoftOne Impact',
+  },
 ];
+
+const EINVOICE_DEFAULT = {
+  api_url: '',
+  issuer_name: '',
+  branch_code: 0,
+  item_code: '',
+  api_key_configured: false,
+};
 
 export const DEFAULT_FISCAL_SETTINGS = {
   provider: 'native_aade',
@@ -49,6 +69,14 @@ export const DEFAULT_FISCAL_SETTINGS = {
     jwt_configured: false,
     subscription_key_configured: false,
   },
+  softone: {
+    ...EINVOICE_DEFAULT,
+    api_url: 'https://einvoice.s1ecos.gr',
+  },
+  impact: {
+    ...EINVOICE_DEFAULT,
+    api_url: 'https://einvoiceapi.impact.gr',
+  },
 };
 
 export function normalizeFiscalSettings(data) {
@@ -57,6 +85,8 @@ export function normalizeFiscalSettings(data) {
     ...base,
     prosvasis: { ...DEFAULT_FISCAL_SETTINGS.prosvasis, ...(base.prosvasis || {}) },
     epsilon: { ...DEFAULT_FISCAL_SETTINGS.epsilon, ...(base.epsilon || {}) },
+    softone: { ...DEFAULT_FISCAL_SETTINGS.softone, ...(base.softone || {}) },
+    impact: { ...DEFAULT_FISCAL_SETTINGS.impact, ...(base.impact || {}) },
   };
 }
 
