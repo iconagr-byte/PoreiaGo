@@ -13,7 +13,6 @@ import SOSButton from '../../components/driver/enterprise/SOSButton.jsx';
 import TachographStrip from '../../components/driver/enterprise/TachographStrip.jsx';
 import DaySummary from '../../components/driver/DaySummary.jsx';
 import DriverShiftTelemetry from '../../components/driver/DriverShiftTelemetry.jsx';
-import DriverPushPanel from '../../components/driver/DriverPushPanel.jsx';
 import DriverOfficeChat from '../../components/driver/DriverOfficeChat.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
 import { useDriverShiftSession } from '../../lib/driver/useDriverShiftSession.js';
@@ -346,7 +345,7 @@ export default function DriverCommandCenter() {
           onOpenChat={() => setTab('chat')}
         />
 
-        {tab !== 'chat' && tab !== 'summary' ? (
+        {tab !== 'home' && tab !== 'chat' && tab !== 'summary' ? (
           <div className="driver-shell">
             <TachographStrip
               drivingLabel={tachograph.drivingLabel}
@@ -412,7 +411,6 @@ export default function DriverCommandCenter() {
                 </span>
                 <span className="material-symbols-outlined text-slate-400">chevron_right</span>
               </button>
-              <DriverPushPanel />
               <DailyManifest />
             </>
           )}
