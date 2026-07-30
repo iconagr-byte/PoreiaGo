@@ -34,6 +34,7 @@ import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
+import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
 import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
@@ -86,6 +87,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const [homeCategory, setHomeCategory] = useState('');
   const [homeQuery, setHomeQuery] = useState('');
   const [searchActive, setSearchActive] = useState(false);
+  const [detailVehicle, setDetailVehicle] = useState(null);
   const { favorites, toggleFavorite } = useRentFavorites();
 
   const goToServicesStep = (vehicle) => {
@@ -281,6 +283,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                         favorite={favorites.includes(v.id)}
                         onToggleFavorite={() => toggleFavorite(v.id)}
                         onSelect={() => goToServicesStep(v)}
+                        onOpenDetails={() => setDetailVehicle(v)}
                       />
                     ))}
                   </div>
@@ -306,6 +309,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           </div>
         </main>
       </div>
+      <RentVehicleDetailSheet
+        vehicle={detailVehicle}
+        onClose={() => setDetailVehicle(null)}
+        onSelect={(v) => goToServicesStep(v)}
+      />
     </div>
   );
 }
@@ -374,6 +382,7 @@ function RentalAuthenticatedApp() {
   const [featuredVehicle, setFeaturedVehicle] = useState(null);
   const [homeCategory, setHomeCategory] = useState('');
   const [homeQuery, setHomeQuery] = useState('');
+  const [detailVehicle, setDetailVehicle] = useState(null);
   const { favorites, toggleFavorite } = useRentFavorites();
 
   useEffect(() => setupRentalPwa(), []);
@@ -551,6 +560,7 @@ function RentalAuthenticatedApp() {
                           favorite={favorites.includes(v.id)}
                           onToggleFavorite={() => toggleFavorite(v.id)}
                           onSelect={() => pickVehicle(v)}
+                          onOpenDetails={() => setDetailVehicle(v)}
                         />
                       ))}
                     </div>
@@ -658,6 +668,11 @@ function RentalAuthenticatedApp() {
           </section>
         </main>
       </div>
+      <RentVehicleDetailSheet
+        vehicle={detailVehicle}
+        onClose={() => setDetailVehicle(null)}
+        onSelect={(v) => pickVehicle(v)}
+      />
     </div>
   );
 }

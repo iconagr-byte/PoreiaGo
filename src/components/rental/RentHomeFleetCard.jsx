@@ -2,12 +2,14 @@ import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 
 /**
  * Vehicle pick card — Hertz-like structure, rent teal brand (not yellow clone).
+ * Double-click (or tap photo on touch) opens vehicle detail sheet.
  */
 export default function RentHomeFleetCard({
   vehicle,
   favorite = false,
   onToggleFavorite,
   onSelect,
+  onOpenDetails,
   ctaLabel = 'Επιλογή',
 }) {
   const v = enrichRentVehicle(vehicle);
@@ -21,8 +23,18 @@ export default function RentHomeFleetCard({
     { icon: 'settings', label: v.transmission || 'Με ταχύτητες' },
   ];
 
+  const openDetails = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    onOpenDetails?.(vehicle);
+  };
+
   return (
-    <article className="rent-pick">
+    <article
+      className="rent-pick"
+      onDoubleClick={openDetails}
+      title="Διπλό κλικ για περισσότερες φωτογραφίες & στοιχεία μίσθωσης"
+    >
       <button
         type="button"
         className="rent-pick-fav"
@@ -63,17 +75,30 @@ export default function RentHomeFleetCard({
         </ul>
       </div>
 
-      <div className="rent-pick-media">
+      <button
+        type="button"
+        className="rent-pick-media"
+        onClick={openDetails}
+        aria-label={`Λεπτομέρειες ${v.model || 'οχήματος'}`}
+      >
         {cover ? (
           <img src={cover} alt={v.model || 'Όχημα'} loading="lazy" />
         ) : (
           <span className="material-symbols-outlined">directions_car</span>
         )}
-      </div>
+        <span className="rent-pick-media-hint">Φωτογραφίες & στοιχεία</span>
+      </button>
 
       <div className="rent-pick-foot">
         {v.price_label ? <p className="rent-pick-price">{v.price_label}</p> : null}
-        <button type="button" className="rent-pick-cta" onClick={onSelect}>
+        <button
+          type="button"
+          className="rent-pick-cta"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect?.();
+          }}
+        >
           {ctaLabel}
         </button>
       </div>
