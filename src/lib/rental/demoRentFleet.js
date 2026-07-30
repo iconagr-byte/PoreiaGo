@@ -1,46 +1,46 @@
 /**
- * Client-side demo rent fleet (3 cars + 3 vans).
+ * Client-side demo rent fleet (Hertz-like pick cards: compact cars + vans).
  * Used when the public catalog API is empty/unreachable so storefront still looks real.
  */
 export const DEMO_RENT_FLEET = [
+  {
+    id: 'demo-rent-car-i10',
+    category: 'CAR',
+    model: 'Hyundai i10',
+    seating_capacity: 4,
+    daily_rate_eur: 32,
+    one_way_surcharge_eur: 25,
+    with_driver_daily_eur: 80,
+    photo_url:
+      'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=1200&q=80',
+    description:
+      'Μικρό city car — ιδανικό για πόλη και εύκολο πάρκινγκ. Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες.',
+  },
+  {
+    id: 'demo-rent-car-c3',
+    category: 'CAR',
+    model: 'Citroen C3',
+    seating_capacity: 5,
+    daily_rate_eur: 38,
+    one_way_surcharge_eur: 28,
+    with_driver_daily_eur: 85,
+    photo_url:
+      'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=1200&q=80',
+    description:
+      'Συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
+  },
   {
     id: 'demo-rent-car-yaris',
     category: 'CAR',
     model: 'Toyota Yaris',
     seating_capacity: 5,
-    daily_rate_eur: 35,
-    one_way_surcharge_eur: 25,
-    with_driver_daily_eur: 80,
+    daily_rate_eur: 42,
+    one_way_surcharge_eur: 30,
+    with_driver_daily_eur: 90,
     photo_url:
       'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=1200&q=80',
     description:
       'Συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
-  },
-  {
-    id: 'demo-rent-car-corolla',
-    category: 'CAR',
-    model: 'Toyota Corolla',
-    seating_capacity: 5,
-    daily_rate_eur: 48,
-    one_way_surcharge_eur: 30,
-    with_driver_daily_eur: 90,
-    photo_url:
-      'https://images.unsplash.com/photo-1623869675781-80aa31012a5a?auto=format&fit=crop&w=1200&q=80',
-    description:
-      'Άνετο οικογενειακό sedan με χώρο για αποσκευές και σταθερή οδήγηση στον αυτοκινητόδρομο. Ιδανικό για πολυήμερες διακοπές ή επαγγελματικά ταξίδια με άνεση και οικονομία.',
-  },
-  {
-    id: 'demo-rent-car-tucson',
-    category: 'CAR',
-    model: 'Hyundai Tucson',
-    seating_capacity: 5,
-    daily_rate_eur: 65,
-    one_way_surcharge_eur: 40,
-    with_driver_daily_eur: 110,
-    photo_url:
-      'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=1200&q=80',
-    description:
-      'SUV με ψηλή ορατότητα, χώρο για οικοσκευή και άνεση σε μεγαλύτερες αποστάσεις. Κατάλληλο για οικογένειες, ορεινές διαδρομές και ταξίδια με περισσότερες αποσκευές.',
   },
   {
     id: 'demo-rent-van-transporter',
@@ -94,4 +94,9 @@ export function rentCategoryLabel(category) {
 export function withDemoRentFleet(vehicles) {
   if (Array.isArray(vehicles) && vehicles.length > 0) return vehicles;
   return DEMO_RENT_FLEET;
+}
+
+/** True when fleet is the client-only showcase fallback (not office store). */
+export function isClientDemoFleetId(id) {
+  return /^demo-rent-(car|van)-/i.test(String(id || ''));
 }

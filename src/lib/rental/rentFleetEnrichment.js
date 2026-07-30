@@ -21,6 +21,26 @@ const DEMO_PHOTO_BY_MODEL = Object.fromEntries(
 
 /** @type {Record<string, RentFleetCopy>} */
 const BY_MODEL = {
+  'hyundai i10': {
+    headline: 'City car',
+    blurb:
+      'Μικρό city car — ιδανικό για πόλη και εύκολο πάρκινγκ. Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Βενζίνη',
+    doors: 5,
+    luggage: '2 βαλίτσες',
+    highlights: ['Εύκολο πάρκινγκ', 'Χαμηλή κατανάλωση', 'A/C'],
+  },
+  'citroen c3': {
+    headline: 'Συμπαγές hatchback',
+    blurb:
+      'Συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
+    transmission: 'Χειροκίνητο',
+    fuel: 'Βενζίνη',
+    doors: 5,
+    luggage: '2 βαλίτσες',
+    highlights: ['A/C', 'Bluetooth', 'Οικονομικό'],
+  },
   'toyota yaris': {
     headline: 'Ιδανικό για πόλη',
     blurb:

@@ -149,11 +149,11 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
       return;
     }
 
-    // Client-only fake cards (never hit the office store).
+    // Client-only showcase cards (API empty) — allow full UI walkthrough.
     if (/^demo-rent-(car|van)-/i.test(String(vehicle.id))) {
-      writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'details' });
-      toast.error('Αυτό το όχημα δεν ανήκει στον στόλο του γραφείου.');
-      navigate('/rent#rent-guest-fleet');
+      writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'done', ...selection });
+      toast.success('Demo κράτηση — έτσι φαίνεται η ροή του γραφείου.');
+      navigate('/rent');
       return;
     }
 
