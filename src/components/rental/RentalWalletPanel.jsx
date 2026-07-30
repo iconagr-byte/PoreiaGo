@@ -11,6 +11,7 @@ import {
 import RentalWalletPass from './RentalWalletPass.jsx';
 
 const STATUS_LABEL = {
+  RESERVED: 'Εκκρεμεί πληρωμή',
   CONFIRMED: 'Επιβεβαιωμένη',
   ACTIVE: 'Σε εξέλιξη',
   COMPLETED: 'Ολοκληρωμένη',
@@ -35,8 +36,9 @@ function rankBooking(b) {
   const status = b.rental_status || '';
   if (status === 'ACTIVE') return 0;
   if (status === 'CONFIRMED') return 1;
-  if (status === 'COMPLETED') return 2;
-  return 3;
+  if (status === 'RESERVED') return 2;
+  if (status === 'COMPLETED') return 3;
+  return 4;
 }
 
 function sortBookings(rows) {
