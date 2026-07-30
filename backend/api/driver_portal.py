@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,11 @@ from database import AsyncSessionLocal
 from ticketing.boarding_service import get_boarding_manifest
 from travel_platform.operations.master_qr_local import DEFAULT_TENANT, _secret as local_secret
 from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
-from travel_platform.settings.drivers_store import authenticate_driver, get_driver
+from travel_platform.settings.drivers_store import (
+    DEMO_TENANT_ID,
+    authenticate_driver,
+    get_driver,
+)
 from travel_platform.telemetry.live_fleet import LiveFleetService
 from travel_platform.telemetry.processor import get_idling, get_live_fleet
 
@@ -214,14 +218,71 @@ def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None
     return 1
 
 
+async def _login_office_tenant(request: Request) -> str | None:
+    """Host / middleware office for this /driver login (None on bare platform host)."""
+    tid = getattr(request.state, "tenant_id", None)
+    if tid:
+        return str(tid)
+    try:
+        from api.request_tenant import public_tenant_id
+
+        return await public_tenant_id(request, allow_demo_fallback=False)
+    except Exception:
+        return None
+
+
 @router.post("/session/login", response_model=DriverSessionResponse)
-async def login_with_password(body: DriverLoginBody):
-    """Primary PWA login — username (email / license / plate) + password."""
-    driver = authenticate_driver(body.username, body.password)
-    if not driver:
-        raise HTTPException(status_code=401, detail="Λάθος όνομα χρήστη ή κωδικός")
-    # Must match the SaaS tenant the admin live map filters by (not the local demo UUID).
-    tenant_id = await resolve_platform_tenant_id()
+async def login_with_password(request: Request, body: DriverLoginBody):
+    """
+    Primary PWA login — username (email / license / plate) + password.
+
+    Locked to the Host office: the same credentials must not open a session
+    that paints GPS onto a different γραφείο.
+    """
+    office_tid = await _login_office_tenant(request)
+    platform_tid = ""
+    allow_demo_legacy = False
+    try:
+        platform_tid = str(await resolve_platform_tenant_id() or "").strip()
+    except Exception:
+        platform_tid = ""
+
+    if office_tid:
+        # Legacy DEMO rows only for the primary SaaS office (Achillio), never PoreiaGo.
+        allow_demo_legacy = bool(platform_tid and office_tid == platform_tid)
+        driver = authenticate_driver(
+            body.username,
+            body.password,
+            tenant_id=office_tid,
+            allow_demo_legacy=allow_demo_legacy,
+        )
+        if not driver:
+            raise HTTPException(
+                status_code=401,
+                detail="Λάθος όνομα χρήστη ή κωδικός — ή ο οδηγός ανήκει σε άλλο γραφείο",
+            )
+        # Session stays on this office (claim DEMO legacy onto the host office).
+        tenant_id = office_tid
+        driver_home = str(getattr(driver, "tenant_id", None) or DEMO_TENANT_ID)
+        if (
+            allow_demo_legacy
+            and driver_home == DEMO_TENANT_ID
+            and office_tid != DEMO_TENANT_ID
+        ):
+            try:
+                from travel_platform.settings.drivers_store import update_driver
+
+                update_driver(driver.id, {"tenant_id": office_tid})
+            except Exception:
+                pass
+    else:
+        # Platform host without office Host (rare) — still bind JWT to the
+        # driver's home tenant, never force the global Achillio platform id.
+        driver = authenticate_driver(body.username, body.password)
+        if not driver:
+            raise HTTPException(status_code=401, detail="Λάθος όνομα χρήστη ή κωδικός")
+        tenant_id = str(getattr(driver, "tenant_id", None) or DEMO_TENANT_ID)
+
     trip_id = _resolve_trip_for_driver(driver.id, tenant_id)
     return _issue_driver_session(
         driver_id=driver.id,
@@ -246,16 +307,24 @@ async def exchange_master_qr(body: MasterQrExchangeBody):
         trip_id = int(hybrid["trip_id"])
         driver_id = hybrid.get("driver_id")
         platform_tid = await resolve_platform_tenant_id()
-        tenant_id = coerce_driver_tenant_id(
-            str(hybrid.get("tenant_id") or ""),
-            platform_tenant_id=platform_tid,
-        )
+        qr_tid = str(hybrid.get("tenant_id") or "").strip()
+        # Keep real office UUIDs; only remap empty/demo QR onto platform.
+        tenant_id = coerce_driver_tenant_id(qr_tid, platform_tenant_id=platform_tid)
+        # If the QR names a driver, session must stay on that driver's office —
+        # never let a PoreiaGo driver paint Achillio (or the reverse).
+        if driver_id and driver_id != "master-qr-driver":
+            bound = get_driver(str(driver_id))
+            if bound:
+                home = str(getattr(bound, "tenant_id", None) or DEMO_TENANT_ID)
+                if home and home != DEMO_TENANT_ID:
+                    tenant_id = home
+                elif tenant_id == DEMO_TENANT_ID and platform_tid:
+                    tenant_id = platform_tid
         # Load office travelers into SQLite so scan validates against real bookings.
         try:
             await sync_trip_passengers_to_ticketing(trip_id, tenant_id=tenant_id)
         except Exception:
             pass
-        # Re-issue JWT with the coerced SaaS tenant so GPS ingest matches the live map.
         return _issue_driver_session(
             driver_id=driver_id,
             tenant_id=tenant_id,
