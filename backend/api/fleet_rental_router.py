@@ -114,7 +114,7 @@ async def list_vehicles(
     _: dict = Depends(_require_admin),
 ):
     tid = _tid(tenant_id)
-    store.ensure_demo_rental_fleet(tid)
+    store.purge_demo_rental_fleet(tid)
     return {"vehicles": store.list_vehicles(tid, category=category)}
 
 

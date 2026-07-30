@@ -149,14 +149,6 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
       return;
     }
 
-    // Client-only showcase cards (API empty) — allow full UI walkthrough.
-    if (/^demo-rent-(car|van)-/i.test(String(vehicle.id))) {
-      writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'done', ...selection });
-      toast.success('Demo κράτηση — έτσι φαίνεται η ροή του γραφείου.');
-      navigate('/rent');
-      return;
-    }
-
     setBusy(true);
     try {
       await ensureCustomerForRental({

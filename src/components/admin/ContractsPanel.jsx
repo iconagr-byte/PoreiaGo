@@ -271,19 +271,13 @@ export default function ContractsPanel({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {demoMode && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
-                <span className="material-symbols-outlined text-[16px]">science</span>
-                Demo · {trialDays}η δοκιμή
-              </span>
-            )}
             {rentEnabled && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-900">
                 <span className="material-symbols-outlined text-[16px]">car_rental</span>
                 {rentOnly ? 'Rent ενεργό' : 'Rent add-on ενεργό'}
               </span>
             )}
-            {!checkoutReady && !demoMode && billingConfig && (
+            {!checkoutReady && billingConfig && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900">
                 <span className="material-symbols-outlined text-[16px]">info</span>
                 Πληρωμές σε ρύθμιση

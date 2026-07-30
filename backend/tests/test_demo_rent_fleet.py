@@ -1,45 +1,79 @@
-"""Demo rental fleet seed (3 cars + 3 vans)."""
+"""Purge legacy demo rental fleet (no longer seeded)."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from unittest import mock
+
+import pytest
 
 from travel_platform.rental import rental_store as store
 
 
-def test_ensure_demo_rental_fleet_seeds_six_vehicles():
-    with TemporaryDirectory() as tmp:
-        path = Path(tmp) / "rental_store.json"
-        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(store, "DATA_DIR", Path(tmp)):
-            tid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-            added = store.ensure_demo_rental_fleet(tid)
-            assert added == 6
-            rows = store.list_vehicles(tid)
-            cats = sorted(v["category"] for v in rows)
-            assert cats.count("CAR") == 3
-            assert cats.count("VAN") == 3
-            assert all(v.get("photo_url") for v in rows)
-            # Idempotent
-            assert store.ensure_demo_rental_fleet(tid) == 0
-            assert len(store.list_vehicles(tid)) == 6
+@pytest.fixture()
+def rental_store_file(tmp_path, monkeypatch):
+    data_file = tmp_path / "rental_store.json"
+    monkeypatch.setattr(store, "STORE_FILE", data_file)
+    return data_file
 
 
-def test_public_catalog_auto_seeds_demo():
-    with TemporaryDirectory() as tmp:
-        path = Path(tmp) / "rental_store.json"
-        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(store, "DATA_DIR", Path(tmp)):
-            tid = "11111111-2222-3333-4444-555555555555"
-            catalog = store.public_catalog(tid)
-            assert len(catalog) == 6
-            assert {v["category"] for v in catalog} == {"CAR", "VAN"}
-            models = {v["model"] for v in catalog}
-            assert "Toyota Aygo X" in models
-            assert "Peugeot 208" in models
-            assert "Renault Clio" in models
-            assert "VW Multivan" in models
-            assert "Ford Transit Custom" in models
-            raw = json.loads(path.read_text(encoding="utf-8"))
-            assert len(raw["vehicles"]) == 6
+def test_purge_demo_rental_fleet_removes_seeded_rows(rental_store_file):
+    tid = "tenant-purge-demo"
+    payload = {
+        "vehicles": [
+            {
+                "id": f"demo-rent-{tid[:8]}-car-i10",
+                "tenant_id": tid,
+                "plate_number": "DEMO-C01",
+                "category": "CAR",
+                "model": "Toyota Aygo X",
+                "notes": "demo_rent_fleet_v1",
+            },
+            {
+                "id": "real-car-1",
+                "tenant_id": tid,
+                "plate_number": "ABC-1234",
+                "category": "CAR",
+                "model": "Office Car",
+                "notes": None,
+            },
+        ],
+        "bookings": [
+            {
+                "id": "b-demo",
+                "tenant_id": tid,
+                "vehicle_id": f"demo-rent-{tid[:8]}-car-i10",
+                "client_name": "Demo",
+            },
+            {
+                "id": "b-real",
+                "tenant_id": tid,
+                "vehicle_id": "real-car-1",
+                "client_name": "Real",
+            },
+        ],
+        "inspections": [],
+        "clients": [],
+    }
+    rental_store_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    removed = store.purge_demo_rental_fleet(tid)
+    assert removed["vehicles"] == 1
+    assert removed["bookings"] == 1
+
+    vehicles = store.list_vehicles(tid)
+    assert len(vehicles) == 1
+    assert vehicles[0]["id"] == "real-car-1"
+    assert store.ensure_demo_rental_fleet(tid) == 0
+    assert len(store.list_vehicles(tid)) == 1
+
+
+def test_public_catalog_does_not_seed_demo(rental_store_file):
+    rental_store_file.write_text(
+        json.dumps({"vehicles": [], "bookings": [], "inspections": [], "clients": []}),
+        encoding="utf-8",
+    )
+    tid = "tenant-empty-catalog"
+    rows = store.public_catalog(tid)
+    assert rows == []
+    assert store.list_vehicles(tid) == []

@@ -21,7 +21,6 @@ import {
   fetchPublicRentalAvailability,
   fetchPublicRentalCatalog,
 } from '../services/customerRentalApi.js';
-import { withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
 import { enrichRentFleet, homeCategoryLabel } from '../lib/rental/rentFleetEnrichment.js';
 import { rememberRentVehicle } from '../lib/rental/rentBookingExtras.js';
 import { writeRentBookingPrefs } from '../lib/rental/rentBookingSearch.js';
@@ -107,11 +106,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       .then((rows) => {
         if (cancelled) return;
         // Showcase: office fleet, or Hertz-like demo cards when empty.
-        setHomeFleet(enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24)));
+        setHomeFleet(enrichRentFleet((Array.isArray(rows) ? rows : []).slice(0, 24)));
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet(enrichRentFleet(withDemoRentFleet([])));
+        setHomeFleet(enrichRentFleet([]));
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);
@@ -215,7 +214,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                     pickupLocation: prefs.pickup_location,
                     dropoffLocation: prefs.dropoff_location || prefs.pickup_location,
                   });
-                  setHomeFleet(enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24)));
+                  setHomeFleet(enrichRentFleet((Array.isArray(rows) ? rows : []).slice(0, 24)));
                 } catch {
                   /* keep current catalog if availability fails */
                 } finally {
@@ -243,7 +242,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                     <p className="rent-pick-head-sub">
                       {searchActive
                         ? `${filteredHomeFleet.length} διαθέσιμα για τις ημερομηνίες σου`
-                        : `${carCount} επιβατικά · ${vanCount} van · demo στόλος γραφείου`}
+                        : `${carCount} επιβατικά · ${vanCount} van`}
                     </p>
                   </div>
                   <div className="rent-pick-filters">
@@ -291,7 +290,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   <p className="rent-home-fleet-empty">
                     {searchActive
                       ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες.'
-                      : 'Φόρτωση demo στόλου…'}
+                      : 'Φόρτωση στόλου…'}
                   </p>
                 )}
               </div>
@@ -423,7 +422,7 @@ function RentalAuthenticatedApp() {
     fetchCustomerRentalCatalog()
       .then((rows) => {
         if (cancelled) return;
-        const sliced = enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24));
+        const sliced = enrichRentFleet((Array.isArray(rows) ? rows : []).slice(0, 24));
         setHomeFleet(sliced);
         try {
           const preferredId = localStorage.getItem(PREFERRED_VEHICLE_ID_KEY);
@@ -437,7 +436,7 @@ function RentalAuthenticatedApp() {
       })
       .catch(() => {
         if (cancelled) return;
-        setHomeFleet(enrichRentFleet(withDemoRentFleet([])));
+        setHomeFleet(enrichRentFleet([]));
       })
       .finally(() => {
         if (!cancelled) setFleetLoading(false);

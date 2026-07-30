@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { RENT_SERVICE_FEATURES, rentServiceCopy } from '../../lib/rental/rentServicesCatalog.js';
-import { rentCategoryLabel, withDemoRentFleet } from '../../lib/rental/demoRentFleet.js';
+import { rentCategoryLabel } from '../../lib/rental/demoRentFleet.js';
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 
 /**
@@ -22,7 +22,7 @@ export default function StorefrontRentSection({
     ? `${brandName ? `${brandName}: ` : ''}online κράτηση — επιβατικά και van, ημερομηνίες και παραλαβή σε λίγα βήματα.`
     : 'Διαθέσιμος στόλος για ημερήσια ή πολυήμερη ενοικίαση, δίπλα στις εκδρομές μας.';
 
-  const preview = withDemoRentFleet(vehicles).slice(0, 6);
+  const preview = (Array.isArray(vehicles) ? vehicles : []).slice(0, 6);
   const cars = preview.filter((v) => String(v.category || '').toUpperCase() === 'CAR');
   const vans = preview.filter((v) => String(v.category || '').toUpperCase() === 'VAN');
 

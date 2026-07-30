@@ -63,240 +63,59 @@ def quote_extras(extra_ids: list[str] | None, *, days: int) -> dict[str, Any]:
     return {"lines": lines, "total": round(total, 2), "days": d}
 
 
-# Stable demo fleet (compact cars + vans) — seeded for empty demo offices.
-# Photos are Wikimedia Commons shots of the named models (not mismatched stock cars).
+# Demo fleet marker — used only to purge previously seeded showcase vehicles.
 _DEMO_FLEET_MARKER = "demo_rent_fleet_v1"
-_WM = "https://upload.wikimedia.org/wikipedia/commons/"
-_DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
-    {
-        "id_suffix": "car-i10",
-        "plate_number": "DEMO-C01",
-        "category": "CAR",
-        "model": "Toyota Aygo X",
-        "seating_capacity": 4,
-        "daily_rate_eur": 32,
-        "one_way_surcharge_eur": 25,
-        "with_driver_daily_eur": 80,
-        "current_mileage": 12400,
-        "photo_url": (
-            f"{_WM}thumb/a/a2/Toyota_Aygo_X_1X7A0063.jpg/"
-            "1280px-Toyota_Aygo_X_1X7A0063.jpg"
-        ),
-        "description": (
-            "Μοντέλο 2026 — μικρό city crossover, ιδανικό για πόλη και εύκολο πάρκινγκ. "
-            "Οικονομικό, με κλιματισμό και άνεση για έως 4 επιβάτες."
-        ),
-    },
-    {
-        "id_suffix": "car-c3",
-        "plate_number": "DEMO-C02",
-        "category": "CAR",
-        "model": "Peugeot 208",
-        "seating_capacity": 5,
-        "daily_rate_eur": 38,
-        "one_way_surcharge_eur": 28,
-        "with_driver_daily_eur": 85,
-        "current_mileage": 15600,
-        "photo_url": (
-            f"{_WM}thumb/d/d8/Peugeot_208_B_facelift_DSC_7227.jpg/"
-            "1280px-Peugeot_208_B_facelift_DSC_7227.jpg"
-        ),
-        "description": (
-            "Μοντέλο 2026 — συμπαγές hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. "
-            "Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση."
-        ),
-    },
-    {
-        "id_suffix": "car-yaris",
-        "plate_number": "DEMO-C03",
-        "category": "CAR",
-        "model": "Renault Clio",
-        "seating_capacity": 5,
-        "daily_rate_eur": 42,
-        "one_way_surcharge_eur": 30,
-        "with_driver_daily_eur": 90,
-        "current_mileage": 18200,
-        "photo_url": (
-            f"{_WM}thumb/c/c6/Renault_Clio_V_%282023%29_1X7A1577.jpg/"
-            "1280px-Renault_Clio_V_%282023%29_1X7A1577.jpg"
-        ),
-        "description": (
-            "Μοντέλο 2026 — συμπαγές και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και "
-            "κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες."
-        ),
-    },
-    {
-        "id_suffix": "van-transporter",
-        "plate_number": "DEMO-V01",
-        "category": "VAN",
-        "model": "VW Multivan",
-        "seating_capacity": 7,
-        "daily_rate_eur": 95,
-        "one_way_surcharge_eur": 50,
-        "with_driver_daily_eur": 140,
-        "current_mileage": 31200,
-        "photo_url": (
-            f"{_WM}thumb/c/c5/Volkswagen_T7_Multivan_1X7A0297.jpg/"
-            "1280px-Volkswagen_T7_Multivan_1X7A0297.jpg"
-        ),
-        "description": (
-            "Μοντέλο 2026 — ευρύχωρο Multivan για οικογένειες, εκδρομές και μεταφορές με αποσκευές. "
-            "Άνετη καμπίνα και χώρος για επιβάτες και εξοπλισμό."
-        ),
-    },
-    {
-        "id_suffix": "van-vito",
-        "plate_number": "DEMO-V02",
-        "category": "VAN",
-        "model": "Mercedes Vito",
-        "seating_capacity": 8,
-        "daily_rate_eur": 110,
-        "one_way_surcharge_eur": 55,
-        "with_driver_daily_eur": 150,
-        "current_mileage": 27800,
-        "photo_url": (
-            f"{_WM}thumb/5/5c/MERCEDES-BENZ_VITO_%28W447%29_China.jpg/"
-            "1280px-MERCEDES-BENZ_VITO_%28W447%29_China.jpg"
-        ),
-        "description": (
-            "Μοντέλο 2026 — premium van για άνετες μετακινήσεις ομάδας ή VIP transfers. "
-            "Ήσυχη καμπίνα, άνετα καθίσματα και παρουσία που ταιριάζει σε επαγγελματικές ή τουριστικές μετακινήσεις υψηλής στάθμης."
-        ),
-    },
-    {
-        "id_suffix": "van-trafic",
-        "plate_number": "DEMO-V03",
-        "category": "VAN",
-        "model": "Ford Transit Custom",
-        "seating_capacity": 9,
-        "daily_rate_eur": 88,
-        "one_way_surcharge_eur": 45,
-        "with_driver_daily_eur": 130,
-        "current_mileage": 33400,
-        "photo_url": (
-            f"{_WM}thumb/e/e4/Ford_Transit_Custom_%282023%29_1X7A1605.jpg/"
-            "1280px-Ford_Transit_Custom_%282023%29_1X7A1605.jpg"
-        ),
-        "description": (
-            "Μοντέλο 2026 — ευέλικτο van για τουρισμό και εταιρικές μετακινήσεις. "
-            "Ισορροπία χώρου, οικονομίας και ευελιξίας — ιδανικό για αεροδρόμιο, ξενοδοχεία και ημερήσιες εκδρομές με ομάδα."
-        ),
-    },
-)
 
 
-def _refresh_demo_fleet_copy(data: dict[str, Any], tenant_id: str) -> int:
-    """Refresh marketing copy + models on seeded demo vehicles (incl. plate remap)."""
-    by_suffix = {spec["id_suffix"]: spec for spec in _DEMO_VEHICLE_SPECS}
-    by_plate = {str(spec["plate_number"]).upper(): spec for spec in _DEMO_VEHICLE_SPECS}
-    updated = 0
-    now = _now()
-    for row in data.get("vehicles") or []:
-        if row.get("tenant_id") != tenant_id:
-            continue
-        if str(row.get("notes") or "") != _DEMO_FLEET_MARKER:
-            continue
-        vid = str(row.get("id") or "")
-        plate = str(row.get("plate_number") or "").strip().upper()
-        spec = by_plate.get(plate)
-        if not spec:
-            suffix = None
-            for key in by_suffix:
-                if vid.endswith(key) or key in vid:
-                    suffix = key
-                    break
-            if not suffix:
-                model = str(row.get("model") or "").strip().lower()
-                for key, candidate in by_suffix.items():
-                    if str(candidate.get("model") or "").strip().lower() == model:
-                        suffix = key
-                        break
-            spec = by_suffix.get(suffix) if suffix else None
-        if not spec:
-            continue
-        changed = False
-        for field, cast in (
-            ("model", str),
-            ("category", str),
-            ("seating_capacity", int),
-            ("daily_rate_eur", float),
-            ("one_way_surcharge_eur", float),
-            ("with_driver_daily_eur", float),
-            ("description", str),
-        ):
-            new_val = cast(spec.get(field))
-            old_val = row.get(field)
-            if field in ("daily_rate_eur", "one_way_surcharge_eur", "with_driver_daily_eur"):
-                try:
-                    if float(old_val or 0) != float(new_val):
-                        row[field] = float(new_val)
-                        changed = True
-                except (TypeError, ValueError):
-                    row[field] = float(new_val)
-                    changed = True
-            elif field == "seating_capacity":
-                if int(old_val or 0) != int(new_val):
-                    row[field] = int(new_val)
-                    changed = True
-            else:
-                if str(old_val or "").strip() != str(new_val or "").strip():
-                    row[field] = new_val
-                    changed = True
-        new_photo = str(spec.get("photo_url") or "").strip()
-        old_photo = str(row.get("photo_url") or "").strip()
-        if new_photo and old_photo != new_photo:
-            row["photo_url"] = new_photo
-            row["photo_urls"] = [new_photo]
-            changed = True
-        if changed:
-            row["updated_at"] = now
-            updated += 1
-    return updated
+def _is_demo_vehicle_row(row: dict[str, Any]) -> bool:
+    notes = str(row.get("notes") or "")
+    if notes == _DEMO_FLEET_MARKER:
+        return True
+    vid = str(row.get("id") or "")
+    if vid.startswith("demo-rent-"):
+        return True
+    plate = str(row.get("plate_number") or "").strip().upper()
+    return plate.startswith("DEMO-C") or plate.startswith("DEMO-V")
 
 
-def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
+def purge_demo_rental_fleet(tenant_id: str | None = None) -> dict[str, int]:
     """
-    Seed 3 επιβατικά + 3 van when the tenant has no rental vehicles yet.
-    Idempotent — skips if any vehicle already exists for the tenant.
-    Returns number of vehicles inserted.
+    Remove previously seeded demo rent vehicles and their bookings.
+    Offices keep only real fleet for contracts / paperwork.
     """
     tid = _normalize_tenant(tenant_id)
     with _LOCK:
         data = _read()
-        existing = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
-        if existing:
-            if _refresh_demo_fleet_copy(data, tid):
-                _write(data)
-            return 0
-        now = _now()
-        added = 0
-        for spec in _DEMO_VEHICLE_SPECS:
-            photo = str(spec.get("photo_url") or "").strip() or None
-            row = {
-                "id": f"demo-rent-{tid[:8]}-{spec['id_suffix']}",
-                "tenant_id": tid,
-                "plate_number": spec["plate_number"],
-                "category": spec["category"],
-                "model": spec["model"],
-                "seating_capacity": int(spec["seating_capacity"]),
-                "current_status": "AVAILABLE",
-                "current_mileage": int(spec.get("current_mileage") or 0),
-                "daily_rate_eur": float(spec["daily_rate_eur"]),
-                "one_way_surcharge_eur": float(spec.get("one_way_surcharge_eur") or 0),
-                "with_driver_daily_eur": float(spec.get("with_driver_daily_eur") or 0),
-                "gps_device_id": None,
-                "photo_url": photo,
-                "photo_urls": [photo] if photo else [],
-                "description": spec.get("description"),
-                "notes": _DEMO_FLEET_MARKER,
-                "created_at": now,
-                "updated_at": now,
-            }
-            data["vehicles"].append(row)
-            added += 1
-        if added:
-            _write(data)
-        return added
+        vehicles = list(data.get("vehicles") or [])
+        demo_ids = {
+            str(v.get("id"))
+            for v in vehicles
+            if v.get("tenant_id") == tid and _is_demo_vehicle_row(v)
+        }
+        if not demo_ids:
+            return {"vehicles": 0, "bookings": 0}
+        data["vehicles"] = [
+            v
+            for v in vehicles
+            if not (v.get("tenant_id") == tid and str(v.get("id")) in demo_ids)
+        ]
+        bookings = list(data.get("bookings") or [])
+        kept_bookings = []
+        removed_bookings = 0
+        for b in bookings:
+            if b.get("tenant_id") == tid and str(b.get("vehicle_id") or "") in demo_ids:
+                removed_bookings += 1
+                continue
+            kept_bookings.append(b)
+        data["bookings"] = kept_bookings
+        _write(data)
+        return {"vehicles": len(demo_ids), "bookings": removed_bookings}
+
+
+def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
+    """Deprecated no-op — demo rent fleet is no longer seeded."""
+    purge_demo_rental_fleet(tenant_id)
+    return 0
 
 
 def _now() -> str:
@@ -1065,8 +884,8 @@ def cancel_booking_for_customer(
 
 
 def public_catalog(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
-    """Customer-facing vehicle cards for this office. Seeds demo fleet when empty (showcase)."""
-    ensure_demo_rental_fleet(tenant_id)
+    """Customer-facing vehicle cards for this office (real fleet only — no demo seed)."""
+    purge_demo_rental_fleet(tenant_id)
     rows = list_vehicles(tenant_id, category=category)
     out = []
     for v in rows:
