@@ -168,26 +168,80 @@ def _driver_for_tenant(driver_id: str, tenant_id: str):
     return d
 
 
-async def _demo_legacy_flags(tenant_id: str) -> tuple[bool, bool]:
+def _host_looks_like_achillio(request: Request | None) -> bool:
+    """True when the admin Host is Achillio Travel (custom domain / subdomain)."""
+    if request is None:
+        return False
+    host = (request.headers.get("host") or "").split(":")[0].strip().lower()
+    host = host.removeprefix("www.")
+    if not host:
+        return False
+    if "achilliotravel" in host or host.endswith(".achillio.gr") or host == "achillio.gr":
+        return True
+    # Local / preview hosts used for the Achillio office.
+    if host.startswith("admin-achillio"):
+        return True
+    return False
+
+
+async def _tenant_is_achillio_office(tenant_id: str) -> bool:
+    """DB lookup — Achillio Travel offices may recover DEMO orphans."""
+    tid = str(tenant_id or "").strip()
+    if not tid or tid == str(DEMO_TENANT_ID):
+        return False
+    try:
+        from uuid import UUID
+
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import is_achillio_travel_office
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Tenant).where(Tenant.id == UUID(tid)).limit(1))
+            tenant = result.scalar_one_or_none()
+            return bool(tenant and is_achillio_travel_office(tenant))
+    except Exception:
+        logger.debug("Achillio office lookup failed for %s", tid, exc_info=True)
+        return False
+
+
+async def _demo_legacy_flags(
+    tenant_id: str,
+    request: Request | None = None,
+) -> tuple[bool, bool]:
     """
     (include, claim) for DEMO-tenant drivers that are not seed demos.
 
-    Primary SaaS office may see + permanently claim them. Other offices stay
-    strictly scoped once the platform tenant is known.
+    Achillio Travel (custom domain Host / platform tenant / Achillio office JWT)
+    may see + permanently claim them. Other SaaS offices stay strictly scoped.
     """
     tid = str(tenant_id or "").strip()
     if not tid or tid == str(DEMO_TENANT_ID):
         return False, False
+
+    if _host_looks_like_achillio(request):
+        return True, True
+
+    platform_tid = ""
     try:
         from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
 
         platform_tid = str(await resolve_platform_tenant_id() or "").strip()
-        if platform_tid:
-            if tid == platform_tid:
-                return True, True
-            return False, False
     except Exception:
         logger.debug("resolve_platform_tenant_id failed for drivers list", exc_info=True)
+
+    if platform_tid and tid == platform_tid:
+        return True, True
+
+    if await _tenant_is_achillio_office(tid):
+        return True, True
+
+    if platform_tid:
+        # Known multi-office deploy — do not leak Achilleas to PoreiaGo/etc.
+        return False, False
+
     # DB unavailable / single-office deploy — recover Achilleas-style orphans.
     return True, True
 
@@ -264,7 +318,7 @@ async def remove_user(user_id: str):
 @router.get("/drivers", response_model=list[FleetDriverResponse])
 async def get_drivers(request: Request, status: str | None = None):
     tenant_id = _request_tenant_id(request)
-    include_legacy, claim_legacy = await _demo_legacy_flags(tenant_id)
+    include_legacy, claim_legacy = await _demo_legacy_flags(tenant_id, request)
     rows = list_drivers_for_office(
         tenant_id,
         status,
