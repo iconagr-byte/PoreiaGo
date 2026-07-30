@@ -10,10 +10,13 @@ export const DEFAULT_RENT_APP_BRANDING = {
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
   rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου & van',
   rent_guest_hero_title_accent: 'για όλο το ταξίδι σας',
-  rent_guest_hero_copy:
-    'Δες τον στόλο, διάλεξε ημερομηνίες και κλείσε online — με ασφάλεια CDW, οδική βοήθεια και Rent Wallet.',
+  rent_guest_hero_copy: '',
   rent_cta_label: 'Βρες όχημα',
 };
+
+/** Legacy guest copy removed from /rent hero — treat as empty if still stored. */
+const OBSOLETE_RENT_GUEST_HERO_COPY =
+  'Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.';
 
 /**
  * @param {object} appearance
@@ -33,11 +36,11 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     : String(appearance.rent_hero_title || '').trim() ||
       DEFAULT_RENT_APP_BRANDING.rent_hero_title;
 
-  const copy = guest
-    ? String(appearance.rent_guest_hero_copy || '').trim() ||
-      DEFAULT_RENT_APP_BRANDING.rent_guest_hero_copy
+  let copy = guest
+    ? String(appearance.rent_guest_hero_copy || '').trim()
     : String(appearance.rent_hero_copy || '').trim() ||
       DEFAULT_RENT_APP_BRANDING.rent_hero_copy;
+  if (guest && copy === OBSOLETE_RENT_GUEST_HERO_COPY) copy = '';
 
   const titleAccent = guest
     ? String(appearance.rent_guest_hero_title_accent || '').trim() ||

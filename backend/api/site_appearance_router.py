@@ -69,7 +69,7 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
     "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
-    "rent_guest_hero_copy": "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.",
+    "rent_guest_hero_copy": "",
     "rent_cta_label": "Βρες όχημα",
     # Extra pickup/dropoff points for /rent search (office address is always included).
     "rent_pickup_locations": [],
@@ -127,9 +127,7 @@ class SiteAppearanceResponse(BaseModel):
         "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
     )
     rent_guest_hero_title: str = "Δες τον στόλο πριν κλείσεις"
-    rent_guest_hero_copy: str = (
-        "Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος."
-    )
+    rent_guest_hero_copy: str = ""
     rent_cta_label: str = "Βρες όχημα"
     rent_pickup_locations: list[str] = []
     homepage_theme_id: str = "aegean_classic"
