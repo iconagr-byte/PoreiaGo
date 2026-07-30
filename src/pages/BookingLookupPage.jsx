@@ -177,6 +177,13 @@ export default function BookingLookupPage() {
             Συμπλήρωσε το email και τον κωδικό από το μήνυμα επιβεβαίωσης για να ανοίξεις το εισιτήριό σου.
           </p>
 
+          <p className="booking-lookup-note" style={{ marginTop: 0, marginBottom: '1rem' }}>
+            Ψάχνεις <strong>ενοικίαση οχήματος</strong>;{' '}
+            <Link to="/rent/my-booking">Εύρεση κράτησης Rent</Link>
+            {' · '}
+            <Link to="/rent/wallet">Rent Wallet</Link>
+          </p>
+
           <form onSubmit={handleSubmit} className="booking-lookup-form" noValidate>
             <label className={`booking-lookup-field ${fieldError.email ? 'has-error' : ''}`} htmlFor="email">
               <span>Email κράτησης</span>
