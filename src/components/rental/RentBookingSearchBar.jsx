@@ -139,12 +139,6 @@ export default function RentBookingSearchBar({
                 ))}
               </select>
             </div>
-            <span className="rent-search-network" title="Δίκτυο γραφείου">
-              <span className="material-symbols-outlined" aria-hidden>
-                hub
-              </span>
-              Δίκτυο
-            </span>
           </div>
 
           {differentDropoff ? (
