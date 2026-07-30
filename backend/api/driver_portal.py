@@ -540,6 +540,13 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
     extra_tenants.discard(tenant_id)
     extra_tenants.discard("")
 
+    try:
+        from travel_platform.telemetry.driver_gps_heartbeat import clear_driver_gps
+
+        clear_driver_gps(session_payload)
+    except Exception:
+        pass
+
     removed: list[str] = []
     if tenant_id and driver_id:
         try:
@@ -549,21 +556,27 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
                 extra_tenant_ids=list(extra_tenants),
             )
         except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "remove_driver_vehicles failed tenant=%s driver=%s",
+                tenant_id,
+                driver_id,
+            )
             removed = []
 
-    if tenant_id:
+    offline_payload = {
+        "type": "fleet_driver_offline",
+        "tenant_id": tenant_id,
+        "driver_id": driver_id,
+        "trip_id": trip_id,
+        "reason": "shift_end",
+        "removed_vehicle_ids": removed,
+    }
+    broadcast_tenants = {tid for tid in [tenant_id, *extra_tenants] if tid}
+    for tid in broadcast_tenants:
         try:
-            await get_fleet_egress_hub().broadcast(
-                tenant_id,
-                {
-                    "type": "fleet_driver_offline",
-                    "tenant_id": tenant_id,
-                    "driver_id": driver_id,
-                    "trip_id": trip_id,
-                    "reason": "shift_end",
-                    "removed_vehicle_ids": removed,
-                },
-            )
+            await get_fleet_egress_hub().broadcast(tid, {**offline_payload, "tenant_id": tid})
         except Exception:
             pass
 

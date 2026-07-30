@@ -30,8 +30,11 @@ export async function fetchLiveFleet(authHeaders = adminAuthHeaders()) {
   }
   // Authenticated failures must not fall back to mock fleet (hides real LIVE drivers).
   if (authHeaders?.Authorization) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Αποτυχία live στόλου (${res.status})`);
+    const body = await res.json().catch(() => ({}));
+    const detail = body.detail || `Αποτυχία live στόλου (${res.status})`;
+    const err = new Error(typeof detail === 'string' ? detail : `Αποτυχία live στόλου (${res.status})`);
+    err.status = res.status;
+    throw err;
   }
   return getMockFleet();
 }
