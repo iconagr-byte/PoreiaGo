@@ -18,8 +18,13 @@ import {
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
 } from '../../../lib/email/mailReachability.js';
+import {
+  buildEmailChecksFromResult,
+  buildPendingEmailChecks,
+} from '../../../lib/email/emailConnectionChecks.js';
 import { PROVIDERS, detectProvider } from '../../../lib/email/emailProviderPresets.js';
 import EmailConnectWizard from './EmailConnectWizard.jsx';
+import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
 
 const EMPTY = {
   label: '',
@@ -92,6 +97,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [testChecks, setTestChecks] = useState([]);
+  const [testingAccountId, setTestingAccountId] = useState(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [showWizard, setShowWizard] = useState(Boolean(openConnectWizard));
   const fileInputRef = useRef(null);
@@ -227,6 +234,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     setEditingId('new');
     setForm({ ...EMPTY });
     setTestResult(null);
+    setTestChecks([]);
+    setTestingAccountId(null);
     setPasswordVisible(false);
   };
 
@@ -251,6 +260,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       is_active: acc.is_active !== false,
     });
     setTestResult(null);
+    setTestChecks([]);
+    setTestingAccountId(null);
     setPasswordVisible(false);
     requestAnimationFrame(() => {
       document.getElementById('email-settings-editor')?.scrollIntoView({
@@ -263,14 +274,25 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
   const runTest = async () => {
     setTesting(true);
     setTestResult(null);
+    const account = {
+      ...form,
+      imap_port: Number(form.imap_port),
+      smtp_port: Number(form.smtp_port),
+      mail_username: form.mail_username || form.email_address,
+      mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
+    };
+    setTestingAccountId(editingId || 'editor');
+    setTestChecks(
+      buildPendingEmailChecks(account).map((c, i) =>
+        i === 0
+          ? { ...c, status: 'running', detail: 'Ξεκινά έλεγχος IMAP & SMTP…' }
+          : { ...c, status: 'pending', detail: 'Αναμονή…' },
+      ),
+    );
     try {
-      const r = await testEmailConnection({
-        ...form,
-        imap_port: Number(form.imap_port),
-        smtp_port: Number(form.smtp_port),
-        mail_username: form.mail_username || form.email_address,
-        mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
-      });
+      const r = await testEmailConnection(account);
+      const built = buildEmailChecksFromResult(account, r);
+      setTestChecks(built.checks);
       if (r.ok) {
         const msg = 'IMAP & SMTP: επιτυχής σύνδεση';
         setTestResult({ ok: true, message: msg });
@@ -310,19 +332,76 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     } catch (err) {
       toast.error(err.message, { id: 'email-conn-test' });
       setTestResult({ ok: false, message: err.message, hint: syncErrorHint(err.message) });
+      setTestChecks((prev) =>
+        prev.map((c) =>
+          c.status === 'running' || c.status === 'pending'
+            ? { ...c, status: 'fail', detail: err.message }
+            : c,
+        ),
+      );
     } finally {
       setTesting(false);
     }
   };
 
   const runTestSaved = async (id) => {
+    const acc = accounts.find((a) => a.id === id);
+    if (!acc) {
+      toast.error('Ο λογαριασμός δεν βρέθηκε');
+      return;
+    }
     setTesting(true);
+    setTestingAccountId(id);
+    setTestResult(null);
+    setTestChecks(
+      buildPendingEmailChecks(acc).map((c, i) =>
+        i === 0
+          ? { ...c, status: 'running', detail: 'Ξεκινά έλεγχος IMAP & SMTP για αυτό το γραφείο…' }
+          : { ...c, status: 'pending', detail: 'Αναμονή…' },
+      ),
+    );
     try {
       const r = await testSavedEmailConnection(id);
-      if (r.ok) toast.success('Σύνδεση OK');
-      else toast.error(r.imap?.error || r.smtp?.error || 'Αποτυχία');
+      const built = buildEmailChecksFromResult(acc, r);
+      setTestChecks(built.checks);
+      if (r.ok) {
+        setTestResult({ ok: true, message: 'IMAP & SMTP: επιτυχής σύνδεση' });
+        toast.success('Σύνδεση OK — δείτε τα βήματα παρακάτω', { id: 'email-conn-test' });
+      } else {
+        const timeout = built.imapHostFail || built.smtpHostFail;
+        if (timeout) {
+          const hint = mailTimeoutHintEl({
+            mailHost: acc.imap_host || acc.smtp_host,
+            imapPort: Number(acc.imap_port) || 993,
+            smtpPort: Number(acc.smtp_port) || 465,
+          });
+          setTestResult({
+            ok: false,
+            message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
+            hint,
+            timeout: true,
+          });
+          toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
+        } else {
+          const msg = r.imap?.error || r.smtp?.error || 'Αποτυχία';
+          setTestResult({
+            ok: false,
+            message: msg,
+            hint: syncErrorHint(msg),
+          });
+          toast.error(msg, { id: 'email-conn-test' });
+        }
+      }
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.message, { id: 'email-conn-test' });
+      setTestResult({ ok: false, message: err.message, hint: syncErrorHint(err.message) });
+      setTestChecks((prev) =>
+        prev.map((c) =>
+          c.status === 'running' || c.status === 'pending'
+            ? { ...c, status: 'fail', detail: err.message }
+            : c,
+        ),
+      );
     } finally {
       setTesting(false);
     }
@@ -389,6 +468,8 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       mail_password: account.mail_password || '',
     });
     setTestResult(null);
+    setTestChecks([]);
+    setTestingAccountId(null);
     setPasswordVisible(false);
     requestAnimationFrame(() => {
       document.getElementById('email-settings-editor')?.scrollIntoView({
@@ -628,7 +709,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                       disabled={testing}
                       className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-1.5 text-label-sm font-bold text-primary hover:bg-primary/10 disabled:opacity-60"
                     >
-                      Έλεγχος
+                      {testing && testingAccountId === a.id ? 'Έλεγχος…' : 'Έλεγχος'}
                     </button>
                     <button
                       type="button"
@@ -646,6 +727,40 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                     </button>
                   </div>
                 </div>
+                {testingAccountId === a.id && testChecks.length > 0 ? (
+                  <div className="mt-3 border-t border-outline-variant/40 pt-3">
+                    <EmailConnectionCheckList
+                      checks={testChecks}
+                      testing={testing && testingAccountId === a.id}
+                      title={
+                        testing && testingAccountId === a.id
+                          ? 'Έλεγχος σε εξέλιξη — τι ελέγχεται'
+                          : 'Αποτέλεσμα ελέγχου σύνδεσης'
+                      }
+                    />
+                    {testResult && !testing ? (
+                      <div
+                        className={`mt-2 rounded-xl border px-3 py-2 text-body-sm ${
+                          testResult.ok
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                            : 'border-rose-200 bg-rose-50 text-rose-900'
+                        }`}
+                      >
+                        <p className="font-bold">
+                          {testResult.ok ? 'Έλεγχος επιτυχής' : 'Έλεγχος απέτυχε'}
+                        </p>
+                        {testResult.message ? (
+                          <p className="mt-1 whitespace-pre-wrap">{testResult.message}</p>
+                        ) : null}
+                        {!testResult.ok && testResult.hint ? (
+                          <p className="mt-1 text-label-sm opacity-90 whitespace-pre-wrap">
+                            {testResult.hint}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -964,7 +1079,21 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             </div>
           </section>
 
-          {testResult && (
+          {(testChecks.length > 0 &&
+            (testingAccountId === editingId || testingAccountId === 'editor')) ||
+          testResult ? (
+            <div className="space-y-2">
+              {testChecks.length > 0 &&
+              (testingAccountId === editingId || testingAccountId === 'editor') ? (
+                <EmailConnectionCheckList
+                  checks={testChecks}
+                  testing={testing}
+                  title={
+                    testing ? 'Έλεγχος σε εξέλιξη — τι ελέγχεται' : 'Αποτέλεσμα ελέγχου σύνδεσης'
+                  }
+                />
+              ) : null}
+              {testResult ? (
             <div
               className={`rounded-2xl border px-4 py-3 ${
                 testResult.ok
@@ -999,7 +1128,9 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                 </button>
               ) : null}
             </div>
-          )}
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-outline-variant/50 pt-4">
             <button
