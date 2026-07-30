@@ -90,8 +90,9 @@ class ListDriversForOfficeTests(unittest.TestCase):
             claim_demo_legacy=True,
         )
         self.assertEqual(listed, [])
+        # Seed rows are purged on reload — they must never stick on an office.
         store.reset_drivers_cache()
-        self.assertEqual(store.get_driver(seed_id).tenant_id, store.DEMO_TENANT_ID)
+        self.assertIsNone(store.get_driver(seed_id))
 
     def test_other_office_without_legacy_flag_stays_empty(self):
         self._create(

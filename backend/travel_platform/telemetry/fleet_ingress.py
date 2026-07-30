@@ -127,10 +127,27 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         coerce_driver_tenant_id,
         resolve_platform_tenant_id,
     )
+    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+    from travel_platform.settings.drivers_store import (
+        DEMO_TENANT_ID,
+        get_driver,
+        is_seed_driver,
+        update_driver,
+    )
     from travel_platform.telemetry.ingress_rate_limit import check_driver_gps_rate_limit
     from travel_platform.telemetry.settings_store import get_telemetry_settings
 
-    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+    driver_id = str(session.get("driver_id") or body.get("driver_id") or "").strip()
+    if driver_id:
+        bound = get_driver(driver_id)
+        if is_seed_driver(bound):
+            logger.info("Rejecting GPS from purged seed demo driver=%s", driver_id)
+            return {
+                "ok": False,
+                "rejected": True,
+                "detail": "Demo driver removed",
+                "tenant_id": str(session.get("tenant_id") or ""),
+            }
 
     platform_tid = await resolve_platform_tenant_id()
     raw_tid = str(session.get("tenant_id") or body.get("tenant_id") or "").strip()
@@ -140,6 +157,34 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         tenant_id = raw_tid
     else:
         tenant_id = coerce_driver_tenant_id(raw_tid, platform_tenant_id=platform_tid)
+
+    # Never paint a pin for a driver that is not on this office's Οδηγοί list.
+    # Claim non-seed DEMO orphans onto the session office so Achilleas can appear
+    # once (and only once) under that γραφείο.
+    if driver_id and tenant_id and tenant_id != str(DEMO_TENANT_ID):
+        bound = get_driver(driver_id)
+        if bound and not is_seed_driver(bound):
+            home = str(getattr(bound, "tenant_id", None) or DEMO_TENANT_ID)
+            if home == str(DEMO_TENANT_ID):
+                try:
+                    update_driver(driver_id, {"tenant_id": tenant_id})
+                    home = tenant_id
+                except Exception:
+                    logger.debug("legacy DEMO claim on GPS failed driver=%s", driver_id, exc_info=True)
+            if home != tenant_id:
+                logger.info(
+                    "Rejecting GPS — driver=%s home=%s session=%s (not on office list)",
+                    driver_id,
+                    home,
+                    tenant_id,
+                )
+                return {
+                    "ok": False,
+                    "rejected": True,
+                    "detail": "Ο οδηγός δεν ανήκει σε αυτό το γραφείο",
+                    "tenant_id": tenant_id,
+                }
+
     session = {**session, "tenant_id": tenant_id}
     if isinstance(body, dict):
         body = {**body, "tenant_id": tenant_id}

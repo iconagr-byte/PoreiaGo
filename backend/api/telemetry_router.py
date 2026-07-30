@@ -112,11 +112,15 @@ async def fleet_live(
     except Exception:
         log.debug("fleet_live trail load skipped", exc_info=True)
 
+    from travel_platform.telemetry.office_fleet_filter import office_allows_live_driver
+
     for v in vehicles:
         try:
             meta = await live.vehicle_meta_async(tenant_id, v.vehicle_id)
             if not meta:
                 meta = live._vehicles.get(v.vehicle_id, {})
+            if not office_allows_live_driver(str(tenant_id), meta.get("driver_id"), meta):
+                continue
             media = enrich_live_vehicle_media(
                 driver_id=meta.get("driver_id"),
                 bus_plate=meta.get("bus_plate", v.vehicle_code),

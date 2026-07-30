@@ -147,40 +147,29 @@ def _driver_to_row(d: FleetDriver) -> dict:
 
 
 def _seed() -> dict[str, FleetDriver]:
-    today = date.today()
-    # Stable IDs so restarts without a store file stay predictable in demos.
-    seeds = [
-        ("a1000000-0000-4000-8000-000000000001", "Νίκος Παπαδόπουλος", "XAH-4021", "XAH-4021", "AB123456", "+30 694 111 0001", "nikos.driver@aerostride.com", 145000, 312, 94),
-        ("a1000000-0000-4000-8000-000000000002", "Γιώργος Γεωργίου", "YZA-9901", "YZA-9901", "AB234567", "+30 694 222 0002", "giorgos.driver@aerostride.com", 280500, 428, 88),
-        ("a1000000-0000-4000-8000-000000000003", "Κώστας Κωνσταντίνου", "IMB-1055", "IMB-1055", "AB345678", "+30 694 333 0003", "kostas.driver@aerostride.com", 410200, 501, 91),
-        ("a1000000-0000-4000-8000-000000000004", "Ανδρέας Ανδρέου", "XAH-4022", "XAH-4022", "AB456789", "+30 694 444 0004", "andreas.driver@aerostride.com", 42000, 89, 97),
-    ]
-    drivers: dict[str, FleetDriver] = {}
-    pwd_hash = hash_password(DEFAULT_DRIVER_PASSWORD)
-    for did, name, vcode, plate, lic, phone, email, km, trips, safety in seeds:
-        drivers[did] = FleetDriver(
-            id=did,
-            name=name,
-            license_no=lic,
-            phone=phone,
-            email=email,
-            hiring_date=date(2022, 3, 15),
-            status="active" if vcode != "IMB-1055" else "on_leave",
-            vehicle_code=vcode,
-            license_plate=plate,
-            salary_per_km=0.45,
-            salary_per_trip=25.0,
-            current_balance=round(trips * 25.0 * 0.3, 2),
-            safety_score=safety,
-            trips_completed=trips,
-            total_km=float(km),
-            license_expires_at=date(today.year + 1, 6, 30),
-            avg_rating=4.2 + (safety % 5) * 0.1,
-            password_hash=pwd_hash,
-            photo_url=None,
-            tenant_id=DEMO_TENANT_ID,
-        )
-    return drivers
+    """No built-in demo drivers — offices create real accounts only."""
+    return {}
+
+
+def purge_seed_demo_drivers() -> int:
+    """
+    Remove Νίκος/Γιώργος/… seed rows from the live store.
+
+    Returns how many rows were deleted. Safe to call on every process boot.
+    """
+    drivers = _ensure()
+    removed = 0
+    for did in list(SEED_DRIVER_IDS):
+        if did in drivers:
+            del drivers[did]
+            removed += 1
+    if removed:
+        try:
+            _persist()
+            logger.info("Purged %s seed demo driver(s) from %s", removed, STORE_PATH)
+        except Exception:
+            logger.exception("Failed to persist after purging seed demo drivers")
+    return removed
 
 
 def _normalize_username(value: str | None) -> str:
@@ -257,6 +246,16 @@ def _ensure() -> dict[str, FleetDriver]:
         else:
             _drivers = _seed()
             _persist()
+        # Drop legacy seed demos that still sit on disk from older deploys.
+        stale = [did for did in SEED_DRIVER_IDS if did in _drivers]
+        if stale:
+            for did in stale:
+                del _drivers[did]
+            try:
+                _persist()
+                logger.info("Removed %s seed demo driver(s) on load", len(stale))
+            except Exception:
+                logger.exception("Failed to persist seed demo purge on load")
     return _drivers
 
 
@@ -303,6 +302,20 @@ def is_seed_driver(driver: FleetDriver | None) -> bool:
     if not driver:
         return False
     return str(getattr(driver, "id", "") or "") in SEED_DRIVER_IDS
+
+
+def office_driver_id_set(
+    tenant_id: str,
+    *,
+    include_demo_legacy: bool = False,
+) -> set[str]:
+    """Driver ids the office may show on Οδηγοί / live map."""
+    rows = list_drivers_for_office(
+        tenant_id,
+        include_demo_legacy=include_demo_legacy,
+        claim_demo_legacy=False,
+    )
+    return {str(d.id) for d in rows if d and not is_seed_driver(d)}
 
 
 def list_drivers_for_office(
@@ -414,6 +427,7 @@ def find_driver_by_username(
             allow_demo_legacy
             and tid != DEMO_TENANT_ID
             and dtid == DEMO_TENANT_ID
+            and not is_seed_driver(d)
         ):
             return d
     return None
@@ -431,7 +445,9 @@ def authenticate_driver(
         tenant_id=tenant_id,
         allow_demo_legacy=allow_demo_legacy,
     )
-    if not driver or driver.status not in ("active", "on_leave"):
+    if not driver or is_seed_driver(driver):
+        return None
+    if driver.status not in ("active", "on_leave"):
         return None
     stored = driver.password_hash
     if not stored:
