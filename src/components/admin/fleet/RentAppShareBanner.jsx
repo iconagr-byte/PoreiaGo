@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { QRCode } from 'react-qr-code';
 import toast from 'react-hot-toast';
 import { fetchTenantBrandingSettings } from '../../../services/growthApi.js';
-import { getOfficeRentUrl } from '../../../lib/platform/officePublicUrl.js';
+import { getOfficeRentWalletUrl } from '../../../lib/platform/officePublicUrl.js';
 
 export default function RentAppShareBanner() {
   const [rentUrl, setRentUrl] = useState('');
@@ -15,18 +15,18 @@ export default function RentAppShareBanner() {
 
   useEffect(() => {
     let cancelled = false;
-    // 1) Resolve current office (JWT tenant branding), 2) then emit link + QR.
+    // 1) Resolve current office (JWT tenant branding), 2) then emit Rent Wallet link + QR.
     fetchTenantBrandingSettings()
       .then((branding) => {
         if (cancelled) return;
         const office = branding || {};
         setOfficeName(office.display_name || office.slug || office.subdomain || 'Γραφείο');
-        setRentUrl(getOfficeRentUrl(office));
+        setRentUrl(getOfficeRentWalletUrl(office));
       })
       .catch(() => {
         if (cancelled) return;
         setOfficeName('Γραφείο');
-        setRentUrl(getOfficeRentUrl({}));
+        setRentUrl(getOfficeRentWalletUrl({}));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -96,18 +96,18 @@ export default function RentAppShareBanner() {
           </div>
           <div className="min-w-0">
             <p className="font-bold tracking-tight">
-              Εφαρμογή πελατών · /rent
+              Rent Wallet · /rent/wallet
               {officeName ? (
                 <span className="ml-1.5 font-semibold text-[#6e6e73]">· {officeName}</span>
               ) : null}
             </p>
             <p className="mt-0.5 text-[#6e6e73] text-[13px] leading-snug">
-              Σκανάρετε το QR για κράτηση, ημερολόγιο και εγκατάσταση στην αρχική οθόνη. Νέα
-              κράτηση → push στο γραφείο.
+              Πράσινο My Wallet ενοικίασης — χωριστά από το μπλε /wallet λεωφορείων. Σκανάρετε για
+              σύνδεση, κρατήσεις και εγκατάσταση.
             </p>
             <div className="mt-2 rounded-xl bg-[#f5f5f7] border border-black/[0.04] px-3 py-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#6e6e73]">
-                Σύνδεσμος γραφείου
+                Σύνδεσμος Rent Wallet
               </p>
               <code className="text-[11px] break-all text-[#1d1d1f] leading-snug">
                 {loading ? 'Φόρτωση γραφείου…' : rentUrl || '—'}
@@ -115,12 +115,12 @@ export default function RentAppShareBanner() {
             </div>
             <div className="mt-2.5 flex flex-wrap gap-2">
               <a
-                href={rentUrl || '/rent'}
+                href={rentUrl || '/rent/wallet'}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#0b3d4a] text-white text-xs font-bold shadow-md shadow-teal-900/20"
               >
-                Άνοιγμα /rent
+                Άνοιγμα /rent/wallet
                 <span className="material-symbols-outlined text-[16px]">open_in_new</span>
               </a>
               <button

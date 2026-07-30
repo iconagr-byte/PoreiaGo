@@ -1,73 +1,45 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
+import { markPreferRentLookup } from '../../lib/rental/preferRentLookup.js';
 
 /**
- * Guest header utilities — booking / account / language.
- * Soft chip design; account icon opens Είσοδος / Εγγραφή menu.
+ * Guest header — booking / account / language.
+ * «Η κράτησή μου» is a hard link to Rent Wallet only — never bus /my-booking.
  */
 export default function RentGuestTopActions({ onAccount } = {}) {
   const [lang, setLang] = useState(() => getRentLang());
-  const [bookingOpen, setBookingOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const rootRef = useRef(null);
 
   useEffect(() => {
-    if (!bookingOpen && !accountOpen) return undefined;
+    markPreferRentLookup();
+  }, []);
+
+  useEffect(() => {
+    if (!accountOpen) return undefined;
     const onDoc = (e) => {
-      if (!rootRef.current?.contains(e.target)) {
-        setBookingOpen(false);
-        setAccountOpen(false);
-      }
+      if (!rootRef.current?.contains(e.target)) setAccountOpen(false);
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [bookingOpen, accountOpen]);
+  }, [accountOpen]);
 
   const el = lang !== 'en';
   const bookingLabel = el ? 'Η κράτησή μου' : 'My booking';
-  const findLabel = el ? 'Εύρεση κράτησης' : 'Find booking';
   const loginLabel = el ? 'Είσοδος' : 'Sign in';
   const registerLabel = el ? 'Εγγραφή' : 'Register';
   const accountAria = el ? 'Λογαριασμός' : 'Account';
 
   return (
     <div className="rent-top-actions" ref={rootRef}>
-      <div className="rent-top-chip-wrap">
-        <button
-          type="button"
-          className={`rent-top-chip${bookingOpen ? ' is-open' : ''}`}
-          aria-expanded={bookingOpen}
-          aria-haspopup="menu"
-          onClick={() => {
-            setBookingOpen((v) => !v);
-            setAccountOpen(false);
-          }}
-        >
-          <span className="material-symbols-outlined" aria-hidden>
-            confirmation_number
-          </span>
-          <span className="rent-top-chip-label">{bookingLabel}</span>
-          <span className="material-symbols-outlined rent-top-chip-caret" aria-hidden>
-            expand_more
-          </span>
-        </button>
-        {bookingOpen ? (
-          <div className="rent-top-menu" role="menu">
-            <Link
-              to="/my-booking"
-              role="menuitem"
-              className="rent-top-menu-item"
-              onClick={() => setBookingOpen(false)}
-            >
-              <span className="material-symbols-outlined" aria-hidden>
-                search
-              </span>
-              {findLabel}
-            </Link>
-          </div>
-        ) : null}
-      </div>
+      {/* Direct navigation — no submenu that could point at bus /my-booking */}
+      <a href="/rent/wallet" className="rent-top-chip" title="Rent Wallet">
+        <span className="material-symbols-outlined" aria-hidden>
+          account_balance_wallet
+        </span>
+        <span className="rent-top-chip-label">{bookingLabel}</span>
+      </a>
 
       <div className="rent-top-chip-wrap">
         <button
@@ -77,10 +49,7 @@ export default function RentGuestTopActions({ onAccount } = {}) {
           aria-expanded={accountOpen}
           aria-haspopup="menu"
           title={accountAria}
-          onClick={() => {
-            setAccountOpen((v) => !v);
-            setBookingOpen(false);
-          }}
+          onClick={() => setAccountOpen((v) => !v)}
         >
           <span className="material-symbols-outlined" aria-hidden>
             person
@@ -103,11 +72,22 @@ export default function RentGuestTopActions({ onAccount } = {}) {
               to="/rent/register"
               role="menuitem"
               className="rent-top-menu-item"
-              state={{ from: { pathname: '/rent' }, rentEntrance: true }}
+              state={{ from: { pathname: '/rent/wallet' }, rentEntrance: true }}
               onClick={() => setAccountOpen(false)}
             >
               {registerLabel}
             </Link>
+            <a
+              href="/rent/my-booking"
+              role="menuitem"
+              className="rent-top-menu-item"
+              onClick={() => setAccountOpen(false)}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                search
+              </span>
+              {el ? 'Εύρεση κράτησης Rent' : 'Find rent booking'}
+            </a>
           </div>
         ) : null}
       </div>

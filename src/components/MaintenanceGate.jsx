@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { fetchPlatformSettings } from '../services/platformApi.js';
 import AchillioLogo from './AchillioLogo.jsx';
 
-const BYPASS_PREFIXES = ['/admin', '/driver', '/wallet', '/login', '/my-booking', '/ticket'];
+const BYPASS_PREFIXES = ['/admin', '/driver', '/wallet', '/login', '/my-booking', '/rent/my-booking', '/rent/login', '/ticket'];
 
 /**
  * Blocks B2C routes when platform maintenance_mode is on.

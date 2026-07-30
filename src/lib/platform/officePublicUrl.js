@@ -114,11 +114,32 @@ export function getOfficeWalletUrl(branding = {}) {
   return `${origin}/wallet`;
 }
 
+/** Bus My Wallet login — blue product, separate from Rent. */
+export function getOfficeWalletLoginUrl(branding = {}) {
+  const origin = getOfficePublicOrigin(branding).replace(/\/$/, '');
+  if (!origin) return '/login';
+  return `${origin}/login`;
+}
+
 /** Customer rental PWA — absolute URL for QR / share (current office). */
 export function getOfficeRentUrl(branding = {}) {
   const origin = getOfficePublicOrigin(branding).replace(/\/$/, '');
   if (!origin) return '/rent';
   return `${origin}/rent`;
+}
+
+/** Rent My Wallet — green product, separate from bus /wallet. */
+export function getOfficeRentWalletUrl(branding = {}) {
+  const origin = getOfficePublicOrigin(branding).replace(/\/$/, '');
+  if (!origin) return '/rent/wallet';
+  return `${origin}/rent/wallet`;
+}
+
+/** Rent Wallet login — green auth page. */
+export function getOfficeRentLoginUrl(branding = {}) {
+  const origin = getOfficePublicOrigin(branding).replace(/\/$/, '');
+  if (!origin) return '/rent/login';
+  return `${origin}/rent/login`;
 }
 
 export function getOfficeStorefrontUrl(branding = {}) {

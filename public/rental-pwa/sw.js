@@ -4,7 +4,7 @@
  *
  * Navigations always prefer the live SPA shell. The offline page is last resort only.
  */
-const CACHE = 'poreiago-rental-v6';
+const CACHE = 'poreiago-rental-v8';
 const OFFLINE_URL = '/rental-pwa/offline.html';
 const APP_SHELL = '/index.html';
 

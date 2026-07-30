@@ -461,3 +461,89 @@
     animation: none;
   }
 }
+
+/* Rent product — teal accents (separate from bus My Wallet blue) */
+.booking-lookup-shell--rent {
+  --bl-accent: #0a7a6c;
+  --bl-accent-deep: #0b3d4a;
+  background:
+    radial-gradient(900px 480px at 8% -10%, rgba(10, 122, 108, 0.14), transparent 55%),
+    radial-gradient(720px 400px at 100% 0%, rgba(11, 61, 74, 0.08), transparent 52%),
+    linear-gradient(180deg, #f5f5f7 0%, #eef5f3 55%, #e8eded 100%);
+}
+
+.booking-lookup-shell--rent .booking-lookup-glow--a {
+  background: rgba(10, 122, 108, 0.18);
+}
+
+.booking-lookup-shell--rent .booking-lookup-note a {
+  color: var(--bl-accent-deep);
+  font-weight: 560;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Choose bus vs rent when landing on /my-booking */
+.booking-lookup-product-gate {
+  margin: 0 0 0.25rem;
+  padding: 1rem 1.05rem;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(10, 122, 108, 0.08), rgba(0, 113, 227, 0.06));
+  border: 1px solid rgba(11, 61, 74, 0.12);
+}
+
+.booking-lookup-product-gate-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1d1d1f;
+}
+
+.booking-lookup-product-gate-actions {
+  display: grid;
+  gap: 0.55rem;
+}
+
+@media (min-width: 420px) {
+  .booking-lookup-product-gate-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.booking-lookup-product-gate-bus,
+.booking-lookup-product-gate-rent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 48px;
+  padding: 0.65rem 0.85rem;
+  border-radius: 14px;
+  font-size: 0.88rem;
+  font-weight: 680;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.booking-lookup-product-gate-bus {
+  background: #fff;
+  color: #0071e3;
+  border-color: rgba(0, 113, 227, 0.28);
+}
+
+.booking-lookup-product-gate-rent {
+  background: #0b3d4a;
+  color: #f2fbf8;
+  border-color: #0a7a6c;
+}
+
+.booking-lookup-product-gate-bus:hover,
+.booking-lookup-product-gate-rent:hover {
+  transform: translateY(-1px);
+}
+
+.booking-lookup-product-gate .material-symbols-outlined {
+  font-size: 1.15rem;
+}
