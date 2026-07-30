@@ -7,7 +7,6 @@ import {
   HowItWorksSection,
   PainPointsSection,
   PricingTeaserSection,
-  RentProductSection,
 } from '../components/marketing/PlatformLandingSections.jsx';
 import { PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
 
@@ -22,9 +21,9 @@ export default function FrontPage() {
             <a href="#features" className="hover:text-white transition-colors">
               Λειτουργίες
             </a>
-            <a href="#rent" className="hover:text-white transition-colors">
+            <Link to="/rent" className="hover:text-white transition-colors">
               Ενοικιάσεις
-            </a>
+            </Link>
             <a href="#pricing" className="hover:text-white transition-colors">
               Τιμές
             </a>
@@ -52,7 +51,6 @@ export default function FrontPage() {
         <HeroSection />
         <PainPointsSection />
         <FeaturesSection />
-        <RentProductSection />
         <HowItWorksSection />
         <PricingTeaserSection />
         <FinalCtaSection />

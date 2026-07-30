@@ -327,9 +327,9 @@ export function RentProductSection() {
               Ενοικιάσεις οχημάτων με SOS, οδική βοήθεια και καθαρή ασφάλεια
             </h2>
             <p className="mt-4 text-base md:text-lg text-teal-50/75 leading-relaxed max-w-xl">
-              Ξεχωριστό συμβόλαιο μόνο για Rent, ή add-on πάνω στο πλάνο λεωφορείων. Ο πελάτης
-              βλέπει τις υπηρεσίες στο <span className="text-white font-semibold">/rent/services</span>{' '}
-              — χωρίς σύνδεση.
+              Ξεχωριστό συμβόλαιο μόνο για Rent, ή add-on πάνω στο πλάνο λεωφορείων. Δες τον στόλο
+              παραπάνω ή τις υπηρεσίες στο{' '}
+              <span className="text-white font-semibold">/rent/services</span> — χωρίς σύνδεση.
             </p>
             <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-teal-50/90">
               {[
@@ -349,12 +349,18 @@ export function RentProductSection() {
               ))}
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/rent/services"
+              <a
+                href="#rent-guest-fleet"
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white text-teal-950 font-bold hover:bg-teal-50"
               >
-                Δες την υπηρεσία
+                Δες τον στόλο
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </a>
+              <Link
+                to="/rent/services"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
+              >
+                Υπηρεσίες Rent
               </Link>
               <Link
                 to="/grafeia"
