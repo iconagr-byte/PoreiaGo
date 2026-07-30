@@ -105,11 +105,6 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
     e?.preventDefault?.();
     setSaving(true);
     try {
-      const pickupLocations = String(form.rent_pickup_locations_text || '')
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .slice(0, 20);
       const payload = {
         rent_office_name: form.rent_office_name.trim(),
         rent_hero_title: form.rent_hero_title.trim(),
@@ -117,7 +112,6 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
         rent_cta_label: form.rent_cta_label.trim(),
         rent_guest_hero_title: form.rent_guest_hero_title.trim(),
         rent_guest_hero_copy: form.rent_guest_hero_copy.trim(),
-        rent_pickup_locations: pickupLocations,
       };
       // Keep storefront brand in sync when rent office name is set.
       if (payload.rent_office_name) {
@@ -194,19 +188,13 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
           ))}
 
           <label className="rent-brand-field">
-            <span className="rent-brand-field-label">Επιπλέον σημεία παραλαβής</span>
+            <span className="rent-brand-field-label">Σημεία παραλαβής</span>
             <span className="rent-brand-field-hint">
-              Ένα ανά γραμμή (π.χ. Αεροδρόμιο, Λιμάνι). Το γραφείο + διεύθυνση προστίθεται αυτόματα.
+              Διαχειρίζονται από το μενού Ενοικιάσεις → Σημεία παραλαβής (όχι εδώ).
             </span>
-            <textarea
-              rows={4}
-              className="rent-brand-input"
-              value={form.rent_pickup_locations_text || ''}
-              placeholder={'Αεροδρόμιο\nΛιμάνι\nΞενοδοχείο …'}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, rent_pickup_locations_text: e.target.value }))
-              }
-            />
+            <p className="text-sm text-teal-800 font-semibold mt-1">
+              Admin → Ενοικιάσεις → Σημεία παραλαβής
+            </p>
           </label>
 
           <div className="rent-brand-actions">

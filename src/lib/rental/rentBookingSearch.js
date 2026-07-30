@@ -15,8 +15,9 @@ export const RENT_BOOKING_PREFS_KEY = 'rent_booking_prefs_v1';
 export function buildRentLocationOptions(office = {}) {
   const brand = String(office.brandLabel || office.officeName || 'Γραφείο').trim() || 'Γραφείο';
   const address = String(office.footerAddress || '').trim();
-  const officeLabel = address ? `${brand} — ${address}` : brand;
-  const officeValue = address || brand;
+  // Guest UI shows «Γραφείο» like Hertz network field; extras come from admin pickups.
+  const officeValue = 'Γραφείο';
+  const officeLabel = address ? `Γραφείο — ${address}` : brand !== 'Γραφείο' ? `Γραφείο · ${brand}` : 'Γραφείο';
 
   const options = [
     { id: 'office', label: officeLabel, value: officeValue, kind: 'office' },
@@ -31,6 +32,7 @@ export function buildRentLocationOptions(office = {}) {
   extras.forEach((raw, idx) => {
     const label = String(raw || '').trim();
     if (!label) return;
+    if (label.toLowerCase() === 'γραφείο') return;
     options.push({
       id: `extra-${idx}`,
       label,
