@@ -107,6 +107,8 @@ FILE_STORE_ADMIN_PREFIXES = (
     "/api/admin/platform/bank-accounts",
     "/api/admin/platform/rent-plan-catalog",
     "/api/admin/platform/drivers",
+    # Fleet coaches/vans — JSON file store (same isolation model as drivers).
+    "/api/admin/platform/fleet",
 )
 
 

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -15,10 +17,27 @@ from travel_platform.settings.drivers_store import DEMO_TENANT_ID, list_drivers
 ServiceStatus = Literal["OK", "Warning", "Urgent"]
 AlertSeverity = Literal["warning", "urgent"]
 
-DATA_DIR = Path(__file__).resolve().parent
-STORE_FILE = DATA_DIR / "fleet_store.json"
-NOTIFICATION_LOG = DATA_DIR / "fleet_notifications.log"
-UPLOAD_DIR = DATA_DIR / "uploads"
+# Prefer persistent volume in production (docker mount /app/data).
+_PKG_DIR = Path(__file__).resolve().parent
+_DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or (_PKG_DIR.parents[1] / "data"))
+_LEGACY_STORE = _PKG_DIR / "fleet_store.json"
+STORE_FILE = Path(os.getenv("FLEET_VEHICLES_STORE") or (_DATA_DIR / "fleet_store.json"))
+NOTIFICATION_LOG = _DATA_DIR / "fleet_notifications.log"
+UPLOAD_DIR = _DATA_DIR / "fleet_uploads"
+# Keep package-relative alias for older imports/tests that patch DATA_DIR.
+DATA_DIR = _DATA_DIR
+
+
+def _ensure_store_path() -> None:
+    """Migrate legacy package-local store onto the durable data volume once."""
+    STORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    if STORE_FILE.exists() or not _LEGACY_STORE.is_file():
+        return
+    try:
+        shutil.copy2(_LEGACY_STORE, STORE_FILE)
+    except OSError:
+        pass
 
 DEFAULT_AMENITIES: dict[str, list[str]] = {
     "Luxury Coach": [
@@ -222,6 +241,7 @@ class ServiceService:
             )
 
     def _load(self) -> None:
+        _ensure_store_path()
         if not STORE_FILE.exists():
             # Start empty — never inject demo coaches for new offices.
             self._persist()
@@ -303,13 +323,16 @@ class ServiceService:
             )
 
     def _persist(self) -> None:
+        _ensure_store_path()
         payload = {
             "vehicles": [_iso(asdict(v)) for v in self._vehicles.values()],
             "events": [_iso(asdict(e)) for e in self._events.values()],
             "alerts": [_iso(asdict(a)) for a in self._alerts.values()],
             "expenses": [_iso(asdict(e)) for e in self._expenses.values()],
         }
-        STORE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp = STORE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(STORE_FILE)
 
     def _service_threshold(self, v: Vehicle) -> float:
         return float(v.next_service_threshold or (v.last_service_mileage + v.service_interval_km))

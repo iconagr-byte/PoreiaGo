@@ -537,15 +537,19 @@ export default function BackOffice() {
         setFleetCards(cards);
         setFleetAlerts(alerts);
         if (vehicles.length) {
-          const firstId = selectedFleetVehicleId || vehicles[0].id;
-          setSelectedFleetVehicleId(firstId);
-          setServiceForm((prev) => ({ ...prev, vehicle_id: firstId }));
+          setSelectedFleetVehicleId((prev) => prev || vehicles[0].id);
+          setServiceForm((prev) => ({
+            ...prev,
+            vehicle_id: prev.vehicle_id || vehicles[0].id,
+          }));
         }
       })
       .catch(() => {
-        /* fallback to local mock data */
+        /* offline — keep current list */
       });
-  }, [activeTab, selectedFleetVehicleId]);
+    // Only reload when entering the fleet tab — not when selection changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'dashboard' || fleetVehicles.length) return;
@@ -1828,7 +1832,17 @@ export default function BackOffice() {
           open={addVehicleOpen}
           onClose={() => setAddVehicleOpen(false)}
           onCreated={async (vehicle) => {
-            await reloadFleetData(vehicle?.id);
+            if (vehicle?.id) {
+              setFleetVehicles((prev) =>
+                prev.some((v) => v.id === vehicle.id) ? prev : [vehicle, ...prev],
+              );
+              setSelectedFleetVehicleId(vehicle.id);
+            }
+            try {
+              await reloadFleetData(vehicle?.id);
+            } catch {
+              /* optimistic row already shown */
+            }
           }}
         />
       </div>
