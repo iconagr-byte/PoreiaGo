@@ -28,8 +28,11 @@ export default function AgencySignupPage() {
   const [searchParams] = useSearchParams();
   const initialPlan = searchParams.get('plan') || 'professional';
   const initialInterval = searchParams.get('interval') || 'month';
+  const wantsRentAddon = searchParams.get('addon') === 'rent';
 
-  const [planId, setPlanId] = useState(initialPlan);
+  const [planId, setPlanId] = useState(
+    wantsRentAddon && initialPlan === 'rent' ? 'professional' : initialPlan,
+  );
   const [interval, setInterval] = useState(
     initialInterval === 'year' ? 'year' : 'month',
   );
@@ -101,6 +104,13 @@ export default function AgencySignupPage() {
 
     setWorking(true);
     try {
+      if (wantsRentAddon) {
+        try {
+          sessionStorage.setItem('poreiago_pending_rent_addon_v1', '1');
+        } catch {
+          /* ignore */
+        }
+      }
       const result = await createSignupCheckout({
         legalName: legalName.trim(),
         adminEmail: adminEmail.trim().toLowerCase(),
@@ -130,8 +140,11 @@ export default function AgencySignupPage() {
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <PlatformBrand variant="light" />
           <nav className="flex items-center gap-3">
-            <Link to="/grafeia" className="text-sm font-semibold text-gray-600 hover:text-primary">
-              Συμβόλαια
+            <Link
+              to={planId === 'rent' || wantsRentAddon ? '/grafeia/rent' : '/grafeia'}
+              className="text-sm font-semibold text-gray-600 hover:text-primary"
+            >
+              {planId === 'rent' || wantsRentAddon ? 'Συμβόλαια ενοικιάσεων' : 'Συμβόλαια λεωφορείων'}
             </Link>
             <Link
               to="/admin/login"
@@ -161,6 +174,12 @@ export default function AgencySignupPage() {
                   ? 'Χωρίς πραγματική χρέωση: δημιουργείται αμέσως ο tenant, ο admin λογαριασμός και trial συνδρομή για δοκιμή.'
                   : 'Μετά την πληρωμή δημιουργείται αυτόματα ο tenant, ο admin λογαριασμός και η συνδρομή σας.'}
               </p>
+              {wantsRentAddon ? (
+                <p className="mt-3 text-xs font-semibold text-teal-900 bg-teal-50 border border-teal-200 rounded-2xl px-3 py-2 leading-relaxed">
+                  Επιλέξατε <strong>λεωφορεία + Rent add-on</strong>. Πρώτα δημιουργείται συμβόλαιο
+                  λεωφορείων· μετά την είσοδο ενεργοποιείτε το Rent από Ρυθμίσεις → Συμβόλαιο.
+                </p>
+              ) : null}
               {demoMode ? (
                 <p className="mt-3 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2">
                   Demo mode ενεργό — ιδανικό για δοκιμή νέου γραφείου.

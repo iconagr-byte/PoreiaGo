@@ -15,6 +15,7 @@ import WalletMagicPage from './pages/WalletMagicPage.jsx';
 import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
 import RentalServicesPage from './pages/RentalServicesPage.jsx';
 import RentBookingWizardPage from './pages/RentBookingWizardPage.jsx';
+import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
 import InBusPortal from './pages/InBusPortal';
 import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
@@ -72,16 +73,19 @@ function App() {
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
             <Route path="/wallet/magic" element={<WalletMagicPage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
-            {/* Rent auth lives on /rent (share URL). /rent/login is an alias only. */}
-            <Route path="/rent/login" element={<Navigate to="/rent" replace />} />
+            {/* Rent: green URLs — /rent/login + /rent/wallet + /rent/my-booking (not bus). */}
+            <Route path="/rent/login" element={<LoginPage rentEntrance />} />
             <Route path="/rent/register" element={<RegisterPage />} />
+            <Route path="/rent/my-booking" element={<RentBookingLookupPage />} />
             <Route path="/rent/services" element={<RentalServicesPage />} />
             <Route path="/rent/book/services" element={<RentBookingWizardPage />} />
+            <Route path="/rent/wallet" element={<RentalCustomerApp />} />
             <Route path="/rent" element={<RentalCustomerApp />} />
             <Route path="/rent/*" element={<RentalCustomerApp />} />
             <Route path="/" element={<HomePage />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />
-            <Route path="/grafeia" element={<AgencyPlansPage />} />
+            <Route path="/grafeia" element={<AgencyPlansPage product="buses" />} />
+            <Route path="/grafeia/rent" element={<AgencyPlansPage product="rent" />} />
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />
             <Route path="/grafeia/signup/success" element={<AgencySignupSuccessPage />} />
             <Route path="/login" element={<LoginPage />} />

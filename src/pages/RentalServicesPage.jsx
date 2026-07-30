@@ -70,7 +70,7 @@ export default function RentalServicesPage() {
               {t('book', lang)}
             </Link>
             <Link
-              to="/grafeia"
+              to="/grafeia/rent"
               className="text-sm font-bold px-4 py-2 rounded-full bg-teal-700 text-white hover:bg-teal-800"
             >
               {en ? 'Contracts' : 'Συμβόλαια'}
@@ -184,7 +184,7 @@ export default function RentalServicesPage() {
                     to={`/grafeia/signup?plan=rent&interval=month`}
                     className="mt-8 inline-flex justify-center items-center gap-2 px-5 py-3.5 rounded-full bg-teal-700 text-white font-bold hover:bg-teal-800"
                   >
-                    {en ? 'Start Rent-only contract' : standalone.ctaGuest}
+                    {en ? 'Register' : standalone.ctaGuest}
                   </Link>
                 </article>
               ) : null}
@@ -211,10 +211,10 @@ export default function RentalServicesPage() {
                     ))}
                   </ul>
                   <Link
-                    to="/grafeia"
+                    to="/grafeia/rent"
                     className="mt-8 inline-flex justify-center items-center gap-2 px-5 py-3.5 rounded-full bg-slate-900 text-white font-bold hover:opacity-90"
                   >
-                    {en ? 'Add on a bus contract' : addon.ctaGuest}
+                    {en ? 'Register' : addon.ctaGuest}
                   </Link>
                 </article>
               ) : null}
@@ -230,7 +230,7 @@ export default function RentalServicesPage() {
             <Link to="/" className="hover:text-slate-900">
               {en ? 'Home' : 'Αρχική'}
             </Link>
-            <Link to="/grafeia" className="hover:text-slate-900">
+            <Link to="/grafeia/rent" className="hover:text-slate-900">
               {en ? 'Contracts' : 'Συμβόλαια'}
             </Link>
             <Link to="/rent" className="hover:text-slate-900">

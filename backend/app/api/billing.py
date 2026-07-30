@@ -35,6 +35,7 @@ from app.services.tenant_modules import (
     is_poreiago_platform_office,
     modules_for_tenant,
     parse_tenant_settings,
+    rent_addon_eligibility,
 )
 
 logger = logging.getLogger(__name__)
@@ -109,13 +110,26 @@ async def enable_rent_addon(
     tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
     _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
 ):
-    """Enable Rent module as add-on on the current bus office plan (keeps trips)."""
+    """Enable Rent module as add-on — only on an active bus office plan (keeps trips)."""
     tenant = await _load_tenant(db, tenant_id)
-    if tenant.plan == TenantPlan.RENT:
-        mods = modules_for_tenant(tenant)
+    billing = BillingService(db)
+    sub = await billing.get_or_create_subscription(tenant)
+    ok, err = rent_addon_eligibility(tenant, subscription_status=sub.status.value)
+    if not ok:
+        # Already on standalone rent: soft response (idempotent UX).
+        if tenant.plan == TenantPlan.RENT:
+            mods = modules_for_tenant(tenant)
+            return BillingEnableRentAddonResponse(
+                **mods,
+                message=err or "Το γραφείο είναι ήδη σε αυτόνομο Rent συμβόλαιο",
+            )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=err)
+
+    mods_before = modules_for_tenant(tenant)
+    if mods_before.get("rent_enabled") and mods_before.get("trips_enabled"):
         return BillingEnableRentAddonResponse(
-            **mods,
-            message="Το γραφείο είναι ήδη σε αυτόνομο Rent συμβόλαιο",
+            **mods_before,
+            message="Το Rent add-on είναι ήδη ενεργό πάνω στο συμβόλαιο λεωφορείων",
         )
 
     current = parse_tenant_settings(tenant.settings_json)
@@ -132,7 +146,7 @@ async def enable_rent_addon(
     mods = modules_for_tenant(tenant)
     return BillingEnableRentAddonResponse(
         **mods,
-        message="Το Rent add-on ενεργοποιήθηκε — εμφανίζεται το μενού Ενοικιάσεις",
+        message="Το Rent add-on ενεργοποιήθηκε πάνω στο συμβόλαιο λεωφορείων",
     )
 
 

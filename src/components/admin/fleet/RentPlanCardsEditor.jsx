@@ -1,5 +1,5 @@
 /**
- * Edit marketing cards for PoreiaGo Rent (standalone + add-on) shown on /grafeia.
+ * Edit marketing cards for PoreiaGo Rent (standalone + add-on) shown on /grafeia/rent.
  * Polished editor: live preview, feature rows, sticky save.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -9,6 +9,7 @@ import {
   RENT_ADDON,
   RENT_STANDALONE_PLAN,
   mergeRentPlanCatalog,
+  normalizeRentCtaLabel,
 } from '../../../lib/billing/planCatalog.js';
 import {
   fetchAdminRentPlanCatalog,
@@ -25,8 +26,8 @@ function cardToForm(card) {
     tagline: card.tagline || '',
     monthlyEur: card.monthlyEur ?? '',
     features: features.length ? features : [''],
-    ctaLoggedIn: card.ctaLoggedIn || '',
-    ctaGuest: card.ctaGuest || '',
+    ctaLoggedIn: normalizeRentCtaLabel(card.ctaLoggedIn || 'Εγγραφή'),
+    ctaGuest: normalizeRentCtaLabel(card.ctaGuest || 'Εγγραφή'),
     servicesLinkLabel: card.servicesLinkLabel || '',
     visible: card.visible !== false,
   };
@@ -40,8 +41,8 @@ function formToCard(form) {
     tagline: String(form.tagline || '').trim(),
     monthlyEur: Number.isFinite(monthly) ? monthly : 0,
     features: (form.features || []).map((l) => String(l).trim()).filter(Boolean),
-    ctaLoggedIn: String(form.ctaLoggedIn || '').trim(),
-    ctaGuest: String(form.ctaGuest || '').trim(),
+    ctaLoggedIn: normalizeRentCtaLabel(form.ctaLoggedIn || 'Εγγραφή'),
+    ctaGuest: normalizeRentCtaLabel(form.ctaGuest || 'Εγγραφή'),
     servicesLinkLabel: String(form.servicesLinkLabel || '').trim(),
     visible: Boolean(form.visible),
   };
@@ -162,7 +163,7 @@ function PlanPreview({ form, tone = 'teal' }) {
   return (
     <div className={`rent-plan-preview rent-plan-preview--${tone}${card.visible ? '' : ' is-hidden'}`}>
       {!card.visible ? (
-        <p className="rent-plan-preview-hidden">Κρυφή στο /grafeia</p>
+        <p className="rent-plan-preview-hidden">Κρυφή στο /grafeia/rent</p>
       ) : null}
       <span className="rent-plan-preview-badge">{card.badge || 'Badge'}</span>
       <h4 className="rent-plan-preview-title">{card.name || 'Τίτλος'}</h4>
@@ -260,6 +261,7 @@ function CardEditor({ title, subtitle, tone, form, onChange, showServicesLink })
                 className="rent-plan-input"
                 value={form.ctaLoggedIn}
                 onChange={(e) => set({ ctaLoggedIn: e.target.value })}
+                placeholder="Εγγραφή"
               />
             </Field>
             <Field label="Κουμπί (επισκέπτης)">
@@ -267,6 +269,7 @@ function CardEditor({ title, subtitle, tone, form, onChange, showServicesLink })
                 className="rent-plan-input"
                 value={form.ctaGuest}
                 onChange={(e) => set({ ctaGuest: e.target.value })}
+                placeholder="Εγγραφή"
               />
             </Field>
           </div>
@@ -377,7 +380,7 @@ export default function RentPlanCardsEditor() {
           <p className="rent-plan-editor-kicker">Marketing · σελίδα συμβολαίων SaaS</p>
           <h3 className="rent-plan-editor-hero-title">Κάρτες τιμών ενοικιάσεων</h3>
           <p className="rent-plan-editor-hero-copy">
-            Τιμές και κείμενα για τη δημόσια σελίδα /grafeia. Η χαρτούρα κάθε κράτησης (υπογραφές,
+            Τιμές και κείμενα για τη δημόσια σελίδα /grafeia/rent. Η χαρτούρα κάθε κράτησης (υπογραφές,
             σύμβαση) είναι στο μενού «Χαρτούρα».
           </p>
         </div>
@@ -392,12 +395,12 @@ export default function RentPlanCardsEditor() {
             Επαναφόρτωση
           </button>
           <a
-            href="/grafeia"
+            href="/grafeia/rent"
             target="_blank"
             rel="noreferrer"
             className="rent-plan-secondary-btn"
           >
-            Άνοιγμα /grafeia
+            Άνοιγμα /grafeia/rent
             <span className="material-symbols-outlined text-[16px]" aria-hidden>
               open_in_new
             </span>

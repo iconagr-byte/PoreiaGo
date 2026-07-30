@@ -34,7 +34,7 @@ export default function RegisterPage() {
   const redirectTo = pathRent
     ? isRentReturn(location.state?.from)
       ? location.state.from
-      : '/rent'
+      : '/rent/wallet'
     : location.state?.from || '/wallet';
   const rentIntent = pathRent || isRentReturn(redirectTo);
   const [error, setError] = useState('');
@@ -172,22 +172,36 @@ export default function RegisterPage() {
           </span>
           <h1>
             {rentIntent
-              ? 'Λογαριασμός ενοικίασης'
+              ? 'Rent Wallet'
               : claim
                 ? 'Αποθήκευση στο My Wallet'
                 : 'Εγγραφή My Wallet'}
           </h1>
           <p className={leadClass}>
             {rentIntent
-              ? 'Δημιουργήστε λογαριασμό για να κλείσετε όχημα. Μετά την εγγραφή μπαίνετε στην εφαρμογή ενοικίασης.'
+              ? 'Δημιουργήστε λογαριασμό για ενοικίαση οχήματος — ξεχωριστά από τα λεωφορεία.'
               : claim
                 ? 'Δημιουργήστε λογαριασμό για να δείτε το εισιτήριο και το QR επιβίβασης'
-                : 'Δημιουργήστε λογαριασμό για ταξίδια με λεωφορείο'}
+                : 'Δημιουργήστε λογαριασμό μόνο για ταξίδια με λεωφορείο'}
           </p>
           <p className={hintClass}>
-            {rentIntent
-              ? 'Τα λεωφορεία είναι στο My Wallet (μπλε) — εδώ είναι μόνο η ενοικίαση.'
-              : 'Η ενοικίαση οχήματος είναι στην εφαρμογή Rent (πράσινο).'}
+            {rentIntent ? (
+              <>
+                Τα λεωφορεία είναι στο{' '}
+                <Link to="/login" className={linkClass}>
+                  My Wallet
+                </Link>{' '}
+                (μπλε, /login).
+              </>
+            ) : (
+              <>
+                Η ενοικίαση είναι στο{' '}
+                <Link to="/rent/login" className={linkClass}>
+                  Rent Wallet
+                </Link>{' '}
+                (πράσινο, /rent/login).
+              </>
+            )}
           </p>
         </div>
 
@@ -227,7 +241,7 @@ export default function RegisterPage() {
               {error}{' '}
               {error.includes('σύνδεση') ? (
                 <Link
-                  to={rentIntent ? '/rent' : '/login'}
+                  to={rentIntent ? '/rent/login' : '/login'}
                   state={loginState}
                   className="font-bold underline"
                 >
@@ -297,7 +311,7 @@ export default function RegisterPage() {
 
         <p className="text-sm text-center mt-6 text-[#6e6e73]">
           Έχετε ήδη λογαριασμό;{' '}
-          <Link to={rentIntent ? '/rent' : '/login'} state={loginState} className={linkClass}>
+          <Link to={rentIntent ? '/rent/login' : '/login'} state={loginState} className={linkClass}>
             Σύνδεση
           </Link>
         </p>
@@ -307,7 +321,13 @@ export default function RegisterPage() {
               Εύρεση κράτησης χωρίς λογαριασμό
             </Link>
           </p>
-        ) : null}
+        ) : (
+          <p className="text-xs text-center mt-4">
+            <Link to="/rent/my-booking" className={linkClass}>
+              Εύρεση κράτησης ενοικίασης
+            </Link>
+          </p>
+        )}
           </div>
         </div>
       </div>

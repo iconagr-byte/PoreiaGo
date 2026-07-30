@@ -615,7 +615,7 @@ export default function FleetRentalPanel({
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
               { id: 'live_gps', label: 'Ζωντανά GPS', copy: `${overlays.length} ενεργά για χάρτη`, icon: 'my_location' },
-              { id: 'plans', label: 'Κάρτες τιμών', copy: 'Τιμές marketing στη σελίδα /grafeia', icon: 'sell' },
+              { id: 'plans', label: 'Κάρτες τιμών', copy: 'Τιμές marketing στη σελίδα /grafeia/rent', icon: 'sell' },
             ].map((hub) => (
               <button
                 key={hub.id}
