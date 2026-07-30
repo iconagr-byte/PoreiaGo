@@ -34,7 +34,6 @@ import RentAppBrandingEditor from './RentAppBrandingEditor.jsx';
 import RentPickupLocationsEditor from './RentPickupLocationsEditor.jsx';
 import RentCoverageExtrasEditor from './RentCoverageExtrasEditor.jsx';
 import RentNotificationsEditor from './RentNotificationsEditor.jsx';
-import RentPaymentsPanel from './RentPaymentsPanel.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../../../services/siteAppearanceApi.js';
@@ -619,7 +618,13 @@ export default function FleetRentalPanel({
               { id: 'clients', label: 'Πελάτες ενοικίασης', copy: `${clients.length} πελάτες · γραφείο + Wallet`, icon: 'groups' },
               { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
               { id: 'paperwork', label: 'Χαρτούρα συμβολαίων', copy: 'Συμβάσεις · υπογραφές · εκτύπωση PDF', icon: 'description' },
-              { id: 'payments', label: 'Πληρωμές /rent', copy: 'Προκαταβολή · κάρτα · τράπεζα · μετρητά', icon: 'payments' },
+              {
+                id: 'payments_settings',
+                label: 'Ρυθμίσεις → Πληρωμές',
+                copy: 'Προκαταβολή · κάρτα · τράπεζα · μετρητά (ίδιο μενού γραφείου)',
+                icon: 'payments',
+                designHref: '/admin?tab=settings&sub=payments',
+              },
               { id: 'pickups', label: 'Σημεία παραλαβής', copy: 'Γραφείο · αεροδρόμιο · λιμάνι στο /rent', icon: 'location_on' },
               { id: 'branding', label: 'Εμφάνιση /rent', copy: 'Σχεδιασμός σελίδων → Ενοικιάσεις', icon: 'palette', designHref: '/admin?tab=settings&sub=homepage&page=rent' },
               { id: 'vehicles', label: 'Οχήματα ενοικίασης', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
@@ -1321,8 +1326,6 @@ export default function FleetRentalPanel({
       {tab === 'services' && <RentCoverageExtrasEditor />}
 
       {tab === 'notifications' && <RentNotificationsEditor />}
-
-      {tab === 'payments' && <RentPaymentsPanel />}
 
       {tab === 'pickups' && <RentPickupLocationsEditor />}
 

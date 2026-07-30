@@ -24,4 +24,9 @@ describe('rent desk nav vs bus fleet', () => {
     expect(rentVehicles.type).toBe('fleet_rental_subtab');
     expect(rentVehicles.tab).toBe('fleet_rental');
   });
+
+  it('does not duplicate office Πληρωμές inside the rent desk nav', () => {
+    expect(RENT_DESK_TABS.map((t) => t.id)).not.toContain('payments');
+    expect(buildRentDeskNavItems().fleet_rental_payments).toBeUndefined();
+  });
 });
