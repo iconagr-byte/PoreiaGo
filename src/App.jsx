@@ -37,6 +37,7 @@ import AgencySignupPage from './pages/AgencySignupPage';
 import AgencySignupSuccessPage from './pages/AgencySignupSuccessPage';
 import CheckoutPage from './pages/CheckoutPage';
 import BookingLookupPage from './pages/BookingLookupPage';
+import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
 import CheckoutResumePage from './pages/CheckoutResumePage';
 import TicketPrintPage from './pages/TicketPrintPage.jsx';
 import FiscalReceiptPrintPage from './pages/FiscalReceiptPrintPage.jsx';
@@ -72,11 +73,13 @@ function App() {
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
             <Route path="/wallet/magic" element={<WalletMagicPage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
-            {/* Rent auth lives on /rent (share URL). /rent/login is an alias only. */}
-            <Route path="/rent/login" element={<Navigate to="/rent" replace />} />
+            {/* Rent: dedicated green URLs — /rent/login + /rent/wallet (not bus /login|/wallet). */}
+            <Route path="/rent/login" element={<LoginPage rentEntrance />} />
             <Route path="/rent/register" element={<RegisterPage />} />
+            <Route path="/rent/my-booking" element={<RentBookingLookupPage />} />
             <Route path="/rent/services" element={<RentalServicesPage />} />
             <Route path="/rent/book/services" element={<RentBookingWizardPage />} />
+            <Route path="/rent/wallet" element={<RentalCustomerApp />} />
             <Route path="/rent" element={<RentalCustomerApp />} />
             <Route path="/rent/*" element={<RentalCustomerApp />} />
             <Route path="/" element={<HomePage />} />
@@ -85,6 +88,7 @@ function App() {
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />
             <Route path="/grafeia/signup/success" element={<AgencySignupSuccessPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/wallet/login" element={<Navigate to="/login" replace />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />

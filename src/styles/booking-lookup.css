@@ -461,3 +461,24 @@
     animation: none;
   }
 }
+
+/* Rent product — teal accents (separate from bus My Wallet blue) */
+.booking-lookup-shell--rent {
+  --bl-accent: #0a7a6c;
+  --bl-accent-deep: #0b3d4a;
+  background:
+    radial-gradient(900px 480px at 8% -10%, rgba(10, 122, 108, 0.14), transparent 55%),
+    radial-gradient(720px 400px at 100% 0%, rgba(11, 61, 74, 0.08), transparent 52%),
+    linear-gradient(180deg, #f5f5f7 0%, #eef5f3 55%, #e8eded 100%);
+}
+
+.booking-lookup-shell--rent .booking-lookup-glow--a {
+  background: rgba(10, 122, 108, 0.18);
+}
+
+.booking-lookup-shell--rent .booking-lookup-note a {
+  color: var(--bl-accent-deep);
+  font-weight: 560;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

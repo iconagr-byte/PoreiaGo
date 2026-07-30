@@ -495,15 +495,15 @@ function WalletAuthenticatedApp() {
                   <span className="material-symbols-outlined">directions_car</span>
                 </span>
                 <div>
-                  <h2>Εφαρμογή ενοικίασης</h2>
+                  <h2>Rent Wallet (ενοικίαση)</h2>
                   <p>
-                    Η κράτηση οχήματος γίνεται πλέον στη dedicated εφαρμογή — εγκαταστήσιμη στην
-                    αρχική οθόνη του κινητού.
+                    Οι κρατήσεις οχημάτων είναι στο πράσινο Rent Wallet — χωριστά από τα εισιτήρια
+                    λεωφορείου εδώ.
                   </p>
                 </div>
               </div>
-              <Link to="/rent" className="wallet-btn wallet-btn-primary wallet-btn-block">
-                Άνοιγμα /rent
+              <Link to="/rent/wallet" className="wallet-btn wallet-btn-primary wallet-btn-block">
+                Άνοιγμα /rent/wallet
               </Link>
             </section>
             <RentalCatalogPanel />

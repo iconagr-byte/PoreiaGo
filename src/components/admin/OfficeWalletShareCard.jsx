@@ -94,11 +94,11 @@ export default function OfficeWalletShareCard() {
           Πελάτες
         </p>
         <h3 className="mt-1 text-[19px] font-semibold tracking-tight text-zinc-900">
-          My Wallet — QR γραφείου
+          My Wallet λεωφορείων — QR
         </h3>
         <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-500 tracking-tight">
-          Σκανάρετε ή μοιραστείτε τον σύνδεσμο. Ανοίγει το{' '}
-          <span className="font-medium text-zinc-700">My Wallet</span> αυτού του γραφείου.
+          Μόνο εισιτήρια λεωφορείου (<span className="font-medium text-zinc-700">/wallet</span>). Η
+          ενοικίαση είναι στο πράσινο Rent Wallet (<span className="font-medium text-zinc-700">/rent/wallet</span>).
         </p>
       </div>
 

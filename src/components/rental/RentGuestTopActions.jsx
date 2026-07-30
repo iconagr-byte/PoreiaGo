@@ -55,7 +55,7 @@ export default function RentGuestTopActions({ onAccount } = {}) {
         {bookingOpen ? (
           <div className="rent-top-menu" role="menu">
             <Link
-              to="/my-booking"
+              to="/rent/my-booking"
               role="menuitem"
               className="rent-top-menu-item"
               onClick={() => setBookingOpen(false)}
@@ -88,22 +88,23 @@ export default function RentGuestTopActions({ onAccount } = {}) {
         </button>
         {accountOpen ? (
           <div className="rent-top-menu rent-top-menu--account" role="menu">
-            <button
-              type="button"
+            <Link
+              to="/rent/login"
               role="menuitem"
               className="rent-top-menu-item"
+              state={{ from: '/rent/wallet', rentEntrance: true }}
               onClick={() => {
                 setAccountOpen(false);
                 onAccount?.();
               }}
             >
               {loginLabel}
-            </button>
+            </Link>
             <Link
               to="/rent/register"
               role="menuitem"
               className="rent-top-menu-item"
-              state={{ from: { pathname: '/rent' }, rentEntrance: true }}
+              state={{ from: { pathname: '/rent/wallet' }, rentEntrance: true }}
               onClick={() => setAccountOpen(false)}
             >
               {registerLabel}
