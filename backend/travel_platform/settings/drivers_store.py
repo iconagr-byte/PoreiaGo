@@ -374,25 +374,63 @@ def get_driver(driver_id: str) -> FleetDriver | None:
     return _ensure().get(driver_id)
 
 
-def find_driver_by_username(username: str) -> FleetDriver | None:
-    """Match email, license number, or vehicle/driver code (case-insensitive)."""
+def _username_matches(driver: FleetDriver, needle: str) -> bool:
+    if driver.email.lower() == needle:
+        return True
+    if driver.license_no.lower() == needle:
+        return True
+    if driver.vehicle_code and driver.vehicle_code.lower() == needle:
+        return True
+    if driver.license_plate and driver.license_plate.lower() == needle:
+        return True
+    return False
+
+
+def find_driver_by_username(
+    username: str,
+    tenant_id: str | None = None,
+    *,
+    allow_demo_legacy: bool = False,
+) -> FleetDriver | None:
+    """
+    Match email, license number, or vehicle/driver code (case-insensitive).
+
+    When ``tenant_id`` is set, only that office's drivers match. Optionally
+    allow non-scoped DEMO rows for the primary office (legacy Achilleas).
+    """
     needle = _normalize_username(username)
     if not needle:
         return None
+    tid = _normalize_tenant_id(tenant_id) if tenant_id is not None else None
     for d in _ensure().values():
-        if d.email.lower() == needle:
+        if not _username_matches(d, needle):
+            continue
+        if tid is None:
             return d
-        if d.license_no.lower() == needle:
+        dtid = _driver_tenant_id(d)
+        if dtid == tid:
             return d
-        if d.vehicle_code and d.vehicle_code.lower() == needle:
-            return d
-        if d.license_plate and d.license_plate.lower() == needle:
+        if (
+            allow_demo_legacy
+            and tid != DEMO_TENANT_ID
+            and dtid == DEMO_TENANT_ID
+        ):
             return d
     return None
 
 
-def authenticate_driver(username: str, password: str) -> FleetDriver | None:
-    driver = find_driver_by_username(username)
+def authenticate_driver(
+    username: str,
+    password: str,
+    tenant_id: str | None = None,
+    *,
+    allow_demo_legacy: bool = False,
+) -> FleetDriver | None:
+    driver = find_driver_by_username(
+        username,
+        tenant_id=tenant_id,
+        allow_demo_legacy=allow_demo_legacy,
+    )
     if not driver or driver.status not in ("active", "on_leave"):
         return None
     stored = driver.password_hash
@@ -506,6 +544,8 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         d.salary_per_km = float(patch["salary_per_km"])
     if patch.get("salary_per_trip") is not None:
         d.salary_per_trip = float(patch["salary_per_trip"])
+    if patch.get("tenant_id"):
+        d.tenant_id = _normalize_tenant_id(patch["tenant_id"])
     if patch.get("password"):
         pwd = str(patch["password"])
         if len(pwd) < 4:

@@ -130,13 +130,16 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
     from travel_platform.telemetry.ingress_rate_limit import check_driver_gps_rate_limit
     from travel_platform.telemetry.settings_store import get_telemetry_settings
 
+    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
     platform_tid = await resolve_platform_tenant_id()
-    # Trust session first; remap legacy …0001 demo sessions onto the real SaaS tenant.
-    tenant_id = coerce_driver_tenant_id(
-        str(session.get("tenant_id") or body.get("tenant_id") or ""),
-        platform_tenant_id=platform_tid,
-    )
-    # Ensure downstream payload builders see the coerced tenant (even for old JWTs).
+    raw_tid = str(session.get("tenant_id") or body.get("tenant_id") or "").strip()
+    # Trust an explicit non-demo office on the JWT — do not remap PoreiaGo ↔ Achillio.
+    # Only empty / legacy DEMO sessions may fall back to the platform tenant.
+    if raw_tid and raw_tid != str(DEFAULT_TENANT):
+        tenant_id = raw_tid
+    else:
+        tenant_id = coerce_driver_tenant_id(raw_tid, platform_tenant_id=platform_tid)
     session = {**session, "tenant_id": tenant_id}
     if isinstance(body, dict):
         body = {**body, "tenant_id": tenant_id}
