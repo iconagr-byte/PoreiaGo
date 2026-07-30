@@ -8,7 +8,7 @@ export default function RentHomeFleetCard({
   favorite = false,
   onToggleFavorite,
   onSelect,
-  ctaLabel = 'Το θέλω',
+  ctaLabel = 'Επιλογή',
 }) {
   const v = enrichRentVehicle(vehicle);
   const cover = v.photo_urls?.[0] || v.photo_url || '';
