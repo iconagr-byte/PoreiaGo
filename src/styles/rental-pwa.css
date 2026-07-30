@@ -1706,25 +1706,6 @@
   gap: 0.35rem;
 }
 
-.rent-search-network {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  align-self: start;
-  margin-top: 0.1rem;
-  padding: 0.22rem 0.45rem;
-  border-radius: 999px;
-  background: rgba(10, 122, 108, 0.12);
-  color: var(--rent-deep);
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-.rent-search-network .material-symbols-outlined {
-  font-size: 0.85rem;
-}
-
 .rent-search-submit {
   appearance: none;
   border: 0;
