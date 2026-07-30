@@ -19,6 +19,17 @@ Admin: **Ρυθμίσεις → Φορολογία**
 
 ---
 
+### SoftOne / Impact wizard
+
+Admin → Φορολογία → **Ενεργοποίηση παρόχου**, ή βήμα «Πάροχος» στο Office setup μετά την αγορά συμβολαίου.
+
+1. Επιλογή SoftOne ή Impact  
+2. API URL · API Key · ΑΦΜ  
+3. `POST /api/v1/settings/fiscal/test-connection` (login μόνο)  
+4. Ενεργοποίηση = `PATCH /settings/fiscal` με `provider=softone|impact`
+
+---
+
 ## SoftOne EINVOICING / Impact (πάροχοι)
 
 Shared API ([developers.s1ecos.com](https://developers.s1ecos.com/)):

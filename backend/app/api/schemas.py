@@ -588,3 +588,18 @@ class TenantFiscalSettingsUpdate(BaseModel):
     epsilon: EpsilonFiscalSettingsUpdate | None = None
     softone: EinvoicingFiscalSettingsUpdate | None = None
     impact: EinvoicingFiscalSettingsUpdate | None = None
+
+
+class FiscalTestConnectionRequest(BaseModel):
+    provider: str
+    issuer_vat: str
+    api_url: str | None = None
+    api_key: str | None = None
+
+
+class FiscalTestConnectionResponse(BaseModel):
+    ok: bool
+    provider: str
+    api_url: str = ""
+    token_received: bool = False
+    message: str = ""

@@ -232,6 +232,31 @@ class SoftOneImpactStrategy:
             raise FiscalAPIError(f"{self._provider.value} login missing accessToken")
         return str(token)
 
+    async def test_login(self, config: EinvoicingTenantConfig, issuer_vat: str) -> dict[str, Any]:
+        """Validate API URL + key against /Authentication/login (no invoice issued)."""
+        if not config.api_key:
+            raise FiscalAPIError(f"{self._provider.value} API key missing")
+        if not config.api_url:
+            raise FiscalAPIError(f"{self._provider.value} API URL missing")
+        vat = str(issuer_vat or "").strip()
+        if not vat:
+            raise FiscalAPIError("Issuer VAT (ΑΦΜ) required for provider login")
+
+        owns_client = self._client is None
+        client = self._client or httpx.AsyncClient(timeout=self._timeout)
+        try:
+            token = await self._login(client, config, vat)
+            return {
+                "ok": True,
+                "provider": self._provider.value,
+                "api_url": config.api_url.rstrip("/"),
+                "token_received": bool(token),
+                "message": "Επιτυχής σύνδεση στον πάροχο",
+            }
+        finally:
+            if owns_client:
+                await client.aclose()
+
     async def transmit(
         self,
         data: BookingFiscalData,
