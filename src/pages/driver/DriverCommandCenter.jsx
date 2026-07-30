@@ -149,7 +149,6 @@ export default function DriverCommandCenter() {
   const [profileTick, setProfileTick] = useState(0);
   const tab = params.get('tab') || 'home';
   const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
-  const tripId = session?.tripId;
 
   useEffect(() => {
     if (!authenticated) {
