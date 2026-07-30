@@ -4,8 +4,8 @@ import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
 import { markPreferRentLookup } from '../../lib/rental/preferRentLookup.js';
 
 /**
- * Guest header — booking / account / language.
- * «Η κράτησή μου» is a hard link to Rent Wallet only — never bus /my-booking.
+ * Guest header — booking find / account / language / Rent My Wallet (right).
+ * My Wallet always opens /rent/wallet — never bus /my-booking.
  */
 export default function RentGuestTopActions({ onAccount } = {}) {
   const [lang, setLang] = useState(() => getRentLang());
@@ -27,16 +27,21 @@ export default function RentGuestTopActions({ onAccount } = {}) {
 
   const el = lang !== 'en';
   const bookingLabel = el ? 'Η κράτησή μου' : 'My booking';
+  const walletLabel = 'My Wallet';
   const loginLabel = el ? 'Είσοδος' : 'Sign in';
   const registerLabel = el ? 'Εγγραφή' : 'Register';
   const accountAria = el ? 'Λογαριασμός' : 'Account';
+  const walletTitle = el ? 'My Wallet ενοικιάσεων' : 'Rent My Wallet';
 
   return (
     <div className="rent-top-actions" ref={rootRef}>
-      {/* Direct navigation — no submenu that could point at bus /my-booking */}
-      <a href="/rent/wallet" className="rent-top-chip" title="Rent Wallet">
+      <a
+        href="/rent/my-booking"
+        className="rent-top-chip"
+        title={el ? 'Εύρεση κράτησης ενοικίασης' : 'Find rent booking'}
+      >
         <span className="material-symbols-outlined" aria-hidden>
-          account_balance_wallet
+          confirmation_number
         </span>
         <span className="rent-top-chip-label">{bookingLabel}</span>
       </a>
@@ -77,17 +82,6 @@ export default function RentGuestTopActions({ onAccount } = {}) {
             >
               {registerLabel}
             </Link>
-            <a
-              href="/rent/my-booking"
-              role="menuitem"
-              className="rent-top-menu-item"
-              onClick={() => setAccountOpen(false)}
-            >
-              <span className="material-symbols-outlined" aria-hidden>
-                search
-              </span>
-              {el ? 'Εύρεση κράτησης Rent' : 'Find rent booking'}
-            </a>
           </div>
         ) : null}
       </div>
@@ -108,6 +102,18 @@ export default function RentGuestTopActions({ onAccount } = {}) {
           EN
         </button>
       </div>
+
+      <a
+        href="/rent/wallet"
+        className="rent-top-chip rent-top-chip--wallet"
+        title={walletTitle}
+        aria-label={walletTitle}
+      >
+        <span className="material-symbols-outlined" aria-hidden>
+          account_balance_wallet
+        </span>
+        <span className="rent-top-chip-wallet-label">{walletLabel}</span>
+      </a>
     </div>
   );
 }
