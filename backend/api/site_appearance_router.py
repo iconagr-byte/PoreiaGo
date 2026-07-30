@@ -77,10 +77,12 @@ DEFAULT_SITE_APPEARANCE = {
     "home_slider_enabled": False,
     "home_slider_autoplay": True,
     "home_slider_interval_sec": 5,
+    "home_slider_options": {},
     "home_slider_slides": [],
     "rent_slider_enabled": False,
     "rent_slider_autoplay": True,
     "rent_slider_interval_sec": 5,
+    "rent_slider_options": {},
     "rent_slider_slides": [],
     "homepage_theme_id": "aegean_classic",
     "accent_color": "#0ea5e9",
@@ -143,10 +145,12 @@ class SiteAppearanceResponse(BaseModel):
     home_slider_enabled: bool = False
     home_slider_autoplay: bool = True
     home_slider_interval_sec: int = 5
+    home_slider_options: dict = {}
     home_slider_slides: list[dict] = []
     rent_slider_enabled: bool = False
     rent_slider_autoplay: bool = True
     rent_slider_interval_sec: int = 5
+    rent_slider_options: dict = {}
     rent_slider_slides: list[dict] = []
     homepage_theme_id: str = "aegean_classic"
     accent_color: str = "#0ea5e9"
@@ -218,10 +222,12 @@ class SiteAppearanceUpdate(BaseModel):
     home_slider_enabled: bool | None = None
     home_slider_autoplay: bool | None = None
     home_slider_interval_sec: int | None = None
+    home_slider_options: dict | None = None
     home_slider_slides: list[dict] | None = None
     rent_slider_enabled: bool | None = None
     rent_slider_autoplay: bool | None = None
     rent_slider_interval_sec: int | None = None
+    rent_slider_options: dict | None = None
     rent_slider_slides: list[dict] | None = None
     homepage_theme_id: str | None = None
     accent_color: str | None = None

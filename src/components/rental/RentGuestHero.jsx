@@ -42,6 +42,7 @@ export default function RentGuestHero({
             slides={slider.slides}
             autoplay={slider.autoplay}
             intervalSec={slider.interval_sec}
+            options={slider.options}
             variant="media"
             accent="rent"
             ariaLabel="Hero slider ενοικιάσεων"

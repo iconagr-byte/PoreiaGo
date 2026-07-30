@@ -819,35 +819,37 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               </PanelCard>
             )}
             {section === 'slider' && (
-              <PanelCard
-                title="Hero Slider · Ενοικιάσεις"
-                description="Ισχυρό carousel στο /rent — βέλη, dots, swipe και αυτόματη εναλλαγή."
-              >
-                <PageSliderEditor
-                  page="rent"
-                  enabled={Boolean(form.rent_slider_enabled)}
-                  autoplay={form.rent_slider_autoplay !== false}
-                  intervalSec={form.rent_slider_interval_sec}
-                  slides={form.rent_slider_slides}
-                  saving={saving}
-                  onChange={(next) =>
-                    setForm((p) => ({
-                      ...p,
-                      ...pageSliderPatch('rent', next),
-                    }))
-                  }
-                  onSave={() =>
-                    patchForm(
-                      pageSliderPatch('rent', {
-                        enabled: Boolean(form.rent_slider_enabled),
-                        autoplay: form.rent_slider_autoplay !== false,
-                        interval_sec: form.rent_slider_interval_sec,
-                        slides: form.rent_slider_slides,
-                      }),
-                      'Το slider ενοικιάσεων αποθηκεύτηκε',
-                    )()
-                  }
-                />
+          <PanelCard
+            title="Hero Slider · Ενοικιάσεις"
+            description="Soliloquy-style builder για /rent — drag & drop, captions, transitions, thumbnails, lightbox, schedule."
+          >
+            <PageSliderEditor
+              page="rent"
+              enabled={Boolean(form.rent_slider_enabled)}
+              autoplay={form.rent_slider_autoplay !== false}
+              intervalSec={form.rent_slider_interval_sec}
+              options={form.rent_slider_options}
+              slides={form.rent_slider_slides}
+              saving={saving}
+              onChange={(next) =>
+                setForm((p) => ({
+                  ...p,
+                  ...pageSliderPatch('rent', next),
+                }))
+              }
+              onSave={() =>
+                patchForm(
+                  pageSliderPatch('rent', {
+                    enabled: Boolean(form.rent_slider_enabled),
+                    autoplay: form.rent_slider_autoplay !== false,
+                    interval_sec: form.rent_slider_interval_sec,
+                    options: form.rent_slider_options,
+                    slides: form.rent_slider_slides,
+                  }),
+                  'Το slider ενοικιάσεων αποθηκεύτηκε',
+                )()
+              }
+            />
               </PanelCard>
             )}
           </>
@@ -1122,13 +1124,14 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         {designPage === 'home' && section === 'slider' && (
           <PanelCard
             title="Hero Slider · Λεωφορεία"
-            description="Ισχυρό carousel στην αρχική — βέλη, dots, swipe και αυτόματη εναλλαγή. Αντικαθιστά τη σταθερή hero εικόνα όταν είναι ενεργό."
+            description="Soliloquy-style builder — drag & drop εικόνες, captions/SEO, transitions, thumbnails, lightbox και προγραμματισμός διαφανειών."
           >
             <PageSliderEditor
               page="home"
               enabled={Boolean(form.home_slider_enabled)}
               autoplay={form.home_slider_autoplay !== false}
               intervalSec={form.home_slider_interval_sec}
+              options={form.home_slider_options}
               slides={form.home_slider_slides}
               saving={saving}
               onChange={(next) =>
@@ -1143,6 +1146,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                     enabled: Boolean(form.home_slider_enabled),
                     autoplay: form.home_slider_autoplay !== false,
                     interval_sec: form.home_slider_interval_sec,
+                    options: form.home_slider_options,
                     slides: form.home_slider_slides,
                   }),
                   'Το slider λεωφορείων αποθηκεύτηκε',
