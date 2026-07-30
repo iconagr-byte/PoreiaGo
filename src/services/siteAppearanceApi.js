@@ -40,6 +40,8 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_guest_hero_copy: '',
   rent_cta_label: 'Βρες όχημα',
   rent_pickup_locations: [],
+  rent_coverage_options: [],
+  rent_included_defaults: [],
   home_slider_enabled: false,
   home_slider_autoplay: true,
   home_slider_interval_sec: 5,

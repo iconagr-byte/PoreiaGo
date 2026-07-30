@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -12,13 +12,16 @@ import {
   RENT_COVERAGE_OPTIONS,
   estimateBookingTotals,
   euroLabel,
+  readCoverageCatalog,
   readExtrasSelection,
   readRentVehicleSnapshot,
   rentalDayCount,
   selectedExtrasLabels,
+  visibleCoverageOptions,
 } from '../../lib/rental/rentBookingExtras.js';
 import { readRentBookingPrefs, writeRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
 import { createCustomerRentalBooking } from '../../services/customerRentalApi.js';
+import { fetchSiteAppearance } from '../../services/siteAppearanceApi.js';
 import RentBookingStepper from './RentBookingStepper.jsx';
 import RentBookingTripSummary from './RentBookingTripSummary.jsx';
 import RentBookingVehicleSidebar from './RentBookingVehicleSidebar.jsx';
@@ -52,9 +55,25 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
   const prefs = useMemo(() => readRentBookingPrefs(), []);
   const snap = useMemo(() => readRentVehicleSnapshot(), []);
   const vehicle = useMemo(() => (snap ? enrichRentVehicle(snap) : null), [snap]);
+  const [catalog, setCatalog] = useState(RENT_COVERAGE_OPTIONS);
   const [selection, setSelection] = useState(() => readExtrasSelection(prefs));
   const [busy, setBusy] = useState(false);
   const named = splitName(prefs.client_first_name ? `${prefs.client_first_name} ${prefs.client_last_name || ''}` : getCustomerName());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSiteAppearance()
+      .then((data) => {
+        if (cancelled) return;
+        const { options } = readCoverageCatalog(data);
+        setCatalog(options);
+        setSelection(readExtrasSelection(readRentBookingPrefs(), options));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [form, setForm] = useState({
     first_name: prefs.client_first_name || named.first,
@@ -80,12 +99,13 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
     dailyRate: vehicle?.daily_rate_eur,
     days: dayCount,
     selection,
+    catalog,
   });
-  const selectedLabels = selectedExtrasLabels(selection);
+  const selectedLabels = selectedExtrasLabels(selection, catalog);
 
   const upsell = useMemo(
-    () => RENT_COVERAGE_OPTIONS.find((opt) => !selection[opt.formKey]) || null,
-    [selection],
+    () => visibleCoverageOptions(catalog).find((opt) => !selection[opt.formKey]) || null,
+    [selection, catalog],
   );
 
   const setField = (key, value) => {

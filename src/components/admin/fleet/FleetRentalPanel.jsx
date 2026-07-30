@@ -32,6 +32,7 @@ import RentPlanCardsEditor from './RentPlanCardsEditor.jsx';
 import RentalPaperworkDesk from './RentalPaperworkDesk.jsx';
 import RentAppBrandingEditor from './RentAppBrandingEditor.jsx';
 import RentPickupLocationsEditor from './RentPickupLocationsEditor.jsx';
+import RentCoverageExtrasEditor from './RentCoverageExtrasEditor.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../../../services/siteAppearanceApi.js';
@@ -1208,6 +1209,8 @@ export default function FleetRentalPanel({
       )}
 
       {tab === 'plans' && <RentPlanCardsEditor />}
+
+      {tab === 'services' && <RentCoverageExtrasEditor />}
 
       {tab === 'pickups' && <RentPickupLocationsEditor />}
 

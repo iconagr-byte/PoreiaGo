@@ -74,6 +74,8 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_cta_label": "Βρες όχημα",
     # Extra pickup/dropoff points for /rent search (office address is always included).
     "rent_pickup_locations": [],
+    "rent_coverage_options": [],
+    "rent_included_defaults": [],
     "home_slider_enabled": False,
     "home_slider_autoplay": True,
     "home_slider_interval_sec": 5,
@@ -142,6 +144,8 @@ class SiteAppearanceResponse(BaseModel):
     rent_guest_hero_copy: str = ""
     rent_cta_label: str = "Βρες όχημα"
     rent_pickup_locations: list[str] = []
+    rent_coverage_options: list[dict] = []
+    rent_included_defaults: list[str] = []
     home_slider_enabled: bool = False
     home_slider_autoplay: bool = True
     home_slider_interval_sec: int = 5
@@ -219,6 +223,8 @@ class SiteAppearanceUpdate(BaseModel):
     rent_guest_hero_copy: str | None = None
     rent_cta_label: str | None = None
     rent_pickup_locations: list[str] | None = None
+    rent_coverage_options: list[dict] | None = None
+    rent_included_defaults: list[str] | None = None
     home_slider_enabled: bool | None = None
     home_slider_autoplay: bool | None = None
     home_slider_interval_sec: int | None = None

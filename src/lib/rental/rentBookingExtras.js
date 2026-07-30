@@ -73,6 +73,99 @@ export const RENT_INCLUDED_DEFAULTS = [
   'Basic CDW',
 ];
 
+export const RENT_COVERAGE_ICON_OPTIONS = [
+  'shield_with_heart',
+  'verified_user',
+  'sports_motorsports',
+  'child_care',
+  'explore',
+  'health_and_safety',
+  'car_crash',
+  'garage',
+  'local_gas_station',
+  'wifi',
+  'luggage',
+  'pets',
+];
+
+const MAX_COVERAGE_OPTIONS = 12;
+
+function slugFormKey(raw, fallback = 'extra') {
+  const base = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+  return base || fallback;
+}
+
+export function createCoverageOption(partial = {}) {
+  const id =
+    String(partial.id || '').trim() ||
+    `cov_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const formKey = slugFormKey(partial.formKey || partial.id || id, `extra_${id.slice(-6)}`);
+  const includes = Array.isArray(partial.includes)
+    ? partial.includes.map((x) => String(x || '').trim()).filter(Boolean)
+    : [];
+  const excludes = Array.isArray(partial.excludes)
+    ? partial.excludes.map((x) => String(x || '').trim()).filter(Boolean)
+    : [];
+  const price = Number(partial.eurPerDay);
+  return {
+    id,
+    icon: String(partial.icon || 'verified_user').trim() || 'verified_user',
+    title: String(partial.title || '').trim(),
+    blurb: String(partial.blurb || '').trim(),
+    includes,
+    excludes,
+    eurPerDay: Number.isFinite(price) ? Math.max(0, price) : 0,
+    formKey,
+    visible: partial.visible !== false,
+  };
+}
+
+/** Merge tenant overrides with defaults; empty/invalid falls back to built-in catalog. */
+export function normalizeCoverageOptions(raw) {
+  if (!Array.isArray(raw) || !raw.length) {
+    return RENT_COVERAGE_OPTIONS.map((o) => createCoverageOption(o));
+  }
+  const seenKeys = new Set();
+  const out = [];
+  for (const item of raw) {
+    const opt = createCoverageOption(item || {});
+    if (!opt.title) continue;
+    let key = opt.formKey;
+    let n = 2;
+    while (seenKeys.has(key)) {
+      key = `${opt.formKey}_${n}`;
+      n += 1;
+    }
+    opt.formKey = key;
+    seenKeys.add(key);
+    out.push(opt);
+    if (out.length >= MAX_COVERAGE_OPTIONS) break;
+  }
+  return out.length ? out : RENT_COVERAGE_OPTIONS.map((o) => createCoverageOption(o));
+}
+
+export function visibleCoverageOptions(rawOrList) {
+  return normalizeCoverageOptions(rawOrList).filter((o) => o.visible !== false);
+}
+
+export function normalizeIncludedDefaults(raw) {
+  if (!Array.isArray(raw) || !raw.length) return [...RENT_INCLUDED_DEFAULTS];
+  const rows = raw.map((x) => String(x || '').trim()).filter(Boolean);
+  return rows.length ? rows.slice(0, 20) : [...RENT_INCLUDED_DEFAULTS];
+}
+
+export function readCoverageCatalog(appearance) {
+  return {
+    options: normalizeCoverageOptions(appearance?.rent_coverage_options),
+    included: normalizeIncludedDefaults(appearance?.rent_included_defaults),
+  };
+}
+
 export function rentalDayCount(startTime, endTime) {
   const a = new Date(startTime);
   const b = new Date(endTime);
@@ -142,45 +235,45 @@ export function readPreferredVehicleId() {
   }
 }
 
-export function emptyExtrasSelection() {
-  return {
-    extra_insurance: false,
-    super_cover: false,
-    extra_driver: false,
-    child_seat: false,
-    gps_pack: false,
-  };
+export function emptyExtrasSelection(catalog = RENT_COVERAGE_OPTIONS) {
+  const base = {};
+  for (const opt of normalizeCoverageOptions(catalog)) {
+    base[opt.formKey] = false;
+  }
+  return base;
 }
 
-export function readExtrasSelection(prefs = {}) {
-  const base = emptyExtrasSelection();
+export function readExtrasSelection(prefs = {}, catalog = RENT_COVERAGE_OPTIONS) {
+  const base = emptyExtrasSelection(catalog);
   for (const key of Object.keys(base)) {
     if (typeof prefs[key] === 'boolean') base[key] = prefs[key];
   }
   return base;
 }
 
-export function extrasDayTotal(selection) {
-  return RENT_COVERAGE_OPTIONS.reduce((sum, opt) => {
+export function extrasDayTotal(selection, catalog = RENT_COVERAGE_OPTIONS) {
+  return visibleCoverageOptions(catalog).reduce((sum, opt) => {
     if (selection?.[opt.formKey]) return sum + Number(opt.eurPerDay || 0);
     return sum;
   }, 0);
 }
 
-export function selectedExtrasLabels(selection) {
-  return RENT_COVERAGE_OPTIONS.filter((opt) => selection?.[opt.formKey]).map((opt) => opt.title);
+export function selectedExtrasLabels(selection, catalog = RENT_COVERAGE_OPTIONS) {
+  return visibleCoverageOptions(catalog)
+    .filter((opt) => selection?.[opt.formKey])
+    .map((opt) => opt.title);
 }
 
-export function extrasNotesLine(selection) {
-  const labels = selectedExtrasLabels(selection);
+export function extrasNotesLine(selection, catalog = RENT_COVERAGE_OPTIONS) {
+  const labels = selectedExtrasLabels(selection, catalog);
   if (!labels.length) return '';
   return `Extras: ${labels.join(', ')}`;
 }
 
-export function estimateBookingTotals({ dailyRate, days, selection }) {
+export function estimateBookingTotals({ dailyRate, days, selection, catalog = RENT_COVERAGE_OPTIONS }) {
   const d = Math.max(1, Number(days) || 1);
   const vehicle = Number(dailyRate || 0) * d;
-  const extrasDay = extrasDayTotal(selection);
+  const extrasDay = extrasDayTotal(selection, catalog);
   const extras = extrasDay * d;
   return {
     days: d,
