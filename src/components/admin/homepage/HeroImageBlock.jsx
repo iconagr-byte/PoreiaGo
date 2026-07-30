@@ -3,6 +3,20 @@ import toast from 'react-hot-toast';
 import { TRIP_COVER_ACCEPT } from '../../../lib/trips/tripImage.js';
 import { HERO_FOCAL_OPTIONS, heroFocalCss } from '../../../lib/homepage/heroFocal.js';
 
+function pickImageFile(dataTransfer) {
+  if (!dataTransfer) return null;
+  const fromFiles = [...(dataTransfer.files || [])].find((f) => f.type.startsWith('image/'));
+  if (fromFiles) return fromFiles;
+  const items = [...(dataTransfer.items || [])];
+  for (const item of items) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (file) return file;
+    }
+  }
+  return null;
+}
+
 /**
  * Rich hero photo editor — drag/drop, paste, URL, focal point, preview.
  */
@@ -22,6 +36,16 @@ export default function HeroImageBlock({
   const [urlDraft, setUrlDraft] = useState('');
   const [lightbox, setLightbox] = useState(false);
   const dropRef = useRef(null);
+  const dragDepth = useRef(0);
+
+  const uploadFile = (file) => {
+    if (!file) return;
+    if (!file.type?.startsWith('image/')) {
+      toast.error('Μόνο αρχεία εικόνας (JPG, PNG, WebP)');
+      return;
+    }
+    onUpload?.({ target: { files: [file], value: '' } });
+  };
 
   useEffect(() => {
     const onPaste = (e) => {
@@ -32,23 +56,48 @@ export default function HeroImageBlock({
       const file = [...(e.clipboardData?.files || [])].find((f) => f.type.startsWith('image/'));
       if (!file) return;
       e.preventDefault();
-      onUpload?.({ target: { files: [file], value: '' } });
+      uploadFile(file);
       toast.success('Εικόνα από clipboard');
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- uploadFile closes over onUpload
   }, [onUpload]);
+
+  const onDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth.current += 1;
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    setDragOver(true);
+  };
+
+  const onDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    setDragOver(true);
+  };
+
+  const onDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragOver(false);
+  };
 
   const onDropFile = (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    dragDepth.current = 0;
     setDragOver(false);
-    const file = e.dataTransfer?.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Μόνο αρχεία εικόνας');
+    if (uploading) return;
+    const file = pickImageFile(e.dataTransfer);
+    if (!file) {
+      toast.error('Σύρε ένα αρχείο εικόνας (JPG / PNG / WebP)');
       return;
     }
-    onUpload?.({ target: { files: [file], value: '' } });
+    uploadFile(file);
   };
 
   const copyUrl = async () => {
@@ -79,46 +128,62 @@ export default function HeroImageBlock({
     <div
       ref={dropRef}
       tabIndex={0}
-      className="rounded-2xl border border-black/[0.06] bg-white overflow-hidden outline-none focus-within:ring-2 focus-within:ring-sky-400/30"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDropFile}
+      className={`rounded-2xl border bg-white overflow-hidden outline-none transition ${
+        dragOver
+          ? 'border-sky-400 ring-4 ring-sky-400/25'
+          : 'border-black/[0.06] focus-within:ring-2 focus-within:ring-sky-400/30'
+      }`}
     >
       <div className="px-5 py-4 border-b border-black/[0.04] bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h5 className="font-bold text-base tracking-tight">Hero φωτογραφία</h5>
             <p className="text-xs text-white/65 mt-0.5 max-w-xl">
-              Full-bleed φόντο πίσω από τον τίτλο · JPG συμπίεση αυτόματα · ιδανικά 1920×1080
+              Σύρε εικόνα οπουδήποτε εδώ, πάτα Ανέβασμα, ή επικόλλησε · JPG συμπίεση αυτόματα · ιδανικά
+              1920×1080
             </p>
           </div>
           <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold">
-            <span className="material-symbols-outlined text-[14px]">wallpaper</span>
-            {hasCustom ? 'Προσαρμοσμένη' : 'Προεπιλογή'}
+            <span className="material-symbols-outlined text-[14px]">
+              {dragOver ? 'file_download' : 'wallpaper'}
+            </span>
+            {dragOver ? 'Άφησε για ανέβασμα' : hasCustom ? 'Προσαρμοσμένη' : 'Προεπιλογή'}
           </span>
         </div>
       </div>
 
-      <div className="p-5 space-y-5">
+      <div className="p-5 space-y-5 relative">
+        {dragOver ? (
+          <div className="absolute inset-0 z-20 m-2 rounded-2xl border-2 border-dashed border-sky-400 bg-sky-500/15 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
+            <span className="rounded-full bg-white text-sky-700 px-5 py-2.5 text-sm font-bold shadow-lg inline-flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px]">upload_file</span>
+              Άφησε την εικόνα για ανέβασμα
+            </span>
+          </div>
+        ) : null}
+
         <div
-          className={`relative aspect-[16/9] w-full rounded-2xl overflow-hidden border transition ${
-            dragOver ? 'border-sky-400 ring-4 ring-sky-400/20' : 'border-slate-200'
+          className={`relative aspect-[16/9] w-full rounded-2xl overflow-hidden border-2 border-dashed transition ${
+            dragOver ? 'border-sky-400' : 'border-slate-200'
           }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDropFile}
         >
           {previewUrl ? (
             <img
               src={previewUrl}
               alt=""
-              className="absolute inset-0 w-full h-full object-cover"
+              draggable={false}
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
               style={{ objectPosition: heroFocalCss(focal) }}
             />
           ) : (
-            <div className="absolute inset-0 bg-slate-100 flex flex-col items-center justify-center text-slate-400 gap-2">
+            <div className="absolute inset-0 bg-slate-100 flex flex-col items-center justify-center text-slate-400 gap-2 pointer-events-none">
               <span className="material-symbols-outlined text-4xl opacity-40">add_photo_alternate</span>
-              <span className="text-sm font-semibold">Σύρε εικόνα εδώ</span>
+              <span className="text-sm font-semibold">Σύρε εικόνα εδώ για ανέβασμα</span>
+              <span className="text-xs text-slate-400">ή πάτα το κουμπί Ανέβασμα παρακάτω</span>
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950/85 via-slate-900/45 to-transparent pointer-events-none" />
@@ -139,16 +204,8 @@ export default function HeroImageBlock({
             </p>
           </div>
 
-          {dragOver ? (
-            <div className="absolute inset-0 bg-sky-500/25 backdrop-blur-[1px] flex items-center justify-center">
-              <span className="rounded-full bg-white text-sky-700 px-4 py-2 text-sm font-bold shadow-lg">
-                Άφησε για ανέβασμα
-              </span>
-            </div>
-          ) : null}
-
           {uploading ? (
-            <div className="absolute inset-0 bg-slate-950/50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-slate-950/50 flex items-center justify-center z-10">
               <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-800 shadow-lg">
                 <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
                 Συμπίεση & ανέβασμα…
@@ -160,7 +217,7 @@ export default function HeroImageBlock({
             <button
               type="button"
               onClick={() => setLightbox(true)}
-              className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/45 text-white text-xs font-bold px-3 py-1.5 backdrop-blur-md hover:bg-black/60"
+              className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-black/45 text-white text-xs font-bold px-3 py-1.5 backdrop-blur-md hover:bg-black/60"
             >
               <span className="material-symbols-outlined text-[16px]">zoom_in</span>
               Μεγέθυνση
@@ -263,7 +320,7 @@ export default function HeroImageBlock({
         <ul className="grid sm:grid-cols-3 gap-2 text-[11px] text-slate-500">
           <li className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
             <span className="font-bold text-slate-700 block">Drag & drop</span>
-            Σύρε JPG / PNG / WebP πάνω στην προεπισκόπηση
+            Σύρε JPG / PNG / WebP οπουδήποτε στο block για άμεσο ανέβασμα
           </li>
           <li className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
             <span className="font-bold text-slate-700 block">Paste</span>

@@ -574,8 +574,8 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   );
 
   const handleImageUpload = async (kind, e) => {
-    const file = e.target?.files?.[0];
-    if (e?.target && 'value' in e.target) e.target.value = '';
+    const file = e instanceof File ? e : e?.target?.files?.[0];
+    if (e && !(e instanceof File) && e?.target && 'value' in e.target) e.target.value = '';
     if (!file) return;
     const setUploading = kind === 'logo' ? setUploadingLogo : setUploadingHero;
     setUploading(true);
