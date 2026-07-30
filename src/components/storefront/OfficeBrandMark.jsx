@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchSiteAppearance, resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { officeLogoImageStyle, resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
 import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
+import { OFFICE_BRAND_CHANGED_EVENT } from '../admin/OfficeLogoChangeModal.jsx';
 
 /**
  * Office wordmark for headers — never shows PoreiaGo platform gold logo on tenant sites.
@@ -12,6 +13,7 @@ export default function OfficeBrandMark({
   variant = 'light',
   asLink = true,
   fallbackLabel = 'Γραφείο',
+  refreshKey = 0,
 }) {
   const [appearance, setAppearance] = useState({});
   const [brand, setBrand] = useState(() => resolveOfficeBrand({}));
@@ -19,21 +21,27 @@ export default function OfficeBrandMark({
 
   useEffect(() => {
     let cancelled = false;
-    fetchSiteAppearance()
-      .then((data) => {
-        if (cancelled) return;
-        setAppearance(data || {});
-        setBrand(resolveOfficeBrand(data));
-      })
-      .catch(() => {});
+    const load = () => {
+      fetchSiteAppearance()
+        .then((data) => {
+          if (cancelled) return;
+          setAppearance(data || {});
+          setBrand(resolveOfficeBrand(data));
+        })
+        .catch(() => {});
+    };
+    load();
+    const onChanged = () => load();
+    window.addEventListener(OFFICE_BRAND_CHANGED_EVENT, onChanged);
     return () => {
       cancelled = true;
+      window.removeEventListener(OFFICE_BRAND_CHANGED_EVENT, onChanged);
     };
-  }, []);
+  }, [refreshKey]);
 
   const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();
-  const label = brand.displayName || (onTenant ? fallbackLabel : 'PoreiaGo');
+  const label = brand.displayName || fallbackLabel || (onTenant ? 'Γραφείο' : 'PoreiaGo');
   const logoStyle = officeLogoImageStyle(appearance);
 
   const inner = logoSrc ? (

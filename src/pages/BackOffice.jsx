@@ -58,6 +58,7 @@ import { clearSaasSession, getSaasToken } from '../services/saasApi.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, DEFAULT_PLATFORM_TAB, sanitizeSettingsSubTab } from '../lib/admin/settingsTabs.js';
 import { DEFAULT_RENT_DESK_TAB, sanitizeRentDeskTab } from '../lib/admin/rentDeskNav.js';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
+import OfficeLogoChangeModal from '../components/admin/OfficeLogoChangeModal.jsx';
 import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
@@ -147,6 +148,8 @@ export default function BackOffice() {
   const [rentalBookings, setRentalBookings] = useState([]);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [logoModalOpen, setLogoModalOpen] = useState(false);
+  const [brandRefreshKey, setBrandRefreshKey] = useState(0);
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   const [rentSummary, setRentSummary] = useState(null);
   const [showOfficeSetup, setShowOfficeSetup] = useState(
@@ -2255,16 +2258,23 @@ export default function BackOffice() {
         <div className="px-4 pt-4 pb-2">
           <button
             type="button"
-            className="block text-left"
-            onClick={() => navigate('/')}
-            aria-label="Αρχική"
+            className="group block text-left w-full rounded-xl hover:bg-slate-50/80 p-1.5 -m-1.5 transition-colors"
+            onClick={() => setLogoModalOpen(true)}
+            aria-label="Αλλαγή λογοτύπου εταιρείας"
+            title="Αλλαγή λογοτύπου"
           >
-            <OfficeBrandMark
-              className="h-9"
-              variant="light"
-              asLink={false}
-              fallbackLabel="Γραφείο"
-            />
+            <span className="flex items-center gap-2">
+              <OfficeBrandMark
+                className="h-9"
+                variant="light"
+                asLink={false}
+                fallbackLabel="Γραφείο"
+                refreshKey={brandRefreshKey}
+              />
+              <span className="material-symbols-outlined text-[18px] text-slate-300 group-hover:text-primary transition-colors shrink-0">
+                edit
+              </span>
+            </span>
           </button>
         </div>
         <SortableSidebarNav
@@ -2294,6 +2304,11 @@ export default function BackOffice() {
         onNavigate={(path) => navigate(path)}
         officeMode={officeMode}
         rentEnabled={rentMenuVisible}
+        brandRefreshKey={brandRefreshKey}
+        onEditLogo={() => {
+          setMobileNavOpen(false);
+          setLogoModalOpen(true);
+        }}
       />
 
       <AddCustomerModal
@@ -2479,6 +2494,12 @@ export default function BackOffice() {
         onClose={() => setCashPaymentBooking(null)}
         onConfirm={handleQuickCashPayment}
         confirming={cashPaymentSaving}
+      />
+
+      <OfficeLogoChangeModal
+        open={logoModalOpen}
+        onClose={() => setLogoModalOpen(false)}
+        onSaved={() => setBrandRefreshKey((k) => k + 1)}
       />
 
       {/* React Hot Toast */}
