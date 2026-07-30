@@ -615,7 +615,7 @@ export default function FleetRentalPanel({
               { id: 'payments', label: 'Πληρωμές /rent', copy: 'Προκαταβολή · κάρτα · τράπεζα · μετρητά', icon: 'payments' },
               { id: 'pickups', label: 'Σημεία παραλαβής', copy: 'Γραφείο · αεροδρόμιο · λιμάνι στο /rent', icon: 'location_on' },
               { id: 'branding', label: 'Εμφάνιση /rent', copy: 'Σχεδιασμός σελίδων → Ενοικιάσεις', icon: 'palette', designHref: '/admin?tab=settings&sub=homepage&page=rent' },
-              { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
+              { id: 'vehicles', label: 'Οχήματα ενοικίασης', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
               { id: 'live_gps', label: 'Ζωντανά GPS', copy: `${overlays.length} ενεργά για χάρτη`, icon: 'my_location' },
