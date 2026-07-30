@@ -86,10 +86,12 @@ class DriverSessionLoginApiTests(unittest.TestCase):
         self.assertIn("vehicle_plate", data)
         self.assertTrue(data.get("expires_at"))
 
-    def test_login_uses_resolved_platform_tenant(self):
+    def test_login_uses_driver_home_tenant_not_platform(self):
         from unittest.mock import AsyncMock
 
         platform = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        # Driver created without explicit tenant → DEMO home office.
+        home = self.store.DEMO_TENANT_ID
         with patch(
             "api.driver_portal.resolve_platform_tenant_id",
             new=AsyncMock(return_value=platform),
@@ -99,7 +101,8 @@ class DriverSessionLoginApiTests(unittest.TestCase):
                 json={"username": self.driver.email, "password": "driver123"},
             )
         self.assertEqual(res.status_code, 200, res.text)
-        self.assertEqual(res.json().get("tenant_id"), platform)
+        self.assertEqual(res.json().get("tenant_id"), home)
+        self.assertNotEqual(res.json().get("tenant_id"), platform)
 
     def test_login_rejects_bad_password(self):
         res = self.client.post(
