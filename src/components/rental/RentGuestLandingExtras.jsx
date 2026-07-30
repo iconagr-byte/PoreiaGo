@@ -4,8 +4,18 @@ import { RENT_HOME_STEPS, RENT_HOME_TRUST } from '../../lib/rental/rentFleetEnri
 /**
  * Guest landing body — same section rhythm as platform bus landing, rent-adapted.
  */
-export default function RentGuestLandingExtras({ brandLabel = 'Γραφείο', onRequireLogin } = {}) {
+export default function RentGuestLandingExtras({
+  brandLabel = 'Γραφείο',
+  onRequireLogin,
+  onStartSearch,
+} = {}) {
   const services = RENT_SERVICE_FEATURES.slice(0, 4);
+  const startSearch =
+    typeof onStartSearch === 'function'
+      ? onStartSearch
+      : () => {
+          document.getElementById('rent-guest-search')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
 
   return (
     <div className="rent-land">
@@ -59,8 +69,8 @@ export default function RentGuestLandingExtras({ brandLabel = 'Γραφείο', 
             ))}
           </ol>
           <div className="rent-land-center">
-            <button type="button" className="rent-land-btn rent-land-btn--sky" onClick={onRequireLogin}>
-              Σύνδεση για κράτηση
+            <button type="button" className="rent-land-btn rent-land-btn--sky" onClick={startSearch}>
+              Ξεκίνα αναζήτηση
               <span className="material-symbols-outlined" aria-hidden>
                 arrow_forward
               </span>
@@ -129,12 +139,17 @@ export default function RentGuestLandingExtras({ brandLabel = 'Γραφείο', 
               </li>
             </ul>
             <div className="rent-land-actions">
-              <button type="button" className="rent-land-btn rent-land-btn--white" onClick={onRequireLogin}>
-                Σύνδεση για κράτηση
+              <button type="button" className="rent-land-btn rent-land-btn--white" onClick={startSearch}>
+                Ξεκίνα αναζήτηση
                 <span className="material-symbols-outlined" aria-hidden>
                   arrow_forward
                 </span>
               </button>
+              {typeof onRequireLogin === 'function' ? (
+                <button type="button" className="rent-land-btn rent-land-btn--ghost" onClick={onRequireLogin}>
+                  Έχεις ήδη λογαριασμό;
+                </button>
+              ) : null}
             </div>
           </div>
           <aside className="rent-land-aside">

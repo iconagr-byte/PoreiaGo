@@ -15,12 +15,19 @@ export default function RentGuestHero({
   carCount = 0,
   vanCount = 0,
   onBrowseFleet,
+  onStartSearch,
   onRequireLogin,
 } = {}) {
   const headline = String(title || '').trim() || RENT_GUEST_HERO.title;
   const accent = String(titleAccent || '').trim() || RENT_GUEST_HERO.titleAccent;
   const subtitle = String(copy || '').trim();
   const stats = rentGuestHeroStats({ carCount, vanCount });
+  const startSearch =
+    typeof onStartSearch === 'function'
+      ? onStartSearch
+      : () => {
+          document.getElementById('rent-guest-search')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
 
   return (
     <section className="rent-hero rent-hero--landing" aria-label="Ενοικίαση">
@@ -43,17 +50,17 @@ export default function RentGuestHero({
         {subtitle ? <p className="rent-hero-landing-copy">{subtitle}</p> : null}
 
         <div className="rent-hero-actions">
-          <button type="button" className="rent-hero-cta rent-hero-cta--primary" onClick={onBrowseFleet}>
-            Δες τον στόλο
+          <button type="button" className="rent-hero-cta rent-hero-cta--primary" onClick={startSearch}>
+            Ξεκίνα αναζήτηση
             <span className="material-symbols-outlined" aria-hidden>
               arrow_forward
             </span>
           </button>
-          <button type="button" className="rent-hero-cta rent-hero-cta--teal" onClick={onRequireLogin}>
+          <button type="button" className="rent-hero-cta rent-hero-cta--teal" onClick={onBrowseFleet}>
             <span className="material-symbols-outlined" aria-hidden>
-              car_rental
+              directions_car
             </span>
-            Σύνδεση για κράτηση
+            Δες τον στόλο
           </button>
         </div>
 

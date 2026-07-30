@@ -189,6 +189,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               const el = document.getElementById('rent-guest-fleet');
               el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }}
+            onStartSearch={() => {
+              document
+                .getElementById('rent-guest-search')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
             onRequireLogin={onRequireLogin}
           />
 
@@ -289,7 +294,15 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               </div>
             </section>
 
-            <RentGuestLandingExtras brandLabel={branding.brandLabel} onRequireLogin={onRequireLogin} />
+            <RentGuestLandingExtras
+              brandLabel={branding.brandLabel}
+              onRequireLogin={onRequireLogin}
+              onStartSearch={() => {
+                document
+                  .getElementById('rent-guest-search')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+            />
           </div>
         </main>
       </div>
