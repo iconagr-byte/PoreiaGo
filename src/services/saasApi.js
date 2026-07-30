@@ -55,6 +55,10 @@ export function getSaasTenantId() {
   return localStorage.getItem(TENANT_KEY) || DEV_TENANT;
 }
 
+export function getSaasUserEmail() {
+  return String(localStorage.getItem(EMAIL_KEY) || '').trim();
+}
+
 export function setSaasSession({ accessToken, tenantId, email }) {
   const previousTenantId = localStorage.getItem(TENANT_KEY) || '';
   if (accessToken) {
