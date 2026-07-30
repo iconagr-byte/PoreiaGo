@@ -54,6 +54,7 @@ function normalizeVehicle(msg, id, prev) {
     sensors: msg.sensors ?? null,
     photo_url: msg.photo_url ?? prev?.photo_url ?? null,
     vehicle_image_url: msg.vehicle_image_url ?? prev?.vehicle_image_url ?? null,
+    trail: Array.isArray(msg.trail) && msg.trail.length ? msg.trail : prev?.trail || null,
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
 }

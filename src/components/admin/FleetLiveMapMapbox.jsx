@@ -216,7 +216,11 @@ export default function FleetLiveMapMapbox({
     return [...vehicles, ...extra];
   }, [vehicles, sosAlerts]);
 
-  const trails = useFleetVehicleTrails(vehicles, { enabled: showTrails });
+  const trails = useFleetVehicleTrails(vehicles, {
+    enabled: showTrails,
+    maxPoints: 3000,
+    minMoveM: 3,
+  });
 
   return (
     <Map

@@ -49,6 +49,7 @@ class LiveVehicleResponse(BaseModel):
     photo_url: str | None = None
     vehicle_image_url: str | None = None
     trip_title: str | None = None
+    trail: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class HeatmapPoint(BaseModel):
