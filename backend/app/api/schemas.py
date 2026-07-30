@@ -399,6 +399,7 @@ class TenantBrandingSettingsUpdate(BaseModel):
 class TenantSiteAppearanceResponse(BaseModel):
     storage_source: str = "postgres"
     tenant_slug: str | None = None
+    display_name: str = ""
     logo_url: str = ""
     logo_height_px: int = 40
     logo_max_width_px: int = 180
@@ -421,6 +422,16 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_coverage_options: list[dict] = []
     rent_included_defaults: list[str] = []
     rent_upsell_coverage_id: str = ""
+    rent_notify_email_enabled: bool = True
+    rent_notify_sms_enabled: bool = True
+    rent_notify_email_label: str = ""
+    rent_notify_sms_label: str = ""
+    rent_notify_email_default: bool = False
+    rent_notify_sms_default: bool = False
+    rent_notify_sms_template_confirmed: str = ""
+    rent_notify_sms_template_status: str = ""
+    rent_notify_email_subject: str = ""
+    rent_notify_email_body: str = ""
     home_slider_enabled: bool = False
     home_slider_autoplay: bool = True
     home_slider_interval_sec: int = 5
@@ -460,6 +471,16 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_coverage_options: list[dict] | None = None
     rent_included_defaults: list[str] | None = None
     rent_upsell_coverage_id: str | None = None
+    rent_notify_email_enabled: bool | None = None
+    rent_notify_sms_enabled: bool | None = None
+    rent_notify_email_label: str | None = None
+    rent_notify_sms_label: str | None = None
+    rent_notify_email_default: bool | None = None
+    rent_notify_sms_default: bool | None = None
+    rent_notify_sms_template_confirmed: str | None = None
+    rent_notify_sms_template_status: str | None = None
+    rent_notify_email_subject: str | None = None
+    rent_notify_email_body: str | None = None
     home_slider_enabled: bool | None = None
     home_slider_autoplay: bool | None = None
     home_slider_interval_sec: int | None = Field(default=None, ge=3, le=20)

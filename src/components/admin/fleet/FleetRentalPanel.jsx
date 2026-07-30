@@ -33,6 +33,8 @@ import RentalPaperworkDesk from './RentalPaperworkDesk.jsx';
 import RentAppBrandingEditor from './RentAppBrandingEditor.jsx';
 import RentPickupLocationsEditor from './RentPickupLocationsEditor.jsx';
 import RentCoverageExtrasEditor from './RentCoverageExtrasEditor.jsx';
+import RentNotificationsEditor from './RentNotificationsEditor.jsx';
+import RentPaymentsPanel from './RentPaymentsPanel.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 import { fetchSiteAppearance } from '../../../services/siteAppearanceApi.js';
@@ -610,6 +612,7 @@ export default function FleetRentalPanel({
               { id: 'clients', label: 'Πελάτες ενοικίασης', copy: `${clients.length} πελάτες · γραφείο + Wallet`, icon: 'groups' },
               { id: 'bookings', label: 'Όλες οι κρατήσεις', copy: `${walletBookingCount} από Wallet · ${bookings.length} σύνολο`, icon: 'event_note' },
               { id: 'paperwork', label: 'Χαρτούρα συμβολαίων', copy: 'Συμβάσεις · υπογραφές · εκτύπωση PDF', icon: 'description' },
+              { id: 'payments', label: 'Πληρωμές /rent', copy: 'Προκαταβολή · κάρτα · τράπεζα · μετρητά', icon: 'payments' },
               { id: 'pickups', label: 'Σημεία παραλαβής', copy: 'Γραφείο · αεροδρόμιο · λιμάνι στο /rent', icon: 'location_on' },
               { id: 'branding', label: 'Εμφάνιση /rent', copy: 'Σχεδιασμός σελίδων → Ενοικιάσεις', icon: 'palette', designHref: '/admin?tab=settings&sub=homepage&page=rent' },
               { id: 'vehicles', label: 'Στόλος & τιμές', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
@@ -1030,6 +1033,7 @@ export default function FleetRentalPanel({
             {[
               { id: 'ALL', label: `Όλες (${bookings.length})` },
               { id: 'ACTIVE', label: `Ενεργές (${activeBookings.length})` },
+              { id: 'RESERVED', label: 'Εκκρεμεί πληρωμή' },
               { id: 'WALLET', label: `Wallet (${walletBookingCount})` },
               { id: 'DESK', label: 'Γραφείο' },
               { id: 'COMPLETED', label: 'Ολοκληρωμένες' },
@@ -1074,6 +1078,7 @@ export default function FleetRentalPanel({
                       {b.driver_mode === 'WITH_DRIVER' ? ' · με οδηγό' : ' · self-drive'}
                       {b.client_email ? ` · ${b.client_email}` : ''}
                       {b.client_phone ? ` · ${b.client_phone}` : ''}
+                      {b.payment_status ? ` · ${b.payment_status}` : ''}
                     </p>
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
@@ -1097,6 +1102,49 @@ export default function FleetRentalPanel({
                     >
                       Χαρτούρα
                     </button>
+                    {b.rental_status === 'RESERVED' ? (
+                      <>
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-teal-800"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await updateRentalBookingStatus(b.id, 'CONFIRMED');
+                              toast.success('Πληρωμή επιβεβαιώθηκε');
+                              await reload();
+                            } catch (err) {
+                              toast.error(err.message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Επιβεβαίωση πληρωμής
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-rose-600"
+                          disabled={busy}
+                          onClick={async () => {
+                            if (!window.confirm('Ακύρωση κράτησης;')) return;
+                            setBusy(true);
+                            try {
+                              await updateRentalBookingStatus(b.id, 'CANCELLED');
+                              toast.success('Ακυρώθηκε');
+                              await reload();
+                            } catch (err) {
+                              toast.error(err.message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Ακύρωση
+                        </button>
+                      </>
+                    ) : null}
                     {b.rental_status === 'CONFIRMED' ? (
                       <>
                         <button
@@ -1211,6 +1259,10 @@ export default function FleetRentalPanel({
       {tab === 'plans' && <RentPlanCardsEditor />}
 
       {tab === 'services' && <RentCoverageExtrasEditor />}
+
+      {tab === 'notifications' && <RentNotificationsEditor />}
+
+      {tab === 'payments' && <RentPaymentsPanel />}
 
       {tab === 'pickups' && <RentPickupLocationsEditor />}
 

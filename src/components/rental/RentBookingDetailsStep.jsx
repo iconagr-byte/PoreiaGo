@@ -4,9 +4,7 @@ import toast from 'react-hot-toast';
 import {
   getCustomerEmail,
   getCustomerName,
-  getCustomerToken,
 } from '../../lib/auth.js';
-import { ensureCustomerForRental } from '../../lib/customers/customerStore.js';
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 import {
   RENT_COVERAGE_OPTIONS,
@@ -20,7 +18,7 @@ import {
   selectedExtrasLabels,
 } from '../../lib/rental/rentBookingExtras.js';
 import { readRentBookingPrefs, writeRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
-import { createCustomerRentalBooking } from '../../services/customerRentalApi.js';
+import { readRentNotifySettings } from '../../lib/rental/rentNotify.js';
 import { fetchSiteAppearance } from '../../services/siteAppearanceApi.js';
 import RentBookingStepper from './RentBookingStepper.jsx';
 import RentBookingTripSummary from './RentBookingTripSummary.jsx';
@@ -58,7 +56,7 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
   const [catalog, setCatalog] = useState(RENT_COVERAGE_OPTIONS);
   const [upsellId, setUpsellId] = useState('');
   const [selection, setSelection] = useState(() => readExtrasSelection(prefs));
-  const [busy, setBusy] = useState(false);
+  const [notify, setNotify] = useState(() => readRentNotifySettings(null));
   const named = splitName(prefs.client_first_name ? `${prefs.client_first_name} ${prefs.client_last_name || ''}` : getCustomerName());
 
   useEffect(() => {
@@ -69,7 +67,21 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
         const { options, upsellId: preferred } = readCoverageCatalog(data);
         setCatalog(options);
         setUpsellId(preferred || '');
-        setSelection(readExtrasSelection(readRentBookingPrefs(), options));
+        const prefsNow = readRentBookingPrefs();
+        setSelection(readExtrasSelection(prefsNow, options));
+        const ns = readRentNotifySettings(data);
+        setNotify(ns);
+        const emailChosen = Object.prototype.hasOwnProperty.call(prefsNow, 'marketing_email');
+        const smsChosen = Object.prototype.hasOwnProperty.call(prefsNow, 'marketing_sms');
+        setForm((f) => ({
+          ...f,
+          marketing_email: emailChosen
+            ? Boolean(prefsNow.marketing_email)
+            : Boolean(ns.emailDefault && ns.emailEnabled),
+          marketing_sms: smsChosen
+            ? Boolean(prefsNow.marketing_sms)
+            : Boolean(ns.smsDefault && ns.smsEnabled),
+        }));
       })
       .catch(() => {});
     return () => {
@@ -166,7 +178,7 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
     return !Object.keys(next).length;
   };
 
-  const confirmBooking = async () => {
+  const goToPayment = () => {
     if (!validate()) {
       toast.error('Συμπλήρωσε τα υποχρεωτικά πεδία');
       return;
@@ -183,60 +195,12 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
     }
 
     persistForm();
-
-    if (!getCustomerToken()) {
-      writeRentBookingPrefs({ ...selection, wizard_pending_confirm: true, wizard_step: 'details' });
-      navigate('/rent', { state: { from: '/rent/book/details', rentContinue: true } });
-      return;
-    }
-
-    if (/^demo-rent-(car|van)-/i.test(String(vehicle.id))) {
-      writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'done', ...selection });
-      toast.success('Demo κράτηση — έτσι φαίνεται η ροή του γραφείου.');
-      navigate('/rent/wallet');
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const fullName = `${form.first_name} ${form.last_name}`.trim();
-      const addressLine = [form.street, form.street_no, form.address2, form.postal, form.city, form.country]
-        .map((x) => String(x || '').trim())
-        .filter(Boolean)
-        .join(', ');
-
-      await ensureCustomerForRental({
-        email: form.email.trim(),
-        name: fullName,
-        phone: form.phone.trim(),
-      }).catch(() => null);
-
-      const extras = Object.entries(selection)
-        .filter(([, on]) => on)
-        .map(([key]) => key);
-      const booking = await createCustomerRentalBooking({
-        vehicle_id: vehicle.id,
-        start_time: new Date(prefs.start_time).toISOString(),
-        end_time: new Date(prefs.end_time).toISOString(),
-        pickup_location: prefs.pickup_location,
-        dropoff_location: prefs.dropoff_location || prefs.pickup_location,
-        driver_mode: prefs.driver_mode || 'SELF_DRIVE',
-        client_phone: form.phone.trim(),
-        notes: addressLine ? `Διεύθυνση: ${addressLine}` : undefined,
-        extras,
-      });
-      writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'done' });
-      toast.success(
-        booking?.reference_code
-          ? `Κράτηση έτοιμη · ${booking.reference_code}`
-          : 'Η κράτηση καταχωρήθηκε',
-      );
-      navigate('/rent/wallet', { state: { rentBookedAt: Date.now(), highlightBooking: booking?.id } });
-    } catch (err) {
-      toast.error(err?.message || 'Αποτυχία κράτησης');
-    } finally {
-      setBusy(false);
-    }
+    writeRentBookingPrefs({
+      ...selection,
+      wizard_step: 'payment',
+      wizard_pending_confirm: false,
+    });
+    navigate('/rent/book/payment');
   };
 
   return (
@@ -345,28 +309,32 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
                 </label>
               </div>
               <div className="rent-wiz-checks">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={form.marketing_email}
-                    onChange={(e) => {
-                      setField('marketing_email', e.target.checked);
-                      persistForm({ ...form, marketing_email: e.target.checked });
-                    }}
-                  />
-                  Θέλω προσφορές στο email
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={form.marketing_sms}
-                    onChange={(e) => {
-                      setField('marketing_sms', e.target.checked);
-                      persistForm({ ...form, marketing_sms: e.target.checked });
-                    }}
-                  />
-                  Θέλω ενημερώσεις SMS για την κράτηση
-                </label>
+                {notify.emailEnabled ? (
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={form.marketing_email}
+                      onChange={(e) => {
+                        setField('marketing_email', e.target.checked);
+                        persistForm({ ...form, marketing_email: e.target.checked });
+                      }}
+                    />
+                    {notify.emailLabel || 'Θέλω προσφορές στο email'}
+                  </label>
+                ) : null}
+                {notify.smsEnabled ? (
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={form.marketing_sms}
+                      onChange={(e) => {
+                        setField('marketing_sms', e.target.checked);
+                        persistForm({ ...form, marketing_sms: e.target.checked });
+                      }}
+                    />
+                    {notify.smsLabel || 'Θέλω ενημερώσεις SMS για την κράτηση'}
+                  </label>
+                ) : null}
               </div>
             </div>
 
@@ -451,10 +419,9 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
             <button
               type="button"
               className="rent-wiz-next rent-wiz-next--mobile"
-              disabled={busy}
-              onClick={confirmBooking}
+              onClick={goToPayment}
             >
-              {busy ? 'Καταχώρηση…' : 'Ολοκληρώνω την κράτηση'}
+              Συνέχεια στην πληρωμή
             </button>
           </section>
 
@@ -463,11 +430,11 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
             dayCount={dayCount}
             totals={totals}
             selectedLabels={selectedLabels}
-            busy={busy}
-            ctaLabel="Ολοκληρώνω την κράτηση"
+            busy={false}
+            ctaLabel="Συνέχεια στην πληρωμή"
             onChangeVehicle={() => navigate('/rent#rent-guest-fleet')}
-            onCta={confirmBooking}
-            note="Μετά την ολοκλήρωση η κράτηση εμφανίζεται στο Rent Wallet."
+            onCta={goToPayment}
+            note="Στο επόμενο βήμα επιλέγεις τρόπο πληρωμής και ολοκληρώνεις την κράτηση."
           />
         </div>
       )}

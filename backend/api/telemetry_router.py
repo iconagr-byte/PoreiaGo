@@ -90,6 +90,10 @@ async def fleet_live(
     import logging
 
     from travel_platform.telemetry.live_fleet_media import enrich_live_vehicle_media
+    from travel_platform.telemetry.live_fleet_trail_redis import (
+        load_trails_for_tenant,
+        trail_points_for_api,
+    )
     from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
     log = logging.getLogger(__name__)
@@ -101,17 +105,32 @@ async def fleet_live(
         raise HTTPException(status_code=503, detail="Live fleet temporarily unavailable") from exc
 
     rows = []
+    trails_by_vehicle: dict = {}
+    try:
+        vids = [str(v.vehicle_id) for v in vehicles if getattr(v, "vehicle_id", None)]
+        trails_by_vehicle = await load_trails_for_tenant(str(tenant_id), vids)
+    except Exception:
+        log.debug("fleet_live trail load skipped", exc_info=True)
+
+    from travel_platform.telemetry.office_fleet_filter import office_allows_live_driver
+
     for v in vehicles:
         try:
             meta = await live.vehicle_meta_async(tenant_id, v.vehicle_id)
             if not meta:
                 meta = live._vehicles.get(v.vehicle_id, {})
+            if not office_allows_live_driver(str(tenant_id), meta.get("driver_id"), meta):
+                continue
             media = enrich_live_vehicle_media(
                 driver_id=meta.get("driver_id"),
                 bus_plate=meta.get("bus_plate", v.vehicle_code),
                 vehicle_code=v.vehicle_code,
             )
             trip_title = await resolve_trip_title(v.trip_id, preferred=meta.get("trip_title"))
+            raw_trail = trails_by_vehicle.get(str(v.vehicle_id)) or []
+            # Always include current pin so a brand-new shift still draws a path start.
+            if not raw_trail:
+                raw_trail = [{"lat": v.lat, "lng": v.lng, "t": None, "s": v.speed_kmh, "h": meta.get("heading_deg")}]
             rows.append(
                 LiveVehicleResponse(
                     vehicle_id=v.vehicle_id,
@@ -131,6 +150,7 @@ async def fleet_live(
                     photo_url=media.get("photo_url"),
                     vehicle_image_url=media.get("vehicle_image_url"),
                     trip_title=trip_title or None,
+                    trail=trail_points_for_api(raw_trail),
                 ),
             )
         except Exception:

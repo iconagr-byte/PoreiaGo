@@ -6,7 +6,8 @@ import {
   officeModeFromModules,
   resolveDesignPageForModules,
 } from '../lib/admin/officeDesignPages.js';
-import { canAccessPlatformOperatorUi } from '../lib/saasJwt.js';
+import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
+import { canAccessPlatformOperatorUi, isImpersonating } from '../lib/saasJwt.js';
 
 export {
   contractDesignLabel,
@@ -72,14 +73,27 @@ export async function fetchAdminOfficeModules() {
  * Whether the Back Office «Ενοικιάσεις» menu should show.
  *
  * - PoreiaGo Super Admin (not impersonating) → always yes
+ * - PoreiaGo marketing host (poreiago.com / localhost) → always yes
  * - Achillio Travel office → no (bus-only policy)
  * - Office with rent_enabled → yes
  * - PoreiaGo platform office → yes
  */
-export function shouldShowRentMenu(modules, _opts = {}) {
+export function shouldShowRentMenu(modules, opts = {}) {
+  // Impersonating a tenant office → match that office (Achillio stays Rent-off).
+  if (isImpersonating()) {
+    if (modules?.office_kind === 'achillio_travel') return false;
+    return Boolean(modules?.rent_enabled) || modules?.office_kind === 'poreiago_platform';
+  }
+
   // Super Admin platform UI — always keep Ενοικιάσεις (host-agnostic).
-  // Impersonation clears canAccessPlatformOperatorUi so Achillio stays Rent-off.
   if (canAccessPlatformOperatorUi()) return true;
+
+  const hostname =
+    opts.hostname ||
+    (typeof window !== 'undefined' ? window.location.hostname : '');
+  // PoreiaGo apex Back Office must always see Rent, even if /billing/modules
+  // returns a bus-only / mis-tagged office payload.
+  if (isPlatformMarketingHost(hostname)) return true;
 
   if (modules?.office_kind === 'achillio_travel') return false;
   if (modules?.rent_enabled) return true;

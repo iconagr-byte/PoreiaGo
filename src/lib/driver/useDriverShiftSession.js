@@ -118,8 +118,10 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
   const goOffline = useCallback(
     async ({ silent = false } = {}) => {
       clearDriverGpsAutostart();
+      let endedOk = false;
       try {
         const ended = await endDriverShift();
+        endedOk = ended?.ok !== false;
         const push = ended?.notify?.push;
         if (push?.sent > 0) {
           console.info('[shift] end push sent', push.sent);
@@ -129,10 +131,21 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       } catch (err) {
         console.warn('[shift] end notify failed, retrying', err);
         try {
-          await endDriverShift();
+          const ended = await endDriverShift();
+          endedOk = ended?.ok !== false;
         } catch (err2) {
           console.warn('[shift] end notify retry failed', err2);
+          endedOk = false;
         }
+      }
+
+      // Explicit Τέλος βάρδιας must reach the server or the office map keeps the pin.
+      // Silent paths (expired token / page teardown) still clear local GPS.
+      if (!endedOk && !silent) {
+        toast.error(
+          'Το τέλος βάρδιας δεν καταχωρήθηκε — δοκιμάστε ξανά (ο χάρτης μπορεί να σας δείχνει ακόμα ενεργό)',
+        );
+        return;
       }
 
       stopRuntime();
@@ -140,7 +153,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       setGpsError('');
       setStarting(false);
       setShiftFlag(false);
-      if (!silent) {
+      if (!silent && endedOk) {
         toast('Η βάρδια τερματίστηκε', { icon: '🛑', duration: 2500 });
       }
     },

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,12 @@ from database import AsyncSessionLocal
 from ticketing.boarding_service import get_boarding_manifest
 from travel_platform.operations.master_qr_local import DEFAULT_TENANT, _secret as local_secret
 from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
-from travel_platform.settings.drivers_store import authenticate_driver, get_driver
+from travel_platform.settings.drivers_store import (
+    DEMO_TENANT_ID,
+    authenticate_driver,
+    get_driver,
+)
+from travel_platform.settings.login_audit_store import record_login_from_request
 from travel_platform.telemetry.live_fleet import LiveFleetService
 from travel_platform.telemetry.processor import get_idling, get_live_fleet
 
@@ -214,15 +219,101 @@ def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None
     return 1
 
 
+async def _login_office_tenant(request: Request) -> str | None:
+    """Host / middleware office for this /driver login (None on bare platform host)."""
+    tid = getattr(request.state, "tenant_id", None)
+    if tid:
+        return str(tid)
+    try:
+        from api.request_tenant import public_tenant_id
+
+        return await public_tenant_id(request, allow_demo_fallback=False)
+    except Exception:
+        return None
+
+
 @router.post("/session/login", response_model=DriverSessionResponse)
-async def login_with_password(body: DriverLoginBody):
-    """Primary PWA login — username (email / license / plate) + password."""
-    driver = authenticate_driver(body.username, body.password)
-    if not driver:
-        raise HTTPException(status_code=401, detail="Λάθος όνομα χρήστη ή κωδικός")
-    # Must match the SaaS tenant the admin live map filters by (not the local demo UUID).
-    tenant_id = await resolve_platform_tenant_id()
+async def login_with_password(request: Request, body: DriverLoginBody):
+    """
+    Primary PWA login — username (email / license / plate) + password.
+
+    Locked to the Host office: the same credentials must not open a session
+    that paints GPS onto a different γραφείο.
+    """
+    username = (body.username or "").strip()
+    office_tid = await _login_office_tenant(request)
+    platform_tid = ""
+    allow_demo_legacy = False
+    try:
+        platform_tid = str(await resolve_platform_tenant_id() or "").strip()
+    except Exception:
+        platform_tid = ""
+
+    if office_tid:
+        # Legacy DEMO rows only for the primary SaaS office (Achillio), never PoreiaGo.
+        allow_demo_legacy = bool(platform_tid and office_tid == platform_tid)
+        driver = authenticate_driver(
+            body.username,
+            body.password,
+            tenant_id=office_tid,
+            allow_demo_legacy=allow_demo_legacy,
+        )
+        if not driver:
+            record_login_from_request(
+                request,
+                actor_type="driver",
+                identity=username,
+                success=False,
+                method="password",
+                detail="Λάθος όνομα χρήστη ή κωδικός — ή ο οδηγός ανήκει σε άλλο γραφείο",
+                tenant_id=office_tid,
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="Λάθος όνομα χρήστη ή κωδικός — ή ο οδηγός ανήκει σε άλλο γραφείο",
+            )
+        # Session stays on this office (claim DEMO legacy onto the host office).
+        tenant_id = office_tid
+        driver_home = str(getattr(driver, "tenant_id", None) or DEMO_TENANT_ID)
+        if (
+            allow_demo_legacy
+            and driver_home == DEMO_TENANT_ID
+            and office_tid != DEMO_TENANT_ID
+        ):
+            try:
+                from travel_platform.settings.drivers_store import update_driver
+
+                update_driver(driver.id, {"tenant_id": office_tid})
+            except Exception:
+                pass
+    else:
+        # Platform host without office Host (rare) — still bind JWT to the
+        # driver's home tenant, never force the global Achillio platform id.
+        driver = authenticate_driver(body.username, body.password)
+        if not driver:
+            record_login_from_request(
+                request,
+                actor_type="driver",
+                identity=username,
+                success=False,
+                method="password",
+                detail="Λάθος όνομα χρήστη ή κωδικός",
+            )
+            raise HTTPException(status_code=401, detail="Λάθος όνομα χρήστη ή κωδικός")
+        tenant_id = str(getattr(driver, "tenant_id", None) or DEMO_TENANT_ID)
+
     trip_id = _resolve_trip_for_driver(driver.id, tenant_id)
+    record_login_from_request(
+        request,
+        actor_type="driver",
+        identity=driver.email or driver.license_no or username,
+        success=True,
+        actor_id=driver.id,
+        actor_name=driver.name,
+        method="password",
+        tenant_id=str(tenant_id) if tenant_id else None,
+        detail=driver.license_plate or driver.vehicle_code,
+    )
     return _issue_driver_session(
         driver_id=driver.id,
         tenant_id=tenant_id,
@@ -231,7 +322,7 @@ async def login_with_password(body: DriverLoginBody):
 
 
 @router.post("/session/master-qr", response_model=DriverSessionResponse)
-async def exchange_master_qr(body: MasterQrExchangeBody):
+async def exchange_master_qr(request: Request, body: MasterQrExchangeBody):
     """Scan bus dashboard QR → day session (secondary login path)."""
     from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
     from travel_platform.operations.master_qr_bridge import (
@@ -246,16 +337,38 @@ async def exchange_master_qr(body: MasterQrExchangeBody):
         trip_id = int(hybrid["trip_id"])
         driver_id = hybrid.get("driver_id")
         platform_tid = await resolve_platform_tenant_id()
-        tenant_id = coerce_driver_tenant_id(
-            str(hybrid.get("tenant_id") or ""),
-            platform_tenant_id=platform_tid,
-        )
+        qr_tid = str(hybrid.get("tenant_id") or "").strip()
+        # Keep real office UUIDs; only remap empty/demo QR onto platform.
+        tenant_id = coerce_driver_tenant_id(qr_tid, platform_tenant_id=platform_tid)
+        # If the QR names a driver, session must stay on that driver's office —
+        # never let a PoreiaGo driver paint Achillio (or the reverse).
+        if driver_id and driver_id != "master-qr-driver":
+            bound = get_driver(str(driver_id))
+            if bound:
+                home = str(getattr(bound, "tenant_id", None) or DEMO_TENANT_ID)
+                if home and home != DEMO_TENANT_ID:
+                    tenant_id = home
+                elif tenant_id == DEMO_TENANT_ID and platform_tid:
+                    tenant_id = platform_tid
         # Load office travelers into SQLite so scan validates against real bookings.
         try:
             await sync_trip_passengers_to_ticketing(trip_id, tenant_id=tenant_id)
         except Exception:
             pass
-        # Re-issue JWT with the coerced SaaS tenant so GPS ingest matches the live map.
+        driver = get_driver(driver_id) if driver_id and driver_id != "master-qr-driver" else None
+        record_login_from_request(
+            request,
+            actor_type="driver",
+            identity=(driver.email if driver else None)
+            or (driver.license_no if driver else None)
+            or str(driver_id or "master-qr"),
+            success=True,
+            actor_id=str(driver_id) if driver_id else None,
+            actor_name=(driver.name if driver else None) or "Master QR",
+            method="master_qr",
+            tenant_id=str(tenant_id) if tenant_id else None,
+            detail=f"trip:{trip_id}",
+        )
         return _issue_driver_session(
             driver_id=driver_id,
             tenant_id=tenant_id,
@@ -265,7 +378,23 @@ async def exchange_master_qr(body: MasterQrExchangeBody):
 
     preview = preview_master_qr_payload(body.qr_raw)
     if not preview or preview.get("typ") != "master_qr":
+        record_login_from_request(
+            request,
+            actor_type="driver",
+            identity="master-qr",
+            success=False,
+            method="master_qr",
+            detail="Not a Master QR code",
+        )
         raise HTTPException(status_code=400, detail="Not a Master QR code")
+    record_login_from_request(
+        request,
+        actor_type="driver",
+        identity="master-qr",
+        success=False,
+        method="master_qr",
+        detail="Invalid or expired Master QR",
+    )
     raise HTTPException(status_code=401, detail="Invalid or expired Master QR")
 
 
@@ -540,6 +669,13 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
     extra_tenants.discard(tenant_id)
     extra_tenants.discard("")
 
+    try:
+        from travel_platform.telemetry.driver_gps_heartbeat import clear_driver_gps
+
+        clear_driver_gps(session_payload)
+    except Exception:
+        pass
+
     removed: list[str] = []
     if tenant_id and driver_id:
         try:
@@ -549,23 +685,53 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
                 extra_tenant_ids=list(extra_tenants),
             )
         except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "remove_driver_vehicles failed tenant=%s driver=%s",
+                tenant_id,
+                driver_id,
+            )
             removed = []
 
-    if tenant_id:
+    # Broadcast offline FIRST — office map must drop the pin before trail/push work.
+    offline_payload = {
+        "type": "fleet_driver_offline",
+        "tenant_id": tenant_id,
+        "driver_id": driver_id,
+        "trip_id": trip_id,
+        "reason": "shift_end",
+        "removed_vehicle_ids": removed,
+    }
+    broadcast_tenants = {tid for tid in [tenant_id, *extra_tenants] if tid}
+    for tid in broadcast_tenants:
         try:
-            await get_fleet_egress_hub().broadcast(
-                tenant_id,
-                {
-                    "type": "fleet_driver_offline",
-                    "tenant_id": tenant_id,
-                    "driver_id": driver_id,
-                    "trip_id": trip_id,
-                    "reason": "shift_end",
-                    "removed_vehicle_ids": removed,
-                },
-            )
+            await get_fleet_egress_hub().broadcast(tid, {**offline_payload, "tenant_id": tid})
         except Exception:
             pass
+
+    # Persist GPS path after map offline signal (must not delay pin clear).
+    trail_points = 0
+    if tenant_id and removed:
+        try:
+            from travel_platform.telemetry.trail_history_flush import persist_trails_for_vehicles
+
+            def _safe_int(value):
+                if value in (None, "", "0"):
+                    return None
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return None
+
+            trail_points = await persist_trails_for_vehicles(
+                tenant_id,
+                removed,
+                trip_id=_safe_int(trip_id),
+                driver_id=driver_id,
+            )
+        except Exception:
+            trail_points = 0
 
     notify_result: dict = {"skipped": True}
     try:
@@ -581,5 +747,6 @@ async def driver_shift_end(session_payload: dict = Depends(require_driver_sessio
         "ok": True,
         "was_online": was_online,
         "removed_vehicles": removed,
+        "trail_points_saved": trail_points,
         "notify": notify_result,
     }

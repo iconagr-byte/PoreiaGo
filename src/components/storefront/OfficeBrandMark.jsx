@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchSiteAppearance, resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import {
+  fetchAdminSiteAppearance,
+  fetchSiteAppearance,
+  resolveSiteAssetUrl,
+} from '../../services/siteAppearanceApi.js';
 import { officeLogoImageStyle, resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
 import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
 import { OFFICE_BRAND_CHANGED_EVENT } from '../admin/OfficeLogoChangeModal.jsx';
 
 /**
  * Office wordmark for headers — never shows PoreiaGo platform gold logo on tenant sites.
+ *
+ * preferAdmin: use JWT/tenant appearance (BackOffice sidebar). Public host fetch can
+ * miss postgres branding when the admin UI runs on the platform domain.
  */
 export default function OfficeBrandMark({
   className = '',
@@ -14,6 +21,7 @@ export default function OfficeBrandMark({
   asLink = true,
   fallbackLabel = 'Γραφείο',
   refreshKey = 0,
+  preferAdmin = false,
 }) {
   const [appearance, setAppearance] = useState({});
   const [brand, setBrand] = useState(() => resolveOfficeBrand({}));
@@ -22,11 +30,18 @@ export default function OfficeBrandMark({
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      fetchSiteAppearance()
+      const loader = preferAdmin ? fetchAdminSiteAppearance() : fetchSiteAppearance();
+      loader
         .then((data) => {
           if (cancelled) return;
-          setAppearance(data || {});
-          setBrand(resolveOfficeBrand(data));
+          // fetchAdminSiteAppearance may return a nested `{ data }` from older callers —
+          // normalise to the appearance object.
+          const next =
+            data?.data && typeof data.data === 'object' && !data.footer_brand_name && !data.logo_url
+              ? data.data
+              : data || {};
+          setAppearance(next);
+          setBrand(resolveOfficeBrand(next));
         })
         .catch(() => {});
     };
@@ -37,11 +52,11 @@ export default function OfficeBrandMark({
       cancelled = true;
       window.removeEventListener(OFFICE_BRAND_CHANGED_EVENT, onChanged);
     };
-  }, [refreshKey]);
+  }, [refreshKey, preferAdmin]);
 
   const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();
-  const label = brand.displayName || fallbackLabel || (onTenant ? 'Γραφείο' : 'PoreiaGo');
+  const label = brand.displayName || brand.name || fallbackLabel || (onTenant ? 'Γραφείο' : 'PoreiaGo');
   const logoStyle = officeLogoImageStyle(appearance);
 
   const inner = logoSrc ? (
@@ -49,7 +64,7 @@ export default function OfficeBrandMark({
       <img src={logoSrc} alt={label || 'Logo'} style={logoStyle} className="object-contain" />
       {brand.showName && (
         <span className={`font-bold tracking-tight text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
-          {brand.displayName}
+          {brand.displayName || brand.name}
         </span>
       )}
     </span>

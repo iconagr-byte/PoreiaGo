@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import '../../styles/driver-app.css';
-import { clearDriverSession, getDriverSession, isSessionValid } from '../../lib/driver/driverSession.js';
+import {
+  clearDriverSession,
+  getDriverSession,
+  resolveDriverAuthOnLaunch,
+} from '../../lib/driver/driverSession.js';
 import { flushOfflineScanQueue } from '../../services/ticketingApi.js';
 import { fetchDriverMe } from '../../services/driverPortalApi.js';
 import MasterQrGate from '../../components/driver/MasterQrGate.jsx';
@@ -13,10 +17,12 @@ import SOSButton from '../../components/driver/enterprise/SOSButton.jsx';
 import TachographStrip from '../../components/driver/enterprise/TachographStrip.jsx';
 import DaySummary from '../../components/driver/DaySummary.jsx';
 import DriverShiftTelemetry from '../../components/driver/DriverShiftTelemetry.jsx';
-import DriverPushPanel from '../../components/driver/DriverPushPanel.jsx';
 import DriverOfficeChat from '../../components/driver/DriverOfficeChat.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
-import { useDriverShiftSession } from '../../lib/driver/useDriverShiftSession.js';
+import {
+  clearDriverShiftLaunchState,
+  useDriverShiftSession,
+} from '../../lib/driver/useDriverShiftSession.js';
 import {
   clearDriverNotifications,
   resetDriverEntryAlerts,
@@ -138,11 +144,17 @@ const toastOptions = {
 export default function DriverCommandCenter() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [authenticated, setAuthenticated] = useState(isSessionValid());
+  // Always show login when reopening the app (no sticky localStorage session).
+  const [authenticated, setAuthenticated] = useState(() => resolveDriverAuthOnLaunch());
   const [profileTick, setProfileTick] = useState(0);
   const tab = params.get('tab') || 'home';
   const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
-  const tripId = session?.tripId;
+
+  useEffect(() => {
+    if (!authenticated) {
+      clearDriverShiftLaunchState();
+    }
+  }, [authenticated]);
 
   const [onBreak, setOnBreak] = useState(false);
   const [chatUnread, setChatUnread] = useState(0);
@@ -346,7 +358,7 @@ export default function DriverCommandCenter() {
           onOpenChat={() => setTab('chat')}
         />
 
-        {tab !== 'chat' && tab !== 'summary' ? (
+        {tab !== 'home' && tab !== 'chat' && tab !== 'summary' ? (
           <div className="driver-shell">
             <TachographStrip
               drivingLabel={tachograph.drivingLabel}
@@ -412,7 +424,6 @@ export default function DriverCommandCenter() {
                 </span>
                 <span className="material-symbols-outlined text-slate-400">chevron_right</span>
               </button>
-              <DriverPushPanel />
               <DailyManifest />
             </>
           )}

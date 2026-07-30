@@ -209,6 +209,18 @@ async def lifespan(app: FastAPI):
             "Office Rent policy sync skipped: %s", exc
         )
     try:
+        from travel_platform.settings.drivers_store import purge_seed_demo_drivers
+
+        purged = purge_seed_demo_drivers()
+        if purged:
+            __import__("logging").getLogger("poreiago.startup").info(
+                "Purged %s seed demo drivers from fleet store", purged
+            )
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Seed demo driver purge skipped: %s", exc
+        )
+    try:
         from app.core.database import AsyncSessionLocal
         from travel_platform.growth.traefik_domains import sync_traefik_custom_domains_from_db
 

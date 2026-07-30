@@ -95,9 +95,9 @@ export default function RentBookingServicesStep({ brandLabel = 'Γραφείο' 
   useEffect(() => {
     if (resumed.current) return;
     const p = readRentBookingPrefs();
-    if (p.wizard_pending_confirm && getCustomerToken() && p.wizard_step === 'details') {
+    if (p.wizard_pending_confirm && getCustomerToken() && (p.wizard_step === 'payment' || p.wizard_step === 'details')) {
       resumed.current = true;
-      navigate('/rent/book/details', { replace: true });
+      navigate(p.wizard_step === 'payment' ? '/rent/book/payment' : '/rent/book/details', { replace: true });
     }
   }, [navigate]);
 

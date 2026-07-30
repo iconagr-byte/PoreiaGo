@@ -19,16 +19,40 @@ export function notifyOfficeBrandChanged() {
   }
 }
 
+function appearanceFromAdminPayload(data) {
+  if (!data || typeof data !== 'object') return {};
+  if (data.data && typeof data.data === 'object' && !data.footer_brand_name && !data.logo_url) {
+    return data.data;
+  }
+  return data;
+}
+
 /**
- * Quick logo change from the admin sidebar brand («Γραφείο»).
+ * Quick logo + office name change from the admin sidebar brand («Γραφείο»).
  */
 export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
   const inputRef = useRef(null);
+  const brandNameRef = useRef('');
+  const savedNameRef = useRef('');
+  const appearanceRef = useRef({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [appearance, setAppearance] = useState({});
   const [brandName, setBrandName] = useState('');
+  const [savedName, setSavedName] = useState('');
   const [dragOver, setDragOver] = useState(false);
+
+  useEffect(() => {
+    brandNameRef.current = brandName;
+  }, [brandName]);
+
+  useEffect(() => {
+    savedNameRef.current = savedName;
+  }, [savedName]);
+
+  useEffect(() => {
+    appearanceRef.current = appearance;
+  }, [appearance]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -37,9 +61,11 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
     fetchAdminSiteAppearance()
       .then((data) => {
         if (cancelled) return;
-        const next = data?.data && typeof data.data === 'object' ? data.data : data || {};
+        const next = appearanceFromAdminPayload(data);
         setAppearance(next);
-        setBrandName(String(next.footer_brand_name || '').trim());
+        const name = String(next.footer_brand_name || next.rent_office_name || next.display_name || '').trim();
+        setBrandName(name);
+        setSavedName(name);
       })
       .catch(() => {
         if (!cancelled) toast.error('Αποτυχία φόρτωσης εμφάνισης');
@@ -52,44 +78,84 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
     };
   }, [open]);
 
+  const persistName = async ({ silent = false, closeAfter = false } = {}) => {
+    const name = brandNameRef.current.trim();
+    if (name === savedNameRef.current.trim()) {
+      if (closeAfter) onClose?.();
+      return true;
+    }
+    setBusy(true);
+    try {
+      const current = appearanceRef.current || {};
+      const patch = { footer_brand_name: name };
+      const rentName = String(current.rent_office_name || '').trim();
+      const prevFooter = String(current.footer_brand_name || '').trim();
+      // Keep /rent brand in sync when unused or previously mirrored.
+      if (!rentName || rentName === prevFooter || rentName === savedNameRef.current.trim()) {
+        patch.rent_office_name = name;
+      }
+      const saved = await updateSiteAppearance(patch);
+      const next = appearanceFromAdminPayload(saved?.data) || {
+        ...current,
+        ...patch,
+      };
+      setAppearance(next);
+      appearanceRef.current = next;
+      setSavedName(name);
+      savedNameRef.current = name;
+      notifyOfficeBrandChanged();
+      onSaved?.();
+      if (!silent) {
+        if (saved?.offline) {
+          toast.success('Αποθηκεύτηκε τοπικά — θα συγχρονιστεί όταν συνδεθεί ο server');
+        } else {
+          toast.success('Το όνομα γραφείου αποθηκεύτηκε');
+        }
+      }
+      if (closeAfter) onClose?.();
+      return true;
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία αποθήκευσης');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.();
+    const onKey = async (e) => {
+      if (e.key === 'Escape') {
+        await persistName({ silent: true, closeAfter: true });
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+    // persistName reads refs — stable enough for this effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onClose]);
 
   if (!open) return null;
 
   const brand = resolveOfficeBrand(appearance);
   const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
-  const label = brandName || brand.displayName || 'Γραφείο';
+  const label = brandName.trim() || brand.displayName || brand.name || 'Γραφείο';
+  const nameDirty = brandName.trim() !== savedName.trim();
 
-  const persistName = async () => {
-    const name = brandName.trim();
-    setBusy(true);
-    try {
-      const saved = await updateSiteAppearance({ footer_brand_name: name });
-      setAppearance(saved?.data || { ...appearance, footer_brand_name: name });
-      notifyOfficeBrandChanged();
-      onSaved?.();
-      toast.success('Το όνομα γραφείου αποθηκεύτηκε');
-    } catch (err) {
-      toast.error(err.message || 'Αποτυχία αποθήκευσης');
-    } finally {
-      setBusy(false);
-    }
+  const requestClose = async () => {
+    await persistName({ silent: !nameDirty, closeAfter: true });
   };
 
   const onFile = async (file) => {
     if (!file) return;
+    // Persist pending name first so a logo-only click does not drop the rename.
+    await persistName({ silent: true });
     setBusy(true);
     try {
       const result = await uploadSiteAsset('logo', file);
-      const next = result?.appearance || { ...appearance, logo_url: result?.url };
+      const next = result?.appearance || { ...appearanceRef.current, logo_url: result?.url };
       setAppearance(next);
+      appearanceRef.current = next;
       notifyOfficeBrandChanged();
       onSaved?.();
       toast.success('Το λογότυπο ενημερώθηκε');
@@ -105,8 +171,9 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
     setBusy(true);
     try {
       const result = await clearSiteAsset('logo');
-      const next = result?.appearance || { ...appearance, logo_url: '' };
+      const next = result?.appearance || { ...appearanceRef.current, logo_url: '' };
       setAppearance(next);
+      appearanceRef.current = next;
       notifyOfficeBrandChanged();
       onSaved?.();
       toast.success('Το λογότυπο αφαιρέθηκε');
@@ -123,8 +190,8 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
       role="dialog"
       aria-modal="true"
       aria-label="Αλλαγή λογοτύπου"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
+      onClick={async (e) => {
+        if (e.target === e.currentTarget) await requestClose();
       }}
     >
       <div className="relative w-full max-w-md rounded-t-[24px] sm:rounded-[24px] bg-white shadow-2xl border border-black/[0.06] overflow-hidden">
@@ -133,14 +200,14 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
               Εμφάνιση γραφείου
             </p>
-            <h2 className="mt-1 text-lg font-bold text-slate-900">Λογότυπο εταιρείας</h2>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">Λογότυπο & όνομα</h2>
             <p className="mt-1 text-sm text-slate-500 leading-relaxed">
               Εμφανίζεται στο admin sidebar, storefront και Rent app.
             </p>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
             aria-label="Κλείσιμο"
           >
@@ -192,8 +259,23 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
                   className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
                   value={brandName}
                   onChange={(e) => setBrandName(e.target.value)}
+                  onBlur={() => {
+                    if (brandName.trim() !== savedName.trim()) {
+                      persistName({ silent: false });
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      persistName({ silent: false });
+                    }
+                  }}
                   placeholder="π.χ. Achillio Travel"
+                  disabled={busy}
                 />
+                <span className="mt-1 block text-[11px] text-slate-400">
+                  Αποθηκεύεται αυτόματα όταν φύγεις από το πεδίο ή πατήσεις Enter.
+                </span>
               </label>
 
               <input
@@ -227,11 +309,15 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
                 ) : null}
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={persistName}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-bold disabled:opacity-50"
+                  disabled={busy || !nameDirty}
+                  onClick={() => persistName({ silent: false })}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-bold disabled:opacity-50 ${
+                    nameDirty
+                      ? 'bg-slate-900 text-white'
+                      : 'border border-slate-200 bg-white text-slate-500'
+                  }`}
                 >
-                  Αποθήκευση ονόματος
+                  {nameDirty ? 'Αποθήκευση ονόματος' : 'Αποθηκευμένο'}
                 </button>
               </div>
             </>

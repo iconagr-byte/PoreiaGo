@@ -202,7 +202,11 @@ export default function FleetLiveMapLeaflet({
     return pts;
   }, [vehicles, sosAlerts]);
 
-  const trails = useFleetVehicleTrails(vehicles, { enabled: showTrails });
+  const trails = useFleetVehicleTrails(vehicles, {
+    enabled: showTrails,
+    maxPoints: 3000,
+    minMoveM: 3,
+  });
 
   return (
     <MapContainer

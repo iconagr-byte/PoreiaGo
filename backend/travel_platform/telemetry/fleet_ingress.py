@@ -127,16 +127,64 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         coerce_driver_tenant_id,
         resolve_platform_tenant_id,
     )
+    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+    from travel_platform.settings.drivers_store import (
+        DEMO_TENANT_ID,
+        get_driver,
+        is_seed_driver,
+        update_driver,
+    )
     from travel_platform.telemetry.ingress_rate_limit import check_driver_gps_rate_limit
     from travel_platform.telemetry.settings_store import get_telemetry_settings
 
+    driver_id = str(session.get("driver_id") or body.get("driver_id") or "").strip()
+    if driver_id:
+        bound = get_driver(driver_id)
+        if is_seed_driver(bound):
+            logger.info("Rejecting GPS from purged seed demo driver=%s", driver_id)
+            return {
+                "ok": False,
+                "rejected": True,
+                "detail": "Demo driver removed",
+                "tenant_id": str(session.get("tenant_id") or ""),
+            }
+
     platform_tid = await resolve_platform_tenant_id()
-    # Trust session first; remap legacy …0001 demo sessions onto the real SaaS tenant.
-    tenant_id = coerce_driver_tenant_id(
-        str(session.get("tenant_id") or body.get("tenant_id") or ""),
-        platform_tenant_id=platform_tid,
-    )
-    # Ensure downstream payload builders see the coerced tenant (even for old JWTs).
+    raw_tid = str(session.get("tenant_id") or body.get("tenant_id") or "").strip()
+    # Trust an explicit non-demo office on the JWT — do not remap PoreiaGo ↔ Achillio.
+    # Only empty / legacy DEMO sessions may fall back to the platform tenant.
+    if raw_tid and raw_tid != str(DEFAULT_TENANT):
+        tenant_id = raw_tid
+    else:
+        tenant_id = coerce_driver_tenant_id(raw_tid, platform_tenant_id=platform_tid)
+
+    # Never paint a pin for a driver that is not on this office's Οδηγοί list.
+    # Claim non-seed DEMO orphans onto the session office so Achilleas can appear
+    # once (and only once) under that γραφείο.
+    if driver_id and tenant_id and tenant_id != str(DEMO_TENANT_ID):
+        bound = get_driver(driver_id)
+        if bound and not is_seed_driver(bound):
+            home = str(getattr(bound, "tenant_id", None) or DEMO_TENANT_ID)
+            if home == str(DEMO_TENANT_ID):
+                try:
+                    update_driver(driver_id, {"tenant_id": tenant_id})
+                    home = tenant_id
+                except Exception:
+                    logger.debug("legacy DEMO claim on GPS failed driver=%s", driver_id, exc_info=True)
+            if home != tenant_id:
+                logger.info(
+                    "Rejecting GPS — driver=%s home=%s session=%s (not on office list)",
+                    driver_id,
+                    home,
+                    tenant_id,
+                )
+                return {
+                    "ok": False,
+                    "rejected": True,
+                    "detail": "Ο οδηγός δεν ανήκει σε αυτό το γραφείο",
+                    "tenant_id": tenant_id,
+                }
+
     session = {**session, "tenant_id": tenant_id}
     if isinstance(body, dict):
         body = {**body, "tenant_id": tenant_id}
@@ -247,6 +295,25 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
             raw=payload,
         ),
     )
+
+    # Full live path ring — admin map draws this; shift-end flushes to history.
+    if vehicle_id:
+        try:
+            from travel_platform.telemetry.live_fleet_trail_redis import append_trail_point
+
+            await append_trail_point(
+                tenant_id,
+                vehicle_id,
+                lat=float(payload["latitude"]),
+                lng=float(payload["longitude"]),
+                speed_kmh=float(payload["speed_kmh"] or 0),
+                heading_deg=payload.get("heading_deg"),
+                recorded_at=recorded_dt,
+                trip_id=payload.get("trip_id"),
+                driver_id=str(payload.get("driver_id")) if payload.get("driver_id") else None,
+            )
+        except Exception:
+            logger.exception("live trail append failed vehicle=%s", vehicle_id)
 
     from travel_platform.telemetry.fleet_metrics import record_gps_ingress
 

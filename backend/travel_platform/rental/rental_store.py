@@ -675,6 +675,32 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         now = _now()
         booking_id = str(uuid4())
         ref_code = f"RB-{booking_id.replace('-', '')[:8].upper()}"
+
+        payment_method = str(body.get("payment_method") or "").strip() or None
+        payment_plan = str(body.get("payment_plan") or "").strip() or None
+        deposit_percent = body.get("deposit_percent")
+        try:
+            deposit_percent = int(deposit_percent) if deposit_percent is not None else None
+        except (TypeError, ValueError):
+            deposit_percent = None
+        amount_paid = body.get("amount_paid")
+        balance_due = body.get("balance_due")
+        try:
+            amount_paid = round(float(amount_paid), 2) if amount_paid is not None else None
+        except (TypeError, ValueError):
+            amount_paid = None
+        try:
+            balance_due = round(float(balance_due), 2) if balance_due is not None else None
+        except (TypeError, ValueError):
+            balance_due = None
+        payment_status = str(body.get("payment_status") or "").strip() or None
+
+        # Bank / cash-at-pickup stay reserved until office confirms settlement.
+        pending_pay = payment_method in {"bank_transfer", "cash_office"}
+        rental_status = "RESERVED" if pending_pay else "CONFIRMED"
+        if not payment_status and payment_method:
+            payment_status = "PENDING" if pending_pay else "PAID"
+
         row = {
             "id": booking_id,
             "reference_code": ref_code,
@@ -701,10 +727,20 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
                 "extras": extras_quote["lines"],
             },
             "extras": [line["id"] for line in extras_quote["lines"]],
-            "rental_status": "CONFIRMED",
+            "rental_status": rental_status,
             "driver_mode": driver_mode,
             "assigned_driver_id": (str(body.get("assigned_driver_id") or "").strip() or None),
             "notes": notes,
+            "marketing_email": bool(body.get("marketing_email")),
+            "marketing_sms": bool(body.get("marketing_sms")),
+            "payment_method": payment_method,
+            "payment_plan": payment_plan,
+            "deposit_percent": deposit_percent,
+            "amount_paid": amount_paid if amount_paid is not None else (0.0 if pending_pay else total),
+            "balance_due": balance_due
+            if balance_due is not None
+            else (total if pending_pay else 0.0),
+            "payment_status": payment_status,
             "legal_doc_signatures": {},
             "created_at": now,
             "updated_at": now,
@@ -1098,8 +1134,8 @@ def cancel_booking_for_customer(
         status = str(booking.get("rental_status") or "").upper()
         if status == "CANCELLED":
             return deepcopy(booking)
-        if status != "CONFIRMED":
-            raise ValueError("Μπορείτε να ακυρώσετε μόνο επιβεβαιωμένες κρατήσεις (όχι ενεργές)")
+        if status not in ("CONFIRMED", "RESERVED"):
+            raise ValueError("Μπορείτε να ακυρώσετε μόνο επιβεβαιωμένες ή δεσμευμένες κρατήσεις")
     return update_booking_status(tid, bid, "CANCELLED")
 
 

@@ -4,7 +4,11 @@ import { getSaasTenantId, getSaasToken } from '../services/saasApi.js';
 import { decodeJwtPayload, getImpersonationTarget } from '../lib/saasJwt.js';
 import { fetchLiveFleet } from '../services/telemetryApi.js';
 import { adminAuthHeaders } from '../services/adminApi.js';
-import { FLEET_LIVE_POLL_MS } from '../lib/admin/fleetLivePoll.js';
+import {
+  FLEET_LIVE_POLL_ACTIVE_MS,
+  FLEET_LIVE_POLL_MS,
+  fleetPollMsForVehicleCount,
+} from '../lib/admin/fleetLivePoll.js';
 
 export const DEMO_TENANT = import.meta.env.VITE_DEMO_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 
@@ -20,6 +24,13 @@ export function resolveFleetTenantId() {
   const stored = getSaasTenantId();
   if (stored) return stored;
   return DEMO_TENANT;
+}
+
+function isFleetAuthError(err) {
+  const status = Number(err?.status);
+  if (status === 401 || status === 403) return true;
+  const raw = String(err?.message || '');
+  return /έληξε|συνδεθείτε|unauthorized|forbidden|401|403/i.test(raw);
 }
 
 const FleetTelemetryContext = createContext(null);
@@ -54,12 +65,55 @@ function normalizeVehicle(msg, id, prev) {
     sensors: msg.sensors ?? null,
     photo_url: msg.photo_url ?? prev?.photo_url ?? null,
     vehicle_image_url: msg.vehicle_image_url ?? prev?.vehicle_image_url ?? null,
+    trail: Array.isArray(msg.trail) && msg.trail.length ? msg.trail : prev?.trail || null,
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
 }
 
 function vehicleIdFromRow(v) {
   return v.vehicle_id || v.driver_id || `${v.bus_plate || v.vehicle_code || 'bus'}-${v.trip_id || '0'}`;
+}
+
+function dropOfflineVehicles(prev, msg) {
+  const next = { ...prev };
+  let changed = false;
+  const removedIds = Array.isArray(msg.removed_vehicle_ids)
+    ? msg.removed_vehicle_ids.map(String)
+    : [];
+  for (const rid of removedIds) {
+    if (next[rid]) {
+      delete next[rid];
+      changed = true;
+    }
+    // Also drop rows keyed by plate/code when Redis id differs from map key.
+    for (const [key, row] of Object.entries(next)) {
+      if (
+        String(row.vehicle_id || '') === rid ||
+        String(row.vehicle_code || '') === rid ||
+        String(row.bus_plate || '') === rid
+      ) {
+        delete next[key];
+        changed = true;
+      }
+    }
+  }
+  const did = msg.driver_id != null ? String(msg.driver_id) : '';
+  if (did) {
+    for (const [key, row] of Object.entries(next)) {
+      if (String(row.driver_id || '') === did) {
+        delete next[key];
+        changed = true;
+      }
+    }
+  }
+  if (!changed) {
+    const id = vehicleIdFromRow(msg);
+    if (next[id]) {
+      delete next[id];
+      changed = true;
+    }
+  }
+  return changed ? next : prev;
 }
 
 export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
@@ -85,7 +139,12 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
   const [pollError, setPollError] = useState('');
   const [lastPollAt, setLastPollAt] = useState(null);
   const wsRef = useRef(null);
-  const lastNonEmptyAtRef = useRef(0);
+  const vehicleCountRef = useRef(0);
+  const boostPollUntilRef = useRef(0);
+
+  useEffect(() => {
+    vehicleCountRef.current = Object.keys(vehicles).length;
+  }, [vehicles]);
 
   // HTTP poll is primary in production — Traefik often 404s WebSocket upgrades.
   useEffect(() => {
@@ -94,18 +153,18 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
     let ws = null;
     let mode = 'poll';
 
+    const wipeVehicles = () => {
+      vehicleCountRef.current = 0;
+      setVehicles({});
+    };
+
     const applyRows = (rows, { replace = true } = {}) => {
       if (!Array.isArray(rows)) return;
       setVehicles((prev) => {
-        // Never wipe a fresh pin with an empty poll (worker lag / brief Redis gap).
-        if (replace && rows.length === 0 && Object.keys(prev).length > 0) {
-          const ageMs = Date.now() - (lastNonEmptyAtRef.current || 0);
-          if (ageMs < 45000) {
-            return prev;
-          }
-        }
+        // Authenticated empty list = Redis has no live pins — clear immediately
+        // so Τέλος βάρδιας does not wait on a grace window.
         if (rows.length > 0) {
-          lastNonEmptyAtRef.current = Date.now();
+          /* keep */
         }
         const map = replace ? {} : { ...prev };
         rows.forEach((row) => {
@@ -113,15 +172,30 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           const normalized = normalizeVehicle(row, id, map[id] || prev[id]);
           if (normalized) map[id] = normalized;
         });
+        vehicleCountRef.current = Object.keys(map).length;
         return map;
       });
+    };
+
+    const nextPollDelay = () => {
+      if (Date.now() < boostPollUntilRef.current) return FLEET_LIVE_POLL_ACTIVE_MS;
+      return fleetPollMsForVehicleCount(vehicleCountRef.current);
+    };
+
+    const scheduleNext = () => {
+      if (closed) return;
+      pollTimer = window.setTimeout(() => {
+        tick();
+      }, nextPollDelay());
     };
 
     const tick = () => {
       const headers = adminAuthHeaders();
       if (!headers.Authorization && !getSaasToken()) {
+        wipeVehicles();
         setPollError('Απαιτείται σύνδεση admin για τον live χάρτη');
         setConnected(false);
+        scheduleNext();
         return;
       }
       fetchLiveFleet(headers)
@@ -129,6 +203,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           if (closed) return;
           if (!Array.isArray(rows)) {
             setPollError('Μη έγκυρη απάντηση live fleet');
+            scheduleNext();
             return;
           }
           applyRows(rows, { replace: true });
@@ -139,22 +214,35 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
             mode = 'poll';
             setTransport('poll');
           }
+          scheduleNext();
         })
         .catch((err) => {
           if (closed) return;
           const raw = String(err?.message || '');
+          if (isFleetAuthError(err)) {
+            // Expired JWT must not freeze the last pin forever as "1 ενεργά".
+            wipeVehicles();
+            setConnected(false);
+            setPollError(
+              /έληξε|συνδεθείτε/i.test(raw)
+                ? raw
+                : 'Η σύνδεση έληξε — συνδεθείτε ξανά στο γραφείο',
+            );
+            scheduleNext();
+            return;
+          }
           const msg =
             raw === 'Failed to fetch' || /network|load failed|fetch/i.test(raw)
               ? 'Δεν συνδέει με το API (Failed to fetch). Ανανέωσε τη σελίδα· αν συνεχίζει, το api host είναι εκτός.'
               : raw || 'Αποτυχία φόρτωσης live στόλου';
           setPollError(msg);
+          scheduleNext();
         });
     };
 
     // Start poll immediately — do not wait for WebSocket.
     setTransport('poll');
     tick();
-    pollTimer = window.setInterval(tick, FLEET_LIVE_POLL_MS);
 
     const url = buildWsUrl(`/ws/telemetry/egress/${tenantId}`, {
       token: getSaasToken() || '',
@@ -197,28 +285,23 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
             setVehicles((prev) => {
               const normalized = normalizeVehicle(msg, id, prev[id]);
               if (!normalized) return prev;
-              return { ...prev, [id]: normalized };
+              const next = { ...prev, [id]: normalized };
+              vehicleCountRef.current = Object.keys(next).length;
+              return next;
             });
             return;
           }
           if (msg.type === 'fleet_driver_offline') {
-            const id = vehicleIdFromRow(msg);
+            // Instant pin drop — do not wait for the next HTTP poll.
             setVehicles((prev) => {
-              if (!prev[id]) {
-                const matchKey = Object.keys(prev).find(
-                  (k) =>
-                    prev[k].driver_id === msg.driver_id &&
-                    String(prev[k].trip_id) === String(msg.trip_id),
-                );
-                if (!matchKey) return prev;
-                const next = { ...prev };
-                delete next[matchKey];
-                return next;
-              }
-              const next = { ...prev };
-              delete next[id];
+              const next = dropOfflineVehicles(prev, msg);
+              vehicleCountRef.current = Object.keys(next).length;
               return next;
             });
+            // Burst-poll for a few seconds in case WS arrived before Redis delete.
+            boostPollUntilRef.current = Date.now() + 4000;
+            if (pollTimer) window.clearTimeout(pollTimer);
+            tick();
           }
         } catch {
           // ignore malformed frames
@@ -232,7 +315,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
 
     return () => {
       closed = true;
-      if (pollTimer) window.clearInterval(pollTimer);
+      if (pollTimer) window.clearTimeout(pollTimer);
       window.clearInterval(ping);
       try {
         ws?.close();
@@ -252,6 +335,7 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
       tenantId,
       pollError,
       lastPollAt,
+      pollIntervalMs: fleetPollMsForVehicleCount(Object.keys(vehicles).length),
     }),
     [connected, transport, vehicles, tenantId, pollError, lastPollAt],
   );
@@ -266,3 +350,6 @@ export function useFleetTelemetryEgress() {
   }
   return ctx;
 }
+
+// Re-export for tests / callers that previously imported poll constants via context path.
+export { FLEET_LIVE_POLL_MS, FLEET_LIVE_POLL_ACTIVE_MS };
