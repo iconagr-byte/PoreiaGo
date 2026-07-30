@@ -27,7 +27,17 @@ _ACHILLIO_TRAVEL_SLUGS = frozenset(
     }
 )
 _ACHILLIO_DOMAIN_RE = re.compile(r"(^|\.)achilliotravel\.com$", re.I)
-_POREIAGO_PLATFORM_SLUGS = frozenset({"poreiago", "platform", "demo"})
+_POREIAGO_PLATFORM_SLUGS = frozenset(
+    {
+        "poreiago",
+        "platform",
+        "demo",
+        "admin-poreiago",
+        "poreiago-saas",
+        "poreiago-platform",
+    }
+)
+_POREIAGO_DOMAIN_RE = re.compile(r"(^|\.)poreiago\.com$", re.I)
 
 
 def parse_tenant_settings(raw: str | None) -> dict[str, Any]:
@@ -190,6 +200,8 @@ def is_poreiago_platform_office(tenant: Any) -> bool:
         return True
     legal = str(getattr(tenant, "legal_name", None) or "").strip().lower()
     domain = _tenant_domain(tenant)
+    if domain and _POREIAGO_DOMAIN_RE.search(domain):
+        return True
     # Seed often used slug=achillio + legal_name=PoreiaGo without Achillio domain.
     if slug == "achillio" and "poreiago" in legal and not domain:
         return True

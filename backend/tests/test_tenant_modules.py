@@ -106,6 +106,17 @@ def test_poreiago_platform_seed_slug_keeps_rent():
     assert updated["modules"]["trips_enabled"] is True
 
 
+def test_poreiago_platform_detected_by_domain():
+    tenant = SimpleNamespace(
+        slug="office-main",
+        custom_domain="www.poreiago.com",
+        legal_name="PoreiaGo SaaS",
+        subdomain="office-main",
+    )
+    assert is_poreiago_platform_office(tenant) is True
+    assert is_achillio_travel_office(tenant) is False
+
+
 def test_achillio_policy_disables_rent_only_for_that_office():
     tenant = SimpleNamespace(
         slug="admin-achillio-gr",
