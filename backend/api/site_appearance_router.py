@@ -76,6 +76,7 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_pickup_locations": [],
     "rent_coverage_options": [],
     "rent_included_defaults": [],
+    "rent_upsell_coverage_id": "",
     "home_slider_enabled": False,
     "home_slider_autoplay": True,
     "home_slider_interval_sec": 5,
@@ -146,6 +147,7 @@ class SiteAppearanceResponse(BaseModel):
     rent_pickup_locations: list[str] = []
     rent_coverage_options: list[dict] = []
     rent_included_defaults: list[str] = []
+    rent_upsell_coverage_id: str = ""
     home_slider_enabled: bool = False
     home_slider_autoplay: bool = True
     home_slider_interval_sec: int = 5
@@ -225,6 +227,7 @@ class SiteAppearanceUpdate(BaseModel):
     rent_pickup_locations: list[str] | None = None
     rent_coverage_options: list[dict] | None = None
     rent_included_defaults: list[str] | None = None
+    rent_upsell_coverage_id: str | None = None
     home_slider_enabled: bool | None = None
     home_slider_autoplay: bool | None = None
     home_slider_interval_sec: int | None = None

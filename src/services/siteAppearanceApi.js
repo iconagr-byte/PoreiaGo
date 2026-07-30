@@ -42,6 +42,7 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_pickup_locations: [],
   rent_coverage_options: [],
   rent_included_defaults: [],
+  rent_upsell_coverage_id: '',
   home_slider_enabled: false,
   home_slider_autoplay: true,
   home_slider_interval_sec: 5,

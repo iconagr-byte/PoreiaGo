@@ -25,10 +25,11 @@ function listToLines(list) {
   return (Array.isArray(list) ? list : []).join('\n');
 }
 
-function snapshotOf(options, included) {
+function snapshotOf(options, included, upsellId = '') {
   return JSON.stringify({
     options: normalizeCoverageOptions(options),
     included: normalizeIncludedDefaults(included),
+    upsellId: String(upsellId || '').trim(),
   });
 }
 
@@ -41,6 +42,7 @@ export default function RentCoverageExtrasEditor() {
     RENT_COVERAGE_OPTIONS.map((o) => createCoverageOption(o)),
   );
   const [included, setIncluded] = useState(() => [...RENT_INCLUDED_DEFAULTS]);
+  const [upsellId, setUpsellId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState('');
@@ -48,8 +50,13 @@ export default function RentCoverageExtrasEditor() {
   const [dragId, setDragId] = useState('');
 
   const dirty = useMemo(
-    () => snapshotOf(options, included) !== baseline,
-    [options, included, baseline],
+    () => snapshotOf(options, included, upsellId) !== baseline,
+    [options, included, upsellId, baseline],
+  );
+
+  const visibleChoices = useMemo(
+    () => options.filter((o) => o.visible !== false),
+    [options],
   );
 
   const load = useCallback(async () => {
@@ -58,9 +65,11 @@ export default function RentCoverageExtrasEditor() {
       const data = await fetchSiteAppearance();
       const nextOpts = normalizeCoverageOptions(data?.rent_coverage_options);
       const nextInc = normalizeIncludedDefaults(data?.rent_included_defaults);
+      const nextUpsell = String(data?.rent_upsell_coverage_id || '').trim();
       setOptions(nextOpts);
       setIncluded(nextInc);
-      setBaseline(snapshotOf(nextOpts, nextInc));
+      setUpsellId(nextUpsell);
+      setBaseline(snapshotOf(nextOpts, nextInc, nextUpsell));
       setExpandedId(nextOpts[0]?.id || '');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία φόρτωσης υπηρεσιών');
@@ -103,6 +112,7 @@ export default function RentCoverageExtrasEditor() {
     if (!window.confirm(`Διαγραφή «${row?.title || 'υπηρεσίας'}»;`)) return;
     setOptions((prev) => prev.filter((o) => o.id !== id));
     if (expandedId === id) setExpandedId('');
+    if (upsellId === id) setUpsellId('');
   };
 
   const moveOption = (id, dir) => {
@@ -130,8 +140,10 @@ export default function RentCoverageExtrasEditor() {
     if (!window.confirm('Επαναφορά στις προεπιλογές PoreiaGo;')) return;
     const nextOpts = RENT_COVERAGE_OPTIONS.map((o) => createCoverageOption(o));
     const nextInc = [...RENT_INCLUDED_DEFAULTS];
+    const nextUpsell = nextOpts[0]?.id || '';
     setOptions(nextOpts);
     setIncluded(nextInc);
+    setUpsellId(nextUpsell);
     setExpandedId(nextOpts[0]?.id || '');
   };
 
@@ -140,13 +152,16 @@ export default function RentCoverageExtrasEditor() {
     try {
       const payloadOpts = normalizeCoverageOptions(options);
       const payloadInc = normalizeIncludedDefaults(included);
+      const preferred = payloadOpts.some((o) => o.id === upsellId) ? upsellId : '';
       await updateSiteAppearance({
         rent_coverage_options: payloadOpts,
         rent_included_defaults: payloadInc,
+        rent_upsell_coverage_id: preferred,
       });
       setOptions(payloadOpts);
       setIncluded(payloadInc);
-      setBaseline(snapshotOf(payloadOpts, payloadInc));
+      setUpsellId(preferred);
+      setBaseline(snapshotOf(payloadOpts, payloadInc, preferred));
       toast.success('Οι υπηρεσίες ενοικίασης αποθηκεύτηκαν');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');
@@ -207,6 +222,66 @@ export default function RentCoverageExtrasEditor() {
       </div>
 
       <section className="rounded-2xl border border-black/[0.06] bg-white shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-black/[0.04]">
+          <h3 className="font-bold text-slate-900">Προσφορά στο checkout</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Ποια κάρτα εμφανίζεται ως «Προσφορά για σένα» αν ο πελάτης δεν την έχει επιλέξει ακόμα.
+          </p>
+        </div>
+        <div className="p-4 grid md:grid-cols-[1fr_auto] gap-4 items-end">
+          <label className="block text-sm min-w-0">
+            <span className="font-bold text-slate-700 text-xs">Προεπιλεγμένη προσφορά</span>
+            <select
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-white text-sm"
+              value={upsellId}
+              onChange={(e) => setUpsellId(e.target.value)}
+            >
+              <option value="">Αυτόματα (πρώτη μη επιλεγμένη)</option>
+              {visibleChoices.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.title} · {euroLabel(o.eurPerDay)}/ημέρα
+                </option>
+              ))}
+            </select>
+          </label>
+          {upsellId ? (
+            <button
+              type="button"
+              onClick={() => setUpsellId('')}
+              className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Καθαρισμός
+            </button>
+          ) : null}
+        </div>
+        {upsellId ? (
+          <div className="px-4 pb-4">
+            {(() => {
+              const pick = options.find((o) => o.id === upsellId);
+              if (!pick) return null;
+              return (
+                <article className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 flex gap-4 items-center max-w-xl">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                      Προσφορά για σένα
+                    </p>
+                    <p className="mt-1 font-bold text-teal-900">
+                      Ανέβα επίπεδο προστασίας — {pick.title} μόνο με {euroLabel(pick.eurPerDay)} /
+                      ημέρα
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{pick.blurb}</p>
+                  </div>
+                  <div className="w-14 h-14 rounded-2xl bg-teal-800 text-white flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[28px]">{pick.icon}</span>
+                  </div>
+                </article>
+              );
+            })()}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-2xl border border-black/[0.06] bg-white shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-black/[0.04] flex items-center justify-between gap-2">
           <h3 className="font-bold text-slate-900">Πάντα συμπεριλαμβάνονται</h3>
           <span className="text-xs text-slate-400">μία γραμμή = ένα bullet</span>
@@ -263,6 +338,11 @@ export default function RentCoverageExtrasEditor() {
                           Κρυφή
                         </span>
                       ) : null}
+                      {upsellId === opt.id ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wide rounded-full bg-teal-100 text-teal-800 px-2 py-0.5">
+                          Προσφορά checkout
+                        </span>
+                      ) : null}
                       <span className="text-[10px] font-bold text-slate-400">#{idx + 1}</span>
                     </div>
                     <p className="text-sm text-slate-500 line-clamp-2 mt-0.5">
@@ -304,6 +384,19 @@ export default function RentCoverageExtrasEditor() {
                   >
                     {open ? 'Κλείσιμο' : 'Επεξεργασία'}
                   </button>
+                  {opt.visible !== false ? (
+                    <button
+                      type="button"
+                      className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold ${
+                        upsellId === opt.id
+                          ? 'border-teal-300 bg-teal-50 text-teal-900'
+                          : 'hover:bg-slate-50'
+                      }`}
+                      onClick={() => setUpsellId(upsellId === opt.id ? '' : opt.id)}
+                    >
+                      {upsellId === opt.id ? 'Προσφορά ✓' : 'Ως προσφορά'}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="rounded-lg border border-rose-200 text-rose-700 px-2.5 py-1.5 text-xs font-bold"

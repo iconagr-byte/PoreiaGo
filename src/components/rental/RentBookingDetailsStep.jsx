@@ -16,8 +16,8 @@ import {
   readExtrasSelection,
   readRentVehicleSnapshot,
   rentalDayCount,
+  resolveUpsellCoverage,
   selectedExtrasLabels,
-  visibleCoverageOptions,
 } from '../../lib/rental/rentBookingExtras.js';
 import { readRentBookingPrefs, writeRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
 import { createCustomerRentalBooking } from '../../services/customerRentalApi.js';
@@ -56,6 +56,7 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
   const snap = useMemo(() => readRentVehicleSnapshot(), []);
   const vehicle = useMemo(() => (snap ? enrichRentVehicle(snap) : null), [snap]);
   const [catalog, setCatalog] = useState(RENT_COVERAGE_OPTIONS);
+  const [upsellId, setUpsellId] = useState('');
   const [selection, setSelection] = useState(() => readExtrasSelection(prefs));
   const [busy, setBusy] = useState(false);
   const named = splitName(prefs.client_first_name ? `${prefs.client_first_name} ${prefs.client_last_name || ''}` : getCustomerName());
@@ -65,8 +66,9 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
     fetchSiteAppearance()
       .then((data) => {
         if (cancelled) return;
-        const { options } = readCoverageCatalog(data);
+        const { options, upsellId: preferred } = readCoverageCatalog(data);
         setCatalog(options);
+        setUpsellId(preferred || '');
         setSelection(readExtrasSelection(readRentBookingPrefs(), options));
       })
       .catch(() => {});
@@ -104,8 +106,8 @@ export default function RentBookingDetailsStep({ brandLabel = 'Γραφείο' }
   const selectedLabels = selectedExtrasLabels(selection, catalog);
 
   const upsell = useMemo(
-    () => visibleCoverageOptions(catalog).find((opt) => !selection[opt.formKey]) || null,
-    [selection, catalog],
+    () => resolveUpsellCoverage(catalog, selection, upsellId),
+    [selection, catalog, upsellId],
   );
 
   const setField = (key, value) => {
