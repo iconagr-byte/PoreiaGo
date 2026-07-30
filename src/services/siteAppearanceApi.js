@@ -43,6 +43,18 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_coverage_options: [],
   rent_included_defaults: [],
   rent_upsell_coverage_id: '',
+  rent_notify_email_enabled: true,
+  rent_notify_sms_enabled: true,
+  rent_notify_email_label: 'Θέλω προσφορές στο email',
+  rent_notify_sms_label: 'Θέλω ενημερώσεις SMS για την κράτηση',
+  rent_notify_email_default: false,
+  rent_notify_sms_default: false,
+  rent_notify_sms_template_confirmed:
+    'Κράτηση {ref} επιβεβαιώθηκε. Παραλαβή: {pickup} · {start}. {office}',
+  rent_notify_sms_template_status: 'Κράτηση {ref}: νέα κατάσταση {status}. {office}',
+  rent_notify_email_subject: 'Κράτηση {ref} — επιβεβαίωση',
+  rent_notify_email_body:
+    'Γεια σου {name},<br/><br/>Η κράτησή σου <strong>{ref}</strong> επιβεβαιώθηκε.<br/>Παραλαβή: {pickup}<br/>Έναρξη: {start}<br/><br/>Ευχαριστούμε,<br/>{office}',
   home_slider_enabled: false,
   home_slider_autoplay: true,
   home_slider_interval_sec: 5,

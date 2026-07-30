@@ -73,6 +73,8 @@ class CustomerBookingBody(BaseModel):
     client_phone: str | None = None
     notes: str | None = None
     extras: list[str] = Field(default_factory=list)
+    marketing_email: bool = False
+    marketing_sms: bool = False
 
 
 class GuestRentalLookupBody(BaseModel):
@@ -101,6 +103,8 @@ def _public_booking(row: dict) -> dict:
         "rental_status": row.get("rental_status"),
         "driver_mode": row.get("driver_mode"),
         "channel": row.get("channel"),
+        "marketing_email": bool(row.get("marketing_email")),
+        "marketing_sms": bool(row.get("marketing_sms")),
         "created_at": row.get("created_at"),
     }
 
@@ -308,6 +312,8 @@ async def book_rental(
         "notes": body.notes,
         "extras": list(body.extras or []),
         "channel": "WALLET",
+        "marketing_email": bool(body.marketing_email),
+        "marketing_sms": bool(body.marketing_sms),
     }
     try:
         row = store.create_booking(await _tenant_id(request), payload)
@@ -320,6 +326,15 @@ async def book_rental(
         await notify_rental_booking_to_office(row)
     except Exception:
         # Booking must succeed even if office push fails.
+        pass
+
+    try:
+        from travel_platform.notifications.rental_customer_notify import (
+            notify_rental_customer_on_create,
+        )
+
+        await notify_rental_customer_on_create(row)
+    except Exception:
         pass
 
     return _public_booking(row)
@@ -344,4 +359,12 @@ async def cancel_my_rental(
         if "δικαίωμα" in msg:
             raise HTTPException(status_code=403, detail=msg) from exc
         raise HTTPException(status_code=400, detail=msg) from exc
+    try:
+        from travel_platform.notifications.rental_customer_notify import (
+            notify_rental_customer_status,
+        )
+
+        await notify_rental_customer_status(row)
+    except Exception:
+        pass
     return _public_booking(row)
