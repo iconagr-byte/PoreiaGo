@@ -78,6 +78,7 @@ import OfficeSetupWizard, {
 } from '../components/admin/OfficeSetupWizard.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
 import DriversHub from '../components/admin/DriversHub.jsx';
+import LoyaltyRewardsPanel from '../components/admin/LoyaltyRewardsPanel.jsx';
 import SortableSidebarNav from '../components/admin/SortableSidebarNav.jsx';
 import DashboardKpiCard from '../components/admin/DashboardKpiCard.jsx';
 import TemplateSearch from '../components/admin/TemplateSearch.jsx';
@@ -1333,10 +1334,10 @@ export default function BackOffice() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-            Πελατολόγιο & Επιβραβεύσεις
+            Πελατολόγιο
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-            Διαχείριση πελατών, πόντων επιβράβευσης και ιστορικού κρατήσεων.
+            Διαχείριση πελατών και ιστορικού κρατήσεων. Τα Miles+Bonus είναι στο μενού Επιβραβεύσεις.
           </p>
           <p className="text-xs text-on-surface-variant mt-2">Κλικ σε γραμμή για προφίλ πελάτη.</p>
         </div>
@@ -2382,6 +2383,7 @@ export default function BackOffice() {
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'routes' && renderRoutes()}
             {activeTab === 'customers' && renderCustomers()}
+            {activeTab === 'loyalty' && <LoyaltyRewardsPanel />}
             {activeTab === 'fleet' && renderFleet()}
             {activeTab === 'drivers' && renderDrivers()}
             {activeTab === 'settings' && (

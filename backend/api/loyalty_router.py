@@ -51,6 +51,12 @@ class MilesTxIn(BaseModel):
     notes: str | None = None
 
 
+@router.get("/meta")
+async def loyalty_meta(payload: dict = Depends(get_token_payload)):
+    _require_admin(payload)
+    return store.tier_meta()
+
+
 @router.get("/accounts")
 async def list_accounts(
     payload: dict = Depends(get_token_payload),
@@ -85,6 +91,18 @@ async def update_account(
         return store.upsert_account(str(tenant_id), body.model_dump(exclude_unset=True), account_id=account_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/accounts/{account_id}")
+async def remove_account(
+    account_id: str,
+    payload: dict = Depends(get_token_payload),
+    tenant_id: UUID = Depends(get_current_tenant_id),
+):
+    _require_admin(payload)
+    if not store.delete_account(str(tenant_id), account_id):
+        raise HTTPException(status_code=404, detail="Ο λογαριασμός δεν βρέθηκε")
+    return {"ok": True}
 
 
 @router.get("/accounts/{account_id}/transactions")

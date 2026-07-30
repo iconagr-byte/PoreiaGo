@@ -216,3 +216,35 @@ def post_transaction(tenant_id: str | None, body: dict[str, Any]) -> dict[str, A
         data["transactions"].append(tx)
         _write(data)
         return {"account": deepcopy(account), "transaction": deepcopy(tx)}
+
+
+def delete_account(tenant_id: str | None, account_id: str) -> bool:
+    tid = _normalize_tenant(tenant_id)
+    aid = str(account_id or "").strip()
+    if not aid:
+        return False
+    with _LOCK:
+        data = _read()
+        before = len(data["accounts"])
+        data["accounts"] = [
+            a for a in data["accounts"] if not (a.get("tenant_id") == tid and a.get("id") == aid)
+        ]
+        if len(data["accounts"]) == before:
+            return False
+        data["transactions"] = [
+            t
+            for t in data["transactions"]
+            if not (t.get("tenant_id") == tid and t.get("loyalty_account_id") == aid)
+        ]
+        _write(data)
+        return True
+
+
+def tier_meta() -> dict[str, Any]:
+    return {
+        "tiers": list(TIERS),
+        "tx_types": list(TX_TYPES),
+        "thresholds": [
+            {"tier": tier, "lifetime_miles": float(threshold)} for tier, threshold in TIER_THRESHOLDS
+        ],
+    }
