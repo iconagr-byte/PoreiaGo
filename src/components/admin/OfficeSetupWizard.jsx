@@ -703,7 +703,7 @@ export default function OfficeSetupWizard({
                       id="os-model"
                       value={fleet.model}
                       onChange={(e) => setFleet((f) => ({ ...f, model: e.target.value }))}
-                      placeholder={rentEnabled ? 'Toyota Yaris' : 'Tourismo'}
+                      placeholder={rentEnabled ? 'Peugeot 208' : 'Tourismo'}
                     />
                   </div>
                   {rentEnabled && (

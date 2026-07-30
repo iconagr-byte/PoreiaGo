@@ -36,8 +36,10 @@ def test_public_catalog_auto_seeds_demo():
             assert len(catalog) == 6
             assert {v["category"] for v in catalog} == {"CAR", "VAN"}
             models = {v["model"] for v in catalog}
-            assert "Hyundai i10" in models
-            assert "Citroen C3" in models
-            assert "Toyota Yaris" in models
+            assert "Toyota Aygo X" in models
+            assert "Peugeot 208" in models
+            assert "Renault Clio" in models
+            assert "VW Multivan" in models
+            assert "Ford Transit Custom" in models
             raw = json.loads(path.read_text(encoding="utf-8"))
             assert len(raw["vehicles"]) == 6
