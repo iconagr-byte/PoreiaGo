@@ -677,7 +677,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                 { id: 'gmail', label: 'Gmail / Google' },
                 { id: 'yahoo', label: 'Yahoo Mail' },
                 { id: 'outlook', label: 'Outlook / Microsoft' },
-                { id: 'achillio', label: 'Achillio cPanel' },
                 { id: 'custom', label: 'Εταιρικό mail.domain' },
               ].map((p) => (
                 <button
