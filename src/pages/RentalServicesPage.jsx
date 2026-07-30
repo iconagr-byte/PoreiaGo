@@ -184,7 +184,7 @@ export default function RentalServicesPage() {
                     to={`/grafeia/signup?plan=rent&interval=month`}
                     className="mt-8 inline-flex justify-center items-center gap-2 px-5 py-3.5 rounded-full bg-teal-700 text-white font-bold hover:bg-teal-800"
                   >
-                    {en ? 'Start Rent-only contract' : standalone.ctaGuest}
+                    {en ? 'Register' : standalone.ctaGuest}
                   </Link>
                 </article>
               ) : null}
@@ -214,7 +214,7 @@ export default function RentalServicesPage() {
                     to="/grafeia"
                     className="mt-8 inline-flex justify-center items-center gap-2 px-5 py-3.5 rounded-full bg-slate-900 text-white font-bold hover:opacity-90"
                   >
-                    {en ? 'Add on a bus contract' : addon.ctaGuest}
+                    {en ? 'Register' : addon.ctaGuest}
                   </Link>
                 </article>
               ) : null}

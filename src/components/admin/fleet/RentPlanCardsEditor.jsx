@@ -9,6 +9,7 @@ import {
   RENT_ADDON,
   RENT_STANDALONE_PLAN,
   mergeRentPlanCatalog,
+  normalizeRentCtaLabel,
 } from '../../../lib/billing/planCatalog.js';
 import {
   fetchAdminRentPlanCatalog,
@@ -25,8 +26,8 @@ function cardToForm(card) {
     tagline: card.tagline || '',
     monthlyEur: card.monthlyEur ?? '',
     features: features.length ? features : [''],
-    ctaLoggedIn: card.ctaLoggedIn || '',
-    ctaGuest: card.ctaGuest || '',
+    ctaLoggedIn: normalizeRentCtaLabel(card.ctaLoggedIn || 'Εγγραφή'),
+    ctaGuest: normalizeRentCtaLabel(card.ctaGuest || 'Εγγραφή'),
     servicesLinkLabel: card.servicesLinkLabel || '',
     visible: card.visible !== false,
   };
@@ -40,8 +41,8 @@ function formToCard(form) {
     tagline: String(form.tagline || '').trim(),
     monthlyEur: Number.isFinite(monthly) ? monthly : 0,
     features: (form.features || []).map((l) => String(l).trim()).filter(Boolean),
-    ctaLoggedIn: String(form.ctaLoggedIn || '').trim(),
-    ctaGuest: String(form.ctaGuest || '').trim(),
+    ctaLoggedIn: normalizeRentCtaLabel(form.ctaLoggedIn || 'Εγγραφή'),
+    ctaGuest: normalizeRentCtaLabel(form.ctaGuest || 'Εγγραφή'),
     servicesLinkLabel: String(form.servicesLinkLabel || '').trim(),
     visible: Boolean(form.visible),
   };
@@ -260,6 +261,7 @@ function CardEditor({ title, subtitle, tone, form, onChange, showServicesLink })
                 className="rent-plan-input"
                 value={form.ctaLoggedIn}
                 onChange={(e) => set({ ctaLoggedIn: e.target.value })}
+                placeholder="Εγγραφή"
               />
             </Field>
             <Field label="Κουμπί (επισκέπτης)">
@@ -267,6 +269,7 @@ function CardEditor({ title, subtitle, tone, form, onChange, showServicesLink })
                 className="rent-plan-input"
                 value={form.ctaGuest}
                 onChange={(e) => set({ ctaGuest: e.target.value })}
+                placeholder="Εγγραφή"
               />
             </Field>
           </div>

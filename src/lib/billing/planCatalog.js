@@ -74,8 +74,8 @@ export const RENT_STANDALONE_PLAN = {
     'Αρχική σελίδα γραφείου μόνο με Rent (χωρίς λεωφορεία)',
     'Desk Ενοικιάσεις στο Control Panel',
   ],
-  ctaLoggedIn: 'Επιλογή Rent συμβολαίου',
-  ctaGuest: 'Εγγραφή μόνο για Rent',
+  ctaLoggedIn: 'Εγγραφή',
+  ctaGuest: 'Εγγραφή',
   visible: true,
   highlighted: true,
 };
@@ -96,13 +96,35 @@ export const RENT_ADDON = {
     'SOS · οδική · ασφάλεια · share · checklist',
     'Χωρίς αλλαγή του core συμβολαίου λεωφορείων',
   ],
-  ctaLoggedIn: 'Ενεργοποίηση add-on στο συμβόλαιο',
-  ctaGuest: 'Θέλω λεωφορεία + Rent',
+  ctaLoggedIn: 'Εγγραφή',
+  ctaGuest: 'Εγγραφή',
   servicesLinkLabel: 'Δες δημόσια σελίδα υπηρεσιών →',
   visible: true,
 };
 
 export const DEFAULT_RENT_SECTION_TITLE = 'Ενοικιάσεις — ξεχωριστά';
+
+/** Legacy CTA labels — always normalize to plain «Εγγραφή». */
+const LEGACY_RENT_CTA_LABELS = new Set([
+  'Εγγραφή μόνο για Rent',
+  'Θέλω λεωφορεία + Rent',
+  'Επιλογή Rent συμβολαίου',
+  'Ενεργοποίηση add-on στο συμβόλαιο',
+  'Start Rent-only contract',
+  'Add on a bus contract',
+  'Sign up for Rent only',
+  'I want buses + Rent',
+]);
+
+export function normalizeRentCtaLabel(value, fallback = 'Εγγραφή') {
+  const s = String(value || '').trim();
+  if (!s || LEGACY_RENT_CTA_LABELS.has(s)) return fallback;
+  // Any CTA that still names Rent/λεωφορεία in the button → plain Εγγραφή.
+  if (/\brent\b|λεωφορ/i.test(s) && /εγγραφ|signup|sign up|θέλω|επιλογή|ενεργοπ/i.test(s)) {
+    return fallback;
+  }
+  return s;
+}
 
 export function mergeRentCard(defaults, override) {
   if (!override || typeof override !== 'object') {
@@ -124,6 +146,8 @@ export function mergeRentCard(defaults, override) {
     features: features?.length ? features : [...(defaults.features || [])],
     visible: override.visible !== false,
     highlighted: defaults.highlighted,
+    ctaLoggedIn: normalizeRentCtaLabel(override.ctaLoggedIn ?? defaults.ctaLoggedIn),
+    ctaGuest: normalizeRentCtaLabel(override.ctaGuest ?? defaults.ctaGuest),
   };
 }
 

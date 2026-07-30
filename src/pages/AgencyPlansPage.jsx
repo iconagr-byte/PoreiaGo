@@ -205,11 +205,7 @@ export default function AgencyPlansPage() {
                         : 'border border-primary/30 text-primary hover:bg-primary/5'
                     }`}
                   >
-                    {plan.contactSales
-                      ? 'Επικοινωνία πωλήσεων'
-                      : loggedIn
-                        ? 'Επιλογή συμβολαίου'
-                        : 'Ξεκινήστε εγγραφή'}
+                    {plan.contactSales ? 'Επικοινωνία πωλήσεων' : 'Εγγραφή'}
                   </button>
                 </article>
               );
