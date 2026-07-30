@@ -21,6 +21,16 @@ DEFAULT_DRIVER_PASSWORD = "driver123"
 # Platform demo office — seed drivers belong only here.
 DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000001"
 
+# Built-in demo rows (Νίκος / Γιώργος / …). Real offices must not inherit these.
+SEED_DRIVER_IDS = frozenset(
+    {
+        "a1000000-0000-4000-8000-000000000001",
+        "a1000000-0000-4000-8000-000000000002",
+        "a1000000-0000-4000-8000-000000000003",
+        "a1000000-0000-4000-8000-000000000004",
+    }
+)
+
 # Prefer persistent volume in production (docker mount /app/data).
 _DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[2] / "data")
 STORE_PATH = Path(os.getenv("FLEET_DRIVERS_STORE") or (_DATA_DIR / "fleet_drivers.json"))
@@ -289,29 +299,138 @@ def list_drivers(status: str | None = None, tenant_id: str | None = None) -> lis
     return sorted(items, key=lambda d: d.name)
 
 
+def is_seed_driver(driver: FleetDriver | None) -> bool:
+    if not driver:
+        return False
+    return str(getattr(driver, "id", "") or "") in SEED_DRIVER_IDS
+
+
+def list_drivers_for_office(
+    tenant_id: str,
+    status: str | None = None,
+    *,
+    include_demo_legacy: bool = False,
+    claim_demo_legacy: bool = False,
+) -> list[FleetDriver]:
+    """
+    List drivers for an admin office.
+
+    Before JWT tenant scoping, real drivers (e.g. Achilleas) were saved under
+    DEMO_TENANT_ID. The live office JWT then saw an empty list even though
+    /driver login still worked. Optionally include (and permanently claim)
+    those non-seed DEMO rows onto the office tenant.
+    """
+    tid = _normalize_tenant_id(tenant_id)
+    items = list(_ensure().values())
+    claimed = False
+    matched: list[FleetDriver] = []
+
+    for d in items:
+        dtid = _driver_tenant_id(d)
+        if dtid == tid:
+            matched.append(d)
+            continue
+        if (
+            include_demo_legacy
+            and tid != DEMO_TENANT_ID
+            and dtid == DEMO_TENANT_ID
+            and not is_seed_driver(d)
+        ):
+            if claim_demo_legacy:
+                d.tenant_id = tid
+                claimed = True
+            matched.append(d)
+
+    if claimed:
+        try:
+            _persist()
+            logger.info(
+                "Claimed %s legacy DEMO driver(s) onto office tenant %s",
+                sum(1 for d in matched if _driver_tenant_id(d) == tid),
+                tid,
+            )
+        except Exception:
+            logger.exception("Failed to persist claimed legacy drivers for %s", tid)
+
+    if status:
+        matched = [d for d in matched if d.status == status]
+    return sorted(matched, key=lambda d: d.name)
+
+
+def driver_visible_to_office(driver: FleetDriver | None, tenant_id: str) -> bool:
+    """True when the office may view/edit this driver (incl. claimed DEMO legacy)."""
+    if not driver:
+        return False
+    tid = _normalize_tenant_id(tenant_id)
+    dtid = _driver_tenant_id(driver)
+    if dtid == tid:
+        return True
+    if tid != DEMO_TENANT_ID and dtid == DEMO_TENANT_ID and not is_seed_driver(driver):
+        return True
+    return False
+
+
 def get_driver(driver_id: str) -> FleetDriver | None:
     return _ensure().get(driver_id)
 
 
-def find_driver_by_username(username: str) -> FleetDriver | None:
-    """Match email, license number, or vehicle/driver code (case-insensitive)."""
+def _username_matches(driver: FleetDriver, needle: str) -> bool:
+    if driver.email.lower() == needle:
+        return True
+    if driver.license_no.lower() == needle:
+        return True
+    if driver.vehicle_code and driver.vehicle_code.lower() == needle:
+        return True
+    if driver.license_plate and driver.license_plate.lower() == needle:
+        return True
+    return False
+
+
+def find_driver_by_username(
+    username: str,
+    tenant_id: str | None = None,
+    *,
+    allow_demo_legacy: bool = False,
+) -> FleetDriver | None:
+    """
+    Match email, license number, or vehicle/driver code (case-insensitive).
+
+    When ``tenant_id`` is set, only that office's drivers match. Optionally
+    allow non-scoped DEMO rows for the primary office (legacy Achilleas).
+    """
     needle = _normalize_username(username)
     if not needle:
         return None
+    tid = _normalize_tenant_id(tenant_id) if tenant_id is not None else None
     for d in _ensure().values():
-        if d.email.lower() == needle:
+        if not _username_matches(d, needle):
+            continue
+        if tid is None:
             return d
-        if d.license_no.lower() == needle:
+        dtid = _driver_tenant_id(d)
+        if dtid == tid:
             return d
-        if d.vehicle_code and d.vehicle_code.lower() == needle:
-            return d
-        if d.license_plate and d.license_plate.lower() == needle:
+        if (
+            allow_demo_legacy
+            and tid != DEMO_TENANT_ID
+            and dtid == DEMO_TENANT_ID
+        ):
             return d
     return None
 
 
-def authenticate_driver(username: str, password: str) -> FleetDriver | None:
-    driver = find_driver_by_username(username)
+def authenticate_driver(
+    username: str,
+    password: str,
+    tenant_id: str | None = None,
+    *,
+    allow_demo_legacy: bool = False,
+) -> FleetDriver | None:
+    driver = find_driver_by_username(
+        username,
+        tenant_id=tenant_id,
+        allow_demo_legacy=allow_demo_legacy,
+    )
     if not driver or driver.status not in ("active", "on_leave"):
         return None
     stored = driver.password_hash
@@ -425,6 +544,8 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         d.salary_per_km = float(patch["salary_per_km"])
     if patch.get("salary_per_trip") is not None:
         d.salary_per_trip = float(patch["salary_per_trip"])
+    if patch.get("tenant_id"):
+        d.tenant_id = _normalize_tenant_id(patch["tenant_id"])
     if patch.get("password"):
         pwd = str(patch["password"])
         if len(pwd) < 4:
