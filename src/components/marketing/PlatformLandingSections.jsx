@@ -71,11 +71,11 @@ export function HeroSection() {
               <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
             <Link
-              to="/grafeia/rent"
+              to="/rent"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-teal-300/50 bg-teal-500/15 text-teal-50 hover:bg-teal-400/25 transition-colors"
             >
               <span className="material-symbols-outlined text-[20px]">car_rental</span>
-              Συμβόλαια ενοικιάσεων
+              Ενοικιάσεις
             </Link>
             <Link
               to="/admin/login"
