@@ -51,9 +51,6 @@ def _jwt_settings() -> tuple[str, str, bool]:
 
 PUBLIC_PATHS = {
     "/health",
-    "/docs",
-    "/openapi.json",
-    "/redoc",
     "/api/v1/health",
     "/api/v1/auth/login",
     "/api/v1/auth/dev-login",
@@ -67,6 +64,10 @@ PUBLIC_PATHS = {
     "/api/v1/bookings/guest",
     "/api/v1/bookings/lookup",
 }
+
+# Swagger only in non-production (FastAPI also disables docs_url there).
+if os.getenv("ENVIRONMENT", "development").lower() not in ("production", "prod"):
+    PUBLIC_PATHS |= {"/docs", "/openapi.json", "/redoc"}
 
 BILLING_PREFIX = "/api/v1/billing"
 PLATFORM_ADMIN_PREFIX = "/api/v1/platform"

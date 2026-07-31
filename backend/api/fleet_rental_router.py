@@ -249,6 +249,35 @@ async def patch_booking_status(
     return row
 
 
+class ConfirmPaymentBody(BaseModel):
+    amount_paid: float | None = None
+    note: str | None = None
+
+
+@router.post("/bookings/{booking_id}/confirm-payment")
+async def confirm_booking_payment(
+    booking_id: str,
+    body: ConfirmPaymentBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Office confirms bank/cash settlement — never trust client PAID."""
+    try:
+        row = store.confirm_booking_payment(
+            _tid(tenant_id),
+            booking_id,
+            amount_paid=body.amount_paid,
+            note=body.note,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+    # Fiscal: mark PENDING_ISSUE for rent desk; MARK pipeline can pick up later.
+    # AADE stub stays warn-only until live credentials.
+    return row
+
+
 @router.patch("/bookings/{booking_id}/legal-docs")
 async def patch_booking_legal_doc(
     booking_id: str,

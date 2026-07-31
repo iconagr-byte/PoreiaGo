@@ -315,6 +315,11 @@ app = FastAPI(
     description="QR ticketing, boarding, fleet telemetry, multi-tenant SaaS.",
     version="2.0.0",
     lifespan=lifespan,
+    docs_url=None if os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") else "/docs",
+    redoc_url=None if os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") else "/redoc",
+    openapi_url=(
+        None if os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") else "/openapi.json"
+    ),
 )
 
 # Inner → outer: tenant/domain auth first, CORS last so it is outermost.

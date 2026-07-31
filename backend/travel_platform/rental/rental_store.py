@@ -914,6 +914,61 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         return deepcopy(row)
 
 
+def confirm_booking_payment(
+    tenant_id: str | None,
+    booking_id: str,
+    *,
+    amount_paid: float | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """
+    Office confirms bank/cash (or post-Stripe) settlement.
+    Marks payment PAID, rental CONFIRMED, and queues fiscal issuance marker.
+    """
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        status = str(booking.get("rental_status") or "").upper()
+        if status == "CANCELLED":
+            raise ValueError("Δεν μπορείτε να επιβεβαιώσετε πληρωμή σε ακυρωμένη κράτηση")
+        total = float(booking.get("total_cost") or 0)
+        paid = amount_paid
+        if paid is None:
+            paid = total
+        try:
+            paid = round(float(paid), 2)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Μη έγκυρο ποσό πληρωμής") from exc
+        if paid < 0 or paid > total + 0.01:
+            raise ValueError("Το ποσό πληρωμής είναι εκτός ορίων")
+        now = _now()
+        booking["payment_status"] = "PAID" if paid + 0.001 >= total else "PARTIAL"
+        booking["amount_paid"] = paid
+        booking["balance_due"] = round(max(0.0, total - paid), 2)
+        booking["provider_payment_id"] = (
+            str(booking.get("provider_payment_id") or "").strip()
+            or f"office-confirm-{uuid4()}"
+        )
+        if status in ("RESERVED", "CONFIRMED"):
+            booking["rental_status"] = "CONFIRMED"
+        booking["fiscal_status"] = booking.get("fiscal_status") or "PENDING_ISSUE"
+        booking["payment_confirmed_at"] = now
+        if note:
+            prev = str(booking.get("notes") or "").strip()
+            addon = f"Πληρωμή επιβεβαιώθηκε: {note.strip()}"
+            booking["notes"] = f"{prev} · {addon}" if prev else addon
+        booking["updated_at"] = now
+        _write(data)
+        return deepcopy(booking)
+
+
 def update_booking_status(tenant_id: str | None, booking_id: str, status: str) -> dict[str, Any]:
     tid = _normalize_tenant(tenant_id)
     st = status.strip().upper()

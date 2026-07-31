@@ -81,6 +81,7 @@ class EmailEncryptionProdTests(unittest.TestCase):
             "ADMIN_AUTH_DISABLED": "0",
             "RENT_DEMO_FLEET": "false",
             "EMAIL_ENCRYPTION_KEY": "",
+            "BILLING_DEMO_MODE": "false",
         }
         errs = collect_production_boot_errors(environ=env)
         self.assertTrue(any("EMAIL_ENCRYPTION_KEY" in e for e in errs))

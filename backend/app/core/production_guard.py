@@ -1,7 +1,7 @@
 """Refuse weak / misconfigured production boots.
 
-Call ``assert_production_safe_or_raise`` from API lifespan when
-ENVIRONMENT is production. Also used by predeploy_check.
+Call ``assert_production_safe_or_raise`` from API lifespan.
+When ``REQUIRE_PRODUCTION=1`` (compose prod), refuse unless ENVIRONMENT is production.
 """
 
 from __future__ import annotations
@@ -41,6 +41,11 @@ def is_production_env(env: str | None = None) -> bool:
     return value in ("production", "prod")
 
 
+def require_production_flag(environ: dict[str, str] | None = None) -> bool:
+    env = environ if environ is not None else os.environ
+    return (env.get("REQUIRE_PRODUCTION") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def _is_weak_secret(value: str | None) -> bool:
     raw = (value or "").strip()
     if raw in WEAK_EXACT:
@@ -59,10 +64,19 @@ def collect_production_boot_errors(
 ) -> list[str]:
     """Return human-readable errors that must block a production boot."""
     env = environ if environ is not None else os.environ
-    if not is_production_env(env.get("ENVIRONMENT", "development")):
-        return []
-
     errors: list[str] = []
+
+    raw_env = (env.get("ENVIRONMENT") or "").strip()
+    if require_production_flag(env):
+        if not raw_env:
+            errors.append("ENVIRONMENT is required (set ENVIRONMENT=production)")
+        elif not is_production_env(raw_env):
+            errors.append(
+                f"ENVIRONMENT={raw_env!r} but REQUIRE_PRODUCTION=1 — must be production/prod"
+            )
+
+    if not is_production_env(env.get("ENVIRONMENT", "development")):
+        return errors
 
     jwt_private = (env.get("AUTH_JWT_PRIVATE_KEY") or "").strip()
     jwt_public = (env.get("AUTH_JWT_PUBLIC_KEY") or "").strip()
@@ -105,6 +119,9 @@ def collect_production_boot_errors(
     ):
         errors.append("EMAIL_ENCRYPTION_KEY missing/weak (min 24 chars) for mailbox secrets")
 
+    if (env.get("BILLING_DEMO_MODE") or "true").strip().lower() in ("1", "true", "yes", "on"):
+        errors.append("BILLING_DEMO_MODE must be false in production")
+
     return errors
 
 
@@ -116,14 +133,14 @@ def collect_production_boot_warnings(
     if not is_production_env(env.get("ENVIRONMENT", "development")):
         return []
     warnings: list[str] = []
-    if (env.get("BILLING_DEMO_MODE") or "true").strip().lower() in ("1", "true", "yes", "on"):
-        warnings.append("BILLING_DEMO_MODE=true — prefer false for live Stripe billing")
     if not (env.get("BACKUP_S3_BUCKET") or "").strip():
         warnings.append("BACKUP_S3_BUCKET unset — ensure local/S3 postgres backup cron is installed")
     if (env.get("AADE_MODE") or "stub").strip().lower() == "stub":
         warnings.append("AADE_MODE=stub — native AADE is demo-only until live credentials")
     if (env.get("METRICS_PUBLIC") or "true").strip().lower() in ("1", "true", "yes", "on"):
         warnings.append("METRICS_PUBLIC=true — prefer restricting /metrics scrape (METRICS_TOKEN or private net)")
+    if not (env.get("STRIPE_SECRET_KEY") or "").strip():
+        warnings.append("STRIPE_SECRET_KEY unset — rent card checkout stays disabled (bank/cash only)")
     return warnings
 
 
@@ -132,7 +149,7 @@ def assert_production_safe_or_raise(*, environ: dict[str, str] | None = None) ->
     if not errors:
         return
     detail = "\n".join(f"  - {msg}" for msg in errors)
-    raise RuntimeError(f"Production boot refused (ENVIRONMENT=production):\n{detail}")
+    raise RuntimeError(f"Production boot refused:\n{detail}")
 
 
 def merge_env_for_checks(base: Iterable[tuple[str, str]] | None = None) -> dict[str, str]:
