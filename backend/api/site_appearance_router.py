@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import mimetypes
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,13 +14,12 @@ from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from app.core.data_paths import migrate_file_once, poreiago_data_dir
+
 router = APIRouter(tags=["site-appearance"])
 logger = logging.getLogger(__name__)
 
-_DATA = Path(__file__).resolve().parents[1] / "data"
-_APPEARANCE_FILE = _DATA / "site_appearance.json"
-_UPLOAD_DIR = _DATA / "uploads" / "site"
-_PLATFORM_SETTINGS_FILE = Path(__file__).resolve().parents[1] / "platform" / "settings" / "platform_settings.json"
+_LEGACY_DATA = Path(__file__).resolve().parents[1] / "data"
 _ALLOWED_KINDS = frozenset({"logo", "hero"})
 _MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 # Only legacy PoreiaGo/AeroStride brand marks — not /api/site/assets/logo
@@ -29,9 +29,43 @@ _PLATFORM_HOST_RE = re.compile(
     r"^(www\.)?(poreiago\.com|localhost|127\.0\.0\.1)$",
     re.I,
 )
-# Achillion Travel logo was uploaded into the shared platform file store and
-# poisoned www.poreiago.com branding. One-shot wipe on first appearance read.
-_PURGE_ACHILLION_PLATFORM_LOGO_MARKER = _DATA / ".purged_achillion_platform_logo_v1"
+
+
+def _data_root() -> Path:
+    return poreiago_data_dir()
+
+
+def _appearance_file() -> Path:
+    return migrate_file_once(
+        _data_root() / "site_appearance.json",
+        _LEGACY_DATA / "site_appearance.json",
+    )
+
+
+def _upload_dir() -> Path:
+    d = _data_root() / "uploads" / "site"
+    legacy = _LEGACY_DATA / "uploads" / "site"
+    if not d.exists() and legacy.is_dir():
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            for item in legacy.iterdir():
+                dest = d / item.name
+                if not dest.exists():
+                    dest.write_bytes(item.read_bytes()) if item.is_file() else None
+        except OSError:
+            return legacy
+    return d
+
+
+def _platform_settings_file() -> Path:
+    return migrate_file_once(
+        _data_root() / "platform_settings.json",
+        Path(__file__).resolve().parents[1] / "platform" / "settings" / "platform_settings.json",
+    )
+
+
+def _purge_achillion_marker() -> Path:
+    return _data_root() / ".purged_achillion_platform_logo_v1"
 
 
 def _is_platform_placeholder_logo(url: str | None) -> bool:
@@ -310,10 +344,10 @@ def _clamp_logo_fields(data: dict) -> dict:
 
 
 def _read_appearance() -> dict:
-    if not _APPEARANCE_FILE.exists():
+    if not _appearance_file().exists():
         return {**DEFAULT_SITE_APPEARANCE}
     try:
-        raw = json.loads(_APPEARANCE_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(_appearance_file().read_text(encoding="utf-8"))
     except (json.JSONDecodeError, TypeError):
         return {**DEFAULT_SITE_APPEARANCE}
     merged = {**DEFAULT_SITE_APPEARANCE, **raw}
@@ -327,10 +361,10 @@ def _read_appearance() -> dict:
 
 
 def _write_appearance(data: dict) -> dict:
-    _APPEARANCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _appearance_file().parent.mkdir(parents=True, exist_ok=True)
     merged = {**DEFAULT_SITE_APPEARANCE, **data}
     merged["updated_at"] = datetime.now(timezone.utc).isoformat()
-    _APPEARANCE_FILE.write_text(
+    _appearance_file().write_text(
         json.dumps(merged, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -339,7 +373,7 @@ def _write_appearance(data: dict) -> dict:
 
 def _asset_file(kind: str) -> Path | None:
     for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
-        path = _UPLOAD_DIR / f"{kind}{ext}"
+        path = _upload_dir() / f"{kind}{ext}"
         if path.is_file():
             return path
     return None
@@ -383,12 +417,12 @@ def purge_mistaken_platform_logo(*, force: bool = False) -> bool:
     The shared uploads/site/logo.* file was used as the marketing-site logo on
     poreiago.com. Tenant offices keep their own branding in Postgres.
     """
-    if not force and _PURGE_ACHILLION_PLATFORM_LOGO_MARKER.exists():
+    if not force and _purge_achillion_marker().exists():
         return False
     removed_files = 0
     try:
-        _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        for path in list(_UPLOAD_DIR.glob("logo.*")):
+        _upload_dir().mkdir(parents=True, exist_ok=True)
+        for path in list(_upload_dir().glob("logo.*")):
             path.unlink(missing_ok=True)
             removed_files += 1
         current = _read_appearance()
@@ -396,8 +430,8 @@ def purge_mistaken_platform_logo(*, force: bool = False) -> bool:
         if logo:
             current["logo_url"] = ""
             _write_appearance(current)
-        _DATA.mkdir(parents=True, exist_ok=True)
-        _PURGE_ACHILLION_PLATFORM_LOGO_MARKER.write_text(
+        _data_root().mkdir(parents=True, exist_ok=True)
+        _purge_achillion_marker().write_text(
             "Cleared platform site logo — Achillion Travel mark was incorrectly "
             "used on PoreiaGo marketing hosts.\n",
             encoding="utf-8",
@@ -453,10 +487,10 @@ def _read_checkout_settings(tenant_id: str | None = None) -> dict:
         ),
         "checkout_bank_reference_template": "VOY-{pnr}",
     }
-    if not _PLATFORM_SETTINGS_FILE.exists():
+    if not _platform_settings_file().exists():
         return defaults
     try:
-        raw = json.loads(_PLATFORM_SETTINGS_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(_platform_settings_file().read_text(encoding="utf-8"))
     except (json.JSONDecodeError, TypeError, OSError):
         return defaults
     try:
@@ -622,10 +656,10 @@ async def upload_site_asset(kind: str, file: UploadFile = File(...)):
     ext = Path(file.filename or "upload.jpg").suffix.lower()
     if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
         ext = ".jpg"
-    _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    for old in _UPLOAD_DIR.glob(f"{kind}.*"):
+    _upload_dir().mkdir(parents=True, exist_ok=True)
+    for old in _upload_dir().glob(f"{kind}.*"):
         old.unlink(missing_ok=True)
-    out_path = _UPLOAD_DIR / f"{kind}{ext}"
+    out_path = _upload_dir() / f"{kind}{ext}"
     out_path.write_bytes(content)
     current = _read_appearance()
     url_key = "logo_url" if kind == "logo" else "hero_image_url"
@@ -643,7 +677,7 @@ async def upload_site_asset(kind: str, file: UploadFile = File(...)):
 async def clear_site_asset(kind: str):
     if kind not in _ALLOWED_KINDS:
         raise HTTPException(status_code=400, detail="Invalid asset kind")
-    for old in _UPLOAD_DIR.glob(f"{kind}.*"):
+    for old in _upload_dir().glob(f"{kind}.*"):
         old.unlink(missing_ok=True)
     current = _read_appearance()
     if kind == "logo":

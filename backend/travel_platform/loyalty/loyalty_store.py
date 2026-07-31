@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -11,10 +12,12 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from app.core.data_paths import poreiago_data_dir, resolve_data_file
 from travel_platform.settings.drivers_store import DEMO_TENANT_ID
 
-DATA_DIR = Path(__file__).resolve().parent
-STORE_FILE = DATA_DIR / "loyalty_store.json"
+_PACKAGE_DIR = Path(__file__).resolve().parent
+DATA_DIR = poreiago_data_dir()
+STORE_FILE = resolve_data_file("loyalty_store.json", _PACKAGE_DIR / "loyalty_store.json")
 _LOCK = threading.RLock()
 
 TIERS = ("STANDARD", "SILVER", "GOLD", "PLATINUM")

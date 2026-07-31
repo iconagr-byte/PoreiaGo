@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import List
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.ticketing_router import router as ticketing_router
@@ -498,8 +498,8 @@ async def health_check(include_fiscal: bool = True):
 
 
 @app.get("/metrics")
-async def prometheus_metrics_root():
+async def prometheus_metrics_root(request: Request):
     """Prometheus scrape (alias of /api/v1/metrics)."""
     from app.api.metrics import prometheus_metrics
 
-    return await prometheus_metrics()
+    return await prometheus_metrics(request)

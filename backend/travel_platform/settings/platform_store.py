@@ -7,9 +7,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from app.core.data_paths import resolve_data_file
 from core.config import get_platform_settings
 
-_SETTINGS_FILE = Path(__file__).resolve().parent / "platform_settings.json"
+_LEGACY_SETTINGS = Path(__file__).resolve().parent / "platform_settings.json"
+_SETTINGS_FILE = resolve_data_file("platform_settings.json", _LEGACY_SETTINGS)
 
 
 @dataclass
@@ -76,6 +78,7 @@ def _load_from_disk() -> PlatformRuntimeSettings | None:
 
 
 def _persist(store: PlatformRuntimeSettings) -> None:
+    _SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     _SETTINGS_FILE.write_text(
         json.dumps(asdict(store), indent=2, ensure_ascii=False),
         encoding="utf-8",

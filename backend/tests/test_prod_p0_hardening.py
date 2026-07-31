@@ -35,6 +35,7 @@ class ProductionGuardTests(unittest.TestCase):
             "DATABASE_URL": "postgresql+asyncpg://u:securepassword@db/x",
             "ADMIN_AUTH_DISABLED": "1",
             "RENT_DEMO_FLEET": "true",
+            "EMAIL_ENCRYPTION_KEY": "aerostride-dev-email-key-change-in-production",
         }
         errs = collect_production_boot_errors(environ=env)
         self.assertTrue(any("AUTH_JWT_SECRET" in e for e in errs))
@@ -43,6 +44,7 @@ class ProductionGuardTests(unittest.TestCase):
         self.assertTrue(any("ADMIN_AUTH_DISABLED" in e for e in errs))
         self.assertTrue(any("RENT_DEMO_FLEET" in e for e in errs))
         self.assertTrue(any("DATABASE_URL" in e for e in errs))
+        self.assertTrue(any("EMAIL_ENCRYPTION_KEY" in e for e in errs))
         with self.assertRaises(RuntimeError):
             assert_production_safe_or_raise(environ=env)
 
@@ -57,6 +59,7 @@ class ProductionGuardTests(unittest.TestCase):
             "DATABASE_URL": "postgresql+asyncpg://u:real-strong-pass@db/x",
             "ADMIN_AUTH_DISABLED": "0",
             "RENT_DEMO_FLEET": "false",
+            "EMAIL_ENCRYPTION_KEY": "email-enc-key-" + ("z" * 24),
         }
         self.assertEqual(collect_production_boot_errors(environ=env), [])
 
@@ -91,11 +94,11 @@ class DemoFleetGateTests(unittest.TestCase):
 
 
 class RentPaymentTrustTests(unittest.TestCase):
-    def _seed_vehicle(self, tid: str) -> str:
+    def _seed_vehicle(self, tid: str, plate: str = "P0-TEST-01") -> str:
         row = store.upsert_vehicle(
             tid,
             {
-                "plate_number": "P0-TEST-01",
+                "plate_number": plate,
                 "category": "ECONOMY",
                 "model": "Test Car",
                 "seating_capacity": 5,
@@ -148,7 +151,8 @@ class RentPaymentTrustTests(unittest.TestCase):
                 vid = self._seed_vehicle(tid)
                 start = datetime.now(timezone.utc) + timedelta(days=1)
                 end = start + timedelta(days=2)
-                booking = store.create_booking(
+                # Client-forged Stripe id alone must NOT mark PAID
+                forged = store.create_booking(
                     tid,
                     {
                         "vehicle_id": vid,
@@ -159,8 +163,28 @@ class RentPaymentTrustTests(unittest.TestCase):
                         "pickup_location": "Office",
                         "dropoff_location": "Office",
                         "payment_method": "card",
+                        "stripe_payment_intent": "pi_forged_abc",
+                    },
+                )
+                self.assertEqual(forged["payment_status"], "PENDING")
+                self.assertEqual(forged["rental_status"], "RESERVED")
+
+                vid2 = self._seed_vehicle(tid, plate="P0-TEST-02")
+                # Only server-verified flag + provider ref confirms settlement
+                booking = store.create_booking(
+                    tid,
+                    {
+                        "vehicle_id": vid2,
+                        "client_name": "Test2",
+                        "client_email": "t2@example.com",
+                        "start_time": (start + timedelta(days=10)).isoformat(),
+                        "end_time": (end + timedelta(days=10)).isoformat(),
+                        "pickup_location": "Office",
+                        "dropoff_location": "Office",
+                        "payment_method": "card",
                         "payment_status": "PENDING",
                         "stripe_payment_intent": "pi_live_abc",
+                        "_server_verified_payment": True,
                     },
                 )
                 self.assertEqual(booking["payment_status"], "PAID")

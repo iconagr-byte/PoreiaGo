@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
-STORE_PATH = DATA_DIR / "tenant_branding.json"
+from app.core.data_paths import poreiago_data_dir, resolve_data_file
+
+_LEGACY_DATA = Path(__file__).resolve().parents[2] / "data"
+DATA_DIR = poreiago_data_dir()
+STORE_PATH = resolve_data_file("tenant_branding.json", _LEGACY_DATA / "tenant_branding.json")
 
 DEFAULT_BRANDING = {
     "slug": "poreiago",

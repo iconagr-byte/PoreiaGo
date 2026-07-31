@@ -63,6 +63,19 @@ elif grep -qE "^TELEMETRY_DEVICE_KEYS=(dev-gps-key)?$" "$ENV_FILE" 2>/dev/null |
   echo "  ~ replaced weak TELEMETRY_DEVICE_KEYS"
 fi
 
+# Mailbox password encryption (Fernet material) — required by production_guard
+if ! grep -q "^EMAIL_ENCRYPTION_KEY=.\+" "$ENV_FILE" 2>/dev/null; then
+  _ekey="$(openssl rand -base64 32)"
+  replace_kv "EMAIL_ENCRYPTION_KEY" "$_ekey"
+  echo "  + generated EMAIL_ENCRYPTION_KEY"
+elif grep -q "aerostride-dev-email-key" "$ENV_FILE" 2>/dev/null; then
+  _ekey="$(openssl rand -base64 32)"
+  replace_kv "EMAIL_ENCRYPTION_KEY" "$_ekey"
+  echo "  ~ replaced weak EMAIL_ENCRYPTION_KEY"
+fi
+set_kv "METRICS_PUBLIC" "false"
+set_kv "METRICS_TOKEN" ""
+
 PLATFORM_DOMAIN="${PLATFORM_DOMAIN:-poreiago.com}"
 if grep -q "^APP_HOST=" "$ENV_FILE" 2>/dev/null; then
   _app_host="$(grep "^APP_HOST=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
