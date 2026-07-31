@@ -2,7 +2,9 @@ import { API_BASE } from '../config/api.js';
 import { adminAuthHeaders } from './adminApi.js';
 import { driverSessionHeaders } from '../lib/driver/driverSession.js';
 
-const DEVICE_KEY = import.meta.env.VITE_TELEMETRY_DEVICE_KEY || 'dev-gps-key';
+const DEVICE_KEY =
+  import.meta.env.VITE_TELEMETRY_DEVICE_KEY ||
+  (import.meta.env.PROD ? '' : 'dev-gps-key');
 
 export async function postTelemetryUpdate(payload) {
   const res = await fetch(`${API_BASE}/telemetry/update`, {

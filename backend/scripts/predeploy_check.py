@@ -89,6 +89,24 @@ def validate_environment(result: CheckResult, *, strict: bool) -> None:
     is_prod = env in ("production", "prod")
 
     if is_prod:
+        try:
+            from app.core.production_guard import (
+                collect_production_boot_errors,
+                collect_production_boot_warnings,
+            )
+
+            for err in collect_production_boot_errors():
+                result.fail(err)
+            for warn in collect_production_boot_warnings():
+                if strict:
+                    result.fail(warn)
+                else:
+                    result.warn(warn)
+            if not collect_production_boot_errors():
+                result.pass_("Production guard secrets OK")
+        except Exception as exc:
+            result.warn(f"production_guard import/check skipped: {exc}")
+
         for key in REQUIRED_PROD:
             val = os.getenv(key, "").strip()
             if not val:

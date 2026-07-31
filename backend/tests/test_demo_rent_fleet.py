@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
@@ -13,7 +14,13 @@ from travel_platform.rental import rental_store as store
 def test_ensure_demo_rental_fleet_seeds_six_vehicles():
     with TemporaryDirectory() as tmp:
         path = Path(tmp) / "rental_store.json"
-        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(store, "DATA_DIR", Path(tmp)):
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "development", "RENT_DEMO_FLEET": "true"},
+            clear=False,
+        ):
             tid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
             added = store.ensure_demo_rental_fleet(tid)
             assert added == 6
@@ -32,7 +39,13 @@ def test_ensure_demo_rental_fleet_seeds_six_vehicles():
 def test_public_catalog_auto_seeds_demo():
     with TemporaryDirectory() as tmp:
         path = Path(tmp) / "rental_store.json"
-        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(store, "DATA_DIR", Path(tmp)):
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "development", "RENT_DEMO_FLEET": "true"},
+            clear=False,
+        ):
             tid = "11111111-2222-3333-4444-555555555555"
             catalog = store.public_catalog(tid)
             assert len(catalog) == 6
@@ -45,3 +58,17 @@ def test_public_catalog_auto_seeds_demo():
             assert "Ford Transit Custom" in models
             raw = json.loads(path.read_text(encoding="utf-8"))
             assert len(raw["vehicles"]) == 6
+
+
+def test_public_catalog_no_seed_in_production():
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "production", "RENT_DEMO_FLEET": "false"},
+            clear=False,
+        ):
+            tid = "11111111-2222-3333-4444-555555555555"
+            assert store.public_catalog(tid) == []

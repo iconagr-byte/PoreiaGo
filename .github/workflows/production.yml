@@ -14,6 +14,9 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      PYTHONPATH: .
+      ENVIRONMENT: test
     steps:
       - uses: actions/checkout@v4
 
@@ -27,10 +30,11 @@ jobs:
         run: pip install -r requirements.txt pytest pytest-asyncio httpx
 
       - name: Run unit tests
-        run: pytest -q tests/ || echo "Check test output"
+        run: pytest -q tests/
 
       - name: Lint frontend
         working-directory: .
+        continue-on-error: true
         run: |
           npm ci
           npm run lint

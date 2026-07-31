@@ -44,6 +44,12 @@ fi
 
 bash "$DEPLOY_DIR/scripts/ensure-env-prod.sh"
 
+# P0: nightly local Postgres dump (idempotent crontab)
+if [[ "${INSTALL_POSTGRES_BACKUP_CRON:-1}" == "1" ]]; then
+  bash "$DEPLOY_DIR/scripts/install-postgres-backup-cron.sh" || \
+    echo "WARN: postgres backup cron install skipped"
+fi
+
 export API_IMAGE
 if ! grep -q "^API_IMAGE=" "$ENV_FILE" 2>/dev/null; then
   echo "API_IMAGE=$API_IMAGE" >> "$ENV_FILE"

@@ -36,9 +36,7 @@ def test_public_tenant_id_ignores_origin_referer(monkeypatch):
             "referer": "https://www.achilliotravel.com/admin",
         },
     )
-    out = asyncio.get_event_loop().run_until_complete(
-        rt.public_tenant_id(req, allow_demo_fallback=False)
-    )
+    out = asyncio.run(rt.public_tenant_id(req, allow_demo_fallback=False))
     assert out is None
     assert "www.achilliotravel.com" not in called_hosts
     assert "achilliotravel.com" not in called_hosts

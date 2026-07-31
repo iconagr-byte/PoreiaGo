@@ -2,6 +2,7 @@
  * Client-side demo rent fleet (compact cars + vans).
  * 2025–2026 generation models with matching Wikimedia Commons exterior photos.
  * Used when the public catalog API is empty/unreachable so storefront still looks real.
+ * Disabled on live production hosts (P0 — no fake fleet on customer sites).
  */
 
 const WM = (path) =>
@@ -94,8 +95,30 @@ export const DEMO_RENT_FLEET = [
 
 export { rentCategoryLabel } from './rentVehicleCategories.js';
 
+/** Live customer hosts — never inject client-side showcase fleet. */
+export function isLiveProductionHost(hostname = '') {
+  const h = String(hostname || (typeof window !== 'undefined' ? window.location.hostname : ''))
+    .trim()
+    .toLowerCase();
+  if (!h || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.local')) return false;
+  return (
+    h === 'www.poreiago.com' ||
+    h === 'poreiago.com' ||
+    h.endsWith('.poreiago.com') ||
+    h === 'achilliotravel.com' ||
+    h === 'www.achilliotravel.com' ||
+    h.endsWith('.achilliotravel.com')
+  );
+}
+
 export function withDemoRentFleet(vehicles) {
   if (Array.isArray(vehicles) && vehicles.length > 0) return vehicles;
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname;
+    if (isLiveProductionHost(h)) return [];
+    // Production builds on real hosts (custom office domains) never invent fleet.
+    if (import.meta.env?.PROD && h && h !== 'localhost' && h !== '127.0.0.1') return [];
+  }
   return DEMO_RENT_FLEET;
 }
 

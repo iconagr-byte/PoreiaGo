@@ -137,6 +137,7 @@ def _request_tenant_id(request: Request) -> str:
     Prefer request.state.tenant_id (set by DomainTenant + JWT middleware).
     Fall back to Bearer JWT tenant_id so creates never silently land in the
     demo office when Host is the platform domain.
+    Production fail-closes instead of returning DEMO_TENANT_ID.
     """
     tid = getattr(request.state, "tenant_id", None)
     if tid:
@@ -157,6 +158,11 @@ def _request_tenant_id(request: Request) -> str:
                         return str(raw)
             except Exception:
                 pass
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    if env in ("production", "prod"):
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=401, detail="tenant context required")
     return DEMO_TENANT_ID
 
 
