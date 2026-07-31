@@ -10,9 +10,17 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.middleware.cors import CORSMiddleware
 
-os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("ADMIN_AUTH_DISABLED", "0")
+os.environ["ENVIRONMENT"] = "test"
+os.environ["ADMIN_AUTH_DISABLED"] = "0"
 os.environ.setdefault("AUTH_JWT_SECRET", "test-security-jwt-secret-32chars!!")
+
+try:
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+except Exception:
+    pass
+
 
 
 def _build_app() -> FastAPI:
@@ -36,6 +44,14 @@ def _build_app() -> FastAPI:
 
 class EmailApiAuthTests(unittest.TestCase):
     def setUp(self):
+        os.environ["ENVIRONMENT"] = "test"
+        os.environ["ADMIN_AUTH_DISABLED"] = "0"
+        try:
+            from app.core.config import get_settings
+
+            get_settings.cache_clear()
+        except Exception:
+            pass
         self.client = TestClient(_build_app())
 
     def test_email_settings_requires_bearer(self):

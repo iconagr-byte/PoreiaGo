@@ -185,8 +185,20 @@ class IngestDriverLocationTests(unittest.IsolatedAsyncioTestCase):
 class FleetTelemetryWebSocketTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        import os
+
         import api.ws_telemetry as ws_mod
 
+        cls._env = patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "test",
+                "ADMIN_AUTH_DISABLED": "1",
+                "AUTH_JWT_SECRET": TEST_JWT_SECRET,
+            },
+            clear=False,
+        )
+        cls._env.start()
         cls._orig_secrets = ws_mod._jwt_secrets
         ws_mod._jwt_secrets = lambda: [TEST_JWT_SECRET]
         cls.ws_mod = ws_mod
@@ -198,6 +210,13 @@ class FleetTelemetryWebSocketTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.ws_mod._jwt_secrets = cls._orig_secrets
+        cls._env.stop()
+        try:
+            from app.core.config import get_settings
+
+            get_settings.cache_clear()
+        except Exception:
+            pass
 
     def test_ingress_rejects_invalid_token(self):
         with self.client.websocket_connect("/ws/telemetry/ingress?token=not-a-jwt") as ws:
