@@ -11,9 +11,8 @@ export const HERO = {
     'Το γραφείο σας με δικό του brand, δικό του site και δικό του συμβόλαιο.',
 };
 
-/** Hero background — πλήρες cover, χωρίς demo εκδρομή */
-export const HERO_BACKGROUND_IMAGE =
-  'https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?auto=format&fit=crop&w=2000&q=85';
+/** Hero background — dark Mediterranean dusk (Aegean coastal road), local asset */
+export const HERO_BACKGROUND_IMAGE = '/images/platform-hero-aegean.png';
 
 /** Έτοιμα πρότυπα email καμπάνιας στο panel (Horizon Ethos / Stitch) */
 import { STITCH_CAMPAIGN_TEMPLATES } from '../email/stitchTemplates.js';
