@@ -10,6 +10,11 @@ import {
   STATS,
   STEPS,
 } from '../../lib/marketing/platformCopy.js';
+import {
+  getPlatformDemoFleetPreview,
+  getPlatformDemoTripPreview,
+  PLATFORM_DEMO_COPY,
+} from '../../lib/marketing/platformDemoShowcase.js';
 import { mergeRentPlanCatalog } from '../../lib/billing/planCatalog.js';
 import { fetchPublicRentPlanCatalog } from '../../services/rentPlanCatalogApi.js';
 import AgencyPlansHook from './AgencyPlansHook.jsx';
@@ -71,9 +76,23 @@ export function HeroSection() {
               Δείτε τα συμβόλαια
               <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
+            <a
+              href="#platform-demo-fleet"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-teal-300/50 bg-teal-500/15 text-teal-50 hover:bg-teal-400/25 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">directions_bus</span>
+              Στόλος demo
+            </a>
+            <a
+              href="#platform-demo-trips"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-sky-300/45 bg-sky-500/15 text-sky-50 hover:bg-sky-400/25 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">map</span>
+              Εκδρομές demo
+            </a>
             <Link
               to="/rent"
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-teal-300/50 bg-teal-500/15 text-teal-50 hover:bg-teal-400/25 transition-colors"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-white/25 text-white hover:bg-white/10 transition-colors"
             >
               <span className="material-symbols-outlined text-[20px]">car_rental</span>
               Ενοικιάσεις
@@ -426,6 +445,117 @@ export function FinalCtaSection() {
           >
             Επιλογή συμβολαίου
           </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Prospective-buyer showcase: rent στόλος + bus εκδρομές (marketing host only). */
+export function PlatformDemoShowcase() {
+  const fleet = getPlatformDemoFleetPreview(3);
+  const trips = getPlatformDemoTripPreview(3);
+
+  return (
+    <section
+      id="platform-demo"
+      className="relative py-20 md:py-24 bg-slate-950 border-y border-white/10 overflow-hidden"
+    >
+      <div
+        className="absolute inset-0 pointer-events-none"
+        aria-hidden
+        style={{
+          backgroundImage:
+            'radial-gradient(ellipse 70% 50% at 15% 0%, rgba(45,212,191,0.12), transparent 55%), radial-gradient(ellipse 60% 45% at 90% 20%, rgba(56,189,248,0.10), transparent 50%)',
+        }}
+      />
+      <div className="relative max-w-6xl mx-auto px-4 md:px-8">
+        <div className="max-w-2xl mb-12 md:mb-14">
+          <p className="text-sm font-semibold tracking-wide text-teal-300/90 mb-3">
+            {PLATFORM_DEMO_COPY.kicker}
+          </p>
+          <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight">
+            {PLATFORM_DEMO_COPY.title}
+          </h2>
+          <p className="mt-4 text-base md:text-lg text-white/65 leading-relaxed">
+            {PLATFORM_DEMO_COPY.subtitle}
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-12">
+          <div id="platform-demo-fleet" className="scroll-mt-28">
+            <div className="flex items-end justify-between gap-3 mb-5">
+              <h3 className="text-xl font-bold text-white">{PLATFORM_DEMO_COPY.fleetTitle}</h3>
+              <Link
+                to="/rent#rent-guest-fleet"
+                className="text-sm font-bold text-teal-300 hover:text-teal-200 inline-flex items-center gap-1"
+              >
+                {PLATFORM_DEMO_COPY.fleetCta}
+                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </Link>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3">
+              {fleet.map((v) => (
+                <Link
+                  key={v.id}
+                  to={v.href}
+                  className="group rounded-2xl overflow-hidden border border-white/10 bg-white/[0.04] hover:bg-white/[0.07] transition-colors"
+                >
+                  <div className="aspect-[4/3] overflow-hidden bg-slate-900">
+                    <img
+                      src={v.photo}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                    />
+                  </div>
+                  <div className="p-3.5">
+                    <p className="font-bold text-white text-sm tracking-tight">{v.title}</p>
+                    <p className="text-xs text-teal-300/90 font-semibold mt-1">{v.priceLabel}</p>
+                    <p className="text-[11px] text-white/45 mt-1">{v.seats} θέσεις</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div id="platform-demo-trips" className="scroll-mt-28">
+            <div className="flex items-end justify-between gap-3 mb-5">
+              <h3 className="text-xl font-bold text-white">{PLATFORM_DEMO_COPY.tripsTitle}</h3>
+              {trips[0] ? (
+                <Link
+                  to={trips[0].href}
+                  className="text-sm font-bold text-sky-300 hover:text-sky-200 inline-flex items-center gap-1"
+                >
+                  {PLATFORM_DEMO_COPY.tripsCta}
+                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </Link>
+              ) : null}
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3">
+              {trips.map((t) => (
+                <Link
+                  key={t.id}
+                  to={t.href}
+                  className="group rounded-2xl overflow-hidden border border-white/10 bg-white/[0.04] hover:bg-white/[0.07] transition-colors"
+                >
+                  <div className="aspect-[4/3] overflow-hidden bg-slate-900">
+                    <img
+                      src={t.photo}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                    />
+                  </div>
+                  <div className="p-3.5">
+                    <p className="font-bold text-white text-sm tracking-tight leading-snug">{t.title}</p>
+                    <p className="text-xs text-sky-300/90 font-semibold mt-1">{t.priceLabel}</p>
+                    {t.blurb ? (
+                      <p className="text-[11px] text-white/45 mt-1 line-clamp-2">{t.blurb}</p>
+                    ) : null}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>
