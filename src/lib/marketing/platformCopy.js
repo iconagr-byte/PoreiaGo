@@ -15,6 +15,9 @@ export const HERO = {
 export const HERO_BACKGROUND_IMAGE =
   'https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?auto=format&fit=crop&w=2000&q=85';
 
+/** Features section background — Aegean coastal dusk (local asset) */
+export const FEATURES_BACKGROUND_IMAGE = '/images/platform-features-aegean.png';
+
 /** Έτοιμα πρότυπα email καμπάνιας στο panel (Horizon Ethos / Stitch) */
 import { STITCH_CAMPAIGN_TEMPLATES } from '../email/stitchTemplates.js';
 export const CAMPAIGN_TEMPLATE_COUNT = STITCH_CAMPAIGN_TEMPLATES.length;

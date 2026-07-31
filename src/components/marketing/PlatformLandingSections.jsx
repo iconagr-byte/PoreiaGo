@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   AUDIENCE_HOOKS,
   FEATURES,
+  FEATURES_BACKGROUND_IMAGE,
   HERO,
   HERO_BACKGROUND_IMAGE,
   PLATFORM_TAGLINE,
@@ -199,17 +200,27 @@ export function FeaturesSection() {
   return (
     <section
       id="features"
-      className="py-24 md:py-32 bg-[#f5f5f7] antialiased font-[system-ui,-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif]"
+      className="relative isolate overflow-hidden py-24 md:py-32 antialiased font-[system-ui,-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif]"
     >
-      <div className="max-w-[980px] mx-auto px-5 md:px-8">
+      <div className="absolute inset-0 -z-10" aria-hidden>
+        <img
+          src={FEATURES_BACKGROUND_IMAGE}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-[center_45%]"
+        />
+        <div className="absolute inset-0 bg-slate-950/55" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/45 to-slate-950/75" />
+      </div>
+
+      <div className="relative max-w-[980px] mx-auto px-5 md:px-8">
         <div className="text-center max-w-3xl mx-auto mb-14 md:mb-20">
-          <p className="text-sm font-medium text-[#6e6e73] tracking-wide mb-3">Δυνατότητες</p>
-          <h2 className="text-[32px] md:text-[48px] font-semibold text-[#1d1d1f] tracking-[-0.02em] leading-[1.08]">
+          <p className="text-sm font-medium text-white/65 tracking-wide mb-3">Δυνατότητες</p>
+          <h2 className="text-[32px] md:text-[48px] font-semibold text-white tracking-[-0.02em] leading-[1.08]">
             Ό,τι χρειάζεται ένα σύγχρονο γραφείο.
             <br className="hidden sm:block" />
-            <span className="text-[#6e6e73]"> Built-in.</span>
+            <span className="text-white/70"> Built-in.</span>
           </h2>
-          <p className="text-[17px] md:text-[19px] text-[#6e6e73] mt-5 leading-relaxed font-normal">
+          <p className="text-[17px] md:text-[19px] text-white/70 mt-5 leading-relaxed font-normal">
             Έτοιμη υποδομή για περισσότερες εκδρομές με λιγότερο admin.
           </p>
         </div>
@@ -220,7 +231,7 @@ export function FeaturesSection() {
             return (
               <article
                 key={f.title}
-                className="group flex flex-col rounded-[22px] bg-white/90 backdrop-blur-xl p-7 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-[box-shadow,transform] duration-500 ease-out hover:-translate-y-0.5"
+                className="group flex flex-col rounded-[22px] bg-white/92 backdrop-blur-xl p-7 md:p-8 shadow-[0_8px_32px_rgba(0,0,0,0.22)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.28)] transition-[box-shadow,transform] duration-500 ease-out hover:-translate-y-0.5"
               >
                 <div
                   className={`w-[52px] h-[52px] rounded-[14px] flex items-center justify-center mb-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] ${iconStyle}`}
