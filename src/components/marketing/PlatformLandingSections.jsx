@@ -73,6 +73,20 @@ export function HeroSection() {
               Δείτε τα συμβόλαια
               <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
+            <a
+              href="#platform-trips"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-sky-300/45 bg-sky-500/15 text-sky-50 hover:bg-sky-400/25 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">map</span>
+              Εκδρομές
+            </a>
+            <a
+              href="#our-fleet"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-teal-300/50 bg-teal-500/15 text-teal-50 hover:bg-teal-400/25 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">directions_bus</span>
+              Στόλος λεωφορείων
+            </a>
             <Link
               to="/rent"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-white/25 text-white hover:bg-white/10 transition-colors"

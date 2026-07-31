@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
+import PlatformOpsShowcase from '../components/marketing/PlatformOpsShowcase.jsx';
 import {
   FeaturesSection,
   FinalCtaSection,
@@ -18,6 +19,12 @@ export default function FrontPage() {
           <PlatformBrand variant="dark" />
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-white/75">
+            <a href="#platform-trips" className="hover:text-white transition-colors">
+              Εκδρομές
+            </a>
+            <a href="#our-fleet" className="hover:text-white transition-colors">
+              Στόλος
+            </a>
             <a href="#features" className="hover:text-white transition-colors">
               Λειτουργίες
             </a>
@@ -49,6 +56,7 @@ export default function FrontPage() {
 
       <main>
         <HeroSection />
+        <PlatformOpsShowcase />
         <PainPointsSection />
         <FeaturesSection />
         <HowItWorksSection />
