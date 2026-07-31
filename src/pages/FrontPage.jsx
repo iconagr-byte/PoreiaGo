@@ -74,9 +74,6 @@ export default function FrontPage() {
             <Link to="/my-booking" className="hover:text-white">
               Ανάκτηση κράτησης
             </Link>
-            <Link to="/admin/login" className="hover:text-white">
-              Σύνδεση γραφείου
-            </Link>
           </div>
         </div>
         <p className="text-center text-xs text-white/30 mt-10">
