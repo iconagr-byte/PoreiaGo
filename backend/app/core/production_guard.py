@@ -32,6 +32,7 @@ WEAK_SUBSTRINGS = (
     "dev-gps",
     "securepassword",
     "olympus_dev",
+    "aerostride-dev-email",
 )
 
 
@@ -95,6 +96,15 @@ def collect_production_boot_errors(
     if (env.get("RENT_DEMO_FLEET") or "").strip().lower() in ("1", "true", "yes", "on"):
         errors.append("RENT_DEMO_FLEET must be false/off in production")
 
+    email_key = (env.get("EMAIL_ENCRYPTION_KEY") or "").strip()
+    if (
+        not email_key
+        or len(email_key) < 24
+        or _is_weak_secret(email_key)
+        or email_key == "aerostride-dev-email-key-change-in-production"
+    ):
+        errors.append("EMAIL_ENCRYPTION_KEY missing/weak (min 24 chars) for mailbox secrets")
+
     return errors
 
 
@@ -110,6 +120,10 @@ def collect_production_boot_warnings(
         warnings.append("BILLING_DEMO_MODE=true — prefer false for live Stripe billing")
     if not (env.get("BACKUP_S3_BUCKET") or "").strip():
         warnings.append("BACKUP_S3_BUCKET unset — ensure local/S3 postgres backup cron is installed")
+    if (env.get("AADE_MODE") or "stub").strip().lower() == "stub":
+        warnings.append("AADE_MODE=stub — native AADE is demo-only until live credentials")
+    if (env.get("METRICS_PUBLIC") or "true").strip().lower() in ("1", "true", "yes", "on"):
+        warnings.append("METRICS_PUBLIC=true — prefer restricting /metrics scrape (METRICS_TOKEN or private net)")
     return warnings
 
 

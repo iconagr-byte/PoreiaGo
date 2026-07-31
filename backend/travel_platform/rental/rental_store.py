@@ -829,19 +829,22 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
         except (TypeError, ValueError):
             balance_due = None
 
-        # P0: never trust client payment_status / fake card as settlement proof.
-        # Only mark PAID when a verified provider reference is present.
+        # P0/P1: never trust client payment_status, fake card, or forged Stripe IDs.
+        # Mark PAID only via trusted server paths (webhook / office confirm) that set
+        # body["_server_verified_payment"]=True with a provider reference.
         provider_ref = None
-        for key in (
-            "stripe_session_id",
-            "stripe_payment_intent",
-            "payment_intent_id",
-            "provider_payment_id",
-        ):
-            cand = str(body.get(key) or "").strip()
-            if cand:
-                provider_ref = cand
-                break
+        server_verified = bool(body.get("_server_verified_payment"))
+        if server_verified:
+            for key in (
+                "stripe_session_id",
+                "stripe_payment_intent",
+                "payment_intent_id",
+                "provider_payment_id",
+            ):
+                cand = str(body.get(key) or "").strip()
+                if cand:
+                    provider_ref = cand
+                    break
 
         if provider_ref:
             payment_status = "PAID"

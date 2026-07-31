@@ -93,6 +93,17 @@ npm run build
 echo "==> API Docker image"
 docker build -t "$API_IMAGE" "$REPO_ROOT/backend"
 
+# P0: refuse deploy when production secrets are weak (uses built image + .env.prod)
+if [[ "${RUN_PREDEPLOY_CHECK:-1}" == "1" ]]; then
+  echo "==> Predeploy production guard"
+  if ! docker run --rm --env-file "$ENV_FILE" --entrypoint python "$API_IMAGE" -c \
+    "from app.core.production_guard import assert_production_safe_or_raise, collect_production_boot_warnings; assert_production_safe_or_raise();
+[print('WARN:', w) for w in collect_production_boot_warnings()]; print('production_guard OK')"; then
+    echo "ERROR: production_guard refused deploy — fix secrets in $ENV_FILE"
+    exit 1
+  fi
+fi
+
 echo "==> Pull Traefik (Docker 29 compat)"
 docker pull traefik:v3.6.6
 

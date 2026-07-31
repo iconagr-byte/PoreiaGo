@@ -18,11 +18,16 @@ def _fernet() -> "Fernet":
         raise RuntimeError(
             "Εγκαταστήστε το cryptography: pip install cryptography"
         )
-    secret = (
-        os.getenv("EMAIL_ENCRYPTION_KEY", "").strip()
-        or os.getenv("CUSTOMER_JWT_SECRET", "").strip()
-        or "aerostride-dev-email-key-change-in-production"
-    )
+    secret = (os.getenv("EMAIL_ENCRYPTION_KEY") or "").strip()
+    env = (os.getenv("ENVIRONMENT") or "development").strip().lower()
+    if not secret:
+        # Dev-only fallback — production_guard refuses boot without EMAIL_ENCRYPTION_KEY.
+        if env in ("production", "prod"):
+            raise RuntimeError("EMAIL_ENCRYPTION_KEY is required in production")
+        secret = (
+            os.getenv("CUSTOMER_JWT_SECRET", "").strip()
+            or "aerostride-dev-email-key-change-in-production"
+        )
     digest = hashlib.sha256(secret.encode("utf-8")).digest()
     key = base64.urlsafe_b64encode(digest)
     return Fernet(key)
