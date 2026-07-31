@@ -5035,6 +5035,84 @@
   margin: 0;
 }
 
+.rent-pay-due-promo {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+.rent-pay-promo-card h2 {
+  margin-bottom: 0.75rem;
+}
+
+.rent-pay-promo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 650;
+  cursor: pointer;
+  color: var(--rent-ink, #1d1d1f);
+}
+
+.rent-pay-promo-toggle input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-pay-promo-row {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.rent-pay-promo-input {
+  width: 100%;
+  border: 1px solid rgba(60, 60, 67, 0.18);
+  border-radius: 12px;
+  background: #f5f5f7;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rent-ink, #1d1d1f);
+}
+
+.rent-pay-promo-input:focus {
+  outline: none;
+  border-color: rgba(10, 122, 108, 0.45);
+  box-shadow: 0 0 0 3px rgba(10, 122, 108, 0.12);
+}
+
+.rent-pay-promo-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #6e6e73;
+}
+
+.rent-pay-promo-hint.is-ok {
+  color: #0a7a6c;
+  font-weight: 650;
+}
+
+.rent-pay-promo-hint.is-bad {
+  color: #c9342c;
+  font-weight: 650;
+}
+
+.rent-pay-promo-saving {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(10, 122, 108, 0.08);
+  color: #0a7a6c;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
 .rent-pay-due-balance {
   font-size: 1.15rem;
   font-weight: 700;

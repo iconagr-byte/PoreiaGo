@@ -228,7 +228,13 @@ export default function RentBookingSearchBar({
             <input
               type="checkbox"
               checked={promoOpen}
-              onChange={(e) => setPromoOpen(e.target.checked)}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setPromoOpen(on);
+                writeRentBookingPrefs({
+                  promo_code: on ? String(promoCode || '').trim() : '',
+                });
+              }}
             />
             <span>Έχεις κωδικό προσφοράς;</span>
           </label>
@@ -237,9 +243,14 @@ export default function RentBookingSearchBar({
               className="rent-search-promo-input"
               type="text"
               value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value)}
-              placeholder="Κωδικός προσφοράς"
+              onChange={(e) => {
+                const v = e.target.value;
+                setPromoCode(v);
+                writeRentBookingPrefs({ promo_code: String(v || '').trim() });
+              }}
+              placeholder="π.χ. RENT10"
               aria-label="Κωδικός προσφοράς"
+              autoCapitalize="characters"
             />
           ) : null}
         </div>

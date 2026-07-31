@@ -96,9 +96,23 @@ export default function RentBookingVehicleSidebar({
             <small>
               {dayCount} ημέρ. · όχημα {euroLabel(totals.vehicle)}
               {totals.extras > 0 ? ` · extras ${euroLabel(totals.extras)}` : ''}
+              {totals.discount > 0
+                ? ` · έκπτωση −${euroLabel(totals.discount)}${
+                    totals.promoCode ? ` (${totals.promoCode})` : ''
+                  }`
+                : ''}
             </small>
           </div>
-          <strong>{euroLabel(totals.total)}</strong>
+          <strong>
+            {totals.discount > 0 ? (
+              <>
+                <span className="rent-wiz-total-was">{euroLabel(totals.totalBefore)}</span>{' '}
+                {euroLabel(totals.total)}
+              </>
+            ) : (
+              euroLabel(totals.total)
+            )}
+          </strong>
         </div>
 
         <button type="button" className="rent-wiz-next" disabled={busy} onClick={onCta}>
