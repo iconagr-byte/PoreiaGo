@@ -18,7 +18,7 @@ import {
   fetchPublicRentalAvailability,
   fetchPublicRentalCatalog,
 } from '../services/customerRentalApi.js';
-import { withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
+import { isClientDemoFleet, withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
 import { enrichRentFleet, homeCategoryLabel } from '../lib/rental/rentFleetEnrichment.js';
 import {
   countRentFleetByBody,
@@ -157,6 +157,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
     () => countRentFleetByBody(homeFleet),
     [homeFleet],
   );
+  const showingDemoFleet = useMemo(() => isClientDemoFleet(homeFleet), [homeFleet]);
   const homeCategories = useMemo(() => rentHomeCategoryFilters(homeFleet), [homeFleet]);
 
   const filteredHomeFleet = homeFleet
@@ -168,6 +169,12 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         .toLowerCase()
         .includes(q);
     });
+
+  const fleetSubtitle = searchActive
+    ? `${filteredHomeFleet.length} διαθέσιμα για τις ημερομηνίες σου`
+    : showingDemoFleet
+      ? `${carCount} επιβατικά · ${vanCount} van · demo προεπισκόπηση πλατφόρμας`
+      : `${carCount} επιβατικά · ${vanCount} van`;
 
   return (
     <div className={`rent-phone-stage${isMobile ? '' : ' rent-phone-stage--desktop'}`}>
@@ -222,7 +229,15 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                     pickupLocation: prefs.pickup_location,
                     dropoffLocation: prefs.dropoff_location || prefs.pickup_location,
                   });
-                  setHomeFleet(enrichRentFleet(withDemoRentFleet(Array.isArray(rows) ? rows : []).slice(0, 24)));
+                  // Date search: never invent availability from marketing demo fleet.
+                  setHomeFleet(
+                    enrichRentFleet(
+                      withDemoRentFleet(Array.isArray(rows) ? rows : [], { allowShowcase: false }).slice(
+                        0,
+                        24,
+                      ),
+                    ),
+                  );
                 } catch {
                   /* keep current catalog if availability fails */
                 } finally {
@@ -247,11 +262,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                         <span className="rent-pick-loc">{branding.brandLabel || 'το γραφείο'}</span>
                       </span>
                     </h2>
-                    <p className="rent-pick-head-sub">
-                      {searchActive
-                        ? `${filteredHomeFleet.length} διαθέσιμα για τις ημερομηνίες σου`
-                        : `${carCount} επιβατικά · ${vanCount} van · demo στόλος γραφείου`}
-                    </p>
+                    <p className="rent-pick-head-sub">{fleetSubtitle}</p>
                   </div>
                   <div className="rent-pick-filters">
                     <label className="rent-pick-filter">
@@ -298,7 +309,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   <p className="rent-home-fleet-empty">
                     {searchActive
                       ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες.'
-                      : 'Φόρτωση demo στόλου…'}
+                      : 'Δεν υπάρχουν διαθέσιμα οχήματα.'}
                   </p>
                 )}
               </div>

@@ -1,9 +1,13 @@
 /**
  * Client-side demo rent fleet (compact cars + vans).
  * 2025–2026 generation models with matching Wikimedia Commons exterior photos.
- * Used when the public catalog API is empty/unreachable so storefront still looks real.
- * Disabled on live production hosts (P0 — no fake fleet on customer sites).
+ *
+ * Showcase ONLY on the PoreiaGo marketing host (/rent guest landing) so
+ * prospective contract buyers see how the product looks. Never invent fleet
+ * for tenant offices (Achillio, slug.poreiago.com, custom domains).
  */
+
+import { isPlatformMarketingHost } from '../platform/tenantHost.js';
 
 const WM = (path) =>
   `https://upload.wikimedia.org/wikipedia/commons/${path}`;
@@ -95,7 +99,10 @@ export const DEMO_RENT_FLEET = [
 
 export { rentCategoryLabel } from './rentVehicleCategories.js';
 
-/** Live customer hosts — never inject client-side showcase fleet. */
+/**
+ * @deprecated Prefer isPlatformMarketingHost — kept for call sites / tests.
+ * True on any live PoreiaGo / Achillio customer hostname (incl. platform apex).
+ */
 export function isLiveProductionHost(hostname = '') {
   const h = String(hostname || (typeof window !== 'undefined' ? window.location.hostname : ''))
     .trim()
@@ -111,18 +118,40 @@ export function isLiveProductionHost(hostname = '') {
   );
 }
 
-export function withDemoRentFleet(vehicles) {
+/**
+ * When catalog is empty: inject showcase fleet ONLY on PoreiaGo marketing host.
+ * Tenant offices always get the real list (or []).
+ *
+ * @param {unknown} vehicles
+ * @param {{ allowShowcase?: boolean, hostname?: string }} [opts]
+ *   allowShowcase=false — e.g. date search returned no availability (don't fake it)
+ */
+export function withDemoRentFleet(vehicles, opts = {}) {
   if (Array.isArray(vehicles) && vehicles.length > 0) return vehicles;
-  if (typeof window !== 'undefined') {
-    const h = window.location.hostname;
-    if (isLiveProductionHost(h)) return [];
-    // Production builds on real hosts (custom office domains) never invent fleet.
-    if (import.meta.env?.PROD && h && h !== 'localhost' && h !== '127.0.0.1') return [];
-  }
+  const allowShowcase = opts.allowShowcase !== false;
+  if (!allowShowcase) return [];
+
+  const hostname =
+    opts.hostname != null
+      ? opts.hostname
+      : typeof window !== 'undefined'
+        ? window.location.hostname
+        : '';
+
+  // No window + no explicit host (SSR / unit without mock) → never invent.
+  if (!hostname && opts.hostname == null && typeof window === 'undefined') return [];
+
+  if (!isPlatformMarketingHost(hostname)) return [];
   return DEMO_RENT_FLEET;
 }
 
 /** True when fleet is the client-only showcase fallback (not office store). */
 export function isClientDemoFleetId(id) {
   return /^demo-rent-(car|van)-/i.test(String(id || ''));
+}
+
+/** True when the list is (or includes) the marketing showcase fleet. */
+export function isClientDemoFleet(vehicles) {
+  if (!Array.isArray(vehicles) || !vehicles.length) return false;
+  return vehicles.some((v) => isClientDemoFleetId(v?.id));
 }
