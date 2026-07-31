@@ -491,10 +491,10 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   }
 
   return (
-    <div className={`wallet-auth-stage${isMobile ? '' : ' wallet-auth-stage--desktop'}`}>
+    <div className={`wallet-auth-stage${isPhone ? '' : ' wallet-auth-stage--desktop'}`}>
       <div className="wallet-auth-shell">
         <div className="wallet-auth-scroll">
-          {!isMobile ? (
+          {!isPhone ? (
             <aside className="wallet-auth-aside" aria-label="Σχετικά με το My Wallet λεωφορείων">
               <p className="wallet-auth-aside-kicker">My Wallet · Λεωφορεία</p>
               <h2 className="wallet-auth-aside-title">

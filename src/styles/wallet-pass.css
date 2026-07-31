@@ -1361,10 +1361,11 @@
 
 .wallet-auth-shell {
   position: relative;
-  width: min(430px, 100%);
-  height: 100dvh;
+  width: 100%;
+  min-height: 100dvh;
+  height: auto;
   max-height: none;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   border-radius: 0;
@@ -1376,21 +1377,30 @@
 }
 
 .wallet-auth-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: max(1.5rem, env(safe-area-inset-top, 0px)) 1.15rem
-    max(1.5rem, env(safe-area-inset-bottom, 0px));
+  flex: 1 0 auto;
+  min-height: 100dvh;
+  overflow: visible;
+  padding: max(1.25rem, env(safe-area-inset-top, 0px)) 1.15rem
+    max(1.25rem, env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
+  /* Never show an inner scrollbar — page/stage sizing adapts instead */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.wallet-auth-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .wallet-auth-card {
-  width: 100%;
+  width: min(400px, 100%);
   border-radius: 28px;
-  padding: 1.5rem 1.25rem 1.35rem;
+  padding: 1.35rem 1.15rem 1.25rem;
   background: #ffffff;
   color: #1d1d1f;
   border: 1px solid rgba(255, 255, 255, 0.35);
@@ -1528,24 +1538,28 @@
   background: rgba(0, 0, 0, 0.08);
 }
 
-/* Desktop / laptop: full-bleed stage, form card centered */
+/* Desktop / laptop / tablet: full-bleed stage, form card centered — no inner scroll */
 .wallet-auth-stage--desktop .wallet-auth-shell {
   width: 100%;
-  height: 100dvh;
+  min-height: 100dvh;
+  height: auto;
   max-height: none;
+  overflow: visible;
 }
 
 .wallet-auth-stage--desktop .wallet-auth-scroll {
   align-items: stretch;
   justify-content: center;
-  padding: 2rem 1.75rem;
+  padding: clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 1.75rem);
   max-width: 1080px;
   margin: 0 auto;
   width: 100%;
+  min-height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 420px);
-  gap: 2.5rem;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 420px);
+  gap: clamp(1.25rem, 3vw, 2.5rem);
   align-content: center;
+  overflow: visible;
 }
 
 .wallet-auth-stage--desktop .wallet-auth-panel {
@@ -1553,10 +1567,57 @@
   flex-direction: column;
   justify-content: center;
   min-width: 0;
+  width: 100%;
 }
 
 .wallet-auth-stage--desktop .wallet-auth-card {
   width: 100%;
+  max-width: 420px;
+}
+
+/* Tablet portrait: slightly tighter card + padding */
+@media (min-width: 701px) and (max-width: 1100px) {
+  .wallet-auth-stage--desktop .wallet-auth-scroll {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 400px);
+    max-width: 920px;
+    gap: 1.5rem;
+  }
+
+  .wallet-auth-card {
+    padding: 1.35rem 1.2rem 1.25rem;
+  }
+}
+
+/* Phone: compact card, no fixed height / no scrollbar */
+@media (max-width: 700px) {
+  .wallet-auth-shell {
+    width: 100%;
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible;
+  }
+
+  .wallet-auth-scroll {
+    min-height: 100dvh;
+    justify-content: flex-start;
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+    overflow: visible;
+  }
+
+  .wallet-auth-card {
+    width: min(400px, 100%);
+    padding: 1.15rem 1rem 1.1rem;
+    border-radius: 22px;
+  }
+
+  .wallet-auth-card h1 {
+    font-size: 1.55rem;
+  }
+
+  .wallet-auth-card .wallet-auth-lead {
+    font-size: 0.84rem;
+  }
 }
 
 .wallet-auth-aside {
