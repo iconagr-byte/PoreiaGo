@@ -86,7 +86,7 @@ export default function AgencyPlansPage() {
               Αρχική
             </Link>
             <Link
-              to="/rent/services"
+              to="/rent"
               className="text-sm font-semibold text-teal-700 hover:text-teal-900 hidden sm:inline"
             >
               Υπηρεσία Rent
@@ -284,7 +284,7 @@ export default function AgencyPlansPage() {
                 </button>
                 {addon.servicesLinkLabel ? (
                   <Link
-                    to="/rent/services"
+                    to="/rent"
                     className="mt-3 text-center text-sm font-bold text-teal-800 hover:underline"
                   >
                     {addon.servicesLinkLabel}

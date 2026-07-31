@@ -70,7 +70,7 @@ export default function FrontPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/55">
-            <Link to="/rent/services" className="hover:text-white">
+            <Link to="/rent" className="hover:text-white">
               Υπηρεσία Rent
             </Link>
             <Link to="/grafeia" className="hover:text-white">

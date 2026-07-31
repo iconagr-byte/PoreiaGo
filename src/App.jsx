@@ -14,7 +14,6 @@ import TripDetails from './pages/TripDetails';
 import SimpleWalletPage from './pages/SimpleWalletPage.jsx';
 import WalletMagicPage from './pages/WalletMagicPage.jsx';
 import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
-import RentalServicesPage from './pages/RentalServicesPage.jsx';
 import RentBookingWizardPage from './pages/RentBookingWizardPage.jsx';
 import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
 import InBusPortal from './pages/InBusPortal';
@@ -90,7 +89,9 @@ function App() {
             <Route path="/rent/login" element={<LoginPage rentEntrance />} />
             <Route path="/rent/register" element={<RegisterPage />} />
             <Route path="/rent/my-booking" element={<RentBookingLookupPage />} />
-            <Route path="/rent/services" element={<RentalServicesPage />} />
+            {/* Legacy marketing URL — same content lives on /rent now. */}
+            <Route path="/rent/services" element={<Navigate to="/rent" replace />} />
+            <Route path="/rent/servises" element={<Navigate to="/rent" replace />} />
             <Route path="/rent/book/services" element={<RentBookingWizardPage />} />
             <Route path="/rent/book/details" element={<RentBookingWizardPage />} />
             <Route path="/rent/book/payment" element={<RentBookingWizardPage />} />
