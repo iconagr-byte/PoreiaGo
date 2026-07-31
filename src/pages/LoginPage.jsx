@@ -21,7 +21,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import { useRentMobile } from '../lib/rental/rentDevice.js';
+import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -42,6 +42,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useRentMobile();
+  const isPhone = useRentPhone();
   const { enabled: googleEnabled } = useGoogleAuthConfig();
   // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
   const pathRent = rentEntrance || isRentAuthPath(location.pathname);
@@ -384,11 +385,13 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   );
 
   if (rentIntent) {
+    // Tablets get full-bleed desktop auth (not the phone bezel). Phones keep compact chrome.
+    const phoneChrome = isPhone;
     return (
-      <div className={`rent-auth-stage${isMobile ? '' : ' rent-auth-stage--desktop'}`}>
+      <div className={`rent-auth-stage${phoneChrome ? '' : ' rent-auth-stage--desktop'}`}>
         <div className="rent-auth-shell">
           <div className="rent-auth-scroll">
-            {!isMobile ? (
+            {!phoneChrome ? (
               <aside className="rent-auth-aside rent-auth-aside--left" aria-label="Τι είναι το Rent Wallet">
                 <p className="rent-auth-aside-kicker">Rent Wallet · Ενοικιάσεις</p>
                 <h2 className="rent-auth-aside-title">
@@ -440,7 +443,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               </Link>
             </div>
 
-            {!isMobile ? (
+            {!phoneChrome ? (
               <aside className="rent-auth-aside rent-auth-aside--right" aria-label="Πώς λειτουργεί">
                 <p className="rent-auth-aside-kicker">Πώς λειτουργεί</p>
                 <h2 className="rent-auth-aside-title rent-auth-aside-title--sm">
