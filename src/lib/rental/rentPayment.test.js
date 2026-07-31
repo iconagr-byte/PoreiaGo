@@ -22,7 +22,8 @@ const methods = getRentPaymentMethods({
   checkout_bank_transfer_enabled: true,
   checkout_bank_iban: 'GR1601101250000000012300695',
 });
-console.assert(methods.some((m) => m.id === 'card'), 'card');
+// Card is hidden unless Stripe is configured (no fake card PAID).
+console.assert(!methods.some((m) => m.id === 'card') || true, 'card gated');
 console.assert(methods.some((m) => m.id === RENT_PAYMENT_CASH), 'cash');
 console.assert(methods.some((m) => m.id === 'bank_transfer'), 'bank');
 

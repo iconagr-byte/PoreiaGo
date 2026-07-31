@@ -19,6 +19,14 @@ export { PAYMENT_PLAN_FULL, PAYMENT_PLAN_DEPOSIT, amountDueAtCheckout, computeDe
 
 export const RENT_PAYMENT_CASH = 'cash_office';
 
+/** Card checkout only when Stripe is configured for rent (no fake card PAID). */
+export function rentCardPaymentsEnabled() {
+  if (import.meta.env.VITE_RENT_STRIPE_ENABLED === 'true') return true;
+  return Boolean(
+    import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || import.meta.env.VITE_STRIPE_PUBLISHABLE,
+  );
+}
+
 export function getRentPaymentPlans(depositPercent = 30, depositEnabled = true) {
   const pct = normalizeDepositPercent(depositPercent);
   const plans = [
@@ -42,7 +50,10 @@ export function getRentPaymentPlans(depositPercent = 30, depositEnabled = true) 
 
 /** Checkout methods for /rent — includes μετρητά στην παραλαβή when enabled. */
 export function getRentPaymentMethods(settings) {
-  const methods = getCheckoutPaymentMethods(settings).filter(Boolean);
+  let methods = getCheckoutPaymentMethods(settings).filter(Boolean);
+  if (!rentCardPaymentsEnabled()) {
+    methods = methods.filter((m) => m.id !== 'card');
+  }
   const cashEnabled = !settings?.methods || settings.methods.cash_office?.enabled !== false;
   if (cashEnabled && !methods.some((m) => m.id === RENT_PAYMENT_CASH)) {
     methods.push({

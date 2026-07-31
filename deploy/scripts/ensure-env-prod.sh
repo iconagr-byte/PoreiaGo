@@ -35,6 +35,7 @@ replace_kv() {
 
 echo "==> Ensuring domain vars in $ENV_FILE"
 replace_kv "ENVIRONMENT" "production"
+replace_kv "REQUIRE_PRODUCTION" "1"
 set_kv "API_HOST" "$API_HOST_DEFAULT"
 set_kv "APP_HOST" "$APP_HOST_DEFAULT"
 set_kv "ACME_EMAIL" "$ACME_EMAIL_DEFAULT"
@@ -46,8 +47,8 @@ set_kv "BILLING_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/admin?billing=success"
 set_kv "BILLING_CANCEL_URL" "https://${APP_HOST_DEFAULT}/admin?billing=cancel"
 set_kv "BILLING_SIGNUP_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup/success?billing=success"
 set_kv "BILLING_SIGNUP_CANCEL_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup?billing=cancel"
-# Prefer live billing; existing installs keep their value via set_kv (no overwrite).
-set_kv "BILLING_DEMO_MODE" "false"
+# Prefer live billing; force false on every deploy (P1 production readiness).
+replace_kv "BILLING_DEMO_MODE" "false"
 set_kv "RENT_DEMO_FLEET" "false"
 set_kv "ADMIN_AUTH_DISABLED" "0"
 

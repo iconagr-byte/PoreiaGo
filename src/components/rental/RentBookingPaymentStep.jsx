@@ -24,6 +24,7 @@ import {
   RENT_PAYMENT_CASH,
   getRentPaymentMethods,
   getRentPaymentPlans,
+  rentCardPaymentsEnabled,
   summarizeRentPayment,
 } from '../../lib/rental/rentPayment.js';
 import {
@@ -53,7 +54,13 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
   const [selection, setSelection] = useState(() => readExtrasSelection(prefs));
   const [settings, setSettings] = useState(null);
   const [paymentPlan, setPaymentPlan] = useState(prefs.payment_plan || PAYMENT_PLAN_FULL);
-  const [paymentMethod, setPaymentMethod] = useState(prefs.payment_method || 'card');
+  const [paymentMethod, setPaymentMethod] = useState(() => {
+    const preferred = prefs.payment_method || 'card';
+    if (preferred === 'card' && !rentCardPaymentsEnabled()) {
+      return PAYMENT_METHOD_BANK;
+    }
+    return preferred;
+  });
   const [bankAccountId, setBankAccountId] = useState(prefs.payment_bank_account_id || '');
   const [card, setCard] = useState({ number: '', expiry: '', cvv: '' });
   const [busy, setBusy] = useState(false);

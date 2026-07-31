@@ -36,6 +36,7 @@ class ProductionGuardTests(unittest.TestCase):
             "ADMIN_AUTH_DISABLED": "1",
             "RENT_DEMO_FLEET": "true",
             "EMAIL_ENCRYPTION_KEY": "aerostride-dev-email-key-change-in-production",
+            "BILLING_DEMO_MODE": "true",
         }
         errs = collect_production_boot_errors(environ=env)
         self.assertTrue(any("AUTH_JWT_SECRET" in e for e in errs))
@@ -45,6 +46,7 @@ class ProductionGuardTests(unittest.TestCase):
         self.assertTrue(any("RENT_DEMO_FLEET" in e for e in errs))
         self.assertTrue(any("DATABASE_URL" in e for e in errs))
         self.assertTrue(any("EMAIL_ENCRYPTION_KEY" in e for e in errs))
+        self.assertTrue(any("BILLING_DEMO_MODE" in e for e in errs))
         with self.assertRaises(RuntimeError):
             assert_production_safe_or_raise(environ=env)
 
@@ -60,8 +62,17 @@ class ProductionGuardTests(unittest.TestCase):
             "ADMIN_AUTH_DISABLED": "0",
             "RENT_DEMO_FLEET": "false",
             "EMAIL_ENCRYPTION_KEY": "email-enc-key-" + ("z" * 24),
+            "BILLING_DEMO_MODE": "false",
         }
         self.assertEqual(collect_production_boot_errors(environ=env), [])
+
+    def test_require_production_refuses_missing_environment(self):
+        from app.core.production_guard import collect_production_boot_errors
+
+        errs = collect_production_boot_errors(
+            environ={"REQUIRE_PRODUCTION": "1", "ENVIRONMENT": ""}
+        )
+        self.assertTrue(any("ENVIRONMENT is required" in e for e in errs))
 
 
 class DemoFleetGateTests(unittest.TestCase):
@@ -190,6 +201,36 @@ class RentPaymentTrustTests(unittest.TestCase):
                 self.assertEqual(booking["payment_status"], "PAID")
                 self.assertEqual(booking["rental_status"], "CONFIRMED")
                 self.assertEqual(booking.get("provider_payment_id"), "pi_live_abc")
+
+    def test_office_confirm_payment_marks_paid_and_fiscal_pending(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "rental_store.json"
+            with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+                store, "DATA_DIR", Path(tmp)
+            ), mock.patch.dict(os.environ, {"RENT_DEMO_FLEET": "false"}, clear=False):
+                tid = "eeeeeeee-ffff-0000-1111-222222222222"
+                vid = self._seed_vehicle(tid, plate="P0-CFM-01")
+                start = datetime.now(timezone.utc) + timedelta(days=1)
+                end = start + timedelta(days=2)
+                booking = store.create_booking(
+                    tid,
+                    {
+                        "vehicle_id": vid,
+                        "client_name": "Bank",
+                        "client_email": "bank@example.com",
+                        "start_time": start.isoformat(),
+                        "end_time": end.isoformat(),
+                        "pickup_location": "Office",
+                        "dropoff_location": "Office",
+                        "payment_method": "bank_transfer",
+                    },
+                )
+                self.assertEqual(booking["payment_status"], "PENDING")
+                confirmed = store.confirm_booking_payment(tid, booking["id"], note="Αντίγραφο εμβάσματος")
+                self.assertEqual(confirmed["payment_status"], "PAID")
+                self.assertEqual(confirmed["rental_status"], "CONFIRMED")
+                self.assertEqual(confirmed.get("fiscal_status"), "PENDING_ISSUE")
+                self.assertTrue(str(confirmed.get("provider_payment_id") or "").startswith("office-confirm-"))
 
 
 class TelemetryDeviceKeyTests(unittest.TestCase):
