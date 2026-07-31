@@ -34,7 +34,8 @@ describe('rentVehicleCategories', () => {
     expect(groups.map((g) => g.id)).toEqual(['MINI', 'COMPACT', 'VAN', 'MINIBUS']);
     expect(groups[0].count).toBe(1);
     expect(rentCategoryLabel('MINI')).toBe('Mini');
-    expect(rentCategoryLabel('COMPACT')).toBe('Μικρομεσαίο');
+    expect(rentCategoryLabel('COMPACT')).toBe('Compact');
+    expect(rentCategoryLabel('MINIBUS')).toBe('Minibus');
   });
 
   it('counts passenger vs van-like and builds home filters', () => {
