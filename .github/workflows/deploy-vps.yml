@@ -30,7 +30,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt pytest pytest-asyncio httpx
-      - run: pytest -q tests/ || true
+      - run: pytest -q tests/
 
   deploy:
     needs: test

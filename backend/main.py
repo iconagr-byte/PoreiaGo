@@ -155,6 +155,24 @@ except ImportError:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # P0: refuse weak secrets / misconfig before serving traffic in production.
+    try:
+        from app.core.production_guard import (
+            assert_production_safe_or_raise,
+            collect_production_boot_warnings,
+            is_production_env,
+        )
+
+        assert_production_safe_or_raise()
+        if is_production_env():
+            for warn in collect_production_boot_warnings():
+                __import__("logging").getLogger("poreiago.startup").warning("%s", warn)
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Production guard skipped: %s", exc
+        )
     await init_ticketing_db()
     await seed_if_empty()
     await seed_customer_bookings_if_empty()

@@ -38,7 +38,21 @@ ingest_router = APIRouter(prefix="/telemetry", tags=["telemetry-ingest"])
 
 
 def verify_device_key(x_device_key: str | None = Header(default=None, alias="X-Device-Key")) -> str:
-    allowed = os.getenv("TELEMETRY_DEVICE_KEYS", "dev-gps-key").split(",")
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    raw = (os.getenv("TELEMETRY_DEVICE_KEYS") or "").strip()
+    if not raw:
+        if env in ("production", "prod"):
+            raise HTTPException(status_code=401, detail="Telemetry device keys not configured")
+        allowed = ["dev-gps-key"]
+    else:
+        allowed = [k.strip() for k in raw.split(",") if k.strip()]
+    if env in ("production", "prod") and any(
+        k.lower() in {"dev-gps-key", "change-me"} for k in allowed
+    ):
+        # Never accept known weak keys even if misconfigured in prod env.
+        allowed = [k for k in allowed if k.lower() not in {"dev-gps-key", "change-me"}]
+        if not allowed:
+            raise HTTPException(status_code=401, detail="Telemetry device keys not configured")
     if not x_device_key or x_device_key.strip() not in allowed:
         raise HTTPException(status_code=401, detail="Invalid device key")
     return x_device_key.strip()

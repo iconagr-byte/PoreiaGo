@@ -94,7 +94,12 @@ def _decode_driver_token(token: str) -> dict:
 
 def _decode_admin_ws_token(token: str | None) -> dict:
     """Validate admin Bearer/query token for live-map / alerts WebSockets."""
-    if os.getenv("ADMIN_AUTH_DISABLED", "").lower() in ("1", "true", "yes"):
+    from middleware.tenant import _admin_auth_disabled_allowed
+
+    if (
+        _admin_auth_disabled_allowed()
+        and os.getenv("ADMIN_AUTH_DISABLED", "").lower() in ("1", "true", "yes")
+    ):
         return {
             "tenant_id": os.getenv("DEFAULT_TENANT_ID") or str(DEMO_TENANT),
             "roles": ["tenant_admin", "superadmin"],

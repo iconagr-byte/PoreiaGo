@@ -89,5 +89,24 @@ class AdminAuthDisabledProdGuardTests(unittest.TestCase):
             self.assertTrue(_admin_auth_disabled_allowed())
 
 
+class ProductionGuardIntegrationTests(unittest.TestCase):
+    def test_boot_guard_raises_on_weak_prod(self):
+        from app.core.production_guard import assert_production_safe_or_raise
+
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "AUTH_JWT_SECRET": "dev-jwt",
+                "TICKET_JWT_SECRET": "short",
+                "TELEMETRY_DEVICE_KEYS": "",
+                "DATABASE_URL": "postgresql+asyncpg://u:x@db/x",
+            },
+            clear=False,
+        ):
+            with self.assertRaises(RuntimeError):
+                assert_production_safe_or_raise()
+
+
 if __name__ == "__main__":
     unittest.main()

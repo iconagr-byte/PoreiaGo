@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -13,9 +14,35 @@ from uuid import uuid4
 
 from travel_platform.settings.drivers_store import DEMO_TENANT_ID
 
-DATA_DIR = Path(__file__).resolve().parent
-STORE_FILE = DATA_DIR / "rental_store.json"
+_PACKAGE_DIR = Path(__file__).resolve().parent
+_LEGACY_STORE_FILE = _PACKAGE_DIR / "rental_store.json"
 _LOCK = threading.RLock()
+
+
+def resolve_rental_store_paths() -> tuple[Path, Path]:
+    """Prefer POREIAGO_DATA_DIR; migrate legacy package-local JSON once."""
+    data_dir = Path(
+        os.getenv("POREIAGO_DATA_DIR")
+        or str(Path(__file__).resolve().parents[2] / "data")
+    )
+    primary = data_dir / "rental_store.json"
+    if primary.is_file():
+        return data_dir, primary
+    if _LEGACY_STORE_FILE.is_file():
+        try:
+            data_dir.mkdir(parents=True, exist_ok=True)
+            if not primary.exists():
+                primary.write_text(
+                    _LEGACY_STORE_FILE.read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            return data_dir, primary
+        except OSError:
+            return _PACKAGE_DIR, _LEGACY_STORE_FILE
+    return data_dir, primary
+
+
+DATA_DIR, STORE_FILE = resolve_rental_store_paths()
 
 # ACRISS-inspired classes (Hertz / Sixt style) + legacy aliases.
 VEHICLE_CATEGORIES = (
@@ -324,12 +351,26 @@ def _refresh_demo_fleet_copy(data: dict[str, Any], tenant_id: str) -> int:
     return updated
 
 
+def demo_rental_fleet_allowed() -> bool:
+    """Demo fleet auto-seed is opt-in outside production; always off in production unless forced."""
+    flag = (os.getenv("RENT_DEMO_FLEET") or "").strip().lower()
+    if flag in ("0", "false", "no", "off"):
+        return False
+    if flag in ("1", "true", "yes", "on"):
+        return True
+    env = (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or "development").strip().lower()
+    return env not in ("production", "prod")
+
+
 def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
     """
     Seed 3 επιβατικά + 3 van when the tenant has no rental vehicles yet.
     Idempotent — skips if any vehicle already exists for the tenant.
+    Disabled in production (set RENT_DEMO_FLEET=true only for explicit demos).
     Returns number of vehicles inserted.
     """
+    if not demo_rental_fleet_allowed():
+        return 0
     tid = _normalize_tenant(tenant_id)
     with _LOCK:
         data = _read()
@@ -787,13 +828,33 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             balance_due = round(float(balance_due), 2) if balance_due is not None else None
         except (TypeError, ValueError):
             balance_due = None
-        payment_status = str(body.get("payment_status") or "").strip() or None
 
-        # Bank / cash-at-pickup stay reserved until office confirms settlement.
-        pending_pay = payment_method in {"bank_transfer", "cash_office"}
-        rental_status = "RESERVED" if pending_pay else "CONFIRMED"
-        if not payment_status and payment_method:
-            payment_status = "PENDING" if pending_pay else "PAID"
+        # P0: never trust client payment_status / fake card as settlement proof.
+        # Only mark PAID when a verified provider reference is present.
+        provider_ref = None
+        for key in (
+            "stripe_session_id",
+            "stripe_payment_intent",
+            "payment_intent_id",
+            "provider_payment_id",
+        ):
+            cand = str(body.get(key) or "").strip()
+            if cand:
+                provider_ref = cand
+                break
+
+        if provider_ref:
+            payment_status = "PAID"
+            pending_pay = False
+            rental_status = "CONFIRMED"
+        else:
+            # Bank / cash / unproven card stay reserved until office or Stripe confirms.
+            pending_pay = True
+            payment_status = "PENDING"
+            rental_status = "RESERVED"
+            # Ignore client-claimed settlement amounts without provider proof.
+            amount_paid = 0.0
+            balance_due = total
 
         row = {
             "id": booking_id,
@@ -835,6 +896,7 @@ def create_booking(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any
             if balance_due is not None
             else (total if pending_pay else 0.0),
             "payment_status": payment_status,
+            "provider_payment_id": provider_ref,
             "legal_doc_signatures": {},
             "created_at": now,
             "updated_at": now,
@@ -1071,7 +1133,7 @@ def create_inspection(tenant_id: str | None, body: dict[str, Any]) -> dict[str, 
         if vehicle and mileage:
             vehicle["current_mileage"] = max(int(vehicle.get("current_mileage") or 0), mileage)
             vehicle["updated_at"] = now
-        if itype == "PICKUP_CHECK" and booking.get("rental_status") == "CONFIRMED":
+        if itype == "PICKUP_CHECK" and booking.get("rental_status") in ("CONFIRMED", "RESERVED"):
             booking["rental_status"] = "ACTIVE"
             booking["updated_at"] = now
             if vehicle:
@@ -1234,7 +1296,7 @@ def cancel_booking_for_customer(
 
 
 def public_catalog(tenant_id: str | None, *, category: str | None = None) -> list[dict[str, Any]]:
-    """Customer-facing vehicle cards for this office. Seeds demo fleet when empty (showcase)."""
+    """Customer-facing vehicle cards for this office. Demo seed only when allowed."""
     ensure_demo_rental_fleet(tenant_id)
     rows = list_vehicles(tenant_id, category=category)
     out = []

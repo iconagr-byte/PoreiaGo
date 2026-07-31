@@ -27,7 +27,7 @@ jobs:
         run: pip install -r requirements.txt pytest pytest-asyncio httpx
 
       - name: Run unit tests
-        run: pytest -q tests/ || echo "Check test output"
+        run: pytest -q tests/
 
       - name: Lint frontend
         working-directory: .

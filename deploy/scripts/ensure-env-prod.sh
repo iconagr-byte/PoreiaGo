@@ -34,6 +34,7 @@ replace_kv() {
 }
 
 echo "==> Ensuring domain vars in $ENV_FILE"
+replace_kv "ENVIRONMENT" "production"
 set_kv "API_HOST" "$API_HOST_DEFAULT"
 set_kv "APP_HOST" "$APP_HOST_DEFAULT"
 set_kv "ACME_EMAIL" "$ACME_EMAIL_DEFAULT"
@@ -45,8 +46,22 @@ set_kv "BILLING_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/admin?billing=success"
 set_kv "BILLING_CANCEL_URL" "https://${APP_HOST_DEFAULT}/admin?billing=cancel"
 set_kv "BILLING_SIGNUP_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup/success?billing=success"
 set_kv "BILLING_SIGNUP_CANCEL_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup?billing=cancel"
-# Demo office signup without real Stripe charge (set to 0 when going live with Stripe).
-set_kv "BILLING_DEMO_MODE" "true"
+# Prefer live billing; existing installs keep their value via set_kv (no overwrite).
+set_kv "BILLING_DEMO_MODE" "false"
+set_kv "RENT_DEMO_FLEET" "false"
+set_kv "ADMIN_AUTH_DISABLED" "0"
+
+# Strong GPS ingest key — required for production boot guard
+if ! grep -q "^TELEMETRY_DEVICE_KEYS=.\+" "$ENV_FILE" 2>/dev/null; then
+  _tkey="$(openssl rand -hex 24)"
+  replace_kv "TELEMETRY_DEVICE_KEYS" "$_tkey"
+  echo "  + generated TELEMETRY_DEVICE_KEYS"
+elif grep -qE "^TELEMETRY_DEVICE_KEYS=(dev-gps-key)?$" "$ENV_FILE" 2>/dev/null || \
+     grep -q "^TELEMETRY_DEVICE_KEYS=dev-gps-key" "$ENV_FILE" 2>/dev/null; then
+  _tkey="$(openssl rand -hex 24)"
+  replace_kv "TELEMETRY_DEVICE_KEYS" "$_tkey"
+  echo "  ~ replaced weak TELEMETRY_DEVICE_KEYS"
+fi
 
 PLATFORM_DOMAIN="${PLATFORM_DOMAIN:-poreiago.com}"
 if grep -q "^APP_HOST=" "$ENV_FILE" 2>/dev/null; then
