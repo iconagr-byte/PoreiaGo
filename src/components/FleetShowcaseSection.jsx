@@ -16,7 +16,7 @@ export default function FleetShowcaseSection({ vehicles, loading, hidden = false
           Premium λεωφορεία & παροχές
         </h2>
         <p className="text-on-surface-variant font-body-md">
-          Τα οχήματά μας συγχρονίζονται από το Control Panel — άνεση, ασφάλεια και σύγχρονες
+          Τα οχήματά μας συγχρονίζονται από τον πίνακα ελέγχου — άνεση, ασφάλεια και σύγχρονες
           παροχές σε κάθε διαδρομή.
         </p>
       </div>

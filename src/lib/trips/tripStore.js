@@ -1,3 +1,4 @@
+import { mockTrips } from '../../data/mockData.js';
 import {
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
@@ -11,7 +12,7 @@ import {
   isAuthenticatedOfficeSession,
   officeStorageKey,
 } from '../admin/officeTenantStore.js';
-import { isTenantStorefrontHost } from '../platform/tenantHost.js';
+import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
 
 const STORAGE_KEY_BASE = 'aerostride_trips_v1';
 
@@ -49,7 +50,13 @@ export function loadTrips() {
     return Array.isArray(base) ? base.map(normalizeTrip) : [];
   }
 
-  if (!base) return [];
+  // Marketing host: curated trips so /trip/:id works from homepage cards.
+  if (!base) {
+    if (isPlatformMarketingHost() && !isTenantStorefrontHost()) {
+      return loadPlatformDemoTrips();
+    }
+    return [];
+  }
   return base.map(normalizeTrip);
 }
 
