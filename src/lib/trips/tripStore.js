@@ -12,7 +12,7 @@ import {
   isAuthenticatedOfficeSession,
   officeStorageKey,
 } from '../admin/officeTenantStore.js';
-import { isTenantStorefrontHost } from '../platform/tenantHost.js';
+import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
 
 const STORAGE_KEY_BASE = 'aerostride_trips_v1';
 
@@ -50,9 +50,14 @@ export function loadTrips() {
     return Array.isArray(base) ? base.map(normalizeTrip) : [];
   }
 
-  // Platform marketing / anonymous non-tenant: no shared mock bleed.
-  // Explicit demo only when localStorage already has office-authored trips.
-  if (!base) return [];
+  // Platform marketing (www.poreiago.com): show curated demo excursions so
+  // prospective buyers can click through the booking UX. Never on tenant hosts.
+  if (!base) {
+    if (isPlatformMarketingHost() && !isTenantStorefrontHost()) {
+      return loadPlatformDemoTrips();
+    }
+    return [];
+  }
   return base.map(normalizeTrip);
 }
 
@@ -231,7 +236,7 @@ export function listPublishedTrips(trips = loadTrips()) {
   return trips.filter(isPublishedTrip);
 }
 
-/** Dev-only helper — platform mocks must never feed live office domains. */
+/** Curated demo trips for PoreiaGo marketing host (prospective buyers). */
 export function loadPlatformDemoTrips() {
   return mockTrips.map(normalizeTrip);
 }

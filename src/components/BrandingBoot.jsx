@@ -40,15 +40,12 @@ export default function BrandingBoot() {
             if (hasOfficeJwt) {
               /* keep JWT tenant */
             } else if (onTenant) {
+              // Guest booking lookup / wallet on office domains need tenant_id.
               localStorage.setItem('saas_tenant_id', branding.tenant_id);
               window.dispatchEvent(new Event('saas-session-changed'));
-            } else {
-              const prev = localStorage.getItem('saas_tenant_id') || '';
-              if (!prev) {
-                localStorage.setItem('saas_tenant_id', branding.tenant_id);
-                window.dispatchEvent(new Event('saas-session-changed'));
-              }
             }
+            // Marketing host (www.poreiago.com): never seed saas_tenant_id —
+            // that remaps officeStorageKey and can pull visitors into an office.
           } catch {
             /* ignore */
           }

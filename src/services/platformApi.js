@@ -94,8 +94,14 @@ function saveSettingsLocally(data) {
   localStorage.setItem(PLATFORM_SETTINGS_KEY, JSON.stringify(data));
 }
 
-export async function fetchPlatformSettings() {
-  if (getSaasToken()) {
+/**
+ * @param {{ preferPublic?: boolean }} [options]
+ * preferPublic: skip SaaS JWT (marketing homepage). Stale office tokens on
+ * www.poreiago.com must not trip saasFetch → /admin/login.
+ */
+export async function fetchPlatformSettings(options = {}) {
+  const preferPublic = Boolean(options.preferPublic);
+  if (!preferPublic && getSaasToken()) {
     try {
       const data = await saasFetch('/api/v1/settings/platform');
       saveSettingsLocally(data);

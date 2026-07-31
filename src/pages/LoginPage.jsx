@@ -5,7 +5,6 @@ import {
   getCustomerToken,
   isCustomer,
   loginAsCustomer,
-  isAdmin,
   isDriver,
 } from '../lib/auth.js';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
@@ -94,17 +93,13 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
-    if (walletIntent) return;
     if (isCustomer() && getCustomerToken()) {
       navigate(redirectTo, { replace: true });
       return;
     }
-    // Rent login is for vehicle customers — keep admins/drivers on this page only for wallet.
-    if (rentIntent) return;
-    if (isAdmin()) {
-      navigate('/admin', { replace: true });
-      return;
-    }
+    // /login and /rent/login are customer wallets — never bounce leftover office
+    // admin sessions into Back Office (that dumped www.poreiago.com visitors).
+    if (rentIntent || walletIntent) return;
     if (isDriver()) {
       navigate('/driver', { replace: true });
     }
