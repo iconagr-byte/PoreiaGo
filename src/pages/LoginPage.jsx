@@ -20,7 +20,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
+import { useRentPhone } from '../lib/rental/rentDevice.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -40,7 +40,6 @@ function isRentAuthPath(pathname) {
 export default function LoginPage({ rentEntrance = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = useRentMobile();
   const isPhone = useRentPhone();
   const { enabled: googleEnabled } = useGoogleAuthConfig();
   // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
@@ -486,10 +485,10 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   }
 
   return (
-    <div className={`wallet-auth-stage${isMobile ? '' : ' wallet-auth-stage--desktop'}`}>
+    <div className={`wallet-auth-stage${isPhone ? '' : ' wallet-auth-stage--desktop'}`}>
       <div className="wallet-auth-shell">
         <div className="wallet-auth-scroll">
-          {!isMobile ? (
+          {!isPhone ? (
             <aside className="wallet-auth-aside" aria-label="Σχετικά με το My Wallet λεωφορείων">
               <p className="wallet-auth-aside-kicker">My Wallet · Λεωφορεία</p>
               <h2 className="wallet-auth-aside-title">
