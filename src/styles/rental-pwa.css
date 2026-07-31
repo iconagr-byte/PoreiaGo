@@ -3783,7 +3783,7 @@
   }
 }
 
-/* Landscape tablets: keep three columns when wide enough, else two */
+/* Landscape tablets: keep three columns when wide enough */
 @media (min-width: 901px) and (max-width: 1100px) and (orientation: landscape) {
   .rent-auth-stage--desktop .rent-auth-scroll {
     grid-template-columns: minmax(180px, 1fr) minmax(300px, 400px) minmax(180px, 1fr);
@@ -3792,11 +3792,6 @@
 
   .rent-auth-stage--desktop .rent-auth-aside--right {
     display: flex;
-  }
-
-  .rent-auth-aside-list li:nth-child(3),
-  .rent-auth-aside-steps li:nth-child(3) {
-    /* keep all steps visible in landscape */
   }
 }
 
@@ -3973,17 +3968,6 @@
 
 .rent-auth-link--on-dark:hover {
   color: #d1fae5;
-}
-
-@media (max-width: 1100px) {
-  .rent-auth-stage--desktop .rent-auth-scroll {
-    grid-template-columns: minmax(280px, 1fr) minmax(300px, 400px);
-    max-width: 920px;
-  }
-
-  .rent-auth-stage--desktop .rent-auth-aside--right {
-    display: none;
-  }
 }
 
 .rent-auth-stage--desktop .rent-auth-card {
