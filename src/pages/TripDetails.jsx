@@ -54,7 +54,11 @@ export default function TripDetails() {
   const [nextStopName, setNextStopName] = useState("");
 
   useEffect(() => {
-    const found = loadTrips().find(t => t.id === parseInt(id));
+    const tripId = parseInt(id, 10);
+    let found = loadTrips().find((t) => t.id === tripId);
+    if (!found && isPlatformSeatBookingDemo()) {
+      found = loadPlatformDemoTrips().find((t) => t.id === tripId);
+    }
     if (found) {
       setTrip(found);
     }
