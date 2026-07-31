@@ -35,9 +35,9 @@ export const RENT_VEHICLE_CATEGORIES = [
   },
   {
     id: 'COMPACT',
-    label: 'Συμπαγές',
+    label: 'Compact',
     shortLabel: 'Compact',
-    blurb: 'Συμπαγές hatchback — άνεση για 4–5 άτομα και αποσκευές.',
+    blurb: 'Compact hatchback — άνεση για 4–5 άτομα και αποσκευές.',
     icon: 'directions_car',
     sort: 30,
     acrissHint: 'C',
@@ -107,9 +107,9 @@ export const RENT_VEHICLE_CATEGORIES = [
   },
   {
     id: 'MINIBUS',
-    label: 'Μινιμπάς',
+    label: 'Minibus',
     shortLabel: 'Minibus',
-    blurb: 'Μινιμπάς 8+ θέσεων για γκρουπ, transfers και εκδρομές.',
+    blurb: 'Minibus 8+ θέσεων για γκρουπ, transfers και εκδρομές.',
     icon: 'directions_bus',
     sort: 110,
     acrissHint: 'V',
