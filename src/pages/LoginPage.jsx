@@ -21,7 +21,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
+import { useRentPhone } from '../lib/rental/rentDevice.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 

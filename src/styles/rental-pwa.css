@@ -3543,11 +3543,13 @@
 .rent-auth-stage--desktop .rent-auth-shell,
 .rent-auth-stage--desktop .rent-gate {
   width: 100%;
-  height: 100dvh;
+  min-height: 100dvh;
+  height: auto;
   max-height: none;
   border-radius: 0;
   border: 0;
   box-shadow: none;
+  overflow: visible;
 }
 
 .rent-phone-stage--desktop .rent-app::before,
