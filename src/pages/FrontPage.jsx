@@ -6,7 +6,6 @@ import {
   HeroSection,
   HowItWorksSection,
   PainPointsSection,
-  PlatformDemoShowcase,
   PricingTeaserSection,
 } from '../components/marketing/PlatformLandingSections.jsx';
 import { PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
@@ -19,9 +18,6 @@ export default function FrontPage() {
           <PlatformBrand variant="dark" />
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-white/75">
-            <a href="#platform-demo" className="hover:text-white transition-colors">
-              Demo
-            </a>
             <a href="#features" className="hover:text-white transition-colors">
               Λειτουργίες
             </a>
@@ -53,7 +49,6 @@ export default function FrontPage() {
 
       <main>
         <HeroSection />
-        <PlatformDemoShowcase />
         <PainPointsSection />
         <FeaturesSection />
         <HowItWorksSection />
