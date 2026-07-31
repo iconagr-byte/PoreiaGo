@@ -37,9 +37,9 @@ export default function FleetShowcaseSection({ vehicles, loading, hidden = false
               <div className="relative h-52 w-full overflow-hidden shrink-0">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent z-10" />
                 <img
-                  src={bus.image_url || '/images/hero-bus-achillio.png'}
+                  src={bus.image_url || '/images/fleet-bus-white-tourismo.png'}
                   alt={bus.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
                 />
                 <span className="absolute top-4 left-4 z-20 px-3 py-1 rounded-full bg-white/95 text-xs font-bold text-primary shadow-sm flex items-center gap-1">
                   <span className="material-symbols-outlined text-[14px]">directions_bus</span>
@@ -52,6 +52,7 @@ export default function FleetShowcaseSection({ vehicles, loading, hidden = false
                   <h3 className="font-headline-md text-white font-bold drop-shadow-md">{bus.name}</h3>
                   <p className="text-sm text-white/85 mt-1">
                     {bus.year} · {bus.seat_count} θέσεις
+                    {bus.color ? ` · ${bus.color}` : ''}
                   </p>
                 </div>
               </div>

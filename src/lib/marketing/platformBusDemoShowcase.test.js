@@ -9,7 +9,10 @@ const buses = getPlatformDemoBuses(3);
 assert.equal(buses.length, 3);
 assert.equal(buses[0].id, DEMO_BUS_FLEET[0].id);
 assert.ok(buses[0].name.includes('Mercedes') || buses[0].category);
-assert.ok(!String(buses[0].name).toLowerCase().includes('aygo'));
+assert.ok(!String(buses.map((b) => b.image_url).join(' ')).includes('achillio'));
+assert.ok(buses.some((b) => /black/i.test(b.image_url) || b.color === 'Μαύρο'));
+assert.ok(buses.some((b) => /white/i.test(b.image_url) || b.color === 'Λευκό'));
+assert.equal(new Set(buses.map((b) => b.image_url)).size, buses.length);
 
 const trips = getPlatformDemoTrips(3);
 assert.equal(trips.length, 3);
