@@ -388,11 +388,99 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       <div className={`rent-auth-stage${isMobile ? '' : ' rent-auth-stage--desktop'}`}>
         <div className="rent-auth-shell">
           <div className="rent-auth-scroll">
-            <div className="rent-auth-card">{formBody}</div>
-            <Link to="/" className="rent-auth-back">
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-              Επιστροφή στην Αρχική
-            </Link>
+            {!isMobile ? (
+              <aside className="rent-auth-aside rent-auth-aside--left" aria-label="Τι είναι το Rent Wallet">
+                <p className="rent-auth-aside-kicker">Rent Wallet · Ενοικιάσεις</p>
+                <h2 className="rent-auth-aside-title">
+                  Η κράτησή σας,
+                  <br />
+                  πάντα στο κινητό
+                </h2>
+                <p className="rent-auth-aside-lead">
+                  Ένας λογαριασμός μόνο για ενοικίαση οχήματος — κρατήσεις, πληρωμές και QR
+                  παραλαβής, χωριστά από τα λεωφορεία.
+                </p>
+                <ul className="rent-auth-aside-list">
+                  <li>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      directions_car
+                    </span>
+                    <div>
+                      <strong>Κρατήσεις οχημάτων</strong>
+                      <span>Επιβατικά, van και υπηρεσίες σε μία λίστα.</span>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      qr_code_2
+                    </span>
+                    <div>
+                      <strong>QR παραλαβής</strong>
+                      <span>Δείξτε το στο γραφείο χωρίς email ή PDF.</span>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      payments
+                    </span>
+                    <div>
+                      <strong>Πληρωμές & κατάθεση</strong>
+                      <span>Κάρτα, τράπεζα ή μετρητά — ξεκάθαρο υπόλοιπο.</span>
+                    </div>
+                  </li>
+                </ul>
+              </aside>
+            ) : null}
+
+            <div className="rent-auth-panel">
+              <div className="rent-auth-card">{formBody}</div>
+              <Link to="/" className="rent-auth-back">
+                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                Επιστροφή στην Αρχική
+              </Link>
+            </div>
+
+            {!isMobile ? (
+              <aside className="rent-auth-aside rent-auth-aside--right" aria-label="Πώς λειτουργεί">
+                <p className="rent-auth-aside-kicker">Πώς λειτουργεί</p>
+                <h2 className="rent-auth-aside-title rent-auth-aside-title--sm">
+                  Από την αναζήτηση
+                  <br />
+                  στην παραλαβή
+                </h2>
+                <ol className="rent-auth-aside-steps">
+                  <li>
+                    <span className="rent-auth-aside-step">1</span>
+                    <div>
+                      <strong>Βρείτε όχημα</strong>
+                      <span>Ημερομηνίες, τοποθεσία και κατηγορία.</span>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="rent-auth-aside-step">2</span>
+                    <div>
+                      <strong>Ολοκληρώστε πληρωμή</strong>
+                      <span>Επιβεβαίωση κράτησης σε λίγα βήματα.</span>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="rent-auth-aside-step">3</span>
+                    <div>
+                      <strong>Παραλάβετε με QR</strong>
+                      <span>Όλα στο Wallet — χωρίς χαρτιά.</span>
+                    </div>
+                  </li>
+                </ol>
+                <p className="rent-auth-aside-note">
+                  Μόνο ενοικιάσεις — <strong>/rent/login</strong> και <strong>/rent/wallet</strong>.
+                  Λεωφορεία:{' '}
+                  <Link to="/login" className="rent-auth-link rent-auth-link--on-dark">
+                    My Wallet
+                  </Link>{' '}
+                  (μπλε, <strong>/login</strong>).
+                </p>
+              </aside>
+            ) : null}
           </div>
         </div>
       </div>
