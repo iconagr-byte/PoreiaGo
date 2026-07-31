@@ -35,9 +35,9 @@ export const RENT_VEHICLE_CATEGORIES = [
   },
   {
     id: 'COMPACT',
-    label: 'Συμπαγές',
+    label: 'Μικρομεσαίο',
     shortLabel: 'Compact',
-    blurb: 'Συμπαγές hatchback — άνεση για 4–5 άτομα και αποσκευές.',
+    blurb: 'Μικρομεσαίο hatchback — άνεση για 4–5 άτομα και αποσκευές.',
     icon: 'directions_car',
     sort: 30,
     acrissHint: 'C',
