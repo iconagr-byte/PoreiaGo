@@ -41,7 +41,6 @@ function isRentAuthPath(pathname) {
 export default function LoginPage({ rentEntrance = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = useRentMobile();
   const isPhone = useRentPhone();
   const { enabled: googleEnabled } = useGoogleAuthConfig();
   // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
