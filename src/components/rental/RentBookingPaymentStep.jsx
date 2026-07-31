@@ -18,6 +18,7 @@ import {
   selectedExtrasLabels,
 } from '../../lib/rental/rentBookingExtras.js';
 import { readRentBookingPrefs, writeRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
+import { priceRentTotalsWithPromo } from '../../lib/rental/rentPromoCodes.js';
 import {
   PAYMENT_PLAN_DEPOSIT,
   PAYMENT_PLAN_FULL,
@@ -67,6 +68,21 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
   const [busy, setBusy] = useState(false);
   /** Success panel after checkout — stay on payment, never dump guests to wallet login. */
   const [bookingDone, setBookingDone] = useState(null);
+  const [promoOpen, setPromoOpen] = useState(() => Boolean(String(prefs.promo_code || '').trim()));
+  const [promoCode, setPromoCode] = useState(() => String(prefs.promo_code || ''));
+  const [promoHint, setPromoHint] = useState('');
+
+  useEffect(() => {
+    const code = String(prefs.promo_code || '').trim();
+    if (!code) return;
+    const check = priceRentTotalsWithPromo(
+      { vehicle: 0, extras: 0, total: 100 },
+      code,
+    ).resolved;
+    if (check.ok) setPromoHint(`Ενεργό: ${check.promo.label}`);
+    else if (check.reason === 'invalid') setPromoHint('Μη έγκυρος κωδικός προσφοράς');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,12 +105,18 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
   }, []);
 
   const dayCount = rentalDayCount(prefs.start_time, prefs.end_time);
-  const totals = estimateBookingTotals({
+  const baseTotals = estimateBookingTotals({
     dailyRate: vehicle?.daily_rate_eur,
     days: dayCount,
     selection,
     catalog,
   });
+  const { priced: totals, resolved: promoResolved } = useMemo(
+    () => priceRentTotalsWithPromo(baseTotals, promoOpen ? promoCode : ''),
+    // baseTotals is a fresh object each render — key on primitive fields
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseTotals.vehicle, baseTotals.extras, baseTotals.total, baseTotals.days, promoOpen, promoCode],
+  );
   const selectedLabels = selectedExtrasLabels(selection, catalog);
   const depositPercent = settings?.checkout_deposit_percent ?? 30;
   const depositEnabled = settings?.checkout_deposit_enabled !== false;
@@ -144,12 +166,30 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
   const isCash = paymentMethod === RENT_PAYMENT_CASH;
   const isDeposit = effectivePlan === PAYMENT_PLAN_DEPOSIT && !isCash;
 
+  const persistPromo = (open, code) => {
+    const nextCode = open ? String(code || '').trim() : '';
+    writeRentBookingPrefs({ promo_code: nextCode });
+    if (!open || !nextCode) {
+      setPromoHint('');
+      return;
+    }
+    const check = priceRentTotalsWithPromo(baseTotals, nextCode).resolved;
+    if (check.ok) {
+      setPromoHint(`Ενεργό: ${check.promo.label}`);
+    } else if (check.reason === 'invalid') {
+      setPromoHint('Μη έγκυρος κωδικός προσφοράς');
+    } else {
+      setPromoHint('');
+    }
+  };
+
   const persistPayment = (patch = {}) => {
     writeRentBookingPrefs({
       wizard_step: 'payment',
       payment_plan: effectivePlan,
       payment_method: paymentMethod,
       payment_bank_account_id: bankAccountId,
+      promo_code: promoOpen ? String(promoCode || '').trim() : '',
       ...patch,
     });
   };
@@ -189,6 +229,11 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
       return;
     }
     if (!validateCard()) return;
+
+    if (promoOpen && String(promoCode || '').trim() && !promoResolved.ok) {
+      toast.error('Μη έγκυρος κωδικός προσφοράς — διόρθωσε ή απενεργοποίησέ τον.');
+      return;
+    }
 
     persistPayment();
 
@@ -250,6 +295,14 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
         .map(([key]) => key);
 
       let notes = addressLine ? `Διεύθυνση: ${addressLine}` : '';
+      if (totals.discount > 0 && totals.promoCode) {
+        notes = [
+          notes,
+          `Κουπόνι ${totals.promoCode}: −${euroLabel(totals.discount)}`,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+      }
       if (isBank && selectedBank) {
         const ref = buildBankPaymentReference(selectedBank.reference_template || 'RB-{pnr}', {
           pnr: 'PENDING',
@@ -383,6 +436,56 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
       ) : (
         <div className="rent-wiz-layout">
           <section className="rent-wiz-main" aria-label="Πληρωμή κράτησης">
+            <div className="rent-wiz-form-card rent-pay-promo-card">
+              <h2>Κουπόνι προσφοράς</h2>
+              <label className="rent-pay-promo-toggle">
+                <input
+                  type="checkbox"
+                  checked={promoOpen}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setPromoOpen(on);
+                    persistPromo(on, promoCode);
+                  }}
+                />
+                <span>Έχεις κωδικό προσφοράς;</span>
+              </label>
+              {promoOpen ? (
+                <div className="rent-pay-promo-row">
+                  <input
+                    type="text"
+                    className="rent-pay-promo-input"
+                    value={promoCode}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setPromoCode(v);
+                      persistPromo(true, v);
+                    }}
+                    placeholder="π.χ. RENT10"
+                    aria-label="Κωδικός προσφοράς"
+                    autoCapitalize="characters"
+                  />
+                  {promoHint ? (
+                    <p
+                      className={`rent-pay-promo-hint${
+                        promoResolved.ok ? ' is-ok' : ' is-bad'
+                      }`}
+                    >
+                      {promoHint}
+                    </p>
+                  ) : (
+                    <p className="rent-pay-promo-hint">Δοκίμασε RENT10, WELCOME20 ή POREIA15</p>
+                  )}
+                </div>
+              ) : null}
+              {totals.discount > 0 ? (
+                <p className="rent-pay-promo-saving">
+                  Έκπτωση {totals.discountLabel}: −{euroLabel(totals.discount)} · νέο σύνολο{' '}
+                  {euroLabel(totals.total)}
+                </p>
+              ) : null}
+            </div>
+
             {plans.length > 1 && !isCash ? (
               <div className="rent-wiz-form-card">
                 <h2>Πλάνο πληρωμής</h2>
@@ -582,6 +685,11 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
               <div>
                 <p className="rent-pay-due-label">Πληρώνεις τώρα</p>
                 <p className="rent-pay-due-amount">{euroLabel(summary.amountPaid)}</p>
+                {totals.discount > 0 ? (
+                  <p className="rent-pay-due-promo">
+                    πριν {euroLabel(totals.totalBefore)} · −{euroLabel(totals.discount)} κουπόνι
+                  </p>
+                ) : null}
               </div>
               {summary.balanceDue > 0 ? (
                 <div>
