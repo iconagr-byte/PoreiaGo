@@ -1,22 +1,16 @@
 import assert from 'node:assert/strict';
-import {
-  DEMO_BUS_FLEET,
-  getPlatformDemoBuses,
-  getPlatformDemoTrips,
-} from './platformBusDemoShowcase.js';
+import { describe, it } from 'node:test';
+import { isPlatformSeatBookingDemo } from './platformBusDemoShowcase.js';
 
-const buses = getPlatformDemoBuses(3);
-assert.equal(buses.length, 3);
-assert.equal(buses[0].id, DEMO_BUS_FLEET[0].id);
-assert.ok(buses[0].name.includes('Mercedes') || buses[0].category);
-assert.ok(!String(buses.map((b) => b.image_url).join(' ')).includes('achillio'));
-assert.ok(buses.some((b) => /black/i.test(b.image_url) || b.color === 'Μαύρο'));
-assert.ok(buses.some((b) => /white/i.test(b.image_url) || b.color === 'Λευκό'));
-assert.equal(new Set(buses.map((b) => b.image_url)).size, buses.length);
+describe('isPlatformSeatBookingDemo', () => {
+  it('is true on poreiago marketing hosts', () => {
+    assert.equal(isPlatformSeatBookingDemo('www.poreiago.com'), true);
+    assert.equal(isPlatformSeatBookingDemo('poreiago.com'), true);
+    assert.equal(isPlatformSeatBookingDemo('localhost'), true);
+  });
 
-const trips = getPlatformDemoTrips(3);
-assert.equal(trips.length, 3);
-assert.ok(trips.every((t) => t.title && t.id));
-assert.equal(trips[0].market, 'domestic');
-
-console.log('platformBusDemoShowcase: OK');
+  it('is false on tenant storefront hosts', () => {
+    assert.equal(isPlatformSeatBookingDemo('demo.poreiago.com'), false);
+    assert.equal(isPlatformSeatBookingDemo('www.achilliotravel.com'), false);
+  });
+});

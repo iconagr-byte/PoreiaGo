@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { loadTrips } from '../lib/trips/tripStore.js';
+import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import { isInternationalTrip, MARKET_LABELS } from '../lib/trips/tripMarket.js';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import TripPriceDisplay from '../components/TripPriceDisplay.jsx';
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
 
 // Custom Red Pin Marker (Google Maps Style)
 const redIcon = L.divIcon({
@@ -266,17 +267,20 @@ export default function TripDetails() {
             <button 
               type="button"
               onClick={async () => {
-                const check = await checkTripAvailable(trip);
-                if (!check.available) {
-                  toast.error(check.reason || 'Το όχημα δεν είναι διαθέσιμο');
-                  return;
+                if (!isPlatformSeatBookingDemo()) {
+                  const check = await checkTripAvailable(trip);
+                  if (!check.available) {
+                    toast.error(check.reason || 'Το όχημα δεν είναι διαθέσιμο');
+                    return;
+                  }
+                  if (check.warning) toast(check.warning, { icon: '⚠️' });
                 }
-                if (check.warning) toast(check.warning, { icon: '⚠️' });
                 navigate(`/select-seat/${trip.id}`);
               }}
               className="w-full py-4 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-[24px] font-headline-sm font-bold shadow-xl hover:scale-[1.02] hover:shadow-gray-900/30 transition-all flex items-center justify-center gap-3"
             >
-              Επιλογή Θέσης <span className="material-symbols-outlined text-2xl">arrow_forward</span>
+              {isPlatformSeatBookingDemo() ? 'Δοκιμή επιλογής θέσης' : 'Επιλογή Θέσης'}{' '}
+              <span className="material-symbols-outlined text-2xl">arrow_forward</span>
             </button>
           </div>
         </div>

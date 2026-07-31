@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { loadTrips } from '../lib/trips/tripStore.js';
+import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import { generateSeatMap } from '../lib/seats/generateSeatMap.js';
 import { savePendingCheckout } from '../lib/ticketing/pendingCheckout.js';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
@@ -21,6 +21,7 @@ import {
   getSeatMapHeaderClasses,
   resolveTripSeatMapTheme,
 } from '../lib/seats/seatMapThemes.js';
+import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
 
 export default function SeatSelection() {
   const { tripId } = useParams();
@@ -28,11 +29,17 @@ export default function SeatSelection() {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [fleetCheck, setFleetCheck] = useState({ loading: true, available: true, reason: null, warning: null });
   const [seatPricingConfig, setSeatPricingConfig] = useState(null);
+  const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
 
   const trip = useMemo(() => {
     const id = Number(tripId);
     if (!id) return null;
-    return loadTrips().find((t) => t.id === id) || null;
+    const found = loadTrips().find((t) => t.id === id) || null;
+    if (found) return found;
+    if (isPlatformSeatBookingDemo()) {
+      return loadPlatformDemoTrips().find((t) => t.id === id) || null;
+    }
+    return null;
   }, [tripId]);
 
   const { pricePerSeat, quote } = useTripPricing(trip);
@@ -46,6 +53,10 @@ export default function SeatSelection() {
 
   useEffect(() => {
     if (!trip) return;
+    if (isDemo) {
+      setFleetCheck({ loading: false, available: true, reason: null, warning: null });
+      return;
+    }
     let cancelled = false;
     setFleetCheck((s) => ({ ...s, loading: true }));
     checkTripAvailable(trip).then((result) => {
@@ -64,7 +75,7 @@ export default function SeatSelection() {
     return () => {
       cancelled = true;
     };
-  }, [trip]);
+  }, [trip, isDemo]);
 
   const { layout, seats, availableCount } = useMemo(() => {
     if (!trip) return { layout: null, seats: [], availableCount: 0 };
@@ -121,6 +132,21 @@ export default function SeatSelection() {
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
           Πίσω
         </button>
+
+        {isDemo ? (
+          <div className="mb-4 rounded-2xl border border-sky-200/80 bg-sky-50 px-4 py-3 text-sm text-sky-950 flex gap-2.5 items-start">
+            <span className="material-symbols-outlined text-[20px] text-sky-600 shrink-0 mt-0.5">
+              science
+            </span>
+            <div>
+              <p className="font-semibold">Demo κράτηση θέσης</p>
+              <p className="text-sky-900/80 text-xs mt-0.5 leading-relaxed">
+                Προεπισκόπηση πλατφόρμας — επιλέξτε θέσεις και ολοκληρώστε το checkout χωρίς
+                πραγματική πληρωμή ή εισιτήριο.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <div
           className={`rounded-[1.75rem] border p-5 md:p-6 mb-5 text-white overflow-hidden relative ${headerChrome.wrapper}`}
@@ -242,18 +268,21 @@ export default function SeatSelection() {
                       priceEur: s.priceEur,
                       tier: s.tier,
                     })),
+                    demo: isDemo,
                   });
-                  trackAbandonedCheckout({
-                    tripId: trip.id,
-                    tripTitle: trip.title,
-                    seats: selectedLabels,
-                    amountEur: total,
-                  });
+                  if (!isDemo) {
+                    trackAbandonedCheckout({
+                      tripId: trip.id,
+                      tripTitle: trip.title,
+                      seats: selectedLabels,
+                      amountEur: total,
+                    });
+                  }
                   navigate(`/checkout/${trip.id}`);
                 }}
                 className={`w-full py-3.5 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all ${getSeatMapCheckoutButtonClass(selectedSeats.length > 0, seatTheme)}`}
               >
-                Ολοκλήρωση
+                {isDemo ? 'Συνέχεια (Demo)' : 'Ολοκλήρωση'}
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
             </div>
