@@ -442,20 +442,20 @@ export function FinalCtaSection() {
           Έτοιμοι να ξεκινήσετε;
         </h2>
         <p className="text-white/80 mb-8 max-w-lg mx-auto">
-          Συνδεθείτε στον πίνακα του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
+          Ζητήστε συμβόλαιο και ξεκινήστε — η πλατφόρμα δουλεύει από την πρώτη μέρα.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link
-            to="/admin/login"
+            to="/grafeia"
             className="px-8 py-3.5 bg-white text-indigo-900 rounded-full font-bold hover:opacity-95"
           >
-            Σύνδεση γραφείου
+            Επιλογή συμβολαίου
           </Link>
           <Link
-            to="/grafeia"
+            to="/rent"
             className="px-8 py-3.5 border border-white/40 rounded-full font-bold hover:bg-white/10"
           >
-            Επιλογή συμβολαίου
+            Δείτε τις ενοικιάσεις
           </Link>
         </div>
       </div>
