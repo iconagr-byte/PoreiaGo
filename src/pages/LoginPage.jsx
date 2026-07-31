@@ -45,6 +45,9 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const { enabled: googleEnabled } = useGoogleAuthConfig();
   // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
   const pathRent = rentEntrance || isRentAuthPath(location.pathname);
+  const bookingPayContinue =
+    typeof location.state?.from === 'string' &&
+    (location.state.from.includes('/rent/book/payment') || location.state?.rentBookingPay);
   const redirectTo = pathRent
     ? isRentReturn(location.state?.from)
       ? location.state.from
@@ -242,13 +245,17 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         <span className={iconClass} aria-hidden>
           {rentIntent ? 'directions_car' : 'account_balance_wallet'}
         </span>
-        <h1>{rentIntent ? 'Rent Wallet' : 'My Wallet'}</h1>
+        <h1>
+          {bookingPayContinue ? 'Ολοκλήρωση πληρωμής' : rentIntent ? 'Rent Wallet' : 'My Wallet'}
+        </h1>
         <p className={leadClass}>
-          {rentIntent
-            ? 'Σύνδεση για ενοικίαση οχήματος — ξεχωριστή εφαρμογή από τα λεωφορεία.'
-            : claim
-              ? 'Συνδεθείτε για να δείτε το εισιτήριο της κράτησής σας'
-              : 'Σύνδεση μόνο για ταξίδια με λεωφορείο — εισιτήρια & QR επιβίβασης'}
+          {bookingPayContinue
+            ? 'Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή — θα επιστρέψετε στη σελίδα πληρωμής.'
+            : rentIntent
+              ? 'Σύνδεση για ενοικίαση οχήματος — ξεχωριστή εφαρμογή από τα λεωφορεία.'
+              : claim
+                ? 'Συνδεθείτε για να δείτε το εισιτήριο της κράτησής σας'
+                : 'Σύνδεση μόνο για ταξίδια με λεωφορείο — εισιτήρια & QR επιβίβασης'}
         </p>
         <p className={hintClass}>
           {rentIntent ? (

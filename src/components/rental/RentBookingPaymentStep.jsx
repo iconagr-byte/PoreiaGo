@@ -37,6 +37,7 @@ import {
 import { createCustomerRentalBooking } from '../../services/customerRentalApi.js';
 import { fetchCheckoutSettings } from '../../services/checkoutSettingsApi.js';
 import { fetchSiteAppearance } from '../../services/siteAppearanceApi.js';
+import { isClientDemoFleetId } from '../../lib/rental/demoRentFleet.js';
 import RentBookingStepper from './RentBookingStepper.jsx';
 import RentBookingTripSummary from './RentBookingTripSummary.jsx';
 import RentBookingVehicleSidebar from './RentBookingVehicleSidebar.jsx';
@@ -64,6 +65,8 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
   const [bankAccountId, setBankAccountId] = useState(prefs.payment_bank_account_id || '');
   const [card, setCard] = useState({ number: '', expiry: '', cvv: '' });
   const [busy, setBusy] = useState(false);
+  /** Success panel after checkout — stay on payment, never dump guests to wallet login. */
+  const [bookingDone, setBookingDone] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,6 +192,24 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
 
     persistPayment();
 
+    // Platform marketing demo fleet: finish on the payment page (no wallet / no login).
+    if (isClientDemoFleetId(vehicle.id)) {
+      const ref = `DEMO-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+      writeRentBookingPrefs({
+        wizard_pending_confirm: false,
+        wizard_step: 'done',
+        ...selection,
+      });
+      setBookingDone({
+        demo: true,
+        reference: ref,
+        amountPaid: summary.amountPaid,
+        methodLabel: summary.payment_method_label,
+      });
+      toast.success('Demo κράτηση — πληρωμή προσομοιώθηκε.');
+      return;
+    }
+
     if (!getCustomerToken()) {
       writeRentBookingPrefs({
         wizard_pending_confirm: true,
@@ -196,14 +217,10 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
         payment_plan: effectivePlan,
         payment_method: paymentMethod,
       });
-      navigate('/rent', { state: { from: '/rent/book/payment', rentContinue: true } });
-      return;
-    }
-
-    if (/^demo-rent-(car|van)-/i.test(String(vehicle.id))) {
-      writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'done', ...selection });
-      toast.success('Demo κράτηση — πληρωμή προσομοιώθηκε.');
-      navigate('/rent/wallet');
+      // Return to payment after login — never default to Rent Wallet.
+      navigate('/rent/login', {
+        state: { from: '/rent/book/payment', rentContinue: true, rentBookingPay: true },
+      });
       return;
     }
 
@@ -268,12 +285,16 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
       });
 
       writeRentBookingPrefs({ wizard_pending_confirm: false, wizard_step: 'done' });
-      toast.success(
-        booking?.reference_code
-          ? `Κράτηση έτοιμη · ${booking.reference_code}`
-          : 'Η κράτηση καταχωρήθηκε',
-      );
-      navigate('/rent/wallet', { state: { rentBookedAt: Date.now(), highlightBooking: booking?.id } });
+      const reference = booking?.reference_code || booking?.id || '';
+      toast.success(reference ? `Κράτηση έτοιμη · ${reference}` : 'Η κράτηση καταχωρήθηκε');
+      // Stay on payment confirmation — wallet is optional follow-up, not the next step.
+      setBookingDone({
+        demo: false,
+        reference,
+        bookingId: booking?.id,
+        amountPaid: summary.amountPaid,
+        methodLabel: summary.payment_method_label,
+      });
     } catch (err) {
       toast.error(err?.message || 'Αποτυχία κράτησης');
     } finally {
@@ -293,13 +314,66 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
     <div className="rent-wiz rent-wiz--payment">
       <header className="rent-wiz-head">
         <p className="rent-wiz-eyebrow">{brandLabel}</p>
-        <h1>Πληρωμή</h1>
+        <h1>{bookingDone ? 'Κράτηση ολοκληρώθηκε' : 'Πληρωμή'}</h1>
         <RentBookingStepper activeId="payment" />
       </header>
 
       <RentBookingTripSummary prefs={prefs} onEdit={() => navigate('/rent#rent-guest-search')} />
 
-      {!vehicle ? (
+      {bookingDone ? (
+        <div className="rent-wiz-layout">
+          <section className="rent-wiz-main rent-wiz-form-card" aria-label="Επιβεβαίωση πληρωμής">
+            <p className="text-sm font-semibold text-emerald-700 mb-2">
+              {bookingDone.demo ? 'Demo πληρωμή προσομοιώθηκε' : 'Η πληρωμή καταχωρήθηκε'}
+            </p>
+            {bookingDone.reference ? (
+              <p className="text-2xl font-bold text-slate-900 tracking-tight mb-2">
+                {bookingDone.reference}
+              </p>
+            ) : null}
+            <p className="text-sm text-slate-600 leading-relaxed mb-6">
+              {bookingDone.methodLabel ? `${bookingDone.methodLabel} · ` : ''}
+              {euroLabel(bookingDone.amountPaid ?? 0)}
+              {bookingDone.demo
+                ? ' — προεπισκόπηση πλατφόρμας, χωρίς χρέωση.'
+                : ' — η κράτησή σας είναι έτοιμη.'}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/rent#rent-guest-fleet" className="rent-wiz-cta-link">
+                Πίσω στον στόλο
+              </Link>
+              {!bookingDone.demo ? (
+                <button
+                  type="button"
+                  className="rent-wiz-next rent-wiz-next--pay"
+                  onClick={() =>
+                    navigate('/rent/wallet', {
+                      state: {
+                        rentBookedAt: Date.now(),
+                        highlightBooking: bookingDone.bookingId,
+                        openRentWallet: true,
+                      },
+                    })
+                  }
+                >
+                  Άνοιγμα Rent Wallet
+                </button>
+              ) : null}
+            </div>
+          </section>
+          <RentBookingVehicleSidebar
+            vehicle={vehicle}
+            dayCount={dayCount}
+            totals={totals}
+            selectedLabels={selectedLabels}
+            busy={false}
+            ctaLabel="Πίσω στον στόλο"
+            onChangeVehicle={() => navigate('/rent#rent-guest-fleet')}
+            onCta={() => navigate('/rent#rent-guest-fleet')}
+            note="Η κράτηση ολοκληρώθηκε σε αυτή τη σελίδα πληρωμής."
+          />
+        </div>
+      ) : !vehicle ? (
         <div className="rent-wiz-empty">
           <p>Δεν έχει επιλεγεί όχημα ακόμα.</p>
           <Link to="/rent#rent-guest-fleet" className="rent-wiz-cta-link">
@@ -546,7 +620,7 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
                 ? `Τώρα ${euroLabel(summary.amountPaid)} · υπόλοιπο ${euroLabel(summary.balanceDue)} στην παραλαβή.`
                 : isCash
                   ? `Πληρωμή ${euroLabel(summary.total)} με μετρητά στην παραλαβή.`
-                  : 'Μετά την ολοκλήρωση η κράτηση εμφανίζεται στο Rent Wallet.'
+                  : 'Μετά την ολοκλήρωση μένετε στη σελίδα πληρωμής με την επιβεβαίωση.'
             }
           />
         </div>
