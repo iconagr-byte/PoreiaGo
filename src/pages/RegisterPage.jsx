@@ -9,7 +9,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
+import { useRentPhone } from '../lib/rental/rentDevice.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -29,7 +29,6 @@ function isRentAuthPath(pathname) {
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = useRentMobile();
   const isPhone = useRentPhone();
   const pathRent = isRentAuthPath(location.pathname);
   const redirectTo = pathRent
