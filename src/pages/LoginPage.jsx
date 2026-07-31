@@ -437,7 +437,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
 
             <div className="rent-auth-panel">
               <div className="rent-auth-card">{formBody}</div>
-              <Link to="/" className="rent-auth-back">
+              <Link to="/rent" className="rent-auth-back">
                 <span className="material-symbols-outlined text-[18px]">arrow_back</span>
                 Επιστροφή στην Αρχική
               </Link>
