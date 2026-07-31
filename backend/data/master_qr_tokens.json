@@ -1,20 +1,20 @@
 {
   "tokens": [
     {
+      "trip_id": 99,
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "token_hash": "13a9c09a3dd9b5e233bf923bd5e4883295a0e19403644a59a32f366fdbba8b89",
+      "expires_at": 1782835473,
+      "revoked": false,
+      "issued_at": "2026-06-29T16:04:33.647165+00:00"
+    },
+    {
       "trip_id": 1,
       "tenant_id": "00000000-0000-0000-0000-000000000001",
       "token_hash": "a316dbc1e40b20dda33eb72be6fd64b8dc33b39673dd4e0dc0828708f53ff70b",
       "expires_at": 1782835579,
       "revoked": false,
       "issued_at": "2026-06-29T16:06:19.796582+00:00"
-    },
-    {
-      "trip_id": 99,
-      "tenant_id": "00000000-0000-0000-0000-000000000001",
-      "token_hash": "b32b9493dffa744f44822963c63ca84418845f031aa30fd984694ae1847bce99",
-      "expires_at": 1785569745,
-      "revoked": false,
-      "issued_at": "2026-07-31T07:35:45.343597+00:00"
     }
   ]
 }
