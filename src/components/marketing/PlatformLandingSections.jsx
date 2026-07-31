@@ -259,21 +259,21 @@ export function FeaturesSection() {
 
 export function HowItWorksSection() {
   return (
-    <section className="py-20 bg-slate-900 text-white">
+    <section className="py-20 md:py-24 bg-white text-slate-900 border-y border-slate-200/70">
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold">Πώς ξεκινάτε</h2>
-          <p className="text-white/60 mt-3">Τρία βήματα · χωρίς IT ομάδα</p>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-[#1d1d1f]">Πώς ξεκινάτε</h2>
+          <p className="text-[#6e6e73] mt-3">Τρία βήματα · χωρίς IT ομάδα</p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {STEPS.map((s, i) => (
             <div key={s.step} className="relative">
               {i < STEPS.length - 1 && (
-                <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-white/15" />
+                <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-slate-200" />
               )}
-              <span className="text-4xl font-black text-white/20">{s.step}</span>
-              <h3 className="text-xl font-bold mt-2 mb-2">{s.title}</h3>
-              <p className="text-sm text-white/65 leading-relaxed">{s.body}</p>
+              <span className="text-4xl font-black text-slate-200">{s.step}</span>
+              <h3 className="text-xl font-bold mt-2 mb-2 text-[#1d1d1f]">{s.title}</h3>
+              <p className="text-sm text-[#6e6e73] leading-relaxed">{s.body}</p>
             </div>
           ))}
         </div>
