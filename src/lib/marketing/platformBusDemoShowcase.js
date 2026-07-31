@@ -4,7 +4,16 @@
  * Images are unmarked coaches (no Achillio / office branding).
  */
 import { mockTrips } from '../../data/mockData.js';
+import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
 import { normalizeTrip } from '../trips/tripMarket.js';
+
+/**
+ * Seat map + checkout on poreiago.com (and localhost) are a walkthrough only —
+ * no real fleet block, booking, wallet claim, or charge.
+ */
+export function isPlatformSeatBookingDemo(hostname) {
+  return isPlatformMarketingHost(hostname) && !isTenantStorefrontHost(hostname);
+}
 
 export const DEMO_BUS_FLEET = [
   {
