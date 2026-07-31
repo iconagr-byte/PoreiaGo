@@ -1,4 +1,3 @@
-import { mockTrips } from '../../data/mockData.js';
 import {
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
@@ -12,7 +11,7 @@ import {
   isAuthenticatedOfficeSession,
   officeStorageKey,
 } from '../admin/officeTenantStore.js';
-import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
+import { isTenantStorefrontHost } from '../platform/tenantHost.js';
 
 const STORAGE_KEY_BASE = 'aerostride_trips_v1';
 
@@ -50,14 +49,7 @@ export function loadTrips() {
     return Array.isArray(base) ? base.map(normalizeTrip) : [];
   }
 
-  // Platform marketing (www.poreiago.com): show curated demo excursions so
-  // prospective buyers can click through the booking UX. Never on tenant hosts.
-  if (!base) {
-    if (isPlatformMarketingHost() && !isTenantStorefrontHost()) {
-      return loadPlatformDemoTrips();
-    }
-    return [];
-  }
+  if (!base) return [];
   return base.map(normalizeTrip);
 }
 
