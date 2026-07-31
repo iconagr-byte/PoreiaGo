@@ -5,7 +5,6 @@ import {
   getCustomerToken,
   isCustomer,
   loginAsCustomer,
-  isAdmin,
   isDriver,
 } from '../lib/auth.js';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
