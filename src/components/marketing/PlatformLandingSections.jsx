@@ -211,7 +211,10 @@ export function FeaturesSection() {
     <section
       id="features"
       className="relative isolate overflow-hidden py-24 md:py-32 antialiased"
-      style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}
+      style={{
+        fontFamily:
+          "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      }}
     >
       <div className="absolute inset-0 -z-10" aria-hidden>
         <img
@@ -237,13 +240,10 @@ export function FeaturesSection() {
             Δυνατότητες
             <span className="w-8 h-px bg-sky-300/60" aria-hidden />
           </p>
-          <h2
-            className="text-[32px] md:text-[46px] font-semibold text-white tracking-[-0.03em] leading-[1.08]"
-            style={{ fontFamily: "'Fraunces', Georgia, serif" }}
-          >
+          <h2 className="text-[32px] md:text-[46px] font-semibold text-white tracking-[-0.03em] leading-[1.08]">
             Ό,τι χρειάζεται ένα σύγχρονο γραφείο.
             <br className="hidden sm:block" />
-            <span className="text-sky-200/90">Όλα ενσωματωμένα.</span>
+            <span className="text-white/70">Όλα ενσωματωμένα.</span>
           </h2>
           <p className="text-[17px] md:text-[19px] text-white/70 mt-5 leading-relaxed font-normal">
             Έτοιμη υποδομή για περισσότερες εκδρομές με λιγότερη διαχείριση.
@@ -274,15 +274,12 @@ export function FeaturesSection() {
                         {f.icon}
                       </span>
                     </div>
-                    <h3
-                      className="text-[18px] font-semibold text-[#1d1d1f] tracking-[-0.02em] leading-snug"
-                      style={{ fontFamily: "'Fraunces', Georgia, serif" }}
-                    >
+                    <h3 className="text-[18px] font-semibold text-[#1d1d1f] tracking-[-0.02em] leading-snug">
                       {f.title}
                     </h3>
                   </div>
-                  <p className="text-[14.5px] text-[#5c5c62] leading-[1.55] flex-1">{f.body}</p>
-                  <p className="text-[13px] font-semibold text-[#0a7ea4] mt-4 leading-snug inline-flex items-center gap-1 group-hover:gap-2 transition-[gap]">
+                  <p className="text-[14.5px] text-[#6e6e73] leading-[1.55] flex-1">{f.body}</p>
+                  <p className="text-[13px] font-semibold text-[#0071e3] mt-4 leading-snug inline-flex items-center gap-1 group-hover:gap-2 transition-[gap]">
                     {f.hook}
                     <span className="material-symbols-outlined text-[16px] opacity-70">arrow_forward</span>
                   </p>
@@ -308,8 +305,10 @@ export function HowItWorksSection() {
     <section className="py-20 md:py-24 bg-white text-slate-900 border-y border-slate-200/70">
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-[#1d1d1f]">Πώς ξεκινάτε</h2>
-          <p className="text-[#6e6e73] mt-3">Τρία βήματα · χωρίς IT ομάδα</p>
+          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-[#1d1d1f]">
+            Πώς ξεκινάτε
+          </h2>
+          <p className="text-[#86868b] mt-3 text-[17px]">Τρία βήματα · χωρίς IT ομάδα</p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {STEPS.map((s, i) => (

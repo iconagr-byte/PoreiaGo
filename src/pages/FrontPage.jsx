@@ -13,7 +13,13 @@ import { PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
 
 export default function FrontPage() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div
+      className="min-h-screen bg-slate-950 text-white"
+      style={{
+        fontFamily:
+          "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      }}
+    >
       <header className="fixed top-0 w-full z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 md:px-8 h-[72px] flex items-center justify-between gap-4">
           <PlatformBrand variant="dark" />
