@@ -1,6 +1,7 @@
 /**
  * Marketing homepage demo: bus στόλος + εκδρομές (όχι rent cars).
  * Matches the public fleet API shape used by FleetShowcaseSection.
+ * Images are unmarked coaches (no Achillio / office branding).
  */
 import { mockTrips } from '../../data/mockData.js';
 import { normalizeTrip } from '../trips/tripMarket.js';
@@ -12,9 +13,10 @@ export const DEMO_BUS_FLEET = [
     category: 'Luxury Coach',
     year: 2022,
     seat_count: 50,
+    color: 'Λευκό',
     amenities: ['Wi-Fi onboard', 'USB & 220V', 'Κλιματισμός', 'WC onboard'],
     summary: 'Premium coach για μεγάλες αποστάσεις — άνεση VIP επιπέδου.',
-    image_url: '/images/hero-bus-achillio.png',
+    image_url: '/images/fleet-bus-white-tourismo.png',
     status_label: 'Διαθέσιμο',
   },
   {
@@ -23,9 +25,10 @@ export const DEMO_BUS_FLEET = [
     category: 'Premium Express',
     year: 2021,
     seat_count: 32,
+    color: 'Μαύρο',
     amenities: ['Wi-Fi onboard', 'USB θύρες', 'Κλιματισμός', 'Ψυγείο'],
     summary: 'Express στόλος για γρήγορες διαδρομές Ελλάδας & Ευρώπης.',
-    image_url: '/images/hero-bus-achillio.png',
+    image_url: '/images/fleet-bus-black-express.png',
     status_label: 'Διαθέσιμο',
   },
   {
@@ -34,9 +37,10 @@ export const DEMO_BUS_FLEET = [
     category: 'Standard',
     year: 2019,
     seat_count: 55,
+    color: 'Λευκό',
     amenities: ['Κλιματισμός', 'USB θύρες', 'Θέρμανση'],
     summary: 'Αξιόπιστο coach για ομαδικές εκδρομές και σχολικές μεταφορές.',
-    image_url: '/images/fleet-bus-thumb.jpg',
+    image_url: '/images/fleet-bus-white-standard.png',
     status_label: 'Διαθέσιμο',
   },
 ];
