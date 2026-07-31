@@ -1,4 +1,4 @@
-/** B2B landing copy — platform for travel agencies (not a single agency brand). */
+/** B2B landing copy — πλατφόρμα για ταξιδιωτικά γραφεία (όχι brand ενός γραφείου). */
 
 export const PLATFORM_NAME = 'PoreiaGo';
 export const PLATFORM_TAGLINE = 'Η πλατφόρμα που τρέχει το ταξιδιωτικό σας γραφείο';
@@ -7,8 +7,8 @@ export const HERO = {
   title: 'Μία πλατφόρμα για',
   titleAccent: 'όλο το ταξιδιωτικό σας γραφείο',
   subtitle:
-    'Κρατήσεις, QR εισιτήρια, live GPS, ενοικιάσεις οχημάτων, email καμπάνιες, billing και Control Panel — χωρίς Excel, χωρίς 5 διαφορετικά εργαλεία. ' +
-    'Το γραφείο σας με δικό του brand, δικό του site και δικό του συμβόλαιο.',
+    'Κρατήσεις, QR εισιτήρια, ζωντανό GPS, ενοικιάσεις οχημάτων, καμπάνιες email, χρεώσεις και πίνακας ελέγχου — χωρίς Excel, χωρίς 5 διαφορετικά εργαλεία. ' +
+    'Το γραφείο σας με δική του επωνυμία, δικό του ιστότοπο και δικό του συμβόλαιο.',
 };
 
 /** Hero background — πλήρες cover, χωρίς demo εκδρομή */
@@ -23,60 +23,74 @@ import { STITCH_CAMPAIGN_TEMPLATES } from '../email/stitchTemplates.js';
 export const CAMPAIGN_TEMPLATE_COUNT = STITCH_CAMPAIGN_TEMPLATES.length;
 
 export const STATS = [
-  { value: '1 panel', label: 'Αντί για 5+ εργαλεία' },
-  { value: 'Live GPS', label: 'Στόλος σε πραγματικό χρόνο' },
-  { value: 'Rent', label: 'Ενοικιάσεις · αυτόνομο ή add-on' },
-  { value: `${CAMPAIGN_TEMPLATE_COUNT}+`, label: 'Έτοιμα email πρότυπα' },
+  { value: '1 πίνακας', label: 'Αντί για 5+ εργαλεία' },
+  { value: 'Ζωντανό GPS', label: 'Στόλος σε πραγματικό χρόνο' },
+  { value: 'Ενοικιάσεις', label: 'Αυτόνομο ή πρόσθετο' },
+  { value: `${CAMPAIGN_TEMPLATE_COUNT}+`, label: 'Έτοιμα πρότυπα email' },
 ];
 
 export const FEATURES = [
   {
+    id: 'email',
     icon: 'campaign',
     accent: 'violet',
+    visual: 'email',
     title: 'Καμπάνιες email & έτοιμα πρότυπα',
-    body: `${CAMPAIGN_TEMPLATE_COUNT} σχεδιασμένα πρότυπα (προσφορές, εκδρομές, πακέτα, lifecycle) — επιλέγετε, προσαρμόζετε brand και στέλνετε σε λίστες πελατών.`,
-    hook: 'Newsletter & promo χωρίς designer ή external Mailchimp',
+    body: `${CAMPAIGN_TEMPLATE_COUNT} σχεδιασμένα πρότυπα (προσφορές, εκδρομές, πακέτα, κύκλος ζωής πελάτη) — επιλέγετε, προσαρμόζετε το brand και στέλνετε σε λίστες πελατών.`,
+    hook: 'Ενημερωτικά & προσφορές χωρίς σχεδιαστή ή εξωτερικό εργαλείο',
   },
   {
+    id: 'bookings',
     icon: 'confirmation_number',
     accent: 'sky',
+    visual: 'qr',
     title: 'Online κρατήσεις & QR',
     body: 'Ο πελάτης κλείνει θέση online. Ο οδηγός σκανάρει QR — χωρίς χαρτί, χωρίς λίστες στο χέρι.',
     hook: 'Λιγότερες ακυρώσεις, γρηγορότερο check-in',
   },
   {
+    id: 'gps',
     icon: 'map',
     accent: 'emerald',
-    title: 'Live GPS & telematics',
-    body: 'Βλέπετε όλο τον στόλο σε χάρτη, ETA για επιβάτες, geofence alerts και ιστορικό διαδρομών.',
+    visual: 'gps',
+    title: 'Ζωντανό GPS & τηλεματική',
+    body: 'Βλέπετε όλο τον στόλο σε χάρτη, εκτιμώμενη άφιξη για επιβάτες, ειδοποιήσεις ζώνης και ιστορικό διαδρομών.',
     hook: 'Ο πελάτης εμπιστεύεται — εσείς ελέγχετε',
   },
   {
+    id: 'panel',
     icon: 'dashboard',
     accent: 'indigo',
-    title: 'Control Panel για το γραφείο',
-    body: 'Εκδρομές, πελάτες, στόλος, καμπάνιες email, lost & found — όλα σε ένα back office.',
+    visual: 'panel',
+    title: 'Πίνακας ελέγχου για το γραφείο',
+    body: 'Εκδρομές, πελάτες, στόλος, καμπάνιες email, απωλεσθέντα — όλα σε ένα πίσω γραφείο.',
     hook: 'Η ομάδα σας δουλεύει από ένα σημείο',
   },
   {
+    id: 'rent',
     icon: 'car_rental',
-    accent: 'emerald',
-    title: 'Ενοικιάσεις οχημάτων (Rent)',
-    body: 'Ξεχωριστό συμβόλαιο ή add-on: /rent app, SOS, οδική 24/7, CDW/SCDW, share trip και checklist — για πελάτες που νοικιάζουν.',
+    accent: 'teal',
+    visual: 'rent',
+    title: 'Ενοικιάσεις οχημάτων',
+    body: 'Ξεχωριστό συμβόλαιο ή πρόσθετο: εφαρμογή ενοικιάσεων, SOS, οδική βοήθεια 24/7, ασφάλειες, κοινή χρήση διαδρομής και λίστα ελέγχου — για πελάτες που νοικιάζουν.',
     hook: 'Ίδια πλατφόρμα · ξεχωριστή υπηρεσία & τιμολόγηση',
   },
   {
+    id: 'billing',
     icon: 'payments',
     accent: 'amber',
+    visual: 'billing',
     title: 'Συμβόλαιο μηνιαίο ή ετήσιο',
-    body: 'Stripe billing, metered χρέωση για λεωφορεία & εκδρομές. Επιλέγετε πλάνο — ξεκινάτε σε λίγα λεπτά.',
+    body: 'Ηλεκτρονικές χρεώσεις με μέτρηση χρήσης για λεωφορεία & εκδρομές. Επιλέγετε πλάνο — ξεκινάτε σε λίγα λεπτά.',
     hook: 'Προβλέψιμο κόστος, κλιμάκωση χωρίς πόνο',
   },
   {
+    id: 'brand',
     icon: 'palette',
     accent: 'rose',
-    title: 'White-label storefront',
-    body: 'Το δικό σας logo, χρώματα και αρχική σελίδα. Ο επιβάτης βλέπει το brand σας — όχι generic portal.',
+    visual: 'brand',
+    title: 'Δική σας βιτρίνα με το brand σας',
+    body: 'Το δικό σας λογότυπο, χρώματα και αρχική σελίδα. Ο επιβάτης βλέπει το brand σας — όχι γενική πύλη.',
     hook: 'Επαγγελματική εικόνα από την πρώτη μέρα',
   },
 ];
@@ -85,17 +99,17 @@ export const STEPS = [
   {
     step: '01',
     title: 'Επιλέγετε συμβόλαιο',
-    body: 'Μηνιαίο ή ετήσιο · Starter, Professional, Enterprise ή Rent μόνο.',
+    body: 'Μηνιαίο ή ετήσιο · Starter, Professional, Enterprise ή μόνο Ενοικιάσεις.',
   },
   {
     step: '02',
     title: 'Ρυθμίζετε το γραφείο',
-    body: 'Branding, εκδρομές, στόλος, οδηγοί, καμπάνιες — μέσα σε ώρες, όχι μήνες.',
+    body: 'Εμφάνιση brand, εκδρομές, στόλος, οδηγοί, καμπάνιες — μέσα σε ώρες, όχι μήνες.',
   },
   {
     step: '03',
     title: 'Πουλάτε & εκτελείτε',
-    body: 'Οι πελάτες κλείνουν online · εσείς διαχειρίζεστε από το panel.',
+    body: 'Οι πελάτες κλείνουν online · εσείς διαχειρίζεστε από τον πίνακα ελέγχου.',
   },
 ];
 
@@ -116,12 +130,12 @@ export const AUDIENCE_HOOKS = [
     accent: 'emerald',
   },
   {
-    text: 'Στέλνετε newsletters με copy-paste από Word ή χωρίς πρότυπα;',
+    text: 'Στέλνετε ενημερωτικά με αντιγραφή από Word ή χωρίς πρότυπα;',
     icon: 'campaign',
     accent: 'amber',
   },
   {
-    text: 'Χρειάζεστε GDPR-ready εργαλεία για B2C πελάτες;',
+    text: 'Χρειάζεστε εργαλεία έτοιμα για προστασία δεδομένων πελατών;',
     icon: 'verified_user',
     accent: 'indigo',
   },

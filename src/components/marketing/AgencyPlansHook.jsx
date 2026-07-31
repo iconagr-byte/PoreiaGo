@@ -30,10 +30,10 @@ export default function AgencyPlansHook({ variant = 'hero' }) {
         <div>
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-bold uppercase tracking-wider mb-4">
             <span className="material-symbols-outlined text-[16px]">rocket_launch</span>
-            SaaS {PLATFORM_NAME} · για ταξιδιωτικά γραφεία
+            Πλατφόρμα {PLATFORM_NAME} · για ταξιδιωτικά γραφεία
           </span>
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4">
-            Ψηφιοποιήστε το γραφείο σας — κρατήσεις, στόλος, GPS, billing σε ένα panel
+            Ψηφιοποιήστε το γραφείο σας — κρατήσεις, στόλος, GPS, χρεώσεις σε έναν πίνακα
           </h2>
           <p className="text-white/75 text-sm md:text-base leading-relaxed mb-6 max-w-xl">
             Επιλέξτε <strong className="text-white">μηνιαίο ή ετήσιο συμβόλαιο</strong> και στείλτε

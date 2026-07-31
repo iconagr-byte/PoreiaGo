@@ -18,11 +18,13 @@ import {
 import { mergeRentPlanCatalog } from '../../lib/billing/planCatalog.js';
 import { fetchPublicRentPlanCatalog } from '../../services/rentPlanCatalogApi.js';
 import AgencyPlansHook from './AgencyPlansHook.jsx';
+import { FeatureVisual } from './FeatureVisuals.jsx';
 
 const FEATURE_ICON_STYLES = {
   violet: 'bg-gradient-to-br from-[#ede8ff] to-[#f7f4ff] text-[#7d5ae8]',
   sky: 'bg-gradient-to-br from-[#e3f0ff] to-[#f2f8ff] text-[#0077ed]',
   emerald: 'bg-gradient-to-br from-[#dff7ec] to-[#f0fdf7] text-[#1f9d62]',
+  teal: 'bg-gradient-to-br from-[#d8faf5] to-[#effefb] text-[#0f766e]',
   indigo: 'bg-gradient-to-br from-[#e8ecff] to-[#f4f6ff] text-[#4f5bd5]',
   amber: 'bg-gradient-to-br from-[#fff4df] to-[#fffaf0] text-[#c9860a]',
   rose: 'bg-gradient-to-br from-[#ffe8ef] to-[#fff5f8] text-[#e84a7a]',
@@ -219,59 +221,95 @@ export function FeaturesSection() {
   return (
     <section
       id="features"
-      className="relative isolate overflow-hidden py-24 md:py-32 antialiased font-[system-ui,-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif]"
+      className="relative isolate overflow-hidden py-24 md:py-32 antialiased"
+      style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}
     >
       <div className="absolute inset-0 -z-10" aria-hidden>
         <img
           src={FEATURES_BACKGROUND_IMAGE}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover object-[center_45%]"
+          className="absolute inset-0 h-full w-full object-cover object-[center_45%] scale-105"
         />
-        <div className="absolute inset-0 bg-slate-950/55" />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/45 to-slate-950/75" />
+        <div className="absolute inset-0 bg-slate-950/60" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-950/50 to-slate-950/80" />
+        <div
+          className="absolute inset-0 opacity-40"
+          style={{
+            backgroundImage:
+              'radial-gradient(ellipse 60% 40% at 50% 0%, rgba(56,189,248,0.18), transparent), radial-gradient(ellipse 40% 30% at 90% 80%, rgba(45,212,191,0.12), transparent)',
+          }}
+        />
       </div>
 
-      <div className="relative max-w-[980px] mx-auto px-5 md:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-14 md:mb-20">
-          <p className="text-sm font-medium text-white/65 tracking-wide mb-3">Δυνατότητες</p>
-          <h2 className="text-[32px] md:text-[48px] font-semibold text-white tracking-[-0.02em] leading-[1.08]">
+      <div className="relative max-w-6xl mx-auto px-5 md:px-8">
+        <div className="text-center max-w-3xl mx-auto mb-14 md:mb-16">
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-sky-200/90 tracking-wide mb-4">
+            <span className="w-8 h-px bg-sky-300/60" aria-hidden />
+            Δυνατότητες
+            <span className="w-8 h-px bg-sky-300/60" aria-hidden />
+          </p>
+          <h2
+            className="text-[32px] md:text-[46px] font-semibold text-white tracking-[-0.03em] leading-[1.08]"
+            style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+          >
             Ό,τι χρειάζεται ένα σύγχρονο γραφείο.
             <br className="hidden sm:block" />
-            <span className="text-white/70"> Built-in.</span>
+            <span className="text-sky-200/90">Όλα ενσωματωμένα.</span>
           </h2>
           <p className="text-[17px] md:text-[19px] text-white/70 mt-5 leading-relaxed font-normal">
-            Έτοιμη υποδομή για περισσότερες εκδρομές με λιγότερο admin.
+            Έτοιμη υποδομή για περισσότερες εκδρομές με λιγότερη διαχείριση.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-          {FEATURES.map((f) => {
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+          {FEATURES.map((f, index) => {
             const iconStyle = FEATURE_ICON_STYLES[f.accent] || FEATURE_ICON_STYLES.indigo;
+            const wide = index === FEATURES.length - 1;
             return (
               <article
-                key={f.title}
-                className="group flex flex-col rounded-[22px] bg-white/92 backdrop-blur-xl p-7 md:p-8 shadow-[0_8px_32px_rgba(0,0,0,0.22)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.28)] transition-[box-shadow,transform] duration-500 ease-out hover:-translate-y-0.5"
+                key={f.id || f.title}
+                className={`group flex flex-col rounded-[22px] bg-white overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.28)] ring-1 ring-white/25 hover:shadow-[0_20px_56px_rgba(0,0,0,0.35)] transition-[box-shadow,transform] duration-500 ease-out hover:-translate-y-1 ${
+                  wide ? 'sm:col-span-2 lg:col-span-1' : ''
+                }`}
+                style={{
+                  animation: `featFadeUp 0.7s ease ${Math.min(index, 6) * 0.06}s both`,
+                }}
               >
-                <div
-                  className={`w-[52px] h-[52px] rounded-[14px] flex items-center justify-center mb-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] ${iconStyle}`}
-                >
-                  <span className="material-symbols-outlined text-[26px] font-light" aria-hidden>
-                    {f.icon}
-                  </span>
+                <FeatureVisual kind={f.visual} />
+                <div className="flex flex-col flex-1 p-6 md:p-7 pt-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div
+                      className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] ${iconStyle}`}
+                    >
+                      <span className="material-symbols-outlined text-[22px] font-light" aria-hidden>
+                        {f.icon}
+                      </span>
+                    </div>
+                    <h3
+                      className="text-[18px] font-semibold text-[#1d1d1f] tracking-[-0.02em] leading-snug"
+                      style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+                    >
+                      {f.title}
+                    </h3>
+                  </div>
+                  <p className="text-[14.5px] text-[#5c5c62] leading-[1.55] flex-1">{f.body}</p>
+                  <p className="text-[13px] font-semibold text-[#0a7ea4] mt-4 leading-snug inline-flex items-center gap-1 group-hover:gap-2 transition-[gap]">
+                    {f.hook}
+                    <span className="material-symbols-outlined text-[16px] opacity-70">arrow_forward</span>
+                  </p>
                 </div>
-
-                <h3 className="text-[19px] font-semibold text-[#1d1d1f] tracking-[-0.01em] leading-snug mb-2">
-                  {f.title}
-                </h3>
-                <p className="text-[15px] text-[#6e6e73] leading-[1.55] flex-1">{f.body}</p>
-                <p className="text-[13px] font-medium text-[#0071e3] mt-4 leading-snug group-hover:underline decoration-[#0071e3]/40 underline-offset-2">
-                  {f.hook}
-                </p>
               </article>
             );
           })}
         </div>
       </div>
+
+      <style>{`
+        @keyframes featFadeUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </section>
   );
 }
@@ -368,7 +406,7 @@ export function RentProductSection() {
                 'CDW / SCDW πριν την υπογραφή',
                 'Share trip στην οικογένεια',
                 'Checklist πριν την αναχώρηση',
-                'Desk Ενοικιάσεις στο panel',
+                'Θυρίδα Ενοικιάσεων στον πίνακα',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="material-symbols-outlined text-teal-300 text-[18px] mt-0.5">
@@ -430,7 +468,7 @@ export function FinalCtaSection() {
           Έτοιμοι να ξεκινήσετε;
         </h2>
         <p className="text-white/80 mb-8 max-w-lg mx-auto">
-          Συνδεθείτε στο panel του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
+          Συνδεθείτε στον πίνακα του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link

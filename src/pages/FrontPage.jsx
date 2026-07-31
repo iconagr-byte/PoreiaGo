@@ -66,7 +66,7 @@ export default function FrontPage() {
           <div>
             <PlatformBrand variant="dark" asLink={false} />
             <p className="text-sm text-white/45 mt-4 max-w-xs">
-              Cloud πλατφόρμα για ταξιδιωτικά γραφεία — κρατήσεις, στόλος, GPS, ενοικιάσεις, billing.
+              Cloud πλατφόρμα για ταξιδιωτικά γραφεία — κρατήσεις, στόλος, GPS, ενοικιάσεις, χρεώσεις.
             </p>
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/55">
@@ -85,7 +85,7 @@ export default function FrontPage() {
           </div>
         </div>
         <p className="text-center text-xs text-white/30 mt-10">
-          © {new Date().getFullYear()} {PLATFORM_NAME} — Travel Agency SaaS
+          © {new Date().getFullYear()} {PLATFORM_NAME} — SaaS για ταξιδιωτικά γραφεία
         </p>
       </footer>
     </div>
