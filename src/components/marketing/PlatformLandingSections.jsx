@@ -99,12 +99,6 @@ export function HeroSection() {
               <span className="material-symbols-outlined text-[20px]">car_rental</span>
               Ενοικιάσεις
             </Link>
-            <Link
-              to="/admin/login"
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-white/25 text-white hover:bg-white/10 transition-colors"
-            >
-              Σύνδεση γραφείου
-            </Link>
           </div>
 
           <p className="text-sm text-white/45">{PLATFORM_TAGLINE}</p>
