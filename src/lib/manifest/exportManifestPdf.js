@@ -57,6 +57,7 @@ export function exportTripManifestPdf({
       (b, i) => `
     <tr>
       <td>${i + 1}</td>
+      <td>${escapeHtml(b.date || '—')}</td>
       <td>${escapeHtml(b.customerName || b.user || '—')}</td>
       <td>${escapeHtml(b.seat || (b.seats || []).join(', ') || '—')}</td>
       <td>${escapeHtml(b.flightSeat || '—')}</td>

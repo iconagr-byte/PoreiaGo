@@ -2014,13 +2014,32 @@ export default function BackOffice() {
       );
     }
 
-    // Group bookings by tripTitle using the state bookings
+    // Group bookings by excursion title (same product = one row; dates live inside).
     const groupedBookings = bookings.reduce((acc, booking) => {
-      const key = `${booking.tripTitle} - ${booking.date}`;
-      if (!acc[key]) acc[key] = { tripTitle: booking.tripTitle, date: booking.date, bookings: [] };
-      acc[key].bookings.push(booking);
+      const tripTitle = String(booking.tripTitle || 'Εκδρομή').trim() || 'Εκδρομή';
+      if (!acc[tripTitle]) {
+        acc[tripTitle] = { tripTitle, bookings: [], dates: new Set() };
+      }
+      acc[tripTitle].bookings.push(booking);
+      if (booking.date) acc[tripTitle].dates.add(String(booking.date));
       return acc;
     }, {});
+
+    const sortedGroups = Object.entries(groupedBookings)
+      .map(([key, group]) => {
+        const dates = [...group.dates].sort();
+        const sortedBookings = [...group.bookings].sort((a, b) => {
+          const da = String(a.date || '');
+          const db = String(b.date || '');
+          if (da !== db) return da.localeCompare(db);
+          return String(a.customerName || a.email || '').localeCompare(
+            String(b.customerName || b.email || ''),
+            'el',
+          );
+        });
+        return [key, { ...group, dates, bookings: sortedBookings }];
+      })
+      .sort((a, b) => a[0].localeCompare(b[0], 'el'));
 
     return (
       <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in zoom-in-95 duration-300">
@@ -2028,7 +2047,7 @@ export default function BackOffice() {
           <div>
             <h2 className="font-headline-lg text-headline-lg font-bold tracking-tight text-on-surface mb-2">Διαχείριση Κρατήσεων ανά Ταξίδι</h2>
             <p className="font-body-md text-on-surface-variant max-w-2xl text-lg">
-              Επιλέξτε μια εκδρομή για manifest & κρατήσεις.
+              Επιλέξτε μια εκδρομή για manifest & κρατήσεις — όλες οι αναχωρήσεις μαζί.
               {bookingsLoading && ' Συγχρονισμός SaaS…'}
             </p>
           </div>
@@ -2048,11 +2067,17 @@ export default function BackOffice() {
         </div>
 
         <div className="space-y-6">
-          {Object.entries(groupedBookings).map(([key, group]) => {
+          {sortedGroups.map(([key, group]) => {
             const isExpanded = expandedTripBookings === key;
             const confirmedCount = group.bookings.filter(b => b.status === 'Επιβεβαιωμένη' || b.status === 'Ολοκληρώθηκε').length;
             const pendingCount = group.bookings.length - confirmedCount;
             const totalRevenue = group.bookings.reduce((sum, b) => sum + (b.price || 0), 0);
+            const dateLabel =
+              group.dates.length === 0
+                ? 'Χωρίς ημερομηνία'
+                : group.dates.length === 1
+                  ? `Αναχώρηση: ${group.dates[0]}`
+                  : `${group.dates.length} αναχωρήσεις · ${group.dates[0]} → ${group.dates[group.dates.length - 1]}`;
 
             return (
               <div key={key} className="bg-white rounded-3xl shadow-sm border border-black/[0.05] overflow-hidden transition-all">
@@ -2067,7 +2092,7 @@ export default function BackOffice() {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900 text-lg">{group.tripTitle}</h3>
-                      <p className="text-sm text-gray-500 font-medium">Αναχώρηση: {group.date}</p>
+                      <p className="text-sm text-gray-500 font-medium">{dateLabel}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-8">
@@ -2103,7 +2128,10 @@ export default function BackOffice() {
                                 getTripById(group.bookings[0]?.tripId);
                               exportTripManifestPdf({
                                 tripTitle: group.tripTitle,
-                                date: group.date,
+                                date:
+                                  group.dates.length === 1
+                                    ? group.dates[0]
+                                    : group.dates.join(', '),
                                 bookings: group.bookings.map((b) => ({
                                   ...b,
                                   flightSeat: b.flightSeat || b.flight_seat,
@@ -2126,6 +2154,7 @@ export default function BackOffice() {
                       <table className="min-w-full divide-y divide-gray-100">
                         <thead>
                           <tr>
+                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Αναχώρηση</th>
                             <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Όνομα Πελάτη</th>
                             <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Θέση</th>
                             <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Boarding Pass</th>
@@ -2150,6 +2179,9 @@ export default function BackOffice() {
                                 className={`hover:bg-gray-50 transition-colors cursor-pointer group ${booking.checkedIn ? 'bg-green-50/30' : ''}`}
                                 onDoubleClick={() => setSelectedBooking(booking)}
                               >
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="font-bold text-gray-900 text-sm">{booking.date || '—'}</div>
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="font-bold text-gray-900 text-base flex items-center gap-2">
                                     <button
