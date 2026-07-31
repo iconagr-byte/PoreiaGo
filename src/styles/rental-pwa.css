@@ -4532,6 +4532,15 @@
   color: var(--rent-deep, #0b3d4a);
 }
 
+.rent-wiz-total-was {
+  display: inline !important;
+  margin-right: 0.35rem;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  color: #8e8e93 !important;
+  text-decoration: line-through;
+}
+
 .rent-wiz-next {
   appearance: none;
   border: 0;

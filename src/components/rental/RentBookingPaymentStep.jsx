@@ -73,6 +73,18 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
   const [promoHint, setPromoHint] = useState('');
 
   useEffect(() => {
+    const code = String(prefs.promo_code || '').trim();
+    if (!code) return;
+    const check = priceRentTotalsWithPromo(
+      { vehicle: 0, extras: 0, total: 100 },
+      code,
+    ).resolved;
+    if (check.ok) setPromoHint(`Ενεργό: ${check.promo.label}`);
+    else if (check.reason === 'invalid') setPromoHint('Μη έγκυρος κωδικός προσφοράς');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     Promise.all([fetchCheckoutSettings(), fetchSiteAppearance()])
       .then(([checkout, appearance]) => {
