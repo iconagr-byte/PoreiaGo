@@ -29,18 +29,19 @@ export function HeroSection() {
         <img
           src={HERO_BACKGROUND_IMAGE}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover object-center"
+          className="absolute inset-0 h-full w-full object-cover object-[center_40%] scale-[1.02]"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/88 to-slate-950/45 lg:to-slate-950/25" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/55" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-slate-950/50 lg:to-slate-950/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-slate-950/50" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_70%_40%,rgba(14,165,233,0.10),transparent_55%)]" />
       </div>
 
       <div
-        className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_15%_20%,rgba(56,189,248,0.12),transparent)] pointer-events-none z-[1]"
+        className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_15%_20%,rgba(56,189,248,0.10),transparent)] pointer-events-none z-[1]"
         aria-hidden
       />
       <div
-        className="absolute inset-0 opacity-[0.15] z-[1] pointer-events-none"
+        className="absolute inset-0 opacity-[0.12] z-[1] pointer-events-none"
         style={{
           backgroundImage:
             'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
