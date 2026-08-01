@@ -6,7 +6,9 @@ import {
   getOfficePublicOrigin,
   getOfficeRentWalletUrl,
   getOfficeShareDisplayName,
+  getOfficeWalletUrl,
   isForbiddenForeignOfficeHost,
+  sanitizeOfficeBrandingForShare,
 } from './officePublicUrl.js';
 
 describe('officePublicUrl seal — no Achillio Travel bleed', () => {
@@ -50,5 +52,47 @@ describe('officePublicUrl seal — no Achillio Travel bleed', () => {
       platform_domain: 'poreiago.com',
     };
     expect(getOfficePublicOrigin(branding)).toBe('https://sunny.poreiago.com');
+  });
+
+  it('session seal: PoreiaGo admin never advertises Achillio Travel domain', () => {
+    const branding = {
+      slug: 'admin-achillio-gr',
+      subdomain: 'admin-achillio-gr',
+      display_name: 'Achillio Travel',
+      custom_domain: 'achilliotravel.com',
+      platform_domain: 'poreiago.com',
+    };
+    expect(
+      getOfficeWalletUrl(branding, { contextHost: 'www.poreiago.com' }),
+    ).toBe('https://www.poreiago.com/wallet');
+    expect(
+      getOfficePublicOrigin(branding, { contextHost: 'admin.poreiago.com' }),
+    ).toBe('https://www.poreiago.com');
+  });
+
+  it('session seal: Achillio host keeps Achillio Travel wallet URL', () => {
+    const branding = {
+      slug: 'admin-achillio-gr',
+      subdomain: 'admin-achillio-gr',
+      display_name: 'Achillio Travel',
+      custom_domain: 'achilliotravel.com',
+      platform_domain: 'poreiago.com',
+    };
+    expect(
+      getOfficeWalletUrl(branding, { contextHost: 'www.achilliotravel.com' }),
+    ).toBe('https://www.achilliotravel.com/wallet');
+  });
+
+  it('sanitizes poisoned checkout/custom_domain on platform branding', () => {
+    const cleaned = sanitizeOfficeBrandingForShare({
+      slug: 'poreiago',
+      display_name: 'Achillio Travel',
+      custom_domain: 'www.achilliotravel.com',
+      checkout_base_url: 'https://www.achilliotravel.com',
+      platform_domain: 'poreiago.com',
+    });
+    expect(cleaned.custom_domain).toBe('');
+    expect(cleaned.checkout_base_url).toBe('https://www.poreiago.com');
+    expect(cleaned.display_name).toBe('PoreiaGo');
   });
 });

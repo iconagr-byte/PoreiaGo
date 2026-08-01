@@ -31,20 +31,71 @@ function normalizeBrandingResponse(data, source = 'postgres') {
     .trim()
     .toLowerCase();
   const platformDomain = data.platform_domain || BASE_DOMAIN;
+  const slug = String(data.slug || subdomain || '')
+    .trim()
+    .toLowerCase();
+  const achillioTravelSlugs = new Set([
+    'admin-achillio-gr',
+    'achillio-travel',
+    'achilliotravel',
+  ]);
+  const poreiagoSlugs = new Set([
+    'achillio',
+    'poreiago',
+    'platform',
+    'demo',
+    'admin-poreiago',
+    'poreiago-saas',
+    'poreiago-platform',
+    'default',
+  ]);
+  let customDomain = String(data.custom_domain || '').trim();
+  let checkoutBase = String(data.checkout_base_url || '').trim();
+  let displayName = String(data.display_name || '').trim();
+  const isAchillioTravel = achillioTravelSlugs.has(slug);
+  const isPoreiago = poreiagoSlugs.has(slug);
+  const achillioHost = /(^|\.)achilliotravel\.com$/i;
+
+  // Client heal: Achillio Travel domain belongs only to Achillio Travel office.
+  if (!isAchillioTravel) {
+    const customHost = customDomain
+      .replace(/^https?:\/\//i, '')
+      .split('/')[0]
+      .replace(/^www\./, '');
+    if (customHost && achillioHost.test(customHost)) {
+      customDomain = '';
+    }
+    try {
+      if (checkoutBase) {
+        const u = new URL(
+          checkoutBase.includes('://') ? checkoutBase : `https://${checkoutBase}`,
+        );
+        if (achillioHost.test(u.hostname.replace(/^www\./, '') || u.hostname)) {
+          checkoutBase = `https://www.${platformDomain}`;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (isPoreiago && (!displayName || /achillio/i.test(displayName))) {
+    displayName = 'PoreiaGo';
+  }
+
   return {
-    display_name: data.display_name || '',
+    display_name: displayName,
     slug: data.slug || subdomain || '',
     subdomain,
     platform_domain: platformDomain,
     subdomain_fqdn:
       data.subdomain_fqdn ||
       (subdomain ? tenantSubdomainFqdn(subdomain, platformDomain) : ''),
-    custom_domain: data.custom_domain || '',
+    custom_domain: customDomain,
     primary_color: data.primary_color || '#0040df',
     logo_url: data.logo_url || '',
     css_injection_url: data.css_injection_url || '',
     css_injection_inline: data.css_injection_inline || '',
-    checkout_base_url: data.checkout_base_url || '',
+    checkout_base_url: checkoutBase,
     dns_instructions: data.dns_instructions || DEFAULT_DNS,
     storage_source: source,
   };
