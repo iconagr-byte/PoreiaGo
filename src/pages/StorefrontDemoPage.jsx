@@ -470,6 +470,7 @@ export default function StorefrontDemoPage() {
             loading={rentalLoading}
             rentOnly={rentOnly}
             brandName={brandName}
+            siteAppearance={siteAppearance}
           />
         ) : null}
 
