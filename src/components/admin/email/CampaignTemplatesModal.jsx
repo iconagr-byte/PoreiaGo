@@ -1,7 +1,40 @@
+import { useEffect, useMemo, useState } from 'react';
 import { LayoutTemplate, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { resolveStitchTemplateAccess } from '../../../lib/email/stitchTemplateAccess.js';
+import { fetchBillingSubscription } from '../../../services/billingApi.js';
+import { fetchAdminOfficeModules } from '../../../services/officeModulesApi.js';
 import CampaignTemplatesGallery from './CampaignTemplatesGallery.jsx';
 
-export default function CampaignTemplatesModal({ open, onClose, onSelect }) {
+export default function CampaignTemplatesModal({ open, onClose, onSelect, onOpenContracts }) {
+  const [modules, setModules] = useState(null);
+  const [subscription, setSubscription] = useState(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    Promise.all([
+      fetchAdminOfficeModules().catch(() => null),
+      fetchBillingSubscription().catch(() => null),
+    ]).then(([mods, sub]) => {
+      if (cancelled) return;
+      setModules(mods);
+      setSubscription(sub);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const access = useMemo(
+    () =>
+      resolveStitchTemplateAccess({
+        modules: modules || undefined,
+        subscription,
+      }),
+    [modules, subscription],
+  );
+
   if (!open) return null;
 
   return (
@@ -24,7 +57,7 @@ export default function CampaignTemplatesModal({ open, onClose, onSelect }) {
                 Πρότυπα email · Horizon Ethos
               </h2>
               <p className="emh-templates-modal-sub">
-                Σύρετε την μικρογραφία για όλο το email · «Προεπισκόπηση» για μεγέθυνση
+                Newsletter & Ενοικιάσεις ξεκλειδώνουν με συμβόλαιο
               </p>
             </div>
           </div>
@@ -35,6 +68,12 @@ export default function CampaignTemplatesModal({ open, onClose, onSelect }) {
 
         <CampaignTemplatesGallery
           variant="modal"
+          access={access}
+          onRequestUnlock={() => {
+            onClose?.();
+            if (onOpenContracts) onOpenContracts();
+            else toast('Ανοίξτε Ρυθμίσεις → Συμβόλαιο για ενεργοποίηση');
+          }}
           onSelect={(tpl) => {
             onSelect(tpl);
             onClose();
