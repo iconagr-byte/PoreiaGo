@@ -16,13 +16,13 @@ import AgencyPlansHook from './AgencyPlansHook.jsx';
 import { FeatureVisual } from './FeatureVisuals.jsx';
 
 const FEATURE_ICON_STYLES = {
-  violet: 'bg-gradient-to-br from-[#ede8ff] to-[#f7f4ff] text-[#7d5ae8]',
-  sky: 'bg-gradient-to-br from-[#e3f0ff] to-[#f2f8ff] text-[#0077ed]',
-  emerald: 'bg-gradient-to-br from-[#dff7ec] to-[#f0fdf7] text-[#1f9d62]',
-  teal: 'bg-gradient-to-br from-[#d8faf5] to-[#effefb] text-[#0f766e]',
-  indigo: 'bg-gradient-to-br from-[#e8ecff] to-[#f4f6ff] text-[#4f5bd5]',
-  amber: 'bg-gradient-to-br from-[#fff4df] to-[#fffaf0] text-[#c9860a]',
-  rose: 'bg-gradient-to-br from-[#ffe8ef] to-[#fff5f8] text-[#e84a7a]',
+  violet: 'bg-[#f5f5f7] text-[#6e6e73]',
+  sky: 'bg-[#f5f5f7] text-[#6e6e73]',
+  emerald: 'bg-[#f5f5f7] text-[#6e6e73]',
+  teal: 'bg-[#f5f5f7] text-[#6e6e73]',
+  indigo: 'bg-[#f5f5f7] text-[#6e6e73]',
+  amber: 'bg-[#f5f5f7] text-[#6e6e73]',
+  rose: 'bg-[#f5f5f7] text-[#6e6e73]',
 };
 
 export function HeroSection() {
@@ -250,38 +250,38 @@ export function FeaturesSection() {
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 items-stretch">
           {FEATURES.map((f, index) => {
             const iconStyle = FEATURE_ICON_STYLES[f.accent] || FEATURE_ICON_STYLES.indigo;
             const wide = index === FEATURES.length - 1;
             return (
               <article
                 key={f.id || f.title}
-                className={`group flex flex-col rounded-[22px] bg-white overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.28)] ring-1 ring-white/25 hover:shadow-[0_20px_56px_rgba(0,0,0,0.35)] transition-[box-shadow,transform] duration-500 ease-out hover:-translate-y-1 ${
+                className={`group h-full flex flex-col rounded-[20px] bg-white/95 overflow-hidden shadow-[0_8px_28px_rgba(0,0,0,0.16)] ring-1 ring-white/30 hover:shadow-[0_12px_36px_rgba(0,0,0,0.2)] transition-shadow duration-300 ease-out ${
                   wide ? 'sm:col-span-2 lg:col-span-1' : ''
                 }`}
                 style={{
-                  animation: `featFadeUp 0.7s ease ${Math.min(index, 6) * 0.06}s both`,
+                  animation: `featFadeUp 0.55s ease ${Math.min(index, 6) * 0.04}s both`,
                 }}
               >
                 <FeatureVisual kind={f.visual} />
-                <div className="flex flex-col flex-1 p-6 md:p-7 pt-5">
-                  <div className="flex items-center gap-3 mb-3">
+                <div className="flex flex-col flex-1 p-5 md:p-6 pt-4">
+                  <div className="flex items-start gap-3 mb-3">
                     <div
-                      className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] ${iconStyle}`}
+                      className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 ${iconStyle}`}
                     >
-                      <span className="material-symbols-outlined text-[22px] font-light" aria-hidden>
+                      <span className="material-symbols-outlined text-[20px] font-light" aria-hidden>
                         {f.icon}
                       </span>
                     </div>
-                    <h3 className="text-[18px] font-semibold text-[#1d1d1f] tracking-[-0.02em] leading-snug">
+                    <h3 className="text-[17px] font-semibold text-[#1d1d1f] tracking-[-0.02em] leading-snug pt-1">
                       {f.title}
                     </h3>
                   </div>
-                  <p className="text-[14.5px] text-[#6e6e73] leading-[1.55] flex-1">{f.body}</p>
-                  <p className="text-[13px] font-semibold text-[#0071e3] mt-4 leading-snug inline-flex items-center gap-1 group-hover:gap-2 transition-[gap]">
+                  <p className="text-[14px] text-[#6e6e73] leading-[1.5] flex-1">{f.body}</p>
+                  <p className="text-[12.5px] font-medium text-[#0071e3] mt-4 leading-snug inline-flex items-center gap-1">
                     {f.hook}
-                    <span className="material-symbols-outlined text-[16px] opacity-70">arrow_forward</span>
+                    <span className="material-symbols-outlined text-[15px] opacity-60">arrow_forward</span>
                   </p>
                 </div>
               </article>
