@@ -339,39 +339,14 @@ async def login_with_password(request: Request, body: DriverLoginBody):
     """
     username = (body.username or "").strip()
     office_tid = await _login_office_tenant(request)
-    platform_tid = ""
-    allow_demo_legacy = False
-    try:
-        platform_tid = str(await resolve_platform_tenant_id() or "").strip()
-    except Exception:
-        platform_tid = ""
 
     if office_tid:
-        # Legacy DEMO rows only for Achillio Travel — never PoreiaGo / other SaaS.
-        allow_demo_legacy = False
-        try:
-            from uuid import UUID
-
-            from sqlalchemy import select
-
-            from app.core.database import AsyncSessionLocal
-            from app.models.tenant import Tenant
-            from app.services.tenant_modules import is_achillio_travel_office
-
-            async with AsyncSessionLocal() as db:
-                result = await db.execute(
-                    select(Tenant).where(Tenant.id == UUID(str(office_tid))).limit(1)
-                )
-                tenant = result.scalar_one_or_none()
-                allow_demo_legacy = bool(tenant and is_achillio_travel_office(tenant))
-        except Exception:
-            # Tests / DB down: only when Host office == resolved Achillio platform.
-            allow_demo_legacy = bool(platform_tid and office_tid == platform_tid)
+        # SEAL: authenticate only against this office's tenant_id — never DEMO claim.
         driver = authenticate_driver(
             body.username,
             body.password,
             tenant_id=office_tid,
-            allow_demo_legacy=allow_demo_legacy,
+            allow_demo_legacy=False,
         )
         if not driver:
             record_login_from_request(
@@ -387,20 +362,7 @@ async def login_with_password(request: Request, body: DriverLoginBody):
                 status_code=401,
                 detail="Λάθος όνομα χρήστη ή κωδικός — ή ο οδηγός ανήκει σε άλλο γραφείο",
             )
-        # Session stays on this office (claim DEMO legacy onto the host office).
         tenant_id = office_tid
-        driver_home = str(getattr(driver, "tenant_id", None) or DEMO_TENANT_ID)
-        if (
-            allow_demo_legacy
-            and driver_home == DEMO_TENANT_ID
-            and office_tid != DEMO_TENANT_ID
-        ):
-            try:
-                from travel_platform.settings.drivers_store import update_driver
-
-                update_driver(driver.id, {"tenant_id": office_tid})
-            except Exception:
-                pass
     else:
         # Unknown / unscoped Host — refuse so the same email cannot open
         # another office's session by first-match.

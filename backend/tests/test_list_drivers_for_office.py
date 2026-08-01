@@ -1,4 +1,4 @@
-"""Legacy DEMO drivers must reappear on the live office list."""
+"""Office driver lists are exact-tenant only (no DEMO claim)."""
 
 from __future__ import annotations
 
@@ -26,101 +26,54 @@ class ListDriversForOfficeTests(unittest.TestCase):
         store.reset_drivers_cache()
         self._tmpdir.cleanup()
 
-    def _create(self, *, name: str, email: str, tenant_id: str, driver_id: str | None = None):
-        row = store.create_driver(
-            {
-                "id": driver_id or str(uuid4()),
-                "name": name,
-                "license_no": f"LIC-{uuid4().hex[:8]}",
-                "email": email,
-                "phone": "+306900000000",
-                "password": "BusPass99",
-                "status": "active",
-                "tenant_id": tenant_id,
-            }
-        )
-        return row
+    def _create(self, *, name: str, email: str, tenant_id: str, **extra):
+        payload = {
+            "id": str(uuid4()),
+            "name": name,
+            "license_no": f"LIC-{uuid4().hex[:8]}",
+            "email": email,
+            "phone": "+306900000000",
+            "password": "BusPass99",
+            "status": "active",
+            "tenant_id": tenant_id,
+        }
+        payload.update(extra)
+        return store.create_driver(payload)
 
-    def test_office_sees_and_claims_non_seed_demo_driver(self):
+    def test_demo_orphan_not_listed_or_claimed(self):
         orphan = self._create(
             name="Achilleas Charalambidis",
             email="axilleas0@yahoo.gr",
             tenant_id=store.DEMO_TENANT_ID,
+            _allow_demo_tenant=True,
         )
-        self.assertEqual(orphan.tenant_id, store.DEMO_TENANT_ID)
-
-        strict = store.list_drivers(tenant_id=OFFICE)
-        self.assertEqual(strict, [])
-
-        listed = store.list_drivers_for_office(
-            OFFICE,
-            include_demo_legacy=True,
-            claim_demo_legacy=True,
-        )
-        self.assertEqual(len(listed), 1)
-        self.assertEqual(listed[0].id, orphan.id)
-        self.assertEqual(listed[0].tenant_id, OFFICE)
-
-        store.reset_drivers_cache()
-        again = store.list_drivers(tenant_id=OFFICE)
-        self.assertEqual([d.id for d in again], [orphan.id])
-
-    def _inject_seed(self):
-        seed_id = next(iter(store.SEED_DRIVER_IDS))
-        drivers = store._ensure()
-        drivers[seed_id] = store.FleetDriver(
-            id=seed_id,
-            name="Νίκος Παπαδόπουλος",
-            license_no="AB123456",
-            phone="+30 694 111 0001",
-            email="nikos.driver@aerostride.com",
-            hiring_date=store.date(2022, 3, 15),
-            status="active",
-            tenant_id=store.DEMO_TENANT_ID,
-            password_hash="x",
-        )
-        store._persist()
-        return seed_id
-
-    def test_seed_demo_drivers_not_claimed(self):
-        seed_id = self._inject_seed()
         listed = store.list_drivers_for_office(
             OFFICE,
             include_demo_legacy=True,
             claim_demo_legacy=True,
         )
         self.assertEqual(listed, [])
-        # Seed rows are purged on reload — they must never stick on an office.
         store.reset_drivers_cache()
-        self.assertIsNone(store.get_driver(seed_id))
+        again = store.get_driver(orphan.id)
+        self.assertEqual(again.tenant_id, store.DEMO_TENANT_ID)
 
-    def test_other_office_without_legacy_flag_stays_empty(self):
-        self._create(
-            name="Achilleas Charalambidis",
-            email="axilleas0@yahoo.gr",
-            tenant_id=store.DEMO_TENANT_ID,
-        )
-        listed = store.list_drivers_for_office(
-            OTHER,
-            include_demo_legacy=False,
-            claim_demo_legacy=False,
-        )
-        self.assertEqual(listed, [])
+    def test_office_sees_only_own_drivers(self):
+        mine = self._create(name="Mine", email="mine@example.com", tenant_id=OFFICE)
+        self._create(name="Other", email="other@example.com", tenant_id=OTHER)
+        listed = store.list_drivers_for_office(OFFICE)
+        self.assertEqual([d.id for d in listed], [mine.id])
 
-    def test_driver_visible_to_office(self):
+    def test_driver_visible_to_office_exact_only(self):
         orphan = self._create(
             name="Achilleas",
             email="a@example.com",
             tenant_id=store.DEMO_TENANT_ID,
+            _allow_demo_tenant=True,
         )
-        # Arbitrary offices must not IDOR DEMO orphans.
         self.assertFalse(store.driver_visible_to_office(orphan, OFFICE))
-        self.assertTrue(
+        self.assertFalse(
             store.driver_visible_to_office(orphan, OFFICE, allow_demo_legacy=True)
         )
-        seed_id = self._inject_seed()
-        seed = store.get_driver(seed_id)
-        self.assertFalse(store.driver_visible_to_office(seed, OFFICE, allow_demo_legacy=True))
 
 
 if __name__ == "__main__":

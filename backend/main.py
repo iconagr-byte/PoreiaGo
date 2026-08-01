@@ -232,16 +232,24 @@ async def lifespan(app: FastAPI):
             "Office Rent policy sync skipped: %s", exc
         )
     try:
-        from travel_platform.settings.drivers_store import purge_seed_demo_drivers
+        from travel_platform.settings.drivers_store import (
+            purge_seed_demo_drivers,
+            seal_cross_office_driver_uniqueness,
+        )
 
         purged = purge_seed_demo_drivers()
         if purged:
             __import__("logging").getLogger("poreiago.startup").info(
                 "Purged %s seed demo drivers from fleet store", purged
             )
+        sealed = seal_cross_office_driver_uniqueness()
+        if sealed.get("removed"):
+            __import__("logging").getLogger("poreiago.startup").info(
+                "SEAL cross-office drivers: removed %s duplicate(s)", sealed["removed"]
+            )
     except Exception as exc:
         __import__("logging").getLogger("poreiago.startup").warning(
-            "Seed demo driver purge skipped: %s", exc
+            "Seed demo driver purge / SEAL skipped: %s", exc
         )
     try:
         from app.core.database import AsyncSessionLocal
