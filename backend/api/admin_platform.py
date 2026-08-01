@@ -274,29 +274,12 @@ async def _resolve_achillio_tenant_id_from_request(request: Request | None) -> s
 
 async def _office_may_claim_demo_legacy(tenant_id: str) -> tuple[bool, bool]:
     """
-    (include, claim) for non-seed DEMO drivers — Achillio Travel JWT only.
+    SEAL: DEMO include/claim is permanently disabled.
 
-    Fail closed when platform resolve fails: never let PoreiaGo / random offices
-    inherit Achilleas-style orphans.
+    Cross-office driver theft via DEMO claim must never happen again.
+    ``tenant_id`` kept for call-site compatibility.
     """
-    tid = str(tenant_id or "").strip()
-    if not tid or tid == str(DEMO_TENANT_ID):
-        return False, False
-
-    if await _tenant_is_achillio_office(tid):
-        return True, True
-
-    # Optional: platform tenant equals Achillio in some deploys.
-    try:
-        from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
-
-        platform_tid = str(await resolve_platform_tenant_id() or "").strip()
-    except Exception:
-        logger.debug("resolve_platform_tenant_id failed for drivers claim gate", exc_info=True)
-        return False, False
-
-    if platform_tid and tid == platform_tid and await _tenant_is_achillio_office(platform_tid):
-        return True, True
+    del tenant_id
     return False, False
 
 
@@ -327,10 +310,11 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
         return jwt_tid, include, claim
 
     # DEMO JWT: only remap when the reverse-proxy Host is Achillio Travel.
+    # SEAL: never enable DEMO include/claim flags.
     if _host_looks_like_achillio(request):
         host_tid = await _resolve_achillio_tenant_id_from_request(request)
         if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
-            return host_tid, True, True
+            return host_tid, False, False
 
     return jwt_tid, False, False
 

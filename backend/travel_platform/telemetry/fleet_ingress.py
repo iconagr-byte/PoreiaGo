@@ -132,7 +132,6 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         DEMO_TENANT_ID,
         get_driver,
         is_seed_driver,
-        update_driver,
     )
     from travel_platform.telemetry.ingress_rate_limit import check_driver_gps_rate_limit
     from travel_platform.telemetry.settings_store import get_telemetry_settings
@@ -165,31 +164,7 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         bound = get_driver(driver_id)
         if bound and not is_seed_driver(bound):
             home = str(getattr(bound, "tenant_id", None) or DEMO_TENANT_ID)
-            if home == str(DEMO_TENANT_ID):
-                may_claim = False
-                try:
-                    from app.core.database import AsyncSessionLocal
-                    from app.models.tenant import Tenant
-                    from app.services.tenant_modules import is_achillio_travel_office
-                    from sqlalchemy import select
-                    from uuid import UUID
-
-                    async with AsyncSessionLocal() as db:
-                        result = await db.execute(
-                            select(Tenant).where(Tenant.id == UUID(str(tenant_id))).limit(1)
-                        )
-                        tenant = result.scalar_one_or_none()
-                        may_claim = bool(tenant and is_achillio_travel_office(tenant))
-                except Exception:
-                    may_claim = False
-                if may_claim:
-                    try:
-                        update_driver(driver_id, {"tenant_id": tenant_id})
-                        home = tenant_id
-                    except Exception:
-                        logger.debug(
-                            "legacy DEMO claim on GPS failed driver=%s", driver_id, exc_info=True
-                        )
+            # SEAL: never claim DEMO drivers onto an office via GPS ingress.
             if home != tenant_id:
                 logger.info(
                     "Rejecting GPS — driver=%s home=%s session=%s (not on office list)",

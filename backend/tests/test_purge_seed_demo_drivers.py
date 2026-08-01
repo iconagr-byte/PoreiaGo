@@ -78,12 +78,13 @@ class PurgeSeedDemoDriversTests(unittest.TestCase):
                 "password": "BusPass99",
                 "status": "active",
                 "tenant_id": store.DEMO_TENANT_ID,
+                "_allow_demo_tenant": True,
             }
         )
         # Still on DEMO — not on office list → no pin.
         self.assertFalse(office_allows_live_driver(OFFICE, real.id))
 
-        store.update_driver(real.id, {"tenant_id": OFFICE})
+        store.update_driver(real.id, {"force_tenant_id": OFFICE})
         self.assertTrue(office_allows_live_driver(OFFICE, real.id))
 
 

@@ -52,7 +52,8 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(include)
         self.assertFalse(claim)
 
-    async def test_achillio_jwt_may_claim_demo_legacy(self):
+    async def test_achillio_jwt_cannot_claim_demo_legacy_anymore(self):
+        """SEAL: Achillio also must not pull DEMO / foreign drivers."""
         achillio = str(uuid4())
         req = SimpleNamespace(
             headers={"host": "www.poreiago.com"},
@@ -62,10 +63,10 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
             tid, include, claim = await ap._drivers_list_tenant_id(req)
 
         self.assertEqual(tid, achillio)
-        self.assertTrue(include)
-        self.assertTrue(claim)
+        self.assertFalse(include)
+        self.assertFalse(claim)
 
-    async def test_demo_jwt_on_proxied_achillio_host_remaps(self):
+    async def test_demo_jwt_on_proxied_achillio_host_remaps_without_claim(self):
         achillio = str(uuid4())
         req = SimpleNamespace(
             headers={"host": "www.achilliotravel.com"},
@@ -80,8 +81,8 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
                 tid, include, claim = await ap._drivers_list_tenant_id(req)
 
         self.assertEqual(tid, achillio)
-        self.assertTrue(include)
-        self.assertTrue(claim)
+        self.assertFalse(include)
+        self.assertFalse(claim)
 
     async def test_fail_closed_when_not_achillio(self):
         other = str(uuid4())

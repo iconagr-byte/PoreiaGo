@@ -172,6 +172,84 @@ def purge_seed_demo_drivers() -> int:
     return removed
 
 
+def _prefer_driver_row(candidates: list[FleetDriver]) -> FleetDriver:
+    """Pick the surviving row when duplicates exist across offices."""
+    def sort_key(d: FleetDriver):
+        tid = _driver_tenant_id(d)
+        # Prefer real offices over DEMO; then oldest record.
+        return (
+            0 if tid != DEMO_TENANT_ID else 1,
+            d.created_at or datetime.now(timezone.utc),
+            d.id,
+        )
+
+    return sorted(candidates, key=sort_key)[0]
+
+
+def seal_cross_office_driver_uniqueness() -> dict:
+    """
+    Boot-time SEAL: one email / license / plate / vehicle code → one office.
+
+    Deletes duplicate rows that leaked across γραφεία (DEMO claim fiasco).
+    Safe to run on every process boot.
+    """
+    drivers = _ensure()
+    groups: dict[str, list[FleetDriver]] = {}
+
+    def add_key(kind: str, value: str | None, d: FleetDriver) -> None:
+        needle = _normalize_username(value)
+        if not needle:
+            return
+        groups.setdefault(f"{kind}:{needle}", []).append(d)
+
+    for d in list(drivers.values()):
+        if is_seed_driver(d):
+            continue
+        add_key("email", d.email, d)
+        add_key("license", d.license_no, d)
+        add_key("code", d.vehicle_code, d)
+        add_key("plate", d.license_plate, d)
+
+    delete_ids: set[str] = set()
+    for key, rows in groups.items():
+        by_id: dict[str, FleetDriver] = {r.id: r for r in rows}
+        uniq = list(by_id.values())
+        if len(uniq) < 2:
+            continue
+        winner = _prefer_driver_row(uniq)
+        for r in uniq:
+            if r.id == winner.id:
+                continue
+            delete_ids.add(r.id)
+            logger.warning(
+                "SEAL driver uniqueness: removing duplicate %s (%s) tenant=%s kept=%s key=%s",
+                r.id,
+                r.email,
+                _driver_tenant_id(r),
+                winner.id,
+                key,
+            )
+
+    removed = 0
+    for did in list(delete_ids):
+        if did in drivers:
+            del drivers[did]
+            removed += 1
+
+    if removed:
+        try:
+            _persist()
+            logger.info(
+                "SEAL: removed %s cross-office duplicate driver(s) from %s",
+                removed,
+                STORE_PATH,
+            )
+        except Exception:
+            logger.exception("SEAL: failed to persist after duplicate purge")
+
+    return {"removed": removed, "store": str(STORE_PATH)}
+
+
 def _normalize_username(value: str | None) -> str:
     return (value or "").strip().lower()
 
@@ -268,24 +346,38 @@ def _assert_unique(
     tenant_id: str | None = None,
     exclude_id: str | None = None,
 ) -> None:
+    """
+    SEAL: email / license / plate / vehicle code are globally unique across
+    ALL offices. Two γραφεία must never share the same driver identity.
+    ``tenant_id`` is accepted for call-site compatibility only.
+    """
+    del tenant_id  # uniqueness is global — never scoped per office
     email_n = _normalize_username(email)
     license_n = _normalize_username(license_no)
     code_n = _normalize_username(vehicle_code)
     plate_n = _normalize_username(license_plate)
-    tid = _normalize_tenant_id(tenant_id)
     for d in _ensure().values():
         if exclude_id and d.id == exclude_id:
             continue
-        if _driver_tenant_id(d) != tid:
+        if is_seed_driver(d):
             continue
         if email_n and d.email.lower() == email_n:
-            raise ValueError("Το email χρησιμοποιείται ήδη από άλλον οδηγό")
+            raise ValueError(
+                "Το email χρησιμοποιείται ήδη από οδηγό άλλου γραφείου — "
+                "κάθε οδηγός ανήκει σε ένα μόνο γραφείο"
+            )
         if license_n and d.license_no.lower() == license_n:
-            raise ValueError("Ο αριθμός άδειας χρησιμοποιείται ήδη")
+            raise ValueError(
+                "Ο αριθμός άδειας χρησιμοποιείται ήδη από οδηγό άλλου γραφείου"
+            )
         if code_n and d.vehicle_code and d.vehicle_code.lower() == code_n:
-            raise ValueError("Ο κωδικός οχήματος χρησιμοποιείται ήδη")
+            raise ValueError(
+                "Ο κωδικός οχήματος χρησιμοποιείται ήδη από οδηγό άλλου γραφείου"
+            )
         if plate_n and d.license_plate and d.license_plate.lower() == plate_n:
-            raise ValueError("Η πινακίδα χρησιμοποιείται ήδη")
+            raise ValueError(
+                "Η πινακίδα χρησιμοποιείται ήδη από οδηγό άλλου γραφείου"
+            )
 
 
 def list_drivers(status: str | None = None, tenant_id: str | None = None) -> list[FleetDriver]:
@@ -328,43 +420,13 @@ def list_drivers_for_office(
     """
     List drivers for an admin office.
 
-    Before JWT tenant scoping, real drivers (e.g. Achilleas) were saved under
-    DEMO_TENANT_ID. The live office JWT then saw an empty list even though
-    /driver login still worked. Optionally include (and permanently claim)
-    those non-seed DEMO rows onto the office tenant.
+    SEAL: only drivers whose ``tenant_id`` equals this office. DEMO legacy
+    include/claim is disabled permanently so one γραφείο can never pull or
+    steal another office's (or DEMO orphan) drivers.
     """
+    del include_demo_legacy, claim_demo_legacy  # hard-disabled — never cross-claim
     tid = _normalize_tenant_id(tenant_id)
-    items = list(_ensure().values())
-    claimed = False
-    matched: list[FleetDriver] = []
-
-    for d in items:
-        dtid = _driver_tenant_id(d)
-        if dtid == tid:
-            matched.append(d)
-            continue
-        if (
-            include_demo_legacy
-            and tid != DEMO_TENANT_ID
-            and dtid == DEMO_TENANT_ID
-            and not is_seed_driver(d)
-        ):
-            if claim_demo_legacy:
-                d.tenant_id = tid
-                claimed = True
-            matched.append(d)
-
-    if claimed:
-        try:
-            _persist()
-            logger.info(
-                "Claimed %s legacy DEMO driver(s) onto office tenant %s",
-                sum(1 for d in matched if _driver_tenant_id(d) == tid),
-                tid,
-            )
-        except Exception:
-            logger.exception("Failed to persist claimed legacy drivers for %s", tid)
-
+    matched = [d for d in _ensure().values() if _driver_tenant_id(d) == tid and not is_seed_driver(d)]
     if status:
         matched = [d for d in matched if d.status == status]
     return sorted(matched, key=lambda d: d.name)
@@ -376,26 +438,11 @@ def driver_visible_to_office(
     *,
     allow_demo_legacy: bool = False,
 ) -> bool:
-    """
-    True when the office may view/edit this driver.
-
-    DEMO orphans are visible only when the caller explicitly allows legacy
-    recovery (Achillio claim path) — never for arbitrary SaaS offices.
-    """
-    if not driver:
+    """True when the office may view/edit this driver — exact tenant match only."""
+    del allow_demo_legacy  # hard-disabled — no DEMO cross-office visibility
+    if not driver or is_seed_driver(driver):
         return False
-    tid = _normalize_tenant_id(tenant_id)
-    dtid = _driver_tenant_id(driver)
-    if dtid == tid:
-        return True
-    if (
-        allow_demo_legacy
-        and tid != DEMO_TENANT_ID
-        and dtid == DEMO_TENANT_ID
-        and not is_seed_driver(driver)
-    ):
-        return True
-    return False
+    return _driver_tenant_id(driver) == _normalize_tenant_id(tenant_id)
 
 
 def get_driver(driver_id: str) -> FleetDriver | None:
@@ -423,27 +470,22 @@ def find_driver_by_username(
     """
     Match email, license number, or vehicle/driver code (case-insensitive).
 
-    When ``tenant_id`` is set, only that office's drivers match. Optionally
-    allow non-scoped DEMO rows for the primary office (legacy Achilleas).
+    When ``tenant_id`` is set, only that office's drivers match.
+    DEMO legacy cross-match is disabled (SEAL).
     """
+    del allow_demo_legacy
     needle = _normalize_username(username)
     if not needle:
         return None
     tid = _normalize_tenant_id(tenant_id) if tenant_id is not None else None
     for d in _ensure().values():
+        if is_seed_driver(d):
+            continue
         if not _username_matches(d, needle):
             continue
         if tid is None:
             return d
-        dtid = _driver_tenant_id(d)
-        if dtid == tid:
-            return d
-        if (
-            allow_demo_legacy
-            and tid != DEMO_TENANT_ID
-            and dtid == DEMO_TENANT_ID
-            and not is_seed_driver(d)
-        ):
+        if _driver_tenant_id(d) == tid:
             return d
     return None
 
@@ -458,8 +500,9 @@ def authenticate_driver(
     driver = find_driver_by_username(
         username,
         tenant_id=tenant_id,
-        allow_demo_legacy=allow_demo_legacy,
+        allow_demo_legacy=False,
     )
+    del allow_demo_legacy
     if not driver or is_seed_driver(driver):
         return None
     if driver.status not in ("active", "on_leave"):
@@ -493,6 +536,13 @@ def create_driver(data: dict) -> FleetDriver:
         license_plate = license_plate.strip() or None
 
     tenant_id = _normalize_tenant_id(data.get("tenant_id"))
+    allow_demo = bool(data.get("_allow_demo_tenant")) or os.getenv(
+        "ALLOW_DEMO_DRIVER_CREATE", ""
+    ).lower() in ("1", "true", "yes")
+    if tenant_id == DEMO_TENANT_ID and not allow_demo:
+        raise ValueError(
+            "Απαιτείται έγκυρο γραφείο για νέο οδηγό — απαγορεύεται δημιουργία χωρίς tenant"
+        )
     _assert_unique(
         email=email,
         license_no=license_no,
@@ -575,8 +625,14 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         d.salary_per_km = float(patch["salary_per_km"])
     if patch.get("salary_per_trip") is not None:
         d.salary_per_trip = float(patch["salary_per_trip"])
-    if patch.get("tenant_id"):
-        d.tenant_id = _normalize_tenant_id(patch["tenant_id"])
+    # SEAL: tenant_id is immutable via normal updates — never move a driver
+    # between offices through PATCH. Internal repair uses force_tenant_id.
+    if patch.get("force_tenant_id"):
+        d.tenant_id = _normalize_tenant_id(patch["force_tenant_id"])
+    elif patch.get("tenant_id") and _normalize_tenant_id(patch["tenant_id"]) != _driver_tenant_id(d):
+        raise ValueError(
+            "Απαγορεύεται η μεταφορά οδηγού σε άλλο γραφείο — κάθε οδηγός ανήκει σε ένα μόνο γραφείο"
+        )
     if patch.get("password"):
         pwd = str(patch["password"])
         if len(pwd) < 4:

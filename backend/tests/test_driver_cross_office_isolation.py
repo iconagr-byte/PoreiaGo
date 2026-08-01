@@ -53,14 +53,13 @@ class DriverCrossOfficeIsolationTests(unittest.TestCase):
         store.reset_drivers_cache()
 
         stamp = str(int(time.time() * 1000))[-6:]
-        self.shared_email = f"shared.{stamp}@example.com"
         self.password = "BusPass99"
 
         self.driver_poreiago = store.create_driver(
             {
                 "name": "Οδηγός PoreiaGo",
                 "license_no": f"LICP{stamp}",
-                "email": self.shared_email,
+                "email": f"poreiago.{stamp}@example.com",
                 "password": self.password,
                 "status": "active",
                 "tenant_id": OFFICE_POREIAGO,
@@ -70,7 +69,7 @@ class DriverCrossOfficeIsolationTests(unittest.TestCase):
             {
                 "name": "Οδηγός Achillio",
                 "license_no": f"LICA{stamp}",
-                "email": self.shared_email,
+                "email": f"achillio.{stamp}@example.com",
                 "password": self.password,
                 "status": "active",
                 "tenant_id": OFFICE_ACHILLIO,
@@ -95,25 +94,31 @@ class DriverCrossOfficeIsolationTests(unittest.TestCase):
             p.stop()
         self._tmpdir.cleanup()
 
-    def test_same_email_exists_independently_per_office(self):
-        poreiago_rows = self.store.list_drivers(tenant_id=OFFICE_POREIAGO)
-        achillio_rows = self.store.list_drivers(tenant_id=OFFICE_ACHILLIO)
-        self.assertEqual([d.id for d in poreiago_rows], [self.driver_poreiago.id])
-        self.assertEqual([d.id for d in achillio_rows], [self.driver_achillio.id])
-        self.assertNotEqual(self.driver_poreiago.id, self.driver_achillio.id)
+    def test_cannot_create_same_email_on_second_office(self):
+        with self.assertRaises(ValueError):
+            self.store.create_driver(
+                {
+                    "name": "Clone",
+                    "license_no": f"LICX{uuid4().hex[:6]}",
+                    "email": self.driver_poreiago.email,
+                    "password": self.password,
+                    "status": "active",
+                    "tenant_id": OFFICE_ACHILLIO,
+                }
+            )
 
     def test_authenticate_scoped_to_office(self):
         p = self.store.authenticate_driver(
-            self.shared_email, self.password, tenant_id=OFFICE_POREIAGO
+            self.driver_poreiago.email, self.password, tenant_id=OFFICE_POREIAGO
         )
         a = self.store.authenticate_driver(
-            self.shared_email, self.password, tenant_id=OFFICE_ACHILLIO
+            self.driver_achillio.email, self.password, tenant_id=OFFICE_ACHILLIO
         )
         self.assertEqual(p.id, self.driver_poreiago.id)
         self.assertEqual(a.id, self.driver_achillio.id)
         self.assertIsNone(
             self.store.authenticate_driver(
-                self.shared_email, self.password, tenant_id=str(uuid4())
+                self.driver_achillio.email, self.password, tenant_id=OFFICE_POREIAGO
             )
         )
 
@@ -124,43 +129,15 @@ class DriverCrossOfficeIsolationTests(unittest.TestCase):
         ):
             res = self.client.post(
                 "/api/driver/session/login",
-                json={"username": self.shared_email, "password": self.password},
+                json={"username": self.driver_poreiago.email, "password": self.password},
                 headers={"x-test-office-tenant": OFFICE_POREIAGO},
             )
         self.assertEqual(res.status_code, 200, res.text)
         body = res.json()
         self.assertEqual(body["tenant_id"], OFFICE_POREIAGO)
         self.assertEqual(body["driver_id"], self.driver_poreiago.id)
-        self.assertEqual(body["driver_name"], "Οδηγός PoreiaGo")
 
-    def test_login_on_achillio_returns_achillio_driver_only(self):
-        with patch(
-            "api.driver_portal.resolve_platform_tenant_id",
-            new=AsyncMock(return_value=OFFICE_ACHILLIO),
-        ):
-            res = self.client.post(
-                "/api/driver/session/login",
-                json={"username": self.shared_email, "password": self.password},
-                headers={"x-test-office-tenant": OFFICE_ACHILLIO},
-            )
-        self.assertEqual(res.status_code, 200, res.text)
-        body = res.json()
-        self.assertEqual(body["tenant_id"], OFFICE_ACHILLIO)
-        self.assertEqual(body["driver_id"], self.driver_achillio.id)
-        self.assertEqual(body["driver_name"], "Οδηγός Achillio")
-
-    def test_achillio_only_driver_rejected_on_poreiago_host(self):
-        stamp = str(int(time.time() * 1000))[-5:]
-        only_ach = self.store.create_driver(
-            {
-                "name": "Μόνο Achillio",
-                "license_no": f"LICX{stamp}",
-                "email": f"only.ach.{stamp}@example.com",
-                "password": self.password,
-                "status": "active",
-                "tenant_id": OFFICE_ACHILLIO,
-            }
-        )
+    def test_achillio_driver_rejected_on_poreiago_host(self):
         with patch(
             "api.driver_portal.resolve_platform_tenant_id",
             new=AsyncMock(return_value=OFFICE_ACHILLIO),
@@ -170,7 +147,7 @@ class DriverCrossOfficeIsolationTests(unittest.TestCase):
         ):
             res = self.client.post(
                 "/api/driver/session/login",
-                json={"username": only_ach.email, "password": self.password},
+                json={"username": self.driver_achillio.email, "password": self.password},
                 headers={"x-test-office-tenant": OFFICE_POREIAGO},
             )
         self.assertEqual(res.status_code, 401)
