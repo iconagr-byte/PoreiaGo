@@ -1,8 +1,32 @@
-/** Fleet operations hub — calendar, availability, documents, expenses, digest. */
+/** Fleet operations hub — settings-style card rail catalog. */
 
 export const FLEET_OPS_OVERVIEW_TAB = 'fleet';
 
-export const FLEET_OPS_ITEMS = [
+export const DEFAULT_FLEET_OPS_TAB = 'fleet_kpis';
+
+/** Full catalog for FleetOpsHub (Δείκτες → Ειδοποιήσεις). */
+export const FLEET_OPS_HUB_TABS = [
+  {
+    id: 'fleet_kpis',
+    label: 'Δείκτες στόλου',
+    description: 'KPIs, πληρότητα και απόδοση',
+    icon: 'analytics',
+    accent: 'violet',
+  },
+  {
+    id: 'driver_chat',
+    label: 'Chat Οδηγών',
+    description: 'Μηνύματα γραφείου ↔ οδηγός',
+    icon: 'forum',
+    accent: 'sky',
+  },
+  {
+    id: 'fleet_route_playback',
+    label: 'Ιστορικό Διαδρομής',
+    description: 'Playback GPS διαδρομών',
+    icon: 'route',
+    accent: 'indigo',
+  },
   {
     id: 'fleet_calendar',
     label: 'Ημερολόγιο',
@@ -26,7 +50,7 @@ export const FLEET_OPS_ITEMS = [
   },
   {
     id: 'fleet_expenses',
-    label: 'Έξοδα',
+    label: 'Έξοδα στόλου',
     description: 'Καύσιμα, διόδια & κόστη',
     icon: 'local_gas_station',
     accent: 'amber',
@@ -40,6 +64,32 @@ export const FLEET_OPS_ITEMS = [
   },
 ];
 
+/** Compact tiles still used on the fleet overview page. */
+export const FLEET_OPS_ITEMS = FLEET_OPS_HUB_TABS.filter((t) =>
+  [
+    'fleet_calendar',
+    'fleet_availability',
+    'fleet_documents',
+    'fleet_expenses',
+    'fleet_digest',
+  ].includes(t.id),
+).map((t) => ({
+  ...t,
+  label: t.id === 'fleet_expenses' ? 'Έξοδα' : t.label,
+}));
+
+const HUB_ID_SET = new Set(FLEET_OPS_HUB_TABS.map((t) => t.id));
+
+export function isFleetOpsSubTab(id) {
+  return HUB_ID_SET.has(String(id || '').trim());
+}
+
+export function sanitizeFleetOpsSubTab(id) {
+  const raw = String(id || '').trim();
+  if (HUB_ID_SET.has(raw)) return raw;
+  return DEFAULT_FLEET_OPS_TAB;
+}
+
 const ACCENT = {
   sky: {
     card: 'from-sky-50/90 to-blue-50/40 border-sky-100/80 hover:border-sky-200',
@@ -47,6 +97,15 @@ const ACCENT = {
     icon: 'bg-sky-500 text-white shadow-sky-200/60',
     badge: 'bg-sky-100 text-sky-800',
     badgeWarn: 'bg-rose-100 text-rose-800',
+    rail: 'sky',
+  },
+  indigo: {
+    card: 'from-indigo-50/90 to-blue-50/30 border-indigo-100/80 hover:border-indigo-200',
+    active: 'ring-2 ring-indigo-400/70 border-indigo-300 bg-white shadow-md',
+    icon: 'bg-indigo-500 text-white shadow-indigo-200/60',
+    badge: 'bg-indigo-100 text-indigo-800',
+    badgeWarn: 'bg-rose-100 text-rose-800',
+    rail: 'indigo',
   },
   emerald: {
     card: 'from-emerald-50/90 to-teal-50/30 border-emerald-100/80 hover:border-emerald-200',
@@ -54,6 +113,7 @@ const ACCENT = {
     icon: 'bg-emerald-500 text-white shadow-emerald-200/60',
     badge: 'bg-emerald-100 text-emerald-800',
     badgeWarn: 'bg-rose-100 text-rose-800',
+    rail: 'emerald',
   },
   violet: {
     card: 'from-violet-50/90 to-indigo-50/30 border-violet-100/80 hover:border-violet-200',
@@ -61,6 +121,7 @@ const ACCENT = {
     icon: 'bg-violet-500 text-white shadow-violet-200/60',
     badge: 'bg-violet-100 text-violet-800',
     badgeWarn: 'bg-rose-100 text-rose-800',
+    rail: 'violet',
   },
   amber: {
     card: 'from-amber-50/90 to-orange-50/30 border-amber-100/80 hover:border-amber-200',
@@ -68,6 +129,7 @@ const ACCENT = {
     icon: 'bg-amber-500 text-white shadow-amber-200/60',
     badge: 'bg-amber-100 text-amber-800',
     badgeWarn: 'bg-rose-100 text-rose-800',
+    rail: 'amber',
   },
   rose: {
     card: 'from-rose-50/90 to-orange-50/20 border-rose-100/80 hover:border-rose-200',
@@ -75,6 +137,7 @@ const ACCENT = {
     icon: 'bg-rose-500 text-white shadow-rose-200/60',
     badge: 'bg-rose-100 text-rose-800',
     badgeWarn: 'bg-rose-100 text-rose-800',
+    rail: 'rose',
   },
 };
 

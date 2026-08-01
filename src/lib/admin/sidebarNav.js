@@ -553,6 +553,7 @@ const BUS_ONLY_TABS = new Set([
   'lost_found',
   'bookings',
   'driver_scan',
+  'fleet_ops',
   ...FLEET_OPS_ONLY_IDS,
 ]);
 

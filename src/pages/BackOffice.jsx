@@ -17,10 +17,6 @@ import RecordCashPaymentModal from '../components/admin/RecordCashPaymentModal.j
 import FiscalMarkCell from '../components/admin/FiscalMarkCell.jsx';
 import toast, { Toaster } from 'react-hot-toast';
 import FleetLiveMapWebSocket from '../components/admin/FleetLiveMapWebSocket.jsx';
-import FleetRouteHistory from '../components/admin/FleetRouteHistory.jsx';
-import FleetKpisDashboard from '../components/admin/FleetKpisDashboard.jsx';
-import HybridSlaDashboard from '../components/admin/HybridSlaDashboard.jsx';
-import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
 import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
 import AdminNotificationBell from '../components/admin/AdminNotificationBell.jsx';
 import AdminAccountMenu from '../components/admin/AdminAccountMenu.jsx';
@@ -57,20 +53,20 @@ import {
 import { clearSaasSession, getSaasToken } from '../services/saasApi.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, DEFAULT_PLATFORM_TAB, sanitizeSettingsSubTab } from '../lib/admin/settingsTabs.js';
 import { DEFAULT_RENT_DESK_TAB, sanitizeRentDeskTab } from '../lib/admin/rentDeskNav.js';
+import {
+  DEFAULT_FLEET_OPS_TAB,
+  isFleetOpsSubTab,
+  sanitizeFleetOpsSubTab,
+} from '../lib/admin/fleetOpsHub.js';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import OfficeLogoChangeModal from '../components/admin/OfficeLogoChangeModal.jsx';
 import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
 import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
-import FleetCalendarPanel from '../components/admin/fleet/FleetCalendarPanel.jsx';
 import FleetRentalPanel from '../components/admin/fleet/FleetRentalPanel.jsx';
 import FleetOpsHubNav from '../components/admin/fleet/FleetOpsHubNav.jsx';
-import FleetOpsPageShell from '../components/admin/fleet/FleetOpsPageShell.jsx';
-import FleetAvailabilityPanel from '../components/admin/fleet/FleetAvailabilityPanel.jsx';
-import FleetDocumentsPanel from '../components/admin/fleet/FleetDocumentsPanel.jsx';
-import FleetExpensesPanel from '../components/admin/fleet/FleetExpensesPanel.jsx';
-import FleetDigestPanel from '../components/admin/fleet/FleetDigestPanel.jsx';
+import FleetOpsHub from '../components/admin/fleet/FleetOpsHub.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
 import OfficeSetupWizard, {
@@ -133,6 +129,17 @@ export default function BackOffice() {
     const fromQuery = params.get('rentTab') || params.get('fleetRentalTab');
     const fromState = location.state?.fleetRentalTab;
     return sanitizeRentDeskTab(fromQuery || fromState || DEFAULT_RENT_DESK_TAB);
+  });
+  const [fleetOpsSubTab, setFleetOpsSubTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('fleetOpsTab') || params.get('opsTab');
+    const fromState = location.state?.fleetOpsSubTab;
+    const tabHint = params.get('tab') || location.state?.activeTab;
+    if (isFleetOpsSubTab(fromQuery || fromState)) {
+      return sanitizeFleetOpsSubTab(fromQuery || fromState);
+    }
+    if (isFleetOpsSubTab(tabHint)) return sanitizeFleetOpsSubTab(tabHint);
+    return DEFAULT_FLEET_OPS_TAB;
   });
   const [trips, setTrips] = useState(() => loadTrips());
   const [routesMarket, setRoutesMarket] = useState(MARKET_DOMESTIC);
@@ -209,7 +216,14 @@ export default function BackOffice() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
-    if (tab) setActiveTab(tab);
+    if (tab) {
+      if (isFleetOpsSubTab(tab)) {
+        setFleetOpsSubTab(sanitizeFleetOpsSubTab(tab));
+        setActiveTab('fleet_ops');
+      } else {
+        setActiveTab(tab);
+      }
+    }
     const driverId = params.get('driverId');
     if (driverId) setChatFocusDriverId(driverId);
     const sub = params.get('sub') || params.get('settingsSubTab');
@@ -222,7 +236,19 @@ export default function BackOffice() {
       setActiveTab('fleet_rental');
       setFleetRentalTab(sanitizeRentDeskTab(rentTab));
     }
+    const opsTab = params.get('fleetOpsTab') || params.get('opsTab');
+    if (opsTab) {
+      setFleetOpsSubTab(sanitizeFleetOpsSubTab(opsTab));
+      setActiveTab('fleet_ops');
+    }
   }, [location.search]);
+
+  // Legacy deep links (?tab=driver_chat) → parent hub + sub-tab.
+  useEffect(() => {
+    if (!isFleetOpsSubTab(activeTab)) return;
+    setFleetOpsSubTab(sanitizeFleetOpsSubTab(activeTab));
+    setActiveTab('fleet_ops');
+  }, [activeTab]);
 
   useEffect(() => {
     const role = localStorage.getItem('userRole');
@@ -712,7 +738,10 @@ export default function BackOffice() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-5 items-stretch">
         <OfficeWalletShareCard />
         <DriverChatDashboardWidget
-          onOpenInbox={() => setActiveTab('driver_chat')}
+          onOpenInbox={() => {
+            setFleetOpsSubTab('driver_chat');
+            setActiveTab('fleet_ops');
+          }}
           onOpenLiveMap={() => setActiveTab('fleet_live_map')}
         />
       </div>
@@ -1482,7 +1511,17 @@ export default function BackOffice() {
               Παρακολούθηση οχημάτων, κατάσταση συντήρησης και οικονομικά στοιχεία.
             </p>
             <div className="mt-5">
-              <FleetOpsHubNav activeTab="fleet" onNavigate={setActiveTab} />
+              <FleetOpsHubNav
+                activeTab="fleet"
+                onNavigate={(id) => {
+                  if (id === 'fleet') {
+                    setActiveTab('fleet');
+                    return;
+                  }
+                  setFleetOpsSubTab(sanitizeFleetOpsSubTab(id));
+                  setActiveTab('fleet_ops');
+                }}
+              />
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -2328,9 +2367,11 @@ export default function BackOffice() {
         <SortableSidebarNav
           activeTab={activeTab}
           settingsSubTab={settingsSubTab}
+          fleetOpsSubTab={fleetOpsSubTab}
           fleetRentalTab={fleetRentalTab}
           onTabChange={setActiveTab}
           onSettingsSubTabChange={setSettingsSubTab}
+          onFleetOpsSubTabChange={setFleetOpsSubTab}
           onFleetRentalTabChange={setFleetRentalTab}
           onEmailClick={goToEmailMailbox}
           onNavigate={(path) => navigate(path)}
@@ -2344,9 +2385,11 @@ export default function BackOffice() {
         onClose={() => setMobileNavOpen(false)}
         activeTab={activeTab}
         settingsSubTab={settingsSubTab}
+        fleetOpsSubTab={fleetOpsSubTab}
         fleetRentalTab={fleetRentalTab}
         onTabChange={setActiveTab}
         onSettingsSubTabChange={setSettingsSubTab}
+        onFleetOpsSubTabChange={setFleetOpsSubTab}
         onFleetRentalTabChange={setFleetRentalTab}
         onEmailClick={goToEmailMailbox}
         onNavigate={(path) => navigate(path)}
@@ -2386,8 +2429,14 @@ export default function BackOffice() {
           <div className="flex items-center gap-3 sm:gap-6 shrink-0">
             <AdminNotificationBell
               onNavigate={(tab, extra = {}) => {
-                if (tab) setActiveTab(tab);
                 if (extra.driverId) setChatFocusDriverId(extra.driverId);
+                if (!tab) return;
+                if (isFleetOpsSubTab(tab)) {
+                  setFleetOpsSubTab(sanitizeFleetOpsSubTab(tab));
+                  setActiveTab('fleet_ops');
+                  return;
+                }
+                setActiveTab(tab);
               }}
             />
             <div className="pl-2 sm:pl-3 border-l border-black/[0.06]">
@@ -2453,22 +2502,19 @@ export default function BackOffice() {
                 <FleetLiveMapWebSocket />
               </div>
             )}
-            {activeTab === 'fleet_kpis' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300">
-                <FleetKpisDashboard />
-              </div>
-            )}
-            {activeTab === 'driver_chat' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300">
-                <DriverChatInbox
-                  initialDriverId={chatFocusDriverId}
+            {activeTab === 'fleet_ops' && (
+              <div className="pb-stack-lg max-w-7xl">
+                <FleetOpsHub
+                  initialTab={fleetOpsSubTab}
+                  onSubTabChange={setFleetOpsSubTab}
+                  chatFocusDriverId={chatFocusDriverId}
                   onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+                  onOpenFleet={() => setActiveTab('fleet')}
+                  onOpenPayments={() => {
+                    setSettingsSubTab('payments');
+                    setActiveTab('settings');
+                  }}
                 />
-              </div>
-            )}
-            {activeTab === 'fleet_route_playback' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300">
-                <FleetRouteHistory />
               </div>
             )}
             {activeTab === 'fleet_rental' && (
@@ -2486,40 +2532,6 @@ export default function BackOffice() {
                   }}
                 />
               </div>
-            )}
-            {activeTab === 'fleet_calendar' && (
-              <FleetOpsPageShell activeTab="fleet_calendar" onNavigate={setActiveTab}>
-                <FleetCalendarPanel
-                  onOpenDocuments={() => setActiveTab('fleet_documents')}
-                  onOpenFleet={() => setActiveTab('fleet')}
-                />
-              </FleetOpsPageShell>
-            )}
-            {activeTab === 'fleet_availability' && (
-              <FleetOpsPageShell activeTab="fleet_availability" onNavigate={setActiveTab}>
-                <FleetAvailabilityPanel />
-              </FleetOpsPageShell>
-            )}
-            {activeTab === 'fleet_documents' && (
-              <FleetOpsPageShell activeTab="fleet_documents" onNavigate={setActiveTab}>
-                <FleetDocumentsPanel />
-              </FleetOpsPageShell>
-            )}
-            {activeTab === 'fleet_expenses' && (
-              <FleetOpsPageShell activeTab="fleet_expenses" onNavigate={setActiveTab}>
-                <FleetExpensesPanel />
-              </FleetOpsPageShell>
-            )}
-            {activeTab === 'fleet_digest' && (
-              <FleetOpsPageShell activeTab="fleet_digest" onNavigate={setActiveTab}>
-                <FleetDigestPanel
-                  onOpenPayments={() => {
-                    setSettingsSubTab('payments');
-                    setActiveTab('settings');
-                  }}
-                  onOpenCalendar={() => setActiveTab('fleet_calendar')}
-                />
-              </FleetOpsPageShell>
             )}
             {activeTab === 'lost_found' && renderLostFound()}
             {activeTab === 'email' && (
