@@ -245,11 +245,27 @@ async def lifespan(app: FastAPI):
         sealed = seal_cross_office_driver_uniqueness()
         if sealed.get("removed"):
             __import__("logging").getLogger("poreiago.startup").info(
-                "SEAL cross-office drivers: removed %s duplicate(s)", sealed["removed"]
+                "SEAL cross-office drivers: removed %s DEMO duplicate(s)", sealed["removed"]
+            )
+        if sealed.get("skipped_real_conflicts"):
+            __import__("logging").getLogger("poreiago.startup").warning(
+                "SEAL: %s real-office driver conflict(s) left for manual review",
+                sealed["skipped_real_conflicts"],
             )
     except Exception as exc:
         __import__("logging").getLogger("poreiago.startup").warning(
             "Seed demo driver purge / SEAL skipped: %s", exc
+        )
+    try:
+        from travel_platform.settings.drivers_store import repair_achillio_home_drivers
+
+        repaired = await repair_achillio_home_drivers()
+        __import__("logging").getLogger("poreiago.startup").info(
+            "Achillio driver rehome: %s", repaired
+        )
+    except Exception as exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Achillio driver rehome skipped: %s", exc
         )
     try:
         from app.core.database import AsyncSessionLocal

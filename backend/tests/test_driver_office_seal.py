@@ -127,6 +127,15 @@ class DriverOfficeSealTests(unittest.TestCase):
                     }
                 )
 
+    def test_rehome_moves_driver_to_achillio(self):
+        row = self._create(email="axilleas0@yahoo.gr", tenant_id=OFFICE_A)
+        result = store.rehome_driver_to_tenant("axilleas0@yahoo.gr", OFFICE_B)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["moved"], 1)
+        store.reset_drivers_cache()
+        again = store.get_driver(row.id)
+        self.assertEqual(again.tenant_id, OFFICE_B)
+
 
 if __name__ == "__main__":
     unittest.main()
