@@ -229,7 +229,7 @@ export default function TripCard({
   // premium (default) — solo = narrower card for new offices with one trip
   return (
     <article
-      className={`relative group bg-gradient-to-b from-white to-[#f8f9fa] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden ${
+      className={`relative group h-full bg-gradient-to-b from-white to-[#f8f9fa] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden ${
         solo ? 'rounded-[22px]' : 'rounded-[32px]'
       }`}
     >
@@ -261,7 +261,7 @@ export default function TripCard({
           </div>
         )}
       </div>
-      <div className={`flex flex-col flex-1 relative ${solo ? 'p-4 sm:p-5' : 'p-8'}`}>
+      <div className={`flex flex-col flex-1 relative min-h-0 ${solo ? 'p-4 sm:p-5' : 'p-8'}`}>
         <h3
           className={`text-on-surface font-bold tracking-tight ${
             solo ? 'text-lg mb-2.5' : 'font-headline-md mb-4'
@@ -273,8 +273,8 @@ export default function TripCard({
           <TripMeta trip={trip} compact={solo} />
         </div>
         <div
-          className={`flex items-end justify-between border-t border-black/[0.04] ${
-            solo ? 'pt-3.5 gap-2' : 'pt-6'
+          className={`mt-auto flex items-end justify-between gap-3 border-t border-black/[0.04] ${
+            solo ? 'pt-3.5' : 'pt-6'
           }`}
         >
           <TripPriceDisplay

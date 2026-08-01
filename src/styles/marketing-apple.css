@@ -80,3 +80,38 @@
 .pg-apple .text-primary {
   color: var(--pg-apple-blue);
 }
+
+/* Trip cards band — cooler panel so white frames read clearly */
+.pg-apple-trips-band {
+  font-family: var(--pg-apple-font);
+  -webkit-font-smoothing: antialiased;
+  color: var(--pg-apple-ink);
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(0, 113, 227, 0.1), transparent 58%),
+    radial-gradient(ellipse 50% 40% at 100% 80%, rgba(15, 23, 42, 0.05), transparent 55%),
+    linear-gradient(180deg, #dfe3ec 0%, #e8ebf2 42%, #e2e6ef 100%);
+}
+
+.pg-apple-trips-band #platform-trips {
+  background: transparent !important;
+}
+
+.pg-apple-trips-band #platform-trips > div:first-child .text-on-surface,
+.pg-apple-trips-band #platform-trips h2 {
+  color: var(--pg-apple-ink);
+}
+
+.pg-apple-trips-band article {
+  height: 100%;
+  background: #ffffff !important;
+  border: 1px solid rgba(15, 23, 42, 0.1) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 14px 36px rgba(15, 23, 42, 0.1) !important;
+}
+
+.pg-apple-trips-band article:hover {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 22px 48px rgba(15, 23, 42, 0.14) !important;
+}

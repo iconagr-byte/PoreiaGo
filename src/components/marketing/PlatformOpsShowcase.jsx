@@ -50,7 +50,7 @@ export default function PlatformOpsShowcase() {
         </nav>
       </div>
 
-      <div className="pg-apple border-t border-black/[0.04]">
+      <div className="pg-apple-trips-band border-t border-black/[0.06]">
         <TripsSection
           id="platform-trips"
           eyebrow="Εκδρομές"
@@ -64,6 +64,7 @@ export default function PlatformOpsShowcase() {
             trip_card_template: 'premium',
           }}
           pricingSettings={DEFAULT_PLATFORM_SETTINGS}
+          sectionClassName="!bg-transparent"
         />
       </div>
 

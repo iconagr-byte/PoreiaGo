@@ -298,12 +298,13 @@ export function tripsGridClass(layoutId, tripCount = 0) {
 export function tripCardWrapperClass(layoutId, tripCount = 0) {
   if (layoutId === 'horizontal_scroll') {
     if (tripCount === 1) {
-      return 'w-full max-w-[320px] sm:max-w-[360px]';
+      return 'w-full max-w-[320px] sm:max-w-[360px] h-full';
     }
-    return 'snap-start shrink-0 w-[min(88vw,300px)]';
+    return 'snap-start shrink-0 w-[min(88vw,300px)] h-full';
   }
   if (layoutId === 'masonry_two') {
     return 'break-inside-avoid mb-6';
   }
-  return '';
+  // Equal-height cards in CSS grids (items stretch; children fill).
+  return 'h-full';
 }
