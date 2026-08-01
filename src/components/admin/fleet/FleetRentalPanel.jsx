@@ -30,6 +30,7 @@ import RentalCalendarBoard from './RentalCalendarBoard.jsx';
 import RentAppShareBanner from './RentAppShareBanner.jsx';
 import RentPlanCardsEditor from './RentPlanCardsEditor.jsx';
 import RentalPaperworkDesk from './RentalPaperworkDesk.jsx';
+import RentalDeskBookingWizard from './RentalDeskBookingWizard.jsx';
 import RentAppBrandingEditor from './RentAppBrandingEditor.jsx';
 import RentPickupLocationsEditor from './RentPickupLocationsEditor.jsx';
 import RentCoverageExtrasEditor from './RentCoverageExtrasEditor.jsx';
@@ -46,8 +47,6 @@ import {
   RENT_CATEGORY_OPTIONS,
 } from '../../../lib/rental/rentVehicleCategories.js';
 import '../../../styles/rental-admin-apple.css';
-
-const CATEGORIES = RENT_CATEGORY_OPTIONS;
 
 const TABS = RENT_DESK_TABS;
 
@@ -146,7 +145,7 @@ export default function FleetRentalPanel({
     start_time: '',
     end_time: '',
     category: '',
-    min_seats: 5,
+    min_seats: 2,
     pickup_location: 'Γραφείο',
     dropoff_location: 'Γραφείο',
     client_name: '',
@@ -337,7 +336,7 @@ export default function FleetRentalPanel({
         email,
         phone: wiz.client_phone || '',
       });
-      await createRentalBooking({
+      const booking = await createRentalBooking({
         vehicle_id: wiz.vehicle_id,
         client_id: person?.id || null,
         client_name: wiz.client_name.trim(),
@@ -350,22 +349,25 @@ export default function FleetRentalPanel({
         dropoff_location: wiz.dropoff_location || wiz.pickup_location,
         driver_mode: wiz.driver_mode,
       });
-      toast.success(
-        person
-          ? `Κράτηση + πελάτης ${person.id}`
-          : 'Η κράτηση ενοικίασης καταχωρήθηκε',
-      );
-      setWiz((w) => ({
-        ...w,
+      toast.success('Η κράτηση καταχωρήθηκε — άνοιξε Χαρτούρα για υπογραφή');
+      setWiz({
         step: 1,
+        start_time: '',
+        end_time: '',
+        category: '',
+        min_seats: 2,
+        pickup_location: 'Γραφείο',
+        dropoff_location: 'Γραφείο',
         client_name: '',
-        client_email: '',
         client_phone: '',
-        suggestions: [],
+        client_email: '',
+        driver_mode: 'SELF_DRIVE',
         vehicle_id: '',
-      }));
-      setTab('clients');
+        suggestions: [],
+      });
       await reload();
+      if (booking?.id) openPaperwork(booking.id);
+      else setTab('paperwork');
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -907,218 +909,14 @@ export default function FleetRentalPanel({
       )}
 
       {tab === 'wizard' && (
-        <div className="bg-white rounded-2xl border border-black/[0.06] p-5 max-w-3xl space-y-4">
-          <div className="flex items-center gap-2 text-sm font-bold text-gray-500">
-            <span className={wiz.step >= 1 ? 'text-primary' : ''}>1. Ημερομηνίες</span>
-            <span>→</span>
-            <span className={wiz.step >= 2 ? 'text-primary' : ''}>2. Όχημα</span>
-            <span>→</span>
-            <span className={wiz.step >= 3 ? 'text-primary' : ''}>3. Πελάτης</span>
-          </div>
-
-          {wiz.step === 1 && (
-            <div className="grid sm:grid-cols-2 gap-3">
-              <label className="block text-xs font-bold text-gray-500">
-                Παραλαβή
-                <input
-                  type="datetime-local"
-                  required
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.start_time}
-                  onChange={(e) => setWiz((w) => ({ ...w, start_time: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                Επιστροφή
-                <input
-                  type="datetime-local"
-                  required
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.end_time}
-                  onChange={(e) => setWiz((w) => ({ ...w, end_time: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                Κατηγορία
-                <select
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.category}
-                  onChange={(e) => setWiz((w) => ({ ...w, category: e.target.value }))}
-                >
-                  <option value="">Όλες</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                Ελάχ. θέσεις
-                <input
-                  type="number"
-                  min={2}
-                  max={80}
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.min_seats}
-                  onChange={(e) => setWiz((w) => ({ ...w, min_seats: Number(e.target.value) }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                Σημείο παραλαβής
-                <input
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.pickup_location}
-                  onChange={(e) => setWiz((w) => ({ ...w, pickup_location: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                Σημείο επιστροφής
-                <input
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.dropoff_location}
-                  onChange={(e) => setWiz((w) => ({ ...w, dropoff_location: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500 sm:col-span-2">
-                Οδηγός
-                <select
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.driver_mode}
-                  onChange={(e) => setWiz((w) => ({ ...w, driver_mode: e.target.value }))}
-                >
-                  <option value="SELF_DRIVE">Self-drive</option>
-                  <option value="WITH_DRIVER">Με οδηγό PoreiaGo</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={runAvailability}
-                className="sm:col-span-2 py-3 rounded-xl bg-primary text-white font-bold"
-              >
-                Εύρεση διαθέσιμων
-              </button>
-            </div>
-          )}
-
-          {wiz.step === 2 && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">
-                Προτάσεις με βάση θέσεις & τιμή (χωρίς double-booking).
-              </p>
-              {wiz.suggestions.map((v) => (
-                <label
-                  key={v.id}
-                  className={`flex items-center gap-3 rounded-xl border px-3 py-3 cursor-pointer ${
-                    wiz.vehicle_id === v.id ? 'border-primary bg-sky-50' : 'border-black/[0.08]'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="vehicle"
-                    checked={wiz.vehicle_id === v.id}
-                    onChange={() => setWiz((w) => ({ ...w, vehicle_id: v.id }))}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-sm">
-                      {v.plate_number} · {v.model}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {v.category} · {v.seating_capacity} θέσεις · {v.suggested_days} ημέρες ·{' '}
-                      {euro(v.suggested_total)}
-                      {v.one_way_surcharge > 0 || v.driver_surcharge > 0
-                        ? ` (βάση ${euro(v.base_total)}${
-                            v.driver_surcharge > 0 ? ` + οδηγός ${euro(v.driver_surcharge)}` : ''
-                          }${
-                            v.one_way_surcharge > 0 ? ` + one-way ${euro(v.one_way_surcharge)}` : ''
-                          })`
-                        : ''}
-                    </p>
-                  </div>
-                </label>
-              ))}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded-xl border text-sm font-bold"
-                  onClick={() => setWiz((w) => ({ ...w, step: 1 }))}
-                >
-                  Πίσω
-                </button>
-                <button
-                  type="button"
-                  disabled={!wiz.vehicle_id}
-                  className="flex-1 py-2.5 rounded-xl bg-primary text-white font-bold disabled:opacity-50"
-                  onClick={() => setWiz((w) => ({ ...w, step: 3 }))}
-                >
-                  Συνέχεια
-                </button>
-              </div>
-            </div>
-          )}
-
-          {wiz.step === 3 && (
-            <div className="grid sm:grid-cols-2 gap-3">
-              <label className="block text-xs font-bold text-gray-500 sm:col-span-2">
-                Ονοματεπώνυμο πελάτη
-                <input
-                  required
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.client_name}
-                  onChange={(e) => setWiz((w) => ({ ...w, client_name: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                Τηλέφωνο
-                <input
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.client_phone}
-                  onChange={(e) => setWiz((w) => ({ ...w, client_phone: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500">
-                Email πελάτη *
-                <input
-                  type="email"
-                  required
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  placeholder="για καρτέλα φυσικού προσώπου"
-                  value={wiz.client_email}
-                  onChange={(e) => setWiz((w) => ({ ...w, client_email: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs font-bold text-gray-500 sm:col-span-2">
-                Οδηγός
-                <select
-                  className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold"
-                  value={wiz.driver_mode}
-                  onChange={(e) => setWiz((w) => ({ ...w, driver_mode: e.target.value }))}
-                >
-                  <option value="SELF_DRIVE">Self-drive</option>
-                  <option value="WITH_DRIVER">Με οδηγό PoreiaGo</option>
-                </select>
-              </label>
-              <div className="sm:col-span-2 flex gap-2">
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded-xl border text-sm font-bold"
-                  onClick={() => setWiz((w) => ({ ...w, step: 2 }))}
-                >
-                  Πίσω
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={confirmBooking}
-                  className="flex-1 py-2.5 rounded-xl bg-primary text-white font-bold"
-                >
-                  Επιβεβαίωση κράτησης
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <RentalDeskBookingWizard
+          wiz={wiz}
+          setWiz={setWiz}
+          busy={busy}
+          onSearchAvailability={runAvailability}
+          onConfirm={confirmBooking}
+          onCancel={() => setTab('bookings')}
+        />
       )}
 
       {tab === 'bookings' && (
