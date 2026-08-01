@@ -75,10 +75,10 @@ export default function FleetOpsHub({
   };
 
   return (
-    <div className="fleet-ops-hub animate-in fade-in duration-300">
-      <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 items-start">
-        <aside className="w-full lg:w-[17.5rem] xl:w-72 shrink-0 lg:sticky lg:top-4">
-          <div className="rounded-[28px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3 sm:p-3.5 space-y-4">
+    <div className="fleet-ops-hub animate-in fade-in duration-300 w-full">
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
+        <aside className="w-full lg:w-[15.5rem] xl:w-64 shrink-0 lg:sticky lg:top-3 self-start">
+          <div className="rounded-[24px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-2.5 sm:p-3 space-y-3">
             <div className="px-1.5 pt-0.5">
               <p className="text-[11px] font-bold uppercase tracking-wide text-sky-700/80">
                 Λειτουργίες Στόλου
