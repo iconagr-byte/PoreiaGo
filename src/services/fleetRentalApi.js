@@ -188,6 +188,22 @@ export async function createRentalSignLink(bookingId, publicBaseUrl) {
   });
 }
 
+/**
+ * Clear issued/wrong signature (even if ACTIVE) and optionally send a new remote link.
+ */
+export async function resetRentalSignature(
+  bookingId,
+  { sendLink = true, publicBaseUrl } = {},
+) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/reset-signature`, {
+    method: 'POST',
+    body: JSON.stringify({
+      send_link: Boolean(sendLink),
+      public_base_url: publicBaseUrl || window.location.origin,
+    }),
+  });
+}
+
 /** Poll agent tablet while waiting for remote client signature. */
 export async function fetchRentalCheckoutStatus(bookingId) {
   return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/checkout-status`);

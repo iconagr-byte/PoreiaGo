@@ -154,3 +154,33 @@ def test_in_person_checkout_sets_signing_method(isolated_rental):
     assert result["signing_method"] == "IN_PERSON"
     assert result["booking"]["signing_method"] == "IN_PERSON"
     assert result["contract_status"] == "ACTIVE"
+
+
+def test_reset_signature_allows_new_remote_link(isolated_rental):
+    tid = "cccccccc-dddd-eeee-ffff-000000000006"
+    booking = _seed_booking(tid)
+    store.complete_rental_checkout(
+        tid,
+        booking["id"],
+        {
+            "signature_url": "/api/site/rental-photos/sig.png",
+            "signer_name": "Μαρία",
+            "accepted_terms": _TERMS,
+            "signing_method": "REMOTE",
+        },
+    )
+    with pytest.raises(ValueError, match="ήδη εκδοθεί"):
+        store.create_signature_link(tid, booking["id"])
+
+    reset = store.reset_rental_signature(tid, booking["id"])
+    assert reset["rental_status"] == "CONFIRMED"
+    assert reset["contract_issued_at"] is None
+    assert reset["contract_pdf_url"] is None
+    assert reset["legal_doc_signatures"] == {}
+    assert reset["signature_pending"] is False
+
+    link = store.create_signature_link(tid, booking["id"])
+    assert link["signature_token"]
+    status = store.get_checkout_status(tid, booking["id"])
+    assert status["signature_pending"] is True
+    assert status["signed"] is False

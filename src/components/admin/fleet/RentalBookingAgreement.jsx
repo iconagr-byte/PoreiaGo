@@ -3,7 +3,10 @@
  */
 import { useEffect, useState } from 'react';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
-import { openRentalContractFile } from '../../../services/fleetRentalApi.js';
+import {
+  openRentalContractFile,
+  resetRentalSignature,
+} from '../../../services/fleetRentalApi.js';
 import {
   legalDocById,
   legalPackProgress,
@@ -52,9 +55,17 @@ export default function RentalBookingAgreement({
   onToast,
 }) {
   const [booking, setBooking] = useState(bookingProp);
+  const [openingContract, setOpeningContract] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
   useEffect(() => {
     setBooking(bookingProp);
   }, [bookingProp]);
+
+  const handleUpdated = (updated) => {
+    if (updated?.id) setBooking(updated);
+    onBookingUpdated?.(updated);
+  };
+
   if (!booking) return null;
 
   const paper = paperworkStatusForBooking(booking, inspections);
@@ -68,8 +79,6 @@ export default function RentalBookingAgreement({
     window.print();
   };
 
-  const [openingContract, setOpeningContract] = useState(false);
-
   const openIssuedContract = async () => {
     if (!booking.contract_pdf_url || openingContract) return;
     setOpeningContract(true);
@@ -82,9 +91,38 @@ export default function RentalBookingAgreement({
     }
   };
 
-  const handleUpdated = (updated) => {
-    if (updated?.id) setBooking(updated);
-    onBookingUpdated?.(updated);
+  const canResetSignature =
+    Boolean(booking.contract_issued_at) ||
+    Boolean(booking.contract_pdf_url) ||
+    (legal.signedCount || 0) > 0 ||
+    Boolean(booking.signature_pending);
+
+  const clearAndResendLink = async () => {
+    if (!booking?.id || resetBusy) return;
+    const ok = window.confirm(
+      'Καθαρισμός υπογραφής / σύμβασης και αποστολή νέου link στον πελάτη;',
+    );
+    if (!ok) return;
+    setResetBusy(true);
+    try {
+      const result = await resetRentalSignature(booking.id, {
+        sendLink: true,
+        publicBaseUrl: window.location.origin,
+      });
+      const updated = result.booking || result;
+      handleUpdated(updated);
+      onToast?.(
+        'success',
+        result.sign_url
+          ? 'Καθαρίστηκε — στάλθηκε νέο link υπογραφής'
+          : 'Καθαρίστηκε η υπογραφή',
+      );
+      if (onOpenCheckout) onOpenCheckout();
+    } catch (err) {
+      onToast?.('error', err?.message || 'Αποτυχία καθαρισμού');
+    } finally {
+      setResetBusy(false);
+    }
   };
 
   return (
@@ -118,6 +156,18 @@ export default function RentalBookingAgreement({
             >
               <span className="material-symbols-outlined text-[18px]">draw</span>
               Ψηφιακή υπογραφή
+            </button>
+          ) : null}
+          {canResetSignature ? (
+            <button
+              type="button"
+              disabled={resetBusy}
+              onClick={clearAndResendLink}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-900 text-sm font-bold disabled:opacity-50"
+              title="Σβήνει την υπογραφή/σύμβαση και στέλνει νέο link 24ωρών"
+            >
+              <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+              {resetBusy ? 'Αποστολή…' : 'Καθαρισμός & νέο link'}
             </button>
           ) : null}
           {booking.contract_pdf_url ? (
