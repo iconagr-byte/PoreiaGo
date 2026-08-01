@@ -1,9 +1,37 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AGENCY_PLANS, BILLING_INTERVALS, displayPrice } from '../../lib/billing/planCatalog.js';
+import {
+  AGENCY_PLANS,
+  BILLING_INTERVALS,
+  displayPrice,
+  listVisibleAgencyPlans,
+} from '../../lib/billing/planCatalog.js';
 import { CAMPAIGN_TEMPLATE_COUNT, PLATFORM_NAME } from '../../lib/marketing/platformCopy.js';
+import { fetchPublicAgencyPlanCatalog } from '../../services/agencyPlanCatalogApi.js';
 
 export default function AgencyPlansHook({ variant = 'hero' }) {
-  const pro = AGENCY_PLANS.find((p) => p.id === 'professional');
+  const [plans, setPlans] = useState(() => listVisibleAgencyPlans(AGENCY_PLANS));
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      fetchPublicAgencyPlanCatalog()
+        .then((data) => {
+          if (!cancelled) setPlans(listVisibleAgencyPlans(data));
+        })
+        .catch(() => {});
+    };
+    load();
+    const onChange = () => load();
+    window.addEventListener('agency-plan-catalog-changed', onChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('agency-plan-catalog-changed', onChange);
+    };
+  }, []);
+
+  const priced = plans.filter((p) => !p.contactSales);
+  const pro = priced.find((p) => p.highlighted) || priced[0] || AGENCY_PLANS[1];
   const price = displayPrice(pro, 'month');
 
   if (variant === 'compact') {
@@ -14,7 +42,10 @@ export default function AgencyPlansHook({ variant = 'hero' }) {
       >
         <span className="material-symbols-outlined text-[18px]">storefront</span>
         Γραφείο ταξιδιών;
-        <span className="text-indigo-200 group-hover:text-white">Συμβόλαια από {price.label}{price.suffix}</span>
+        <span className="text-indigo-200 group-hover:text-white">
+          Συμβόλαια από {price.label}
+          {price.suffix}
+        </span>
         <span className="material-symbols-outlined text-[16px] opacity-80">arrow_forward</span>
       </Link>
     );
@@ -23,9 +54,9 @@ export default function AgencyPlansHook({ variant = 'hero' }) {
   return (
     <section
       id="agency-saas"
-      className="relative overflow-hidden rounded-[32px] border border-indigo-200/80 bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 text-white p-8 md:p-12 shadow-2xl"
+      className="relative overflow-hidden rounded-[32px] border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950 text-white p-8 md:p-12 shadow-2xl"
     >
-      <div className="absolute top-0 right-0 w-72 h-72 bg-sky-400/20 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 right-0 w-72 h-72 bg-sky-400/15 rounded-full blur-[100px] pointer-events-none" />
       <div className="relative z-10 grid lg:grid-cols-2 gap-10 items-center">
         <div>
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-bold uppercase tracking-wider mb-4">
@@ -42,7 +73,7 @@ export default function AgencyPlansHook({ variant = 'hero' }) {
           <div className="flex flex-wrap gap-3">
             <Link
               to="/grafeia/signup"
-              className="inline-flex items-center gap-2 px-6 py-3.5 bg-white text-indigo-950 rounded-full font-bold hover:scale-[1.02] transition-transform shadow-lg"
+              className="inline-flex items-center gap-2 px-6 py-3.5 bg-white text-slate-950 rounded-full font-bold hover:scale-[1.02] transition-transform shadow-lg"
             >
               Εγγραφή γραφείου
               <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
@@ -56,7 +87,7 @@ export default function AgencyPlansHook({ variant = 'hero' }) {
           </div>
         </div>
         <div className="grid gap-3">
-          {AGENCY_PLANS.filter((p) => !p.contactSales).map((plan) => {
+          {priced.slice(0, 4).map((plan) => {
             const m = displayPrice(plan, 'month');
             const y = displayPrice(plan, 'year');
             return (
@@ -78,9 +109,12 @@ export default function AgencyPlansHook({ variant = 'hero' }) {
                       {m.label}
                       <span className="text-sm font-medium text-white/70">{m.suffix}</span>
                     </p>
-                    <p className="text-[11px] text-emerald-300 font-semibold">
-                      ή {y.label}{y.suffix} · {BILLING_INTERVALS.year.badge}
-                    </p>
+                    {y.amount != null ? (
+                      <p className="text-[11px] text-emerald-300 font-semibold">
+                        ή {y.label}
+                        {y.suffix} · {BILLING_INTERVALS.year.badge}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>

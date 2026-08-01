@@ -7,6 +7,10 @@ import {
   RENT_ADDON,
   RENT_STANDALONE_PLAN,
   displayPrice,
+  isBillablePlanId,
+  listVisibleAgencyPlans,
+  mergeAgencyPlanCatalog,
+  mergeRentPlanCatalog,
   rentAddonDisplayPrice,
 } from '../../lib/billing/planCatalog.js';
 import {
@@ -19,6 +23,10 @@ import {
 } from '../../services/billingApi.js';
 import { fetchAdminOfficeModules } from '../../services/officeModulesApi.js';
 import { getSaasToken } from '../../services/saasApi.js';
+import { fetchPublicAgencyPlanCatalog } from '../../services/agencyPlanCatalogApi.js';
+import { fetchPublicRentPlanCatalog } from '../../services/rentPlanCatalogApi.js';
+import AgencyPlanCatalogEditor from './AgencyPlanCatalogEditor.jsx';
+import RentPlanCardsEditor from './fleet/RentPlanCardsEditor.jsx';
 
 const PLAN_ICONS = {
   starter: 'storefront',
@@ -70,14 +78,14 @@ function daysUntil(iso) {
   return Math.ceil((end - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-function planDisplayName(planId) {
-  if (planId === RENT_STANDALONE_PLAN.id) return RENT_STANDALONE_PLAN.name;
-  return AGENCY_PLANS.find((p) => p.id === planId)?.name || planId || '—';
+function planDisplayName(planId, agencyPlans = AGENCY_PLANS, rentStandalone = RENT_STANDALONE_PLAN) {
+  if (planId === rentStandalone.id) return rentStandalone.name;
+  return agencyPlans.find((p) => p.id === planId)?.name || planId || '—';
 }
 
-function findCatalogPlan(planId) {
-  if (planId === RENT_STANDALONE_PLAN.id) return RENT_STANDALONE_PLAN;
-  return AGENCY_PLANS.find((p) => p.id === planId) || AGENCY_PLANS[1];
+function findCatalogPlan(planId, agencyPlans = AGENCY_PLANS, rentStandalone = RENT_STANDALONE_PLAN) {
+  if (planId === rentStandalone.id) return rentStandalone;
+  return agencyPlans.find((p) => p.id === planId) || agencyPlans[1] || AGENCY_PLANS[1];
 }
 
 export default function ContractsPanel({
@@ -88,11 +96,27 @@ export default function ContractsPanel({
   const [sub, setSub] = useState(null);
   const [billingConfig, setBillingConfig] = useState(null);
   const [modules, setModules] = useState(null);
+  const [agencyCatalog, setAgencyCatalog] = useState(() => mergeAgencyPlanCatalog(null));
+  const [rentCatalog, setRentCatalog] = useState(() => mergeRentPlanCatalog(null));
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [interval, setInterval] = useState(initialInterval);
   const [selectedPlan, setSelectedPlan] = useState(initialPlan || 'professional');
   const rentSectionRef = useRef(null);
+
+  const agencyPlans = agencyCatalog.plans || AGENCY_PLANS;
+  const visibleAgencyPlans = listVisibleAgencyPlans(agencyCatalog);
+  const rentAddon = rentCatalog.addon || RENT_ADDON;
+  const rentStandalone = rentCatalog.standalone || RENT_STANDALONE_PLAN;
+
+  const loadCatalogs = useCallback(async () => {
+    const [agency, rent] = await Promise.all([
+      fetchPublicAgencyPlanCatalog().catch(() => mergeAgencyPlanCatalog(null)),
+      fetchPublicRentPlanCatalog().catch(() => mergeRentPlanCatalog(null)),
+    ]);
+    setAgencyCatalog(agency);
+    setRentCatalog(rent);
+  }, []);
 
   const load = useCallback(async () => {
     if (!getSaasToken()) {
@@ -107,6 +131,7 @@ export default function ContractsPanel({
         fetchBillingConfig().catch(() => null),
         fetchAdminOfficeModules().catch(() => null),
       ]);
+      await loadCatalogs();
       setSub(subscription);
       setBillingConfig(config);
       setModules(officeModules);
@@ -120,7 +145,7 @@ export default function ContractsPanel({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadCatalogs]);
 
   useEffect(() => {
     // Initial subscription fetch — setState happens after the async resolve.
@@ -131,7 +156,16 @@ export default function ContractsPanel({
       toast.success('Το συμβόλαιο ενεργοποιήθηκε — ενημερώνουμε…');
       void load();
     }
-  }, [load]);
+    const onCatalog = () => {
+      void loadCatalogs();
+    };
+    window.addEventListener('agency-plan-catalog-changed', onCatalog);
+    window.addEventListener('rent-plan-catalog-changed', onCatalog);
+    return () => {
+      window.removeEventListener('agency-plan-catalog-changed', onCatalog);
+      window.removeEventListener('rent-plan-catalog-changed', onCatalog);
+    };
+  }, [load, loadCatalogs]);
 
   useEffect(() => {
     if (!focusRentModule || loading) return;
@@ -147,6 +181,10 @@ export default function ContractsPanel({
   }
 
   const startCheckout = async () => {
+    if (!isBillablePlanId(selectedPlan)) {
+      toast.error('Αυτό το πλάνο είναι μόνο για marketing — επιλέξτε Starter, Professional ή Rent');
+      return;
+    }
     setWorking(true);
     try {
       const { checkout_url: url } = await createBillingCheckout(selectedPlan, interval);
@@ -160,6 +198,10 @@ export default function ContractsPanel({
   };
 
   const startTrial = async () => {
+    if (!isBillablePlanId(selectedPlan)) {
+      toast.error('Αυτό το πλάνο είναι μόνο για marketing — επιλέξτε Starter, Professional ή Rent');
+      return;
+    }
     setWorking(true);
     try {
       const updated = await startBillingTrial(selectedPlan, interval);
@@ -208,9 +250,9 @@ export default function ContractsPanel({
     }
   };
 
-  const catalogPlan = findCatalogPlan(selectedPlan);
+  const catalogPlan = findCatalogPlan(selectedPlan, agencyPlans, rentStandalone);
   const quote = displayPrice(catalogPlan, interval);
-  const addonQuote = rentAddonDisplayPrice(interval, RENT_ADDON);
+  const addonQuote = rentAddonDisplayPrice(interval, rentAddon);
   const checkoutReady = billingConfig?.checkout_ready === true;
   const demoMode = billingConfig?.demo_mode === true;
   const trialDays = billingConfig?.trial_days || 14;
@@ -308,7 +350,9 @@ export default function ContractsPanel({
               <span className="material-symbols-outlined text-[15px]">{statusMeta.icon}</span>
               {statusMeta.label}
             </span>
-            <span className="text-sm font-bold text-slate-900">{planDisplayName(sub.plan)}</span>
+            <span className="text-sm font-bold text-slate-900">
+              {planDisplayName(sub.plan, agencyPlans, rentStandalone)}
+            </span>
             <span className="text-xs text-slate-500">
               Λήξη {formatDate(periodEnd)}
               {remaining != null && remaining >= 0 ? ` · ${remaining} ημ.` : ''}
@@ -335,6 +379,9 @@ export default function ContractsPanel({
       </div>
 
       <div className="p-6 space-y-5">
+        <AgencyPlanCatalogEditor compact />
+        <RentPlanCardsEditor />
+
         {loading ? (
           <div className="h-40 animate-pulse rounded-[22px] bg-slate-100" />
         ) : (
@@ -371,8 +418,8 @@ export default function ContractsPanel({
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {AGENCY_PLANS.map((plan) => {
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3 items-stretch">
+              {visibleAgencyPlans.map((plan) => {
                 const p = displayPrice(plan, interval);
                 const active = selectedPlan === plan.id;
                 const isCurrent = sub?.plan === plan.id;
@@ -380,9 +427,11 @@ export default function ContractsPanel({
                   <button
                     key={plan.id}
                     type="button"
-                    onClick={() => !plan.contactSales && setSelectedPlan(plan.id)}
-                    className={`text-left rounded-[22px] border p-5 transition ${
-                      active && !plan.contactSales
+                    onClick={() =>
+                      !plan.contactSales && isBillablePlanId(plan.id) && setSelectedPlan(plan.id)
+                    }
+                    className={`h-full flex flex-col text-left rounded-[22px] border p-5 transition ${
+                      active && !plan.contactSales && isBillablePlanId(plan.id)
                         ? 'border-primary/40 bg-gradient-to-b from-primary/[0.07] to-white ring-2 ring-primary/15 shadow-sm'
                         : 'border-slate-200/90 bg-gradient-to-b from-slate-50/50 to-white hover:border-primary/25'
                     }`}
@@ -397,7 +446,7 @@ export default function ContractsPanel({
                           }`}
                         >
                           <span className="material-symbols-outlined text-[20px]">
-                            {PLAN_ICONS[plan.id] || 'workspace_premium'}
+                            {plan.icon || PLAN_ICONS[plan.id] || 'workspace_premium'}
                           </span>
                         </span>
                         <div className="min-w-0">
@@ -432,7 +481,7 @@ export default function ContractsPanel({
                       </p>
                     )}
 
-                    <ul className="mt-4 space-y-1.5">
+                    <ul className="mt-4 space-y-1.5 flex-1">
                       {(plan.features || []).map((f) => (
                         <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
                           <span className="material-symbols-outlined text-[14px] text-primary mt-0.5">check</span>
@@ -458,7 +507,7 @@ export default function ContractsPanel({
             <div
               ref={rentSectionRef}
               id="contracts-rent"
-              className="scroll-mt-28 rounded-[22px] border border-teal-200/80 bg-gradient-to-b from-teal-50/70 to-white p-5 space-y-4"
+              className="scroll-mt-28 rounded-[22px] border border-slate-200/90 bg-gradient-to-b from-slate-50/80 via-white to-teal-50/30 p-5 space-y-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -477,113 +526,117 @@ export default function ContractsPanel({
                 ) : null}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-3">
-                <div
-                  className={`rounded-[20px] border p-5 ${
-                    rentEnabled && !rentOnly
-                      ? 'border-teal-300 bg-white ring-2 ring-teal-100'
-                      : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">
-                        {RENT_ADDON.badge}
-                      </p>
-                      <p className="font-bold text-slate-900 text-lg mt-0.5">{RENT_ADDON.name}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{RENT_ADDON.tagline}</p>
+              <div className="grid md:grid-cols-2 gap-3 items-stretch">
+                {rentAddon.visible !== false ? (
+                  <div
+                    className={`h-full flex flex-col rounded-[20px] border p-5 ${
+                      rentEnabled && !rentOnly
+                        ? 'border-teal-300 bg-white ring-2 ring-teal-100'
+                        : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">
+                          {rentAddon.badge}
+                        </p>
+                        <p className="font-bold text-slate-900 text-lg mt-0.5">{rentAddon.name}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{rentAddon.tagline}</p>
+                      </div>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-100 text-teal-800">
+                        <span className="material-symbols-outlined text-[20px]">add_circle</span>
+                      </span>
                     </div>
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-100 text-teal-800">
-                      <span className="material-symbols-outlined text-[20px]">add_circle</span>
-                    </span>
+                    <p className="text-2xl font-bold text-slate-900 mt-3 tabular-nums">
+                      {addonQuote.label}
+                      {addonQuote.suffix ? (
+                        <span className="text-sm font-semibold text-slate-500">{addonQuote.suffix}</span>
+                      ) : null}
+                    </p>
+                    <ul className="mt-3 space-y-1.5 flex-1">
+                      {(rentAddon.features || []).slice(0, 4).map((f) => (
+                        <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
+                          <span className="material-symbols-outlined text-[14px] text-teal-700 mt-0.5">
+                            check
+                          </span>
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      disabled={working || (rentEnabled && !rentOnly) || rentOnly}
+                      onClick={enableRentAddon}
+                      className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-full bg-teal-700 text-white px-4 py-2.5 text-sm font-bold hover:bg-teal-800 disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">car_rental</span>
+                      {rentOnly
+                        ? 'Ήδη σε αυτόνομο Rent'
+                        : rentEnabled
+                          ? 'Rent add-on ενεργό'
+                          : 'Ενεργοποίηση Rent add-on'}
+                    </button>
                   </div>
-                  <p className="text-2xl font-bold text-slate-900 mt-3 tabular-nums">
-                    {addonQuote.label}
-                    {addonQuote.suffix ? (
-                      <span className="text-sm font-semibold text-slate-500">{addonQuote.suffix}</span>
-                    ) : null}
-                  </p>
-                  <ul className="mt-3 space-y-1.5">
-                    {(RENT_ADDON.features || []).slice(0, 4).map((f) => (
-                      <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
-                        <span className="material-symbols-outlined text-[14px] text-teal-700 mt-0.5">
-                          check
-                        </span>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
+                ) : null}
+
+                {rentStandalone.visible !== false ? (
                   <button
                     type="button"
-                    disabled={working || (rentEnabled && !rentOnly) || rentOnly}
-                    onClick={enableRentAddon}
-                    className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-full bg-teal-700 text-white px-4 py-2.5 text-sm font-bold hover:bg-teal-800 disabled:opacity-50"
+                    onClick={() => setSelectedPlan(rentStandalone.id)}
+                    className={`h-full flex flex-col text-left rounded-[20px] border p-5 transition ${
+                      selectedPlan === rentStandalone.id
+                        ? 'border-teal-400 bg-white ring-2 ring-teal-100 shadow-sm'
+                        : 'border-slate-200 bg-white hover:border-teal-300'
+                    }`}
                   >
-                    <span className="material-symbols-outlined text-[18px]">car_rental</span>
-                    {rentOnly
-                      ? 'Ήδη σε αυτόνομο Rent'
-                      : rentEnabled
-                        ? 'Rent add-on ενεργό'
-                        : 'Ενεργοποίηση Rent add-on'}
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedPlan(RENT_STANDALONE_PLAN.id)}
-                  className={`text-left rounded-[20px] border p-5 transition ${
-                    selectedPlan === RENT_STANDALONE_PLAN.id
-                      ? 'border-teal-400 bg-white ring-2 ring-teal-100 shadow-sm'
-                      : 'border-slate-200 bg-white hover:border-teal-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">
-                        {RENT_STANDALONE_PLAN.badge}
-                      </p>
-                      <p className="font-bold text-slate-900 text-lg mt-0.5">{RENT_STANDALONE_PLAN.name}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{RENT_STANDALONE_PLAN.tagline}</p>
-                    </div>
-                    <span
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${
-                        selectedPlan === RENT_STANDALONE_PLAN.id
-                          ? 'bg-teal-100 text-teal-800'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[20px]">directions_car</span>
-                    </span>
-                  </div>
-                  <p className="text-2xl font-bold text-slate-900 mt-3 tabular-nums">
-                    {displayPrice(RENT_STANDALONE_PLAN, interval).label}
-                    {displayPrice(RENT_STANDALONE_PLAN, interval).suffix ? (
-                      <span className="text-sm font-semibold text-slate-500">
-                        {displayPrice(RENT_STANDALONE_PLAN, interval).suffix}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">
+                          {rentStandalone.badge}
+                        </p>
+                        <p className="font-bold text-slate-900 text-lg mt-0.5">{rentStandalone.name}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{rentStandalone.tagline}</p>
+                      </div>
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                          selectedPlan === rentStandalone.id
+                            ? 'bg-teal-100 text-teal-800'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[20px]">directions_car</span>
                       </span>
-                    ) : null}
-                  </p>
-                  {sub?.plan === 'rent' && (
-                    <span className="inline-flex mt-2 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Τρέχον
-                    </span>
-                  )}
-                  <ul className="mt-3 space-y-1.5">
-                    {(RENT_STANDALONE_PLAN.features || []).slice(0, 4).map((f) => (
-                      <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
-                        <span className="material-symbols-outlined text-[14px] text-teal-700 mt-0.5">
-                          check
+                    </div>
+                    <p className="text-2xl font-bold text-slate-900 mt-3 tabular-nums">
+                      {displayPrice(rentStandalone, interval).label}
+                      {displayPrice(rentStandalone, interval).suffix ? (
+                        <span className="text-sm font-semibold text-slate-500">
+                          {displayPrice(rentStandalone, interval).suffix}
                         </span>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-4 text-xs font-semibold text-teal-800">
-                    {selectedPlan === RENT_STANDALONE_PLAN.id
-                      ? 'Επιλεγμένο — πάτα δοκιμή / ενεργοποίηση κάτω'
-                      : 'Πάτα για επιλογή αυτόνομου Rent'}
-                  </p>
-                </button>
+                      ) : null}
+                    </p>
+                    {sub?.plan === 'rent' && (
+                      <span className="inline-flex mt-2 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Τρέχον
+                      </span>
+                    )}
+                    <ul className="mt-3 space-y-1.5 flex-1">
+                      {(rentStandalone.features || []).slice(0, 4).map((f) => (
+                        <li key={f} className="flex items-start gap-1.5 text-xs text-slate-600">
+                          <span className="material-symbols-outlined text-[14px] text-teal-700 mt-0.5">
+                            check
+                          </span>
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-4 text-xs font-semibold text-teal-800">
+                      {selectedPlan === rentStandalone.id
+                        ? 'Επιλεγμένο — πάτα δοκιμή / ενεργοποίηση κάτω'
+                        : 'Πάτα για επιλογή αυτόνομου Rent'}
+                    </p>
+                  </button>
+                ) : null}
               </div>
             </div>
 

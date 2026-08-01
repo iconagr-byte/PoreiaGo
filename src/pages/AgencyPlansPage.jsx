@@ -2,18 +2,22 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import {
-  AGENCY_PLANS,
   BILLING_INTERVALS,
+  DEFAULT_AGENCY_SECTION_TITLE,
   DEFAULT_RENT_SECTION_TITLE,
   RENT_ADDON,
   RENT_STANDALONE_PLAN,
   displayPrice,
+  isBillablePlanId,
+  listVisibleAgencyPlans,
+  mergeAgencyPlanCatalog,
   mergeRentPlanCatalog,
   rentAddonDisplayPrice,
   rentStandaloneDisplayPrice,
 } from '../lib/billing/planCatalog.js';
 import { CAMPAIGN_TEMPLATE_COUNT } from '../lib/marketing/platformCopy.js';
 import { getSaasToken } from '../services/saasApi.js';
+import { fetchPublicAgencyPlanCatalog } from '../services/agencyPlanCatalogApi.js';
 import { fetchPublicRentPlanCatalog } from '../services/rentPlanCatalogApi.js';
 
 export default function AgencyPlansPage() {
@@ -21,19 +25,43 @@ export default function AgencyPlansPage() {
   const [interval, setInterval] = useState('month');
   const loggedIn = Boolean(getSaasToken());
   const [rentCatalog, setRentCatalog] = useState(() => mergeRentPlanCatalog(null));
+  const [agencyCatalog, setAgencyCatalog] = useState(() => mergeAgencyPlanCatalog(null));
 
   useEffect(() => {
     let cancelled = false;
-    fetchPublicRentPlanCatalog().then((data) => {
-      if (!cancelled) setRentCatalog(data);
-    });
+    const loadAll = () => {
+      Promise.all([fetchPublicRentPlanCatalog(), fetchPublicAgencyPlanCatalog()]).then(
+        ([rent, agency]) => {
+          if (!cancelled) {
+            setRentCatalog(rent);
+            setAgencyCatalog(agency);
+          }
+        },
+      );
+    };
+    loadAll();
+    const onAgency = () => {
+      fetchPublicAgencyPlanCatalog().then((agency) => {
+        if (!cancelled) setAgencyCatalog(agency);
+      });
+    };
+    const onRent = () => {
+      fetchPublicRentPlanCatalog().then((rent) => {
+        if (!cancelled) setRentCatalog(rent);
+      });
+    };
+    window.addEventListener('agency-plan-catalog-changed', onAgency);
+    window.addEventListener('rent-plan-catalog-changed', onRent);
     return () => {
       cancelled = true;
+      window.removeEventListener('agency-plan-catalog-changed', onAgency);
+      window.removeEventListener('rent-plan-catalog-changed', onRent);
     };
   }, []);
 
   const standalone = rentCatalog.standalone || RENT_STANDALONE_PLAN;
   const addon = rentCatalog.addon || RENT_ADDON;
+  const agencyPlans = listVisibleAgencyPlans(agencyCatalog);
   const rentStandalonePrice = rentStandaloneDisplayPrice(interval, standalone);
   const rentAddonPrice = rentAddonDisplayPrice(interval, addon);
   const visibleCards = [standalone.visible !== false, addon.visible !== false].filter(Boolean)
@@ -42,8 +70,15 @@ export default function AgencyPlansPage() {
     visibleCards <= 1 ? 'grid md:grid-cols-1 max-w-xl gap-6' : 'grid md:grid-cols-2 gap-6';
 
   const choosePlan = (planId) => {
-    if (planId === 'enterprise') {
-      window.location.href = 'mailto:sales@travelos.app?subject=Enterprise%20συμβόλαιο';
+    const selected = agencyPlans.find((p) => p.id === planId);
+    if (
+      selected?.contactSales ||
+      planId === 'enterprise' ||
+      (planId !== 'rent' && !isBillablePlanId(planId))
+    ) {
+      window.location.href = `mailto:sales@travelos.app?subject=${encodeURIComponent(
+        `${selected?.name || planId} συμβόλαιο`,
+      )}`;
       return;
     }
     if (loggedIn) {
@@ -139,29 +174,38 @@ export default function AgencyPlansPage() {
         </div>
 
         <section className="space-y-5">
-          <h2 className="text-xl font-bold tracking-tight">Συμβόλαια λεωφορείων</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            {AGENCY_PLANS.map((plan) => {
+          <h2 className="text-xl font-bold tracking-tight">
+            {agencyCatalog.sectionTitle || DEFAULT_AGENCY_SECTION_TITLE}
+          </h2>
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 items-stretch">
+            {agencyPlans.map((plan) => {
               const price = displayPrice(plan, interval);
               return (
                 <article
                   key={plan.id}
-                  className={`relative flex flex-col rounded-[28px] border p-6 md:p-8 ${
+                  className={`relative h-full flex flex-col rounded-[28px] border p-6 md:p-8 ${
                     plan.highlighted
-                      ? 'border-primary/40 bg-white shadow-xl ring-2 ring-primary/20 scale-[1.02]'
-                      : 'border-black/[0.06] bg-surface-container-lowest shadow-sm'
+                      ? 'border-sky-300/70 bg-white shadow-[0_16px_40px_rgba(14,165,233,0.12)] ring-1 ring-sky-200'
+                      : 'border-black/[0.07] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)]'
                   }`}
                 >
                   {plan.highlighted && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-sky-600 text-white text-xs font-bold rounded-full shadow-sm">
                       Προτεινόμενο
                     </span>
                   )}
-                  <h3 className="text-xl font-bold">{plan.name}</h3>
-                  <p className="text-sm text-on-surface-variant mt-1 mb-6">{plan.tagline}</p>
-                  <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="material-symbols-outlined text-sky-700 text-[22px]">
+                      {plan.icon || 'workspace_premium'}
+                    </span>
+                    <h3 className="text-xl font-bold">{plan.name}</h3>
+                  </div>
+                  <p className="text-sm text-on-surface-variant mt-1 mb-6 min-h-[2.5rem]">
+                    {plan.tagline}
+                  </p>
+                  <div className="mb-6 min-h-[4.5rem]">
                     {plan.contactSales ? (
-                      <p className="text-2xl font-bold">Enterprise</p>
+                      <p className="text-2xl font-bold">Κατόπιν συνεννόησης</p>
                     ) : (
                       <>
                         <p className="text-3xl font-bold tracking-tight">
@@ -177,9 +221,9 @@ export default function AgencyPlansPage() {
                     )}
                   </div>
                   <ul className="space-y-2 flex-1 text-sm text-on-surface-variant mb-8">
-                    {plan.features.map((f) => (
+                    {(plan.features || []).map((f) => (
                       <li key={f} className="flex gap-2">
-                        <span className="material-symbols-outlined text-primary text-[18px] shrink-0">
+                        <span className="material-symbols-outlined text-sky-600 text-[18px] shrink-0">
                           check_circle
                         </span>
                         {f}
@@ -198,10 +242,10 @@ export default function AgencyPlansPage() {
                   <button
                     type="button"
                     onClick={() => choosePlan(plan.id)}
-                    className={`w-full py-3.5 rounded-full font-bold text-sm transition-all ${
+                    className={`mt-auto w-full py-3.5 rounded-full font-bold text-sm transition-all ${
                       plan.highlighted
-                        ? 'bg-primary text-white hover:opacity-90'
-                        : 'border border-primary/30 text-primary hover:bg-primary/5'
+                        ? 'bg-sky-600 text-white hover:bg-sky-700'
+                        : 'border border-slate-200 text-slate-800 hover:bg-slate-50'
                     }`}
                   >
                     {plan.contactSales
@@ -220,9 +264,9 @@ export default function AgencyPlansPage() {
           <h2 className="text-xl font-bold tracking-tight">
             {rentCatalog.sectionTitle || DEFAULT_RENT_SECTION_TITLE}
           </h2>
-          <div className={rentGridClass}>
+          <div className={`${rentGridClass} items-stretch`}>
             {standalone.visible !== false ? (
-              <article className="rounded-[28px] border border-teal-200 bg-gradient-to-br from-teal-50 via-white to-sky-50 p-6 md:p-8 flex flex-col shadow-sm">
+              <article className="h-full rounded-[28px] border border-teal-200/80 bg-gradient-to-br from-teal-50 via-white to-sky-50 p-6 md:p-8 flex flex-col shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
                 <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-teal-700 text-white text-[11px] font-bold uppercase tracking-wider">
                   {standalone.badge}
                 </span>
@@ -255,7 +299,7 @@ export default function AgencyPlansPage() {
             ) : null}
 
             {addon.visible !== false ? (
-              <article className="rounded-[28px] border border-slate-200 bg-white p-6 md:p-8 flex flex-col shadow-sm">
+              <article className="h-full rounded-[28px] border border-slate-200 bg-white p-6 md:p-8 flex flex-col shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
                 <span className="inline-flex self-start items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
                   {addon.badge}
                 </span>

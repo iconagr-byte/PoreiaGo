@@ -107,6 +107,11 @@ except ImportError:
     rent_plan_catalog_router = None
 
 try:
+    from api.agency_plan_catalog_router import router as agency_plan_catalog_router
+except ImportError:
+    agency_plan_catalog_router = None
+
+try:
     from api.ws_telemetry import router as ws_telemetry_router
 except ImportError as exc:
     import logging as _logging
@@ -402,6 +407,8 @@ if seat_pricing_router:
     app.include_router(seat_pricing_router)
 if rent_plan_catalog_router:
     app.include_router(rent_plan_catalog_router)
+if agency_plan_catalog_router:
+    app.include_router(agency_plan_catalog_router)
 try:
     from api.payment_settings_router import router as payment_settings_router
 except ImportError:
