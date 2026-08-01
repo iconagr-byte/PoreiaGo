@@ -413,36 +413,54 @@ def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
         return added
 
 
-def ensure_demo_rental_sample_booking(tenant_id: str | None = None) -> dict[str, Any] | None:
-    """
-    When a demo fleet office has zero bookings, seed one CONFIRMED sample so
-    Χαρτούρα → dual-mode signature is immediately visible for demos.
-    Idempotent — skips if any booking already exists for the tenant.
-    """
+def _ensure_demo_sign_vehicle(tenant_id: str) -> dict[str, Any]:
+    """Pick an available vehicle, or create a compact demo car for signature trials."""
     tid = _normalize_tenant(tenant_id)
     ensure_demo_rental_fleet(tid)
-    with _LOCK:
-        data = _read()
-        if any(b.get("tenant_id") == tid for b in data["bookings"]):
-            return None
-        vehicles = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
-        if not vehicles:
-            return None
-        has_demo_fleet = any(str(v.get("notes") or "") == _DEMO_FLEET_MARKER for v in vehicles)
-        if not has_demo_fleet and not demo_rental_fleet_allowed():
-            return None
-        vehicle = next(
+    vehicles = list_vehicles(tid)
+    if vehicles:
+        return next(
             (v for v in vehicles if str(v.get("current_status") or "") == "AVAILABLE"),
             vehicles[0],
         )
-        vehicle_id = vehicle["id"]
+    return upsert_vehicle(
+        tid,
+        {
+            "plate_number": "DEMO-SIGN",
+            "category": "COMPACT",
+            "model": "Demo Sign Car",
+            "seating_capacity": 5,
+            "daily_rate_eur": 35,
+            "current_status": "AVAILABLE",
+            "notes": _DEMO_FLEET_MARKER,
+            "description": "Όχημα δοκιμής για dual-mode ψηφιακή υπογραφή",
+        },
+    )
+
+
+def create_demo_sign_sample(tenant_id: str | None = None) -> dict[str, Any]:
+    """
+    Admin one-click: guarantee a CONFIRMED booking ready for dual-mode signature.
+    Reuses an existing unsigned demo booking when present.
+    """
+    tid = _normalize_tenant(tenant_id)
+    vehicle = _ensure_demo_sign_vehicle(tid)
+    for booking in list_bookings(tid):
+        notes = str(booking.get("notes") or "")
+        if _DEMO_BOOKING_MARKER not in notes:
+            continue
+        if booking.get("rental_status") == "CANCELLED":
+            continue
+        if booking.get("contract_status") == "ACTIVE" and booking.get("contract_issued_at"):
+            continue
+        return booking
 
     start = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
     end = start + timedelta(days=2)
     booking = create_booking(
         tid,
         {
-            "vehicle_id": vehicle_id,
+            "vehicle_id": vehicle["id"],
             "client_name": "Δοκιμαστικός Πελάτης",
             "client_email": "demo.renter@poreiago.local",
             "client_phone": "+306900000001",
@@ -455,6 +473,26 @@ def ensure_demo_rental_sample_booking(tenant_id: str | None = None) -> dict[str,
         },
     )
     return update_booking_status(tid, booking["id"], "CONFIRMED")
+
+
+def ensure_demo_rental_sample_booking(tenant_id: str | None = None) -> dict[str, Any] | None:
+    """
+    Auto-seed one sample booking when the tenant has zero bookings and at least
+    one vehicle (or demo fleet can be created). Used by list endpoints.
+    """
+    tid = _normalize_tenant(tenant_id)
+    ensure_demo_rental_fleet(tid)
+    with _LOCK:
+        data = _read()
+        if any(b.get("tenant_id") == tid for b in data["bookings"]):
+            return None
+        vehicles = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
+        if not vehicles:
+            return None
+    try:
+        return create_demo_sign_sample(tid)
+    except ValueError:
+        return None
 
 
 def _now() -> str:

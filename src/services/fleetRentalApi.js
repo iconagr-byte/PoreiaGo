@@ -118,6 +118,11 @@ export async function createRentalBooking(body) {
   return rentalFetch('/bookings', { method: 'POST', body: JSON.stringify(body) });
 }
 
+/** One-click CONFIRMED sample booking for dual-mode signature demo. */
+export async function createRentalDemoSignSample() {
+  return rentalFetch('/bookings/demo-sign-sample', { method: 'POST', body: '{}' });
+}
+
 export async function updateRentalBookingStatus(id, rentalStatus) {
   return rentalFetch(`/bookings/${encodeURIComponent(id)}/status`, {
     method: 'PATCH',

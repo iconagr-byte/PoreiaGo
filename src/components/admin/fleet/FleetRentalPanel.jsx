@@ -1404,7 +1404,13 @@ export default function FleetRentalPanel({
           onConsumedFocus={() => setPaperworkFocusId(null)}
           onBookingUpdated={(updated) => {
             if (!updated?.id) return;
-            setBookings((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
+            setBookings((prev) => {
+              const exists = prev.some((b) => b.id === updated.id);
+              if (exists) {
+                return prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b));
+              }
+              return [updated, ...prev];
+            });
             void reload();
           }}
           onToast={(kind, message) => {

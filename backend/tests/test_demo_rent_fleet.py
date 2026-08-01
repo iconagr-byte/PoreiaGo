@@ -117,3 +117,24 @@ def test_sample_booking_seeds_when_demo_fleet_already_present_in_prod():
             booking = store.ensure_demo_rental_sample_booking(tid)
             assert booking is not None
             assert len(store.list_bookings(tid)) == 1
+
+
+def test_create_demo_sign_sample_works_with_empty_prod_office():
+    """One-click path must work even when demo fleet auto-seed is off."""
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "production", "RENT_DEMO_FLEET": "false"},
+            clear=False,
+        ):
+            tid = "cccccccc-dddd-eeee-ffff-111111111111"
+            assert store.list_vehicles(tid) == []
+            booking = store.create_demo_sign_sample(tid)
+            assert booking["rental_status"] == "CONFIRMED"
+            assert booking["client_name"] == "Δοκιμαστικός Πελάτης"
+            assert len(store.list_vehicles(tid)) >= 1
+            again = store.create_demo_sign_sample(tid)
+            assert again["id"] == booking["id"]
