@@ -118,10 +118,13 @@ class DriverLoginOfficeLockTests(unittest.TestCase):
         self.assertEqual(res.json().get("driver_id"), self.driver_a.id)
 
     def test_login_without_host_is_rejected(self):
-        """Bare api Host must not first-match across offices."""
+        """Bare unknown Host must not first-match across offices."""
         with patch(
             "api.driver_portal.resolve_platform_tenant_id",
             new=AsyncMock(return_value=OFFICE_A),
+        ), patch(
+            "api.driver_portal._resolve_poreiago_office_tenant_id",
+            new=AsyncMock(return_value=None),
         ):
             res = self.client.post(
                 "/api/driver/session/login",
@@ -129,6 +132,30 @@ class DriverLoginOfficeLockTests(unittest.TestCase):
             )
         self.assertEqual(res.status_code, 401)
         self.assertIn("γραφείου", res.json().get("detail", ""))
+        self.assertNotIn("achilliotravel", res.json().get("detail", "").lower())
+
+    def test_login_on_poreiago_platform_host_uses_poreiago_office(self):
+        """www.poreiago.com is the PoreiaGo office Host — allow scoped login."""
+        with patch(
+            "api.driver_portal.resolve_platform_tenant_id",
+            new=AsyncMock(return_value=OFFICE_B),
+        ), patch(
+            "api.driver_portal._resolve_poreiago_office_tenant_id",
+            new=AsyncMock(return_value=OFFICE_A),
+        ), patch(
+            "middleware.domain_tenant._request_host",
+            return_value="www.poreiago.com",
+        ), patch(
+            "middleware.domain_tenant._is_platform_host",
+            return_value=True,
+        ):
+            res = self.client.post(
+                "/api/driver/session/login",
+                json={"username": self.driver_a.email, "password": "driver123"},
+            )
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(res.json().get("tenant_id"), OFFICE_A)
+        self.assertEqual(res.json().get("driver_id"), self.driver_a.id)
 
     def test_authenticate_scoped_by_tenant(self):
         found = self.store.authenticate_driver(
