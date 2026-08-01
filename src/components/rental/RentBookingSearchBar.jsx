@@ -14,6 +14,8 @@ export default function RentBookingSearchBar({
   brandLabel = 'Γραφείο',
   footerAddress = '',
   pickupLocations = [],
+  /** When set (e.g. hero chip click), sync the pickup select. */
+  preferredPickup = '',
   onSearch,
   compact = false,
 } = {}) {
@@ -57,6 +59,15 @@ export default function RentBookingSearchBar({
     if (!values.has(pickupLocation)) setPickupLocation(locations[0].value);
     if (!differentDropoff) setDropoffLocation(pickupLocation);
   }, [locations, pickupLocation, differentDropoff]);
+
+  useEffect(() => {
+    const next = String(preferredPickup || '').trim();
+    if (!next || !locations.length) return;
+    const values = new Set(locations.map((l) => l.value));
+    if (!values.has(next)) return;
+    setPickupLocation(next);
+    if (!differentDropoff) setDropoffLocation(next);
+  }, [preferredPickup, locations, differentDropoff]);
 
   const splitDateTime = (value) => {
     if (!value || !value.includes('T')) return { date: '', time: '10:00' };
