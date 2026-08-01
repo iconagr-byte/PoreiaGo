@@ -9,6 +9,11 @@ import {
 } from '../../lib/admin/sidebarNav.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, sanitizeSettingsSubTab } from '../../lib/admin/settingsTabs.js';
 import { DEFAULT_RENT_DESK_TAB, sanitizeRentDeskTab } from '../../lib/admin/rentDeskNav.js';
+import {
+  DEFAULT_FLEET_OPS_TAB,
+  isFleetOpsSubTab,
+  sanitizeFleetOpsSubTab,
+} from '../../lib/admin/fleetOpsHub.js';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 
 const SECTIONS = [
@@ -22,9 +27,11 @@ const SECTIONS = [
 export default function SortableSidebarNav({
   activeTab,
   settingsSubTab,
+  fleetOpsSubTab,
   fleetRentalTab,
   onTabChange,
   onSettingsSubTabChange,
+  onFleetOpsSubTabChange,
   onFleetRentalTabChange,
   onEmailClick,
   onNavigate,
@@ -52,10 +59,9 @@ export default function SortableSidebarNav({
 
   const sections = useMemo(() => {
     const visible = SECTIONS.filter((s) => {
-      // Settings + SaaS platform tabs live in SettingsHub card rail — not the left κατεβατό.
-      if (s.id === 'settings' || s.id === 'platform') return false;
+      // Settings + SaaS platform + fleet ops live in hub card rails — not the left κατεβατό.
+      if (s.id === 'settings' || s.id === 'platform' || s.id === 'fleet_ops') return false;
       if (s.superOnly && !superAdmin) return false;
-      if (rentOnly && s.id === 'fleet_ops') return false;
       if (!rentEnabled && s.id === 'rent') return false;
       return true;
     });
@@ -67,10 +73,11 @@ export default function SortableSidebarNav({
         items: navItemsFromIds(displayLayout[section.id] || [], superAdmin).filter(
           (item) =>
             item.type !== 'settings_subtab' &&
+            !isFleetOpsSubTab(item.id) &&
             (superAdmin || item.settingsSection !== 'platform'),
         ),
       }))
-      .filter((section) => section.items.length > 0 || (!rentOnly && section.id !== 'fleet_ops'));
+      .filter((section) => section.items.length > 0);
   }, [displayLayout, superAdmin, rentOnly, rentEnabled]);
 
   const persistLayout = useCallback(
@@ -123,6 +130,11 @@ export default function SortableSidebarNav({
     onTabChange?.('settings');
   };
 
+  const openFleetOps = (subTab) => {
+    onFleetOpsSubTabChange?.(sanitizeFleetOpsSubTab(subTab || DEFAULT_FLEET_OPS_TAB));
+    onTabChange?.('fleet_ops');
+  };
+
   const openRentDesk = (subTab) => {
     onFleetRentalTabChange?.(sanitizeRentDeskTab(subTab));
     onTabChange?.('fleet_rental');
@@ -149,7 +161,12 @@ export default function SortableSidebarNav({
       openRentDesk(item.fleetRentalTab || DEFAULT_RENT_DESK_TAB);
       return;
     }
-    onTabChange?.(item.tab || item.id);
+    const tabId = item.tab || item.id;
+    if (isFleetOpsSubTab(tabId) || tabId === 'fleet_ops') {
+      openFleetOps(tabId === 'fleet_ops' ? fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB : tabId);
+      return;
+    }
+    onTabChange?.(tabId);
   };
 
   const buttonClass = (item) => {
@@ -169,6 +186,7 @@ export default function SortableSidebarNav({
   };
 
   const settingsActive = activeTab === 'settings';
+  const fleetOpsActive = activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab);
 
   const navAccent = (item) =>
     item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
@@ -339,8 +357,28 @@ export default function SortableSidebarNav({
         {sections.map((section) => renderSection(section))}
       </div>
 
-      {/* Single Settings entry — subtabs open as cards in the main pane */}
-      <div className="shrink-0 border-t border-black/[0.06] px-2.5 py-2.5 bg-white/70 backdrop-blur-sm">
+      {/* Pinned hub entries — subtabs open as cards in the main pane */}
+      <div className="shrink-0 border-t border-black/[0.06] px-2.5 py-2.5 bg-white/70 backdrop-blur-sm space-y-1.5">
+        {!rentOnly ? (
+          <button
+            type="button"
+            onClick={() => openFleetOps(fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB)}
+            className={`admin-nav-btn w-full ${fleetOpsActive ? 'admin-nav-btn-active' : ''}`}
+            data-accent="sky"
+            title="Λειτουργίες Στόλου"
+            aria-current={fleetOpsActive ? 'page' : undefined}
+          >
+            <span className="admin-nav-icon">
+              <span
+                className="material-symbols-outlined"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                directions_bus
+              </span>
+            </span>
+            <span className="admin-nav-label">Λειτουργίες Στόλου</span>
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() =>
