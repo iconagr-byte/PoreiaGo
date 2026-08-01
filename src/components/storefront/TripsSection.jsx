@@ -11,6 +11,7 @@ export default function TripsSection({
   siteAppearance,
   pricingSettings,
   hidden = false,
+  sectionClassName = '',
 }) {
   if (hidden) return null;
 
@@ -24,7 +25,7 @@ export default function TripsSection({
   return (
     <section
       id={id}
-      className={`${solo ? 'py-10 md:py-12' : 'py-24'} px-margin-desktop max-w-container-max mx-auto bg-surface`}
+      className={`${solo ? 'py-10 md:py-12' : 'py-24'} px-margin-desktop max-w-container-max mx-auto bg-surface ${sectionClassName}`.trim()}
     >
       <div className={`text-center ${solo ? 'mb-6' : 'mb-16'}`}>
         {eyebrow && (
