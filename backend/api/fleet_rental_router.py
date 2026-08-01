@@ -120,6 +120,11 @@ class SignLinkBody(BaseModel):
     public_base_url: str | None = Field(default=None, max_length=240)
 
 
+class ResetSignatureBody(BaseModel):
+    send_link: bool = True
+    public_base_url: str | None = Field(default=None, max_length=240)
+
+
 class InspectionBody(BaseModel):
     rental_booking_id: str
     inspection_type: str
@@ -348,25 +353,7 @@ async def patch_booking_legal_doc(
     return row
 
 
-@router.post("/bookings/{booking_id}/sign-link")
-async def generate_rental_sign_link(
-    booking_id: str,
-    body: SignLinkBody = Body(default_factory=SignLinkBody),
-    tenant_id: UUID = Depends(get_current_tenant_id),
-    _: dict = Depends(_require_admin),
-):
-    """Create 24h contactless signing link and notify client via SMS/email."""
-    try:
-        link = store.create_signature_link(_tid(tenant_id), booking_id)
-    except ValueError as exc:
-        msg = str(exc)
-        code = 404 if "δεν βρέθηκε" in msg else 400
-        raise HTTPException(status_code=code, detail=msg) from exc
-
-    base = str(body.public_base_url or "").strip().rstrip("/")
-    if not base:
-        base = ""
-    sign_url = f"{base}/sign/{link['signature_token']}" if base else f"/sign/{link['signature_token']}"
+async def _notify_sign_link(link: dict, sign_url: str) -> dict:
     notify: dict = {"email": None, "sms": None}
     name = link.get("client_name") or ""
     try:
@@ -388,7 +375,77 @@ async def generate_rental_sign_link(
             notify["sms"] = await send_sms(phone, sms_body[:300])
     except Exception:
         pass
+    return notify
+
+
+@router.post("/bookings/{booking_id}/sign-link")
+async def generate_rental_sign_link(
+    booking_id: str,
+    body: SignLinkBody = Body(default_factory=SignLinkBody),
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Create 24h contactless signing link and notify client via SMS/email."""
+    try:
+        link = store.create_signature_link(_tid(tenant_id), booking_id)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+    base = str(body.public_base_url or "").strip().rstrip("/")
+    sign_url = f"{base}/sign/{link['signature_token']}" if base else f"/sign/{link['signature_token']}"
+    notify = await _notify_sign_link(link, sign_url)
     return {**link, "sign_url": sign_url, "notify": notify}
+
+
+@router.post("/bookings/{booking_id}/reset-signature")
+async def reset_rental_signature(
+    booking_id: str,
+    body: ResetSignatureBody = Body(default_factory=ResetSignatureBody),
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Clear wrong/issued signature and optionally send a fresh remote signing link."""
+    tid = _tid(tenant_id)
+    try:
+        booking = store.reset_rental_signature(tid, booking_id)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+    result: dict = {
+        "booking": booking,
+        "sign_url": None,
+        "notify": None,
+        "signature_token": None,
+    }
+    if body.send_link:
+        try:
+            link = store.create_signature_link(tid, booking_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        base = str(body.public_base_url or "").strip().rstrip("/")
+        sign_url = (
+            f"{base}/sign/{link['signature_token']}" if base else f"/sign/{link['signature_token']}"
+        )
+        notify = await _notify_sign_link(link, sign_url)
+        # Refresh booking after token write.
+        booking = next(
+            (b for b in store.list_bookings(tid) if b.get("id") == booking_id),
+            booking,
+        )
+        result.update(
+            {
+                "booking": booking,
+                "sign_url": sign_url,
+                "notify": notify,
+                "signature_token": link.get("signature_token"),
+                "signature_token_expires_at": link.get("signature_token_expires_at"),
+            }
+        )
+    return result
 
 
 @router.get("/bookings/{booking_id}/checkout-status")

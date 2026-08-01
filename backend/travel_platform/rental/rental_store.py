@@ -1392,6 +1392,76 @@ def complete_rental_checkout(
         }
 
 
+def reset_rental_signature(tenant_id: str | None, booking_id: str) -> dict[str, Any]:
+    """
+    Clear issued contract / legal signatures so the client can sign again.
+    ACTIVE → CONFIRMED; vehicle returns to AVAILABLE when no other active rental.
+    """
+    tid = _normalize_tenant(tenant_id)
+    bid = str(booking_id or "").strip()
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == bid),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        if booking.get("rental_status") == "CANCELLED":
+            raise ValueError("Η κράτηση είναι ακυρωμένη")
+        if booking.get("rental_status") == "COMPLETED":
+            raise ValueError("Ολοκληρωμένη κράτηση — δεν γίνεται επαναυπογραφή")
+
+        now = _now()
+        booking["legal_doc_signatures"] = {}
+        booking["checkout_accepted_terms"] = []
+        booking["checkout_insurance_label"] = None
+        booking["checkout_deposit_eur"] = None
+        booking["contract_issued_at"] = None
+        booking["contract_pdf_url"] = None
+        booking["contract_status"] = None
+        booking["signing_method"] = None
+        booking["signature_token"] = None
+        booking["signature_token_expires_at"] = None
+        booking["signature_pending"] = False
+        was_active = booking.get("rental_status") == "ACTIVE"
+        if was_active:
+            booking["rental_status"] = "CONFIRMED"
+        booking["updated_at"] = now
+
+        # Drop auto-created tablet-checkout pickup rows so paperwork isn't stuck "signed".
+        data["inspections"] = [
+            i
+            for i in data["inspections"]
+            if not (
+                i.get("tenant_id") == tid
+                and i.get("rental_booking_id") == bid
+                and i.get("inspection_type") == "PICKUP_CHECK"
+                and "Tablet checkout" in str(i.get("damage_notes") or "")
+            )
+        ]
+
+        vehicle_id = booking.get("vehicle_id")
+        if was_active and vehicle_id:
+            other_active = any(
+                b.get("tenant_id") == tid
+                and b.get("id") != bid
+                and b.get("vehicle_id") == vehicle_id
+                and b.get("rental_status") == "ACTIVE"
+                for b in data["bookings"]
+            )
+            if not other_active:
+                for v in data["vehicles"]:
+                    if v.get("tenant_id") == tid and v.get("id") == vehicle_id:
+                        if str(v.get("current_status") or "") == "RENTED":
+                            v["current_status"] = "AVAILABLE"
+                            v["updated_at"] = now
+                        break
+
+        _write(data)
+        return deepcopy(booking)
+
+
 def create_signature_link(tenant_id: str | None, booking_id: str) -> dict[str, Any]:
     """Generate a 24h remote-signing token for contactless client signature."""
     tid = _normalize_tenant(tenant_id)
@@ -1406,7 +1476,7 @@ def create_signature_link(tenant_id: str | None, booking_id: str) -> dict[str, A
         if booking.get("rental_status") == "CANCELLED":
             raise ValueError("Η κράτηση είναι ακυρωμένη")
         if booking.get("contract_status") == "ACTIVE" and booking.get("contract_issued_at"):
-            raise ValueError("Η σύμβαση έχει ήδη εκδοθεί")
+            raise ValueError("Η σύμβαση έχει ήδη εκδοθεί — καθαρίστε την υπογραφή πρώτα")
         token = str(uuid4())
         expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
         booking["signature_token"] = token

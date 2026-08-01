@@ -6,6 +6,7 @@ import {
   completeRentalCheckout,
   createRentalSignLink,
   fetchRentalCheckoutStatus,
+  resetRentalSignature,
   uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';
 import {
@@ -132,6 +133,33 @@ export default function RentalCheckout({
       );
     } catch (err) {
       onToast?.('error', err?.message || 'Αποτυχία αποστολής link');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearAndResendLink = async () => {
+    if (!booking?.id || busy) return;
+    const ok = window.confirm(
+      'Καθαρισμός υπογραφής / σύμβασης και αποστολή νέου link στον πελάτη;',
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const result = await resetRentalSignature(booking.id, {
+        sendLink: true,
+        publicBaseUrl: window.location.origin,
+      });
+      if (result.booking) onComplete?.(result.booking);
+      setSignUrl(result.sign_url || '');
+      setRemoteNotify(result.notify || null);
+      setMode('REMOTE');
+      setWaitingRemote(true);
+      setAccept(emptyCheckoutAcceptances());
+      setHasInk(false);
+      onToast?.('success', 'Καθαρίστηκε — στάλθηκε νέο link υπογραφής');
+    } catch (err) {
+      onToast?.('error', err?.message || 'Αποτυχία καθαρισμού / αποστολής');
     } finally {
       setBusy(false);
     }
@@ -297,7 +325,7 @@ export default function RentalCheckout({
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-700 text-white">
               <span className="material-symbols-outlined">send_to_mobile</span>
             </span>
-            <p className="font-bold text-lg text-slate-900 mt-3">Send Link to Client</p>
+            <p className="font-bold text-lg text-slate-900 mt-3">Αποστολή link στον πελάτη</p>
             <p className="text-sm text-slate-600 mt-1 leading-relaxed">
               Ασφαλές σύνδεσμος 24ωρών στο SMS / email του πελάτη για contactless υπογραφή.
             </p>
@@ -351,6 +379,14 @@ export default function RentalCheckout({
               className="rounded-full border border-sky-300 bg-white px-4 py-2 text-xs font-bold text-sky-900"
             >
               Ξαναστείλε link
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={clearAndResendLink}
+              className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-800"
+            >
+              Καθαρισμός & νέο link
             </button>
             <button
               type="button"
