@@ -201,11 +201,24 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             carCount={carCount}
             vanCount={vanCount}
             siteAppearance={siteAppearance}
+            footerAddress={footerAddress}
+            pickupLocations={pickupLocations}
             onBrowseFleet={() => {
               const el = document.getElementById('rent-guest-fleet');
               el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }}
             onStartSearch={() => {
+              document
+                .getElementById('rent-guest-search')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+            onSelectPickup={(value) => {
+              setHeroPickup(value);
+              writeRentBookingPrefs({
+                ...readRentBookingPrefs(),
+                pickup_location: value,
+                dropoff_location: value,
+              });
               document
                 .getElementById('rent-guest-search')
                 ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -218,6 +231,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               brandLabel={branding.brandLabel}
               footerAddress={footerAddress}
               pickupLocations={pickupLocations}
+              preferredPickup={heroPickup}
               onSearch={async (prefs) => {
                 writeRentBookingPrefs({ ...(prefs || {}), wizard_step: 'vehicle' });
                 setSearchActive(true);

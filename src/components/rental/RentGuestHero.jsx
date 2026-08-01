@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import {
   RENT_GUEST_HERO,
   RENT_GUEST_HERO_IMAGE,
   rentGuestHeroStats,
 } from '../../lib/rental/rentGuestHero.js';
+import { buildRentLocationOptions } from '../../lib/rental/rentBookingSearch.js';
 import { readPageSlider } from '../../lib/homepage/pageSlider.js';
 import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
 
@@ -18,8 +20,11 @@ export default function RentGuestHero({
   carCount = 0,
   vanCount = 0,
   siteAppearance,
+  footerAddress = '',
+  pickupLocations = [],
   onBrowseFleet,
   onStartSearch,
+  onSelectPickup,
   onRequireLogin,
 } = {}) {
   const headline = String(title || '').trim() || RENT_GUEST_HERO.title;
@@ -27,12 +32,29 @@ export default function RentGuestHero({
   const subtitle = String(copy || '').trim();
   const stats = rentGuestHeroStats({ carCount, vanCount });
   const slider = readPageSlider(siteAppearance, 'rent');
+  const locations = useMemo(
+    () =>
+      buildRentLocationOptions({
+        brandLabel,
+        footerAddress,
+        pickupLocations,
+      }),
+    [brandLabel, footerAddress, pickupLocations],
+  );
   const startSearch =
     typeof onStartSearch === 'function'
       ? onStartSearch
       : () => {
           document.getElementById('rent-guest-search')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         };
+
+  const pickLocation = (loc) => {
+    if (typeof onSelectPickup === 'function') {
+      onSelectPickup(loc.value);
+      return;
+    }
+    startSearch();
+  };
 
   return (
     <section className="rent-hero rent-hero--landing" aria-label="Ενοικίαση">
@@ -81,6 +103,30 @@ export default function RentGuestHero({
             Δες τον στόλο
           </button>
         </div>
+
+        {locations.length > 0 ? (
+          <div className="rent-hero-pickups" aria-label="Σημεία παραλαβής">
+            <p className="rent-hero-pickups-label">
+              <span className="material-symbols-outlined" aria-hidden>
+                location_on
+              </span>
+              Σημεία παραλαβής
+            </p>
+            <div className="rent-hero-pickup-chips">
+              {locations.map((loc) => (
+                <button
+                  key={loc.id}
+                  type="button"
+                  className="rent-hero-pickup-chip"
+                  onClick={() => pickLocation(loc)}
+                  title={`Αναζήτηση από ${loc.label}`}
+                >
+                  {loc.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <p className="rent-hero-tagline">{RENT_GUEST_HERO.tagline}</p>
 
