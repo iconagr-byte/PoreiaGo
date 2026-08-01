@@ -99,9 +99,10 @@ export default function RentalBookingAgreement({
               type="button"
               onClick={onOpenCheckout}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-teal-300 bg-teal-50 text-teal-900 text-sm font-bold"
+              title="Sign-on-Glass ή σύνδεσμος στο κινητό πελάτη"
             >
               <span className="material-symbols-outlined text-[18px]">draw</span>
-              Tablet υπογραφή
+              Ψηφιακή υπογραφή
             </button>
           ) : null}
           {booking.contract_pdf_url ? (

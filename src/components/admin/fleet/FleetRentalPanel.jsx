@@ -1400,6 +1400,7 @@ export default function FleetRentalPanel({
           officeName={officeName}
           initialBookingId={paperworkFocusId}
           onOpenCheckIn={openPaperworkCheckIn}
+          onOpenWizard={() => setTab('wizard')}
           onConsumedFocus={() => setPaperworkFocusId(null)}
           onBookingUpdated={(updated) => {
             if (!updated?.id) return;

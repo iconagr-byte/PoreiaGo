@@ -35,6 +35,7 @@ export default function RentalPaperworkDesk({
   officeName,
   initialBookingId = null,
   onOpenCheckIn,
+  onOpenWizard,
   onConsumedFocus,
   onBookingUpdated,
   onToast,
@@ -147,9 +148,9 @@ export default function RentalPaperworkDesk({
         <div>
           <h3 className="font-bold text-gray-900">Χαρτούρα κρατήσεων</h3>
           <p className="text-sm text-gray-500 mt-1 max-w-xl">
-            Νομικό πακέτο (σύμβαση, άδεια, ασφάλιση, εγγύηση, GDPR, όροι) + πρωτόκολλα
-            παραλαβής/επιστροφής — έτοιμα για υπογραφή και εκτύπωση. Tablet checkout με 5
-            υποχρεωτικούς όρους και ψηφιακή υπογραφή.
+            Νομικό πακέτο + πρωτόκολλα παραλαβής/επιστροφής. Dual-mode υπογραφή: στο tablet
+            του γραφείου (Sign-on-Glass) ή ασφαλές σύνδεσμος 24ωρών στο κινητό του πελάτη
+            (SMS/email) — 5 υποχρεωτικοί όροι.
           </p>
           <p className="text-xs text-gray-400 mt-2">
             Εκκρεμούν υπογραφές: {pendingCount} · Πλήρεις φάκελοι: {completeCount}
@@ -193,12 +194,36 @@ export default function RentalPaperworkDesk({
         {loading ? (
           <p className="p-6 text-sm text-gray-500">Φόρτωση…</p>
         ) : rows.length === 0 ? (
-          <div className="p-6 space-y-1">
-            <p className="text-sm font-bold text-gray-800">Δεν υπάρχουν φάκελοι σε αυτό το φίλτρο</p>
-            <p className="text-sm text-gray-500">
-              Οι κρατήσεις εμφανίζονται εδώ αυτόματα. Ανοίξτε τον φάκελο για να υπογράψει ο πελάτης
-              όλα τα νομικά έντυπα· το Check-in / out καλύπτει τα πρωτόκολλα παραλαβής/επιστροφής.
+          <div className="p-6 space-y-3">
+            <p className="text-sm font-bold text-gray-800">
+              {(bookings || []).length === 0
+                ? 'Δεν υπάρχουν ακόμα κρατήσεις'
+                : 'Δεν υπάρχουν φάκελοι σε αυτό το φίλτρο'}
             </p>
+            <p className="text-sm text-gray-500 max-w-lg">
+              {(bookings || []).length === 0 ? (
+                <>
+                  Δημιούργησε πρώτα κράτηση από «Νέα κράτηση γραφείου». Μετά πάτα{' '}
+                  <strong className="font-bold text-gray-700">Ψηφιακή υπογραφή</strong> για να
+                  επιλέξεις Sign-on-Glass ή αποστολή link στον πελάτη.
+                </>
+              ) : (
+                <>
+                  Δοκίμασε το φίλτρο «Όλες». Άνοιξε φάκελο ή πάτα «Ψηφιακή υπογραφή» για dual-mode
+                  checkout.
+                </>
+              )}
+            </p>
+            {(bookings || []).length === 0 && onOpenWizard ? (
+              <button
+                type="button"
+                onClick={onOpenWizard}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-700 text-white text-sm font-bold hover:bg-teal-800"
+              >
+                <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                Νέα κράτηση γραφείου
+              </button>
+            ) : null}
           </div>
         ) : (
           rows.map(({ booking: b, paper }) => (
@@ -252,9 +277,10 @@ export default function RentalPaperworkDesk({
                     type="button"
                     className="px-3 py-1.5 rounded-xl border border-teal-300 bg-teal-50 text-teal-900 text-xs font-bold inline-flex items-center gap-1"
                     onClick={() => setCheckoutId(b.id)}
+                    title="Sign-on-Glass ή σύνδεσμος στο κινητό πελάτη"
                   >
                     <span className="material-symbols-outlined text-[16px]">draw</span>
-                    Tablet υπογραφή
+                    Ψηφιακή υπογραφή
                   </button>
                 ) : null}
                 {!paper.pickupSigned && onOpenCheckIn ? (

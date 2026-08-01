@@ -165,6 +165,7 @@ def quote_extras(extra_ids: list[str] | None, *, days: int) -> dict[str, Any]:
 # Stable demo fleet (compact cars + vans) — seeded for empty demo offices.
 # Photos are Wikimedia Commons shots of the named models (not mismatched stock cars).
 _DEMO_FLEET_MARKER = "demo_rent_fleet_v1"
+_DEMO_BOOKING_MARKER = "demo_rent_booking_v1"
 _WM = "https://upload.wikimedia.org/wikipedia/commons/"
 _DEMO_VEHICLE_SPECS: tuple[dict[str, Any], ...] = (
     {
@@ -410,6 +411,50 @@ def ensure_demo_rental_fleet(tenant_id: str | None = None) -> int:
         if added:
             _write(data)
         return added
+
+
+def ensure_demo_rental_sample_booking(tenant_id: str | None = None) -> dict[str, Any] | None:
+    """
+    When a demo fleet office has zero bookings, seed one CONFIRMED sample so
+    Χαρτούρα → dual-mode signature is immediately visible for demos.
+    Idempotent — skips if any booking already exists for the tenant.
+    """
+    tid = _normalize_tenant(tenant_id)
+    ensure_demo_rental_fleet(tid)
+    with _LOCK:
+        data = _read()
+        if any(b.get("tenant_id") == tid for b in data["bookings"]):
+            return None
+        vehicles = [v for v in data["vehicles"] if v.get("tenant_id") == tid]
+        if not vehicles:
+            return None
+        has_demo_fleet = any(str(v.get("notes") or "") == _DEMO_FLEET_MARKER for v in vehicles)
+        if not has_demo_fleet and not demo_rental_fleet_allowed():
+            return None
+        vehicle = next(
+            (v for v in vehicles if str(v.get("current_status") or "") == "AVAILABLE"),
+            vehicles[0],
+        )
+        vehicle_id = vehicle["id"]
+
+    start = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
+    end = start + timedelta(days=2)
+    booking = create_booking(
+        tid,
+        {
+            "vehicle_id": vehicle_id,
+            "client_name": "Δοκιμαστικός Πελάτης",
+            "client_email": "demo.renter@poreiago.local",
+            "client_phone": "+306900000001",
+            "start_time": start.isoformat(),
+            "end_time": end.isoformat(),
+            "pickup_location": "Γραφείο ενοικιάσεων",
+            "dropoff_location": "Γραφείο ενοικιάσεων",
+            "channel": "DESK",
+            "notes": _DEMO_BOOKING_MARKER,
+        },
+    )
+    return update_booking_status(tid, booking["id"], "CONFIRMED")
 
 
 def _now() -> str:
