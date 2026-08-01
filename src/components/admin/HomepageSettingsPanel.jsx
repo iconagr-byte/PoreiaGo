@@ -380,6 +380,237 @@ function SaveButton({ saving, label = 'Αποθήκευση' }) {
   );
 }
 
+const HERO_TEXT_DEFAULTS = {
+  hero_badge: DEFAULT_SITE_APPEARANCE.hero_badge,
+  hero_title: DEFAULT_SITE_APPEARANCE.hero_title,
+  hero_title_accent: DEFAULT_SITE_APPEARANCE.hero_title_accent,
+  hero_subtitle: DEFAULT_SITE_APPEARANCE.hero_subtitle,
+  hero_search_label: DEFAULT_SITE_APPEARANCE.hero_search_label,
+};
+
+function HeroTextField({
+  label,
+  hint,
+  icon,
+  value,
+  onChange,
+  onReset,
+  placeholder,
+  multiline = false,
+  rows = 3,
+  maxHint,
+}) {
+  const len = String(value || '').length;
+  const softMax = maxHint || 0;
+  const overSoft = softMax > 0 && len > softMax;
+
+  return (
+    <label className="block rounded-2xl border border-black/[0.06] bg-slate-50/60 hover:bg-slate-50 focus-within:bg-white focus-within:border-sky-300 focus-within:ring-2 focus-within:ring-sky-100 transition-all p-3.5 md:p-4">
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-8 h-8 rounded-xl bg-white border border-black/[0.06] flex items-center justify-center shrink-0 text-slate-500">
+            <span className="material-symbols-outlined text-[18px]">{icon}</span>
+          </span>
+          <div className="min-w-0">
+            <span className="block text-sm font-bold text-slate-800">{label}</span>
+            {hint ? <span className="block text-[11px] text-slate-500 mt-0.5 leading-snug">{hint}</span> : null}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {softMax > 0 ? (
+            <span
+              className={`text-[10px] font-bold tabular-nums ${
+                overSoft ? 'text-amber-600' : 'text-slate-400'
+              }`}
+            >
+              {len}/{softMax}
+            </span>
+          ) : (
+            <span className="text-[10px] font-bold tabular-nums text-slate-400">{len}</span>
+          )}
+          {onReset ? (
+            <button
+              type="button"
+              onClick={onReset}
+              className="text-[10px] font-bold uppercase tracking-wide text-sky-700 hover:text-sky-900 px-1.5 py-0.5 rounded-md hover:bg-sky-50"
+              title="Επαναφορά προεπιλογής"
+            >
+              Προεπιλογή
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {multiline ? (
+        <textarea
+          rows={rows}
+          className="w-full rounded-xl border border-black/[0.08] bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 resize-y focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
+          value={value}
+          placeholder={placeholder}
+          onChange={onChange}
+        />
+      ) : (
+        <input
+          className="w-full rounded-xl border border-black/[0.08] bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
+          value={value}
+          placeholder={placeholder}
+          onChange={onChange}
+        />
+      )}
+    </label>
+  );
+}
+
+function HeroTextsBlock({ form, setForm }) {
+  const setField = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+  const resetField = (key) => () =>
+    setForm((p) => ({ ...p, [key]: HERO_TEXT_DEFAULTS[key] ?? '' }));
+  const resetAll = () => {
+    setForm((p) => ({ ...p, ...HERO_TEXT_DEFAULTS }));
+    toast.success('Επαναφορά προεπιλεγμένων κειμένων hero');
+  };
+
+  const badge = String(form.hero_badge || '').trim();
+  const title = String(form.hero_title || '').trim();
+  const accent = String(form.hero_title_accent || '').trim();
+  const subtitle = String(form.hero_subtitle || '').trim();
+  const searchLabel = String(form.hero_search_label || '').trim();
+
+  return (
+    <div className="mt-8 pt-8 border-t border-black/[0.06]">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
+        <div>
+          <h5 className="font-bold text-slate-900 text-base flex items-center gap-2">
+            <span className="material-symbols-outlined text-sky-600 text-[22px]">title</span>
+            Κείμενα hero
+          </h5>
+          <p className="text-xs text-slate-500 mt-1 max-w-xl">
+            Εμφανίζονται πάνω στη φωτογραφία της αρχικής. Η προεπισκόπηση δεξιά ενημερώνεται καθώς
+            πληκτρολογείτε.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={resetAll}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 px-3 py-2 rounded-full border border-black/[0.08] bg-white hover:bg-slate-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+          Όλα στα προεπιλεγμένα
+        </button>
+      </div>
+
+      <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)] gap-5 lg:gap-6 items-start">
+        <div className="space-y-3">
+          <HeroTextField
+            label="Badge"
+            hint="Μικρή ετικέτα πάνω από τον τίτλο"
+            icon="sell"
+            value={form.hero_badge}
+            onChange={setField('hero_badge')}
+            onReset={resetField('hero_badge')}
+            placeholder="π.χ. Premium Ταξιδιωτική Εμπειρία"
+            maxHint={42}
+          />
+          <div className="grid sm:grid-cols-2 gap-3">
+            <HeroTextField
+              label="Τίτλος"
+              hint="Κύρια γραμμή τίτλου"
+              icon="format_size"
+              value={form.hero_title}
+              onChange={setField('hero_title')}
+              onReset={resetField('hero_title')}
+              placeholder="π.χ. Η Ελλάδα, όπως δεν την έχεις ξαναδεί:"
+              maxHint={72}
+            />
+            <HeroTextField
+              label="Τίτλος — τονισμένο"
+              hint="Δεύτερη γραμμή με έμφαση (χρώμα)"
+              icon="format_color_text"
+              value={form.hero_title_accent}
+              onChange={setField('hero_title_accent')}
+              onReset={resetField('hero_title_accent')}
+              placeholder="π.χ. Άνεση, ασφάλεια & θέση εξασφαλισμένη."
+              maxHint={72}
+            />
+          </div>
+          <HeroTextField
+            label="Υπότιτλος"
+            hint="Σύντομη περιγραφή κάτω από τον τίτλο"
+            icon="notes"
+            value={form.hero_subtitle}
+            onChange={setField('hero_subtitle')}
+            onReset={resetField('hero_subtitle')}
+            placeholder="Περιγράψτε τι βρίσκει ο επισκέπτης…"
+            multiline
+            rows={3}
+            maxHint={180}
+          />
+          <HeroTextField
+            label="Ετικέτα φόρμας"
+            hint="Επικεφαλίδα πάνω από τη φόρμα / πρόγραμμα εκδρομών"
+            icon="search"
+            value={form.hero_search_label}
+            onChange={setField('hero_search_label')}
+            onReset={resetField('hero_search_label')}
+            placeholder="π.χ. Πρόγραμμα εκδρομών"
+            maxHint={36}
+          />
+        </div>
+
+        <aside className="lg:sticky lg:top-4">
+          <div className="rounded-[22px] overflow-hidden border border-black/[0.08] shadow-[0_12px_32px_rgba(15,23,42,0.1)] bg-slate-900">
+            <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between gap-2 bg-white/5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
+                Ζωντανή προεπισκόπηση
+              </span>
+              <span className="text-[10px] font-medium text-sky-300/90">Hero · αρχική</span>
+            </div>
+            <div
+              className="relative min-h-[280px] p-5 md:p-6 flex flex-col justify-end"
+              style={{
+                background:
+                  'linear-gradient(160deg, rgba(15,23,42,0.35) 0%, rgba(15,23,42,0.78) 55%, rgba(15,23,42,0.92) 100%), radial-gradient(ellipse 70% 50% at 20% 20%, rgba(56,189,248,0.22), transparent)',
+              }}
+            >
+              {badge ? (
+                <span className="inline-flex self-start mb-3 px-2.5 py-1 rounded-full bg-white/15 border border-white/20 text-[10px] font-bold uppercase tracking-wide text-white/90">
+                  {badge}
+                </span>
+              ) : (
+                <span className="inline-flex self-start mb-3 px-2.5 py-1 rounded-full border border-dashed border-white/25 text-[10px] text-white/40">
+                  Badge
+                </span>
+              )}
+              <h3 className="text-xl md:text-2xl font-semibold text-white tracking-tight leading-snug">
+                {title || <span className="text-white/35">Τίτλος hero…</span>}
+                {accent ? (
+                  <span className="block text-sky-300 mt-1.5">{accent}</span>
+                ) : (
+                  <span className="block text-sky-300/35 mt-1.5 text-lg">Τονισμένο κείμενο…</span>
+                )}
+              </h3>
+              <p className="text-[13px] text-white/70 mt-3 leading-relaxed line-clamp-4">
+                {subtitle || 'Ο υπότιτλος εμφανίζεται εδώ.'}
+              </p>
+              <div className="mt-5 rounded-2xl bg-white/95 p-3.5 border border-white/40 shadow-lg">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  {searchLabel || 'Ετικέτα φόρμας'}
+                </p>
+                <div className="h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center px-3 text-xs text-slate-400">
+                  Προεπισκόπηση πεδίων αναζήτησης
+                </div>
+              </div>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2.5 leading-relaxed px-0.5">
+            Η τελική εμφάνιση εξαρτάται και από το πρότυπο Hero / τη φωτογραφία στην ενότητα
+            «Λογότυπο & εικόνες».
+          </p>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 function OverviewSummary({ form }) {
   const theme = getHomepageThemeById(form.homepage_theme_id);
   const items = [
@@ -1086,50 +1317,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 onChange={(id) => setForm((p) => ({ ...p, hero_template: id }))}
               />
 
-              <div className="mt-8 pt-8 border-t border-black/[0.06] space-y-4">
-                <h5 className="font-bold text-gray-900">Κείμενα hero</h5>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Badge</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.hero_badge}
-                    onChange={(e) => setForm((p) => ({ ...p, hero_badge: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Τίτλος</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.hero_title}
-                    onChange={(e) => setForm((p) => ({ ...p, hero_title: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Τίτλος — τονισμένο</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.hero_title_accent}
-                    onChange={(e) => setForm((p) => ({ ...p, hero_title_accent: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Υπότιτλος</span>
-                  <textarea
-                    rows={3}
-                    className="mt-1 w-full rounded-xl border px-3 py-2 resize-y"
-                    value={form.hero_subtitle}
-                    onChange={(e) => setForm((p) => ({ ...p, hero_subtitle: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Ετικέτα φόρμας</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.hero_search_label}
-                    onChange={(e) => setForm((p) => ({ ...p, hero_search_label: e.target.value }))}
-                  />
-                </label>
-              </div>
+              <HeroTextsBlock form={form} setForm={setForm} />
             </PanelCard>
           </form>
         )}
