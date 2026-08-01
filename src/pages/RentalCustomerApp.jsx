@@ -30,6 +30,7 @@ import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
 import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
+import RentWalletCheckInBand from '../components/rental/RentWalletCheckInBand.jsx';
 import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.jsx';
 import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
@@ -661,20 +662,22 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
             </section>
           ) : null}
 
-          <section id="rent-wallet" className="rent-inline-section">
-            <div className="rent-panel rent-panel--wallet">
-              <h2>Rent Wallet</h2>
-              <p className="rent-panel-lead">
-                Οι κάρτες ενοικίασής σας — χωριστά από το My Wallet των λεωφορείων.
-              </p>
-              <RentalWalletPanel
-                brandLabel={branding.brandLabel}
-                passengerName={profile.name}
-                refreshKey={walletKey}
-                highlightBookingId={highlightBookingId}
-                onBookVehicle={() => scrollToSection('rent-book')}
-              />
-            </div>
+          <section id="rent-wallet" className="rent-inline-section rent-inline-section--wallet">
+            <RentWalletCheckInBand officeName={branding.brandLabel}>
+              <div className="rent-panel rent-panel--wallet">
+                <h2>My Wallet</h2>
+                <p className="rent-panel-lead">
+                  Οι κάρτες ενοικίασής σας — χωριστά από το My Wallet των λεωφορείων.
+                </p>
+                <RentalWalletPanel
+                  brandLabel={branding.brandLabel}
+                  passengerName={profile.name}
+                  refreshKey={walletKey}
+                  highlightBookingId={highlightBookingId}
+                  onBookVehicle={() => scrollToSection('rent-book')}
+                />
+              </div>
+            </RentWalletCheckInBand>
           </section>
 
           <section id="rent-book" className="rent-inline-section">
