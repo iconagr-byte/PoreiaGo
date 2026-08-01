@@ -10,7 +10,7 @@ from uuid import UUID
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -113,6 +113,11 @@ class RentalCheckoutBody(BaseModel):
     insurance_label: str | None = Field(default=None, max_length=80)
     deposit_eur: float | None = Field(default=None, ge=0)
     summary: dict | None = None
+    signing_method: str = "IN_PERSON"
+
+
+class SignLinkBody(BaseModel):
+    public_base_url: str | None = Field(default=None, max_length=240)
 
 
 class InspectionBody(BaseModel):
@@ -328,6 +333,64 @@ async def patch_booking_legal_doc(
     return row
 
 
+@router.post("/bookings/{booking_id}/sign-link")
+async def generate_rental_sign_link(
+    booking_id: str,
+    body: SignLinkBody = Body(default_factory=SignLinkBody),
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Create 24h contactless signing link and notify client via SMS/email."""
+    try:
+        link = store.create_signature_link(_tid(tenant_id), booking_id)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+    base = str(body.public_base_url or "").strip().rstrip("/")
+    if not base:
+        base = ""
+    sign_url = f"{base}/sign/{link['signature_token']}" if base else f"/sign/{link['signature_token']}"
+    notify: dict = {"email": None, "sms": None}
+    name = link.get("client_name") or ""
+    try:
+        from travel_platform.notifications.dispatcher import send_email, send_sms
+        from ticketing.fiscal_notifications import normalize_phone
+
+        email = str(link.get("client_email") or "").strip()
+        phone = normalize_phone(link.get("client_phone"))
+        msg = (
+            f"Γεια σας {name},\n\n"
+            f"Υπογράψτε τη σύμβαση ενοικίασης online (ισχύει 24 ώρες):\n"
+            f"{sign_url}\n\n"
+            f"PoreiaGo Rent"
+        )
+        if email:
+            notify["email"] = await send_email(email, "Υπογραφή σύμβασης ενοικίασης", msg)
+        if phone:
+            sms_body = f"PoreiaGo Rent: υπογράψτε τη σύμβαση {sign_url}"
+            notify["sms"] = await send_sms(phone, sms_body[:300])
+    except Exception:
+        pass
+    return {**link, "sign_url": sign_url, "notify": notify}
+
+
+@router.get("/bookings/{booking_id}/checkout-status")
+async def rental_checkout_status(
+    booking_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """Poll remote signing progress for the agent tablet."""
+    try:
+        return store.get_checkout_status(_tid(tenant_id), booking_id)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+
 @router.post("/bookings/{booking_id}/checkout")
 async def rental_tablet_checkout(
     booking_id: str,
@@ -339,11 +402,14 @@ async def rental_tablet_checkout(
     Tablet checkout: accept mandatory terms + one signature → stamp legal pack,
     activate contract, write printable HTML contract, notify customer.
     """
+    payload = body.model_dump()
+    if not payload.get("signing_method"):
+        payload["signing_method"] = "IN_PERSON"
     try:
         result = store.complete_rental_checkout(
             _tid(tenant_id),
             booking_id,
-            body.model_dump(),
+            payload,
         )
     except ValueError as exc:
         msg = str(exc)
