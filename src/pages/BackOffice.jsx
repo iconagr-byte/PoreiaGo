@@ -27,7 +27,7 @@ import SettingsHub from '../components/admin/SettingsHub.jsx';
 import AddCustomerModal from '../components/admin/AddCustomerModal.jsx';
 import CustomersCrmPanel from '../components/admin/CustomersCrmPanel.jsx';
 import AdminMobileNavDrawer from '../components/admin/AdminMobileNavDrawer.jsx';
-import { isPaid, isConfirmed, canRecordCashPayment } from '../lib/bookingDisplay.js';
+import { canRecordCashPayment } from '../lib/bookingDisplay.js';
 import { recordCashPayment } from '../lib/ticketing/bookingStore.js';
 import { DEFAULT_PAYMENT_SECURITY } from '../lib/payments/paymentSecurity.js';
 import { deleteTrip as removeTripFromStore, loadTrips, getTripById } from '../lib/trips/tripStore.js';
