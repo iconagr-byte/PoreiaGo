@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
+import { FLEET_MARKER_ANIM_MS, easeOutQuad } from '../lib/admin/fleetMarkerMotion.js';
 
-const DEFAULT_ANIM_MS = 3500;
+export { FLEET_MARKER_ANIM_MS };
 
 /**
  * Ομαλή μετάβαση δεικτών στόλου (ease-out quad) μεταξύ GPS pings.
+ * Duration stays under the active 1s poll so pins do not lag a full cycle behind.
  */
-export function useAnimatedFleetVehicles(vehicles, animMs = DEFAULT_ANIM_MS) {
+export function useAnimatedFleetVehicles(vehicles, animMs = FLEET_MARKER_ANIM_MS) {
   const [display, setDisplay] = useState([]);
   const rafRef = useRef(null);
 
@@ -15,12 +17,13 @@ export function useAnimatedFleetVehicles(vehicles, animMs = DEFAULT_ANIM_MS) {
       setDisplay(
         vehicles.map((v) => {
           const start = v.animStart || now;
-          const t = Math.min(1, (now - start) / animMs);
-          const ease = t * (2 - t);
+          const t = easeOutQuad((now - start) / animMs);
+          const prevLat = Number.isFinite(v.prevLat) ? v.prevLat : v.targetLat;
+          const prevLng = Number.isFinite(v.prevLng) ? v.prevLng : v.targetLng;
           return {
             ...v,
-            lat: v.prevLat + (v.targetLat - v.prevLat) * ease,
-            lng: v.prevLng + (v.targetLng - v.prevLng) * ease,
+            lat: prevLat + (v.targetLat - prevLat) * t,
+            lng: prevLng + (v.targetLng - prevLng) * t,
           };
         }),
       );

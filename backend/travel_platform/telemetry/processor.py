@@ -39,6 +39,16 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
         meta["bus_plate"] = raw.get("bus_plate") or raw.get("vehicle_code")
     if raw.get("heading_deg") is not None:
         meta["heading_deg"] = raw.get("heading_deg")
+    if raw.get("accuracy_m") is not None:
+        try:
+            meta["accuracy_m"] = float(raw["accuracy_m"])
+        except (TypeError, ValueError):
+            pass
+    if raw.get("altitude_m") is not None:
+        try:
+            meta["altitude_m"] = float(raw["altitude_m"])
+        except (TypeError, ValueError):
+            pass
     if raw.get("driver_id"):
         meta["driver_id"] = raw.get("driver_id")
     preferred_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
