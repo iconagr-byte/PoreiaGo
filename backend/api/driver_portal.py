@@ -219,17 +219,114 @@ def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None
     return 1
 
 
+_POREIAGO_OFFICE_CACHE: tuple[float, str | None] | None = None
+_POREIAGO_OFFICE_CACHE_TTL_SEC = 300.0
+
+
+async def _resolve_poreiago_office_tenant_id() -> str | None:
+    """PoreiaGo platform office UUID (www.poreiago.com is the office Host, not «no tenant»)."""
+    global _POREIAGO_OFFICE_CACHE
+    now = time.time()
+    if _POREIAGO_OFFICE_CACHE and now - _POREIAGO_OFFICE_CACHE[0] < _POREIAGO_OFFICE_CACHE_TTL_SEC:
+        return _POREIAGO_OFFICE_CACHE[1]
+
+    tid: str | None = None
+    try:
+        from sqlalchemy import or_, select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import is_poreiago_platform_office
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(Tenant)
+                .where(
+                    or_(
+                        Tenant.slug.in_(
+                            (
+                                "poreiago",
+                                "platform",
+                                "demo",
+                                "admin-poreiago",
+                                "poreiago-saas",
+                                "poreiago-platform",
+                                "achillio",  # historic PoreiaGo seed slug
+                            )
+                        ),
+                        Tenant.subdomain.in_(
+                            (
+                                "poreiago",
+                                "platform",
+                                "demo",
+                                "admin-poreiago",
+                                "poreiago-saas",
+                                "poreiago-platform",
+                                "achillio",
+                            )
+                        ),
+                        Tenant.custom_domain.ilike("%poreiago.com%"),
+                        Tenant.legal_name.ilike("%poreiago%"),
+                    )
+                )
+                .limit(20)
+            )
+            rows = list(result.scalars().all())
+            from app.services.tenant_modules import is_achillio_travel_office
+
+            preferred = None
+            for tenant in rows:
+                if is_achillio_travel_office(tenant):
+                    continue
+                if not is_poreiago_platform_office(tenant):
+                    continue
+                slug = str(getattr(tenant, "slug", "") or "").strip().lower()
+                candidate = str(tenant.id)
+                if slug in ("poreiago", "poreiago-platform", "admin-poreiago", "poreiago-saas"):
+                    preferred = candidate
+                    break
+                if preferred is None:
+                    preferred = candidate
+            tid = preferred
+    except Exception:
+        tid = None
+
+    _POREIAGO_OFFICE_CACHE = (now, tid)
+    return tid
+
+
 async def _login_office_tenant(request: Request) -> str | None:
-    """Host / middleware office for this /driver login (None on bare platform host)."""
+    """Host / middleware office for this /driver login.
+
+    Custom office domains resolve via Host. ``www.poreiago.com`` is the PoreiaGo
+    platform office itself — not an unscoped API host — so map it to that tenant.
+    Bare unknown hosts (e.g. testserver, raw IP) stay None so login cannot
+    first-match across offices.
+    """
     tid = getattr(request.state, "tenant_id", None)
     if tid:
         return str(tid)
     try:
         from api.request_tenant import public_tenant_id
 
-        return await public_tenant_id(request, allow_demo_fallback=False)
+        resolved = await public_tenant_id(request, allow_demo_fallback=False)
+        if resolved:
+            return resolved
     except Exception:
-        return None
+        pass
+
+    try:
+        from middleware.domain_tenant import _is_platform_host, _request_host
+
+        host = _request_host(request)
+        if host and _is_platform_host(host):
+            poreiago_tid = await _resolve_poreiago_office_tenant_id()
+            if poreiago_tid:
+                request.state.tenant_id = poreiago_tid
+                return poreiago_tid
+    except Exception:
+        pass
+    return None
 
 
 @router.post("/session/login", response_model=DriverSessionResponse)
@@ -305,8 +402,8 @@ async def login_with_password(request: Request, body: DriverLoginBody):
             except Exception:
                 pass
     else:
-        # Bare platform/api Host — refuse unscoped login so the same email
-        # cannot open another office's session by first-match.
+        # Unknown / unscoped Host — refuse so the same email cannot open
+        # another office's session by first-match.
         record_login_from_request(
             request,
             actor_type="driver",
@@ -317,7 +414,7 @@ async def login_with_password(request: Request, body: DriverLoginBody):
         )
         raise HTTPException(
             status_code=401,
-            detail="Συνδεθείτε από το domain του γραφείου σας (π.χ. www.achilliotravel.com)",
+            detail="Συνδεθείτε από το domain του γραφείου σας (π.χ. www.poreiago.com)",
         )
 
     trip_id = _resolve_trip_for_driver(driver.id, tenant_id)
