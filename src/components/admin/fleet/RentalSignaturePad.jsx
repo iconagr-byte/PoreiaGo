@@ -42,6 +42,8 @@ const RentalSignaturePad = forwardRef(function RentalSignaturePad(
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, rect.width, rect.height);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.strokeStyle = '#0f172a';
@@ -95,6 +97,15 @@ const RentalSignaturePad = forwardRef(function RentalSignaturePad(
     drawing.current = false;
   };
 
+  const paintWhiteBackground = (ctx, width, height) => {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  };
+
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -102,6 +113,8 @@ const RentalSignaturePad = forwardRef(function RentalSignaturePad(
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
     }
     setInk(false);
@@ -115,6 +128,8 @@ const RentalSignaturePad = forwardRef(function RentalSignaturePad(
         resolve(null);
         return;
       }
+      const ctx = canvas.getContext('2d');
+      if (ctx) paintWhiteBackground(ctx, canvas.width, canvas.height);
       canvas.toBlob(
         (blob) => {
           if (!blob) {
