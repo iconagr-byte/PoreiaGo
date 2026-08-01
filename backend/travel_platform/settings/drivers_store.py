@@ -188,10 +188,11 @@ def _prefer_driver_row(candidates: list[FleetDriver]) -> FleetDriver:
 
 def seal_cross_office_driver_uniqueness() -> dict:
     """
-    Boot-time SEAL: one email / license / plate / vehicle code → one office.
+    Boot-time SEAL: drop DEMO duplicates only.
 
-    Deletes duplicate rows that leaked across γραφεία (DEMO claim fiasco).
-    Safe to run on every process boot.
+    Never auto-delete a real-office driver when another real office also has
+    the same email/license — that needs a human decision. Global create-time
+    uniqueness still prevents new cross-office clones.
     """
     drivers = _ensure()
     groups: dict[str, list[FleetDriver]] = {}
@@ -211,6 +212,7 @@ def seal_cross_office_driver_uniqueness() -> dict:
         add_key("plate", d.license_plate, d)
 
     delete_ids: set[str] = set()
+    skipped_real_conflicts = 0
     for key, rows in groups.items():
         by_id: dict[str, FleetDriver] = {r.id: r for r in rows}
         uniq = list(by_id.values())
@@ -220,12 +222,23 @@ def seal_cross_office_driver_uniqueness() -> dict:
         for r in uniq:
             if r.id == winner.id:
                 continue
+            # Only purge the DEMO side of a conflict — never wipe a real office row.
+            if _driver_tenant_id(r) != DEMO_TENANT_ID:
+                skipped_real_conflicts += 1
+                logger.error(
+                    "SEAL: real-office driver conflict key=%s keep=%s (%s) other=%s (%s) — not auto-deleted",
+                    key,
+                    winner.id,
+                    _driver_tenant_id(winner),
+                    r.id,
+                    _driver_tenant_id(r),
+                )
+                continue
             delete_ids.add(r.id)
             logger.warning(
-                "SEAL driver uniqueness: removing duplicate %s (%s) tenant=%s kept=%s key=%s",
+                "SEAL: removing DEMO duplicate %s (%s) kept=%s key=%s",
                 r.id,
                 r.email,
-                _driver_tenant_id(r),
                 winner.id,
                 key,
             )
@@ -240,14 +253,18 @@ def seal_cross_office_driver_uniqueness() -> dict:
         try:
             _persist()
             logger.info(
-                "SEAL: removed %s cross-office duplicate driver(s) from %s",
+                "SEAL: removed %s DEMO duplicate driver(s) from %s",
                 removed,
                 STORE_PATH,
             )
         except Exception:
             logger.exception("SEAL: failed to persist after duplicate purge")
 
-    return {"removed": removed, "store": str(STORE_PATH)}
+    return {
+        "removed": removed,
+        "skipped_real_conflicts": skipped_real_conflicts,
+        "store": str(STORE_PATH),
+    }
 
 
 def _normalize_username(value: str | None) -> str:
@@ -471,9 +488,8 @@ def find_driver_by_username(
     Match email, license number, or vehicle/driver code (case-insensitive).
 
     When ``tenant_id`` is set, only that office's drivers match.
-    DEMO legacy cross-match is disabled (SEAL).
+    ``allow_demo_legacy`` may match a DEMO orphan (Achillio login recovery only).
     """
-    del allow_demo_legacy
     needle = _normalize_username(username)
     if not needle:
         return None
@@ -485,7 +501,14 @@ def find_driver_by_username(
             continue
         if tid is None:
             return d
-        if _driver_tenant_id(d) == tid:
+        dtid = _driver_tenant_id(d)
+        if dtid == tid:
+            return d
+        if (
+            allow_demo_legacy
+            and tid != DEMO_TENANT_ID
+            and dtid == DEMO_TENANT_ID
+        ):
             return d
     return None
 
@@ -500,9 +523,8 @@ def authenticate_driver(
     driver = find_driver_by_username(
         username,
         tenant_id=tenant_id,
-        allow_demo_legacy=False,
+        allow_demo_legacy=allow_demo_legacy,
     )
-    del allow_demo_legacy
     if not driver or is_seed_driver(driver):
         return None
     if driver.status not in ("active", "on_leave"):
