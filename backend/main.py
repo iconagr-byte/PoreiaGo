@@ -423,6 +423,12 @@ except ImportError:
 if fleet_rental_router:
     app.include_router(fleet_rental_router)
 try:
+    from api.rent_sign_public_router import router as rent_sign_public_router
+except ImportError:
+    rent_sign_public_router = None
+if rent_sign_public_router:
+    app.include_router(rent_sign_public_router)
+try:
     from api.loyalty_router import router as loyalty_router
 except ImportError:
     loyalty_router = None

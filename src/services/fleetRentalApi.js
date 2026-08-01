@@ -145,6 +145,19 @@ export async function completeRentalCheckout(bookingId, body) {
   });
 }
 
+/** Generate 24h contactless signing link + SMS/email to client. */
+export async function createRentalSignLink(bookingId, publicBaseUrl) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/sign-link`, {
+    method: 'POST',
+    body: JSON.stringify({ public_base_url: publicBaseUrl || window.location.origin }),
+  });
+}
+
+/** Poll agent tablet while waiting for remote client signature. */
+export async function fetchRentalCheckoutStatus(bookingId) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/checkout-status`);
+}
+
 export async function fetchRentalCalendar(days = 30) {
   const data = await rentalFetch(`/calendar?days=${days}`);
   return data.blocks || [];

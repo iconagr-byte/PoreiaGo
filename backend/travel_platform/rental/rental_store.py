@@ -1225,18 +1225,26 @@ def complete_rental_checkout(
         sigs = booking.get("legal_doc_signatures")
         if not isinstance(sigs, dict):
             sigs = {}
+        signing_method = str(body.get("signing_method") or "IN_PERSON").strip().upper()
+        if signing_method not in ("IN_PERSON", "REMOTE"):
+            signing_method = "IN_PERSON"
         for doc in _LEGAL_DOC_IDS:
             sigs[doc] = {
                 "signature_url": url,
                 "signed_at": now,
                 "signer_name": signer or booking.get("client_name"),
-                "via": "tablet_checkout",
+                "via": "remote_sign" if signing_method == "REMOTE" else "tablet_checkout",
             }
         booking["legal_doc_signatures"] = sigs
         booking["checkout_accepted_terms"] = accepted
         booking["checkout_insurance_label"] = insurance_label
         booking["checkout_deposit_eur"] = deposit_n
         booking["contract_issued_at"] = now
+        booking["signing_method"] = signing_method
+        # Consume / clear remote token once signed.
+        booking["signature_token"] = None
+        booking["signature_token_expires_at"] = None
+        booking["signature_pending"] = False
         # Activate rental (contract_status alias = rental_status ACTIVE).
         if booking.get("rental_status") in ("RESERVED", "CONFIRMED"):
             booking["rental_status"] = "ACTIVE"
@@ -1297,7 +1305,169 @@ def complete_rental_checkout(
             "contract_pdf_url": contract_url,
             "contract_status": "ACTIVE",
             "pickup_inspection_id": pickup_id,
+            "signing_method": signing_method,
         }
+
+
+def create_signature_link(tenant_id: str | None, booking_id: str) -> dict[str, Any]:
+    """Generate a 24h remote-signing token for contactless client signature."""
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == booking_id),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        if booking.get("rental_status") == "CANCELLED":
+            raise ValueError("Η κράτηση είναι ακυρωμένη")
+        if booking.get("contract_status") == "ACTIVE" and booking.get("contract_issued_at"):
+            raise ValueError("Η σύμβαση έχει ήδη εκδοθεί")
+        token = str(uuid4())
+        expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        booking["signature_token"] = token
+        booking["signature_token_expires_at"] = expires
+        booking["signing_method"] = "REMOTE"
+        booking["signature_pending"] = True
+        booking["updated_at"] = _now()
+        _write(data)
+        return {
+            "booking_id": booking_id,
+            "signature_token": token,
+            "signature_token_expires_at": expires,
+            "signing_method": "REMOTE",
+            "client_email": booking.get("client_email"),
+            "client_phone": booking.get("client_phone"),
+            "client_name": booking.get("client_name"),
+        }
+
+
+def _find_booking_by_sign_token(token: str) -> dict[str, Any] | None:
+    needle = str(token or "").strip()
+    if not needle or len(needle) < 16:
+        return None
+    with _LOCK:
+        for b in _read()["bookings"]:
+            if str(b.get("signature_token") or "") == needle:
+                return deepcopy(b)
+    return None
+
+
+def get_signing_session(token: str) -> dict[str, Any]:
+    """Public session payload for /sign/:token (no admin auth)."""
+    booking = _find_booking_by_sign_token(token)
+    if not booking:
+        raise ValueError("Μη έγκυρος ή ληγμένος σύνδεσμος υπογραφής")
+    raw_exp = booking.get("signature_token_expires_at")
+    if raw_exp:
+        try:
+            exp_dt = _parse_dt(raw_exp)
+        except Exception as exc:
+            raise ValueError("Μη έγκυρος σύνδεσμος υπογραφής") from exc
+        if exp_dt < datetime.now(timezone.utc):
+            raise ValueError("Ο σύνδεσμος υπογραφής έχει λήξει — ζητήστε νέο από το γραφείο")
+    if booking.get("contract_status") == "ACTIVE" and booking.get("contract_issued_at"):
+        return {
+            "status": "already_signed",
+            "contract_status": "ACTIVE",
+            "client_name": booking.get("client_name"),
+            "vehicle_plate": booking.get("vehicle_plate"),
+            "vehicle_model": booking.get("vehicle_model"),
+        }
+    vehicle = get_vehicle(booking.get("tenant_id"), booking.get("vehicle_id") or "")
+    return {
+        "status": "pending",
+        "booking_id": booking.get("id"),
+        "client_name": booking.get("client_name"),
+        "vehicle_plate": booking.get("vehicle_plate") or (vehicle or {}).get("plate_number"),
+        "vehicle_model": booking.get("vehicle_model") or (vehicle or {}).get("model"),
+        "vehicle_photo_url": (vehicle or {}).get("photo_url"),
+        "start_time": booking.get("start_time"),
+        "end_time": booking.get("end_time"),
+        "pickup_location": booking.get("pickup_location"),
+        "total_cost": booking.get("total_cost"),
+        "expires_at": booking.get("signature_token_expires_at"),
+        "office_hint": "PoreiaGo Rent",
+    }
+
+
+def save_signature_image_bytes(content: bytes, *, content_type: str = "image/png") -> str:
+    """Persist a remote signature PNG and return a public /api/site URL."""
+    if not content:
+        raise ValueError("Άδειο αρχείο υπογραφής")
+    if len(content) > 4 * 1024 * 1024:
+        raise ValueError("Η υπογραφή είναι πολύ μεγάλη")
+    ext = ".png"
+    if "jpeg" in content_type or "jpg" in content_type:
+        ext = ".jpg"
+    elif "webp" in content_type:
+        ext = ".webp"
+    folder = DATA_DIR / "uploads" / "rental_damage"
+    folder.mkdir(parents=True, exist_ok=True)
+    filename = f"sign-{uuid4().hex}{ext}"
+    (folder / filename).write_bytes(content)
+    return f"/api/site/rental-photos/{filename}"
+
+
+def submit_signature_by_token(token: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Finalize contract from the client's phone (remote contactless)."""
+    booking = _find_booking_by_sign_token(token)
+    if not booking:
+        raise ValueError("Μη έγκυρος ή ληγμένος σύνδεσμος υπογραφής")
+    raw_exp = booking.get("signature_token_expires_at")
+    if raw_exp:
+        try:
+            exp_dt = _parse_dt(raw_exp)
+        except Exception as exc:
+            raise ValueError("Μη έγκυρος σύνδεσμος υπογραφής") from exc
+        if exp_dt < datetime.now(timezone.utc):
+            raise ValueError("Ο σύνδεσμος υπογραφής έχει λήξει")
+    if booking.get("contract_status") == "ACTIVE" and booking.get("contract_issued_at"):
+        raise ValueError("Η σύμβαση έχει ήδη υπογραφεί")
+    payload = dict(body or {})
+    payload["signing_method"] = "REMOTE"
+    # Prefer uploaded URL; otherwise accept raw base64.
+    if not payload.get("signature_url") and payload.get("signature_base64"):
+        raw = str(payload.get("signature_base64") or "")
+        if "," in raw:
+            raw = raw.split(",", 1)[1]
+        import base64
+
+        try:
+            content = base64.b64decode(raw, validate=False)
+        except Exception as exc:
+            raise ValueError("Μη έγκυρη υπογραφή") from exc
+        payload["signature_url"] = save_signature_image_bytes(content)
+    return complete_rental_checkout(booking.get("tenant_id"), booking["id"], payload)
+
+
+def get_checkout_status(tenant_id: str | None, booking_id: str) -> dict[str, Any]:
+    """Agent polling — has the remote client finished signing?"""
+    tid = _normalize_tenant(tenant_id)
+    booking = next((b for b in list_bookings(tid) if b.get("id") == booking_id), None)
+    if not booking:
+        raise ValueError("Η κράτηση δεν βρέθηκε")
+    issued = bool(booking.get("contract_issued_at") and booking.get("contract_status") == "ACTIVE")
+    pending = bool(booking.get("signature_pending") and booking.get("signature_token"))
+    expires_at = booking.get("signature_token_expires_at")
+    expired = False
+    if expires_at:
+        try:
+            expired = _parse_dt(expires_at) < datetime.now(timezone.utc)
+        except Exception:
+            expired = False
+    return {
+        "booking_id": booking_id,
+        "contract_status": booking.get("contract_status") or booking.get("rental_status"),
+        "rental_status": booking.get("rental_status"),
+        "signing_method": booking.get("signing_method"),
+        "signature_pending": pending and not issued and not expired,
+        "signed": issued,
+        "contract_pdf_url": booking.get("contract_pdf_url"),
+        "signature_token_expires_at": expires_at,
+        "token_expired": expired and not issued,
+    }
 
 
 def list_documents(

@@ -16,6 +16,7 @@ import WalletMagicPage from './pages/WalletMagicPage.jsx';
 import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
 import RentBookingWizardPage from './pages/RentBookingWizardPage.jsx';
 import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
+import RentalRemoteSignPage from './pages/RentalRemoteSignPage.jsx';
 import InBusPortal from './pages/InBusPortal';
 import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
@@ -98,6 +99,8 @@ function App() {
             <Route path="/rent/wallet" element={<RentalCustomerApp />} />
             <Route path="/rent" element={<RentalCustomerApp />} />
             <Route path="/rent/*" element={<RentalCustomerApp />} />
+            {/* Contactless rental contract signature (token from SMS/email). */}
+            <Route path="/sign/:token" element={<RentalRemoteSignPage />} />
             <Route path="/" element={<HomePage />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />
             <Route path="/grafeia" element={<AgencyPlansPage />} />

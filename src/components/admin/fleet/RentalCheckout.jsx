@@ -1,10 +1,11 @@
 /**
- * Tablet / kiosk digital contract checkout — summary, mandatory terms, signature, issue.
- * Adapts the PoreiaGo Rent master prompt to the existing admin desk stack.
+ * Dual-mode digital contract checkout — Sign-on-Glass or contactless SMS/Email link.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   completeRentalCheckout,
+  createRentalSignLink,
+  fetchRentalCheckoutStatus,
   uploadRentalInspectionPhoto,
 } from '../../../services/fleetRentalApi.js';
 import {
@@ -43,9 +44,7 @@ function FuelBars({ level = 6, max = 8 }) {
       {Array.from({ length: max }, (_, i) => (
         <span
           key={i}
-          className={`w-2.5 rounded-sm ${
-            i < filled ? 'bg-teal-600' : 'bg-slate-200'
-          }`}
+          className={`w-2.5 rounded-sm ${i < filled ? 'bg-teal-600' : 'bg-slate-200'}`}
           style={{ height: `${10 + i * 2}px` }}
         />
       ))}
@@ -65,6 +64,7 @@ export default function RentalCheckout({
   onToast,
 }) {
   const padRef = useRef(null);
+  const [mode, setMode] = useState(null); // null | 'IN_PERSON' | 'REMOTE'
   const [accept, setAccept] = useState(() => emptyCheckoutAcceptances());
   const [hasInk, setHasInk] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
@@ -72,21 +72,72 @@ export default function RentalCheckout({
   const [depositEur, setDepositEur] = useState('');
   const [insuranceLabel, setInsuranceLabel] = useState('CDW');
   const [busy, setBusy] = useState(false);
+  const [waitingRemote, setWaitingRemote] = useState(false);
+  const [signUrl, setSignUrl] = useState('');
+  const [remoteNotify, setRemoteNotify] = useState(null);
 
   const plate = booking?.vehicle_plate || vehicle?.plate_number || '—';
   const model = booking?.vehicle_model || vehicle?.model || 'Όχημα';
   const photo = resolveSiteAssetUrl(vehicle?.photo_url || booking?.vehicle_photo_url);
 
   const canSubmit = useMemo(
-    () => allCheckoutTermsAccepted(accept) && hasInk && !busy,
-    [accept, hasInk, busy],
+    () => mode === 'IN_PERSON' && allCheckoutTermsAccepted(accept) && hasInk && !busy,
+    [mode, accept, hasInk, busy],
   );
+
+  // Poll while waiting for remote signature.
+  useEffect(() => {
+    if (!waitingRemote || !booking?.id) return undefined;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const status = await fetchRentalCheckoutStatus(booking.id);
+        if (cancelled) return;
+        if (status.signed) {
+          setWaitingRemote(false);
+          onToast?.('success', 'Ο πελάτης υπέγραψε — σύμβαση ACTIVE');
+          onComplete?.(status);
+        } else if (status.token_expired) {
+          setWaitingRemote(false);
+          onToast?.('error', 'Ο σύνδεσμος έληξε — στείλε νέο link');
+        }
+      } catch {
+        /* keep polling */
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [waitingRemote, booking?.id, onComplete, onToast]);
 
   const toggle = (id) => {
     setAccept((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const submit = async () => {
+  const sendRemoteLink = async () => {
+    if (!booking?.id || busy) return;
+    setBusy(true);
+    try {
+      const result = await createRentalSignLink(booking.id, window.location.origin);
+      setSignUrl(result.sign_url || '');
+      setRemoteNotify(result.notify || null);
+      setMode('REMOTE');
+      setWaitingRemote(true);
+      onToast?.(
+        'success',
+        'Στάλθηκε σύνδεσμος στον πελάτη — αναμονή υπογραφής…',
+      );
+    } catch (err) {
+      onToast?.('error', err?.message || 'Αποτυχία αποστολής link');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitInPerson = async () => {
     if (!canSubmit || !booking?.id) return;
     setBusy(true);
     try {
@@ -104,6 +155,7 @@ export default function RentalCheckout({
         fuel_level: fuelPct,
         insurance_label: insuranceLabel,
         deposit_eur: depositEur === '' ? null : Number(depositEur),
+        signing_method: 'IN_PERSON',
         summary: {
           vehicle: `${model} (${plate})`,
           start_time: booking.start_time,
@@ -128,13 +180,13 @@ export default function RentalCheckout({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wide text-teal-700/80">
-            Tablet · ψηφιακή σύμβαση
+            Dual-mode · ψηφιακή υπογραφή
           </p>
           <h3 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
             Ολοκλήρωση & υπογραφή
           </h3>
           <p className="text-sm text-slate-500 mt-1">
-            {officeName} · ο πελάτης ελέγχει, αποδέχεται όρους και υπογράφει.
+            {officeName} · Sign-on-Glass ή απομακρυσμένο link στο κινητό του πελάτη.
           </p>
         </div>
         <button
@@ -146,7 +198,7 @@ export default function RentalCheckout({
         </button>
       </div>
 
-      {/* Section A — Summary */}
+      {/* Summary */}
       <section className="rounded-[28px] border border-slate-200/90 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)] overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-teal-50/80 to-white flex gap-4">
           <div className="h-20 w-28 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
@@ -161,169 +213,254 @@ export default function RentalCheckout({
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Όχημα</p>
             <p className="text-xl font-bold text-slate-900 truncate">
-              {model}{' '}
-              <span className="text-teal-800">({plate})</span>
+              {model} <span className="text-teal-800">({plate})</span>
             </p>
             <p className="text-sm text-slate-600 mt-1">{booking.client_name}</p>
-          </div>
-        </div>
-        <div className="p-5 grid sm:grid-cols-2 gap-4">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Περίοδος</p>
-            <p className="text-sm font-semibold text-slate-800 mt-1">
-              {formatWhen(booking.start_time)}
-              <span className="text-slate-400"> → </span>
-              {formatWhen(booking.end_time)}
+            <p className="text-xs text-slate-500 mt-0.5">
+              {formatWhen(booking.start_time)} → {formatWhen(booking.end_time)} ·{' '}
+              {euro(booking.total_cost)}
             </p>
           </div>
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Καύσιμο</p>
-            <div className="mt-2 flex items-center gap-3">
-              <FuelBars level={fuelLevel} />
-              <input
-                type="range"
-                min={0}
-                max={8}
-                step={1}
-                value={fuelLevel}
-                onChange={(e) => setFuelLevel(Number(e.target.value))}
-                className="flex-1 accent-teal-700"
-                aria-label="Στάθμη καυσίμου"
-              />
-            </div>
-          </div>
-          <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-              Ασφάλιση
-            </span>
-            <select
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold"
-              value={insuranceLabel}
-              onChange={(e) => setInsuranceLabel(e.target.value)}
-            >
-              <option value="Βασική ΑΕ">Βασική αστική ευθύνη</option>
-              <option value="CDW">CDW (με απαλλαγή)</option>
-              <option value="SCDW">SCDW Plus</option>
-              <option value="Super Cover">Super Cover</option>
-            </select>
-          </label>
-          <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-              Εγγύηση (€)
-            </span>
-            <input
-              type="number"
-              min={0}
-              step="1"
-              placeholder="π.χ. 500"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold"
-              value={depositEur}
-              onChange={(e) => setDepositEur(e.target.value)}
-            />
-          </label>
-          <div className="sm:col-span-2 rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+        </div>
+        {mode === 'IN_PERSON' ? (
+          <div className="p-5 grid sm:grid-cols-2 gap-4">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Σύνολο</p>
-              <p className="text-2xl font-bold text-slate-900 tabular-nums">
-                {euro(booking.total_cost)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Εγγύηση</p>
-              <p className="text-lg font-bold text-slate-800 tabular-nums">
-                {depositEur === '' ? '—' : euro(depositEur)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Section B — Terms */}
-      <section className="rounded-[28px] border border-slate-200/90 bg-white p-5 shadow-sm space-y-3">
-        <div>
-          <h4 className="font-bold text-slate-900 text-lg">Υποχρεωτικοί όροι</h4>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Ο πελάτης πρέπει να αποδεχτεί και τους 5 όρους για να προχωρήσει.
-          </p>
-        </div>
-        <ul className="space-y-2.5">
-          {RENTAL_CHECKOUT_TERMS.map((term) => (
-            <li
-              key={term.id}
-              className={`rounded-2xl border px-3.5 py-3 transition ${
-                accept[term.id]
-                  ? 'border-teal-300 bg-teal-50/50'
-                  : 'border-slate-200 bg-slate-50/40'
-              }`}
-            >
-              <label className="flex items-start gap-3 cursor-pointer">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Καύσιμο</p>
+              <div className="mt-2 flex items-center gap-3">
+                <FuelBars level={fuelLevel} />
                 <input
-                  type="checkbox"
-                  className="mt-1 h-5 w-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600"
-                  checked={Boolean(accept[term.id])}
-                  onChange={() => toggle(term.id)}
+                  type="range"
+                  min={0}
+                  max={8}
+                  step={1}
+                  value={fuelLevel}
+                  onChange={(e) => setFuelLevel(Number(e.target.value))}
+                  className="flex-1 accent-teal-700"
                 />
-                <span className="text-sm text-slate-800 leading-relaxed">
-                  {term.hasTermsModal ? (
-                    <>
-                      <strong className="font-bold">Γενικοί Όροι: </strong>
-                      {term.label}{' '}
-                      <button
-                        type="button"
-                        className="text-teal-700 font-bold underline underline-offset-2"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setTermsOpen(true);
-                        }}
-                      >
-                        Δες πλήρες κείμενο
-                      </button>
-                    </>
-                  ) : (
-                    term.label
-                  )}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
+              </div>
+            </div>
+            <label className="block">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                Ασφάλιση
+              </span>
+              <select
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold"
+                value={insuranceLabel}
+                onChange={(e) => setInsuranceLabel(e.target.value)}
+              >
+                <option value="Βασική ΑΕ">Βασική αστική ευθύνη</option>
+                <option value="CDW">CDW (με απαλλαγή)</option>
+                <option value="SCDW">SCDW Plus</option>
+                <option value="Super Cover">Super Cover</option>
+              </select>
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                Εγγύηση (€)
+              </span>
+              <input
+                type="number"
+                min={0}
+                className="mt-1 w-full max-w-xs rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold"
+                value={depositEur}
+                onChange={(e) => setDepositEur(e.target.value)}
+                placeholder="π.χ. 500"
+              />
+            </label>
+          </div>
+        ) : null}
       </section>
 
-      {/* Section C — Signature */}
-      <section className="rounded-[28px] border border-slate-200/90 bg-white p-5 shadow-sm">
-        <h4 className="font-bold text-slate-900 text-lg mb-3">Ψηφιακή υπογραφή</h4>
-        <RentalSignaturePad
-          ref={padRef}
-          embedded
-          heightClass="h-40 sm:h-48"
-          watermark="Υπογράψτε εδώ..."
-          onInkChange={setHasInk}
-          disabled={busy}
-        />
-      </section>
+      {/* Method selector */}
+      {mode == null && !waitingRemote ? (
+        <section className="grid sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setMode('IN_PERSON')}
+            className="text-left rounded-[28px] border border-teal-300/80 bg-gradient-to-br from-teal-50 to-white p-5 shadow-sm hover:ring-2 hover:ring-teal-100 transition"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-700 text-white">
+              <span className="material-symbols-outlined">touch_app</span>
+            </span>
+            <p className="font-bold text-lg text-slate-900 mt-3">Sign on this Device</p>
+            <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+              Ο πελάτης υπογράφει εδώ στο tablet / οθόνη του γραφείου (Sign-on-Glass).
+            </p>
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={sendRemoteLink}
+            className="text-left rounded-[28px] border border-sky-300/80 bg-gradient-to-br from-sky-50 to-white p-5 shadow-sm hover:ring-2 hover:ring-sky-100 transition"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-700 text-white">
+              <span className="material-symbols-outlined">send_to_mobile</span>
+            </span>
+            <p className="font-bold text-lg text-slate-900 mt-3">Send Link to Client</p>
+            <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+              Ασφαλές σύνδεσμος 24ωρών στο SMS / email του πελάτη για contactless υπογραφή.
+            </p>
+            <p className="text-xs text-slate-500 mt-2">
+              {booking.client_phone || '—'} · {booking.client_email || 'χωρίς email'}
+            </p>
+          </button>
+        </section>
+      ) : null}
 
-      {/* Section D — Actions */}
-      <div className="sticky bottom-3 z-10 flex flex-col sm:flex-row gap-2 rounded-[24px] border border-slate-200 bg-white/95 backdrop-blur px-4 py-3 shadow-lg">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="flex-1 py-3.5 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-        >
-          ΑΚΥΡΩΣΗ
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!canSubmit}
-          className="flex-[1.4] py-3.5 rounded-full bg-teal-700 text-white text-sm font-bold hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-        >
-          <span className="material-symbols-outlined text-[20px]">
-            {busy ? 'progress_activity' : 'draw'}
+      {/* Waiting for remote */}
+      {waitingRemote || mode === 'REMOTE' ? (
+        <section className="rounded-[28px] border border-sky-200 bg-sky-50/80 p-6 text-center space-y-3">
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white border border-sky-200 text-sky-700">
+            <span className="material-symbols-outlined text-[28px] animate-spin">
+              progress_activity
+            </span>
           </span>
-          {busy ? 'Έκδοση…' : 'ΟΛΟΚΛΗΡΩΣΗ & ΕΚΔΟΣΗ ΣΥΜΒΟΛΑΙΟΥ'}
-        </button>
-      </div>
+          <h4 className="font-bold text-lg text-sky-950">Waiting for Client Signature…</h4>
+          <p className="text-sm text-sky-900/80 max-w-md mx-auto">
+            Ο πελάτης ανοίγει τον σύνδεσμο στο κινητό του. Η οθόνη ενημερώνεται αυτόματα μόλις
+            υπογράψει (polling κάθε 3″).
+          </p>
+          {signUrl ? (
+            <div className="rounded-2xl bg-white border border-sky-100 px-4 py-3 text-left max-w-lg mx-auto">
+              <p className="text-[11px] font-bold uppercase text-slate-400">Σύνδεσμος</p>
+              <p className="text-xs font-semibold text-slate-800 break-all mt-1">{signUrl}</p>
+              <button
+                type="button"
+                className="mt-2 text-xs font-bold text-sky-700 hover:underline"
+                onClick={() => {
+                  navigator.clipboard?.writeText(signUrl);
+                  onToast?.('success', 'Αντιγράφηκε');
+                }}
+              >
+                Αντιγραφή link
+              </button>
+              {remoteNotify ? (
+                <p className="text-[11px] text-slate-500 mt-2">
+                  Email: {remoteNotify.email ? 'στάλθηκε' : '—'} · SMS:{' '}
+                  {remoteNotify.sms ? 'στάλθηκε' : '—'}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="flex flex-wrap justify-center gap-2 pt-1">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={sendRemoteLink}
+              className="rounded-full border border-sky-300 bg-white px-4 py-2 text-xs font-bold text-sky-900"
+            >
+              Ξαναστείλε link
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setWaitingRemote(false);
+                setMode(null);
+              }}
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700"
+            >
+              Άλλη μέθοδος
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {/* In-person pad */}
+      {mode === 'IN_PERSON' ? (
+        <>
+          <section className="rounded-[28px] border border-slate-200/90 bg-white p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h4 className="font-bold text-slate-900 text-lg">Υποχρεωτικοί όροι</h4>
+                <p className="text-sm text-slate-500 mt-0.5">Και οι 5 πρέπει να είναι αποδεκτοί.</p>
+              </div>
+              <button
+                type="button"
+                className="text-xs font-bold text-slate-500 hover:underline"
+                onClick={() => setMode(null)}
+              >
+                Αλλαγή μεθόδου
+              </button>
+            </div>
+            <ul className="space-y-2.5">
+              {RENTAL_CHECKOUT_TERMS.map((term) => (
+                <li
+                  key={term.id}
+                  className={`rounded-2xl border px-3.5 py-3 ${
+                    accept[term.id]
+                      ? 'border-teal-300 bg-teal-50/50'
+                      : 'border-slate-200 bg-slate-50/40'
+                  }`}
+                >
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-5 w-5 rounded border-slate-300 text-teal-700"
+                      checked={Boolean(accept[term.id])}
+                      onChange={() => toggle(term.id)}
+                    />
+                    <span className="text-sm text-slate-800 leading-relaxed">
+                      {term.hasTermsModal ? (
+                        <>
+                          <strong className="font-bold">Γενικοί Όροι: </strong>
+                          {term.label}{' '}
+                          <button
+                            type="button"
+                            className="text-teal-700 font-bold underline underline-offset-2"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setTermsOpen(true);
+                            }}
+                          >
+                            Δες πλήρες κείμενο
+                          </button>
+                        </>
+                      ) : (
+                        term.label
+                      )}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="rounded-[28px] border border-slate-200/90 bg-white p-5 shadow-sm">
+            <h4 className="font-bold text-slate-900 text-lg mb-3">Ψηφιακή υπογραφή</h4>
+            <RentalSignaturePad
+              ref={padRef}
+              embedded
+              heightClass="h-40 sm:h-48"
+              watermark="Υπογράψτε εδώ..."
+              onInkChange={setHasInk}
+              disabled={busy}
+            />
+          </section>
+
+          <div className="sticky bottom-3 z-10 flex flex-col sm:flex-row gap-2 rounded-[24px] border border-slate-200 bg-white/95 backdrop-blur px-4 py-3 shadow-lg">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={busy}
+              className="flex-1 py-3.5 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              ΑΚΥΡΩΣΗ
+            </button>
+            <button
+              type="button"
+              onClick={submitInPerson}
+              disabled={!canSubmit}
+              className="flex-[1.4] py-3.5 rounded-full bg-teal-700 text-white text-sm font-bold hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {busy ? 'progress_activity' : 'draw'}
+              </span>
+              {busy ? 'Έκδοση…' : 'ΟΛΟΚΛΗΡΩΣΗ & ΕΚΔΟΣΗ ΣΥΜΒΟΛΑΙΟΥ'}
+            </button>
+          </div>
+        </>
+      ) : null}
 
       <RentalTermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
     </div>
