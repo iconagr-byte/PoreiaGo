@@ -46,6 +46,7 @@ export default function RentalBookingAgreement({
   officeName = 'Γραφείο ενοικιάσεων',
   onClose,
   onOpenCheckIn,
+  onOpenCheckout,
   onBookingUpdated,
   onToast,
 }) {
@@ -93,6 +94,27 @@ export default function RentalBookingAgreement({
             <span className="material-symbols-outlined text-[18px]">print</span>
             Εκτύπωση πακέτου / PDF
           </button>
+          {onOpenCheckout && (legal.signedCount < 6 || !paper.pickupSigned) ? (
+            <button
+              type="button"
+              onClick={onOpenCheckout}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-teal-300 bg-teal-50 text-teal-900 text-sm font-bold"
+            >
+              <span className="material-symbols-outlined text-[18px]">draw</span>
+              Tablet υπογραφή
+            </button>
+          ) : null}
+          {booking.contract_pdf_url ? (
+            <a
+              href={booking.contract_pdf_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-bold text-slate-700"
+            >
+              <span className="material-symbols-outlined text-[18px]">description</span>
+              Σύμβαση
+            </a>
+          ) : null}
           {!paper.pickupSigned && onOpenCheckIn ? (
             <button
               type="button"

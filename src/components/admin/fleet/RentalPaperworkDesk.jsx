@@ -3,6 +3,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import RentalBookingAgreement from './RentalBookingAgreement.jsx';
+import RentalCheckout from './RentalCheckout.jsx';
 import {
   paperworkStatusChipClass,
   paperworkStatusForBooking,
@@ -41,6 +42,7 @@ export default function RentalPaperworkDesk({
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('ALL');
   const [selectedId, setSelectedId] = useState(initialBookingId || null);
+  const [checkoutId, setCheckoutId] = useState(null);
 
   useEffect(() => {
     if (!initialBookingId) return undefined;
@@ -86,6 +88,32 @@ export default function RentalPaperworkDesk({
   }, [bookings, vehicles, inspections, query, filter]);
 
   const selected = rows.find((r) => r.booking.id === selectedId) || null;
+  const checkoutRow =
+    rows.find((r) => r.booking.id === checkoutId) ||
+    (bookings || [])
+      .map((b) => ({
+        booking: b,
+        vehicle: (vehicles || []).find((v) => v.id === b.vehicle_id) || null,
+      }))
+      .find((r) => r.booking.id === checkoutId) ||
+    null;
+
+  if (checkoutRow) {
+    return (
+      <RentalCheckout
+        booking={checkoutRow.booking}
+        vehicle={checkoutRow.vehicle}
+        officeName={officeName}
+        onCancel={() => setCheckoutId(null)}
+        onComplete={(updated) => {
+          onBookingUpdated?.(updated);
+          setCheckoutId(null);
+          if (updated?.id) setSelectedId(updated.id);
+        }}
+        onToast={onToast}
+      />
+    );
+  }
 
   if (selected) {
     return (
@@ -96,6 +124,10 @@ export default function RentalPaperworkDesk({
         officeName={officeName}
         onClose={() => setSelectedId(null)}
         onOpenCheckIn={onOpenCheckIn}
+        onOpenCheckout={() => {
+          setCheckoutId(selected.booking.id);
+          setSelectedId(null);
+        }}
         onBookingUpdated={onBookingUpdated}
         onToast={onToast}
       />
@@ -116,7 +148,8 @@ export default function RentalPaperworkDesk({
           <h3 className="font-bold text-gray-900">Χαρτούρα κρατήσεων</h3>
           <p className="text-sm text-gray-500 mt-1 max-w-xl">
             Νομικό πακέτο (σύμβαση, άδεια, ασφάλιση, εγγύηση, GDPR, όροι) + πρωτόκολλα
-            παραλαβής/επιστροφής — έτοιμα για υπογραφή και εκτύπωση.
+            παραλαβής/επιστροφής — έτοιμα για υπογραφή και εκτύπωση. Tablet checkout με 5
+            υποχρεωτικούς όρους και ψηφιακή υπογραφή.
           </p>
           <p className="text-xs text-gray-400 mt-2">
             Εκκρεμούν υπογραφές: {pendingCount} · Πλήρεις φάκελοι: {completeCount}
@@ -214,6 +247,16 @@ export default function RentalPaperworkDesk({
                 >
                   Άνοιγμα φακέλου
                 </button>
+                {!paper.pickupSigned || (paper.legal?.signedCount ?? 0) < 6 ? (
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 rounded-xl border border-teal-300 bg-teal-50 text-teal-900 text-xs font-bold inline-flex items-center gap-1"
+                    onClick={() => setCheckoutId(b.id)}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">draw</span>
+                    Tablet υπογραφή
+                  </button>
+                ) : null}
                 {!paper.pickupSigned && onOpenCheckIn ? (
                   <button
                     type="button"

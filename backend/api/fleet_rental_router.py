@@ -105,6 +105,16 @@ class LegalDocSignatureBody(BaseModel):
     signer_name: str | None = Field(default=None, max_length=160)
 
 
+class RentalCheckoutBody(BaseModel):
+    signature_url: str = Field(min_length=4, max_length=500)
+    signer_name: str | None = Field(default=None, max_length=160)
+    accepted_terms: list[str] = Field(default_factory=list)
+    fuel_level: float | None = Field(default=None, ge=0, le=100)
+    insurance_label: str | None = Field(default=None, max_length=80)
+    deposit_eur: float | None = Field(default=None, ge=0)
+    summary: dict | None = None
+
+
 class InspectionBody(BaseModel):
     rental_booking_id: str
     inspection_type: str
@@ -316,6 +326,71 @@ async def patch_booking_legal_doc(
         code = 404 if "δεν βρέθηκε" in msg else 400
         raise HTTPException(status_code=code, detail=msg) from exc
     return row
+
+
+@router.post("/bookings/{booking_id}/checkout")
+async def rental_tablet_checkout(
+    booking_id: str,
+    body: RentalCheckoutBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """
+    Tablet checkout: accept mandatory terms + one signature → stamp legal pack,
+    activate contract, write printable HTML contract, notify customer.
+    """
+    try:
+        result = store.complete_rental_checkout(
+            _tid(tenant_id),
+            booking_id,
+            body.model_dump(),
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "δεν βρέθηκε" in msg else 400
+        raise HTTPException(status_code=code, detail=msg) from exc
+
+    booking = result.get("booking") or {}
+    try:
+        from travel_platform.notifications.rental_customer_notify import (
+            notify_rental_customer_status,
+        )
+
+        await notify_rental_customer_status(booking)
+    except Exception:
+        pass
+    try:
+        from travel_platform.notifications.dispatcher import send_email
+
+        email = str(booking.get("client_email") or "").strip()
+        if email:
+            contract_url = result.get("contract_pdf_url") or ""
+            await send_email(
+                email,
+                "Η σύμβαση ενοικίασης εκδόθηκε",
+                (
+                    f"Γεια σας {booking.get('client_name') or ''},\n\n"
+                    f"Η ψηφιακή σύμβαση για την κράτησή σας είναι έτοιμη.\n"
+                    f"Κατάσταση: ACTIVE\n"
+                    f"Αρχείο: {contract_url}\n\n"
+                    "PoreiaGo Rent"
+                ),
+            )
+    except Exception:
+        pass
+    return result
+
+
+@router.get("/contracts/file/{filename}")
+async def get_rental_contract_file(
+    filename: str,
+    _: dict = Depends(_require_admin),
+):
+    safe = Path(filename).name
+    path = _DATA_ROOT / "uploads" / "rental_contracts" / safe
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Η σύμβαση δεν βρέθηκε")
+    return FileResponse(path, media_type="text/html; charset=utf-8")
 
 
 @router.get("/calendar")

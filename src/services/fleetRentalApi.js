@@ -137,6 +137,14 @@ export async function saveRentalLegalDocSignature(bookingId, { docId, signatureU
   });
 }
 
+/** Tablet checkout — accept terms + signature → issue contract (ACTIVE). */
+export async function completeRentalCheckout(bookingId, body) {
+  return rentalFetch(`/bookings/${encodeURIComponent(bookingId)}/checkout`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 export async function fetchRentalCalendar(days = 30) {
   const data = await rentalFetch(`/calendar?days=${days}`);
   return data.blocks || [];

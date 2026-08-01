@@ -1115,6 +1115,191 @@ def save_legal_doc_signature(
         return deepcopy(booking)
 
 
+_CHECKOUT_REQUIRED_TERMS = frozenset(
+    {
+        "general_terms",
+        "vehicle_condition",
+        "fines",
+        "offroad_ferry",
+        "gdpr_gps",
+    }
+)
+
+
+def _write_contract_html(
+    booking: dict[str, Any],
+    *,
+    signature_url: str,
+    accepted_terms: list[str],
+    summary: dict[str, Any] | None,
+    insurance_label: str | None,
+    deposit_eur: float | None,
+) -> str:
+    """Persist a printable HTML contract (tablet checkout deliverable)."""
+    contracts_dir = DATA_DIR / "uploads" / "rental_contracts"
+    contracts_dir.mkdir(parents=True, exist_ok=True)
+    bid = str(booking.get("id") or "booking")
+    filename = f"contract-{bid}-{uuid4().hex[:10]}.html"
+    path = contracts_dir / filename
+    office = (summary or {}).get("office_name") or "PoreiaGo Rent"
+    vehicle = (summary or {}).get("vehicle") or (
+        f"{booking.get('vehicle_model') or ''} ({booking.get('vehicle_plate') or ''})"
+    )
+    terms_html = "".join(f"<li>{t}</li>" for t in accepted_terms)
+    html = f"""<!DOCTYPE html>
+<html lang="el"><head><meta charset="utf-8"/>
+<title>Σύμβαση ενοικίασης · {bid}</title>
+<style>
+body{{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;color:#0f172a;line-height:1.5}}
+h1{{font-size:1.4rem}} .meta{{color:#475569;font-size:.9rem}}
+.box{{border:1px solid #e2e8f0;border-radius:16px;padding:1rem 1.25rem;margin:1rem 0}}
+img.sig{{max-height:120px;border:1px dashed #cbd5e1;border-radius:12px;padding:.5rem;background:#fff}}
+</style></head><body>
+<h1>Σύμβαση ενοικίασης οχήματος</h1>
+<p class="meta">{office} · Εκδόθηκε {_now()}</p>
+<div class="box">
+<p><strong>Πελάτης:</strong> {booking.get("client_name") or "—"}</p>
+<p><strong>Όχημα:</strong> {vehicle}</p>
+<p><strong>Περίοδος:</strong> {booking.get("start_time") or "—"} → {booking.get("end_time") or "—"}</p>
+<p><strong>Σύνολο:</strong> €{booking.get("total_cost") or 0}</p>
+<p><strong>Ασφάλιση:</strong> {insurance_label or "—"}</p>
+<p><strong>Εγγύηση:</strong> {"€" + str(deposit_eur) if deposit_eur is not None else "—"}</p>
+</div>
+<div class="box">
+<p><strong>Αποδεκτοί όροι</strong></p>
+<ul>{terms_html or "<li>—</li>"}</ul>
+</div>
+<div class="box">
+<p><strong>Υπογραφή πελάτη</strong></p>
+<p><img class="sig" src="{signature_url}" alt="Υπογραφή"/></p>
+<p class="meta">Υπογράφων: {booking.get("client_name") or "—"}</p>
+</div>
+</body></html>
+"""
+    path.write_text(html, encoding="utf-8")
+    return f"/api/admin/platform/fleet-rental/contracts/file/{filename}"
+
+
+def complete_rental_checkout(
+    tenant_id: str | None,
+    booking_id: str,
+    body: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Tablet checkout: stamp all booking legal docs, activate contract, store printable HTML.
+    """
+    tid = _normalize_tenant(tenant_id)
+    url = str(body.get("signature_url") or "").strip()
+    if not url:
+        raise ValueError("Απαιτείται υπογραφή")
+    accepted = [str(t).strip() for t in (body.get("accepted_terms") or []) if str(t).strip()]
+    if not _CHECKOUT_REQUIRED_TERMS.issubset(set(accepted)):
+        raise ValueError("Πρέπει να αποδεχτείτε όλους τους υποχρεωτικούς όρους")
+    signer = str(body.get("signer_name") or "").strip() or None
+    fuel = body.get("fuel_level")
+    try:
+        fuel_n = float(fuel) if fuel is not None else 75.0
+    except (TypeError, ValueError):
+        fuel_n = 75.0
+    fuel_n = max(0.0, min(100.0, fuel_n))
+    deposit = body.get("deposit_eur")
+    try:
+        deposit_n = float(deposit) if deposit not in (None, "") else None
+    except (TypeError, ValueError):
+        deposit_n = None
+    insurance_label = str(body.get("insurance_label") or "").strip() or None
+    summary = body.get("summary") if isinstance(body.get("summary"), dict) else {}
+
+    with _LOCK:
+        data = _read()
+        booking = next(
+            (b for b in data["bookings"] if b.get("tenant_id") == tid and b.get("id") == booking_id),
+            None,
+        )
+        if not booking:
+            raise ValueError("Η κράτηση δεν βρέθηκε")
+        if booking.get("rental_status") == "CANCELLED":
+            raise ValueError("Η κράτηση είναι ακυρωμένη")
+
+        now = _now()
+        sigs = booking.get("legal_doc_signatures")
+        if not isinstance(sigs, dict):
+            sigs = {}
+        for doc in _LEGAL_DOC_IDS:
+            sigs[doc] = {
+                "signature_url": url,
+                "signed_at": now,
+                "signer_name": signer or booking.get("client_name"),
+                "via": "tablet_checkout",
+            }
+        booking["legal_doc_signatures"] = sigs
+        booking["checkout_accepted_terms"] = accepted
+        booking["checkout_insurance_label"] = insurance_label
+        booking["checkout_deposit_eur"] = deposit_n
+        booking["contract_issued_at"] = now
+        # Activate rental (contract_status alias = rental_status ACTIVE).
+        if booking.get("rental_status") in ("RESERVED", "CONFIRMED"):
+            booking["rental_status"] = "ACTIVE"
+        vehicle = next(
+            (
+                v
+                for v in data["vehicles"]
+                if v.get("tenant_id") == tid and v.get("id") == booking.get("vehicle_id")
+            ),
+            None,
+        )
+        if vehicle and booking.get("rental_status") == "ACTIVE":
+            vehicle["current_status"] = "RENTED"
+            vehicle["updated_at"] = now
+
+        # Pickup protocol if missing.
+        has_pickup = any(
+            i.get("tenant_id") == tid
+            and i.get("rental_booking_id") == booking_id
+            and i.get("inspection_type") == "PICKUP_CHECK"
+            for i in data["inspections"]
+        )
+        pickup_id = None
+        if not has_pickup:
+            pickup_id = str(uuid4())
+            mileage = int((vehicle or {}).get("current_mileage") or 0)
+            data["inspections"].append(
+                {
+                    "id": pickup_id,
+                    "tenant_id": tid,
+                    "rental_booking_id": booking_id,
+                    "inspection_type": "PICKUP_CHECK",
+                    "fuel_level": round(fuel_n, 2),
+                    "mileage": mileage,
+                    "damage_notes": "Tablet checkout — αποδοχή κατάστασης οχήματος",
+                    "photo_urls": [],
+                    "signature_url": url,
+                    "inspector_name": signer or booking.get("client_name"),
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
+
+        contract_url = _write_contract_html(
+            booking,
+            signature_url=url,
+            accepted_terms=accepted,
+            summary=summary,
+            insurance_label=insurance_label,
+            deposit_eur=deposit_n,
+        )
+        booking["contract_pdf_url"] = contract_url
+        booking["contract_status"] = "ACTIVE"
+        booking["updated_at"] = now
+        _write(data)
+        return {
+            "booking": deepcopy(booking),
+            "contract_pdf_url": contract_url,
+            "contract_status": "ACTIVE",
+            "pickup_inspection_id": pickup_id,
+        }
+
+
 def list_documents(
     tenant_id: str | None,
     *,
