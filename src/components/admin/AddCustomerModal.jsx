@@ -50,20 +50,39 @@ const EMPTY = {
   tags: [],
 };
 
-/** Modal — δημιουργία νέου πελάτη στο πελατολόγιο. */
-export default function AddCustomerModal({ open, onClose, onCreated }) {
+function formFromCustomer(customer) {
+  if (!customer) return EMPTY;
+  return {
+    name: customer.name || '',
+    email: customer.email || '',
+    phone: customer.phone || '',
+    company: customer.company || '',
+    afm: customer.afm || '',
+    city: customer.city || '',
+    address: customer.address || '',
+    notes: customer.notes || '',
+    tier: customer.tier || 'Silver',
+    source: customer.source || 'manual',
+    marketingOptIn: customer.marketingOptIn !== false,
+    tags: Array.isArray(customer.tags) ? [...customer.tags] : [],
+  };
+}
+
+/** Modal — δημιουργία / επεξεργασία πελάτη στο πελατολόγιο. */
+export default function AddCustomerModal({ open, onClose, onCreated, customer = null }) {
   const [form, setForm] = useState(EMPTY);
   const [tagDraft, setTagDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState('main'); // main | extra
+  const isEdit = Boolean(customer?.id || customer?.email);
 
   useEffect(() => {
     if (!open) return;
-    setForm(EMPTY);
+    setForm(formFromCustomer(customer));
     setTagDraft('');
     setBusy(false);
     setStep('main');
-  }, [open]);
+  }, [open, customer]);
 
   if (!open) return null;
 
@@ -98,6 +117,7 @@ export default function AddCustomerModal({ open, onClose, onCreated }) {
     setBusy(true);
     try {
       const row = upsertCustomer({
+        id: customer?.id,
         name: form.name.trim() || cleanEmail.split('@')[0],
         email: cleanEmail,
         phone: form.phone.trim(),
@@ -115,7 +135,7 @@ export default function AddCustomerModal({ open, onClose, onCreated }) {
         toast.error('Αποτυχία αποθήκευσης');
         return;
       }
-      toast.success(`Προστέθηκε: ${row.name}`);
+      toast.success(isEdit ? `Ενημερώθηκε: ${row.name}` : `Προστέθηκε: ${row.name}`);
       onCreated?.(row);
       onClose?.();
     } catch (err) {
@@ -137,11 +157,15 @@ export default function AddCustomerModal({ open, onClose, onCreated }) {
         <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-br from-slate-50 to-white">
           <div className="flex items-start gap-3 min-w-0">
             <span className="w-11 h-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[22px]">person_add</span>
+              <span className="material-symbols-outlined text-[22px]">{isEdit ? 'edit' : 'person_add'}</span>
             </span>
             <div className="min-w-0">
-              <h3 className="text-lg font-bold tracking-tight text-slate-900">Νέος πελάτης</h3>
-              <p className="text-sm text-slate-500 mt-0.5">Καρτέλα στο πελατολόγιο του γραφείου</p>
+              <h3 className="text-lg font-bold tracking-tight text-slate-900">
+                {isEdit ? 'Επεξεργασία πελάτη' : 'Νέος πελάτης'}
+              </h3>
+              <p className="text-sm text-slate-500 mt-0.5">
+                {isEdit ? 'Ενημέρωση καρτέλας στο πελατολόγιο' : 'Καρτέλα στο πελατολόγιο του γραφείου'}
+              </p>
             </div>
           </div>
           <button
@@ -188,11 +212,17 @@ export default function AddCustomerModal({ open, onClose, onCreated }) {
                     autoFocus
                   />
                 </Field>
-                <Field label="Email" required className="sm:col-span-2">
+                <Field
+                  label="Email"
+                  required
+                  className="sm:col-span-2"
+                  hint={isEdit ? 'Το email δεν αλλάζει — είναι το κλειδί της καρτέλας.' : undefined}
+                >
                   <input
                     type="email"
                     required
-                    className={fieldClass}
+                    disabled={isEdit}
+                    className={`${fieldClass} ${isEdit ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                     value={form.email}
                     onChange={(e) => patch({ email: e.target.value })}
                     placeholder="maria@email.com"

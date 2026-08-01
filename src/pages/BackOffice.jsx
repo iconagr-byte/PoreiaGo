@@ -1141,6 +1141,7 @@ export default function BackOffice() {
       bookings={bookings}
       rentalBookings={rentalBookings}
       onAddCustomer={() => setAddCustomerOpen(true)}
+      onCustomersChange={() => setCustomers(loadAllCustomers())}
       openBookingTicket={openBookingTicket}
     />
   );
