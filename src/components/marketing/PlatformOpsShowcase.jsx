@@ -50,7 +50,7 @@ export default function PlatformOpsShowcase() {
         </nav>
       </div>
 
-      <div className="pg-apple-trips-band border-t border-black/[0.06]">
+      <div className="pg-apple-cards-band border-t border-black/[0.06]">
         <TripsSection
           id="platform-trips"
           eyebrow="Εκδρομές"
@@ -68,8 +68,12 @@ export default function PlatformOpsShowcase() {
         />
       </div>
 
-      <div className="pg-apple border-t border-black/[0.04] bg-white">
-        <FleetShowcaseSection vehicles={buses} loading={false} />
+      <div className="pg-apple-cards-band border-t border-black/[0.06]">
+        <FleetShowcaseSection
+          vehicles={buses}
+          loading={false}
+          sectionClassName="!bg-transparent !border-transparent"
+        />
       </div>
     </div>
   );
