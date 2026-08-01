@@ -81,7 +81,8 @@
   color: var(--pg-apple-blue);
 }
 
-/* Trip cards band — cooler panel so white frames read clearly */
+/* Cards band — cooler panel so white frames read clearly (trips + fleet) */
+.pg-apple-cards-band,
 .pg-apple-trips-band {
   font-family: var(--pg-apple-font);
   -webkit-font-smoothing: antialiased;
@@ -92,15 +93,22 @@
     linear-gradient(180deg, #dfe3ec 0%, #e8ebf2 42%, #e2e6ef 100%);
 }
 
-.pg-apple-trips-band #platform-trips {
+.pg-apple-cards-band #platform-trips,
+.pg-apple-cards-band #our-fleet,
+.pg-apple-trips-band #platform-trips,
+.pg-apple-trips-band #our-fleet {
   background: transparent !important;
+  border-color: transparent !important;
 }
 
-.pg-apple-trips-band #platform-trips > div:first-child .text-on-surface,
-.pg-apple-trips-band #platform-trips h2 {
+.pg-apple-cards-band #platform-trips h2,
+.pg-apple-cards-band #our-fleet h2,
+.pg-apple-trips-band #platform-trips h2,
+.pg-apple-trips-band #our-fleet h2 {
   color: var(--pg-apple-ink);
 }
 
+.pg-apple-cards-band article,
 .pg-apple-trips-band article {
   height: 100%;
   background: #ffffff !important;
@@ -110,6 +118,7 @@
     0 14px 36px rgba(15, 23, 42, 0.1) !important;
 }
 
+.pg-apple-cards-band article:hover,
 .pg-apple-trips-band article:hover {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.7) inset,
