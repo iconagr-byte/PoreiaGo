@@ -271,6 +271,87 @@ def _normalize_username(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
+# Emails that must live on Achillio Travel after the cross-office fiasco.
+_ACHILLIO_HOME_EMAILS = frozenset(
+    {
+        "axilleas0@yahoo.gr",
+    }
+)
+
+
+def find_drivers_by_email(email: str) -> list[FleetDriver]:
+    needle = _normalize_username(email)
+    if not needle:
+        return []
+    return [
+        d
+        for d in _ensure().values()
+        if not is_seed_driver(d) and _normalize_username(d.email) == needle
+    ]
+
+
+def rehome_driver_to_tenant(email: str, tenant_id: str) -> dict:
+    """
+    Move every non-seed row with this email onto ``tenant_id``.
+
+    Used once at boot to undo PoreiaGo↔Achillio driver leaks for known accounts.
+    """
+    tid = _normalize_tenant_id(tenant_id)
+    if not tid or tid == DEMO_TENANT_ID:
+        return {"ok": False, "reason": "invalid_tenant", "moved": 0}
+    rows = find_drivers_by_email(email)
+    if not rows:
+        return {"ok": False, "reason": "not_found", "moved": 0, "email": email}
+    moved = 0
+    for d in rows:
+        if _driver_tenant_id(d) == tid:
+            continue
+        prev = _driver_tenant_id(d)
+        d.tenant_id = tid
+        moved += 1
+        logger.warning(
+            "REHOME driver %s (%s) %s → %s",
+            d.id,
+            d.email,
+            prev,
+            tid,
+        )
+    if moved:
+        _persist()
+    return {"ok": True, "moved": moved, "email": email, "tenant_id": tid, "ids": [d.id for d in rows]}
+
+
+async def repair_achillio_home_drivers() -> dict:
+    """Boot repair: known Achillio drivers must not stay on PoreiaGo/DEMO."""
+    try:
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import is_achillio_travel_office
+    except Exception as exc:
+        return {"ok": False, "reason": f"imports:{exc}"}
+
+    achillio_tid: str | None = None
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Tenant).limit(50))
+            for tenant in result.scalars().all():
+                if is_achillio_travel_office(tenant):
+                    achillio_tid = str(tenant.id)
+                    break
+    except Exception as exc:
+        return {"ok": False, "reason": f"db:{exc}"}
+
+    if not achillio_tid:
+        return {"ok": False, "reason": "achillio_tenant_missing"}
+
+    reports = []
+    for email in _ACHILLIO_HOME_EMAILS:
+        reports.append(rehome_driver_to_tenant(email, achillio_tid))
+    return {"ok": True, "achillio_tenant_id": achillio_tid, "reports": reports}
+
+
 def _load_from_disk() -> tuple[dict[str, FleetDriver], float] | None:
     """
     Load store from disk.
