@@ -11,6 +11,8 @@ import {
   FOOTER_TEMPLATES,
   HEADER_TEMPLATES,
   HERO_TEMPLATES,
+  RENT_FLEET_CARD_TEMPLATES,
+  RENT_FLEET_LAYOUT_TEMPLATES,
   TRIP_CARD_TEMPLATES,
   TRIPS_LAYOUT_TEMPLATES,
   getTemplateById,
@@ -92,6 +94,7 @@ const HOME_SECTIONS = [
 const RENT_SECTIONS = [
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-teal-600' },
   { id: 'copy', label: 'Όνομα & κείμενα', icon: 'edit_note', accent: 'bg-cyan-600' },
+  { id: 'fleet', label: 'Καρτέλες στόλου', icon: 'directions_car', accent: 'bg-sky-600' },
   { id: 'slider', label: 'Slider', icon: 'slideshow', accent: 'bg-emerald-600' },
 ];
 
@@ -801,8 +804,18 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       trips_layout_template: form.trips_layout_template,
       trip_card_template: form.trip_card_template,
       footer_template: form.footer_template,
+      rent_fleet_layout_template: form.rent_fleet_layout_template,
+      rent_fleet_card_template: form.rent_fleet_card_template,
     },
     'Τα πρότυπα αποθηκεύτηκαν',
+  );
+
+  const saveRentFleetLayout = patchForm(
+    {
+      rent_fleet_layout_template: form.rent_fleet_layout_template || 'rent_grid_three',
+      rent_fleet_card_template: form.rent_fleet_card_template || 'rent_premium',
+    },
+    'Τα πρότυπα στόλου ενοικίασης αποθηκεύτηκαν',
   );
 
   const saveTripsCopy = patchForm(
@@ -999,6 +1012,20 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                         label: 'Περιγραφή',
                         value: rentPreview.copy,
                       },
+                      {
+                        label: 'Διάταξη στόλου',
+                        value: getTemplateById(
+                          RENT_FLEET_LAYOUT_TEMPLATES,
+                          form.rent_fleet_layout_template || 'rent_grid_three',
+                        ).label,
+                      },
+                      {
+                        label: 'Στυλ κάρτας',
+                        value: getTemplateById(
+                          RENT_FLEET_CARD_TEMPLATES,
+                          form.rent_fleet_card_template || 'rent_premium',
+                        ).label,
+                      },
                     ].map((row) => (
                       <div
                         key={row.label}
@@ -1019,6 +1046,23 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   description="Επεξεργαστείτε όνομα, τίτλους, κείμενα και hero slider."
                 >
                   <div className="grid sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSection('fleet')}
+                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
+                    >
+                      <span className="w-11 h-11 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined">directions_car</span>
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-bold text-slate-900 group-hover:text-teal-800">
+                          Καρτέλες στόλου
+                        </span>
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          Διάταξη & στυλ οχημάτων στην αρχική
+                        </span>
+                      </span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setSection('copy')}
@@ -1062,6 +1106,43 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 />
               </PanelCard>
             )}
+
+            {section === 'fleet' && (
+              <>
+                <form onSubmit={saveRentFleetLayout}>
+                  <PanelCard
+                    title="Διάταξη στόλου ενοικίασης"
+                    description="Πώς εμφανίζονται τα οχήματα στο block ενοικίασης της αρχικής / στο storefront."
+                    action={<SaveButton saving={saving} label="Αποθήκευση διάταξης" />}
+                  >
+                    <TemplatePicker
+                      category="rent_fleet_layout"
+                      templates={RENT_FLEET_LAYOUT_TEMPLATES}
+                      value={form.rent_fleet_layout_template || 'rent_grid_three'}
+                      onChange={(id) => setForm((p) => ({ ...p, rent_fleet_layout_template: id }))}
+                      accent="teal"
+                    />
+                  </PanelCard>
+                </form>
+                <form onSubmit={saveRentFleetLayout} className="mt-6">
+                  <PanelCard
+                    title="Στυλ κάρτας οχήματος"
+                    description="Premium showroom, overlay, συμπαγής λίστα ή spec sheet — επιλέξτε εμφάνιση κάρτας."
+                    action={<SaveButton saving={saving} label="Αποθήκευση στυλ" />}
+                  >
+                    <TemplatePicker
+                      category="rent_fleet_card"
+                      templates={RENT_FLEET_CARD_TEMPLATES}
+                      value={form.rent_fleet_card_template || 'rent_premium'}
+                      onChange={(id) => setForm((p) => ({ ...p, rent_fleet_card_template: id }))}
+                      accent="teal"
+                      columns={3}
+                    />
+                  </PanelCard>
+                </form>
+              </>
+            )}
+
             {section === 'slider' && (
           <PanelCard
             title="Hero Slider · Ενοικιάσεις"

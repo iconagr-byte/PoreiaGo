@@ -20,7 +20,6 @@ export default function TripsSection({
   const tripCount = trips.length;
   const solo = tripCount === 1;
   const gridClass = tripsGridClass(layoutId, tripCount);
-  const wrapClass = tripCardWrapperClass(layoutId, tripCount);
 
   return (
     <section
@@ -56,7 +55,7 @@ export default function TripsSection({
       ) : (
         <div className={gridClass}>
           {trips.map((trip, index) => (
-            <div key={trip.id} className={wrapClass}>
+            <div key={trip.id} className={tripCardWrapperClass(layoutId, tripCount, index)}>
               <TripCard
                 trip={trip}
                 pricingSettings={pricingSettings}

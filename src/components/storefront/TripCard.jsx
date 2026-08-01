@@ -226,6 +226,118 @@ export default function TripCard({
     );
   }
 
+  if (templateId === 'soft_apple') {
+    return (
+      <article
+        className="group h-full flex flex-col rounded-[22px] bg-[#f5f5f7] border border-black/[0.05] overflow-hidden hover:bg-white hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] transition-all duration-300 cursor-pointer"
+        onClick={go}
+      >
+        <div className="relative h-44 overflow-hidden shrink-0">
+          <img src={img} alt={trip.title} className="w-full h-full object-cover" />
+        </div>
+        <div className="p-5 flex flex-col flex-1">
+          <h3 className="text-[17px] font-semibold text-[#1d1d1f] tracking-tight mb-2">{trip.title}</h3>
+          <TripMeta trip={trip} compact />
+          <div className="mt-auto pt-4 flex items-end justify-between gap-3">
+            <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="md" />
+            <BookButton onClick={go} className="text-sm text-[#0071e3] font-semibold" />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  if (templateId === 'luxe_noir') {
+    return (
+      <article
+        className="group h-full flex flex-col rounded-[24px] bg-[#121214] border border-white/10 overflow-hidden shadow-[0_16px_40px_rgba(0,0,0,0.35)] hover:border-amber-500/30 transition-colors cursor-pointer"
+        onClick={go}
+      >
+        <div className="relative h-48 overflow-hidden shrink-0">
+          <img src={img} alt={trip.title} className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#121214] via-transparent to-transparent" />
+          <span className="absolute top-3 left-3 z-10 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300/90">
+            Luxury
+          </span>
+        </div>
+        <div className="p-5 flex flex-col flex-1 text-white">
+          <h3 className="text-lg font-semibold tracking-tight mb-2">{trip.title}</h3>
+          <div className="text-white/70 [&_span]:text-amber-200/80">
+            <TripMeta trip={trip} compact />
+          </div>
+          <div className="mt-auto pt-4 flex items-end justify-between gap-3 border-t border-white/10">
+            <div className="[&_*]:text-white">
+              <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="md" />
+            </div>
+            <BookButton
+              onClick={go}
+              className="text-sm px-4 py-2.5 rounded-full bg-amber-500 text-slate-950 font-bold"
+            />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  if (templateId === 'spotlight') {
+    return (
+      <article
+        className="group relative h-full min-h-[340px] rounded-[28px] overflow-hidden cursor-pointer shadow-lg"
+        onClick={go}
+      >
+        <img
+          src={img}
+          alt={trip.title}
+          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
+        <div className="absolute top-4 right-4 z-10 rounded-2xl bg-white/95 px-3 py-2 shadow-md">
+          <div className="[&_*]:text-slate-900">
+            <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="sm" />
+          </div>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 z-10 p-5 md:p-6 text-white">
+          <h3 className="text-xl font-bold tracking-tight mb-1">{trip.title}</h3>
+          <div className="text-white/80 mb-4">
+            <TripMeta trip={trip} compact />
+          </div>
+          <BookButton
+            onClick={go}
+            className="text-sm px-5 py-2.5 rounded-full bg-white text-slate-900 font-bold"
+          />
+        </div>
+      </article>
+    );
+  }
+
+  if (templateId === 'ticket_stub') {
+    return (
+      <article
+        className="group h-full flex flex-col sm:flex-row rounded-2xl bg-white border border-dashed border-slate-300 overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+        onClick={go}
+      >
+        <div className="relative sm:w-[42%] h-40 sm:h-auto shrink-0 overflow-hidden">
+          <img src={img} alt={trip.title} className="w-full h-full object-cover min-h-[160px]" />
+          <span className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-wider bg-white/95 px-2 py-1 rounded">
+            Ticket
+          </span>
+        </div>
+        <div className="relative flex-1 p-5 flex flex-col border-t sm:border-t-0 sm:border-l border-dashed border-slate-300">
+          <div className="absolute -left-2 top-1/2 -translate-y-1/2 hidden sm:block w-4 h-4 rounded-full bg-surface border border-dashed border-slate-300" />
+          <h3 className="font-bold text-on-surface mb-2">{trip.title}</h3>
+          <TripMeta trip={trip} compact />
+          <div className="mt-auto pt-4 flex items-end justify-between gap-2">
+            <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="md" />
+            <BookButton
+              onClick={go}
+              className="text-sm px-4 py-2 rounded-lg bg-slate-900 text-white font-bold"
+            />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   // premium (default) — solo = narrower card for new offices with one trip
   return (
     <article

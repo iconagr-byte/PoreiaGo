@@ -78,6 +78,10 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "accent_color": "#0ea5e9",
     "show_fleet_section": True,
     "show_why_us_section": True,
+    "trips_layout_template": "grid_three",
+    "trip_card_template": "premium",
+    "rent_fleet_layout_template": "rent_grid_three",
+    "rent_fleet_card_template": "rent_premium",
 }
 
 _PLATFORM_BRAND_RE = re.compile(r"^(aerostride|poreiago)$", re.I)
