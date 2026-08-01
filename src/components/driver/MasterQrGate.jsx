@@ -9,6 +9,7 @@ export default function MasterQrGate({ onAuthenticated }) {
   const [mode, setMode] = useState('password'); // password | qr
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -115,16 +116,30 @@ export default function MasterQrGate({ onAuthenticated }) {
               </label>
               <label className="block">
                 <span className="driver-gate-label">Κωδικός</span>
-                <input
-                  className="driver-gate-input"
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                />
+                <div className="driver-gate-password-wrap">
+                  <input
+                    className="driver-gate-input driver-gate-input--with-eye"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    className="driver-gate-eye"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
+                    aria-pressed={showPassword}
+                    tabIndex={0}
+                  >
+                    <span className="material-symbols-outlined text-[22px]">
+                      {showPassword ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
               </label>
               <button type="submit" className="driver-gate-submit" disabled={loading || !username || !password}>
                 {loading ? 'Σύνδεση…' : 'Είσοδος'}
