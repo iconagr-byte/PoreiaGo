@@ -132,7 +132,6 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         DEMO_TENANT_ID,
         get_driver,
         is_seed_driver,
-        update_driver,
     )
     from travel_platform.telemetry.ingress_rate_limit import check_driver_gps_rate_limit
     from travel_platform.telemetry.settings_store import get_telemetry_settings
