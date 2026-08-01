@@ -1404,6 +1404,7 @@ export default function FleetRentalPanel({
           onBookingUpdated={(updated) => {
             if (!updated?.id) return;
             setBookings((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
+            void reload();
           }}
           onToast={(kind, message) => {
             if (kind === 'error') toast.error(message);
