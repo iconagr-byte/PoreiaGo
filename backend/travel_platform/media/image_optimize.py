@@ -35,9 +35,14 @@ def optimize_driver_photo(content: bytes, *, max_side: int = 512, quality: int =
     if getattr(img, "is_animated", False) and len(content) <= 250_000:
         return OptimizedImage(content=content, ext=".gif", content_type="image/gif")
 
-    if img.mode not in ("RGB", "L"):
-        img = img.convert("RGB")
-    elif img.mode == "L":
+    # RGBA / palette-with-alpha → composite onto white before JPEG.
+    # Plain convert("RGB") fills transparency with black (broken signatures).
+    had_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
+    if had_alpha:
+        rgba = img.convert("RGBA")
+        background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+        img = Image.alpha_composite(background, rgba).convert("RGB")
+    elif img.mode != "RGB":
         img = img.convert("RGB")
 
     w, h = img.size
@@ -50,6 +55,11 @@ def optimize_driver_photo(content: bytes, *, max_side: int = 512, quality: int =
     img.save(buf, format="JPEG", quality=quality, optimize=True, progressive=True)
     data = buf.getvalue()
     # If somehow larger than original non-jpeg and original is modest, keep original.
-    if len(data) > len(content) and len(content) <= 180_000:
+    # Never keep originals that had alpha — callers expect opaque JPEG (signatures).
+    if (
+        not had_alpha
+        and len(data) > len(content)
+        and len(content) <= 180_000
+    ):
         return OptimizedImage(content=content, ext=".jpg", content_type="image/jpeg")
     return OptimizedImage(content=data, ext=".jpg", content_type="image/jpeg")

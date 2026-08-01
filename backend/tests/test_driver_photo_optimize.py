@@ -35,6 +35,25 @@ class DriverPhotoOptimizeTests(unittest.TestCase):
         self.assertEqual(out.ext, ".jpg")
         self.assertGreater(len(out.content), 200)
 
+    def test_rgba_transparency_composites_onto_white(self):
+        """Signature PNGs with alpha must not become black JPEG backgrounds."""
+        img = Image.new("RGBA", (80, 40), (0, 0, 0, 0))
+        for x in range(10, 70):
+            img.putpixel((x, 20), (15, 23, 42, 255))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        out = optimize_driver_photo(buf.getvalue(), max_side=512)
+        self.assertEqual(out.ext, ".jpg")
+        jpeg = Image.open(io.BytesIO(out.content)).convert("RGB")
+        # Transparent corner → near white, not black.
+        corner = jpeg.getpixel((0, 0))
+        self.assertGreater(corner[0], 240)
+        self.assertGreater(corner[1], 240)
+        self.assertGreater(corner[2], 240)
+        # Ink pixel stays dark.
+        ink = jpeg.getpixel((40, 20))
+        self.assertLess(ink[0] + ink[1] + ink[2], 120)
+
 
 if __name__ == "__main__":
     unittest.main()
