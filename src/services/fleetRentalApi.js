@@ -118,6 +118,36 @@ export async function createRentalBooking(body) {
   return rentalFetch('/bookings', { method: 'POST', body: JSON.stringify(body) });
 }
 
+/**
+ * Open issued rental contract HTML in a new tab.
+ * Admin `/contracts/file/*` needs Bearer auth — plain <a target=_blank> shows blank/401.
+ */
+export async function openRentalContractFile(contractUrl) {
+  const raw = String(contractUrl || '').trim();
+  if (!raw) throw new Error('Δεν υπάρχει αρχείο σύμβασης');
+  const abs = raw.startsWith('http') ? raw : `${API_BASE}${raw}`;
+  const token = getSaasToken();
+  const res = await fetch(abs, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(
+      typeof data?.detail === 'string' ? data.detail : `Αποτυχία ανοίγματος σύμβασης (${res.status})`,
+    );
+  }
+  const html = await res.text();
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const href = URL.createObjectURL(blob);
+  const win = window.open(href, '_blank', 'noopener,noreferrer');
+  if (!win) {
+    URL.revokeObjectURL(href);
+    throw new Error('Το παράθυρο μπλοκαρίστηκε — επέτρεψε pop-ups');
+  }
+  window.setTimeout(() => URL.revokeObjectURL(href), 120_000);
+  return true;
+}
+
 /** One-click CONFIRMED sample booking for dual-mode signature demo. */
 export async function createRentalDemoSignSample() {
   return rentalFetch('/bookings/demo-sign-sample', { method: 'POST', body: '{}' });

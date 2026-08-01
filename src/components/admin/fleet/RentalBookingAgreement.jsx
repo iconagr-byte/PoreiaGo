@@ -3,6 +3,7 @@
  */
 import { useEffect, useState } from 'react';
 import { resolveSiteAssetUrl } from '../../../services/siteAppearanceApi.js';
+import { openRentalContractFile } from '../../../services/fleetRentalApi.js';
 import {
   legalDocById,
   legalPackProgress,
@@ -67,6 +68,20 @@ export default function RentalBookingAgreement({
     window.print();
   };
 
+  const [openingContract, setOpeningContract] = useState(false);
+
+  const openIssuedContract = async () => {
+    if (!booking.contract_pdf_url || openingContract) return;
+    setOpeningContract(true);
+    try {
+      await openRentalContractFile(booking.contract_pdf_url);
+    } catch (err) {
+      onToast?.('error', err?.message || 'Αποτυχία ανοίγματος σύμβασης');
+    } finally {
+      setOpeningContract(false);
+    }
+  };
+
   const handleUpdated = (updated) => {
     if (updated?.id) setBooking(updated);
     onBookingUpdated?.(updated);
@@ -106,15 +121,26 @@ export default function RentalBookingAgreement({
             </button>
           ) : null}
           {booking.contract_pdf_url ? (
-            <a
-              href={booking.contract_pdf_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-bold text-slate-700"
+            <button
+              type="button"
+              disabled={openingContract}
+              onClick={openIssuedContract}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              title="Άνοιγμα εκδομένης σύμβασης"
+            >
+              <span className="material-symbols-outlined text-[18px]">description</span>
+              {openingContract ? 'Άνοιγμα…' : 'Σύμβαση'}
+            </button>
+          ) : onOpenCheckout ? (
+            <button
+              type="button"
+              onClick={onOpenCheckout}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-bold text-slate-700 hover:bg-slate-50"
+              title="Έκδοση σύμβασης με dual-mode υπογραφή"
             >
               <span className="material-symbols-outlined text-[18px]">description</span>
               Σύμβαση
-            </a>
+            </button>
           ) : null}
           {!paper.pickupSigned && onOpenCheckIn ? (
             <button
