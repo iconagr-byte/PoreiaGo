@@ -104,17 +104,21 @@ class DriverOfficeSealTests(unittest.TestCase):
             store.update_driver(row.id, {"tenant_id": OFFICE_B})
 
     def test_demo_create_blocked_without_flag(self):
-        with self.assertRaises(ValueError):
-            store.create_driver(
-                {
-                    "name": "Demo",
-                    "license_no": f"LIC-{uuid4().hex[:8]}",
-                    "email": "demo.block@example.com",
-                    "password": "BusPass99",
-                    "status": "active",
-                    "tenant_id": store.DEMO_TENANT_ID,
-                }
-            )
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {"ENVIRONMENT": "production"}, clear=False):
+            with self.assertRaises(ValueError):
+                store.create_driver(
+                    {
+                        "name": "Demo",
+                        "license_no": f"LIC-{uuid4().hex[:8]}",
+                        "email": "demo.block@example.com",
+                        "password": "BusPass99",
+                        "status": "active",
+                        "tenant_id": store.DEMO_TENANT_ID,
+                    }
+                )
 
 
 if __name__ == "__main__":

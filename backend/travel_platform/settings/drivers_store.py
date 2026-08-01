@@ -536,9 +536,13 @@ def create_driver(data: dict) -> FleetDriver:
         license_plate = license_plate.strip() or None
 
     tenant_id = _normalize_tenant_id(data.get("tenant_id"))
-    allow_demo = bool(data.get("_allow_demo_tenant")) or os.getenv(
-        "ALLOW_DEMO_DRIVER_CREATE", ""
-    ).lower() in ("1", "true", "yes")
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    allow_demo = (
+        bool(data.get("_allow_demo_tenant"))
+        or os.getenv("ALLOW_DEMO_DRIVER_CREATE", "").lower() in ("1", "true", "yes")
+        or env in ("development", "dev", "local", "test")
+    )
+    # Production SEAL: never create drivers on the shared DEMO tenant.
     if tenant_id == DEMO_TENANT_ID and not allow_demo:
         raise ValueError(
             "Απαιτείται έγκυρο γραφείο για νέο οδηγό — απαγορεύεται δημιουργία χωρίς tenant"
