@@ -67,14 +67,25 @@ class DriverOfficeSealTests(unittest.TestCase):
         self.assertIsNotNone(again)
         self.assertEqual(again.tenant_id, store.DEMO_TENANT_ID)
 
-    def test_seal_removes_cross_office_duplicates(self):
+    def test_seal_removes_demo_duplicates_only(self):
         a = self._create(email="dup@example.com", tenant_id=OFFICE_A)
-        # Bypass create seal to simulate the historical fiasco (two rows).
         drivers = store._ensure()
-        clone_id = str(uuid4())
-        clone = store.FleetDriver(
-            id=clone_id,
-            name="Clone",
+        demo_id = str(uuid4())
+        drivers[demo_id] = store.FleetDriver(
+            id=demo_id,
+            name="DemoClone",
+            license_no=f"LIC-{uuid4().hex[:8]}",
+            phone="",
+            email="dup@example.com",
+            hiring_date=a.hiring_date,
+            status="active",
+            password_hash=a.password_hash,
+            tenant_id=store.DEMO_TENANT_ID,
+        )
+        other_id = str(uuid4())
+        drivers[other_id] = store.FleetDriver(
+            id=other_id,
+            name="OtherOffice",
             license_no=f"LIC-{uuid4().hex[:8]}",
             phone="",
             email="dup@example.com",
@@ -83,20 +94,16 @@ class DriverOfficeSealTests(unittest.TestCase):
             password_hash=a.password_hash,
             tenant_id=OFFICE_B,
         )
-        drivers[clone_id] = clone
         store._persist()
         store.reset_drivers_cache()
 
         result = store.seal_cross_office_driver_uniqueness()
         self.assertEqual(result["removed"], 1)
+        self.assertGreaterEqual(result["skipped_real_conflicts"], 1)
         store.reset_drivers_cache()
-        survivors = [
-            d
-            for d in store.list_drivers()
-            if d.email == "dup@example.com"
-        ]
-        self.assertEqual(len(survivors), 1)
-        self.assertEqual(survivors[0].tenant_id, OFFICE_A)
+        survivors = [d for d in store.list_drivers() if d.email == "dup@example.com"]
+        self.assertEqual(len(survivors), 2)
+        self.assertTrue(all(d.tenant_id != store.DEMO_TENANT_ID for d in survivors))
 
     def test_cannot_move_driver_between_offices(self):
         row = self._create(email="move@example.com", tenant_id=OFFICE_A)
