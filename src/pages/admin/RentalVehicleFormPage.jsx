@@ -37,6 +37,8 @@ const EMPTY = {
   photo_urls: [],
   description: '',
   notes: '',
+  legal_deadline: '',
+  insurance_due_date: '',
 };
 
 const inputClass =
@@ -101,6 +103,8 @@ export default function RentalVehicleFormPage() {
               : [],
           description: v.description || '',
           notes: v.notes || '',
+          legal_deadline: v.legal_deadline || '',
+          insurance_due_date: v.insurance_due_date || '',
         });
       } catch (err) {
         if (!cancelled) {
@@ -146,6 +150,8 @@ export default function RentalVehicleFormPage() {
       photo_urls: form.photo_urls || [],
       description: form.description?.trim() || null,
       notes: form.notes?.trim() || null,
+      legal_deadline: form.legal_deadline || null,
+      insurance_due_date: form.insurance_due_date || null,
     };
 
     setSaving(true);
@@ -354,6 +360,24 @@ export default function RentalVehicleFormPage() {
                 value={form.gps_device_id}
                 onChange={setField('gps_device_id')}
                 placeholder="π.χ. ίδια με πινακίδα στον ζωντανό χάρτη"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-bold text-gray-800">Λήξη ΚΤΕΟ</span>
+              <input
+                type="date"
+                className={inputClass}
+                value={form.legal_deadline}
+                onChange={setField('legal_deadline')}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-bold text-gray-800">Λήξη ασφάλειας</span>
+              <input
+                type="date"
+                className={inputClass}
+                value={form.insurance_due_date}
+                onChange={setField('insurance_due_date')}
               />
             </label>
           </div>

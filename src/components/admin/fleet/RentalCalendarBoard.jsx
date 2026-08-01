@@ -174,7 +174,9 @@ export default function RentalCalendarBoard({
       }));
 
     const maintenance = (blocks || [])
-      .filter((b) => b.kind === 'maintenance' || b.kind === 'service_due')
+      .filter((b) =>
+        ['maintenance', 'service_due', 'kteo', 'insurance'].includes(b.kind),
+      )
       .map((b) => ({
         id: b.id,
         kind: b.kind,
@@ -228,6 +230,14 @@ export default function RentalCalendarBoard({
       return start <= monthEnd && end >= monthStart;
     });
   }, [cursor, rentalBlocks]);
+
+  const complianceAlerts = useMemo(
+    () =>
+      (rentalBlocks || []).filter((b) =>
+        ['kteo', 'insurance', 'service_due', 'maintenance'].includes(b.kind),
+      ),
+    [rentalBlocks],
+  );
 
   const dayRentals = useMemo(
     () => monthRentals.filter((b) => sameDayRange(b.start_time, b.end_time, selectedDay)),
@@ -369,6 +379,31 @@ export default function RentalCalendarBoard({
             </button>
           </div>
         </div>
+
+        {complianceAlerts.length > 0 ? (
+          <div className="mb-4 rounded-2xl border border-amber-200/80 bg-amber-50/90 px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-800/80">
+              Ops · ΚΤΕΟ / ασφάλεια / συντήρηση
+            </p>
+            <ul className="mt-1.5 flex flex-wrap gap-2">
+              {complianceAlerts.slice(0, 8).map((a) => (
+                <li
+                  key={a.id}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-semibold text-amber-950"
+                >
+                  <span className="material-symbols-outlined text-[14px] text-amber-700">
+                    {a.kind === 'kteo'
+                      ? 'fact_check'
+                      : a.kind === 'insurance'
+                        ? 'verified_user'
+                        : 'build'}
+                  </span>
+                  {a.plate_number} · {a.title}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="grid xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)] gap-4">
           {/* Month grid */}

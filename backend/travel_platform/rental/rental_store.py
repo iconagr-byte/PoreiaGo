@@ -7,7 +7,7 @@ import math
 import os
 import threading
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -120,6 +120,8 @@ BOOKING_STATUSES = ("RESERVED", "CONFIRMED", "ACTIVE", "COMPLETED", "CANCELLED")
 ACTIVE_BOOKING_STATUSES = frozenset({"RESERVED", "CONFIRMED", "ACTIVE"})
 INSPECTION_TYPES = ("PICKUP_CHECK", "RETURN_CHECK", "PICKUP", "RETURN")
 SERVICE_MILEAGE_EVERY = 15_000
+DOC_KINDS = frozenset({"registration", "insurance", "kteo", "other"})
+EXPENSE_CATEGORIES = frozenset({"fuel", "tolls", "insurance", "service", "cleaning", "other"})
 
 # Bookable extras (customer wizard + wallet) — priced into booking.total_cost.
 EXTRAS_CATALOG: dict[str, dict[str, Any]] = {
@@ -431,7 +433,21 @@ def _parse_dt(value: str | datetime) -> datetime:
 
 
 def _empty() -> dict[str, Any]:
-    return {"vehicles": [], "bookings": [], "inspections": []}
+    return {"vehicles": [], "bookings": [], "inspections": [], "expenses": []}
+
+
+def _parse_date(value: Any) -> date | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    text = str(value).strip()[:10]
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
 
 
 def _read() -> dict[str, Any]:
@@ -443,7 +459,7 @@ def _read() -> dict[str, Any]:
         return _empty()
     if not isinstance(data, dict):
         return _empty()
-    for key in ("vehicles", "bookings", "inspections"):
+    for key in ("vehicles", "bookings", "inspections", "expenses"):
         if not isinstance(data.get(key), list):
             data[key] = []
     return data
@@ -556,7 +572,21 @@ def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: s
             "id": str(uuid4()),
             "tenant_id": tid,
             "created_at": now,
+            "documents": [],
         }
+        kteo = _parse_date(body.get("legal_deadline")) if "legal_deadline" in body else _parse_date(
+            (existing or {}).get("legal_deadline")
+        )
+        insurance = (
+            _parse_date(body.get("insurance_due_date"))
+            if "insurance_due_date" in body
+            else _parse_date((existing or {}).get("insurance_due_date"))
+        )
+        # Allow explicit clear via null when key present.
+        if "legal_deadline" in body and body.get("legal_deadline") in (None, ""):
+            kteo = None
+        if "insurance_due_date" in body and body.get("insurance_due_date") in (None, ""):
+            insurance = None
         row.update(
             {
                 "plate_number": plate,
@@ -578,6 +608,9 @@ def upsert_vehicle(tenant_id: str | None, body: dict[str, Any], *, vehicle_id: s
                 ][:12],
                 "description": (str(body.get("description") or "").strip() or None),
                 "notes": (str(body.get("notes") or "").strip() or None),
+                "legal_deadline": kteo.isoformat() if kteo else None,
+                "insurance_due_date": insurance.isoformat() if insurance else None,
+                "documents": list((existing or {}).get("documents") or row.get("documents") or []),
                 "updated_at": now,
             }
         )
@@ -1082,8 +1115,245 @@ def save_legal_doc_signature(
         return deepcopy(booking)
 
 
+def list_documents(
+    tenant_id: str | None,
+    *,
+    vehicle_id: str | None = None,
+) -> list[dict[str, Any]]:
+    tid = _normalize_tenant(tenant_id)
+    out: list[dict[str, Any]] = []
+    with _LOCK:
+        for v in _read()["vehicles"]:
+            if v.get("tenant_id") != tid:
+                continue
+            if vehicle_id and v.get("id") != vehicle_id:
+                continue
+            for doc in v.get("documents") or []:
+                row = deepcopy(doc)
+                row["vehicle_id"] = v["id"]
+                row["plate_number"] = v.get("plate_number")
+                row["model"] = v.get("model")
+                out.append(row)
+    return sorted(out, key=lambda d: d.get("created_at") or "", reverse=True)
+
+
+def add_vehicle_document(
+    tenant_id: str | None,
+    vehicle_id: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    kind = str(payload.get("kind") or "other").strip().lower()
+    if kind not in DOC_KINDS:
+        kind = "other"
+    with _LOCK:
+        data = _read()
+        vehicle = next(
+            (v for v in data["vehicles"] if v.get("tenant_id") == tid and v.get("id") == vehicle_id),
+            None,
+        )
+        if not vehicle:
+            raise KeyError("vehicle")
+        expires = _parse_date(payload.get("expires_at"))
+        doc = {
+            "id": str(uuid4()),
+            "kind": kind,
+            "file_name": str(payload.get("file_name") or "document").strip() or "document",
+            "mime_type": str(payload.get("mime_type") or "application/octet-stream"),
+            "size_bytes": int(payload.get("size_bytes") or 0),
+            "storage_path": str(payload.get("storage_path") or ""),
+            "url": str(payload.get("url") or ""),
+            "expires_at": expires.isoformat() if expires else None,
+            "created_at": _now(),
+        }
+        docs = list(vehicle.get("documents") or [])
+        docs.append(doc)
+        vehicle["documents"] = docs
+        vehicle["updated_at"] = _now()
+        # Sync compliance dates from document expiry when kind matches.
+        if expires and kind == "kteo":
+            vehicle["legal_deadline"] = expires.isoformat()
+        if expires and kind == "insurance":
+            vehicle["insurance_due_date"] = expires.isoformat()
+        _write(data)
+        out = deepcopy(doc)
+        out["vehicle_id"] = vehicle_id
+        out["plate_number"] = vehicle.get("plate_number")
+        out["model"] = vehicle.get("model")
+        return out
+
+
+def delete_vehicle_document(tenant_id: str | None, vehicle_id: str, document_id: str) -> bool:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        vehicle = next(
+            (v for v in data["vehicles"] if v.get("tenant_id") == tid and v.get("id") == vehicle_id),
+            None,
+        )
+        if not vehicle:
+            return False
+        before = len(vehicle.get("documents") or [])
+        vehicle["documents"] = [d for d in (vehicle.get("documents") or []) if d.get("id") != document_id]
+        if len(vehicle["documents"]) == before:
+            return False
+        vehicle["updated_at"] = _now()
+        _write(data)
+        return True
+
+
+def list_expenses(
+    tenant_id: str | None,
+    *,
+    vehicle_id: str | None = None,
+) -> list[dict[str, Any]]:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        vehicles = {
+            v["id"]: v for v in data["vehicles"] if v.get("tenant_id") == tid
+        }
+        rows = [deepcopy(e) for e in data.get("expenses") or [] if e.get("tenant_id") == tid]
+    if vehicle_id:
+        rows = [e for e in rows if e.get("vehicle_id") == vehicle_id]
+    for e in rows:
+        v = vehicles.get(e.get("vehicle_id") or "")
+        if v:
+            e["plate_number"] = v.get("plate_number")
+            e["model"] = v.get("model")
+    return sorted(rows, key=lambda e: e.get("expense_date") or "", reverse=True)
+
+
+def create_expense(tenant_id: str | None, body: dict[str, Any]) -> dict[str, Any]:
+    tid = _normalize_tenant(tenant_id)
+    vehicle_id = str(body.get("vehicle_id") or "").strip()
+    if not vehicle_id:
+        raise ValueError("Απαιτείται όχημα")
+    category = str(body.get("category") or "other").strip().lower()
+    if category not in EXPENSE_CATEGORIES:
+        category = "other"
+    try:
+        amount = float(body.get("amount"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Μη έγκυρο ποσό") from exc
+    if amount < 0:
+        raise ValueError("Μη έγκυρο ποσό")
+    expense_date = _parse_date(body.get("expense_date")) or date.today()
+    with _LOCK:
+        data = _read()
+        vehicle = next(
+            (v for v in data["vehicles"] if v.get("tenant_id") == tid and v.get("id") == vehicle_id),
+            None,
+        )
+        if not vehicle:
+            raise KeyError("vehicle")
+        liters = body.get("liters")
+        odometer = body.get("odometer")
+        try:
+            liters_n = float(liters) if liters not in (None, "") else None
+        except (TypeError, ValueError):
+            liters_n = None
+        try:
+            odo_n = int(odometer) if odometer not in (None, "") else None
+        except (TypeError, ValueError):
+            odo_n = None
+        row = {
+            "id": str(uuid4()),
+            "tenant_id": tid,
+            "vehicle_id": vehicle_id,
+            "expense_date": expense_date.isoformat(),
+            "category": category,
+            "amount": round(amount, 2),
+            "liters": liters_n,
+            "odometer": odo_n,
+            "note": (str(body.get("note") or "").strip() or None),
+            "created_at": _now(),
+        }
+        data.setdefault("expenses", []).append(row)
+        _write(data)
+        out = deepcopy(row)
+        out["plate_number"] = vehicle.get("plate_number")
+        out["model"] = vehicle.get("model")
+        return out
+
+
+def delete_expense(tenant_id: str | None, expense_id: str) -> bool:
+    tid = _normalize_tenant(tenant_id)
+    with _LOCK:
+        data = _read()
+        before = len(data.get("expenses") or [])
+        data["expenses"] = [
+            e
+            for e in (data.get("expenses") or [])
+            if not (e.get("tenant_id") == tid and e.get("id") == expense_id)
+        ]
+        if len(data["expenses"]) == before:
+            return False
+        _write(data)
+        return True
+
+
+def availability_board(tenant_id: str | None) -> list[dict[str, Any]]:
+    """Vehicle readiness: status + ΚΤΕΟ/ασφάλεια + upcoming rentals."""
+    tid = _normalize_tenant(tenant_id)
+    today = date.today()
+    vehicles = list_vehicles(tid)
+    bookings = [
+        b
+        for b in list_bookings(tid)
+        if b.get("rental_status") in ACTIVE_BOOKING_STATUSES
+    ]
+    board: list[dict[str, Any]] = []
+    for v in vehicles:
+        vid = v["id"]
+        kteo = _parse_date(v.get("legal_deadline"))
+        insurance = _parse_date(v.get("insurance_due_date"))
+        flags: list[str] = []
+        if str(v.get("current_status") or "") in {"MAINTENANCE", "CLEANING", "IN_TRANSIT"}:
+            flags.append(str(v.get("current_status")))
+        if kteo and kteo < today:
+            flags.append("KTEO_EXPIRED")
+        elif kteo and (kteo - today).days <= 30:
+            flags.append("KTEO_SOON")
+        if insurance and insurance < today:
+            flags.append("INSURANCE_EXPIRED")
+        elif insurance and (insurance - today).days <= 30:
+            flags.append("INSURANCE_SOON")
+        active = [b for b in bookings if b.get("vehicle_id") == vid]
+        upcoming = sorted(
+            (b for b in active if b.get("start_time")),
+            key=lambda b: b.get("start_time") or "",
+        )
+        bookable = (
+            str(v.get("current_status") or "") == "AVAILABLE"
+            and "KTEO_EXPIRED" not in flags
+            and "INSURANCE_EXPIRED" not in flags
+        )
+        board.append(
+            {
+                "vehicle_id": vid,
+                "plate_number": v.get("plate_number"),
+                "model": v.get("model"),
+                "category": v.get("category"),
+                "current_status": v.get("current_status"),
+                "legal_deadline": v.get("legal_deadline"),
+                "insurance_due_date": v.get("insurance_due_date"),
+                "days_to_kteo": (kteo - today).days if kteo else None,
+                "days_to_insurance": (insurance - today).days if insurance else None,
+                "active_bookings": len(active),
+                "next_booking_start": (upcoming[0].get("start_time") if upcoming else None),
+                "bookable": bookable,
+                "flags": flags,
+                "photo_url": v.get("photo_url"),
+            }
+        )
+    return board
+
+
 def calendar_blocks(tenant_id: str | None, *, days: int = 30) -> list[dict[str, Any]]:
     tid = _normalize_tenant(tenant_id)
+    today = date.today()
+    horizon = today + timedelta(days=max(7, int(days or 30)))
     with _LOCK:
         data = _read()
         vehicles = {v["id"]: v for v in data["vehicles"] if v.get("tenant_id") == tid}
@@ -1141,6 +1411,44 @@ def calendar_blocks(tenant_id: str | None, *, days: int = 30) -> list[dict[str, 
                         "start_time": None,
                         "end_time": None,
                         "status": "SERVICE_DUE",
+                    }
+                )
+            kteo = _parse_date(v.get("legal_deadline"))
+            insurance = _parse_date(v.get("insurance_due_date"))
+            if kteo and kteo <= horizon:
+                overdue = kteo < today
+                blocks.append(
+                    {
+                        "id": f"kteo-{v['id']}",
+                        "kind": "kteo",
+                        "vehicle_id": v["id"],
+                        "plate_number": v.get("plate_number"),
+                        "model": v.get("model"),
+                        "category": v.get("category"),
+                        "title": "ΚΤΕΟ ληγμένο" if overdue else "ΚΤΕΟ λήγει",
+                        "start_time": f"{kteo.isoformat()}T00:00:00+00:00",
+                        "end_time": f"{kteo.isoformat()}T23:59:59+00:00",
+                        "status": "OVERDUE" if overdue else "DUE",
+                        "due_date": kteo.isoformat(),
+                        "days_left": (kteo - today).days,
+                    }
+                )
+            if insurance and insurance <= horizon:
+                overdue = insurance < today
+                blocks.append(
+                    {
+                        "id": f"insurance-{v['id']}",
+                        "kind": "insurance",
+                        "vehicle_id": v["id"],
+                        "plate_number": v.get("plate_number"),
+                        "model": v.get("model"),
+                        "category": v.get("category"),
+                        "title": "Ασφάλεια ληγμένη" if overdue else "Ασφάλεια λήγει",
+                        "start_time": f"{insurance.isoformat()}T00:00:00+00:00",
+                        "end_time": f"{insurance.isoformat()}T23:59:59+00:00",
+                        "status": "OVERDUE" if overdue else "DUE",
+                        "due_date": insurance.isoformat(),
+                        "days_left": (insurance - today).days,
                     }
                 )
     return blocks
@@ -1420,18 +1728,52 @@ def dashboard_summary(tenant_id: str | None) -> dict[str, Any]:
     tid = _normalize_tenant(tenant_id)
     vehicles = list_vehicles(tid)
     bookings = list_bookings(tid)
+    expenses = list_expenses(tid)
+    today = date.today()
     available = sum(1 for v in vehicles if v.get("current_status") == "AVAILABLE")
     rented = sum(1 for v in vehicles if v.get("current_status") == "RENTED")
     maintenance = sum(1 for v in vehicles if v.get("current_status") == "MAINTENANCE")
     active = sum(1 for b in bookings if b.get("rental_status") in ACTIVE_BOOKING_STATUSES)
     revenue = sum(float(b.get("total_cost") or 0) for b in bookings if b.get("rental_status") != "CANCELLED")
+    board = availability_board(tid)
+    bookable = sum(1 for row in board if row.get("bookable"))
+    compliance_alerts: list[dict[str, Any]] = []
+    for v in vehicles:
+        kteo = _parse_date(v.get("legal_deadline"))
+        insurance = _parse_date(v.get("insurance_due_date"))
+        if kteo and (kteo - today).days <= 30:
+            compliance_alerts.append(
+                {
+                    "vehicle_id": v["id"],
+                    "plate_number": v.get("plate_number"),
+                    "kind": "kteo",
+                    "due_date": kteo.isoformat(),
+                    "days_left": (kteo - today).days,
+                    "severity": "urgent" if (kteo - today).days <= 14 else "warning",
+                }
+            )
+        if insurance and (insurance - today).days <= 30:
+            compliance_alerts.append(
+                {
+                    "vehicle_id": v["id"],
+                    "plate_number": v.get("plate_number"),
+                    "kind": "insurance",
+                    "due_date": insurance.isoformat(),
+                    "days_left": (insurance - today).days,
+                    "severity": "urgent" if (insurance - today).days <= 14 else "warning",
+                }
+            )
+    compliance_alerts.sort(key=lambda a: a.get("days_left") if a.get("days_left") is not None else 999)
     return {
         "vehicles_total": len(vehicles),
         "available": available,
         "rented": rented,
         "maintenance": maintenance,
+        "bookable": bookable,
         "active_bookings": active,
         "revenue_eur": round(revenue, 2),
+        "expenses_eur": round(sum(float(e.get("amount") or 0) for e in expenses), 2),
+        "documents_total": sum(len(v.get("documents") or []) for v in vehicles),
         "service_alerts": [
             {
                 "vehicle_id": v["id"],
@@ -1442,4 +1784,5 @@ def dashboard_summary(tenant_id: str | None) -> dict[str, Any]:
             if int(v.get("current_mileage") or 0) % SERVICE_MILEAGE_EVERY
             >= SERVICE_MILEAGE_EVERY - 500
         ],
+        "compliance_alerts": compliance_alerts,
     }

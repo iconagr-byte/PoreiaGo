@@ -142,6 +142,56 @@ export async function fetchRentalCalendar(days = 30) {
   return data.blocks || [];
 }
 
+export async function fetchRentalAvailabilityBoard() {
+  const data = await rentalFetch('/availability-board');
+  return data.vehicles || [];
+}
+
+export async function fetchRentalDocuments(vehicleId) {
+  const q = vehicleId ? `?vehicle_id=${encodeURIComponent(vehicleId)}` : '';
+  const data = await rentalFetch(`/documents${q}`);
+  return data.documents || [];
+}
+
+export async function uploadRentalDocument(vehicleId, file, { kind = 'registration', expiresAt } = {}) {
+  const form = new FormData();
+  form.append('file', file);
+  const params = new URLSearchParams({ kind });
+  if (expiresAt) params.set('expires_at', expiresAt);
+  const token = getSaasToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(
+    `${API_BASE}/api/admin/platform/fleet-rental/vehicles/${encodeURIComponent(vehicleId)}/documents?${params}`,
+    { method: 'POST', headers, body: form },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Αποτυχία ανεβάσματος εγγράφου');
+  }
+  return data;
+}
+
+export async function deleteRentalDocument(vehicleId, documentId) {
+  return rentalFetch(
+    `/vehicles/${encodeURIComponent(vehicleId)}/documents/${encodeURIComponent(documentId)}`,
+    { method: 'DELETE' },
+  );
+}
+
+export async function fetchRentalExpenses(vehicleId) {
+  const q = vehicleId ? `?vehicle_id=${encodeURIComponent(vehicleId)}` : '';
+  const data = await rentalFetch(`/expenses${q}`);
+  return data.expenses || [];
+}
+
+export async function createRentalExpense(body) {
+  return rentalFetch('/expenses', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function deleteRentalExpense(expenseId) {
+  return rentalFetch(`/expenses/${encodeURIComponent(expenseId)}`, { method: 'DELETE' });
+}
+
 export async function fetchRentalInspections(bookingId) {
   const q = bookingId ? `?booking_id=${encodeURIComponent(bookingId)}` : '';
   const data = await rentalFetch(`/inspections${q}`);

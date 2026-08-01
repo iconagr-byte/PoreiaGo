@@ -34,6 +34,9 @@ import RentAppBrandingEditor from './RentAppBrandingEditor.jsx';
 import RentPickupLocationsEditor from './RentPickupLocationsEditor.jsx';
 import RentCoverageExtrasEditor from './RentCoverageExtrasEditor.jsx';
 import RentNotificationsEditor from './RentNotificationsEditor.jsx';
+import RentDocumentsPanel from './RentDocumentsPanel.jsx';
+import RentExpensesPanel from './RentExpensesPanel.jsx';
+import RentAvailabilityPanel from './RentAvailabilityPanel.jsx';
 import { RENT_DESK_TABS, sanitizeRentDeskTab } from '../../../lib/admin/rentDeskNav.js';
 import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 import { fetchAdminSiteAppearance } from '../../../services/siteAppearanceApi.js';
@@ -596,7 +599,7 @@ export default function FleetRentalPanel({
       {tab === 'overview' && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { label: 'Διαθέσιμα', value: summary?.available ?? '—', icon: 'check_circle', tone: 'text-emerald-600' },
+            { label: 'Έτοιμα για κράτηση', value: summary?.bookable ?? summary?.available ?? '—', icon: 'event_available', tone: 'text-emerald-600' },
             { label: 'Σε ενοικίαση', value: summary?.rented ?? '—', icon: 'key', tone: 'text-sky-600' },
             { label: 'Ενεργές κρατήσεις', value: summary?.active_bookings ?? '—', icon: 'event', tone: 'text-violet-600' },
             { label: 'Έσοδα', value: euro(summary?.revenue_eur), icon: 'payments', tone: 'text-amber-600' },
@@ -628,6 +631,9 @@ export default function FleetRentalPanel({
               { id: 'pickups', label: 'Σημεία παραλαβής', copy: 'Γραφείο · αεροδρόμιο · λιμάνι στο /rent', icon: 'location_on' },
               { id: 'branding', label: 'Εμφάνιση /rent', copy: 'Σχεδιασμός σελίδων → Ενοικιάσεις', icon: 'palette', designHref: '/admin?tab=settings&sub=homepage&page=rent' },
               { id: 'vehicles', label: 'Οχήματα ενοικίασης', copy: 'One-way · με οδηγό · GPS device', icon: 'directions_car' },
+              { id: 'availability', label: 'Διαθεσιμότητα στόλου', copy: `${summary?.bookable ?? '—'} έτοιμα · ΚΤΕΟ & ασφάλεια`, icon: 'event_available' },
+              { id: 'documents', label: 'Έγγραφα οχημάτων', copy: `${summary?.documents_total ?? 0} αρχεία · άδειες / ΚΤΕΟ`, icon: 'folder_managed' },
+              { id: 'expenses', label: 'Έξοδα στόλου', copy: `${euro(summary?.expenses_eur)} καταχωρημένα`, icon: 'local_gas_station' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
               { id: 'live_gps', label: 'Ζωντανά GPS', copy: `${overlays.length} ενεργά για χάρτη`, icon: 'my_location' },
@@ -656,6 +662,29 @@ export default function FleetRentalPanel({
 
           <RentAppShareBanner />
 
+          {(summary?.compliance_alerts || []).length > 0 ? (
+            <div className="sm:col-span-2 lg:col-span-4 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-rose-900">ΚΤΕΟ / ασφάλεια — προσεχείς λήξεις</p>
+                <button
+                  type="button"
+                  className="text-xs font-bold text-rose-800 hover:underline"
+                  onClick={() => setTab('availability')}
+                >
+                  Διαθεσιμότητα
+                </button>
+              </div>
+              <ul className="mt-1 text-sm text-rose-900/80 space-y-0.5">
+                {summary.compliance_alerts.slice(0, 6).map((a) => (
+                  <li key={`${a.vehicle_id}-${a.kind}`}>
+                    {a.plate_number} · {a.kind === 'kteo' ? 'ΚΤΕΟ' : 'Ασφάλεια'} ·{' '}
+                    {a.days_left < 0 ? `ληγμένο ${Math.abs(a.days_left)}η` : `σε ${a.days_left}η`} ·{' '}
+                    {a.due_date}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {(summary?.service_alerts || []).length > 0 ? (
             <div className="sm:col-span-2 lg:col-span-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
               <p className="text-sm font-bold text-amber-900">Service alerts (χιλιόμετρα)</p>
@@ -1322,6 +1351,17 @@ export default function FleetRentalPanel({
       )}
 
       {tab === 'plans' && <RentPlanCardsEditor />}
+
+      {tab === 'documents' && <RentDocumentsPanel />}
+
+      {tab === 'expenses' && <RentExpensesPanel />}
+
+      {tab === 'availability' && (
+        <RentAvailabilityPanel
+          onOpenVehicles={() => setTab('vehicles')}
+          onOpenWizard={() => setTab('wizard')}
+        />
+      )}
 
       {tab === 'services' && <RentCoverageExtrasEditor />}
 

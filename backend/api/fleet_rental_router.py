@@ -8,7 +8,10 @@ import uuid
 from pathlib import Path
 from uuid import UUID
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from travel_platform.rental import rental_store as store
@@ -29,7 +32,9 @@ router = APIRouter(prefix="/api/admin/platform/fleet-rental", tags=["Fleet Renta
 _ADMIN_ROLES = {"tenant_admin", "dispatcher", "superadmin"}
 _DATA_ROOT = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data")
 _RENTAL_PHOTO_DIR = _DATA_ROOT / "uploads" / "rental_damage"
+_RENTAL_DOC_DIR = _DATA_ROOT / "uploads" / "rental_docs"
 _MAX_PHOTO_BYTES = 4 * 1024 * 1024
+_MAX_DOC_BYTES = 12 * 1024 * 1024
 
 
 async def _require_admin(payload: dict = Depends(get_token_payload)) -> dict:
@@ -59,6 +64,18 @@ class VehicleBody(BaseModel):
     photo_urls: list[str] = Field(default_factory=list)
     description: str | None = Field(default=None, max_length=2000)
     notes: str | None = None
+    legal_deadline: date | None = None
+    insurance_due_date: date | None = None
+
+
+class ExpenseBody(BaseModel):
+    vehicle_id: str
+    expense_date: date | None = None
+    category: str = "fuel"
+    amount: float = Field(ge=0)
+    liters: float | None = None
+    odometer: int | None = None
+    note: str | None = None
 
 
 class BookingBody(BaseModel):
@@ -308,6 +325,125 @@ async def rental_calendar(
     _: dict = Depends(_require_admin),
 ):
     return {"blocks": store.calendar_blocks(_tid(tenant_id), days=days)}
+
+
+@router.get("/availability-board")
+async def rental_availability_board(
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    return {"vehicles": store.availability_board(_tid(tenant_id))}
+
+
+@router.get("/documents")
+async def rental_documents(
+    vehicle_id: str | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    return {"documents": store.list_documents(_tid(tenant_id), vehicle_id=vehicle_id)}
+
+
+@router.post("/vehicles/{vehicle_id}/documents", status_code=201)
+async def upload_rental_vehicle_document(
+    vehicle_id: str,
+    file: UploadFile = File(...),
+    kind: str = Query("registration"),
+    expires_at: date | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    tid = _tid(tenant_id)
+    if not store.get_vehicle(tid, vehicle_id):
+        raise HTTPException(status_code=404, detail="Το όχημα δεν βρέθηκε")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Λείπει όνομα αρχείου")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    if len(content) > _MAX_DOC_BYTES:
+        raise HTTPException(status_code=400, detail="Το αρχείο είναι πολύ μεγάλο (μέγ. 12 MB)")
+    safe_name = file.filename.replace("..", "_").replace("/", "_").replace("\\", "_")
+    out_name = f"rdoc-{vehicle_id}-{uuid.uuid4().hex[:10]}-{safe_name}"[:180]
+    _RENTAL_DOC_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _RENTAL_DOC_DIR / out_name
+    out_path.write_bytes(content)
+    try:
+        doc = store.add_vehicle_document(
+            tid,
+            vehicle_id,
+            {
+                "kind": kind,
+                "file_name": file.filename,
+                "mime_type": file.content_type or "application/octet-stream",
+                "size_bytes": len(content),
+                "storage_path": str(out_path),
+                "url": f"/api/admin/platform/fleet-rental/documents/file/{out_name}",
+                "expires_at": expires_at.isoformat() if expires_at else None,
+            },
+        )
+    except KeyError as exc:
+        out_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=404, detail="Το όχημα δεν βρέθηκε") from exc
+    return doc
+
+
+@router.delete("/vehicles/{vehicle_id}/documents/{document_id}")
+async def delete_rental_vehicle_document(
+    vehicle_id: str,
+    document_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    if not store.delete_vehicle_document(_tid(tenant_id), vehicle_id, document_id):
+        raise HTTPException(status_code=404, detail="Το έγγραφο δεν βρέθηκε")
+    return {"ok": True}
+
+
+@router.get("/documents/file/{filename}")
+async def get_rental_document_file(
+    filename: str,
+    _: dict = Depends(_require_admin),
+):
+    safe = Path(filename).name
+    path = _RENTAL_DOC_DIR / safe
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Το αρχείο δεν βρέθηκε")
+    return FileResponse(path)
+
+
+@router.get("/expenses")
+async def rental_expenses(
+    vehicle_id: str | None = None,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    return {"expenses": store.list_expenses(_tid(tenant_id), vehicle_id=vehicle_id)}
+
+
+@router.post("/expenses", status_code=201)
+async def create_rental_expense(
+    body: ExpenseBody,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    try:
+        return store.create_expense(_tid(tenant_id), body.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Το όχημα δεν βρέθηκε") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/expenses/{expense_id}")
+async def delete_rental_expense(
+    expense_id: str,
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    if not store.delete_expense(_tid(tenant_id), expense_id):
+        raise HTTPException(status_code=404, detail="Η δαπάνη δεν βρέθηκε")
+    return {"ok": True}
 
 
 @router.get("/live-overlays")
