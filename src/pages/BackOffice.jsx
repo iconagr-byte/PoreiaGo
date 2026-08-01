@@ -2544,7 +2544,14 @@ export default function BackOffice() {
               />
             )}
             {activeTab === 'email_templates' && (
-              <EmailTemplatesPage onUseTemplate={useEmailTemplate} />
+              <EmailTemplatesPage
+                onUseTemplate={useEmailTemplate}
+                rentEnabled={rentMenuVisible}
+                onOpenContracts={() => {
+                  setSettingsSubTab('contracts');
+                  setActiveTab('settings');
+                }}
+              />
             )}
             {activeTab === 'bookings' && renderBookings()}
           </div>
