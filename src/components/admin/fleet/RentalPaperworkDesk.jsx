@@ -269,7 +269,17 @@ export default function RentalPaperworkDesk({
           rows.map(({ booking: b, paper }) => (
             <article
               key={b.id}
-              className="px-4 py-3 flex flex-wrap items-start justify-between gap-3"
+              role="button"
+              tabIndex={0}
+              title="Διπλό κλικ για άνοιγμα φακέλου"
+              onDoubleClick={() => setSelectedId(b.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedId(b.id);
+                }
+              }}
+              className="px-4 py-3 flex flex-wrap items-start justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
             >
               <div className="min-w-0 space-y-1">
                 <p className="font-bold text-sm text-gray-900">
