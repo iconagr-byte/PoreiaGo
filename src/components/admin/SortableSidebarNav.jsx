@@ -59,10 +59,16 @@ export default function SortableSidebarNav({
 
   const sections = useMemo(() => {
     const visible = SECTIONS.filter((s) => {
-      // Settings + SaaS platform + fleet ops live in hub card rails — not the left κατεβατό.
-      if (s.id === 'settings' || s.id === 'platform' || s.id === 'fleet_ops') return false;
+      // Settings / platform / fleet ops / rent live in hub card rails — not the left κατεβατό.
+      if (
+        s.id === 'settings' ||
+        s.id === 'platform' ||
+        s.id === 'fleet_ops' ||
+        s.id === 'rent'
+      ) {
+        return false;
+      }
       if (s.superOnly && !superAdmin) return false;
-      if (!rentEnabled && s.id === 'rent') return false;
       return true;
     });
     return visible
@@ -73,12 +79,13 @@ export default function SortableSidebarNav({
         items: navItemsFromIds(displayLayout[section.id] || [], superAdmin).filter(
           (item) =>
             item.type !== 'settings_subtab' &&
+            item.type !== 'fleet_rental_subtab' &&
             !isFleetOpsSubTab(item.id) &&
             (superAdmin || item.settingsSection !== 'platform'),
         ),
       }))
       .filter((section) => section.items.length > 0);
-  }, [displayLayout, superAdmin, rentOnly, rentEnabled]);
+  }, [displayLayout, superAdmin, rentOnly]);
 
   const persistLayout = useCallback(
     (next) => {
@@ -187,6 +194,7 @@ export default function SortableSidebarNav({
 
   const settingsActive = activeTab === 'settings';
   const fleetOpsActive = activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab);
+  const rentDeskActive = activeTab === 'fleet_rental';
 
   const navAccent = (item) =>
     item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
@@ -359,6 +367,26 @@ export default function SortableSidebarNav({
 
       {/* Pinned hub entries — subtabs open as cards in the main pane */}
       <div className="shrink-0 border-t border-black/[0.06] px-2.5 py-2.5 bg-white/70 backdrop-blur-sm space-y-1.5">
+        {rentEnabled ? (
+          <button
+            type="button"
+            onClick={() => openRentDesk(fleetRentalTab || DEFAULT_RENT_DESK_TAB)}
+            className={`admin-nav-btn w-full ${rentDeskActive ? 'admin-nav-btn-active' : ''}`}
+            data-accent="teal"
+            title="Ενοικιάσεις"
+            aria-current={rentDeskActive ? 'page' : undefined}
+          >
+            <span className="admin-nav-icon">
+              <span
+                className="material-symbols-outlined"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                directions_car
+              </span>
+            </span>
+            <span className="admin-nav-label">Ενοικιάσεις</span>
+          </button>
+        ) : null}
         {!rentOnly ? (
           <button
             type="button"
