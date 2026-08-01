@@ -72,3 +72,48 @@ def test_public_catalog_no_seed_in_production():
         ):
             tid = "11111111-2222-3333-4444-555555555555"
             assert store.public_catalog(tid) == []
+
+
+def test_ensure_demo_sample_booking_for_empty_demo_office():
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "development", "RENT_DEMO_FLEET": "true"},
+            clear=False,
+        ):
+            tid = "aaaaaaaa-bbbb-cccc-dddd-ffffffffffff"
+            assert store.ensure_demo_rental_fleet(tid) == 6
+            first = store.ensure_demo_rental_sample_booking(tid)
+            assert first is not None
+            assert first["rental_status"] == "CONFIRMED"
+            assert first["client_name"] == "Δοκιμαστικός Πελάτης"
+            assert store.ensure_demo_rental_sample_booking(tid) is None
+            assert len(store.list_bookings(tid)) == 1
+
+
+def test_sample_booking_seeds_when_demo_fleet_already_present_in_prod():
+    """Prod may keep demo vehicles; still seed one paperwork booking if empty."""
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rental_store.json"
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "development", "RENT_DEMO_FLEET": "true"},
+            clear=False,
+        ):
+            tid = "bbbbbbbb-cccc-dddd-eeee-ffffffffffff"
+            store.ensure_demo_rental_fleet(tid)
+        with mock.patch.object(store, "STORE_FILE", path), mock.patch.object(
+            store, "DATA_DIR", Path(tmp)
+        ), mock.patch.dict(
+            os.environ,
+            {"ENVIRONMENT": "production", "RENT_DEMO_FLEET": "false"},
+            clear=False,
+        ):
+            booking = store.ensure_demo_rental_sample_booking(tid)
+            assert booking is not None
+            assert len(store.list_bookings(tid)) == 1

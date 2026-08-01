@@ -147,6 +147,7 @@ async def list_vehicles(
 ):
     tid = _tid(tenant_id)
     store.ensure_demo_rental_fleet(tid)
+    store.ensure_demo_rental_sample_booking(tid)
     return {"vehicles": store.list_vehicles(tid, category=category)}
 
 
@@ -229,8 +230,10 @@ async def list_bookings(
     tenant_id: UUID = Depends(get_current_tenant_id),
     _: dict = Depends(_require_admin),
 ):
+    tid = _tid(tenant_id)
+    store.ensure_demo_rental_sample_booking(tid)
     return {
-        "bookings": store.list_bookings(_tid(tenant_id), vehicle_id=vehicle_id, status=status),
+        "bookings": store.list_bookings(tid, vehicle_id=vehicle_id, status=status),
     }
 
 

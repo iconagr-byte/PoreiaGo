@@ -283,7 +283,7 @@ export default function RentalCheckout({
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-700 text-white">
               <span className="material-symbols-outlined">touch_app</span>
             </span>
-            <p className="font-bold text-lg text-slate-900 mt-3">Sign on this Device</p>
+            <p className="font-bold text-lg text-slate-900 mt-3">Υπογραφή σε αυτή τη συσκευή</p>
             <p className="text-sm text-slate-600 mt-1 leading-relaxed">
               Ο πελάτης υπογράφει εδώ στο tablet / οθόνη του γραφείου (Sign-on-Glass).
             </p>
@@ -316,7 +316,7 @@ export default function RentalCheckout({
               progress_activity
             </span>
           </span>
-          <h4 className="font-bold text-lg text-sky-950">Waiting for Client Signature…</h4>
+          <h4 className="font-bold text-lg text-sky-950">Αναμονή υπογραφής πελάτη…</h4>
           <p className="text-sm text-sky-900/80 max-w-md mx-auto">
             Ο πελάτης ανοίγει τον σύνδεσμο στο κινητό του. Η οθόνη ενημερώνεται αυτόματα μόλις
             υπογράψει (polling κάθε 3″).
