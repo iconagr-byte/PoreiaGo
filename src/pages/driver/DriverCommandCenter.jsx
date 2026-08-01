@@ -34,7 +34,7 @@ const TABS = [
   { id: 'gps', icon: 'share_location', label: 'Θέση', short: 'GPS' },
   { id: 'scan', icon: 'qr_code_scanner', label: 'Scan', short: 'Scan' },
   { id: 'sos', icon: 'emergency', label: 'SOS', short: 'SOS' },
-  { id: 'summary', icon: 'summarize', label: 'Σύνοψη', short: 'Σύν.' },
+  { id: 'summary', icon: 'summarize', label: 'Κρατήσεις', short: 'Κρατ.' },
 ];
 
 function driverInitials(name) {

@@ -30,7 +30,7 @@ export default function DaySummary() {
   }, []);
 
   if (!stats) {
-    return <p className="py-12 text-center text-[var(--driver-muted)]">Φόρτωση σύνοψης…</p>;
+    return <p className="py-12 text-center text-[var(--driver-muted)]">Φόρτωση κρατήσεων…</p>;
   }
 
   const boardedList = stats.boardedPassengers || [];
@@ -49,7 +49,7 @@ export default function DaySummary() {
     <div className="driver-stack">
       <div className="text-center py-2">
         <p className="driver-card-label">Τέλος βάρδιας</p>
-        <h2 className="text-2xl font-extrabold tracking-tight mt-1">Σύνοψη ημέρας</h2>
+        <h2 className="text-2xl font-extrabold tracking-tight mt-1">Κρατήσεις</h2>
       </div>
 
       <div className="driver-card">
