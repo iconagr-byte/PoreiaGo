@@ -3,33 +3,42 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  filterStitchCategories,
+  filterStitchTemplates,
   isStitchTemplateUnlocked,
   resolveStitchTemplateAccess,
 } from './stitchTemplateAccess.js';
 
 describe('stitchTemplateAccess', () => {
-  it('unlocks rent templates only when rent is enabled', () => {
-    const locked = resolveStitchTemplateAccess({
+  it('hides rent templates when rent is not enabled', () => {
+    const access = resolveStitchTemplateAccess({
       rentEnabled: false,
       modules: { plan: 'starter' },
       subscription: { status: 'active', plan: 'starter' },
     });
-    expect(locked.rentEnabled).toBe(false);
-    expect(locked.newsletterEnabled).toBe(true);
-    expect(
-      isStitchTemplateUnlocked({ requiresModule: 'rent' }, locked),
-    ).toBe(false);
-    expect(
-      isStitchTemplateUnlocked({ requiresModule: 'newsletter' }, locked),
-    ).toBe(true);
+    expect(access.rentEnabled).toBe(false);
+    expect(access.newsletterEnabled).toBe(true);
 
-    const open = resolveStitchTemplateAccess({
-      rentEnabled: true,
-      modules: { plan: 'rent', rent_enabled: true },
-      subscription: { status: 'active', plan: 'rent' },
-    });
-    expect(open.rentEnabled).toBe(true);
-    expect(isStitchTemplateUnlocked({ requiresModule: 'rent' }, open)).toBe(true);
+    const cats = filterStitchCategories(
+      [
+        { id: 'all' },
+        { id: 'newsletter', requiresModule: 'newsletter' },
+        { id: 'rent', requiresModule: 'rent' },
+      ],
+      access,
+    );
+    expect(cats.map((c) => c.id)).toEqual(['all', 'newsletter']);
+
+    const tpls = filterStitchTemplates(
+      [
+        { id: 'a', category: 'promotions' },
+        { id: 'b', requiresModule: 'newsletter' },
+        { id: 'c', requiresModule: 'rent' },
+      ],
+      access,
+    );
+    expect(tpls.map((t) => t.id)).toEqual(['a', 'b']);
+    expect(isStitchTemplateUnlocked({ requiresModule: 'rent' }, access)).toBe(false);
   });
 
   it('keeps free templates always unlocked', () => {
