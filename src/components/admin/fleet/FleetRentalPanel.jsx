@@ -48,8 +48,6 @@ import {
 } from '../../../lib/rental/rentVehicleCategories.js';
 import '../../../styles/rental-admin-apple.css';
 
-const CATEGORIES = RENT_CATEGORY_OPTIONS;
-
 const TABS = RENT_DESK_TABS;
 
 function bookingSource(b) {
