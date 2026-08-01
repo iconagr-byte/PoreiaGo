@@ -6,9 +6,14 @@ import {
   BILLING_INTERVALS,
   displayPrice,
   getPlanById,
+  isBillablePlanId,
+  mergeAgencyPlanCatalog,
+  mergeRentPlanCatalog,
   selectableAgencyPlans,
 } from '../lib/billing/planCatalog.js';
 import { createSignupCheckout, fetchBillingConfig } from '../services/billingApi.js';
+import { fetchPublicAgencyPlanCatalog } from '../services/agencyPlanCatalogApi.js';
+import { fetchPublicRentPlanCatalog } from '../services/rentPlanCatalogApi.js';
 import { getPlatformBaseDomain } from '../lib/platform/domain.js';
 import PasswordField from '../components/PasswordField.jsx';
 
@@ -41,8 +46,17 @@ export default function AgencySignupPage() {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const [billingConfig, setBillingConfig] = useState(null);
+  const [agencyCatalog, setAgencyCatalog] = useState(() => mergeAgencyPlanCatalog(null));
+  const [rentCatalog, setRentCatalog] = useState(() => mergeRentPlanCatalog(null));
 
-  const plan = useMemo(() => getPlanById(planId), [planId]);
+  const planOptions = useMemo(
+    () => selectableAgencyPlans(agencyCatalog, rentCatalog).filter((p) => isBillablePlanId(p.id)),
+    [agencyCatalog, rentCatalog],
+  );
+  const plan = useMemo(
+    () => getPlanById(planId, agencyCatalog, rentCatalog),
+    [planId, agencyCatalog, rentCatalog],
+  );
   const price = useMemo(() => displayPrice(plan, interval), [plan, interval]);
   const subdomainPreview = normalizeSubdomain(subdomain) || 'your-agency';
   const demoMode = billingConfig?.demo_mode === true;
@@ -57,10 +71,25 @@ export default function AgencySignupPage() {
       .catch(() => {
         if (!cancelled) setBillingConfig({ demo_mode: true, trial_days: 14 });
       });
+    Promise.all([
+      fetchPublicAgencyPlanCatalog().catch(() => mergeAgencyPlanCatalog(null)),
+      fetchPublicRentPlanCatalog().catch(() => mergeRentPlanCatalog(null)),
+    ]).then(([agency, rent]) => {
+      if (!cancelled) {
+        setAgencyCatalog(agency);
+        setRentCatalog(rent);
+      }
+    });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!planOptions.some((p) => p.id === planId) && planOptions[0]) {
+      setPlanId(planOptions[0].id);
+    }
+  }, [planOptions, planId]);
 
   useEffect(() => {
     if (searchParams.get('billing') === 'cancel') {
@@ -187,7 +216,7 @@ export default function AgencySignupPage() {
                 ))}
               </div>
               <div className="grid gap-2">
-                {selectableAgencyPlans().map((p) => {
+                {planOptions.map((p) => {
                   const pPrice = displayPrice(p, interval);
                   const selected = planId === p.id;
                   return (
