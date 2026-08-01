@@ -159,10 +159,28 @@ def _write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def _heal_default_branding(merged: dict) -> dict:
+    """Shared file branding must never advertise Achillio Travel to PoreiaGo admin."""
+    out = dict(merged)
+    domain = str(out.get("custom_domain") or "").strip().lower().removeprefix("www.")
+    if domain == "achilliotravel.com" or domain.endswith(".achilliotravel.com"):
+        out["custom_domain"] = ""
+    checkout = str(out.get("checkout_base_url") or "").strip().lower()
+    if "achilliotravel.com" in checkout:
+        out["checkout_base_url"] = "https://www.poreiago.com"
+    slug = str(out.get("slug") or "").strip().lower()
+    if slug in {"admin-achillio-gr", "achillio-travel", "achilliotravel"}:
+        out["slug"] = "poreiago"
+    name = str(out.get("display_name") or "").strip()
+    if (not name) or ("achillio" in name.lower()):
+        out["display_name"] = "PoreiaGo"
+    return out
+
+
 def _branding_dict(host: str | None = None) -> dict:
     raw = _read_json(_BRANDING_FILE)
     row = raw.get("default") or _DEFAULT_BRANDING
-    merged = {**_DEFAULT_BRANDING, **row}
+    merged = _heal_default_branding({**_DEFAULT_BRANDING, **row})
     if host:
         h = host.lower().removeprefix("www.")
         for entry in raw.values():

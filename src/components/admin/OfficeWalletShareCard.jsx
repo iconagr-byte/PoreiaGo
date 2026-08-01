@@ -19,16 +19,19 @@ export default function OfficeWalletShareCard() {
   useEffect(() => {
     let cancelled = false;
     // Resolve current office first, then emit wallet link + QR for that office only.
+    // Pass browser host so PoreiaGo admin never advertises Achillio Travel domain.
+    const contextHost =
+      typeof window !== 'undefined' ? window.location.hostname : '';
     fetchTenantBrandingSettings()
       .then((branding) => {
         if (cancelled) return;
         const office = branding || {};
-        setWalletUrl(getOfficeWalletUrl(office));
+        setWalletUrl(getOfficeWalletUrl(office, { contextHost }));
         setOfficeName(getOfficeShareDisplayName(office));
       })
       .catch(() => {
         if (!cancelled) {
-          setWalletUrl(getOfficeWalletUrl({}));
+          setWalletUrl(getOfficeWalletUrl({}, { contextHost }));
           setOfficeName('Γραφείο');
         }
       })
@@ -99,6 +102,11 @@ export default function OfficeWalletShareCard() {
         <h3 className="mt-1 text-[19px] font-semibold tracking-tight text-zinc-900">
           My Wallet λεωφορείων — QR
         </h3>
+        {officeName ? (
+          <p className="mt-1 text-[13px] font-medium text-sky-700/90 tracking-tight">
+            Γραφείο: {officeName}
+          </p>
+        ) : null}
         <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-500 tracking-tight">
           Μόνο εισιτήρια λεωφορείου (<span className="font-medium text-zinc-700">/wallet</span>). Η
           ενοικίαση είναι στο πράσινο Rent Wallet (<span className="font-medium text-zinc-700">/rent/wallet</span>).
@@ -153,7 +161,8 @@ export default function OfficeWalletShareCard() {
             </button>
           </div>
           <p className="text-[12px] text-zinc-500 leading-relaxed">
-            Ο σύνδεσμος είναι μοναδικός για το domain του γραφείου (custom domain ή subdomain).
+            Ο σύνδεσμος είναι μόνο για αυτό το γραφείο — δεν μοιράζεται domain με άλλο
+            γραφείο (π.χ. Achillio Travel ≠ PoreiaGo).
           </p>
         </div>
       </div>

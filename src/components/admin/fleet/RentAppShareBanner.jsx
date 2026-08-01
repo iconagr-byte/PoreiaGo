@@ -19,17 +19,20 @@ export default function RentAppShareBanner() {
   useEffect(() => {
     let cancelled = false;
     // 1) Resolve current office (JWT tenant branding), 2) then emit Rent Wallet link + QR.
+    // Session seal: on PoreiaGo admin host never emit Achillio Travel domain.
+    const contextHost =
+      typeof window !== 'undefined' ? window.location.hostname : '';
     fetchTenantBrandingSettings()
       .then((branding) => {
         if (cancelled) return;
         const office = branding || {};
         setOfficeName(getOfficeShareDisplayName(office));
-        setRentUrl(getOfficeRentWalletUrl(office));
+        setRentUrl(getOfficeRentWalletUrl(office, { contextHost }));
       })
       .catch(() => {
         if (cancelled) return;
         setOfficeName('Γραφείο');
-        setRentUrl(getOfficeRentWalletUrl({}));
+        setRentUrl(getOfficeRentWalletUrl({}, { contextHost }));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

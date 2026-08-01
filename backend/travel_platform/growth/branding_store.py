@@ -59,10 +59,39 @@ def _save_all(data: dict[str, dict[str, Any]]) -> None:
     STORE_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+_ACHILLIO_TRAVEL_SLUGS = frozenset(
+    {"admin-achillio-gr", "achillio-travel", "achilliotravel"}
+)
+_PLATFORM_KEYS = frozenset({"default", "poreiago", "achillio", "platform", "demo"})
+
+
+def _heal_platform_row(key: str, row: dict[str, Any]) -> dict[str, Any]:
+    """Never let shared platform keys advertise Achillio Travel domain/name."""
+    if key not in _PLATFORM_KEYS:
+        return row
+    merged = {**DEFAULT_BRANDING, **row}
+    domain = str(merged.get("custom_domain") or "").strip().lower().removeprefix("www.")
+    if domain == "achilliotravel.com" or domain.endswith(".achilliotravel.com"):
+        merged["custom_domain"] = ""
+        merged["verified_domain"] = True
+    checkout = str(merged.get("checkout_base_url") or "").strip().lower()
+    if "achilliotravel.com" in checkout:
+        merged["checkout_base_url"] = "https://www.poreiago.com"
+    slug = str(merged.get("slug") or "").strip().lower()
+    if slug in _ACHILLIO_TRAVEL_SLUGS:
+        merged["slug"] = "poreiago"
+    name = str(merged.get("display_name") or "").strip()
+    if (not name) or ("achillio" in name.lower()):
+        merged["display_name"] = "PoreiaGo"
+    return merged
+
+
 def get_branding(tenant_key: str = "default") -> BrandingConfig:
     data = _load_all()
-    row = data.get(tenant_key) or data.get("default") or DEFAULT_BRANDING
-    return BrandingConfig(**{**DEFAULT_BRANDING, **row})
+    key = (tenant_key or "default").strip().lower() or "default"
+    row = data.get(key) or data.get("default") or DEFAULT_BRANDING
+    healed = _heal_platform_row(key if key in data else "default", dict(row))
+    return BrandingConfig(**{**DEFAULT_BRANDING, **healed})
 
 
 def update_branding(tenant_key: str, patch: dict[str, Any]) -> BrandingConfig:
