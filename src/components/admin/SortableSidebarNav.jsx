@@ -52,6 +52,8 @@ export default function SortableSidebarNav({
 
   const sections = useMemo(() => {
     const visible = SECTIONS.filter((s) => {
+      // Settings + SaaS platform tabs live in SettingsHub card rail — not the left κατεβατό.
+      if (s.id === 'settings' || s.id === 'platform') return false;
       if (s.superOnly && !superAdmin) return false;
       if (rentOnly && s.id === 'fleet_ops') return false;
       if (!rentEnabled && s.id === 'rent') return false;
@@ -63,7 +65,9 @@ export default function SortableSidebarNav({
         label: rentOnly && section.id === 'main' ? 'Γραφείο' : section.label,
         order: displayLayout[section.id] || [],
         items: navItemsFromIds(displayLayout[section.id] || [], superAdmin).filter(
-          (item) => superAdmin || item.settingsSection !== 'platform',
+          (item) =>
+            item.type !== 'settings_subtab' &&
+            (superAdmin || item.settingsSection !== 'platform'),
         ),
       }))
       .filter((section) => section.items.length > 0 || (!rentOnly && section.id !== 'fleet_ops'));
@@ -149,25 +153,22 @@ export default function SortableSidebarNav({
   };
 
   const buttonClass = (item) => {
-    const isSettingsSubActive =
-      item.type === 'settings_subtab' &&
-      activeTab === 'settings' &&
-      settingsSubTab === item.settingsSubTab;
     const isRentSubActive =
       item.type === 'fleet_rental_subtab' &&
       activeTab === 'fleet_rental' &&
       sanitizeRentDeskTab(fleetRentalTab) === item.fleetRentalTab;
     const isTabActive = item.type === 'tab' && activeTab === item.tab;
     const isEmailActive = item.type === 'email' && activeTab === 'email';
-    const isActive = isSettingsSubActive || isRentSubActive || isTabActive || isEmailActive;
+    const isActive = isRentSubActive || isTabActive || isEmailActive;
 
     const classes = ['admin-nav-btn'];
     if (isActive) {
       classes.push('admin-nav-btn-active');
-      if (item.settingsSection === 'platform') classes.push('admin-nav-btn-platform');
     }
     return classes.join(' ');
   };
+
+  const settingsActive = activeTab === 'settings';
 
   const navAccent = (item) =>
     item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
@@ -336,6 +337,30 @@ export default function SortableSidebarNav({
           <p className="admin-nav-hint">Σύρετε ⋮⋮ σε οποιαδήποτε ενότητα</p>
         )}
         {sections.map((section) => renderSection(section))}
+      </div>
+
+      {/* Single Settings entry — subtabs open as cards in the main pane */}
+      <div className="shrink-0 border-t border-black/[0.06] px-2.5 py-2.5 bg-white/70 backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={() =>
+            openSettings(settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB)
+          }
+          className={`admin-nav-btn w-full ${settingsActive ? 'admin-nav-btn-active' : ''}`}
+          data-accent="violet"
+          title="Ρυθμίσεις"
+          aria-current={settingsActive ? 'page' : undefined}
+        >
+          <span className="admin-nav-icon">
+            <span
+              className="material-symbols-outlined"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              settings
+            </span>
+          </span>
+          <span className="admin-nav-label">Ρυθμίσεις</span>
+        </button>
       </div>
     </nav>
   );
