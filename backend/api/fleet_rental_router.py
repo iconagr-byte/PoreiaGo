@@ -237,6 +237,18 @@ async def list_bookings(
     }
 
 
+@router.post("/bookings/demo-sign-sample")
+async def create_demo_sign_sample(
+    tenant_id: UUID = Depends(get_current_tenant_id),
+    _: dict = Depends(_require_admin),
+):
+    """One-click demo booking so Χαρτούρα can open dual-mode signature immediately."""
+    try:
+        return store.create_demo_sign_sample(_tid(tenant_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/clients")
 async def list_rental_clients(
     tenant_id: UUID = Depends(get_current_tenant_id),

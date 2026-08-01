@@ -2,6 +2,7 @@
  * Rent desk «Χαρτούρα» — booking contracts, signatures, printable agreements.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { createRentalDemoSignSample } from '../../../services/fleetRentalApi.js';
 import RentalBookingAgreement from './RentalBookingAgreement.jsx';
 import RentalCheckout from './RentalCheckout.jsx';
 import {
@@ -44,6 +45,24 @@ export default function RentalPaperworkDesk({
   const [filter, setFilter] = useState('ALL');
   const [selectedId, setSelectedId] = useState(initialBookingId || null);
   const [checkoutId, setCheckoutId] = useState(null);
+  const [demoBusy, setDemoBusy] = useState(false);
+
+  const openDemoSign = async () => {
+    if (demoBusy) return;
+    setDemoBusy(true);
+    try {
+      const booking = await createRentalDemoSignSample();
+      if (!booking?.id) throw new Error('Δεν δημιουργήθηκε δοκιμαστική κράτηση');
+      onBookingUpdated?.(booking);
+      setSelectedId(null);
+      setCheckoutId(booking.id);
+      onToast?.('success', 'Άνοιξε dual-mode υπογραφή');
+    } catch (err) {
+      onToast?.('error', err?.message || 'Αποτυχία δοκιμαστικής υπογραφής');
+    } finally {
+      setDemoBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!initialBookingId) return undefined;
@@ -155,6 +174,17 @@ export default function RentalPaperworkDesk({
           <p className="text-xs text-gray-400 mt-2">
             Εκκρεμούν υπογραφές: {pendingCount} · Πλήρεις φάκελοι: {completeCount}
           </p>
+          <button
+            type="button"
+            disabled={demoBusy}
+            onClick={openDemoSign}
+            className="mt-3 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-700 text-white text-sm font-bold hover:bg-teal-800 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {demoBusy ? 'progress_activity' : 'draw'}
+            </span>
+            {demoBusy ? 'Άνοιγμα…' : 'Δοκιμή ψηφιακής υπογραφής'}
+          </button>
         </div>
         <label className="block text-xs font-bold text-gray-500 min-w-[12rem] flex-1 max-w-sm">
           Αναζήτηση
@@ -203,9 +233,8 @@ export default function RentalPaperworkDesk({
             <p className="text-sm text-gray-500 max-w-lg">
               {(bookings || []).length === 0 ? (
                 <>
-                  Δημιούργησε πρώτα κράτηση από «Νέα κράτηση γραφείου». Μετά πάτα{' '}
-                  <strong className="font-bold text-gray-700">Ψηφιακή υπογραφή</strong> για να
-                  επιλέξεις Sign-on-Glass ή αποστολή link στον πελάτη.
+                  Πάτα <span className="font-bold text-teal-800">Δοκιμή ψηφιακής υπογραφής</span>{' '}
+                  πάνω ή εδώ — ανοίγει αμέσως η επιλογή Sign-on-Glass / αποστολή link.
                 </>
               ) : (
                 <>
@@ -214,16 +243,27 @@ export default function RentalPaperworkDesk({
                 </>
               )}
             </p>
-            {(bookings || []).length === 0 && onOpenWizard ? (
+            <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
-                onClick={onOpenWizard}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-700 text-white text-sm font-bold hover:bg-teal-800"
+                disabled={demoBusy}
+                onClick={openDemoSign}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-700 text-white text-sm font-bold hover:bg-teal-800 disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                Νέα κράτηση γραφείου
+                <span className="material-symbols-outlined text-[18px]">draw</span>
+                {demoBusy ? 'Άνοιγμα…' : 'Δοκιμή ψηφιακής υπογραφής'}
               </button>
-            ) : null}
+              {(bookings || []).length === 0 && onOpenWizard ? (
+                <button
+                  type="button"
+                  onClick={onOpenWizard}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                  Νέα κράτηση γραφείου
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : (
           rows.map(({ booking: b, paper }) => (
