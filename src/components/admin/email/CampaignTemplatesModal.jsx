@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LayoutTemplate, X } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { resolveStitchTemplateAccess } from '../../../lib/email/stitchTemplateAccess.js';
 import { fetchBillingSubscription } from '../../../services/billingApi.js';
 import { fetchAdminOfficeModules } from '../../../services/officeModulesApi.js';
 import CampaignTemplatesGallery from './CampaignTemplatesGallery.jsx';
 
-export default function CampaignTemplatesModal({ open, onClose, onSelect, onOpenContracts }) {
+export default function CampaignTemplatesModal({ open, onClose, onSelect }) {
   const [modules, setModules] = useState(null);
   const [subscription, setSubscription] = useState(null);
 
@@ -57,7 +56,7 @@ export default function CampaignTemplatesModal({ open, onClose, onSelect, onOpen
                 Πρότυπα email · Horizon Ethos
               </h2>
               <p className="emh-templates-modal-sub">
-                Newsletter & Ενοικιάσεις ξεκλειδώνουν με συμβόλαιο
+                Σύρετε την μικρογραφία · packs συμβολαίου μόνο αν είναι ενεργά
               </p>
             </div>
           </div>
@@ -69,11 +68,6 @@ export default function CampaignTemplatesModal({ open, onClose, onSelect, onOpen
         <CampaignTemplatesGallery
           variant="modal"
           access={access}
-          onRequestUnlock={() => {
-            onClose?.();
-            if (onOpenContracts) onOpenContracts();
-            else toast('Ανοίξτε Ρυθμίσεις → Συμβόλαιο για ενεργοποίηση');
-          }}
           onSelect={(tpl) => {
             onSelect(tpl);
             onClose();

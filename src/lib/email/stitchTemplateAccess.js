@@ -3,6 +3,8 @@
  *
  * - rent → Rent standalone plan or Rent add-on (rent_enabled)
  * - newsletter → active bus/agency or Rent contract (paid / trial office)
+ *
+ * Locked packs are hidden entirely from the gallery (not shown greyed-out).
  */
 
 import { canAccessPlatformOperatorUi, isImpersonating } from '../saasJwt.js';
@@ -35,7 +37,7 @@ export function resolveStitchTemplateAccess(opts = {}) {
     opts.hostname ||
     (typeof window !== 'undefined' ? window.location.hostname : '');
 
-  // Platform / superadmin always see locked packs (demo + sales).
+  // Platform / superadmin always see contract packs (demo + sales).
   try {
     if (
       !isImpersonating() &&
@@ -70,33 +72,17 @@ export function isStitchTemplateUnlocked(template, access) {
   return true;
 }
 
+/** Hide categories that require a contract the office does not have. */
 export function filterStitchCategories(categories, access) {
   return (categories || []).filter((cat) => {
-    if (!cat.requiresModule) return true;
-    if (cat.requiresModule === 'rent') return true; // keep visible (locked state in UI)
-    if (cat.requiresModule === 'newsletter') return true;
+    if (!cat?.requiresModule) return true;
+    if (cat.requiresModule === 'rent') return Boolean(access?.rentEnabled);
+    if (cat.requiresModule === 'newsletter') return Boolean(access?.newsletterEnabled);
     return true;
   });
 }
 
-export function stitchModuleLockCopy(requiresModule) {
-  if (requiresModule === 'rent') {
-    return {
-      title: 'Απαιτεί συμβόλαιο Ενοικιάσεων',
-      body: 'Ενεργοποιείται με το PoreiaGo Rent ή το add-on Ενοικιάσεις στο συμβόλαιό σας.',
-      cta: 'Άνοιγμα συμβολαίων',
-    };
-  }
-  if (requiresModule === 'newsletter') {
-    return {
-      title: 'Απαιτεί ενεργό συμβόλαιο',
-      body: 'Τα πρότυπα Newsletter ξεκλειδώνουν όταν αγοράσετε / ενεργοποιήσετε συμβόλαιο γραφείου.',
-      cta: 'Άνοιγμα συμβολαίων',
-    };
-  }
-  return {
-    title: 'Κλειδωμένο',
-    body: 'Διαθέσιμο με ενεργό συμβόλαιο.',
-    cta: 'Άνοιγμα συμβολαίων',
-  };
+/** Hide templates that require a missing contract. */
+export function filterStitchTemplates(templates, access) {
+  return (templates || []).filter((tpl) => isStitchTemplateUnlocked(tpl, access));
 }

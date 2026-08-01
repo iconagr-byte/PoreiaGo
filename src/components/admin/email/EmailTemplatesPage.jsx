@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LayoutTemplate } from 'lucide-react';
-import { STITCH_CAMPAIGN_TEMPLATES } from '../../../lib/email/stitchTemplates.js';
 import { resolveStitchTemplateAccess } from '../../../lib/email/stitchTemplateAccess.js';
 import { fetchBillingSubscription } from '../../../services/billingApi.js';
 import { fetchAdminOfficeModules } from '../../../services/officeModulesApi.js';
@@ -10,7 +9,6 @@ import '../../../styles/emailMarketingHub.css';
 export default function EmailTemplatesPage({
   onUseTemplate,
   rentEnabled: rentEnabledProp,
-  onOpenContracts,
 }) {
   const [modules, setModules] = useState(null);
   const [subscription, setSubscription] = useState(null);
@@ -50,14 +48,13 @@ export default function EmailTemplatesPage({
           <div className="min-w-0">
             <h2 className="emh-page-title m-0">Πρότυπα email</h2>
             <p className="emh-page-sub m-0 mt-1">
-              {STITCH_CAMPAIGN_TEMPLATES.length} πρότυπα · Newsletter & Ενοικιάσεις ξεκλειδώνουν με
-              συμβόλαιο
+              Έτοιμα πρότυπα καμπάνιας · packs συμβολαίου εμφανίζονται μόνο όταν είναι ενεργά
             </p>
           </div>
         </div>
         <p className="emh-templates-page-hint">
           Επιλέξτε πρότυπο και πατήστε <strong>Χρήση</strong> για νέα καμπάνια. Τα packs{' '}
-          <strong>Newsletter</strong> και <strong>Ενοικιάσεις</strong> ενεργοποιούνται όταν αγοραστεί
+          <strong>Newsletter</strong> και <strong>Ενοικιάσεις</strong> εμφανίζονται μόνο όταν έχετε
           το αντίστοιχο συμβόλαιο.
         </p>
       </header>
@@ -66,7 +63,6 @@ export default function EmailTemplatesPage({
         variant="page"
         onSelect={onUseTemplate}
         access={access}
-        onRequestUnlock={() => onOpenContracts?.()}
       />
     </div>
   );

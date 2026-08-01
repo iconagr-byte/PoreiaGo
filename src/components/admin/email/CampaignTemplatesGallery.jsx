@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Eye } from 'lucide-react';
 import {
   STITCH_TEMPLATE_CATEGORIES,
@@ -7,8 +7,8 @@ import {
   getStitchTemplatesByCategory,
 } from '../../../lib/email/stitchTemplates.js';
 import {
-  isStitchTemplateUnlocked,
-  stitchModuleLockCopy,
+  filterStitchCategories,
+  filterStitchTemplates,
 } from '../../../lib/email/stitchTemplateAccess.js';
 
 const PREVIEW_BASE =
@@ -32,54 +32,50 @@ export default function CampaignTemplatesGallery({
   variant = 'modal',
   initialCategory = 'all',
   access = { rentEnabled: false, newsletterEnabled: false },
-  onRequestUnlock,
 }) {
-  const [category, setCategory] = useState(initialCategory);
+  const visibleCategories = useMemo(
+    () => filterStitchCategories(STITCH_TEMPLATE_CATEGORIES, access),
+    [access],
+  );
+
+  const [category, setCategory] = useState(() =>
+    visibleCategories.some((c) => c.id === initialCategory) ? initialCategory : 'all',
+  );
   const [lightboxTpl, setLightboxTpl] = useState(null);
+
+  useEffect(() => {
+    if (!visibleCategories.some((c) => c.id === category)) {
+      setCategory('all');
+    }
+  }, [visibleCategories, category]);
 
   const templates = useMemo(() => {
     const list = getStitchTemplatesByCategory(category);
-    return list.map((tpl) => ({
-      ...tpl,
-      locked: !isStitchTemplateUnlocked(tpl, access),
-    }));
+    return filterStitchTemplates(list, access);
   }, [category, access]);
+
+  const visibleAll = useMemo(
+    () => filterStitchTemplates(STITCH_CAMPAIGN_TEMPLATES, access),
+    [access],
+  );
 
   const previewById = useMemo(() => {
     const map = {};
-    for (const tpl of STITCH_CAMPAIGN_TEMPLATES) {
+    for (const tpl of visibleAll) {
       map[tpl.id] = getStitchTemplatePreviewHtml(tpl, PREVIEW_BASE);
     }
     return map;
-  }, []);
+  }, [visibleAll]);
 
   const counts = useMemo(() => {
-    const map = { all: getStitchTemplatesByCategory('all').length };
-    for (const c of STITCH_TEMPLATE_CATEGORIES) {
-      if (c.id !== 'all') map[c.id] = getStitchTemplatesByCategory(c.id).length;
+    const map = { all: visibleAll.length };
+    for (const c of visibleCategories) {
+      if (c.id !== 'all') {
+        map[c.id] = filterStitchTemplates(getStitchTemplatesByCategory(c.id), access).length;
+      }
     }
     return map;
-  }, []);
-
-  const categoryLocked = useMemo(() => {
-    const cat = STITCH_TEMPLATE_CATEGORIES.find((c) => c.id === category);
-    if (!cat?.requiresModule) return false;
-    if (cat.requiresModule === 'rent') return !access.rentEnabled;
-    if (cat.requiresModule === 'newsletter') return !access.newsletterEnabled;
-    return false;
-  }, [category, access]);
-
-  const lockInfo = stitchModuleLockCopy(
-    STITCH_TEMPLATE_CATEGORIES.find((c) => c.id === category)?.requiresModule,
-  );
-
-  const tryUse = (tpl) => {
-    if (!isStitchTemplateUnlocked(tpl, access)) {
-      onRequestUnlock?.(tpl.requiresModule);
-      return;
-    }
-    onSelect?.(tpl);
-  };
+  }, [visibleCategories, visibleAll, access]);
 
   const isPage = variant === 'page';
   const catClass = isPage ? 'emh-templates-categories--page' : 'emh-templates-categories--modal';
@@ -92,72 +88,27 @@ export default function CampaignTemplatesGallery({
   return (
     <>
       <nav className={`emh-templates-categories ${catClass}`} aria-label="Κατηγορίες προτύπων">
-        {STITCH_TEMPLATE_CATEGORIES.map((cat) => {
-          const locked =
-            (cat.requiresModule === 'rent' && !access.rentEnabled) ||
-            (cat.requiresModule === 'newsletter' && !access.newsletterEnabled);
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              className={`emh-templates-cat ${category === cat.id ? 'emh-templates-cat-active' : ''} ${
-                locked ? 'opacity-80' : ''
-              }`}
-              onClick={() => setCategory(cat.id)}
-              title={locked ? 'Ξεκλειδώνει με συμβόλαιο' : undefined}
-            >
-              <span className="material-symbols-outlined text-[18px]" aria-hidden>
-                {locked ? 'lock' : cat.icon}
-              </span>
-              {cat.label}
-              <span className="emh-templates-cat-count">{counts[cat.id] ?? 0}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {categoryLocked ? (
-        <div className="mx-1 mb-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-amber-950 m-0">{lockInfo.title}</p>
-            <p className="text-[13px] text-amber-900/90 m-0 mt-0.5">{lockInfo.body}</p>
-          </div>
+        {visibleCategories.map((cat) => (
           <button
+            key={cat.id}
             type="button"
-            className="emh-btn-primary shrink-0"
-            onClick={() =>
-              onRequestUnlock?.(
-                STITCH_TEMPLATE_CATEGORIES.find((c) => c.id === category)?.requiresModule,
-              )
-            }
+            className={`emh-templates-cat ${category === cat.id ? 'emh-templates-cat-active' : ''}`}
+            onClick={() => setCategory(cat.id)}
           >
-            {lockInfo.cta}
+            <span className="material-symbols-outlined text-[18px]" aria-hidden>
+              {cat.icon}
+            </span>
+            {cat.label}
+            <span className="emh-templates-cat-count">{counts[cat.id] ?? 0}</span>
           </button>
-        </div>
-      ) : null}
+        ))}
+      </nav>
 
       <div className={bodyClass}>
         <div className={isPage ? 'emh-templates-page-grid-wrap' : 'emh-templates-modal-grid-wrap'}>
           <div className={`emh-templates-grid ${gridClass}`}>
             {templates.map((tpl) => (
-              <article
-                key={tpl.id}
-                className={`emh-templates-card ${cardClass} emh-templates-card--gallery ${
-                  tpl.locked ? 'relative' : ''
-                }`}
-              >
-                {tpl.locked ? (
-                  <div className="absolute inset-0 z-[1] rounded-[inherit] bg-white/55 backdrop-blur-[1px] flex items-center justify-center p-3">
-                    <div className="text-center max-w-[14rem]">
-                      <span className="material-symbols-outlined text-[28px] text-slate-500">
-                        lock
-                      </span>
-                      <p className="text-xs font-bold text-slate-800 mt-1 m-0">
-                        {stitchModuleLockCopy(tpl.requiresModule).title}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
+              <article key={tpl.id} className={`emh-templates-card ${cardClass} emh-templates-card--gallery`}>
                 <button
                   type="button"
                   className="emh-tpl-thumb-btn"
@@ -184,9 +135,9 @@ export default function CampaignTemplatesGallery({
                     <button
                       type="button"
                       className="emh-btn-primary emh-templates-use-btn"
-                      onClick={() => tryUse(tpl)}
+                      onClick={() => onSelect?.(tpl)}
                     >
-                      {tpl.locked ? 'Ξεκλείδωμα' : 'Χρήση'}
+                      Χρήση
                     </button>
                   </div>
                 </div>
@@ -240,13 +191,11 @@ export default function CampaignTemplatesGallery({
                 type="button"
                 className="emh-btn-primary"
                 onClick={() => {
-                  tryUse(lightboxTpl);
+                  onSelect?.(lightboxTpl);
                   setLightboxTpl(null);
                 }}
               >
-                {lightboxTpl.locked || !isStitchTemplateUnlocked(lightboxTpl, access)
-                  ? 'Ξεκλείδωμα συμβολαίου'
-                  : 'Χρήση στον editor'}
+                Χρήση στον editor
               </button>
             </footer>
           </div>
