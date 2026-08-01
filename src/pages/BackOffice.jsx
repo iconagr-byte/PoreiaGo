@@ -64,9 +64,9 @@ import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
 import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
-import FleetRentalPanel from '../components/admin/fleet/FleetRentalPanel.jsx';
 import FleetOpsHubNav from '../components/admin/fleet/FleetOpsHubNav.jsx';
 import FleetOpsHub from '../components/admin/fleet/FleetOpsHub.jsx';
+import RentDeskHub from '../components/admin/fleet/RentDeskHub.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
 import OfficeSetupWizard, {
@@ -2463,7 +2463,7 @@ export default function BackOffice() {
                 ? 'flex-1 overflow-auto p-4 md:p-5 lg:p-6'
                 : activeTab === 'fleet_live_map'
                   ? 'flex-1 overflow-auto p-2 sm:p-3 md:p-4'
-                : activeTab === 'fleet_ops'
+                : activeTab === 'fleet_ops' || activeTab === 'fleet_rental'
                   ? 'flex-1 overflow-auto p-3 sm:p-4 md:pl-4 md:pr-5 md:py-5'
                 : 'flex-1 overflow-auto p-margin-mobile md:p-margin-desktop'
           }
@@ -2474,7 +2474,8 @@ export default function BackOffice() {
               activeTab === 'email_templates' ||
               activeTab === 'dashboard' ||
               activeTab === 'fleet_live_map' ||
-              activeTab === 'fleet_ops'
+              activeTab === 'fleet_ops' ||
+              activeTab === 'fleet_rental'
                 ? 'w-full min-w-0'
                 : 'max-w-container-max mx-auto'
             }
@@ -2521,9 +2522,8 @@ export default function BackOffice() {
               </div>
             )}
             {activeTab === 'fleet_rental' && (
-              <div className="pb-stack-lg">
-                <FleetRentalPanel
-                  hideSideNav
+              <div className="pb-stack-lg w-full">
+                <RentDeskHub
                   activeTab={fleetRentalTab}
                   onTabChange={setFleetRentalTab}
                   initialTab={fleetRentalTab}
