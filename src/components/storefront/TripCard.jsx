@@ -55,6 +55,39 @@ function BookButton({ onClick, className = '' }) {
   );
 }
 
+/** Bus seat class label — never airline «Economy». */
+function busSeatClassLabel(trip) {
+  const raw = String(trip?.vehicleType || trip?.seat_class || '').toLowerCase();
+  if (raw.includes('vip') || raw.includes('luxury')) return 'VIP';
+  if (raw.includes('premium') || raw.includes('comfort') || raw.includes('express')) return 'Comfort';
+  return 'Standard';
+}
+
+function formatBusDateRange(trip) {
+  const start = trip?.departureTime ? new Date(trip.departureTime) : null;
+  const end = trip?.arrivalTime ? new Date(trip.arrivalTime) : null;
+  if (!start || Number.isNaN(start.getTime())) return '';
+  const fmt = (d) =>
+    d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (!end || Number.isNaN(end.getTime()) || end.getTime() === start.getTime()) {
+    return fmt(start);
+  }
+  // Same calendar day day-trip → show date once + times feel odd in this layout; keep range if multi-day.
+  if (start.toDateString() === end.toDateString()) return fmt(start);
+  return `${fmt(start)} - ${fmt(end)}`;
+}
+
+function destinationTitle(trip) {
+  const dest = String(trip?.destination || '').trim();
+  if (dest) return dest.split(',')[0].trim();
+  const title = String(trip?.title || '').trim();
+  // Prefer short destination-like titles for poster cards.
+  if (title.includes('—')) return title.split('—')[0].trim();
+  if (title.includes(' στα ')) return title.split(' στα ').pop().trim();
+  if (title.includes(' στην ')) return title.split(' στην ').pop().trim();
+  return title;
+}
+
 export default function TripCard({
   trip,
   pricingSettings,
@@ -68,6 +101,52 @@ export default function TripCard({
   const go = () => navigate(`/trip/${trip.id}`);
   const img = trip.image || '/images/hero-bus-achillio.png';
   const altLayout = layoutId === 'alternating_rows' && index % 2 === 1;
+  const useDestinationPoster =
+    templateId === 'destination_poster' || layoutId === 'destination_bento';
+
+  if (useDestinationPoster) {
+    const seatClass = busSeatClassLabel(trip);
+    const dateRange = formatBusDateRange(trip);
+    const place = destinationTitle(trip);
+    const amount = Number(priceQuote?.finalPrice ?? trip.price ?? 0);
+    const currency = String(trip.currency || 'EUR').toUpperCase();
+    return (
+      <article
+        className="relative h-full min-h-[220px] rounded-[22px] overflow-hidden group cursor-pointer shadow-[0_8px_28px_rgba(15,23,42,0.12)] ring-1 ring-black/[0.04]"
+        onClick={go}
+        role="link"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            go();
+          }
+        }}
+      >
+        <img
+          src={img}
+          alt={place}
+          className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 flex items-end justify-between gap-3 text-white">
+          <div className="min-w-0">
+            <h3 className="text-[1.15rem] sm:text-[1.35rem] font-semibold tracking-tight leading-tight truncate">
+              {place}
+            </h3>
+            {dateRange ? (
+              <p className="mt-1 text-[12px] sm:text-[13px] text-white/85 font-normal tracking-tight">
+                {dateRange}
+              </p>
+            ) : null}
+          </div>
+          <p className="shrink-0 text-right text-[12px] sm:text-[13px] font-medium text-white/95 tracking-tight">
+            {seatClass} {currency} {amount.toFixed(0)}
+          </p>
+        </div>
+      </article>
+    );
+  }
 
   if (templateId === 'compact_horizontal' || layoutId === 'compact_list') {
     return (

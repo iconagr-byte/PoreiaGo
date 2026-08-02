@@ -120,6 +120,14 @@ export const TRIPS_LAYOUT_TEMPLATES = [
     tags: ['Premium', 'Creative'],
   },
   {
+    id: 'destination_bento',
+    label: 'Destination bento',
+    description:
+      'Gallery προορισμών 3+2 — πλήρης φωτογραφία, ημερομηνίες και τιμή θέσης λεωφορείου (όχι αεροπλάνο).',
+    icon: 'photo_library',
+    tags: ['Premium', 'Gallery', 'Λεωφορείο'],
+  },
+  {
     id: 'grid_four',
     label: 'Πλέγμα 4 στήλες',
     description: 'Πυκνό gallery σε μεγάλες οθόνες — ιδανικό για πλούσιο κατάλογο.',
@@ -212,6 +220,14 @@ export const TRIP_CARD_TEMPLATES = [
     description: 'Όλα πάνω στην εικόνα — cinematic look.',
     icon: 'layers',
     tags: ['Cinematic', 'Premium'],
+  },
+  {
+    id: 'destination_poster',
+    label: 'Destination Poster',
+    description:
+      'Full-bleed προορισμός: τίτλος + ημερομηνίες αριστερά, «Standard / VIP · €» δεξιά — για εκδρομές λεωφορείου.',
+    icon: 'wallpaper',
+    tags: ['Gallery', 'Λεωφορείο', 'Premium'],
   },
   {
     id: 'minimal_clean',
@@ -429,6 +445,9 @@ export function tripsGridClass(layoutId, tripCount = 0) {
       return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 items-stretch';
     case 'bento_showcase':
       return 'grid grid-cols-1 md:grid-cols-6 gap-4 md:gap-5 items-stretch';
+    case 'destination_bento':
+      // 3 tall cards on top, 2 wider on bottom — airline-gallery look for coaches.
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-5 items-stretch';
     case 'grid_four':
       return 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6';
     case 'editorial_stack':
@@ -464,6 +483,11 @@ export function tripCardWrapperClass(layoutId, tripCount = 0, index = 0) {
     if (index === 0) return 'h-full md:col-span-4 md:row-span-2 min-h-[280px]';
     if (index === 1) return 'h-full md:col-span-2';
     return 'h-full md:col-span-2';
+  }
+  if (layoutId === 'destination_bento') {
+    // Top row: indices 0–2 → 2 cols each. Bottom: 3–4 → 3 cols each (wider).
+    if (index <= 2) return 'h-full lg:col-span-2 min-h-[220px] sm:min-h-[260px] lg:min-h-[300px]';
+    return 'h-full sm:col-span-2 lg:col-span-3 min-h-[200px] sm:min-h-[240px] lg:min-h-[260px]';
   }
   // Equal-height cards in CSS grids (items stretch; children fill).
   return 'h-full';

@@ -1450,7 +1450,16 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   category="trips_layout"
                   templates={TRIPS_LAYOUT_TEMPLATES}
                   value={form.trips_layout_template}
-                  onChange={(id) => setForm((p) => ({ ...p, trips_layout_template: id }))}
+                  onChange={(id) =>
+                    setForm((p) => ({
+                      ...p,
+                      trips_layout_template: id,
+                      // Destination bento pairs with poster cards (bus gallery look).
+                      ...(id === 'destination_bento'
+                        ? { trip_card_template: 'destination_poster' }
+                        : {}),
+                    }))
+                  }
                 />
               </PanelCard>
             </form>
