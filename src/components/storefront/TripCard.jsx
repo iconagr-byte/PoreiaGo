@@ -5,7 +5,9 @@ import { isInternationalTrip } from '../../lib/trips/tripMarket.js';
 
 /** Bus seat class for abroad cards — never airline «Economy». */
 function busSeatClassLabel(trip) {
-  const raw = String(trip?.vehicleType || trip?.seatClass || trip?.cabin || '').toLowerCase();
+  const raw = String(
+    trip?.vehicleType || trip?.seatClass || trip?.seat_class || trip?.cabin || '',
+  ).toLowerCase();
   if (raw.includes('vip') || raw.includes('luxury')) return 'VIP';
   if (raw.includes('premium') || raw.includes('comfort') || raw.includes('express')) return 'Comfort';
   return 'Standard';
@@ -72,14 +74,6 @@ function BookButton({ onClick, className = '' }) {
       <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
     </button>
   );
-}
-
-/** Bus seat class label — never airline «Economy». */
-function busSeatClassLabel(trip) {
-  const raw = String(trip?.vehicleType || trip?.seat_class || '').toLowerCase();
-  if (raw.includes('vip') || raw.includes('luxury')) return 'VIP';
-  if (raw.includes('premium') || raw.includes('comfort') || raw.includes('express')) return 'Comfort';
-  return 'Standard';
 }
 
 function formatBusDateRange(trip) {
