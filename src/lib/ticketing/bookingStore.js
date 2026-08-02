@@ -242,6 +242,9 @@ function buildLocalBooking({
   balanceDue,
   depositPercent,
   saasMeta,
+  extras = [],
+  extrasTotal = 0,
+  seatSubtotal = null,
 }) {
   const email = passenger.email.trim().toLowerCase();
   const customer = ensureCustomerForPassenger(passenger);
@@ -257,6 +260,14 @@ function buildLocalBooking({
   const now = new Date();
   const paymentLabel = buildPaymentStatusLabel(paymentPlan, paymentMethod, pct);
   const paymentMethodLabel = buildPaymentMethodLabel(paymentPlan, paymentMethod, pct);
+  const extrasList = Array.isArray(extras) ? extras : [];
+  const extrasSum = roundMoney(extrasTotal || extrasList.reduce((s, x) => s + (Number(x.lineTotalEur) || 0), 0));
+  const seatsTotal = roundMoney(
+    seatSubtotal != null ? seatSubtotal : Math.max(0, total - extrasSum),
+  );
+  const extrasNote = extrasList.length
+    ? `Extras: ${extrasList.map((x) => x.title).join(', ')} (€${extrasSum.toFixed(2)}).`
+    : '';
 
   const dep = trip.departureTime ? new Date(trip.departureTime) : now;
   const ref = saasMeta?.referenceCode || randomPnr();
@@ -281,6 +292,9 @@ function buildLocalBooking({
     seats: seatList,
     seat: seatList.join(', '),
     price: total,
+    seatSubtotal: seatsTotal,
+    extras: extrasList,
+    extrasTotal: extrasSum,
     amountPaid: paidNow,
     balanceDue: remaining,
     paymentPlan,
@@ -296,7 +310,7 @@ function buildLocalBooking({
     paymentStatus: paymentLabel,
     paymentMethod: paymentMethodLabel,
     paymentDate: now.toISOString().replace('T', ' ').slice(0, 19),
-    notes: [saasMeta?.syncedToSaas ? 'Συγχρονισμένο με SaaS API' : '', depositNote]
+    notes: [saasMeta?.syncedToSaas ? 'Συγχρονισμένο με SaaS API' : '', depositNote, extrasNote]
       .filter(Boolean)
       .join(' '),
     boardingPassIssued: true,
@@ -354,6 +368,9 @@ export async function createBookingFromCheckout({
   passenger,
   paymentMethod,
   bankAccountId = null,
+  extras = [],
+  extrasTotal = 0,
+  seatSubtotal = null,
 }) {
   const seatList = seats.split(',').map((s) => s.trim()).filter(Boolean);
   const pct = normalizeDepositPercent(depositPercent);
@@ -366,6 +383,9 @@ export async function createBookingFromCheckout({
   );
   const paymentMethodMeta = buildPaymentMethodLabel(paymentPlan, paymentMethod, pct);
   const tenantId = getSaasTenantId();
+  const extrasList = Array.isArray(extras) ? extras : [];
+  const extrasSum = roundMoney(extrasTotal || 0);
+  const seatsTotal = roundMoney(seatSubtotal != null ? seatSubtotal : total);
 
   if (tenantId) {
     try {
@@ -396,6 +416,9 @@ export async function createBookingFromCheckout({
           amountPaid: paidNow,
           balanceDue: remaining,
           depositPercent: pct,
+          extras: extrasList,
+          extrasTotal: extrasSum,
+          seatSubtotal: seatsTotal,
           saasMeta: {
             saasBookingId: api.id,
             referenceCode: api.reference_code,
@@ -453,6 +476,9 @@ export async function createBookingFromCheckout({
         amountPaid: paidNow,
         balanceDue: remaining,
         depositPercent: pct,
+        extras: extrasList,
+        extrasTotal: extrasSum,
+        seatSubtotal: seatsTotal,
         saasMeta: null,
       }),
       {

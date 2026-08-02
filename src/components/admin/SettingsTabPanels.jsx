@@ -2,6 +2,7 @@ import PlatformSettingsPanel from './PlatformSettingsPanel.jsx';
 import PaymentManagementPanel from './PaymentManagementPanel.jsx';
 import FiscalSettingsPanel from './FiscalSettingsPanel.jsx';
 import SeatPricingPanel from './SeatPricingPanel.jsx';
+import TripExtrasEditor from './TripExtrasEditor.jsx';
 import UsersManagementPanel from './UsersManagementPanel.jsx';
 import BrandingPanel from './BrandingPanel.jsx';
 import HomepageSettingsPanel from './HomepageSettingsPanel.jsx';
@@ -49,6 +50,16 @@ export default function SettingsTabPanels({
             <div className="h-px flex-1 bg-slate-200" />
           </div>
           <SeatPricingPanel />
+        </div>
+        <div id="trip-extras" className="scroll-mt-28 space-y-3">
+          <div className="flex items-center gap-3 px-1">
+            <div className="h-px flex-1 bg-slate-200" />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Υπηρεσίες εκδρομής
+            </p>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+          <TripExtrasEditor />
         </div>
       </div>
     );

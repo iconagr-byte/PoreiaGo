@@ -83,6 +83,15 @@ function TicketPassCard({ booking, tripTitle, brandLabel, coverImage }) {
           </Field>
         </div>
 
+        {Array.isArray(booking.extras) && booking.extras.length > 0 ? (
+          <p className="ticket-print-hint" style={{ marginTop: '0.75rem', textAlign: 'left' }}>
+            Υπηρεσίες:{' '}
+            {booking.extras
+              .map((line) => `${line.title}${line.qty > 1 ? ` ×${line.qty}` : ''}`)
+              .join(' · ')}
+          </p>
+        ) : null}
+
         <div className="ticket-print-perforation" aria-hidden />
 
         <div className="ticket-print-qr-block">

@@ -49,6 +49,7 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_coverage_options": [],
     "rent_included_defaults": [],
     "rent_upsell_coverage_id": "",
+    "trip_extra_options": [],
     "rent_notify_email_enabled": True,
     "rent_notify_sms_enabled": True,
     "rent_notify_email_label": "Θέλω προσφορές στο email",

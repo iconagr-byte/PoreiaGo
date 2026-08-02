@@ -111,6 +111,7 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_coverage_options": [],
     "rent_included_defaults": [],
     "rent_upsell_coverage_id": "",
+    "trip_extra_options": [],
     "rent_notify_email_enabled": True,
     "rent_notify_sms_enabled": True,
     "rent_notify_email_label": "Θέλω προσφορές στο email",
@@ -197,6 +198,7 @@ class SiteAppearanceResponse(BaseModel):
     rent_coverage_options: list[dict] = []
     rent_included_defaults: list[str] = []
     rent_upsell_coverage_id: str = ""
+    trip_extra_options: list[dict] = []
     rent_notify_email_enabled: bool = True
     rent_notify_sms_enabled: bool = True
     rent_notify_email_label: str = "Θέλω προσφορές στο email"
@@ -287,6 +289,7 @@ class SiteAppearanceUpdate(BaseModel):
     rent_coverage_options: list[dict] | None = None
     rent_included_defaults: list[str] | None = None
     rent_upsell_coverage_id: str | None = None
+    trip_extra_options: list[dict] | None = None
     rent_notify_email_enabled: bool | None = None
     rent_notify_sms_enabled: bool | None = None
     rent_notify_email_label: str | None = None

@@ -247,8 +247,31 @@ export default function BookingDetailPanel({
             <div className="bg-gradient-to-br from-gray-50 to-slate-100 rounded-2xl p-6 mb-6">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-gray-500">Εισιτήριο</span>
-                <span className="font-bold">€{Number(base).toFixed(2)}</span>
+                <span className="font-bold">
+                  €{Number(booking.seatSubtotal != null ? booking.seatSubtotal : base).toFixed(2)}
+                </span>
               </div>
+              {Array.isArray(booking.extras) && booking.extras.length > 0 && (
+                <div className="mb-3 space-y-1.5">
+                  <div className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                    Υπηρεσίες
+                  </div>
+                  {booking.extras.map((line) => (
+                    <div
+                      key={line.id || line.formKey || line.title}
+                      className="flex justify-between items-center text-sm"
+                    >
+                      <span className="text-gray-600">
+                        {line.title}
+                        {line.qty > 1 ? ` × ${line.qty}` : ''}
+                      </span>
+                      <span className="font-semibold">
+                        €{Number(line.lineTotalEur || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex justify-between items-center mb-3">
                 <span className="text-gray-500">Φόροι & τέλη (24%)</span>
                 <span className="font-bold">€{Number(taxes).toFixed(2)}</span>

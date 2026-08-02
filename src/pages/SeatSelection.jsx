@@ -261,6 +261,7 @@ export default function SeatSelection() {
                   savePendingCheckout({
                     tripId: trip.id,
                     seats: selectedLabels,
+                    seatSubtotal: total,
                     total,
                     pricePerSeat: selectedSeatRows.length ? total / selectedSeatRows.length : tripBasePrice,
                     seatBreakdown: selectedSeatRows.map((s) => ({
@@ -268,6 +269,9 @@ export default function SeatSelection() {
                       priceEur: s.priceEur,
                       tier: s.tier,
                     })),
+                    extras: [],
+                    extrasTotal: 0,
+                    extrasSelection: {},
                     demo: isDemo,
                   });
                   if (!isDemo) {
@@ -278,11 +282,11 @@ export default function SeatSelection() {
                       amountEur: total,
                     });
                   }
-                  navigate(`/checkout/${trip.id}`);
+                  navigate(`/book/extras/${trip.id}`);
                 }}
                 className={`w-full py-3.5 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all ${getSeatMapCheckoutButtonClass(selectedSeats.length > 0, seatTheme)}`}
               >
-                {isDemo ? 'Συνέχεια (Demo)' : 'Ολοκλήρωση'}
+                {isDemo ? 'Συνέχεια (Demo)' : 'Πρόσθεσε υπηρεσίες'}
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
             </div>

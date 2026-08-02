@@ -10,6 +10,7 @@ import BackOffice from './pages/BackOffice';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import SeatSelection from './pages/SeatSelection';
+import TripExtrasPage from './pages/TripExtrasPage';
 import TripDetails from './pages/TripDetails';
 import SimpleWalletPage from './pages/SimpleWalletPage.jsx';
 import WalletMagicPage from './pages/WalletMagicPage.jsx';
@@ -139,6 +140,7 @@ function App() {
             <Route path="/driver/scan" element={<DriverScan />} />
             <Route path="/select-seat/:tripId" element={<SeatSelection />} />
             <Route path="/select-seat" element={<SeatSelection />} />
+            <Route path="/book/extras/:tripId" element={<TripExtrasPage />} />
             <Route path="/trip/:id" element={<TripDetails />} />
             <Route path="/checkout/:tripId" element={<CheckoutPage />} />
             <Route path="/checkout/resume/:token" element={<CheckoutResumePage />} />
