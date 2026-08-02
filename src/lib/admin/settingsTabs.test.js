@@ -14,7 +14,7 @@ assert.equal(sanitizeSettingsSubTab('growth', false), 'platform');
 assert.equal(sanitizeSettingsSubTab('homepage', false), 'homepage');
 assert.equal(sanitizeSettingsSubTab('domain', false), 'domain');
 assert.equal(sanitizeSettingsSubTab('tenants', true), 'tenants');
-assert.equal(sanitizeSettingsSubTab('integrations', true), 'integrations');
+assert.equal(sanitizeSettingsSubTab('integrations', true), 'saas_infra');
 assert.equal(sanitizeSettingsSubTab('growth', true), 'growth');
 
 const tenantTabs = settingsTabsForRole(false);
@@ -31,7 +31,7 @@ assert.equal(tenantTabs.length, TENANT_SETTINGS_TABS.length);
 
 const platformTabs = settingsTabsForRole(true);
 assert.ok(platformTabs.some((t) => t.id === 'growth'));
-assert.ok(platformTabs.some((t) => t.id === 'integrations'));
+assert.ok(!platformTabs.some((t) => t.id === 'integrations'));
 assert.ok(platformTabs.some((t) => t.id === 'domain'));
 
 console.log('settingsTabs role gating: OK');
