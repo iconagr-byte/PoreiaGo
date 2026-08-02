@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   loadNavLayout,
@@ -14,15 +14,45 @@ import {
   isFleetOpsSubTab,
   sanitizeFleetOpsSubTab,
 } from '../../lib/admin/fleetOpsHub.js';
+import {
+  isSharedNavItem,
+  loadNavServiceMode,
+  NAV_SERVICE_MODES,
+  navItemVisibleInServiceMode,
+  normalizeNavServiceMode,
+  saveNavServiceMode,
+  suggestTabForServiceMode,
+} from '../../lib/admin/navServiceScope.js';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 
-const SECTIONS = [
-  { id: 'main', label: 'Λειτουργίες' },
-  { id: 'rent', label: 'Ενοικιάσεις' },
-  { id: 'fleet_ops', label: 'Λειτουργίες Στόλου' },
-  { id: 'platform', label: 'Πλατφόρμα SaaS', superOnly: true },
-  { id: 'settings', label: 'Ρυθμίσεις' },
-];
+function DualScopeBadge() {
+  return (
+    <span className="admin-nav-dual-badge" title="Λεωφορεία & Ενοικιάσεις" aria-label="Κοινό · λεωφορεία & ενοικιάσεις">
+      <span className="admin-nav-dual-badge-icon" aria-hidden>
+        <span className="material-symbols-outlined">directions_bus</span>
+      </span>
+      <span className="admin-nav-dual-badge-icon admin-nav-dual-badge-icon--car" aria-hidden>
+        <span className="material-symbols-outlined">directions_car</span>
+      </span>
+    </span>
+  );
+}
+
+function ZoneHeader({ tone, icon, title, subtitle }) {
+  return (
+    <div className={`admin-nav-zone-head admin-nav-zone-head--${tone}`}>
+      <span className="admin-nav-zone-icon" aria-hidden>
+        <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+          {icon}
+        </span>
+      </span>
+      <div className="min-w-0">
+        <p className="admin-nav-zone-title">{title}</p>
+        {subtitle ? <p className="admin-nav-zone-sub">{subtitle}</p> : null}
+      </div>
+    </div>
+  );
+}
 
 export default function SortableSidebarNav({
   activeTab,
@@ -40,7 +70,9 @@ export default function SortableSidebarNav({
 }) {
   const superAdmin = isSaasSuperAdmin();
   const rentOnly = officeMode === 'rent_only';
+  const showServiceSwitch = rentEnabled && !rentOnly;
   const [layout, setLayout] = useState(() => loadNavLayout(superAdmin));
+  const [storedServiceMode, setStoredServiceMode] = useState(() => loadNavServiceMode());
   const [dragState, setDragState] = useState({
     section: null,
     fromSection: null,
@@ -48,53 +80,75 @@ export default function SortableSidebarNav({
     draggingId: null,
   });
 
-  useEffect(() => {
+  // Re-read layout when superadmin flag flips (token / role change).
+  const [layoutRole, setLayoutRole] = useState(superAdmin);
+  if (layoutRole !== superAdmin) {
+    setLayoutRole(superAdmin);
     setLayout(loadNavLayout(superAdmin));
-  }, [superAdmin]);
+  }
+
+  const serviceMode = rentOnly
+    ? 'rent'
+    : !rentEnabled
+      ? 'buses'
+      : normalizeNavServiceMode(storedServiceMode);
 
   const displayLayout = useMemo(
     () => navLayoutForOfficeMode(layout, officeMode, superAdmin),
     [layout, officeMode, superAdmin],
   );
 
-  const sections = useMemo(() => {
-    const visible = SECTIONS.filter((s) => {
-      // Settings / platform / fleet ops / rent live in hub card rails — not the left κατεβατό.
-      if (
-        s.id === 'settings' ||
-        s.id === 'platform' ||
-        s.id === 'fleet_ops' ||
-        s.id === 'rent'
-      ) {
-        return false;
-      }
-      if (s.superOnly && !superAdmin) return false;
-      return true;
-    });
-    return visible
-      .map((section) => ({
-        ...section,
-        label: rentOnly && section.id === 'main' ? 'Γραφείο' : section.label,
-        order: displayLayout[section.id] || [],
-        items: navItemsFromIds(displayLayout[section.id] || [], superAdmin).filter(
-          (item) =>
-            item.type !== 'settings_subtab' &&
-            item.type !== 'fleet_rental_subtab' &&
-            !isFleetOpsSubTab(item.id) &&
-            (superAdmin || item.settingsSection !== 'platform'),
-        ),
-      }))
-      .filter((section) => section.items.length > 0);
-  }, [displayLayout, superAdmin, rentOnly]);
+  const mainItems = useMemo(() => {
+    return navItemsFromIds(displayLayout.main || [], superAdmin).filter(
+      (item) =>
+        item.type !== 'settings_subtab' &&
+        item.type !== 'fleet_rental_subtab' &&
+        !isFleetOpsSubTab(item.id) &&
+        (superAdmin || item.settingsSection !== 'platform'),
+    );
+  }, [displayLayout, superAdmin]);
+
+  const sharedItems = useMemo(
+    () =>
+      mainItems.filter(
+        (item) =>
+          isSharedNavItem(item) && navItemVisibleInServiceMode(item, serviceMode),
+      ),
+    [mainItems, serviceMode],
+  );
+
+  const busItems = useMemo(
+    () =>
+      mainItems.filter(
+        (item) =>
+          !isSharedNavItem(item) && navItemVisibleInServiceMode(item, serviceMode),
+      ),
+    [mainItems, serviceMode],
+  );
 
   const persistLayout = useCallback(
     (next) => {
-      // Rent-only menu is fixed by contract — don't overwrite the full-office layout.
       if (rentOnly) return;
       setLayout(next);
       saveNavLayout(superAdmin, next);
     },
     [superAdmin, rentOnly],
+  );
+
+  const applyServiceMode = useCallback(
+    (nextMode) => {
+      const mode = normalizeNavServiceMode(nextMode);
+      setStoredServiceMode(mode);
+      saveNavServiceMode(mode);
+      const landing = suggestTabForServiceMode(activeTab, mode, { rentEnabled });
+      if (landing === 'fleet_rental') {
+        onFleetRentalTabChange?.(sanitizeRentDeskTab(fleetRentalTab || DEFAULT_RENT_DESK_TAB));
+        onTabChange?.('fleet_rental');
+      } else if (landing) {
+        onTabChange?.(landing);
+      }
+    },
+    [activeTab, rentEnabled, fleetRentalTab, onFleetRentalTabChange, onTabChange],
   );
 
   const handleDrop = (sectionId, dropIndex) => {
@@ -186,23 +240,31 @@ export default function SortableSidebarNav({
     const isActive = isRentSubActive || isTabActive || isEmailActive;
 
     const classes = ['admin-nav-btn'];
-    if (isActive) {
-      classes.push('admin-nav-btn-active');
-    }
+    if (isActive) classes.push('admin-nav-btn-active');
+    if (isSharedNavItem(item)) classes.push('admin-nav-btn--shared');
     return classes.join(' ');
   };
 
   const settingsActive = activeTab === 'settings';
   const fleetOpsActive = activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab);
   const rentDeskActive = activeTab === 'fleet_rental';
+  const showBusZone = !rentOnly && serviceMode !== 'rent' && busItems.length > 0;
+  const showSharedZone = sharedItems.length > 0;
+  const showFleetOpsPin = !rentOnly && serviceMode !== 'rent';
+  const showRentPin = rentEnabled && (rentOnly || serviceMode !== 'buses');
 
   const navAccent = (item) =>
     item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
 
   const renderRow = (item, sectionId, { nested = false } = {}) => {
     const dragging = dragState.draggingId === item.id;
+    const shared = isSharedNavItem(item);
     return (
-      <div className={`admin-nav-row ${dragging ? 'admin-nav-row-dragging' : ''} ${nested ? 'admin-nav-row-nested' : ''}`}>
+      <div
+        className={`admin-nav-row ${dragging ? 'admin-nav-row-dragging' : ''} ${
+          nested ? 'admin-nav-row-nested' : ''
+        }`}
+      >
         {!rentOnly ? (
           <span
             className="admin-nav-grip"
@@ -221,8 +283,8 @@ export default function SortableSidebarNav({
           type="button"
           onClick={() => handleClick(item)}
           className={buttonClass(item)}
-          data-accent={navAccent(item)}
-          title={item.label}
+          data-accent={shared ? 'shared' : navAccent(item)}
+          title={shared ? `${item.label} · λεωφορεία & ενοικιάσεις` : item.label}
         >
           <span className="admin-nav-icon">
             <span
@@ -233,123 +295,102 @@ export default function SortableSidebarNav({
             </span>
           </span>
           <span className="admin-nav-label">{item.label}</span>
+          {shared && showServiceSwitch ? <DualScopeBadge /> : null}
         </button>
       </div>
     );
   };
 
-  const renderSection = (section) => {
-    const isSettingsSection = section.id === 'settings';
-    const isRentSection = section.id === 'rent';
-    const isFleetOpsSection = section.id === 'fleet_ops';
-    const isPlatformSection = section.id === 'platform';
-    const isDropTarget = !rentOnly && dragState.draggingId && dragState.section === section.id;
+  const resolveMainDropIndex = useCallback(
+    (zoneItems, visualIndex) => {
+      const order = displayLayout.main || [];
+      if (!zoneItems.length) return Math.max(0, Math.min(visualIndex, order.length));
+      if (visualIndex >= zoneItems.length) {
+        const lastId = zoneItems[zoneItems.length - 1]?.id;
+        const idx = order.indexOf(lastId);
+        return idx < 0 ? order.length : idx + 1;
+      }
+      const id = zoneItems[visualIndex]?.id;
+      const idx = order.indexOf(id);
+      return idx < 0 ? visualIndex : idx;
+    },
+    [displayLayout.main],
+  );
+
+  const renderItemList = (items, sectionId) => {
+    const isDropTarget = !rentOnly && dragState.draggingId && dragState.section === sectionId;
+    const toLayoutIndex = (visualIndex) =>
+      sectionId === 'main' ? resolveMainDropIndex(items, visualIndex) : visualIndex;
 
     return (
-      <div
-        key={section.id}
-        className={`admin-nav-section ${isPlatformSection ? 'admin-nav-section-platform' : ''} ${
-          isSettingsSection ? 'admin-nav-section-settings' : ''
-        } ${isRentSection ? 'admin-nav-section-rent' : ''} ${
-          isFleetOpsSection ? 'admin-nav-section-fleet' : ''
-        } ${isDropTarget ? 'admin-nav-section-drop-target' : ''}`}
+      <ul
+        className="admin-nav-list"
         onDragOver={(e) => {
           if (rentOnly || !dragState.draggingId) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          if (section.items.length === 0) markDropTarget(section.id, 0);
+          if (items.length === 0) markDropTarget(sectionId, toLayoutIndex(0));
         }}
         onDrop={(e) => {
           e.preventDefault();
           if (rentOnly) return;
-          if (section.items.length === 0) handleDrop(section.id, 0);
+          if (items.length === 0) handleDrop(sectionId, toLayoutIndex(0));
         }}
       >
-        <p
-          className={`admin-nav-section-label ${
-            isPlatformSection ? 'admin-nav-section-label-platform' : ''
-          } ${isSettingsSection ? 'admin-nav-section-label-settings' : ''} ${
-            isRentSection ? 'admin-nav-section-label-rent' : ''
-          }`}
-        >
-          {section.label}
-        </p>
-
-        <ul className="admin-nav-list">
-          {section.items.length === 0 && !rentOnly && (
-            <li
-              className={`admin-nav-item admin-nav-empty-drop ${
-                isDropTarget && dragState.overIndex === 0 ? 'admin-nav-drop-end-active' : ''
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                markDropTarget(section.id, 0);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDrop(section.id, 0);
-              }}
-            >
-              <p className="admin-nav-empty-hint">Αφήστε εδώ</p>
-              {isDropTarget && dragState.overIndex === 0 && (
-                <div className="admin-nav-drop-line" aria-hidden />
-              )}
-            </li>
-          )}
-          {section.items.map((item, idx) => (
+        {items.map((item, idx) => {
+          const layoutIdx = toLayoutIndex(idx);
+          return (
             <li key={item.id} className="admin-nav-item">
-              {isDropTarget && dragState.overIndex === idx && (
+              {isDropTarget && dragState.overIndex === layoutIdx ? (
                 <div className="admin-nav-drop-line" aria-hidden />
-              )}
+              ) : null}
               <div
                 onDragOver={(e) => {
                   if (rentOnly) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
-                  markDropTarget(section.id, idx);
+                  markDropTarget(sectionId, layoutIdx);
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  handleDrop(section.id, idx);
+                  handleDrop(sectionId, layoutIdx);
                 }}
               >
-                {renderRow(item, section.id, {
-                  nested: isSettingsSection || isFleetOpsSection || isRentSection,
-                })}
+                {renderRow(item, sectionId)}
               </div>
             </li>
-          ))}
-          {section.items.length > 0 && !rentOnly && (
-            <li
-              className={`admin-nav-item ${
-                isDropTarget && dragState.overIndex === section.items.length
-                  ? 'admin-nav-drop-end-active'
-                  : ''
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                markDropTarget(section.id, section.items.length);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDrop(section.id, section.items.length);
-              }}
-            >
-              {isDropTarget && dragState.overIndex === section.items.length && (
-                <div className="admin-nav-drop-line" aria-hidden />
-              )}
-            </li>
-          )}
-        </ul>
-      </div>
+          );
+        })}
+        {items.length > 0 && !rentOnly ? (
+          <li
+            className={`admin-nav-item ${
+              isDropTarget && dragState.overIndex === toLayoutIndex(items.length)
+                ? 'admin-nav-drop-end-active'
+                : ''
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              markDropTarget(sectionId, toLayoutIndex(items.length));
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleDrop(sectionId, toLayoutIndex(items.length));
+            }}
+          >
+            {isDropTarget && dragState.overIndex === toLayoutIndex(items.length) ? (
+              <div className="admin-nav-drop-line" aria-hidden />
+            ) : null}
+          </li>
+        ) : null}
+      </ul>
     );
   };
 
   return (
     <nav
-      className="admin-sidebar-nav flex-1 flex flex-col min-h-0"
+      className={`admin-sidebar-nav flex-1 flex flex-col min-h-0 admin-sidebar-nav--mode-${serviceMode}`}
+      data-service-mode={serviceMode}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) {
           setDragState((prev) => ({ ...prev, overIndex: null }));
@@ -357,75 +398,151 @@ export default function SortableSidebarNav({
       }}
     >
       <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-2.5 py-2 space-y-3 admin-nav-scroll">
-        {rentOnly ? (
-          <p className="admin-nav-hint">Μενού Rent — χωρίς εκδρομές / λεωφορεία</p>
+        {showServiceSwitch ? (
+          <div className="admin-nav-mode-switch" role="tablist" aria-label="Υπηρεσία μενού">
+            {NAV_SERVICE_MODES.map((mode) => {
+              const active = serviceMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  title={mode.hint}
+                  className={`admin-nav-mode-btn admin-nav-mode-btn--${mode.id}${
+                    active ? ' is-active' : ''
+                  }`}
+                  onClick={() => applyServiceMode(mode.id)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden>
+                    {mode.icon}
+                  </span>
+                  <span className="admin-nav-mode-label">{mode.short}</span>
+                </button>
+              );
+            })}
+          </div>
         ) : (
-          <p className="admin-nav-hint">Σύρετε ⋮⋮ σε οποιαδήποτε ενότητα</p>
+          <p className="admin-nav-hint">
+            {rentOnly ? 'Μενού Rent — χωρίς εκδρομές / λεωφορεία' : 'Σύρετε ⋮⋮ σε οποιαδήποτε ενότητα'}
+          </p>
         )}
-        {sections.map((section) => renderSection(section))}
+
+        {rentOnly ? (
+          <div className="admin-nav-zone admin-nav-zone--shared">
+            <ZoneHeader tone="shared" icon="apartment" title="Γραφείο" subtitle="Κοινά εργαλεία" />
+            {renderItemList(mainItems, 'main')}
+          </div>
+        ) : (
+          <>
+            {showSharedZone ? (
+              <div className="admin-nav-zone admin-nav-zone--shared">
+                <ZoneHeader
+                  tone="shared"
+                  icon="hub"
+                  title="Κοινά"
+                  subtitle="Λεωφορεία & ενοικιάσεις"
+                />
+                {renderItemList(sharedItems, 'main')}
+              </div>
+            ) : null}
+
+            {showBusZone ? (
+              <div className="admin-nav-zone admin-nav-zone--buses">
+                <ZoneHeader
+                  tone="buses"
+                  icon="directions_bus"
+                  title="Λεωφορεία"
+                  subtitle="Εκδρομές, κρατήσεις, οδηγοί"
+                />
+                {renderItemList(busItems, 'main')}
+              </div>
+            ) : null}
+
+            {showServiceSwitch && serviceMode === 'rent' ? (
+              <div className="admin-nav-zone admin-nav-zone--rent-hint">
+                <p className="admin-nav-rent-hint-text">
+                  Τα εργαλεία ενοικίασης ανοίγουν από την κάρτα <strong>Ενοικιάσεις</strong> κάτω —
+                  πελάτες /rent, οχήματα, ημερολόγιο.
+                </p>
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
 
-      {/* Pinned hub entries — subtabs open as cards in the main pane */}
-      <div className="shrink-0 border-t border-black/[0.06] px-2.5 py-2.5 bg-white/70 backdrop-blur-sm space-y-1.5">
-        {rentEnabled ? (
+      {/* Pinned hubs */}
+      <div className="shrink-0 border-t border-black/[0.06] px-2.5 py-2.5 bg-white/80 backdrop-blur-sm space-y-2">
+        {showRentPin ? (
           <button
             type="button"
             onClick={() => openRentDesk(fleetRentalTab || DEFAULT_RENT_DESK_TAB)}
-            className={`admin-nav-btn w-full ${rentDeskActive ? 'admin-nav-btn-active' : ''}`}
-            data-accent="teal"
-            title="Ενοικιάσεις"
+            className={`admin-nav-service-card admin-nav-service-card--rent${
+              rentDeskActive ? ' is-active' : ''
+            }`}
+            title="Υπηρεσία ενοικίασης"
             aria-current={rentDeskActive ? 'page' : undefined}
           >
-            <span className="admin-nav-icon">
-              <span
-                className="material-symbols-outlined"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
+            <span className="admin-nav-service-card-glow" aria-hidden />
+            <span className="admin-nav-service-card-icon" aria-hidden>
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
                 directions_car
               </span>
             </span>
-            <span className="admin-nav-label">Ενοικιάσεις</span>
+            <span className="admin-nav-service-card-copy">
+              <span className="admin-nav-service-card-kicker">Υπηρεσία</span>
+              <span className="admin-nav-service-card-title">Ενοικιάσεις</span>
+              <span className="admin-nav-service-card-sub">Desk · στόλος · /rent app</span>
+            </span>
+            <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
+              chevron_right
+            </span>
           </button>
         ) : null}
-        {!rentOnly ? (
+
+        {showFleetOpsPin ? (
           <button
             type="button"
             onClick={() => openFleetOps(fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB)}
-            className={`admin-nav-btn w-full ${fleetOpsActive ? 'admin-nav-btn-active' : ''}`}
-            data-accent="sky"
-            title="Λειτουργίες Στόλου"
+            className={`admin-nav-service-card admin-nav-service-card--buses${
+              fleetOpsActive ? ' is-active' : ''
+            }`}
+            title="Λειτουργίες στόλου λεωφορείων"
             aria-current={fleetOpsActive ? 'page' : undefined}
           >
-            <span className="admin-nav-icon">
-              <span
-                className="material-symbols-outlined"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
+            <span className="admin-nav-service-card-icon" aria-hidden>
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
                 directions_bus
               </span>
             </span>
-            <span className="admin-nav-label">Λειτουργίες Στόλου</span>
+            <span className="admin-nav-service-card-copy">
+              <span className="admin-nav-service-card-kicker">Λεωφορεία</span>
+              <span className="admin-nav-service-card-title">Λειτουργίες Στόλου</span>
+              <span className="admin-nav-service-card-sub">GPS · KPIs · ημερολόγιο</span>
+            </span>
+            <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
+              chevron_right
+            </span>
           </button>
         ) : null}
+
         <button
           type="button"
-          onClick={() =>
-            openSettings(settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB)
-          }
-          className={`admin-nav-btn w-full ${settingsActive ? 'admin-nav-btn-active' : ''}`}
-          data-accent="violet"
-          title="Ρυθμίσεις"
+          onClick={() => openSettings(settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB)}
+          className={`admin-nav-btn w-full admin-nav-btn--shared ${
+            settingsActive ? 'admin-nav-btn-active' : ''
+          }`}
+          data-accent="shared"
+          title="Ρυθμίσεις · κοινό για λεωφορεία & ενοικιάσεις"
           aria-current={settingsActive ? 'page' : undefined}
         >
           <span className="admin-nav-icon">
-            <span
-              className="material-symbols-outlined"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
               settings
             </span>
           </span>
           <span className="admin-nav-label">Ρυθμίσεις</span>
+          {showServiceSwitch ? <DualScopeBadge /> : null}
         </button>
       </div>
     </nav>
