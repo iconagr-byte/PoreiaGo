@@ -44,6 +44,348 @@
   color: color-mix(in srgb, var(--color-primary) 55%, var(--color-on-surface-variant));
 }
 
+/* —— Service mode switch (Όλα / Λεωφορεία / Ενοικιάσεις) —— */
+.admin-nav-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid color-mix(in srgb, #94a3b8 22%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.admin-nav-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 2.65rem;
+  padding: 0.3rem 0.15rem;
+  border: 1px solid transparent;
+  border-radius: 0.7rem;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.admin-nav-mode-btn .material-symbols-outlined {
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.admin-nav-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.85);
+  color: #334155;
+}
+
+.admin-nav-mode-btn.is-active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.admin-nav-mode-btn--all.is-active {
+  color: #4338ca;
+  border-color: color-mix(in srgb, #6366f1 28%, transparent);
+}
+
+.admin-nav-mode-btn--buses.is-active {
+  color: #0369a1;
+  border-color: color-mix(in srgb, #0ea5e9 30%, transparent);
+}
+
+.admin-nav-mode-btn--rent.is-active {
+  color: #0f766e;
+  border-color: color-mix(in srgb, #14b8a6 35%, transparent);
+  background: linear-gradient(180deg, #f0fdfa 0%, #fff 100%);
+}
+
+.admin-nav-mode-label {
+  line-height: 1.1;
+}
+
+/* —— Zones —— */
+.admin-nav-zone {
+  border-radius: 0.95rem;
+  padding: 0.45rem 0.3rem 0.35rem;
+}
+
+.admin-nav-zone--shared {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(255, 255, 255, 0.4) 100%);
+  border: 1px solid color-mix(in srgb, #94a3b8 16%, transparent);
+}
+
+.admin-nav-zone--buses {
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.9) 0%, rgba(255, 255, 255, 0.35) 100%);
+  border: 1px solid color-mix(in srgb, #0ea5e9 16%, transparent);
+}
+
+.admin-nav-zone--rent-hint {
+  background: linear-gradient(135deg, rgba(240, 253, 250, 0.95), rgba(255, 255, 255, 0.7));
+  border: 1px dashed color-mix(in srgb, #14b8a6 35%, transparent);
+  padding: 0.75rem 0.85rem;
+}
+
+.admin-nav-rent-hint-text {
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.admin-nav-zone-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.15rem 0.4rem 0.45rem;
+}
+
+.admin-nav-zone-icon {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-nav-zone-icon .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.admin-nav-zone-head--shared .admin-nav-zone-icon {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.admin-nav-zone-head--buses .admin-nav-zone-icon {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.admin-nav-zone-title {
+  margin: 0;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.admin-nav-zone-head--buses .admin-nav-zone-title {
+  color: #0369a1;
+}
+
+.admin-nav-zone-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #94a3b8;
+  line-height: 1.2;
+}
+
+/* Dual bus+car badge on shared items */
+.admin-nav-dual-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  margin-left: 0.15rem;
+}
+
+.admin-nav-dual-badge-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0f2fe;
+  color: #0284c7;
+  border: 1px solid color-mix(in srgb, #0ea5e9 25%, transparent);
+}
+
+.admin-nav-dual-badge-icon--car {
+  background: #ccfbf1;
+  color: #0f766e;
+  border-color: color-mix(in srgb, #14b8a6 30%, transparent);
+  margin-left: -0.2rem;
+}
+
+.admin-nav-dual-badge-icon .material-symbols-outlined {
+  font-size: 0.7rem;
+  line-height: 1;
+  font-variation-settings: 'FILL' 1;
+}
+
+.admin-nav-btn--shared {
+  padding-right: 0.4rem;
+}
+
+.admin-nav-btn[data-accent='shared']:hover,
+.admin-nav-btn-active[data-accent='shared'] {
+  background: #f8fafc;
+  color: #334155;
+  border-color: color-mix(in srgb, #94a3b8 28%, transparent);
+}
+
+.admin-nav-btn[data-accent='shared'] .admin-nav-icon {
+  color: #64748b;
+}
+
+/* Pinned service cards (Rent / Fleet ops) */
+.admin-nav-service-card {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: left;
+  padding: 0.55rem 0.5rem 0.55rem 0.55rem;
+  border-radius: 0.95rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease;
+}
+
+.admin-nav-service-card:active {
+  transform: scale(0.985);
+}
+
+.admin-nav-service-card-glow {
+  position: absolute;
+  inset: auto -20% -40% auto;
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(18px);
+  opacity: 0.55;
+}
+
+.admin-nav-service-card--rent {
+  background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 55%, #ecfeff 100%);
+  border-color: color-mix(in srgb, #14b8a6 28%, transparent);
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.08);
+}
+
+.admin-nav-service-card--rent .admin-nav-service-card-glow {
+  background: #2dd4bf;
+}
+
+.admin-nav-service-card--rent.is-active,
+.admin-nav-service-card--rent:hover {
+  border-color: color-mix(in srgb, #0f766e 45%, transparent);
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.14);
+}
+
+.admin-nav-service-card--buses {
+  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 60%);
+  border-color: color-mix(in srgb, #0ea5e9 22%, transparent);
+}
+
+.admin-nav-service-card--buses.is-active,
+.admin-nav-service-card--buses:hover {
+  border-color: color-mix(in srgb, #0369a1 40%, transparent);
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.12);
+}
+
+.admin-nav-service-card-icon {
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-nav-service-card-icon .material-symbols-outlined {
+  font-size: 1.25rem;
+}
+
+.admin-nav-service-card--rent .admin-nav-service-card-icon {
+  background: linear-gradient(160deg, #14b8a6, #0f766e);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(15, 118, 110, 0.28);
+}
+
+.admin-nav-service-card--buses .admin-nav-service-card-icon {
+  background: linear-gradient(160deg, #38bdf8, #0284c7);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.22);
+}
+
+.admin-nav-service-card-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.admin-nav-service-card-kicker {
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.admin-nav-service-card--rent .admin-nav-service-card-kicker {
+  color: #0f766e;
+}
+
+.admin-nav-service-card--buses .admin-nav-service-card-kicker {
+  color: #0369a1;
+}
+
+.admin-nav-service-card-title {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.admin-nav-service-card-sub {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+.admin-nav-service-card-chevron {
+  font-size: 1.125rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.admin-nav-service-card--rent .admin-nav-service-card-chevron {
+  color: #2dd4bf;
+}
+
+.admin-nav-service-card--buses .admin-nav-service-card-chevron {
+  color: #7dd3fc;
+}
+
 .admin-nav-scroll {
   scrollbar-gutter: stable;
 }
