@@ -95,8 +95,11 @@ export function saveDriverSession(session) {
   try {
     localStorage.setItem('userRole', 'driver');
     localStorage.setItem('driverApiKey', 'dev-driver-key');
-    if (session.tripId != null) {
+    if (session.tripId != null && Number(session.tripId) > 0) {
       sessionStorage.setItem('driverActiveTripId', String(session.tripId));
+      localStorage.removeItem('driverActiveTripId');
+    } else {
+      sessionStorage.removeItem('driverActiveTripId');
       localStorage.removeItem('driverActiveTripId');
     }
   } catch {
@@ -146,12 +149,13 @@ export function driverSessionHeaders() {
 
 export function getActiveTripId() {
   const s = getDriverSession();
-  if (s?.tripId != null) return s.tripId;
+  if (s?.tripId != null && Number(s.tripId) > 0) return Number(s.tripId);
   try {
     const fromSession = Number(sessionStorage.getItem('driverActiveTripId'));
-    if (fromSession) return fromSession;
+    if (fromSession > 0) return fromSession;
   } catch {
     /* ignore */
   }
-  return 1;
+  // Never invent demo trip #1 — office must assign / open an excursion.
+  return null;
 }

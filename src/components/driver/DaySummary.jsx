@@ -29,6 +29,18 @@ export default function DaySummary() {
     };
   }, []);
 
+  if (!session?.tripId && !manifest) {
+    return (
+      <div className="driver-card text-center py-8">
+        <p className="driver-card-label">Τέλος βάρδιας</p>
+        <h2 className="text-xl font-extrabold tracking-tight mt-1">Χωρίς εκδρομή</h2>
+        <p className="mt-2 text-sm font-semibold text-[var(--driver-muted)]">
+          Δεν υπάρχει ανοιχτή εκδρομή για σύνοψη σήμερα.
+        </p>
+      </div>
+    );
+  }
+
   if (!stats) {
     return <p className="py-12 text-center text-[var(--driver-muted)]">Φόρτωση σύνοψης…</p>;
   }
