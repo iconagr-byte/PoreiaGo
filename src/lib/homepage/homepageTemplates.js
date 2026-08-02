@@ -215,6 +215,14 @@ export const TRIP_CARD_TEMPLATES = [
     tags: ['Συμπαγές'],
   },
   {
+    id: 'abroad_horizontal',
+    label: 'Abroad Horizontal',
+    description:
+      'Οριζόντια κάρτα εκδρομής εξωτερικού — προορισμός, ημερομηνίες και τιμή θέσης λεωφορείου (όχι αεροπλάνο).',
+    icon: 'public',
+    tags: ['Εξωτερικό', 'Horizontal', 'Λεωφορείο'],
+  },
+  {
     id: 'image_overlay',
     label: 'Image Overlay',
     description: 'Όλα πάνω στην εικόνα — cinematic look.',
@@ -396,6 +404,9 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   footer_template: 'classic_columns',
   rent_fleet_layout_template: 'rent_grid_three',
   rent_fleet_card_template: 'rent_premium',
+  /** International section — independent of Greece layout/card. */
+  intl_trips_layout_template: 'horizontal_scroll',
+  intl_trip_card_template: 'abroad_horizontal',
   trips_section_eyebrow: 'Ανακαλύψτε',
   trips_section_title: 'Εκδρομές στην Ελλάδα',
   trips_section_subtitle:
@@ -403,7 +414,7 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   intl_section_eyebrow: 'Διεθνή δρομολόγια',
   intl_section_title: 'Ταξίδια προς το Εξωτερικό',
   intl_section_subtitle:
-    'Αναχωρήσεις από Ελλάδα με Premium & Luxury coach — κράτηση θέσης online σε λίγα δευτερόλεπτα.',
+    'Οριζόντια προβολή διεθνών εκδρομών με λεωφορείο — σύρετε για να δείτε όλες.',
 };
 
 export function getTemplateById(list, id) {
@@ -466,12 +477,17 @@ export function tripsGridClass(layoutId, tripCount = 0) {
   }
 }
 
-export function tripCardWrapperClass(layoutId, tripCount = 0, index = 0) {
+export function tripCardWrapperClass(layoutId, tripCount = 0, index = 0, cardTemplateId = '') {
   if (layoutId === 'horizontal_scroll') {
+    const abroad = cardTemplateId === 'abroad_horizontal';
     if (tripCount === 1) {
-      return 'w-full max-w-[320px] sm:max-w-[360px] h-full';
+      return abroad
+        ? 'w-full max-w-[420px] sm:max-w-[460px] h-full'
+        : 'w-full max-w-[320px] sm:max-w-[360px] h-full';
     }
-    return 'snap-start shrink-0 w-[min(88vw,300px)] h-full';
+    return abroad
+      ? 'snap-start shrink-0 w-[min(92vw,420px)] h-full'
+      : 'snap-start shrink-0 w-[min(88vw,300px)] h-full';
   }
   if (layoutId === 'masonry_two') {
     return 'break-inside-avoid mb-6';

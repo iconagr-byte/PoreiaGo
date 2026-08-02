@@ -74,6 +74,11 @@ export function getPlatformDemoInternationalTrips(limit = 3) {
     .map(normalizeTrip);
 }
 
+/** Alias — horizontal abroad strip uses the same international demo set. */
+export function getPlatformDemoIntlTrips(limit = 3) {
+  return getPlatformDemoInternationalTrips(limit);
+}
+
 export function getPlatformDemoBuses(limit = 3) {
   return DEMO_BUS_FLEET.slice(0, Math.max(1, limit));
 }

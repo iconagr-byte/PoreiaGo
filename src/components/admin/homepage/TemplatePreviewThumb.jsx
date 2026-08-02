@@ -227,6 +227,21 @@ function CardThumb({ id }) {
       </ThumbFrame>
     );
   }
+  if (id === 'abroad_horizontal') {
+    return (
+      <ThumbFrame className="bg-slate-50 p-1.5">
+        <div className="flex gap-1.5 h-full rounded-md overflow-hidden bg-white border border-sky-100">
+          <div className="w-[38%] bg-gradient-to-br from-sky-300 to-slate-400" />
+          <div className="flex-1 flex flex-col justify-center gap-1 pr-1">
+            <div className="h-1 w-1/3 bg-sky-500 rounded" />
+            <div className="h-1.5 w-full bg-slate-800 rounded" />
+            <div className="h-1 w-2/3 bg-slate-300 rounded" />
+            <div className="h-1 w-1/2 bg-sky-400 rounded mt-0.5" />
+          </div>
+        </div>
+      </ThumbFrame>
+    );
+  }
   if (id === 'image_overlay') {
     return (
       <ThumbFrame>

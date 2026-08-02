@@ -211,7 +211,6 @@ async def scan_and_send_recovery(
             base_url = _heal_checkout_base(get_branding().checkout_base_url)
         except Exception:
             cfg = get_platform_config()
-<<<<<<< HEAD
             from travel_platform.settings.checkout_base import (
                 PRODUCTION_PLATFORM_CHECKOUT,
                 heal_checkout_base_url,
@@ -221,9 +220,6 @@ async def scan_and_send_recovery(
                 getattr(cfg, "checkout_base_url", None),
                 fallback=PRODUCTION_PLATFORM_CHECKOUT,
             )
-    candidates = find_recovery_candidates(pending_minutes=pending_minutes, base_url=base_url)
-=======
-            base_url = _heal_checkout_base(getattr(cfg, "checkout_base_url", None))
     else:
         base_url = _heal_checkout_base(base_url)
     candidates = find_recovery_candidates(
@@ -231,7 +227,6 @@ async def scan_and_send_recovery(
         base_url=base_url,
         tenant_id=tenant_id,
     )
->>>>>>> origin/cursor/achillio-isolation-audit-5ffb
     sent = 0
     errors: list[str] = []
     label = (company_label or "PoreiaGo").strip() or "PoreiaGo"

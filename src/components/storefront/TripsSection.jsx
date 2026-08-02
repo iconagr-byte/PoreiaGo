@@ -55,7 +55,10 @@ export default function TripsSection({
       ) : (
         <div className={gridClass}>
           {trips.map((trip, index) => (
-            <div key={trip.id} className={tripCardWrapperClass(layoutId, tripCount, index)}>
+            <div
+              key={trip.id}
+              className={tripCardWrapperClass(layoutId, tripCount, index, cardId)}
+            >
               <TripCard
                 trip={trip}
                 pricingSettings={pricingSettings}

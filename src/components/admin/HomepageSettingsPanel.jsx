@@ -622,6 +622,13 @@ function OverviewSummary({ form }) {
     { label: 'Hero', value: getTemplateById(HERO_TEMPLATES, form.hero_template).label },
     { label: 'Διάταξη λίστας', value: getTemplateById(TRIPS_LAYOUT_TEMPLATES, form.trips_layout_template).label },
     { label: 'Κάρτα εκδρομής', value: getTemplateById(TRIP_CARD_TEMPLATES, form.trip_card_template).label },
+    {
+      label: 'Κάρτα εξωτερικού',
+      value: getTemplateById(
+        TRIP_CARD_TEMPLATES,
+        form.intl_trip_card_template || 'abroad_horizontal',
+      ).label,
+    },
     { label: 'Footer', value: getTemplateById(FOOTER_TEMPLATES, form.footer_template).label },
   ];
 
@@ -806,6 +813,8 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       footer_template: form.footer_template,
       rent_fleet_layout_template: form.rent_fleet_layout_template,
       rent_fleet_card_template: form.rent_fleet_card_template,
+      intl_trips_layout_template: form.intl_trips_layout_template || 'horizontal_scroll',
+      intl_trip_card_template: form.intl_trip_card_template || 'abroad_horizontal',
     },
     'Τα πρότυπα αποθηκεύτηκαν',
   );
@@ -826,6 +835,8 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       intl_section_eyebrow: form.intl_section_eyebrow,
       intl_section_title: form.intl_section_title,
       intl_section_subtitle: form.intl_section_subtitle,
+      intl_trips_layout_template: form.intl_trips_layout_template || 'horizontal_scroll',
+      intl_trip_card_template: form.intl_trip_card_template || 'abroad_horizontal',
     },
     'Τα κείμενα ενότητας αποθηκεύτηκαν',
   );
@@ -1477,6 +1488,50 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   onChange={(id) => setForm((p) => ({ ...p, trip_card_template: id }))}
                   columns={4}
                 />
+              </PanelCard>
+            </form>
+
+            <form onSubmit={saveLayout} className="mt-6">
+              <PanelCard
+                title="Εξωτερικό — οριζόντια κάρτα"
+                description="Ξεχωριστή διάταξη και κάρτα μόνο για διεθνείς εκδρομές. Δεν αλλάζει τις εκδρομές Ελλάδας."
+                action={<SaveButton saving={saving} label="Αποθήκευση εξωτερικού" />}
+              >
+                <div className="space-y-6">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-sky-600 mb-3">
+                      Διάταξη εξωτερικού
+                    </p>
+                    <TemplatePicker
+                      category="trips_layout"
+                      templates={TRIPS_LAYOUT_TEMPLATES}
+                      value={form.intl_trips_layout_template || 'horizontal_scroll'}
+                      onChange={(id) =>
+                        setForm((p) => ({ ...p, intl_trips_layout_template: id }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-sky-600 mb-3">
+                      Κάρτα εξωτερικού
+                    </p>
+                    <TemplatePicker
+                      category="trip_card"
+                      templates={TRIP_CARD_TEMPLATES}
+                      value={form.intl_trip_card_template || 'abroad_horizontal'}
+                      onChange={(id) =>
+                        setForm((p) => ({
+                          ...p,
+                          intl_trip_card_template: id,
+                          ...(id === 'abroad_horizontal'
+                            ? { intl_trips_layout_template: 'horizontal_scroll' }
+                            : {}),
+                        }))
+                      }
+                      columns={4}
+                    />
+                  </div>
+                </div>
               </PanelCard>
             </form>
 

@@ -159,13 +159,8 @@ export async function fetchPlatformSettings(options = {}) {
     /* offline */
   }
   try {
-<<<<<<< HEAD
-    const cached = localStorage.getItem(PLATFORM_SETTINGS_KEY);
-    if (cached) return healLocalCheckout(JSON.parse(cached));
-=======
     const cached = localStorage.getItem(platformSettingsKey());
-    if (cached) return JSON.parse(cached);
->>>>>>> origin/cursor/achillio-isolation-audit-5ffb
+    if (cached) return healLocalCheckout(JSON.parse(cached));
   } catch {
     /* ignore */
   }

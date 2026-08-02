@@ -1,6 +1,25 @@
 import { useNavigate } from 'react-router-dom';
 import TripPriceDisplay from '../TripPriceDisplay.jsx';
 import { computeDynamicPrice } from '../../lib/revenue/dynamicPricing.js';
+import { isInternationalTrip } from '../../lib/trips/tripMarket.js';
+
+/** Bus seat class for abroad cards — never airline «Economy». */
+function busSeatClassLabel(trip) {
+  const raw = String(trip?.vehicleType || trip?.seatClass || trip?.cabin || '').toLowerCase();
+  if (raw.includes('vip') || raw.includes('luxury')) return 'VIP';
+  if (raw.includes('premium') || raw.includes('comfort') || raw.includes('express')) return 'Comfort';
+  return 'Standard';
+}
+
+function formatTripDateRange(trip) {
+  const opts = { day: '2-digit', month: 'short', year: 'numeric' };
+  const dep = trip?.departureTime ? new Date(trip.departureTime) : null;
+  const arr = trip?.arrivalTime ? new Date(trip.arrivalTime) : null;
+  if (!dep || Number.isNaN(dep.getTime())) return '';
+  const left = dep.toLocaleDateString('en-GB', opts);
+  if (!arr || Number.isNaN(arr.getTime())) return left;
+  return `${left} - ${arr.toLocaleDateString('en-GB', opts)}`;
+}
 
 function TripMeta({ trip, compact = false }) {
   const dateStr = new Date(trip.departureTime).toLocaleDateString('el-GR', {
@@ -161,6 +180,73 @@ export default function TripCard({
           <div className="mt-2 flex items-center justify-between gap-2">
             <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="sm" />
             <BookButton onClick={go} className="text-sm text-primary px-3 py-1.5 rounded-full bg-primary/10" />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  if (templateId === 'abroad_horizontal') {
+    const destination = trip.destination || trip.title || 'Εξωτερικό';
+    const dateRange = formatTripDateRange(trip);
+    const seat = busSeatClassLabel(trip);
+    const amount = Number(priceQuote?.finalPrice ?? trip.price ?? 0);
+    const currency = String(trip.currency || 'EUR').toUpperCase();
+    const abroad = isInternationalTrip(trip);
+
+    return (
+      <article
+        className="group h-full flex flex-col sm:flex-row rounded-[22px] bg-white border border-black/[0.06] shadow-[0_8px_28px_rgba(15,23,42,0.06)] hover:shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-all duration-300 overflow-hidden cursor-pointer"
+        onClick={go}
+      >
+        <div className="relative sm:w-[42%] h-44 sm:h-auto sm:min-h-[180px] shrink-0 overflow-hidden">
+          <img
+            src={img}
+            alt={destination}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent sm:bg-gradient-to-r sm:from-transparent sm:via-transparent sm:to-black/10" />
+          {abroad ? (
+            <span className="absolute top-3 left-3 z-10 text-[10px] font-black uppercase tracking-wider bg-sky-600 text-white px-2.5 py-1 rounded-full shadow-sm">
+              Εξωτερικό
+            </span>
+          ) : null}
+        </div>
+        <div className="flex-1 p-5 sm:p-6 flex flex-col justify-between gap-4 min-w-0">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-sky-600 mb-1.5">
+              Coach · διεθνές
+            </p>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-tight truncate">
+              {destination}
+            </h3>
+            {trip.title && trip.title !== destination ? (
+              <p className="mt-1 text-sm font-semibold text-slate-500 truncate">{trip.title}</p>
+            ) : null}
+            {dateRange ? (
+              <p className="mt-3 text-sm font-medium text-slate-500 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px] text-sky-600">calendar_month</span>
+                {dateRange}
+              </p>
+            ) : (
+              <div className="mt-3">
+                <TripMeta trip={trip} compact />
+              </div>
+            )}
+          </div>
+          <div className="flex items-end justify-between gap-3 pt-1 border-t border-black/[0.05]">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                {seat} {currency}
+              </p>
+              <p className="text-2xl font-extrabold text-slate-900 tabular-nums">
+                {Number.isFinite(amount) ? amount.toFixed(0) : '—'}
+              </p>
+            </div>
+            <BookButton
+              onClick={go}
+              className="text-sm px-5 py-2.5 rounded-full bg-sky-600 text-white hover:bg-sky-500 shrink-0"
+            />
           </div>
         </div>
       </article>
