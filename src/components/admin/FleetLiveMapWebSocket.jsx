@@ -211,7 +211,12 @@ export default function FleetLiveMapWebSocket() {
                           />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-bold tracking-tight">
-                              {v.is_rental ? `Ενοικίαση · ${v.rental_client_name || v.driver_name}` : v.driver_name}
+                              {v.is_rental
+                                ? v.trip_title ||
+                                  (v.bus_plate
+                                    ? `Ενοικίαση · ${v.bus_plate}`
+                                    : 'Ενοικίαση · όχημα')
+                                : v.driver_name}
                             </div>
                             <div className="truncate text-xs text-[var(--fleet-secondary)]">
                               {(() => {
