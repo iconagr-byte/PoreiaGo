@@ -56,13 +56,20 @@ export const DEMO_BUS_FLEET = [
 
 /** Domestic-first trip cards for marketing preview. */
 export function getPlatformDemoTrips(limit = 3) {
+  return getPlatformDemoDomesticTrips(limit);
+}
+
+export function getPlatformDemoDomesticTrips(limit = 3) {
   return mockTrips
-    .filter((t) => t && t.id && t.title)
-    .sort((a, b) => {
-      const am = a.market === 'domestic' ? 0 : 1;
-      const bm = b.market === 'domestic' ? 0 : 1;
-      return am - bm;
-    })
+    .filter((t) => t && t.id && t.title && t.market !== 'international' && t.category !== 'international')
+    .slice(0, Math.max(1, limit))
+    .map(normalizeTrip);
+}
+
+/** International excursion cards for the horizontal «Εξωτερικό» tab. */
+export function getPlatformDemoInternationalTrips(limit = 3) {
+  return mockTrips
+    .filter((t) => t && t.id && t.title && (t.market === 'international' || t.category === 'international'))
     .slice(0, Math.max(1, limit))
     .map(normalizeTrip);
 }

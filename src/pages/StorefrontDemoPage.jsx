@@ -452,12 +452,19 @@ export default function StorefrontDemoPage() {
 
             <TripsSection
               id="international-trips"
-              eyebrow={siteAppearance.intl_section_eyebrow}
-              title={siteAppearance.intl_section_title}
-              subtitle={siteAppearance.intl_section_subtitle}
+              eyebrow={siteAppearance.intl_section_eyebrow || 'Εξωτερικό'}
+              title={siteAppearance.intl_section_title || 'Εκδρομές εξωτερικού'}
+              subtitle={
+                siteAppearance.intl_section_subtitle ||
+                'Οριζόντια προβολή — σύρετε για να δείτε όλες τις διεθνείς εκδρομές.'
+              }
               trips={filteredInternational}
               emptyMessage="Δεν βρέθηκαν διεθνή δρομολόγια με τα κριτήριά σας."
-              siteAppearance={siteAppearance}
+              siteAppearance={{
+                ...siteAppearance,
+                // International strip scrolls horizontally; Greece keeps office layout.
+                trips_layout_template: 'horizontal_scroll',
+              }}
               pricingSettings={pricingSettings}
               hidden={!showInternational}
             />
