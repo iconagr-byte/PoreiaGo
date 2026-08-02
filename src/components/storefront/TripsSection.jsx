@@ -22,14 +22,15 @@ export default function TripsSection({
   const tripCount = trips.length;
   const solo = tripCount === 1;
   const dense = compact || solo;
-  const gridClass = tripsGridClass(layoutId, tripCount);
+  const gridClass = tripsGridClass(layoutId, tripCount, cardId);
+  const abroadStrip = cardId === 'abroad_horizontal';
 
   return (
     <section
       id={id}
       className={`${dense ? 'py-10 md:py-12' : 'py-24'} px-margin-desktop max-w-container-max mx-auto bg-surface ${sectionClassName}`.trim()}
     >
-      <div className={`text-center ${dense ? 'mb-6' : 'mb-16'}`}>
+      <div className={`text-center ${dense ? (abroadStrip ? 'mb-8' : 'mb-6') : 'mb-16'}`}>
         {eyebrow && (
           <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
             {eyebrow}
@@ -37,7 +38,11 @@ export default function TripsSection({
         )}
         <h2
           className={`font-bold text-on-surface tracking-tight ${
-            dense ? 'text-2xl md:text-3xl' : 'font-headline-lg text-4xl md:text-5xl'
+            abroadStrip
+              ? 'text-3xl md:text-4xl'
+              : dense
+                ? 'text-2xl md:text-3xl'
+                : 'font-headline-lg text-4xl md:text-5xl'
           }`}
         >
           {title}
@@ -45,7 +50,11 @@ export default function TripsSection({
         {subtitle && (
           <p
             className={`text-on-surface-variant font-body-md mt-3 mx-auto ${
-              dense ? 'max-w-md text-sm sm:text-base' : 'max-w-xl'
+              abroadStrip
+                ? 'max-w-2xl text-base sm:text-lg'
+                : dense
+                  ? 'max-w-md text-sm sm:text-base'
+                  : 'max-w-xl'
             }`}
           >
             {subtitle}

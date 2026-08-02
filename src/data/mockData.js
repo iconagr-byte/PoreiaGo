@@ -123,7 +123,8 @@ export const mockTrips = [
     availableSeats: 20,
     driverName: 'Ανδρέας Ανδρέου',
     vehiclePlate: 'XAH-4022',
-    image: 'https://images.unsplash.com/photo-1541849543477-7ddc1d1e8f4e?w=1200&q=80',
+    // Charles Bridge / Prague old town — not a generic stock mismatch.
+    image: 'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=1400&q=80',
     hook: 'Δύο κορυφαίες ευρωπαϊκές πρωτεύουσες, ένα ταξίδι',
     description:
       'Οργανωμένη εκδρομή προς Κεντρική Ευρώπη. Πράγα και Βιέννη με ίδιο άνετο coach και επιλογή θέσης.',

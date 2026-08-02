@@ -421,7 +421,9 @@ export function getTemplateById(list, id) {
   return list.find((t) => t.id === id) || list[0];
 }
 
-export function tripsGridClass(layoutId, tripCount = 0) {
+export function tripsGridClass(layoutId, tripCount = 0, cardTemplateId = '') {
+  const abroad = cardTemplateId === 'abroad_horizontal';
+
   // One trip (typical new office) — keep the card narrow/centered, not full-bleed.
   if (tripCount === 1) {
     switch (layoutId) {
@@ -431,7 +433,9 @@ export function tripsGridClass(layoutId, tripCount = 0) {
         return 'flex justify-center gap-6';
       case 'alternating_rows':
       case 'editorial_stack':
-        return 'flex flex-col gap-8 max-w-lg sm:max-w-xl mx-auto w-full';
+        return abroad
+          ? 'flex flex-col gap-8 max-w-3xl sm:max-w-4xl mx-auto w-full'
+          : 'flex flex-col gap-8 max-w-lg sm:max-w-xl mx-auto w-full';
       default:
         return 'grid grid-cols-1 max-w-[300px] sm:max-w-[340px] md:max-w-[380px] mx-auto gap-6 w-full';
     }
@@ -462,7 +466,9 @@ export function tripsGridClass(layoutId, tripCount = 0) {
     case 'grid_four':
       return 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6';
     case 'editorial_stack':
-      return 'flex flex-col gap-5 md:gap-6 max-w-3xl mx-auto w-full';
+      return abroad
+        ? 'flex flex-col gap-6 md:gap-8 max-w-5xl mx-auto w-full'
+        : 'flex flex-col gap-5 md:gap-6 max-w-3xl mx-auto w-full';
     case 'horizontal_scroll':
       return 'flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-thin';
     case 'alternating_rows':
