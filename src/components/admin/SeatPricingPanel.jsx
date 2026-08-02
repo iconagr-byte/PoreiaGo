@@ -160,8 +160,13 @@ export default function SeatPricingPanel() {
     try {
       const data = await fetchAdminSeatPricing();
       setAllLayouts({ ...DEFAULT_SEAT_PRICING.layouts, ...data.layouts });
-    } catch {
-      toast.error('Αποτυχία φόρτωσης ρυθμίσεων θέσεων');
+    } catch (err) {
+      const detail = String(err?.message || '').trim();
+      toast.error(
+        detail && detail !== 'Request failed'
+          ? detail
+          : 'Αποτυχία φόρτωσης ρυθμίσεων θέσεων',
+      );
     } finally {
       setLoading(false);
     }

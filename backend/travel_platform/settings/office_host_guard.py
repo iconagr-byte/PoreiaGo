@@ -20,10 +20,40 @@ def _roles_include_superadmin(roles: list[str] | None) -> bool:
     return "superadmin" in {str(r).lower() for r in (roles or [])}
 
 
-def host_looks_like_achillio_travel(host: str) -> bool:
+def _normalize_host(host: str) -> str:
     h = (host or "").strip().lower().split(":")[0]
-    h = h.removeprefix("www.")
+    return h.removeprefix("www.")
+
+
+def host_looks_like_achillio_travel(host: str) -> bool:
+    h = _normalize_host(host)
     return bool(h and _ACHILLIO_HOST_RE.search(h))
+
+
+def host_is_shared_api(host: str) -> bool:
+    """
+    Shared API hostname (api.poreiago.com) — not a storefront page.
+
+    Achillio admin often calls the shared API; JWT tenant_id already scopes
+    seat-pricing / drivers. Blocking Achillio JWT here caused false
+    «Αποτυχία φόρτωσης ρυθμίσεων θέσεων» toasts.
+    """
+    h = (host or "").strip().lower().split(":")[0]
+    if not h:
+        return False
+    if h.startswith("api.") or h.startswith("api-"):
+        return True
+    # Traefik internal service names
+    if h in ("api-blue", "api-green", "api"):
+        return True
+    return False
+
+
+def host_is_platform_marketing(host: str, *, is_platform_host: bool) -> bool:
+    """www/apex PoreiaGo pages — not api.* and not Achillio custom domain."""
+    if host_is_shared_api(host) or host_looks_like_achillio_travel(host):
+        return False
+    return bool(is_platform_host)
 
 
 async def office_host_mismatch_detail(
@@ -37,11 +67,15 @@ async def office_host_mismatch_detail(
     """
     Return a Greek error detail when Host and JWT office disagree.
 
-    Superadmin may cross hosts only while explicitly impersonating a tenant.
-    Bare Achillio JWT on poreiago.com is always blocked (that caused dual deletes).
+    Shared API hosts are never blocked (JWT scopes the office).
+    Bare Achillio JWT on www.poreiago.com storefront/admin is blocked.
     """
     tid = str(tenant_id or "").strip()
     if not tid:
+        return None
+
+    # Shared API — do not treat as PoreiaGo marketing host.
+    if host_is_shared_api(host):
         return None
 
     try:
@@ -74,7 +108,7 @@ async def office_host_mismatch_detail(
             )
         return None
 
-    if is_platform_host and is_achillio_jwt and not impersonating:
+    if host_is_platform_marketing(host, is_platform_host=is_platform_host) and is_achillio_jwt and not impersonating:
         return (
             "Ο λογαριασμός Achillio Travel ανοίγει μόνο από "
             "https://www.achilliotravel.com/admin — όχι από poreiago.com. "
