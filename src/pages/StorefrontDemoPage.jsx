@@ -456,20 +456,21 @@ export default function StorefrontDemoPage() {
               title={siteAppearance.intl_section_title || 'Εκδρομές εξωτερικού'}
               subtitle={
                 siteAppearance.intl_section_subtitle ||
-                'Οριζόντια προβολή — σύρετε για να δείτε όλες τις διεθνείς εκδρομές.'
+                'Οριζόντιες κάρτες — Παρίσι, Ρώμη και άλλες διεθνείς εκδρομές με λεωφορείο.'
               }
               trips={filteredInternational}
               emptyMessage="Δεν βρέθηκαν διεθνή δρομολόγια με τα κριτήριά σας."
               siteAppearance={{
                 ...siteAppearance,
-                // Abroad strip keeps its own layout/card — Greece templates stay untouched.
+                // Abroad strip between Greece and fleet — stacked horizontal cards.
                 trips_layout_template:
-                  siteAppearance.intl_trips_layout_template || 'horizontal_scroll',
+                  siteAppearance.intl_trips_layout_template || 'editorial_stack',
                 trip_card_template:
                   siteAppearance.intl_trip_card_template || 'abroad_horizontal',
               }}
               pricingSettings={pricingSettings}
-              hidden={!showInternational}
+              compact
+              hidden={!showInternational || filteredInternational.length === 0}
             />
           </>
         ) : null}

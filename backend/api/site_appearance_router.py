@@ -148,7 +148,7 @@ DEFAULT_SITE_APPEARANCE = {
     "trips_layout_template": "grid_three",
     "trip_card_template": "premium",
     "footer_template": "classic_columns",
-    "intl_trips_layout_template": "horizontal_scroll",
+    "intl_trips_layout_template": "editorial_stack",
     "intl_trip_card_template": "abroad_horizontal",
     "trips_section_eyebrow": "Ανακαλύψτε",
     "trips_section_title": "Εκδρομές στην Ελλάδα",
@@ -232,7 +232,7 @@ class SiteAppearanceResponse(BaseModel):
     trips_layout_template: str = "grid_three"
     trip_card_template: str = "premium"
     footer_template: str = "classic_columns"
-    intl_trips_layout_template: str = "horizontal_scroll"
+    intl_trips_layout_template: str = "editorial_stack"
     intl_trip_card_template: str = "abroad_horizontal"
     trips_section_eyebrow: str = "Ανακαλύψτε"
     trips_section_title: str = "Εκδρομές στην Ελλάδα"
@@ -242,7 +242,7 @@ class SiteAppearanceResponse(BaseModel):
     intl_section_eyebrow: str = "Διεθνή δρομολόγια"
     intl_section_title: str = "Ταξίδια προς το Εξωτερικό"
     intl_section_subtitle: str = (
-        "Οριζόντια προβολή διεθνών εκδρομών με λεωφορείο — σύρετε για να δείτε όλες."
+        "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     )
     updated_at: str | None = None
 

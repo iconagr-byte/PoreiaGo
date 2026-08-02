@@ -1,6 +1,6 @@
 /**
- * Marketing host only: trip cards + abroad horizontal + bus fleet showcase under the hero.
- * Apple aesthetic — SF Pro stack, soft gray, quiet chips.
+ * Marketing host only: Greece trip cards + 3 abroad horizontal cards + bus fleet.
+ * Abroad strip sits in the gap between εκδρομές and «Ο ΣΤΟΛΟΣ ΜΑΣ».
  */
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -17,6 +17,7 @@ import FleetShowcaseSection from '../FleetShowcaseSection.jsx';
 import '../../styles/marketing-apple.css';
 
 export default function PlatformOpsShowcase() {
+  // Greece grid (existing) + exactly 3 abroad horizontal cards + fleet buses.
   const domesticTrips = useMemo(() => getPlatformDemoTrips(3), []);
   const intlTrips = useMemo(() => getPlatformDemoIntlTrips(3), []);
   const buses = useMemo(() => getPlatformDemoBuses(3), []);
@@ -59,6 +60,7 @@ export default function PlatformOpsShowcase() {
         </nav>
       </div>
 
+      {/* One continuous band: Greece → 3 abroad horizontals → fleet (no empty gap). */}
       <div className="pg-apple-cards-band border-t border-black/[0.06]">
         <TripsSection
           id="platform-trips"
@@ -73,33 +75,32 @@ export default function PlatformOpsShowcase() {
             trip_card_template: 'premium',
           }}
           pricingSettings={DEFAULT_PLATFORM_SETTINGS}
-          sectionClassName="!bg-transparent"
+          sectionClassName="!bg-transparent !pb-8 md:!pb-10"
         />
-      </div>
 
-      <div className="pg-apple-cards-band border-t border-black/[0.06]">
+        {/* Inserted between Greece cards and «Ο ΣΤΟΛΟΣ ΜΑΣ» — 3 abroad trip cards. */}
         <TripsSection
           id="platform-abroad"
+          compact
           eyebrow="Εξωτερικό"
-          title="Οριζόντιες εκδρομές εξωτερικού"
-          subtitle="Παρίσι, Ρώμη, Πράγα & Βιέννη — οριζόντια κάρτα λεωφορείου με ημερομηνίες και τιμή θέσης."
+          title="Εκδρομές εξωτερικού"
+          subtitle="Παρίσι · Ρώμη · Πράγα & Βιέννη — οριζόντια κάρτα λεωφορείου."
           trips={intlTrips}
           emptyMessage="Δεν υπάρχουν διεθνείς εκδρομές προς εμφάνιση."
           siteAppearance={{
             ...DEFAULT_SITE_APPEARANCE,
-            trips_layout_template: 'horizontal_scroll',
+            // Stack of 3 wide horizontal cards (not a thin carousel strip).
+            trips_layout_template: 'editorial_stack',
             trip_card_template: 'abroad_horizontal',
           }}
           pricingSettings={DEFAULT_PLATFORM_SETTINGS}
-          sectionClassName="!bg-transparent"
+          sectionClassName="!bg-transparent !pt-2 !pb-10 md:!pb-12 pg-apple-abroad-strip"
         />
-      </div>
 
-      <div className="pg-apple-cards-band border-t border-black/[0.06]">
         <FleetShowcaseSection
           vehicles={buses}
           loading={false}
-          sectionClassName="!bg-transparent !border-transparent"
+          sectionClassName="!bg-transparent !border-transparent !pt-8 md:!pt-10"
         />
       </div>
     </div>

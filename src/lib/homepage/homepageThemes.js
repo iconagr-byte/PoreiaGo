@@ -220,7 +220,7 @@ export const HOMEPAGE_THEMES = [
     hero_template: 'fullscreen_overlay',
     trips_layout_template: 'grid_two_large',
     trip_card_template: 'premium',
-    intl_trips_layout_template: 'horizontal_scroll',
+    intl_trips_layout_template: 'editorial_stack',
     intl_trip_card_template: 'abroad_horizontal',
     footer_template: 'compact_inline',
     show_fleet_section: true,

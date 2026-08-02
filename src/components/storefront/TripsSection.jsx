@@ -12,6 +12,8 @@ export default function TripsSection({
   pricingSettings,
   hidden = false,
   sectionClassName = '',
+  /** Tighter padding — for strips inserted between hero blocks (e.g. abroad before fleet). */
+  compact = false,
 }) {
   if (hidden) return null;
 
@@ -19,14 +21,15 @@ export default function TripsSection({
   const cardId = siteAppearance.trip_card_template || 'premium';
   const tripCount = trips.length;
   const solo = tripCount === 1;
+  const dense = compact || solo;
   const gridClass = tripsGridClass(layoutId, tripCount);
 
   return (
     <section
       id={id}
-      className={`${solo ? 'py-10 md:py-12' : 'py-24'} px-margin-desktop max-w-container-max mx-auto bg-surface ${sectionClassName}`.trim()}
+      className={`${dense ? 'py-10 md:py-12' : 'py-24'} px-margin-desktop max-w-container-max mx-auto bg-surface ${sectionClassName}`.trim()}
     >
-      <div className={`text-center ${solo ? 'mb-6' : 'mb-16'}`}>
+      <div className={`text-center ${dense ? 'mb-6' : 'mb-16'}`}>
         {eyebrow && (
           <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
             {eyebrow}
@@ -34,7 +37,7 @@ export default function TripsSection({
         )}
         <h2
           className={`font-bold text-on-surface tracking-tight ${
-            solo ? 'text-2xl md:text-3xl' : 'font-headline-lg text-4xl md:text-5xl'
+            dense ? 'text-2xl md:text-3xl' : 'font-headline-lg text-4xl md:text-5xl'
           }`}
         >
           {title}
@@ -42,7 +45,7 @@ export default function TripsSection({
         {subtitle && (
           <p
             className={`text-on-surface-variant font-body-md mt-3 mx-auto ${
-              solo ? 'max-w-md text-sm sm:text-base' : 'max-w-xl'
+              dense ? 'max-w-md text-sm sm:text-base' : 'max-w-xl'
             }`}
           >
             {subtitle}

@@ -813,7 +813,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       footer_template: form.footer_template,
       rent_fleet_layout_template: form.rent_fleet_layout_template,
       rent_fleet_card_template: form.rent_fleet_card_template,
-      intl_trips_layout_template: form.intl_trips_layout_template || 'horizontal_scroll',
+      intl_trips_layout_template: form.intl_trips_layout_template || 'editorial_stack',
       intl_trip_card_template: form.intl_trip_card_template || 'abroad_horizontal',
     },
     'Τα πρότυπα αποθηκεύτηκαν',
@@ -835,7 +835,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       intl_section_eyebrow: form.intl_section_eyebrow,
       intl_section_title: form.intl_section_title,
       intl_section_subtitle: form.intl_section_subtitle,
-      intl_trips_layout_template: form.intl_trips_layout_template || 'horizontal_scroll',
+      intl_trips_layout_template: form.intl_trips_layout_template || 'editorial_stack',
       intl_trip_card_template: form.intl_trip_card_template || 'abroad_horizontal',
     },
     'Τα κείμενα ενότητας αποθηκεύτηκαν',
@@ -1505,7 +1505,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                     <TemplatePicker
                       category="trips_layout"
                       templates={TRIPS_LAYOUT_TEMPLATES}
-                      value={form.intl_trips_layout_template || 'horizontal_scroll'}
+                      value={form.intl_trips_layout_template || 'editorial_stack'}
                       onChange={(id) =>
                         setForm((p) => ({ ...p, intl_trips_layout_template: id }))
                       }
@@ -1524,7 +1524,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                           ...p,
                           intl_trip_card_template: id,
                           ...(id === 'abroad_horizontal'
-                            ? { intl_trips_layout_template: 'horizontal_scroll' }
+                            ? { intl_trips_layout_template: 'editorial_stack' }
                             : {}),
                         }))
                       }

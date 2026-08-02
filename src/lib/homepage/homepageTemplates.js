@@ -404,8 +404,8 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   footer_template: 'classic_columns',
   rent_fleet_layout_template: 'rent_grid_three',
   rent_fleet_card_template: 'rent_premium',
-  /** International section — independent of Greece layout/card. */
-  intl_trips_layout_template: 'horizontal_scroll',
+  /** International section — stacked horizontal cards between Greece and fleet. */
+  intl_trips_layout_template: 'editorial_stack',
   intl_trip_card_template: 'abroad_horizontal',
   trips_section_eyebrow: 'Ανακαλύψτε',
   trips_section_title: 'Εκδρομές στην Ελλάδα',
@@ -414,7 +414,7 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   intl_section_eyebrow: 'Διεθνή δρομολόγια',
   intl_section_title: 'Ταξίδια προς το Εξωτερικό',
   intl_section_subtitle:
-    'Οριζόντια προβολή διεθνών εκδρομών με λεωφορείο — σύρετε για να δείτε όλες.',
+    'Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη.',
 };
 
 export function getTemplateById(list, id) {
@@ -462,7 +462,7 @@ export function tripsGridClass(layoutId, tripCount = 0) {
     case 'grid_four':
       return 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6';
     case 'editorial_stack':
-      return 'flex flex-col gap-10 max-w-3xl mx-auto w-full';
+      return 'flex flex-col gap-5 md:gap-6 max-w-3xl mx-auto w-full';
     case 'horizontal_scroll':
       return 'flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-thin';
     case 'alternating_rows':
