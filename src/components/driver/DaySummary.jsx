@@ -63,8 +63,8 @@ export default function DaySummary() {
   return (
     <div className="driver-stack">
       <div className="text-center py-2">
-        <p className="driver-card-label">Τέλος βάρδιας</p>
-        <h2 className="text-2xl font-extrabold tracking-tight mt-1">Σύνοψη ημέρας</h2>
+        <p className="driver-card-label">Κρατήσεις</p>
+        <h2 className="text-2xl font-extrabold tracking-tight mt-1">Κάτοψη & επιβίβαση</h2>
       </div>
 
       {manifest ? (
