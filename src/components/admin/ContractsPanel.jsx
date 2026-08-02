@@ -379,7 +379,7 @@ export default function ContractsPanel({
       </div>
 
       <div className="p-6 space-y-5">
-        <AgencyPlanCatalogEditor compact />
+        <AgencyPlanCatalogEditor />
         <RentPlanCardsEditor />
 
         {loading ? (
@@ -395,7 +395,9 @@ export default function ContractsPanel({
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-sm font-bold text-slate-900">Επιλέξτε πλάνο λεωφορείων</p>
-                <p className="text-xs text-slate-500 mt-0.5">Ετήσιο = 2 μήνες δώρο</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Τα features εμφανίζονται από την παραμετροποίηση πάνω · Ετήσιο = 2 μήνες δώρο
+                </p>
               </div>
               <div className="inline-flex p-1 rounded-full bg-slate-100 border border-slate-200/80">
                 {Object.values(BILLING_INTERVALS).map((opt) => (
