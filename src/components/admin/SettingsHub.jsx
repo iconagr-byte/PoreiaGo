@@ -34,7 +34,6 @@ const TAB_HINTS = {
   logins: 'Ιστορικό συνδέσεων και audit εισόδου',
   tenants: 'Διαχείριση γραφείων / tenants της πλατφόρμας',
   saas_infra: 'Υποδομή SaaS και σύνδεση υπηρεσιών',
-  integrations: 'Aviationstack / Twilio API keys (μόνο super admin)',
   backup: 'Αντίγραφα ασφαλείας και επαναφορά',
   growth: 'Partner webhooks και growth εργαλεία',
 };
