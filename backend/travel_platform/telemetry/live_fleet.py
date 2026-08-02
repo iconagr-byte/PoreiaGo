@@ -88,6 +88,16 @@ class LiveFleetService:
             merged["bus_plate"] = plate
         if raw.get("heading_deg") is not None:
             merged["heading_deg"] = raw.get("heading_deg")
+        if raw.get("accuracy_m") is not None:
+            try:
+                merged["accuracy_m"] = float(raw["accuracy_m"])
+            except (TypeError, ValueError):
+                pass
+        if raw.get("altitude_m") is not None:
+            try:
+                merged["altitude_m"] = float(raw["altitude_m"])
+            except (TypeError, ValueError):
+                pass
         trip_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
         if trip_title:
             merged["trip_title"] = str(trip_title).strip()

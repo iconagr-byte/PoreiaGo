@@ -55,7 +55,7 @@ export default function DriverShiftTelemetry({ shift }) {
       {!online ? (
         <p className="text-xs text-[var(--driver-muted)] leading-relaxed">
           Πατήστε «Έναρξη βάρδιας» και επιτρέψτε την τοποθεσία. Περιμένετε «Σύνδεση θέσης OK» —
-          το στίγμα εμφανίζεται στον live χάρτη του γραφείου σε ~5–10 δευτ.
+          το στίγμα εμφανίζεται στον live χάρτη του γραφείου σε ~2–4 δευτ.
           του γραφείου.
         </p>
       ) : !lastPing ? (

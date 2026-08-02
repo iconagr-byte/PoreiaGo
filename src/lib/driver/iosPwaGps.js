@@ -119,7 +119,8 @@ export function resetGuidanceDismissal() {
 export function iosGeolocationOptions(isIos = detectIosDevice()) {
   return {
     enableHighAccuracy: true,
-    maximumAge: isIos ? 5000 : 4000,
+    // Keep cached fixes short so the live map stays near the real vehicle.
+    maximumAge: isIos ? 2000 : 1500,
     timeout: isIos ? 20000 : 15000,
   };
 }

@@ -4,9 +4,9 @@ import { postDriverTelemetryLocation } from '../../services/driverPortalApi.js';
 /**
  * Driver GPS transport — HTTP is authoritative for the office live map.
  *
- * The admin map polls GET /fleet/live every 5s. WebSockets behind Traefik/nginx
- * often "open" as zombies and never deliver frames. Prefer HTTP on every GPS
- * tick; keep WS as a best-effort bonus for low-latency egress only.
+ * The admin map polls GET /fleet/live every ~1s while pins are active.
+ * WebSockets behind Traefik/nginx often "open" as zombies and never deliver
+ * frames. Prefer HTTP on every GPS tick; keep WS as a best-effort bonus.
  */
 export function createDriverTelemetryTransport({
   onMessage,

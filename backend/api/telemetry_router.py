@@ -164,6 +164,8 @@ async def fleet_live(
                     photo_url=media.get("photo_url"),
                     vehicle_image_url=media.get("vehicle_image_url"),
                     trip_title=trip_title or None,
+                    accuracy_m=meta.get("accuracy_m"),
+                    altitude_m=meta.get("altitude_m"),
                     trail=trail_points_for_api(raw_trail),
                 ),
             )

@@ -9,6 +9,14 @@ import {
   FLEET_LIVE_POLL_MS,
   fleetPollMsForVehicleCount,
 } from '../lib/admin/fleetLivePoll.js';
+import {
+  FLEET_MARKER_ANIM_MS,
+  FLEET_MARKER_MIN_MOVE_M,
+  FLEET_MARKER_SNAP_M,
+  currentAnimatedPosition,
+  haversineMeters,
+  parseVehicleTimestamp,
+} from '../lib/admin/fleetMarkerMotion.js';
 
 export const DEMO_TENANT = import.meta.env.VITE_DEMO_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 
@@ -39,9 +47,24 @@ function normalizeVehicle(msg, id, prev) {
   const targetLat = Number(msg.lat ?? msg.latitude);
   const targetLng = Number(msg.lng ?? msg.longitude);
   if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng)) return null;
-  const prevLat = Number.isFinite(prev?.lat) ? prev.lat : targetLat;
-  const prevLng = Number.isFinite(prev?.lng) ? prev.lng : targetLng;
-  return {
+
+  const timestamp = msg.timestamp || msg.updated_at;
+  const msgTs = parseVehicleTimestamp(timestamp);
+  const prevTs = parseVehicleTimestamp(prev?.timestamp);
+  // Never move a pin backwards in time (out-of-order poll / WS race).
+  if (prev && msgTs && prevTs && msgTs < prevTs) {
+    return {
+      ...prev,
+      driver_name: msg.driver_name || prev.driver_name || '—',
+      photo_url: msg.photo_url ?? prev.photo_url ?? null,
+      vehicle_image_url: msg.vehicle_image_url ?? prev.vehicle_image_url ?? null,
+      trail: Array.isArray(msg.trail) && msg.trail.length ? msg.trail : prev.trail || null,
+      trip_title: msg.trip_title || msg.tripTitle || prev.trip_title || null,
+      accuracy_m: msg.accuracy_m ?? prev.accuracy_m ?? null,
+    };
+  }
+
+  const meta = {
     id,
     vehicle_id: msg.vehicle_id || id,
     vehicle_code: msg.vehicle_code || msg.bus_plate || id,
@@ -50,23 +73,68 @@ function normalizeVehicle(msg, id, prev) {
     driver_id: msg.driver_id,
     trip_id: msg.trip_id,
     trip_title: msg.trip_title || msg.tripTitle || prev?.trip_title || null,
-    lat: prevLat,
-    lng: prevLng,
-    targetLat,
-    targetLng,
-    prevLat,
-    prevLng,
     speed: msg.speed ?? msg.speed_kmh ?? 0,
     heading: msg.heading ?? msg.heading_deg,
-    timestamp: msg.timestamp || msg.updated_at,
-    accuracy_m: msg.accuracy_m ?? null,
-    altitude_m: msg.altitude_m ?? null,
-    boarding: msg.boarding ?? null,
-    sensors: msg.sensors ?? null,
+    timestamp,
+    accuracy_m: msg.accuracy_m ?? prev?.accuracy_m ?? null,
+    altitude_m: msg.altitude_m ?? prev?.altitude_m ?? null,
+    boarding: msg.boarding ?? prev?.boarding ?? null,
+    sensors: msg.sensors ?? prev?.sensors ?? null,
     photo_url: msg.photo_url ?? prev?.photo_url ?? null,
     vehicle_image_url: msg.vehicle_image_url ?? prev?.vehicle_image_url ?? null,
     trail: Array.isArray(msg.trail) && msg.trail.length ? msg.trail : prev?.trail || null,
-    animStart: typeof performance !== 'undefined' ? performance.now() : 0,
+  };
+
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  const lastTargetLat = Number(prev?.targetLat);
+  const lastTargetLng = Number(prev?.targetLng);
+  const movedM =
+    prev && Number.isFinite(lastTargetLat) && Number.isFinite(lastTargetLng)
+      ? haversineMeters(lastTargetLat, lastTargetLng, targetLat, targetLng)
+      : Infinity;
+
+  // Stationary / GPS jitter — refresh metadata without rewinding the marker.
+  if (prev && movedM < FLEET_MARKER_MIN_MOVE_M) {
+    return {
+      ...prev,
+      ...meta,
+      lat: prev.lat,
+      lng: prev.lng,
+      prevLat: prev.prevLat,
+      prevLng: prev.prevLng,
+      targetLat: prev.targetLat,
+      targetLng: prev.targetLng,
+      animStart: prev.animStart,
+    };
+  }
+
+  // Large teleport — snap; short lerp would look like a wrong path.
+  if (!prev || movedM >= FLEET_MARKER_SNAP_M) {
+    return {
+      ...meta,
+      lat: targetLat,
+      lng: targetLng,
+      prevLat: targetLat,
+      prevLng: targetLng,
+      targetLat,
+      targetLng,
+      animStart: now - FLEET_MARKER_ANIM_MS,
+    };
+  }
+
+  // Continue from the pin's current animated position (not the previous lerp start).
+  const current = currentAnimatedPosition(prev, now, FLEET_MARKER_ANIM_MS);
+  const fromLat = Number.isFinite(current.lat) ? current.lat : targetLat;
+  const fromLng = Number.isFinite(current.lng) ? current.lng : targetLng;
+  return {
+    ...meta,
+    lat: fromLat,
+    lng: fromLng,
+    prevLat: fromLat,
+    prevLng: fromLng,
+    targetLat,
+    targetLng,
+    animStart: now,
   };
 }
 

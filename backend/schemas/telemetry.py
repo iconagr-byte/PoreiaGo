@@ -49,6 +49,8 @@ class LiveVehicleResponse(BaseModel):
     photo_url: str | None = None
     vehicle_image_url: str | None = None
     trip_title: str | None = None
+    accuracy_m: float | None = None
+    altitude_m: float | None = None
     trail: list[dict[str, Any]] = Field(default_factory=list)
 
 
