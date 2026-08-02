@@ -52,15 +52,42 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(include)
         self.assertFalse(claim)
 
-    async def test_achillio_jwt_cannot_claim_demo_legacy_anymore(self):
-        """SEAL: Achillio also must not pull DEMO / foreign drivers."""
+    async def test_achillio_jwt_on_poreiago_remaps_to_platform(self):
+        """SEAL: Achillio JWT on poreiago.com never lists/deletes Achillio drivers."""
         achillio = str(uuid4())
+        platform = str(uuid4())
         req = SimpleNamespace(
             headers={"host": "www.poreiago.com"},
             state=SimpleNamespace(tenant_id=achillio),
         )
         with patch.object(ap, "_tenant_is_achillio_office", new=AsyncMock(return_value=True)):
-            tid, include, claim = await ap._drivers_list_tenant_id(req)
+            with patch.object(ap, "_request_is_platform_host", return_value=True):
+                with patch.object(ap, "_request_is_impersonating", return_value=False):
+                    with patch(
+                        "travel_platform.settings.office_host_guard.resolve_poreiago_platform_tenant_id",
+                        new=AsyncMock(return_value=platform),
+                    ):
+                        tid, include, claim = await ap._drivers_list_tenant_id(req)
+
+        self.assertEqual(tid, platform)
+        self.assertNotEqual(tid, achillio)
+        self.assertFalse(include)
+        self.assertFalse(claim)
+
+    async def test_achillio_jwt_on_achillio_host_no_demo_claim(self):
+        """On achilliotravel.com, Achillio JWT stays Achillio — still no DEMO claim."""
+        achillio = str(uuid4())
+        req = SimpleNamespace(
+            headers={"host": "www.achilliotravel.com"},
+            state=SimpleNamespace(tenant_id=achillio),
+        )
+        with patch.object(
+            ap,
+            "_resolve_achillio_tenant_id_from_request",
+            new=AsyncMock(return_value=achillio),
+        ):
+            with patch.object(ap, "_tenant_is_achillio_office", new=AsyncMock(return_value=True)):
+                tid, include, claim = await ap._drivers_list_tenant_id(req)
 
         self.assertEqual(tid, achillio)
         self.assertFalse(include)
