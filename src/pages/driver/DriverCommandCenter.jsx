@@ -19,6 +19,7 @@ import DaySummary from '../../components/driver/DaySummary.jsx';
 import DriverShiftTelemetry from '../../components/driver/DriverShiftTelemetry.jsx';
 import DriverOfficeChat from '../../components/driver/DriverOfficeChat.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
+import { useDriverDeviceForm } from '../../hooks/useDriverDeviceForm.js';
 import {
   clearDriverShiftLaunchState,
   useDriverShiftSession,
@@ -149,6 +150,11 @@ export default function DriverCommandCenter() {
   const [profileTick, setProfileTick] = useState(0);
   const tab = params.get('tab') || 'home';
   const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
+  const device = useDriverDeviceForm();
+  const deviceClass = [
+    device.isTablet ? 'is-tablet' : 'is-phone',
+    device.isLandscape ? 'is-landscape' : 'is-portrait',
+  ].join(' ');
 
   useEffect(() => {
     if (!authenticated) {
@@ -349,95 +355,101 @@ export default function DriverCommandCenter() {
     );
   } else {
     body = (
-      <div className="driver-app">
-        <DriverHeader
-          session={session}
-          telemetryOnline={telemetryOnline}
-          onLogout={logout}
-          chatUnread={chatUnread}
-          onOpenChat={() => setTab('chat')}
-        />
+      <div
+        className={`driver-app ${deviceClass}`}
+        data-device-form={device.form}
+        data-orientation={device.orientation}
+      >
+        <div className="driver-app-body">
+          <DriverHeader
+            session={session}
+            telemetryOnline={telemetryOnline}
+            onLogout={logout}
+            chatUnread={chatUnread}
+            onOpenChat={() => setTab('chat')}
+          />
 
-        {tab !== 'home' && tab !== 'chat' && tab !== 'summary' ? (
-          <div className="driver-shell">
-            <TachographStrip
-              drivingLabel={tachograph.drivingLabel}
-              limitReached={tachograph.limitReached}
-              progressPct={tachograph.progressPct}
-              isCounting={tachograph.isCounting}
-              onBreak={onBreak}
-            />
+          {tab !== 'home' && tab !== 'chat' && tab !== 'summary' ? (
+            <div className="driver-shell">
+              <TachographStrip
+                drivingLabel={tachograph.drivingLabel}
+                limitReached={tachograph.limitReached}
+                progressPct={tachograph.progressPct}
+                isCounting={tachograph.isCounting}
+                onBreak={onBreak}
+              />
 
-            <div className="driver-break-bar">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onBreak) {
-                    setOnBreak(false);
-                    tachograph.resetBreak();
-                  } else {
-                    setOnBreak(true);
-                  }
-                }}
-                className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
-                  onBreak
-                    ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
-                    : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
-                }`}
-              >
-                {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
-              </button>
+              <div className="driver-break-bar">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onBreak) {
+                      setOnBreak(false);
+                      tachograph.resetBreak();
+                    } else {
+                      setOnBreak(true);
+                    }
+                  }}
+                  className={`driver-touch w-full rounded-xl font-bold border transition-colors ${
+                    onBreak
+                      ? 'border-[var(--driver-success)] text-[var(--driver-success)] bg-green-50'
+                      : 'border-[var(--driver-accent)]/40 text-[var(--driver-accent)] bg-[var(--driver-accent-soft)]'
+                  }`}
+                >
+                  {onBreak ? 'Τέλος διαλείμματος' : 'Έναρξη διαλείμματος'}
+                </button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        <main className={`driver-shell driver-main ${tab === 'chat' ? 'driver-main--chat' : ''}`}>
-          {tab === 'home' && (
-            <>
-              <button
-                type="button"
-                onClick={() => setTab('chat')}
-                className="driver-card flex items-center gap-3 text-left w-full !py-3.5"
-                aria-label={
-                  chatUnread > 0
-                    ? `Άνοιγμα chat με το γραφείο, ${chatUnread} νέα`
-                    : 'Άνοιγμα chat με το γραφείο'
-                }
-              >
-                <span className="relative shrink-0">
-                  <span className="material-symbols-outlined text-[28px] text-[var(--driver-accent)]">
-                    forum
-                  </span>
-                  {chatUnread > 0 ? (
-                    <span className="driver-inline-badge">
-                      {chatUnread > 99 ? '99+' : chatUnread}
+          <main className={`driver-shell driver-main ${tab === 'chat' ? 'driver-main--chat' : ''}`}>
+            {tab === 'home' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setTab('chat')}
+                  className="driver-card flex items-center gap-3 text-left w-full !py-3.5"
+                  aria-label={
+                    chatUnread > 0
+                      ? `Άνοιγμα chat με το γραφείο, ${chatUnread} νέα`
+                      : 'Άνοιγμα chat με το γραφείο'
+                  }
+                >
+                  <span className="relative shrink-0">
+                    <span className="material-symbols-outlined text-[28px] text-[var(--driver-accent)]">
+                      forum
                     </span>
-                  ) : null}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-extrabold text-base text-slate-900">Chat γραφείου</span>
-                  <span className="block text-xs text-slate-500 mt-0.5">
-                    {chatUnread > 0
-                      ? `${chatUnread} νέο${chatUnread === 1 ? '' : 'α'} μήνυμα${chatUnread === 1 ? '' : 'τα'}`
-                      : 'Μηνύματα με το γραφείο · παράδοση & ανάγνωση'}
+                    {chatUnread > 0 ? (
+                      <span className="driver-inline-badge">
+                        {chatUnread > 99 ? '99+' : chatUnread}
+                      </span>
+                    ) : null}
                   </span>
-                </span>
-                <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-              </button>
-              <DailyManifest />
-            </>
-          )}
-          {/* Keep GPS panel mounted so tab switches never remount shift UI. */}
-          <div hidden={tab !== 'gps'} aria-hidden={tab !== 'gps'}>
-            <DriverShiftTelemetry shift={shift} />
-          </div>
-          <div hidden={tab !== 'chat'} aria-hidden={tab !== 'chat'}>
-            <DriverOfficeChat isActive={tab === 'chat'} onUnreadChange={setChatUnread} />
-          </div>
-          {tab === 'scan' && <Scanner />}
-          {tab === 'sos' && <SOSButton />}
-          {tab === 'summary' && <DaySummary />}
-        </main>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-extrabold text-base text-slate-900">Chat γραφείου</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      {chatUnread > 0
+                        ? `${chatUnread} νέο${chatUnread === 1 ? '' : 'α'} μήνυμα${chatUnread === 1 ? '' : 'τα'}`
+                        : 'Μηνύματα με το γραφείο · παράδοση & ανάγνωση'}
+                    </span>
+                  </span>
+                  <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+                </button>
+                <DailyManifest />
+              </>
+            )}
+            {/* Keep GPS panel mounted so tab switches never remount shift UI. */}
+            <div hidden={tab !== 'gps'} aria-hidden={tab !== 'gps'}>
+              <DriverShiftTelemetry shift={shift} />
+            </div>
+            <div hidden={tab !== 'chat'} aria-hidden={tab !== 'chat'}>
+              <DriverOfficeChat isActive={tab === 'chat'} onUnreadChange={setChatUnread} />
+            </div>
+            {tab === 'scan' && <Scanner />}
+            {tab === 'sos' && <SOSButton />}
+            {tab === 'summary' && <DaySummary />}
+          </main>
+        </div>
 
         <nav className="driver-nav" aria-label="Driver navigation">
           <div className="driver-nav-inner">
@@ -469,8 +481,14 @@ export default function DriverCommandCenter() {
                     ) : null}
                   </span>
                   <span className="driver-nav-label">
-                    <span className="hidden min-[360px]:inline">{t.label}</span>
-                    <span className="min-[360px]:hidden">{t.short}</span>
+                    {device.isTablet ? (
+                      <span>{t.label}</span>
+                    ) : (
+                      <>
+                        <span className="hidden min-[360px]:inline">{t.label}</span>
+                        <span className="min-[360px]:hidden">{t.short}</span>
+                      </>
+                    )}
                   </span>
                 </button>
               );

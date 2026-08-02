@@ -300,56 +300,58 @@ export default function DailyManifest() {
         ) : null}
       </div>
 
-      <div className="driver-card">
-        <h3 className="font-bold text-base mb-1 flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[var(--driver-yellow)] text-[22px]">
-              hourglass_top
+      <div className="driver-home-board">
+        <div className="driver-card">
+          <h3 className="font-bold text-base mb-1 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[var(--driver-yellow)] text-[22px]">
+                hourglass_top
+              </span>
+              Αναμονή επιβίβασης
             </span>
-            Αναμονή επιβίβασης
-          </span>
-          <span className="text-sm font-extrabold tabular-nums text-[var(--driver-muted)]">
-            {waitingList.length}
-          </span>
-        </h3>
-        {waitingList.length ? (
-          <ul className="mt-1">
-            {waitingList.map((p, i) => (
-              <PassengerRow key={passengerKey(p, i)} passenger={p} tone="waiting" />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-[var(--driver-muted)] py-4 text-center">
-            {manifest
-              ? 'Όλοι οι επιβάτες έχουν επιβιβαστεί ή δεν υπάρχουν κρατήσεις.'
-              : 'Φόρτωση πελατών…'}
-          </p>
-        )}
-      </div>
+            <span className="text-sm font-extrabold tabular-nums text-[var(--driver-muted)]">
+              {waitingList.length}
+            </span>
+          </h3>
+          {waitingList.length ? (
+            <ul className="mt-1 driver-passenger-list">
+              {waitingList.map((p, i) => (
+                <PassengerRow key={passengerKey(p, i)} passenger={p} tone="waiting" />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-[var(--driver-muted)] py-4 text-center">
+              {manifest
+                ? 'Όλοι οι επιβάτες έχουν επιβιβαστεί ή δεν υπάρχουν κρατήσεις.'
+                : 'Φόρτωση πελατών…'}
+            </p>
+          )}
+        </div>
 
-      <div className="driver-card">
-        <h3 className="font-bold text-base mb-1 flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[var(--driver-success)] text-[22px]">
-              groups
+        <div className="driver-card">
+          <h3 className="font-bold text-base mb-1 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[var(--driver-success)] text-[22px]">
+                groups
+              </span>
+              Επιβιβασμένοι
             </span>
-            Επιβιβασμένοι
-          </span>
-          <span className="text-sm font-extrabold tabular-nums text-[var(--driver-muted)]">
-            {boardedList.length}
-          </span>
-        </h3>
-        {boardedList.length ? (
-          <ul className="mt-1">
-            {boardedList.map((p, i) => (
-              <PassengerRow key={passengerKey(p, i)} passenger={p} tone="boarded" />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-[var(--driver-muted)] py-4 text-center">
-            Κανένας επιβιβασμένος ακόμα.
-          </p>
-        )}
+            <span className="text-sm font-extrabold tabular-nums text-[var(--driver-muted)]">
+              {boardedList.length}
+            </span>
+          </h3>
+          {boardedList.length ? (
+            <ul className="mt-1 driver-passenger-list">
+              {boardedList.map((p, i) => (
+                <PassengerRow key={passengerKey(p, i)} passenger={p} tone="boarded" />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-[var(--driver-muted)] py-4 text-center">
+              Κανένας επιβιβασμένος ακόμα.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="driver-card">
