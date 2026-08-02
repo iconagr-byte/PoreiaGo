@@ -205,6 +205,12 @@ export default function CheckoutPage() {
   }
 
   const seatCount = pending.seats?.split(',').filter(Boolean).length || 1;
+  const extrasLines = Array.isArray(pending.extras) ? pending.extras : [];
+  const extrasTotal = Number(pending.extrasTotal) || 0;
+  const seatSubtotal =
+    Number(pending.seatSubtotal) ||
+    Math.max(0, checkoutTotal - extrasTotal) ||
+    checkoutTotal;
   const subtotal = checkoutTotal;
   const serviceFee = 0;
   const total = checkoutTotal;
@@ -305,6 +311,9 @@ export default function CheckoutPage() {
         },
         paymentMethod,
         bankAccountId: selectedBankAccount?.id || null,
+        extras: Array.isArray(pending.extras) ? pending.extras : [],
+        extrasTotal: Number(pending.extrasTotal) || 0,
+        seatSubtotal: Number(pending.seatSubtotal) || null,
       });
       clearPendingCheckout();
       const resumeToken = getStoredResumeToken();
@@ -359,11 +368,11 @@ export default function CheckoutPage() {
       <div className="relative z-10 max-w-5xl mx-auto">
         <button
           type="button"
-          onClick={() => navigate(`/select-seat/${trip.id}`)}
+          onClick={() => navigate(`/book/extras/${trip.id}`)}
           className="mb-4 flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-bold text-sm"
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-          Επιλογή θέσεων
+          Υπηρεσίες
         </button>
 
         <div className="mb-6">
@@ -702,6 +711,26 @@ export default function CheckoutPage() {
                           {row.tier === 'vip' ? ' · VIP' : ''}
                         </span>
                         <span>€{Number(row.priceEur).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {extrasLines.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-on-surface-variant">
+                      <dt>Εισιτήρια</dt>
+                      <dd>€{seatSubtotal.toFixed(2)}</dd>
+                    </div>
+                    {extrasLines.map((line) => (
+                      <div
+                        key={line.id || line.formKey || line.title}
+                        className="flex justify-between text-xs text-on-surface-variant pl-1"
+                      >
+                        <span>
+                          {line.title}
+                          {line.qty > 1 ? ` × ${line.qty}` : ''}
+                        </span>
+                        <span>€{Number(line.lineTotalEur || 0).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>

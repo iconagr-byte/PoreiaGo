@@ -214,6 +214,22 @@ export default function WalletTicketDetail({
               <dd>{booking.dietary}</dd>
             </div>
           ) : null}
+          {Array.isArray(booking.extras) && booking.extras.length > 0 ? (
+            <div className="sm:col-span-2">
+              <dt>Υπηρεσίες</dt>
+              <dd>
+                <ul className="mt-1 space-y-1">
+                  {booking.extras.map((line) => (
+                    <li key={line.id || line.formKey || line.title}>
+                      {line.title}
+                      {line.qty > 1 ? ` × ${line.qty}` : ''}
+                      {' · '}€{Number(line.lineTotalEur || 0).toFixed(2)}
+                    </li>
+                  ))}
+                </ul>
+              </dd>
+            </div>
+          ) : null}
         </dl>
       </section>
 

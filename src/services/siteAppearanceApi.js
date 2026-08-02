@@ -57,6 +57,8 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_coverage_options: [],
   rent_included_defaults: [],
   rent_upsell_coverage_id: '',
+  /** Bus trip extras catalog (after seat selection). */
+  trip_extra_options: [],
   rent_notify_email_enabled: true,
   rent_notify_sms_enabled: true,
   rent_notify_email_label: 'Θέλω προσφορές στο email',
