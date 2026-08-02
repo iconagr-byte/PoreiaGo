@@ -446,8 +446,8 @@ export default function FleetRentalPanel({
             <div className="min-w-0">
               <h2 className="rental-apple-title">Ενοικιάσεις</h2>
               <p className="rental-apple-subtitle">
-                Στόλος, κρατήσεις, χαρτούρα συμβολαίων, check-in/out με υπογραφή και ζωντανό GPS —
-                πλήρες αυτόνομο γραφείο ενοικιάσεων.
+                Στόλος, κρατήσεις, χαρτούρα συμβολαίων, check-in/out με υπογραφή — GPS μόνο από
+                συσκευή στο όχημα (όχι από το κινητό του πελάτη).
               </p>
             </div>
           </div>
@@ -638,7 +638,12 @@ export default function FleetRentalPanel({
               { id: 'expenses', label: 'Έξοδα στόλου', copy: `${euro(summary?.expenses_eur)} καταχωρημένα`, icon: 'local_gas_station' },
               { id: 'wizard', label: 'Νέα κράτηση γραφείου', copy: 'Διαθεσιμότητα χωρίς double-booking', icon: 'add_circle' },
               { id: 'inspections', label: 'Check-in / out', copy: 'Selfie ζημιάς · ψηφιακή υπογραφή', icon: 'fact_check' },
-              { id: 'live_gps', label: 'Ζωντανά GPS', copy: `${overlays.length} ενεργά για χάρτη`, icon: 'my_location' },
+              {
+                id: 'live_gps',
+                label: 'GPS στόλου',
+                copy: `${overlays.filter((o) => o.gps_device_id || o.plate_number).length} με συσκευή/πινακίδα`,
+                icon: 'my_location',
+              },
               { id: 'plans', label: 'Κάρτες τιμών', copy: 'Τιμές marketing στη σελίδα /grafeia', icon: 'sell' },
             ].map((hub) => (
               <button
@@ -1094,11 +1099,14 @@ export default function FleetRentalPanel({
       {tab === 'live_gps' && (
         <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-black/[0.06] p-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="font-bold text-gray-900">Ζωντανά GPS ενοικιάσεων</h3>
-              <p className="text-sm text-gray-500 mt-1 max-w-xl">
-                Ενεργές κρατήσεις με πινακίδα / GPS device εμφανίζονται στον ζωντανό χάρτη ως
-                «Ενοικίαση · πελάτης».
+            <div className="min-w-0 max-w-2xl">
+              <h3 className="font-bold text-gray-900">GPS στόλου ενοικίασης</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Ζωντανή θέση μόνο από <strong>συσκευή GPS / πινακίδα στο όχημα</strong> — ποτέ από το
+                κινητό του πελάτη. Δεν ζητάμε opt-in τοποθεσίας από τον ενοικιαστή.
+              </p>
+              <p className="text-xs text-slate-400 mt-2">
+                Στον χάρτη εμφανίζεται «Ενοικίαση · πινακίδα» (όχι ονοματεπώνυμο πελάτη).
               </p>
             </div>
             <button
@@ -1112,37 +1120,60 @@ export default function FleetRentalPanel({
           </div>
           <div className="bg-white rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05]">
             {overlays.length === 0 ? (
-              <p className="p-6 text-sm text-gray-500">
-                Καμία ενεργή ενοικίαση για overlay. Ορίστε GPS device ή πινακίδα στο όχημα και κάντε
-                κράτηση.
-              </p>
+              <div className="p-6 space-y-2">
+                <p className="text-sm font-semibold text-gray-800">Κανένα όχημα με ενεργό GPS overlay</p>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Ορίστε <strong>GPS device</strong> (και πινακίδα) στην καρτέλα οχήματος ενοικίασης,
+                  μετά κάντε ενεργή κράτηση. Ο πελάτης δεν χρειάζεται να ανοίξει τοποθεσία στο
+                  τηλέφωνό του.
+                </p>
+              </div>
             ) : (
-              overlays.map((o) => (
-                <div key={o.booking_id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm text-gray-900">{o.label}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {o.plate_number || '—'}
-                      {o.gps_device_id ? ` · device ${o.gps_device_id}` : ' · χωρίς gps_device_id'}
-                      {` · ${o.rental_status}`}
-                      {o.driver_mode === 'WITH_DRIVER' ? ' · με οδηγό' : ''}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {formatWhen(o.start_time)} → {formatWhen(o.end_time)}
-                      {o.pickup_location ? ` · ${o.pickup_location}` : ''}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-[11px] font-bold px-2 py-1 rounded-full ${
-                      o.gps_device_id || o.plate_number
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}
+              overlays.map((o) => {
+                const fleetId = o.plate_number
+                  ? o.plate_number
+                  : o.gps_device_id
+                    ? `device ${o.gps_device_id}`
+                    : 'Όχημα χωρίς ταυτότητα GPS';
+                const ready = Boolean(o.gps_device_id || o.plate_number);
+                return (
+                  <div
+                    key={o.booking_id}
+                    className="px-4 py-3 flex flex-wrap items-center justify-between gap-2"
                   >
-                    {o.gps_device_id || o.plate_number ? 'Έτοιμο για χάρτη' : 'Χωρίς GPS'}
-                  </span>
-                </div>
-              ))
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm text-gray-900">Ενοικίαση · {fleetId}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {o.gps_device_id
+                          ? `Συσκευή ${o.gps_device_id}`
+                          : 'Χωρίς GPS device — μόνο πινακίδα'}
+                        {` · ${o.rental_status}`}
+                        {o.driver_mode === 'WITH_DRIVER' ? ' · με οδηγό' : ''}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {formatWhen(o.start_time)} → {formatWhen(o.end_time)}
+                        {o.pickup_location ? ` · ${o.pickup_location}` : ''}
+                        {o.client_name ? ` · κράτηση: ${o.client_name}` : ''}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-[11px] font-bold px-2 py-1 rounded-full ${
+                        o.gps_device_id
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : ready
+                            ? 'bg-sky-100 text-sky-800'
+                            : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {o.gps_device_id
+                        ? 'Συσκευή GPS'
+                        : ready
+                          ? 'Πινακίδα'
+                          : 'Χωρίς GPS'}
+                    </span>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

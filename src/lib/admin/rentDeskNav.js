@@ -72,7 +72,7 @@ export const RENT_DESK_TABS = [
     id: 'live_gps',
     label: 'GPS ενοικίασης',
     icon: 'my_location',
-    description: 'Ζωντανή θέση οχημάτων',
+    description: 'Συσκευή στο όχημα',
     accent: 'sky',
     group: 'fleet',
   },

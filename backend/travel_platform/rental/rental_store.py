@@ -2211,6 +2211,14 @@ def active_rental_overlays(tenant_id: str | None) -> list[dict[str, Any]]:
             v = vehicles.get(b.get("vehicle_id") or "") or {}
             plate = (v.get("plate_number") or b.get("vehicle_plate") or "").strip().upper()
             gps_id = (v.get("gps_device_id") or "").strip()
+            # Map label = vehicle identity only (plate / GPS device). Never customer name —
+            # tracking is fleet hardware, not a phone opt-in from the renter.
+            if plate:
+                map_label = f"Ενοικίαση · {plate}"
+            elif gps_id:
+                map_label = f"Ενοικίαση · device {gps_id}"
+            else:
+                map_label = "Ενοικίαση · όχημα"
             out.append(
                 {
                     "booking_id": b["id"],
@@ -2226,7 +2234,7 @@ def active_rental_overlays(tenant_id: str | None) -> list[dict[str, Any]]:
                     "end_time": b.get("end_time"),
                     "pickup_location": b.get("pickup_location"),
                     "dropoff_location": b.get("dropoff_location"),
-                    "label": f"Ενοικίαση · {b.get('client_name') or plate or '—'}",
+                    "label": map_label,
                 }
             )
     return out
