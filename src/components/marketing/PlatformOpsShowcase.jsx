@@ -1,10 +1,12 @@
 /**
- * Marketing host only: trip cards + bus fleet showcase under the hero.
+ * Marketing host only: trip cards + abroad horizontal + bus fleet showcase under the hero.
  * Apple aesthetic — SF Pro stack, soft gray, quiet chips.
  */
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   getPlatformDemoBuses,
+  getPlatformDemoIntlTrips,
   getPlatformDemoTrips,
   PLATFORM_OPS_COPY,
 } from '../../lib/marketing/platformBusDemoShowcase.js';
@@ -15,7 +17,8 @@ import FleetShowcaseSection from '../FleetShowcaseSection.jsx';
 import '../../styles/marketing-apple.css';
 
 export default function PlatformOpsShowcase() {
-  const trips = getPlatformDemoTrips(3);
+  const domesticTrips = useMemo(() => getPlatformDemoTrips(3), []);
+  const intlTrips = useMemo(() => getPlatformDemoIntlTrips(3), []);
   const buses = getPlatformDemoBuses(3);
 
   return (
@@ -34,6 +37,12 @@ export default function PlatformOpsShowcase() {
               map
             </span>
             Εκδρομές
+          </a>
+          <a href="#platform-abroad" className="pg-apple-chip">
+            <span className="material-symbols-outlined" aria-hidden>
+              public
+            </span>
+            Εξωτερικό
           </a>
           <a href="#our-fleet" className="pg-apple-chip">
             <span className="material-symbols-outlined" aria-hidden>
@@ -56,12 +65,30 @@ export default function PlatformOpsShowcase() {
           eyebrow="Εκδρομές"
           title="Κάρτες ταξιδιών"
           subtitle="Online κράτηση με τιμές, θέσεις και ημερομηνία — όπως στο site του γραφείου."
-          trips={trips}
+          trips={domesticTrips}
           emptyMessage="Δεν υπάρχουν εκδρομές προς εμφάνιση."
           siteAppearance={{
             ...DEFAULT_SITE_APPEARANCE,
             trips_layout_template: 'grid_three',
             trip_card_template: 'premium',
+          }}
+          pricingSettings={DEFAULT_PLATFORM_SETTINGS}
+          sectionClassName="!bg-transparent"
+        />
+      </div>
+
+      <div className="pg-apple-cards-band border-t border-black/[0.06]">
+        <TripsSection
+          id="platform-abroad"
+          eyebrow="Εξωτερικό"
+          title="Οριζόντιες εκδρομές εξωτερικού"
+          subtitle="Παρίσι, Ρώμη, Πράγα & Βιέννη — οριζόντια κάρτα λεωφορείου με ημερομηνίες και τιμή θέσης."
+          trips={intlTrips}
+          emptyMessage="Δεν υπάρχουν διεθνείς εκδρομές προς εμφάνιση."
+          siteAppearance={{
+            ...DEFAULT_SITE_APPEARANCE,
+            trips_layout_template: 'horizontal_scroll',
+            trip_card_template: 'abroad_horizontal',
           }}
           pricingSettings={DEFAULT_PLATFORM_SETTINGS}
           sectionClassName="!bg-transparent"

@@ -67,6 +67,14 @@ export function getPlatformDemoTrips(limit = 3) {
     .map(normalizeTrip);
 }
 
+/** International coach trips for the horizontal abroad strip. */
+export function getPlatformDemoIntlTrips(limit = 3) {
+  return mockTrips
+    .filter((t) => t && t.id && t.market === 'international')
+    .slice(0, Math.max(1, limit))
+    .map(normalizeTrip);
+}
+
 export function getPlatformDemoBuses(limit = 3) {
   return DEMO_BUS_FLEET.slice(0, Math.max(1, limit));
 }

@@ -148,6 +148,8 @@ DEFAULT_SITE_APPEARANCE = {
     "trips_layout_template": "grid_three",
     "trip_card_template": "premium",
     "footer_template": "classic_columns",
+    "intl_trips_layout_template": "horizontal_scroll",
+    "intl_trip_card_template": "abroad_horizontal",
     "trips_section_eyebrow": "Ανακαλύψτε",
     "trips_section_title": "Εκδρομές στην Ελλάδα",
     "trips_section_subtitle": (
@@ -156,7 +158,7 @@ DEFAULT_SITE_APPEARANCE = {
     "intl_section_eyebrow": "Διεθνή δρομολόγια",
     "intl_section_title": "Ταξίδια προς το Εξωτερικό",
     "intl_section_subtitle": (
-        "Αναχωρήσεις από Ελλάδα με Premium & Luxury coach — κράτηση θέσης online σε λίγα δευτερόλεπτα."
+        "Οριζόντια προβολή διεθνών εκδρομών με λεωφορείο — σύρετε για να δείτε όλες."
     ),
     "updated_at": None,
 }
@@ -230,6 +232,8 @@ class SiteAppearanceResponse(BaseModel):
     trips_layout_template: str = "grid_three"
     trip_card_template: str = "premium"
     footer_template: str = "classic_columns"
+    intl_trips_layout_template: str = "horizontal_scroll"
+    intl_trip_card_template: str = "abroad_horizontal"
     trips_section_eyebrow: str = "Ανακαλύψτε"
     trips_section_title: str = "Εκδρομές στην Ελλάδα"
     trips_section_subtitle: str = (
@@ -238,7 +242,7 @@ class SiteAppearanceResponse(BaseModel):
     intl_section_eyebrow: str = "Διεθνή δρομολόγια"
     intl_section_title: str = "Ταξίδια προς το Εξωτερικό"
     intl_section_subtitle: str = (
-        "Αναχωρήσεις από Ελλάδα με Premium & Luxury coach — κράτηση θέσης online σε λίγα δευτερόλεπτα."
+        "Οριζόντια προβολή διεθνών εκδρομών με λεωφορείο — σύρετε για να δείτε όλες."
     )
     updated_at: str | None = None
 
@@ -321,6 +325,8 @@ class SiteAppearanceUpdate(BaseModel):
     trips_layout_template: str | None = None
     trip_card_template: str | None = None
     footer_template: str | None = None
+    intl_trips_layout_template: str | None = None
+    intl_trip_card_template: str | None = None
     trips_section_eyebrow: str | None = None
     trips_section_title: str | None = None
     trips_section_subtitle: str | None = None

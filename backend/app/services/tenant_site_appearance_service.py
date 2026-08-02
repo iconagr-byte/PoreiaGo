@@ -81,6 +81,8 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "show_why_us_section": True,
     "trips_layout_template": "grid_three",
     "trip_card_template": "premium",
+    "intl_trips_layout_template": "horizontal_scroll",
+    "intl_trip_card_template": "abroad_horizontal",
     "rent_fleet_layout_template": "rent_grid_three",
     "rent_fleet_card_template": "rent_premium",
 }

@@ -94,18 +94,28 @@
 }
 
 .pg-apple-cards-band #platform-trips,
+.pg-apple-cards-band #platform-abroad,
 .pg-apple-cards-band #our-fleet,
 .pg-apple-trips-band #platform-trips,
+.pg-apple-trips-band #platform-abroad,
 .pg-apple-trips-band #our-fleet {
   background: transparent !important;
   border-color: transparent !important;
 }
 
 .pg-apple-cards-band #platform-trips h2,
+.pg-apple-cards-band #platform-abroad h2,
 .pg-apple-cards-band #our-fleet h2,
 .pg-apple-trips-band #platform-trips h2,
+.pg-apple-trips-band #platform-abroad h2,
 .pg-apple-trips-band #our-fleet h2 {
   color: var(--pg-apple-ink);
+}
+
+/* Wider abroad horizontal cards in the marketing strip */
+.pg-apple-cards-band #platform-abroad .snap-start,
+.pg-apple-trips-band #platform-abroad .snap-start {
+  scroll-snap-align: start;
 }
 
 .pg-apple-cards-band article,
