@@ -128,17 +128,20 @@
 .pg-apple-abroad-strip,
 .pg-apple-cards-band #platform-abroad,
 .pg-apple-trips-band #platform-abroad {
-  max-width: 920px;
+  max-width: 1120px;
 }
 
 .pg-apple-abroad-strip .max-w-3xl,
-.pg-apple-cards-band #platform-abroad .max-w-3xl {
+.pg-apple-abroad-strip .max-w-5xl,
+.pg-apple-cards-band #platform-abroad .max-w-3xl,
+.pg-apple-cards-band #platform-abroad .max-w-5xl {
   max-width: 100%;
 }
 
 .pg-apple-cards-band #platform-abroad article,
-.pg-apple-trips-band #platform-abroad article {
-  min-height: 168px;
+.pg-apple-trips-band #platform-abroad article,
+.pg-apple-abroad-strip article {
+  min-height: 240px;
 }
 
 .pg-apple-cards-band article,

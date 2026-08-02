@@ -190,10 +190,10 @@ export default function TripCard({
 
     return (
       <article
-        className="group h-full flex flex-col sm:flex-row rounded-[22px] bg-white border border-black/[0.06] shadow-[0_8px_28px_rgba(15,23,42,0.06)] hover:shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-all duration-300 overflow-hidden cursor-pointer"
+        className="group h-full flex flex-col sm:flex-row rounded-[28px] bg-white border border-black/[0.06] shadow-[0_12px_36px_rgba(15,23,42,0.08)] hover:shadow-[0_22px_52px_rgba(15,23,42,0.14)] transition-all duration-300 overflow-hidden cursor-pointer"
         onClick={go}
       >
-        <div className="relative sm:w-[42%] h-44 sm:h-auto sm:min-h-[180px] shrink-0 overflow-hidden">
+        <div className="relative sm:w-[46%] lg:w-[48%] h-56 sm:h-auto sm:min-h-[240px] lg:min-h-[280px] shrink-0 overflow-hidden">
           <img
             src={img}
             alt={destination}
@@ -201,45 +201,45 @@ export default function TripCard({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent sm:bg-gradient-to-r sm:from-transparent sm:via-transparent sm:to-black/10" />
           {abroad ? (
-            <span className="absolute top-3 left-3 z-10 text-[10px] font-black uppercase tracking-wider bg-sky-600 text-white px-2.5 py-1 rounded-full shadow-sm">
+            <span className="absolute top-4 left-4 z-10 text-[11px] font-black uppercase tracking-wider bg-sky-600 text-white px-3 py-1.5 rounded-full shadow-sm">
               Εξωτερικό
             </span>
           ) : null}
         </div>
-        <div className="flex-1 p-5 sm:p-6 flex flex-col justify-between gap-4 min-w-0">
+        <div className="flex-1 p-6 sm:p-7 lg:p-8 flex flex-col justify-between gap-5 min-w-0">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-sky-600 mb-1.5">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-600 mb-2">
               Coach · διεθνές
             </p>
-            <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-tight truncate">
+            <h3 className="text-2xl sm:text-3xl lg:text-[2.1rem] font-extrabold text-slate-900 tracking-tight leading-tight truncate">
               {destination}
             </h3>
             {trip.title && trip.title !== destination ? (
-              <p className="mt-1 text-sm font-semibold text-slate-500 truncate">{trip.title}</p>
+              <p className="mt-1.5 text-base font-semibold text-slate-500 truncate">{trip.title}</p>
             ) : null}
             {dateRange ? (
-              <p className="mt-3 text-sm font-medium text-slate-500 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px] text-sky-600">calendar_month</span>
+              <p className="mt-4 text-base font-medium text-slate-500 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[22px] text-sky-600">calendar_month</span>
                 {dateRange}
               </p>
             ) : (
-              <div className="mt-3">
+              <div className="mt-4">
                 <TripMeta trip={trip} compact />
               </div>
             )}
           </div>
-          <div className="flex items-end justify-between gap-3 pt-1 border-t border-black/[0.05]">
+          <div className="flex items-end justify-between gap-4 pt-2 border-t border-black/[0.05]">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                 {seat} {currency}
               </p>
-              <p className="text-2xl font-extrabold text-slate-900 tabular-nums">
+              <p className="text-3xl sm:text-4xl font-extrabold text-slate-900 tabular-nums leading-none">
                 {Number.isFinite(amount) ? amount.toFixed(0) : '—'}
               </p>
             </div>
             <BookButton
               onClick={go}
-              className="text-sm px-5 py-2.5 rounded-full bg-sky-600 text-white hover:bg-sky-500 shrink-0"
+              className="text-base px-6 py-3 rounded-full bg-sky-600 text-white hover:bg-sky-500 shrink-0"
             />
           </div>
         </div>
