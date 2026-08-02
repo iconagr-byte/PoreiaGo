@@ -131,7 +131,8 @@ export default function DriversManagementPanel() {
             Λογαριασμοί οδηγών
           </h3>
           <p className="mt-1 text-[14px] text-zinc-500 tracking-tight max-w-lg">
-            Email και κωδικός για είσοδο στο /driver.
+            Email και κωδικός για είσοδο στο /driver. Οι οδηγοί ανήκουν μόνο σε αυτό το
+            γραφείο — διαγραφή στο PoreiaGo δεν αγγίζει το Achillio Travel και αντίστροφα.
           </p>
         </div>
         <button
