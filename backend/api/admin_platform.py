@@ -398,21 +398,109 @@ def _user_response(u) -> PlatformUserResponse:
     )
 
 
+def _settings_response_from_dict(data: dict) -> PlatformSettingsResponse:
+    fields = getattr(PlatformSettingsResponse, "model_fields", None) or getattr(
+        PlatformSettingsResponse, "__fields__", {}
+    )
+    return PlatformSettingsResponse(**{k: v for k, v in data.items() if k in fields})
+
+
+async def _office_uses_tenant_platform_settings(request: Request):
+    """
+    True for Achillio Travel + customer offices (Postgres only).
+
+    False for PoreiaGo platform — shared platform_settings.json is OK there.
+    """
+    from uuid import UUID
+
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+    from app.services.tenant_modules import (
+        is_achillio_travel_office,
+        is_poreiago_platform_office,
+    )
+
+    raw = str(_request_tenant_id(request) or "").strip()
+    if not raw:
+        return None
+    try:
+        tid = UUID(raw)
+    except ValueError:
+        return None
+    try:
+        async with AsyncSessionLocal() as db:
+            row = await db.execute(select(Tenant).where(Tenant.id == tid).limit(1))
+            tenant = row.scalar_one_or_none()
+            if not tenant:
+                return None
+            if is_achillio_travel_office(tenant):
+                return tid
+            if is_poreiago_platform_office(tenant):
+                return None
+            return tid
+    except Exception:
+        logger.debug("tenant platform settings resolve failed", exc_info=True)
+        return None
+
+
 @router.get("/settings", response_model=PlatformSettingsResponse)
-async def get_settings():
+async def get_settings(request: Request):
+    from app.core.database import AsyncSessionLocal
+    from app.services.tenant_platform_settings_service import TenantPlatformSettingsService
+
+    tid = await _office_uses_tenant_platform_settings(request)
+    if tid is not None:
+        try:
+            async with AsyncSessionLocal() as db:
+                data = await TenantPlatformSettingsService(db).get_settings(tid)
+                await db.commit()
+                return _settings_response_from_dict(data)
+        except Exception:
+            logger.debug("tenant platform settings get failed", exc_info=True)
+            from fastapi import HTTPException
+
+            raise HTTPException(
+                status_code=503,
+                detail="Αδυναμία φόρτωσης ρυθμίσεων γραφείου",
+            ) from None
     s = get_platform_config()
-    return PlatformSettingsResponse(**s.__dict__)
+    return _settings_response_from_dict(s.__dict__)
 
 
 @router.patch("/settings", response_model=PlatformSettingsResponse)
-async def patch_settings(body: PlatformSettingsUpdate):
+async def patch_settings(request: Request, body: PlatformSettingsUpdate):
+    from app.core.database import AsyncSessionLocal
+    from app.services.tenant_platform_settings_service import TenantPlatformSettingsService
+
     patch = body.model_dump(exclude_unset=True)
+    tid = await _office_uses_tenant_platform_settings(request)
+    if tid is not None:
+        async with AsyncSessionLocal() as db:
+            data = await TenantPlatformSettingsService(db).update_settings(tid, patch)
+            await db.commit()
+            return _settings_response_from_dict(data)
+
+    # Shared file store — PoreiaGo platform only. Never write Achillio checkout
+    # into branding key "default".
+    checkout = str(patch.get("checkout_base_url") or "").strip().lower()
+    if "achilliotravel.com" in checkout:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Το checkout URL του Achillio Travel δεν αποθηκεύεται στις "
+                "κοινές ρυθμίσεις PoreiaGo"
+            ),
+        )
     s = update_platform_config(patch)
     if patch.get("checkout_base_url"):
         from travel_platform.growth.branding_store import update_branding
 
         update_branding("default", {"checkout_base_url": patch["checkout_base_url"]})
-    return PlatformSettingsResponse(**s.__dict__)
+    return _settings_response_from_dict(s.__dict__)
 
 
 @router.get("/users", response_model=list[PlatformUserResponse])
@@ -1120,23 +1208,40 @@ async def get_admin_branding(request: Request):
 
 @router.put("/branding", response_model=BrandingAdminResponse)
 async def put_admin_branding(request: Request, body: BrandingAdminUpdate):
-    from travel_platform.growth.branding_store import update_branding
-    from app.core.database import AsyncSessionLocal
+    from fastapi import HTTPException
     from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
     from app.models.tenant import Tenant
-    from app.services.tenant_modules import is_poreiago_platform_office
+    from app.services.tenant_modules import (
+        is_achillio_travel_office,
+        is_poreiago_platform_office,
+    )
+    from travel_platform.growth.branding_store import update_branding
 
     patch = body.model_dump(exclude_unset=True)
     tid = _request_tenant_id(request)
-    key = "default"
+    key = None
     try:
         async with AsyncSessionLocal() as session:
             row = await session.execute(select(Tenant).where(Tenant.id == tid).limit(1))
             tenant = row.scalar_one_or_none()
-            if tenant and not is_poreiago_platform_office(tenant):
+            if not tenant:
+                raise HTTPException(status_code=403, detail="Άγνωστο γραφείο — branding απορρίφθηκε")
+            if is_poreiago_platform_office(tenant) and not is_achillio_travel_office(tenant):
+                key = "default"
+            else:
+                # Achillio Travel / customer offices — never write shared "default".
                 key = str(tenant.slug or tenant.subdomain or tid)
+    except HTTPException:
+        raise
     except Exception:
-        key = "default"
+        raise HTTPException(
+            status_code=503,
+            detail="Αδυναμία επίλυσης γραφείου για branding",
+        ) from None
+    if not key:
+        raise HTTPException(status_code=403, detail="Άγνωστο γραφείο — branding απορρίφθηκε")
     return BrandingAdminResponse(**update_branding(key, patch).to_dict())
 
 
@@ -1216,19 +1321,53 @@ async def get_public_pricing_quote(
 
 
 @router.get("/abandoned/carts", response_model=list[AbandonedCartResponse])
-async def list_abandoned_carts(include_completed: bool = False):
+async def list_abandoned_carts(request: Request, include_completed: bool = False):
     from travel_platform.revenue.abandoned_carts import list_carts
 
-    return [AbandonedCartResponse(**c.to_dict()) for c in list_carts(include_completed=include_completed)]
+    tid = str(_request_tenant_id(request) or "").strip() or None
+    return [
+        AbandonedCartResponse(**c.to_dict())
+        for c in list_carts(include_completed=include_completed, tenant_id=tid)
+    ]
 
 
 @router.post("/abandoned/scan", response_model=AbandonedScanResponse)
 async def scan_abandoned_carts(body: AbandonedScanRequest, request: Request):
     from travel_platform.revenue.abandoned_carts import scan_and_send_recovery
 
+    tid = str(_request_tenant_id(request) or "").strip() or None
     origin = request.headers.get("origin") or request.headers.get("referer", "")
-    base = body.base_url or (origin.rstrip("/") if origin else "http://localhost:5173")
-    stats = await scan_and_send_recovery(base_url=base, pending_minutes=body.pending_minutes)
+    base = body.base_url or (origin.rstrip("/") if origin else "https://www.poreiago.com")
+    # Never let Achillio Travel domain leak into PoreiaGo recovery scans.
+    if tid and "achilliotravel.com" in str(base).lower():
+        if not await _tenant_is_achillio_office(tid):
+            base = "https://www.poreiago.com"
+    label = "PoreiaGo"
+    try:
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import is_achillio_travel_office
+
+        if tid:
+            from uuid import UUID
+
+            async with AsyncSessionLocal() as db:
+                row = await db.execute(select(Tenant).where(Tenant.id == UUID(tid)).limit(1))
+                tenant = row.scalar_one_or_none()
+                if tenant:
+                    label = str(tenant.legal_name or tenant.slug or "PoreiaGo")
+                    if is_achillio_travel_office(tenant) and not body.base_url:
+                        base = "https://www.achilliotravel.com"
+    except Exception:
+        pass
+    stats = await scan_and_send_recovery(
+        base_url=base,
+        pending_minutes=body.pending_minutes,
+        tenant_id=tid,
+        company_label=label,
+    )
     return AbandonedScanResponse(**stats)
 
 

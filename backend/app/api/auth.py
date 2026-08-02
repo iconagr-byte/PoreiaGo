@@ -129,15 +129,20 @@ async def login(request: Request, body: LoginRequest):
     from travel_platform.settings.login_audit_store import record_login_from_request
 
     email = (body.email or "").strip().lower()
-    # Host affinity: Achillio Travel URL → that office only.
-    # Platform URL (poreiago.com) must not silently open an Achillio session.
+    # Host affinity:
+    # - Achillio Travel URL → Achillio office JWT only
+    # - poreiago.com → PoreiaGo platform JWT (never Achillio Travel session)
+    # Same email/password can open both desks; tenant_id always follows Host.
     forced_tenant_id = body.tenant_id
-    reject_achillio_on_platform = False
+    mirror_missing_user = False
     try:
+        from uuid import UUID as _UUID
+
         from middleware.domain_tenant import _is_platform_host, _request_host
         from travel_platform.settings.office_host_guard import (
             host_looks_like_achillio_travel,
             login_host_forced_tenant_id,
+            resolve_poreiago_platform_tenant_id,
         )
 
         host = _request_host(request)
@@ -147,13 +152,16 @@ async def login(request: Request, body: LoginRequest):
             if forced is not None:
                 forced_tenant_id = forced
             elif platform:
-                reject_achillio_on_platform = True
+                platform_tid = await resolve_poreiago_platform_tenant_id()
+                if platform_tid:
+                    forced_tenant_id = _UUID(str(platform_tid))
+                    mirror_missing_user = True
         elif host_looks_like_achillio_travel(host) and forced_tenant_id is None:
             forced = await login_host_forced_tenant_id(host, is_platform_host=False)
             if forced is not None:
                 forced_tenant_id = forced
     except Exception:
-        reject_achillio_on_platform = False
+        mirror_missing_user = False
 
     async with AsyncSessionLocal() as db:
         try:
@@ -163,15 +171,8 @@ async def login(request: Request, body: LoginRequest):
                 tenant_id=forced_tenant_id,
                 tenant_slug=body.tenant_slug,
                 mfa_code=body.mfa_code,
+                mirror_missing_user=mirror_missing_user,
             )
-            if reject_achillio_on_platform:
-                from app.services.tenant_modules import is_achillio_travel_office
-
-                if is_achillio_travel_office(tenant):
-                    raise ValueError(
-                        "Αυτός ο λογαριασμός ανήκει στο Achillio Travel — "
-                        "συνδεθείτε από https://www.achilliotravel.com/admin/login"
-                    )
             await db.commit()
         except ValueError as exc:
             await db.rollback()

@@ -39,16 +39,21 @@ import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
 import { RentProductSection } from '../components/marketing/PlatformLandingSections.jsx';
 import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
+import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 import LoginPage from './LoginPage.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
 const PREFERRED_VEHICLE_ID_KEY = 'rent_preferred_vehicle_id_v1';
 
+function rentFavoritesKey() {
+  return officeStorageKey('rent_favorites_v1');
+}
+
 function useRentFavorites() {
   const [favorites, setFavorites] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('rent_favorites_v1') || '[]');
+      return JSON.parse(localStorage.getItem(rentFavoritesKey()) || '[]');
     } catch {
       return [];
     }
@@ -56,7 +61,7 @@ function useRentFavorites() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('rent_favorites_v1', JSON.stringify(favorites));
+      localStorage.setItem(rentFavoritesKey(), JSON.stringify(favorites));
     } catch {
       /* ignore */
     }
