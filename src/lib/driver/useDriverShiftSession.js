@@ -368,8 +368,14 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
     const onVisible = () => {
       if (document.visibilityState === 'visible') ensureRunning();
     };
+    // SOS keepalive: only refresh an already-running shift — never start one.
+    const onKeepalive = () => {
+      if (!isDriverShiftOnline()) return;
+      ensureRunning();
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', ensureRunning);
+    window.addEventListener('driver-gps-keepalive', onKeepalive);
 
     // Real document unload (close tab / kill PWA) — clear office pin immediately.
     // App-switch usually only fires visibilitychange; pagehide+persisted=bfcache.
@@ -392,6 +398,7 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       window.clearInterval(retryId);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', ensureRunning);
+      window.removeEventListener('driver-gps-keepalive', onKeepalive);
       window.removeEventListener('pagehide', onPageHide);
       // Do NOT stopRuntime here — Strict Mode remount would kill GPS.
       // Teardown only when enabled flips false (above) or goOffline/logout.
