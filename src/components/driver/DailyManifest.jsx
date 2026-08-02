@@ -4,8 +4,10 @@ import {
   fetchDriverSchedule,
   fetchDriverTrip,
 } from '../../services/driverPortalApi.js';
-import { getDriverSession } from '../../lib/driver/driverSession.js';
-import DriverBoardingSeatMap from './DriverBoardingSeatMap.jsx';
+import {
+  getDriverSession,
+  hasOpenDriverTrip,
+} from '../../lib/driver/driverSession.js';
 import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
 const STATUS_LABEL = {
@@ -84,16 +86,19 @@ export default function DailyManifest() {
         fetchDriverSchedule().catch(() => []),
         fetchDriverManifest().catch(() => null),
       ]);
-      setTripMeta(trip);
-      const schedule =
-        (trip?.stops?.length ? trip.stops : null) ||
-        apiStops ||
-        getDriverSession()?.schedule ||
-        [];
-      setStops(schedule);
-      setManifest(man);
-      if (!trip && !man && !getDriverSession()?.tripId) {
-        setError('Δεν έχει συνδεθεί ταξίδι σε αυτή τη συνεδρία.');
+      if (!trip && !man) {
+        setTripMeta(null);
+        setManifest(null);
+        setStops([]);
+        setError('');
+      } else {
+        setTripMeta(trip);
+        const schedule =
+          (trip?.stops?.length ? trip.stops : null) ||
+          apiStops ||
+          [];
+        setStops(schedule);
+        setManifest(man);
       }
     } catch {
       setError('Αποτυχία φόρτωσης ταξιδιού. Δοκιμάστε ξανά.');
@@ -108,7 +113,11 @@ export default function DailyManifest() {
     inflightRef.current = true;
     try {
       const man = await fetchDriverManifest().catch(() => null);
-      if (man) setManifest(man);
+      setManifest(man);
+      if (!man && !hasOpenDriverTrip()) {
+        setTripMeta(null);
+        setStops([]);
+      }
     } finally {
       inflightRef.current = false;
     }
@@ -129,12 +138,21 @@ export default function DailyManifest() {
     const onUpdated = () => {
       if (!cancelled) refreshManifest();
     };
+    const onCleared = () => {
+      if (cancelled) return;
+      setTripMeta(null);
+      setManifest(null);
+      setStops([]);
+      setLoading(false);
+    };
     window.addEventListener('driver-manifest-updated', onUpdated);
+    window.addEventListener('driver-trip-cleared', onCleared);
 
     return () => {
       cancelled = true;
       clearInterval(id);
       window.removeEventListener('driver-manifest-updated', onUpdated);
+      window.removeEventListener('driver-trip-cleared', onCleared);
     };
   }, [session?.tripId, loadAll, refreshManifest]);
 
@@ -175,6 +193,36 @@ export default function DailyManifest() {
           <div className="driver-boarding-bar mt-4">
             <div className="driver-boarding-fill" style={{ width: '28%' }} />
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Only show excursion + bus map when office opened / assigned a real trip.
+  const hasTrip = Boolean(
+    hasOpenDriverTrip(session) && (tripMeta?.trip_id || manifest?.trip_id),
+  );
+
+  if (!hasTrip) {
+    return (
+      <div className="driver-stack">
+        <div className="driver-card driver-card-accent">
+          <p className="driver-card-label">Σημερινό δρομολόγιο</p>
+          <h2 className="text-xl font-extrabold mt-1 tracking-tight">Χωρίς εκδρομή</h2>
+          <p className="mt-2 text-sm font-semibold text-[var(--driver-muted)] leading-relaxed">
+            Δεν φορτώνεται εκδρομή ούτε κάτοψη λεωφορείου μέχρι το γραφείο να ανοίξει /
+            αναθέσει δρομολόγιο (Master QR ή ανάθεση).
+          </p>
+          <button
+            type="button"
+            onClick={() => loadAll({ silent: false })}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--driver-yellow-soft)] border border-[var(--driver-yellow)]/30 px-3 py-2 text-sm font-bold"
+          >
+            <span className="material-symbols-outlined text-[var(--driver-yellow)] text-[20px]">
+              refresh
+            </span>
+            Έλεγχος ξανά
+          </button>
         </div>
       </div>
     );
@@ -252,65 +300,58 @@ export default function DailyManifest() {
         ) : null}
       </div>
 
-      {manifest ? (
+      <div className="driver-home-board">
         <div className="driver-card">
-          <DriverBoardingSeatMap
-            manifest={manifest}
-            vehicleType={session?.vehicleType || tripMeta?.vehicle_type || manifest?.vehicle_type}
-          />
+          <h3 className="font-bold text-base mb-1 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[var(--driver-yellow)] text-[22px]">
+                hourglass_top
+              </span>
+              Αναμονή επιβίβασης
+            </span>
+            <span className="text-sm font-extrabold tabular-nums text-[var(--driver-muted)]">
+              {waitingList.length}
+            </span>
+          </h3>
+          {waitingList.length ? (
+            <ul className="mt-1 driver-passenger-list">
+              {waitingList.map((p, i) => (
+                <PassengerRow key={passengerKey(p, i)} passenger={p} tone="waiting" />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-[var(--driver-muted)] py-4 text-center">
+              {manifest
+                ? 'Όλοι οι επιβάτες έχουν επιβιβαστεί ή δεν υπάρχουν κρατήσεις.'
+                : 'Φόρτωση πελατών…'}
+            </p>
+          )}
         </div>
-      ) : null}
 
-      <div className="driver-card">
-        <h3 className="font-bold text-base mb-1 flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[var(--driver-yellow)] text-[22px]">
-              hourglass_top
+        <div className="driver-card">
+          <h3 className="font-bold text-base mb-1 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[var(--driver-success)] text-[22px]">
+                groups
+              </span>
+              Επιβιβασμένοι
             </span>
-            Αναμονή επιβίβασης
-          </span>
-          <span className="text-sm font-extrabold tabular-nums text-[var(--driver-muted)]">
-            {waitingList.length}
-          </span>
-        </h3>
-        {waitingList.length ? (
-          <ul className="mt-1">
-            {waitingList.map((p, i) => (
-              <PassengerRow key={passengerKey(p, i)} passenger={p} tone="waiting" />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-[var(--driver-muted)] py-4 text-center">
-            {manifest
-              ? 'Όλοι οι επιβάτες έχουν επιβιβαστεί ή δεν υπάρχουν κρατήσεις.'
-              : 'Φόρτωση πελατών…'}
-          </p>
-        )}
-      </div>
-
-      <div className="driver-card">
-        <h3 className="font-bold text-base mb-1 flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[var(--driver-success)] text-[22px]">
-              groups
+            <span className="text-sm font-extrabold tabular-nums text-[var(--driver-muted)]">
+              {boardedList.length}
             </span>
-            Επιβιβασμένοι
-          </span>
-          <span className="text-sm font-extrabold tabular-nums text-[var(--driver-muted)]">
-            {boardedList.length}
-          </span>
-        </h3>
-        {boardedList.length ? (
-          <ul className="mt-1">
-            {boardedList.map((p, i) => (
-              <PassengerRow key={passengerKey(p, i)} passenger={p} tone="boarded" />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-[var(--driver-muted)] py-4 text-center">
-            Κανένας επιβιβασμένος ακόμα.
-          </p>
-        )}
+          </h3>
+          {boardedList.length ? (
+            <ul className="mt-1 driver-passenger-list">
+              {boardedList.map((p, i) => (
+                <PassengerRow key={passengerKey(p, i)} passenger={p} tone="boarded" />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-[var(--driver-muted)] py-4 text-center">
+              Κανένας επιβιβασμένος ακόμα.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="driver-card">

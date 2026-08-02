@@ -9,6 +9,11 @@ from typing import Any
 
 from app.core.data_paths import resolve_data_file
 from core.config import get_platform_settings
+from travel_platform.settings.checkout_base import (
+    PRODUCTION_PLATFORM_CHECKOUT,
+    heal_checkout_base_url,
+    is_localhost_checkout_url,
+)
 
 _LEGACY_SETTINGS = Path(__file__).resolve().parent / "platform_settings.json"
 _SETTINGS_FILE = resolve_data_file("platform_settings.json", _LEGACY_SETTINGS)
@@ -31,7 +36,7 @@ class PlatformRuntimeSettings:
     smtp_from_email: str = "noreply@aerostride.app"
     sms_sender_id: str = "AEROSTRIDE"
     maintenance_mode: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = PRODUCTION_PLATFORM_CHECKOUT
     checkout_deposit_enabled: bool = True
     checkout_deposit_percent: int = 30
     checkout_bank_transfer_enabled: bool = True
@@ -72,7 +77,14 @@ def _load_from_disk() -> PlatformRuntimeSettings | None:
         raw = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
         allowed = PlatformRuntimeSettings.__dataclass_fields__
         filtered = {k: v for k, v in raw.items() if k in allowed}
-        return PlatformRuntimeSettings(**filtered)
+        cfg = PlatformRuntimeSettings(**filtered)
+        healed = heal_checkout_base_url(
+            cfg.checkout_base_url, fallback=PRODUCTION_PLATFORM_CHECKOUT
+        )
+        if healed != str(cfg.checkout_base_url or "").rstrip("/"):
+            cfg.checkout_base_url = healed
+            _persist(cfg)
+        return cfg
     except (json.JSONDecodeError, TypeError, ValueError):
         return None
 
@@ -89,6 +101,9 @@ def get_platform_config() -> PlatformRuntimeSettings:
     global _store
     if _store is None:
         _store = _load_from_disk() or _defaults()
+    if is_localhost_checkout_url(_store.checkout_base_url):
+        _store.checkout_base_url = PRODUCTION_PLATFORM_CHECKOUT
+        _persist(_store)
     return _store
 
 
@@ -100,5 +115,7 @@ def update_platform_config(patch: dict[str, Any]) -> PlatformRuntimeSettings:
     for k, v in patch.items():
         if k in allowed and v is not None:
             setattr(_store, k, v)
+    if is_localhost_checkout_url(_store.checkout_base_url):
+        _store.checkout_base_url = PRODUCTION_PLATFORM_CHECKOUT
     _persist(_store)
     return _store

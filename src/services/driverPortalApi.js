@@ -1,5 +1,6 @@
 import { API_BASE } from '../config/api.js';
 import {
+  clearDriverTripBinding,
   driverSessionHeaders,
   getActiveTripId,
   getDriverSession,
@@ -9,17 +10,12 @@ import { fetchBoardingManifest, adminScanTicket } from './ticketingApi.js';
 
 export { adminScanTicket, fetchBoardingManifest };
 
-const DEV_SCHEDULE = [
-  { time: '08:00', stop: 'Αθήνα — Λαρίσσης', status: 'completed' },
-  { time: '10:30', stop: 'Λαμία', status: 'current' },
-  { time: '13:00', stop: 'Μετέωρα', status: 'upcoming' },
-  { time: '18:00', stop: 'Επιστροφή', status: 'upcoming' },
-];
-
 function mapSessionPayload(data) {
+  const rawTrip = data?.trip_id;
+  const tripId = rawTrip != null && Number(rawTrip) > 0 ? Number(rawTrip) : null;
   return {
     accessToken: data.access_token,
-    tripId: data.trip_id,
+    tripId,
     tenantId: data.tenant_id,
     driverId: data.driver_id,
     expiresAt: data.expires_at,
@@ -43,11 +39,12 @@ function saveMappedSession(data) {
 
 const DEV_SESSION = {
   accessToken: 'dev-driver-session',
-  tripId: 1,
+  // No fake trip — matches production when office has not opened an excursion.
+  tripId: null,
   tenantId: '00000000-0000-0000-0000-000000000001',
   driverId: 'dev-driver',
   expiresAt: Math.floor(Date.now() / 1000) + 86400,
-  schedule: DEV_SCHEDULE,
+  schedule: [],
   driverName: 'Οδηγός Demo',
   photoUrl: null,
   vehiclePlate: 'XAH-4021',
@@ -66,7 +63,6 @@ export async function loginDriver(username, password) {
   } catch {
     if (import.meta.env.DEV) {
       saveDriverSession(DEV_SESSION);
-      await cacheManifestForOffline(1);
       return DEV_SESSION;
     }
     throw new Error('Δεν υπάρχει σύνδεση με τον server');
@@ -77,7 +73,7 @@ export async function loginDriver(username, password) {
     throw new Error(typeof detail === 'string' ? detail : 'Λάθος όνομα χρήστη ή κωδικός');
   }
   const session = saveMappedSession(data);
-  await cacheManifestForOffline(data.trip_id);
+  if (data.trip_id) await cacheManifestForOffline(data.trip_id);
   return session;
 }
 
@@ -92,7 +88,6 @@ export async function exchangeMasterQr(qrRaw) {
   } catch {
     if (import.meta.env.DEV) {
       saveDriverSession(DEV_SESSION);
-      await cacheManifestForOffline(1);
       return DEV_SESSION;
     }
     throw new Error('Δεν υπάρχει σύνδεση με τον server');
@@ -101,13 +96,12 @@ export async function exchangeMasterQr(qrRaw) {
   if (!res.ok) {
     if (import.meta.env.DEV && qrRaw.trim().length > 4) {
       saveDriverSession(DEV_SESSION);
-      await cacheManifestForOffline(1);
       return DEV_SESSION;
     }
     throw new Error(data.detail || 'Master QR invalid');
   }
   const session = saveMappedSession(data);
-  await cacheManifestForOffline(data.trip_id);
+  if (data.trip_id) await cacheManifestForOffline(data.trip_id);
   return session;
 }
 
@@ -186,6 +180,7 @@ export async function endDriverShift() {
 
 export async function fetchDriverManifest() {
   const tripId = getActiveTripId();
+  if (!tripId) return null;
   try {
     const res = await fetch(`${API_BASE}/api/driver/manifest`, {
       headers: driverSessionHeaders(),
@@ -197,10 +192,15 @@ export async function fetchDriverManifest() {
       // flows (e.g. Scanner check-in) dispatch `driver-manifest-updated`.
       return data;
     }
+    // No open excursion — clear binding so κάτοψη / Εκδρομή #1 cannot linger.
+    if (res.status === 403 || res.status === 404) {
+      clearDriverTripBinding();
+      return null;
+    }
   } catch {
-    /* offline */
+    /* offline — never fall back to demo bookings without a live open trip */
   }
-  return loadCachedManifest(tripId) ?? fetchBoardingManifest(tripId);
+  return null;
 }
 
 export async function fetchDriverSchedule() {
@@ -225,22 +225,19 @@ export async function fetchDriverTrip() {
       headers: driverSessionHeaders(),
     });
     if (res.ok) return res.json();
+    if (res.status === 403 || res.status === 404) {
+      clearDriverTripBinding();
+      return null;
+    }
   } catch {
     /* offline */
   }
-  const session = getDriverSession();
-  if (!session?.tripId) return null;
-  return {
-    trip_id: session.tripId,
-    trip_title: session.tripTitle,
-    destination: session.destination,
-    meeting_point: session.meetingPoint,
-    stops: session.schedule || [],
-    schedule: session.schedule || [],
-  };
+  // Do not invent trip meta from a stale session tripId (demo #1).
+  return null;
 }
 
 export async function cacheManifestForOffline(tripId, manifest) {
+  if (!tripId) return;
   const key = `driver_manifest_${tripId}`;
   if (manifest) {
     localStorage.setItem(key, JSON.stringify({ manifest, cachedAt: Date.now() }));
@@ -255,6 +252,7 @@ export async function cacheManifestForOffline(tripId, manifest) {
 }
 
 export function loadCachedManifest(tripId) {
+  if (!tripId) return null;
   try {
     const raw = localStorage.getItem(`driver_manifest_${tripId}`);
     if (!raw) return null;

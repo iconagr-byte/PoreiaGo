@@ -230,7 +230,10 @@ class FleetRentalStoreTests(unittest.TestCase):
         overlays = store.active_rental_overlays(self.tid)
         self.assertEqual(len(overlays), 1)
         self.assertEqual(overlays[0]["gps_device_id"], "GPS-99")
-        self.assertIn("Ελένη", overlays[0]["label"])
+        # Map pin uses vehicle identity only — never renter name.
+        self.assertIn("ΡΕΝΤ-GPS", overlays[0]["label"])
+        self.assertNotIn("Ελένη", overlays[0]["label"])
+        self.assertEqual(overlays[0]["client_name"], "Ελένη")
 
     def test_inspection_completes_booking(self) -> None:
         v = self._vehicle()

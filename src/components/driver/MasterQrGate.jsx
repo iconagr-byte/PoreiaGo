@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { exchangeMasterQr, loginDriver } from '../../services/driverPortalApi.js';
 import { clearDriverShiftLaunchState } from '../../lib/driver/useDriverShiftSession.js';
+import { useDriverDeviceForm } from '../../hooks/useDriverDeviceForm.js';
 import BusQrScanner from '../BusQrScanner.jsx';
 import '../../styles/driver-app.css';
 
@@ -12,6 +13,11 @@ export default function MasterQrGate({ onAuthenticated }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const device = useDriverDeviceForm();
+  const deviceClass = [
+    device.isTablet ? 'is-tablet' : 'is-phone',
+    device.isLandscape ? 'is-landscape' : 'is-portrait',
+  ].join(' ');
 
   useEffect(() => {
     document.documentElement.classList.add('driver-route');
@@ -62,7 +68,11 @@ export default function MasterQrGate({ onAuthenticated }) {
   };
 
   return (
-    <div className="driver-gate">
+    <div
+      className={`driver-gate ${deviceClass}`}
+      data-device-form={device.form}
+      data-orientation={device.orientation}
+    >
       <div className="driver-gate-glow driver-gate-glow--tr" aria-hidden />
       <div className="driver-gate-glow driver-gate-glow--bl" aria-hidden />
 

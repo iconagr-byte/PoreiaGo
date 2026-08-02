@@ -107,8 +107,15 @@ class AuthService:
         tenant_id: UUID | None = None,
         tenant_slug: str | None = None,
         mfa_code: str | None = None,
+        mirror_missing_user: bool = False,
     ) -> tuple[str, str, User, Tenant]:
-        """Email + password login — tenant resolved automatically or via optional slug."""
+        """Email + password login — tenant resolved automatically or via optional slug.
+
+        ``mirror_missing_user``: when Host forces an office (e.g. poreiago.com →
+        PoreiaGo platform), copy an existing email+password membership onto that
+        office so the same operator can open Achillio Travel and PoreiaGo without
+        a hard reject.
+        """
         resolved_id = await self._resolve_tenant_id(
             email=email,
             password=password,
@@ -116,15 +123,107 @@ class AuthService:
             tenant_slug=tenant_slug,
         )
         await apply_tenant_rls(self._session, resolved_id)
-        token, refresh, user = await self.authenticate(
-            tenant_id=resolved_id,
-            email=email,
-            password=password,
-            mfa_code=mfa_code,
-        )
+        try:
+            token, refresh, user = await self.authenticate(
+                tenant_id=resolved_id,
+                email=email,
+                password=password,
+                mfa_code=mfa_code,
+            )
+        except ValueError:
+            if not (mirror_missing_user and tenant_id is not None):
+                raise
+            mirrored = await self._mirror_user_onto_tenant(
+                target_tenant_id=resolved_id,
+                email=email,
+                password=password,
+            )
+            if not mirrored:
+                raise
+            token, refresh, user = await self.authenticate(
+                tenant_id=resolved_id,
+                email=email,
+                password=password,
+                mfa_code=mfa_code,
+            )
         tenant_result = await self._session.execute(select(Tenant).where(Tenant.id == resolved_id))
         tenant = tenant_result.scalar_one()
         return token, refresh, user, tenant
+
+    async def _mirror_user_onto_tenant(
+        self,
+        *,
+        target_tenant_id: UUID,
+        email: str,
+        password: str,
+    ) -> User | None:
+        """
+        If email+password is valid on another office, ensure the same credentials
+        exist on ``target_tenant_id`` (PoreiaGo platform login from Achillio admin).
+        """
+        matches = await self._match_users_by_email_password(email, password)
+        if not matches:
+            return None
+        # Prefer a non-Achillio source if somehow multiple; else first match.
+        source = matches[0]
+        try:
+            from app.services.tenant_modules import is_achillio_travel_office
+
+            for candidate in matches:
+                t_result = await self._session.execute(
+                    select(Tenant).where(Tenant.id == candidate.tenant_id).limit(1),
+                )
+                t = t_result.scalar_one_or_none()
+                if t and not is_achillio_travel_office(t):
+                    source = candidate
+                    break
+        except Exception:
+            pass
+
+        try:
+            await self._session.execute(text("SET LOCAL row_security = off"))
+        except Exception:
+            pass
+
+        existing = await self._session.execute(
+            select(User).where(
+                User.tenant_id == target_tenant_id,
+                func.lower(User.email) == email.strip().lower(),
+            ),
+        )
+        user = existing.scalar_one_or_none()
+        if user:
+            if not user.is_active:
+                return None
+            # Same email already on PoreiaGo with a different password — do not overwrite.
+            if not verify_password(password, user.password_hash):
+                return None
+            return user
+
+        roles = list(source.roles or [])
+        # Never copy bare customer-only onto platform admin desk.
+        admin_roles = {
+            UserRole.SUPERADMIN.value,
+            UserRole.TENANT_ADMIN.value,
+            UserRole.DISPATCHER.value,
+            UserRole.AUDITOR.value,
+        }
+        if not (set(roles) & admin_roles):
+            roles = [UserRole.TENANT_ADMIN.value]
+
+        user = User(
+            tenant_id=target_tenant_id,
+            email=email.strip().lower(),
+            password_hash=source.password_hash,
+            full_name=source.full_name or email.strip().lower(),
+            roles=roles,
+            is_active=True,
+            mfa_enabled=False,
+            mfa_secret_encrypted=None,
+        )
+        self._session.add(user)
+        await self._session.flush()
+        return user
 
     async def _resolve_tenant_id(
         self,

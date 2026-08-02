@@ -148,6 +148,8 @@ DEFAULT_SITE_APPEARANCE = {
     "trips_layout_template": "grid_three",
     "trip_card_template": "premium",
     "footer_template": "classic_columns",
+    "intl_trips_layout_template": "editorial_stack",
+    "intl_trip_card_template": "abroad_horizontal",
     "trips_section_eyebrow": "Ανακαλύψτε",
     "trips_section_title": "Εκδρομές στην Ελλάδα",
     "trips_section_subtitle": (
@@ -156,7 +158,7 @@ DEFAULT_SITE_APPEARANCE = {
     "intl_section_eyebrow": "Διεθνή δρομολόγια",
     "intl_section_title": "Ταξίδια προς το Εξωτερικό",
     "intl_section_subtitle": (
-        "Αναχωρήσεις από Ελλάδα με Premium & Luxury coach — κράτηση θέσης online σε λίγα δευτερόλεπτα."
+        "Οριζόντια προβολή διεθνών εκδρομών με λεωφορείο — σύρετε για να δείτε όλες."
     ),
     "updated_at": None,
 }
@@ -230,6 +232,8 @@ class SiteAppearanceResponse(BaseModel):
     trips_layout_template: str = "grid_three"
     trip_card_template: str = "premium"
     footer_template: str = "classic_columns"
+    intl_trips_layout_template: str = "editorial_stack"
+    intl_trip_card_template: str = "abroad_horizontal"
     trips_section_eyebrow: str = "Ανακαλύψτε"
     trips_section_title: str = "Εκδρομές στην Ελλάδα"
     trips_section_subtitle: str = (
@@ -238,7 +242,7 @@ class SiteAppearanceResponse(BaseModel):
     intl_section_eyebrow: str = "Διεθνή δρομολόγια"
     intl_section_title: str = "Ταξίδια προς το Εξωτερικό"
     intl_section_subtitle: str = (
-        "Αναχωρήσεις από Ελλάδα με Premium & Luxury coach — κράτηση θέσης online σε λίγα δευτερόλεπτα."
+        "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     )
     updated_at: str | None = None
 
@@ -321,6 +325,8 @@ class SiteAppearanceUpdate(BaseModel):
     trips_layout_template: str | None = None
     trip_card_template: str | None = None
     footer_template: str | None = None
+    intl_trips_layout_template: str | None = None
+    intl_trip_card_template: str | None = None
     trips_section_eyebrow: str | None = None
     trips_section_title: str | None = None
     trips_section_subtitle: str | None = None
@@ -631,13 +637,68 @@ async def get_rental_damage_photo(filename: str):
     )
 
 
+async def _reject_non_platform_shared_appearance(request: Request) -> None:
+    """
+    Shared site_appearance.json is PoreiaGo marketing only.
+
+    Achillio Travel / customer offices must use Postgres
+    ``/api/v1/branding/site-appearance`` — never overwrite the shared file.
+    """
+    tid = getattr(request.state, "tenant_id", None)
+    if not tid:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                import jwt
+                from middleware.tenant import _jwt_settings
+
+                secret, algorithm, _ = _jwt_settings()
+                if secret:
+                    payload = jwt.decode(auth[7:].strip(), secret, algorithms=[algorithm])
+                    tid = payload.get("tenant_id")
+            except Exception:
+                tid = None
+    if not tid:
+        return
+    try:
+        from uuid import UUID
+
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import (
+            is_achillio_travel_office,
+            is_poreiago_platform_office,
+        )
+
+        async with AsyncSessionLocal() as db:
+            row = await db.execute(select(Tenant).where(Tenant.id == UUID(str(tid))).limit(1))
+            tenant = row.scalar_one_or_none()
+            if not tenant:
+                return
+            if is_achillio_travel_office(tenant) or not is_poreiago_platform_office(tenant):
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "Η εμφάνιση αυτού του γραφείου αποθηκεύεται μόνο στο "
+                        "γραφείο (Postgres) — όχι στο κοινό site_appearance του PoreiaGo"
+                    ),
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.debug("site appearance office seal skipped", exc_info=True)
+
+
 @router.get("/api/admin/platform/site-appearance", response_model=SiteAppearanceResponse)
 async def get_admin_site_appearance():
     return await get_public_site_appearance()
 
 
 @router.patch("/api/admin/platform/site-appearance", response_model=SiteAppearanceResponse)
-async def patch_site_appearance(body: SiteAppearanceUpdate):
+async def patch_site_appearance(request: Request, body: SiteAppearanceUpdate):
+    await _reject_non_platform_shared_appearance(request)
     current = _read_appearance()
     patch = _clamp_logo_fields(body.model_dump(exclude_unset=True))
     for key, value in patch.items():
@@ -648,7 +709,8 @@ async def patch_site_appearance(body: SiteAppearanceUpdate):
 
 
 @router.post("/api/admin/platform/site-appearance/upload/{kind}")
-async def upload_site_asset(kind: str, file: UploadFile = File(...)):
+async def upload_site_asset(kind: str, request: Request, file: UploadFile = File(...)):
+    await _reject_non_platform_shared_appearance(request)
     if kind not in _ALLOWED_KINDS:
         raise HTTPException(status_code=400, detail="Invalid asset kind")
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -677,7 +739,8 @@ async def upload_site_asset(kind: str, file: UploadFile = File(...)):
 
 
 @router.delete("/api/admin/platform/site-appearance/upload/{kind}")
-async def clear_site_asset(kind: str):
+async def clear_site_asset(kind: str, request: Request):
+    await _reject_non_platform_shared_appearance(request)
     if kind not in _ALLOWED_KINDS:
         raise HTTPException(status_code=400, detail="Invalid asset kind")
     for old in _upload_dir().glob(f"{kind}.*"):

@@ -302,3 +302,20 @@ export function getOfficeStorefrontUrl(branding = {}, options = {}) {
   const origin = getOfficePublicOrigin(branding, options).replace(/\/$/, '');
   return origin || '/';
 }
+
+/** Driver PWA entry — password login / QR scan on office host. */
+export function getOfficeDriverAppUrl(branding = {}, options = {}) {
+  const origin = getOfficePublicOrigin(branding, options).replace(/\/$/, '');
+  if (!origin) return '/driver';
+  return `${origin}/driver`;
+}
+
+/**
+ * Open Viber share sheet with prefilled text (user picks contact).
+ * Keep text short — Viber trims around 200 characters.
+ */
+export function buildViberForwardHref(text) {
+  const body = String(text || '').trim();
+  if (!body) return '';
+  return `viber://forward?text=${encodeURIComponent(body.slice(0, 200))}`;
+}

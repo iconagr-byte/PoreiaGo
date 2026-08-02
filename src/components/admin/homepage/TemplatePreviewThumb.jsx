@@ -227,12 +227,42 @@ function CardThumb({ id }) {
       </ThumbFrame>
     );
   }
+  if (id === 'abroad_horizontal') {
+    return (
+      <ThumbFrame className="bg-slate-50 p-1.5">
+        <div className="flex gap-1.5 h-full rounded-md overflow-hidden bg-white border border-sky-100">
+          <div className="w-[38%] bg-gradient-to-br from-sky-300 to-slate-400" />
+          <div className="flex-1 flex flex-col justify-center gap-1 pr-1">
+            <div className="h-1 w-1/3 bg-sky-500 rounded" />
+            <div className="h-1.5 w-full bg-slate-800 rounded" />
+            <div className="h-1 w-2/3 bg-slate-300 rounded" />
+            <div className="h-1 w-1/2 bg-sky-400 rounded mt-0.5" />
+          </div>
+        </div>
+      </ThumbFrame>
+    );
+  }
   if (id === 'image_overlay') {
     return (
       <ThumbFrame>
         <div className="h-full bg-slate-500" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute bottom-2 left-2 right-2 h-1 bg-white/90 rounded" />
+      </ThumbFrame>
+    );
+  }
+  if (id === 'destination_poster') {
+    return (
+      <ThumbFrame>
+        <div className="h-full bg-gradient-to-br from-sky-600 via-slate-500 to-amber-700" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
+        <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-end justify-between gap-1">
+          <div className="space-y-0.5 min-w-0 flex-1">
+            <div className="h-1.5 w-2/3 bg-white rounded" />
+            <div className="h-1 w-1/2 bg-white/70 rounded" />
+          </div>
+          <div className="h-1 w-8 bg-white/85 rounded shrink-0" />
+        </div>
       </ThumbFrame>
     );
   }
@@ -310,6 +340,17 @@ function LayoutThumb({ id }) {
         <div className="col-span-2 row-span-2 bg-slate-300 rounded" />
         <div className="bg-slate-200 rounded" />
         <div className="bg-slate-250 bg-slate-200 rounded" />
+      </ThumbFrame>
+    );
+  }
+  if (id === 'destination_bento') {
+    return (
+      <ThumbFrame className="bg-[#f5f5f7] p-1.5 grid grid-cols-6 grid-rows-2 gap-1">
+        <div className="col-span-2 rounded bg-gradient-to-br from-slate-400 to-slate-600" />
+        <div className="col-span-2 rounded bg-gradient-to-br from-sky-400 to-sky-700" />
+        <div className="col-span-2 rounded bg-gradient-to-br from-amber-400 to-rose-600" />
+        <div className="col-span-3 rounded bg-gradient-to-br from-emerald-500 to-teal-800" />
+        <div className="col-span-3 rounded bg-gradient-to-br from-violet-400 to-indigo-700" />
       </ThumbFrame>
     );
   }

@@ -28,7 +28,6 @@ export const RENT_ONLY_SETTINGS_TAB_IDS = new Set([
 export const PLATFORM_OPERATOR_TABS = [
   { id: 'tenants', label: 'Γραφεία', icon: 'domain', section: 'platform' },
   { id: 'saas_infra', label: 'SaaS Infra', icon: 'dns', section: 'platform' },
-  { id: 'integrations', label: 'Integrations', icon: 'key', section: 'platform' },
   { id: 'backup', label: 'Backup', icon: 'backup', section: 'platform' },
   // Partner webhooks / growth tools — platform only (όχι νέο γραφείο).
   { id: 'growth', label: 'Growth', icon: 'hub', section: 'platform' },
@@ -66,6 +65,10 @@ export function settingsTabsForRole(isSuperAdmin, officeMode = 'trips_only') {
 export function sanitizeSettingsSubTab(tab, isSuperAdmin, officeMode = 'trips_only') {
   const fallback = isSuperAdmin ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
   if (!tab) return fallback;
+  // Removed from UI — old bookmarks / ?sub=integrations land on SaaS Infra.
+  if (tab === 'integrations') {
+    return isSuperAdmin ? 'saas_infra' : DEFAULT_TENANT_SETTINGS_TAB;
+  }
   if (PLATFORM_ONLY_TAB_IDS.has(tab) && !isSuperAdmin) return DEFAULT_TENANT_SETTINGS_TAB;
   const allowed = new Set(settingsTabsForRole(isSuperAdmin, officeMode).map((t) => t.id));
   return allowed.has(tab) ? tab : fallback;

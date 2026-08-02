@@ -12,6 +12,7 @@ import {
 } from '../../services/platformApi.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
 import DriverLoginQrPanel from '../../components/admin/DriverLoginQrPanel.jsx';
+import PasswordField from '../../components/PasswordField.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 const STATUS_LABELS = {
@@ -447,6 +448,7 @@ export default function DriverDetailPage() {
             <DriverLoginQrPanel
               driverId={driver.id}
               driverName={driver.name}
+              driverPhone={driver.phone || ''}
               assignedTrips={assignedTrips}
             />
           </div>

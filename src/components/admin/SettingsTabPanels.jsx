@@ -13,7 +13,6 @@ import ContractsPanel from './ContractsPanel.jsx';
 import SuperAdminPanel from './SuperAdminPanel.jsx';
 import SaasConnectionPanel from './SaasConnectionPanel.jsx';
 import BackupPanel from './BackupPanel.jsx';
-import IntegrationsPanel from './IntegrationsPanel.jsx';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 import { PLATFORM_ONLY_TAB_IDS } from '../../lib/admin/settingsTabs.js';
 
@@ -34,7 +33,6 @@ export default function SettingsTabPanels({
 
   if (tab === 'tenants') return <SuperAdminPanel />;
   if (tab === 'saas_infra') return <SaasConnectionPanel />;
-  if (tab === 'integrations') return <IntegrationsPanel />;
   if (tab === 'backup') return <BackupPanel />;
 
   if (tab === 'platform') {

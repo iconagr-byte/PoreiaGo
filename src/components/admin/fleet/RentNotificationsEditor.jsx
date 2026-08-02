@@ -232,7 +232,7 @@ export default function RentNotificationsEditor() {
           {'{ref} {name} {pickup} {start} {end} {status} {plate} {office}'}
         </p>
         <p className="text-xs mt-2">
-          Το SMS χρειάζεται ρυθμισμένο Twilio στις Integrations. Χωρίς SMTP/Twilio τα μηνύματα
+          Το SMS χρειάζεται ρυθμισμένο Twilio (env / server). Χωρίς SMTP/Twilio τα μηνύματα
           καταγράφονται στο log και η κράτηση ολο ολο.
         </p>
       </div>

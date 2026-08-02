@@ -175,12 +175,9 @@ export async function updateSiteAppearance(patch) {
       cacheLocally(merged);
       return { data: merged, source: data.storage_source === 'postgres' ? 'postgres' : 'server', offline: false };
     } catch (saasErr) {
-      try {
-        const legacy = await updateSiteAppearanceLegacy(patch);
-        return legacy;
-      } catch {
-        throw saasErr;
-      }
+      // Fail closed — never fall through to shared /api/admin/platform/site-appearance
+      // (that file is PoreiaGo marketing; Achillio must not overwrite it).
+      throw saasErr;
     }
   }
 
