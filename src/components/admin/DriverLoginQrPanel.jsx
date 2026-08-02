@@ -4,12 +4,33 @@ import toast from 'react-hot-toast';
 import { loadTrips, getTripById } from '../../lib/trips/tripStore.js';
 import { issueMasterQr, getMasterQrPngUrl } from '../../services/platformApi.js';
 import { syncTripsToPostgres } from '../../services/tripsSyncApi.js';
+import {
+  buildViberForwardHref,
+  getOfficeDriverAppUrl,
+} from '../../lib/platform/officePublicUrl.js';
+
+function buildDriverViberMessage({ driverName, tripTitle, link }) {
+  const name = String(driverName || 'οδηγέ').trim() || 'οδηγέ';
+  const url = String(link || '').trim();
+  if (!url) return '';
+  if (tripTitle) {
+    // Keep under Viber ~200 char trim.
+    return `Σύνδεση βάρδιας «${String(tripTitle).slice(0, 48)}» — ${name}: ${url}`;
+  }
+  return `Εφαρμογή οδηγού — ${name}: ${url}`;
+}
 
 /**
  * Passwordless driver login QR for the driver profile account section.
  * Issues a Master QR bound to this driver + a selected trip.
+ * Also offers Viber share: magic excursion link or plain /driver entry.
  */
-export default function DriverLoginQrPanel({ driverId, driverName, assignedTrips = [] }) {
+export default function DriverLoginQrPanel({
+  driverId,
+  driverName,
+  driverPhone = '',
+  assignedTrips = [],
+}) {
   const allTrips = useMemo(() => loadTrips(), []);
   const tripOptions = useMemo(() => {
     if (assignedTrips.length) return assignedTrips;
@@ -19,6 +40,8 @@ export default function DriverLoginQrPanel({ driverId, driverName, assignedTrips
   const [tripId, setTripId] = useState('');
   const [issued, setIssued] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const driverAppUrl = useMemo(() => getOfficeDriverAppUrl(), []);
 
   useEffect(() => {
     if (!tripOptions.length) {
@@ -34,6 +57,14 @@ export default function DriverLoginQrPanel({ driverId, driverName, assignedTrips
   useEffect(() => {
     setIssued(null);
   }, [driverId]);
+
+  const selectedTrip = useMemo(
+    () =>
+      tripOptions.find((t) => String(t.id) === String(tripId)) ||
+      getTripById(Number(tripId)) ||
+      null,
+    [tripOptions, tripId],
+  );
 
   const onIssue = useCallback(
     async (e) => {
@@ -69,22 +100,51 @@ export default function DriverLoginQrPanel({ driverId, driverName, assignedTrips
     [tripId, driverId, tripOptions],
   );
 
+  const authUrl = issued?.auth_url || issued?.qr_content || '';
+  const shareLink = authUrl || driverAppUrl;
+  const shareTripTitle = authUrl
+    ? selectedTrip?.title || issued?.trip_title || ''
+    : '';
+  const viberHref = useMemo(
+    () =>
+      buildViberForwardHref(
+        buildDriverViberMessage({
+          driverName,
+          tripTitle: shareTripTitle,
+          link: shareLink,
+        }),
+      ),
+    [driverName, shareTripTitle, shareLink],
+  );
+
   const copyLink = async () => {
-    const url = issued?.auth_url || issued?.qr_content;
+    const url = shareLink;
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
-      toast.success('Ο σύνδεσμος αντιγράφηκε');
+      toast.success(authUrl ? 'Ο σύνδεσμος εκδρομής αντιγράφηκε' : 'Το link εφαρμογής αντιγράφηκε');
     } catch {
       toast.error('Αποτυχία αντιγραφής');
     }
   };
 
+  const openViber = (e) => {
+    if (!viberHref) {
+      e.preventDefault();
+      toast.error('Δεν υπάρχει σύνδεσμος για αποστολή');
+      return;
+    }
+    toast.success(
+      authUrl
+        ? 'Άνοιγμα Viber — στείλτε το link εκδρομής'
+        : 'Άνοιγμα Viber — στείλτε το link εφαρμογής /driver',
+      { id: 'driver-viber-share' },
+    );
+  };
+
   const expiresLabel = issued?.expires_at
     ? new Date(issued.expires_at * 1000).toLocaleString('el-GR')
     : null;
-
-  const authUrl = issued?.auth_url || issued?.qr_content || '';
 
   return (
     <div className="rounded-2xl border border-primary/15 bg-primary/[0.03] p-4 sm:p-5 space-y-4">
@@ -103,15 +163,17 @@ export default function DriverLoginQrPanel({ driverId, driverName, assignedTrips
               </>
             ) : null}
             . Σκανάρει στο τηλέφωνο και μπαίνει στο{' '}
-            <span className="font-semibold text-on-surface">/driver</span> χωρίς password.
+            <span className="font-semibold text-on-surface">/driver</span> χωρίς password — ή
+            στείλτε το link με Viber.
           </p>
         </div>
       </div>
 
       {!tripOptions.length ? (
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
-          Δεν υπάρχει εκδρομή για δέσμευση QR. Δημιουργήστε ή αναθέστε μία εκδρομή στον οδηγό, μετά
-          εκδώστε το QR εδώ.
+          Δεν υπάρχει εκδρομή για δέσμευση QR. Μπορείτε πάντως να στείλετε με Viber το link της
+          εφαρμογής <span className="font-semibold">/driver</span> για είσοδο με κωδικό. Για QR
+          χωρίς κωδικό, δημιουργήστε ή αναθέστε μία εκδρομή.
         </p>
       ) : (
         <form onSubmit={onIssue} className="space-y-3">
@@ -145,6 +207,37 @@ export default function DriverLoginQrPanel({ driverId, driverName, assignedTrips
         </form>
       )}
 
+      {/* Viber — works with magic excursion link OR plain /driver app entry */}
+      <div className="flex flex-wrap gap-2 pt-1">
+        <a
+          href={viberHref || '#'}
+          onClick={openViber}
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#7360f2] text-white text-sm font-bold hover:opacity-90 shadow-sm"
+        >
+          <span className="material-symbols-outlined text-[18px]">chat</span>
+          {authUrl ? 'Αποστολή με Viber (εκδρομή)' : 'Αποστολή με Viber (εφαρμογή)'}
+        </a>
+        <button
+          type="button"
+          onClick={copyLink}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-on-surface hover:bg-surface-container-low"
+        >
+          <span className="material-symbols-outlined text-[18px]">content_copy</span>
+          {authUrl ? 'Αντιγραφή link εκδρομής' : 'Αντιγραφή link /driver'}
+        </button>
+      </div>
+      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+        {authUrl
+          ? 'Το Viber ανοίγει με το magic link της εκδρομής (είσοδος χωρίς κωδικό).'
+          : 'Χωρίς εκδομένο QR στέλνεται το link της εφαρμογής — ο οδηγός μπαίνει στο /driver με κωδικό.'}
+        {driverPhone ? (
+          <>
+            {' '}
+            Τηλέφωνο οδηγού: <span className="font-semibold text-on-surface">{driverPhone}</span>
+          </>
+        ) : null}
+      </p>
+
       {issued && authUrl ? (
         <div className="pt-3 border-t border-primary/10 flex flex-col sm:flex-row gap-4 items-center sm:items-start">
           <div className="rounded-2xl bg-white p-3 border border-black/[0.06] shrink-0 shadow-sm">
@@ -152,14 +245,6 @@ export default function DriverLoginQrPanel({ driverId, driverName, assignedTrips
           </div>
           <div className="flex-1 w-full min-w-0 space-y-2.5 text-sm">
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={copyLink}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-primary text-white text-xs font-bold hover:opacity-90"
-              >
-                <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                Αντιγραφή link
-              </button>
               <a
                 href={getMasterQrPngUrl(issued.trip_id, { driverId })}
                 target="_blank"

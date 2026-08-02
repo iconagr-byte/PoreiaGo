@@ -448,6 +448,7 @@ export default function DriverDetailPage() {
             <DriverLoginQrPanel
               driverId={driver.id}
               driverName={driver.name}
+              driverPhone={driver.phone || ''}
               assignedTrips={assignedTrips}
             />
           </div>
