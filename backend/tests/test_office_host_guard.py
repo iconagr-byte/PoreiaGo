@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from travel_platform.settings.office_host_guard import (
+    host_is_shared_api,
     host_looks_like_achillio_travel,
     office_host_mismatch_detail,
 )
@@ -18,6 +19,20 @@ class OfficeHostGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(host_looks_like_achillio_travel("achilliotravel.com"))
         self.assertFalse(host_looks_like_achillio_travel("www.poreiago.com"))
         self.assertFalse(host_looks_like_achillio_travel("api.poreiago.com"))
+        self.assertTrue(host_is_shared_api("api.poreiago.com"))
+        self.assertTrue(host_is_shared_api("api-blue"))
+        self.assertFalse(host_is_shared_api("www.poreiago.com"))
+
+    async def test_shared_api_host_never_blocks_achillio_jwt(self):
+        """Achillio seat-pricing/drivers must work via api.poreiago.com."""
+        tid = str(uuid4())
+        detail = await office_host_mismatch_detail(
+            host="api.poreiago.com",
+            tenant_id=tid,
+            roles=["tenant_admin"],
+            is_platform_host=True,
+        )
+        self.assertIsNone(detail)
 
     async def test_achillio_jwt_blocked_on_poreiago_platform_host(self):
         tid = str(uuid4())

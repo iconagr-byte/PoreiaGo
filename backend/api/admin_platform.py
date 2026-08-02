@@ -342,19 +342,28 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
         if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
             return host_tid, False, False
 
-    # poreiago.com — never list/delete Achillio Travel drivers (test drivers stay here).
+    # www.poreiago.com page — never list/delete Achillio Travel drivers.
+    # Shared api.* Host is ignored (JWT scopes); do not remap on api.poreiago.com.
     if _request_is_platform_host(request) and not impersonating:
-        if await _tenant_is_achillio_office(jwt_tid):
-            from fastapi import HTTPException
+        from fastapi import HTTPException
+        from middleware.domain_tenant import _request_host
+        from travel_platform.settings.office_host_guard import (
+            host_is_platform_marketing,
+            host_is_shared_api,
+            resolve_poreiago_platform_tenant_id,
+        )
 
-            from travel_platform.settings.office_host_guard import (
-                resolve_poreiago_platform_tenant_id,
-            )
-
+        host = _request_host(request)
+        if (
+            host
+            and not host_is_shared_api(host)
+            and host_is_platform_marketing(host, is_platform_host=True)
+            and await _tenant_is_achillio_office(jwt_tid)
+        ):
             platform_tid = await resolve_poreiago_platform_tenant_id()
             if platform_tid:
                 logger.warning(
-                    "SEAL: Achillio JWT on platform host remapped to PoreiaGo platform for drivers"
+                    "SEAL: Achillio JWT on PoreiaGo page remapped to platform for drivers"
                 )
                 return platform_tid, False, False
             raise HTTPException(
