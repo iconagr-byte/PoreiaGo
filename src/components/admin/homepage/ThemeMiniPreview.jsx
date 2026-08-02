@@ -105,10 +105,37 @@ function TripCards({ theme }) {
     );
   }
 
+  if (layout === 'destination_bento' || card === 'destination_poster') {
+    const tiles = [0, 1, 2, 3, 4];
+    return (
+      <div className="grid grid-cols-6 grid-rows-2 gap-1">
+        {tiles.map((n) => (
+          <div
+            key={n}
+            className={`relative rounded-md overflow-hidden ${
+              n <= 2 ? 'col-span-2 min-h-[22px]' : 'col-span-3 min-h-[18px]'
+            }`}
+            style={{
+              background: `${n % 2 ? palette.secondary : palette.primary}${n <= 2 ? '99' : '77'}`,
+            }}
+          >
+            <div className="absolute inset-x-0 bottom-0 p-0.5 bg-gradient-to-t from-black/70 to-transparent">
+              <div className="h-0.5 w-2/3 rounded bg-white/90 mb-0.5" />
+              <div className="flex justify-between gap-0.5">
+                <div className="h-0.5 w-1/3 rounded bg-white/60" />
+                <div className="h-0.5 w-1/4 rounded bg-white/80" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className={`grid gap-1 ${layout === 'grid_two_large' ? 'grid-cols-2' : 'grid-cols-2'}`}>
       {items.map((n) => {
-        const overlay = card === 'image_overlay';
+        const overlay = card === 'image_overlay' || card === 'destination_poster';
         return (
           <div
             key={n}
