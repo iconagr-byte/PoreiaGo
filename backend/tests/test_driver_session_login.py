@@ -94,6 +94,19 @@ class DriverSessionLoginApiTests(unittest.TestCase):
         self.assertIn("vehicle_plate", data)
         self.assertTrue(data.get("expires_at"))
 
+    def test_login_without_fleet_assignment_has_no_fake_trip(self):
+        """Password login must not invent demo Εκδρομή #1 when office opened nothing."""
+        with patch.object(self.portal, "_resolve_trip_for_driver", return_value=None):
+            res = self.client.post(
+                "/api/driver/session/login",
+                json={"username": self.driver.email, "password": "driver123"},
+            )
+        self.assertEqual(res.status_code, 200, res.text)
+        data = res.json()
+        self.assertIsNone(data.get("trip_id"))
+        self.assertEqual(data.get("schedule") or [], [])
+        self.assertFalse(data.get("trip_title"))
+
     def test_login_stays_on_host_office_not_platform(self):
         from unittest.mock import AsyncMock
 

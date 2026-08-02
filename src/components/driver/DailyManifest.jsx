@@ -180,6 +180,33 @@ export default function DailyManifest() {
     );
   }
 
+  const hasTrip = Boolean(session?.tripId || tripMeta?.trip_id || manifest?.trip_id);
+
+  if (!hasTrip) {
+    return (
+      <div className="driver-stack">
+        <div className="driver-card driver-card-accent">
+          <p className="driver-card-label">Σημερινό δρομολόγιο</p>
+          <h2 className="text-xl font-extrabold mt-1 tracking-tight">Χωρίς εκδρομή</h2>
+          <p className="mt-2 text-sm font-semibold text-[var(--driver-muted)] leading-relaxed">
+            Το γραφείο δεν έχει ανοίξει / αναθέσει εκδρομή στη βάρδια σας ακόμα. Όταν εκδοθεί
+            Master QR ή ανατεθεί δρομολόγιο, θα εμφανιστεί εδώ.
+          </p>
+          <button
+            type="button"
+            onClick={() => loadAll({ silent: false })}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--driver-yellow-soft)] border border-[var(--driver-yellow)]/30 px-3 py-2 text-sm font-bold"
+          >
+            <span className="material-symbols-outlined text-[var(--driver-yellow)] text-[20px]">
+              refresh
+            </span>
+            Έλεγχος ξανά
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="driver-stack">
       <div className="driver-card driver-card-accent">

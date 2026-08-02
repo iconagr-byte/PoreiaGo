@@ -44,7 +44,8 @@ class DriverLoginBody(BaseModel):
 
 class DriverSessionResponse(BaseModel):
     access_token: str
-    trip_id: int
+    # None until office assigns / opens a trip (Master QR or live fleet).
+    trip_id: int | None = None
     tenant_id: str
     driver_id: str | None
     expires_at: int
@@ -150,7 +151,13 @@ def _profile_fields(driver_id: str | None) -> dict:
     }
 
 
-def _trip_context(trip_id: int) -> dict:
+def _trip_context(trip_id: int | None) -> dict:
+    if not trip_id:
+        return {
+            "trip_title": None,
+            "destination": None,
+            "meeting_point": None,
+        }
     from travel_platform.operations.trip_ops_store import get_trip_ops
     from travel_platform.telemetry.trip_title_resolve import resolve_trip_title_sync
 
@@ -167,18 +174,23 @@ def _issue_driver_session(
     *,
     driver_id: str | None,
     tenant_id: str,
-    trip_id: int,
+    trip_id: int | None,
     expires_at: int | None = None,
 ) -> DriverSessionResponse:
     exp = expires_at or int(time.time()) + 24 * 3600
     tid = tenant_id or DEFAULT_TENANT
     profile = _profile_fields(driver_id)
-    vehicle_code = profile.get("vehicle_plate") or profile.get("vehicle_code") or f"BUS-{trip_id}"
+    bound_trip = int(trip_id) if trip_id else None
+    vehicle_code = (
+        profile.get("vehicle_plate")
+        or profile.get("vehicle_code")
+        or (f"BUS-{bound_trip}" if bound_trip else None)
+    )
     driver_jwt = jwt.encode(
         {
             "sub": driver_id or "master-qr-driver",
             "tenant_id": tid,
-            "trip_id": trip_id,
+            "trip_id": bound_trip,
             "roles": ["driver"],
             "scope": "manifest:read driver:scan",
             "exp": exp,
@@ -190,23 +202,23 @@ def _issue_driver_session(
         _jwt_secret(),
         algorithm=JWT_ALGORITHM,
     )
-    ctx = _trip_context(trip_id)
+    ctx = _trip_context(bound_trip)
     return DriverSessionResponse(
         access_token=driver_jwt,
-        trip_id=trip_id,
+        trip_id=bound_trip,
         tenant_id=tid,
         driver_id=driver_id,
         expires_at=exp,
-        schedule=_build_daily_schedule(trip_id),
+        schedule=_build_daily_schedule(bound_trip) if bound_trip else [],
         **profile,
         **ctx,
     )
 
 
-def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None) -> int:
-    """Prefer live fleet assignment; otherwise default demo trip."""
+def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None) -> int | None:
+    """Live fleet assignment only — never invent demo trip #1."""
     if not driver_id:
-        return 1
+        return None
     try:
         live: LiveFleetService = get_live_fleet()
         tid = UUID(tenant_id or DEFAULT_TENANT)
@@ -216,7 +228,7 @@ def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None
                 return int(v.trip_id)
     except Exception:
         pass
-    return 1
+    return None
 
 
 _POREIAGO_OFFICE_CACHE: tuple[float, str | None] | None = None
@@ -587,8 +599,10 @@ async def driver_schedule(session_payload: dict = Depends(require_driver_session
     }
 
 
-def _build_daily_schedule(trip_id: int) -> list[dict]:
+def _build_daily_schedule(trip_id: int | None) -> list[dict]:
     """Real excursion timeline from synced trip ops (stops / hybrid / destination)."""
+    if not trip_id:
+        return []
     from travel_platform.operations.trip_ops_store import build_schedule_from_ops, get_trip_ops
 
     ops = get_trip_ops(trip_id)
