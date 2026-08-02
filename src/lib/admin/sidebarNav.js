@@ -7,12 +7,12 @@ import {
 import { settingsTabToNavItem } from './settingsSidebar.js';
 import { buildRentDeskNavItems, RENT_DESK_NAV_IDS } from './rentDeskNav.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v10';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v11';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 
-/** Default ids under «Λειτουργίες Στόλου» (users can drag them anywhere). */
+/** Hub subtabs (open via «Λειτουργίες στόλου» under Λεωφορεία — not a separate pin). */
 export const FLEET_OPS_ONLY_IDS = [
   'fleet_kpis',
   'driver_chat',
@@ -34,6 +34,7 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'customers',
   'loyalty',
   'fleet',
+  'fleet_ops',
   'drivers',
   'lost_found',
   'email',
@@ -169,6 +170,7 @@ export function loadNavLayout(isSuperAdmin) {
   const storageKey = layoutStorageKey(isSuperAdmin);
   const legacyKeys = [
     storageKey,
+    isSuperAdmin ? 'aerostride_admin_nav_layout_v10_super' : 'aerostride_admin_nav_layout_v10',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v9_super' : 'aerostride_admin_nav_layout_v9',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v7_super' : 'aerostride_admin_nav_layout_v7',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v6_super' : 'aerostride_admin_nav_layout_v6',
@@ -264,6 +266,16 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'fleet',
     navGroup: 'main',
     accent: 'sky',
+  },
+  fleet_ops: {
+    id: 'fleet_ops',
+    label: 'Λειτουργίες στόλου',
+    icon: 'query_stats',
+    filled: true,
+    type: 'tab',
+    tab: 'fleet_ops',
+    navGroup: 'main',
+    accent: 'cyan',
   },
   ...buildRentDeskNavItems(),
   drivers: {
