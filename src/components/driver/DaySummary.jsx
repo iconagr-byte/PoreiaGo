@@ -34,17 +34,18 @@ export default function DaySummary() {
   if (!hasOpenDriverTrip(session) || !manifest) {
     return (
       <div className="driver-card text-center py-8">
-        <p className="driver-card-label">Τέλος βάρδιας</p>
+        <p className="driver-card-label">Κρατήσεις</p>
         <h2 className="text-xl font-extrabold tracking-tight mt-1">Χωρίς εκδρομή</h2>
         <p className="mt-2 text-sm font-semibold text-[var(--driver-muted)]">
-          Δεν υπάρχει ανοιχτή εκδρομή — δεν εμφανίζεται κάτοψη λεωφορείου.
+          Δεν υπάρχει ανοιχτή εκδρομή — η κάτοψη λεωφορείου εμφανίζεται μόνο εδώ όταν υπάρχει
+          δρομολόγιο.
         </p>
       </div>
     );
   }
 
   if (!stats) {
-    return <p className="py-12 text-center text-[var(--driver-muted)]">Φόρτωση σύνοψης…</p>;
+    return <p className="py-12 text-center text-[var(--driver-muted)]">Φόρτωση κρατήσεων…</p>;
   }
 
   const boardedList = stats.boardedPassengers || [];
