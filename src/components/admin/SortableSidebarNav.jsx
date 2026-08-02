@@ -230,14 +230,18 @@ export default function SortableSidebarNav({
     onTabChange?.(tabId);
   };
 
+  const fleetOpsActive = activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab);
+
   const buttonClass = (item) => {
     const isRentSubActive =
       item.type === 'fleet_rental_subtab' &&
       activeTab === 'fleet_rental' &&
       sanitizeRentDeskTab(fleetRentalTab) === item.fleetRentalTab;
+    const isFleetOpsRow =
+      item.type === 'tab' && (item.tab === 'fleet_ops' || item.id === 'fleet_ops') && fleetOpsActive;
     const isTabActive = item.type === 'tab' && activeTab === item.tab;
     const isEmailActive = item.type === 'email' && activeTab === 'email';
-    const isActive = isRentSubActive || isTabActive || isEmailActive;
+    const isActive = isRentSubActive || isFleetOpsRow || isTabActive || isEmailActive;
 
     const classes = ['admin-nav-btn'];
     if (isActive) classes.push('admin-nav-btn-active');
@@ -246,11 +250,9 @@ export default function SortableSidebarNav({
   };
 
   const settingsActive = activeTab === 'settings';
-  const fleetOpsActive = activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab);
   const rentDeskActive = activeTab === 'fleet_rental';
   const showBusZone = !rentOnly && serviceMode !== 'rent' && busItems.length > 0;
   const showSharedZone = sharedItems.length > 0;
-  const showFleetOpsPin = !rentOnly && serviceMode !== 'rent';
   const showRentPin = rentEnabled && (rentOnly || serviceMode !== 'buses');
 
   const navAccent = (item) =>
@@ -453,7 +455,7 @@ export default function SortableSidebarNav({
                   tone="buses"
                   icon="directions_bus"
                   title="Λεωφορεία"
-                  subtitle="Εκδρομές, κρατήσεις, οδηγοί"
+                  subtitle="Εκδρομές, στόλος, GPS & KPIs"
                 />
                 {renderItemList(busItems, 'main')}
               </div>
@@ -493,32 +495,6 @@ export default function SortableSidebarNav({
               <span className="admin-nav-service-card-kicker">Υπηρεσία</span>
               <span className="admin-nav-service-card-title">Ενοικιάσεις</span>
               <span className="admin-nav-service-card-sub">Desk · στόλος · /rent app</span>
-            </span>
-            <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
-              chevron_right
-            </span>
-          </button>
-        ) : null}
-
-        {showFleetOpsPin ? (
-          <button
-            type="button"
-            onClick={() => openFleetOps(fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB)}
-            className={`admin-nav-service-card admin-nav-service-card--buses${
-              fleetOpsActive ? ' is-active' : ''
-            }`}
-            title="Λειτουργίες στόλου λεωφορείων"
-            aria-current={fleetOpsActive ? 'page' : undefined}
-          >
-            <span className="admin-nav-service-card-icon" aria-hidden>
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-                directions_bus
-              </span>
-            </span>
-            <span className="admin-nav-service-card-copy">
-              <span className="admin-nav-service-card-kicker">Λεωφορεία</span>
-              <span className="admin-nav-service-card-title">Λειτουργίες Στόλου</span>
-              <span className="admin-nav-service-card-sub">GPS · KPIs · ημερολόγιο</span>
             </span>
             <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
               chevron_right
