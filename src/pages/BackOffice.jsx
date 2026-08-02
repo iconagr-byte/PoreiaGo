@@ -471,6 +471,19 @@ export default function BackOffice() {
     setActiveTab('customers');
   };
 
+  /** Sidebar / header: always land on the customers list (leave profile detail). */
+  const goToCustomersHome = () => {
+    setSelectedCustomer(null);
+    setActiveTab('customers');
+  };
+
+  const handleAdminTabChange = (tab) => {
+    if (tab === 'customers') {
+      setSelectedCustomer(null);
+    }
+    setActiveTab(tab);
+  };
+
   const openBookingTicket = (booking) => {
     setSelectedCustomer(null);
     setActiveTab('bookings');
@@ -688,7 +701,7 @@ export default function BackOffice() {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('customers')}
+                onClick={goToCustomersHome}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-slate-800 hover:bg-slate-50"
               >
                 <span className="material-symbols-outlined text-[18px]">group</span>
@@ -2047,7 +2060,7 @@ export default function BackOffice() {
           settingsSubTab={settingsSubTab}
           fleetOpsSubTab={fleetOpsSubTab}
           fleetRentalTab={fleetRentalTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleAdminTabChange}
           onSettingsSubTabChange={setSettingsSubTab}
           onFleetOpsSubTabChange={setFleetOpsSubTab}
           onFleetRentalTabChange={setFleetRentalTab}
@@ -2065,7 +2078,7 @@ export default function BackOffice() {
         settingsSubTab={settingsSubTab}
         fleetOpsSubTab={fleetOpsSubTab}
         fleetRentalTab={fleetRentalTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleAdminTabChange}
         onSettingsSubTabChange={setSettingsSubTab}
         onFleetOpsSubTabChange={setFleetOpsSubTab}
         onFleetRentalTabChange={setFleetRentalTab}
