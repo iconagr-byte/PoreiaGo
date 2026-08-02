@@ -137,27 +137,10 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
   }
 
   if (templateId === 'newsletter_cta') {
+    // CTA banner lives above the footer (NewsletterOfferBanner); keep contact only.
     return (
-      <footer id="contact" className="scroll-mt-24 bg-gradient-to-b from-surface-container-lowest to-slate-100 border-t py-16">
+      <footer id="contact" className="scroll-mt-24 bg-surface-container-lowest border-t py-14">
         <div className="max-w-container-max mx-auto px-margin-desktop">
-          <div className="rounded-3xl bg-slate-900 text-white p-8 md:p-10 mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <p className="text-xl font-bold mb-1">Μείνετε ενημερωμένοι</p>
-              <p className="text-white/70 text-sm">Νέες εκδρομές και προσφορές στο inbox σας.</p>
-            </div>
-            <div className="flex gap-2 w-full md:w-auto">
-              <input
-                type="email"
-                placeholder="email@example.com"
-                className="flex-1 md:w-64 px-4 py-3 rounded-full text-slate-900 text-sm"
-                readOnly
-                aria-label="Newsletter email"
-              />
-              <button type="button" className="px-6 py-3 rounded-full bg-sky-500 font-bold text-sm shrink-0">
-                Εγγραφή
-              </button>
-            </div>
-          </div>
           <div className="grid md:grid-cols-2 gap-8">
             <FooterBrandBlock siteAppearance={siteAppearance} />
             <div className="flex flex-wrap gap-6 justify-start md:justify-end text-sm text-secondary">{links}</div>
