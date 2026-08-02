@@ -447,9 +447,9 @@ def _assert_unique(
     """
     SEAL: email / license / plate / vehicle code are globally unique across
     ALL offices. Two γραφεία must never share the same driver identity.
-    ``tenant_id`` is accepted for call-site compatibility only.
+    ``tenant_id`` only shapes the error copy (same vs other office).
     """
-    del tenant_id  # uniqueness is global — never scoped per office
+    office_tid = _normalize_tenant_id(tenant_id) if tenant_id else None
     email_n = _normalize_username(email)
     license_n = _normalize_username(license_no)
     code_n = _normalize_username(vehicle_code)
@@ -460,21 +460,23 @@ def _assert_unique(
         if is_seed_driver(d):
             continue
         if email_n and d.email.lower() == email_n:
+            same_office = bool(office_tid) and _driver_tenant_id(d) == office_tid
             raise ValueError(
-                "Το email χρησιμοποιείται ήδη από οδηγό άλλου γραφείου — "
-                "κάθε οδηγός ανήκει σε ένα μόνο γραφείο"
+                "Το email χρησιμοποιείται ήδη"
+                + (" σε αυτό το γραφείο" if same_office else " σε άλλο γραφείο")
+                + " — δοκιμάστε άλλο email (κάθε οδηγός ανήκει σε ένα μόνο γραφείο)"
             )
         if license_n and d.license_no.lower() == license_n:
             raise ValueError(
-                "Ο αριθμός άδειας χρησιμοποιείται ήδη από οδηγό άλλου γραφείου"
+                "Ο αριθμός άδειας χρησιμοποιείται ήδη — δοκιμάστε άλλον"
             )
         if code_n and d.vehicle_code and d.vehicle_code.lower() == code_n:
             raise ValueError(
-                "Ο κωδικός οχήματος χρησιμοποιείται ήδη από οδηγό άλλου γραφείου"
+                "Ο κωδικός οχήματος χρησιμοποιείται ήδη — δοκιμάστε άλλον"
             )
         if plate_n and d.license_plate and d.license_plate.lower() == plate_n:
             raise ValueError(
-                "Η πινακίδα χρησιμοποιείται ήδη από οδηγό άλλου γραφείου"
+                "Η πινακίδα χρησιμοποιείται ήδη — δοκιμάστε άλλη"
             )
 
 
