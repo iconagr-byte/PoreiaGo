@@ -290,11 +290,12 @@ def find_drivers_by_email(email: str) -> list[FleetDriver]:
     ]
 
 
-def rehome_driver_to_tenant(email: str, tenant_id: str) -> dict:
+def rehome_driver_to_tenant(email: str, tenant_id: str, *, only_from_demo: bool = True) -> dict:
     """
-    Move every non-seed row with this email onto ``tenant_id``.
+    Move DEMO orphan rows with this email onto ``tenant_id``.
 
-    Used once at boot to undo PoreiaGo↔Achillio driver leaks for known accounts.
+    SEAL: never steal a driver from a real office (PoreiaGo ↔ Achillio).
+    Boot repair may only claim DEMO leftovers.
     """
     tid = _normalize_tenant_id(tenant_id)
     if not tid or tid == DEMO_TENANT_ID:
@@ -303,10 +304,20 @@ def rehome_driver_to_tenant(email: str, tenant_id: str) -> dict:
     if not rows:
         return {"ok": False, "reason": "not_found", "moved": 0, "email": email}
     moved = 0
+    skipped_real = 0
     for d in rows:
         if _driver_tenant_id(d) == tid:
             continue
         prev = _driver_tenant_id(d)
+        if only_from_demo and prev != DEMO_TENANT_ID:
+            skipped_real += 1
+            logger.warning(
+                "REHOME skip real-office driver %s (%s) on %s — never steal across offices",
+                d.id,
+                d.email,
+                prev,
+            )
+            continue
         d.tenant_id = tid
         moved += 1
         logger.warning(
@@ -318,7 +329,14 @@ def rehome_driver_to_tenant(email: str, tenant_id: str) -> dict:
         )
     if moved:
         _persist()
-    return {"ok": True, "moved": moved, "email": email, "tenant_id": tid, "ids": [d.id for d in rows]}
+    return {
+        "ok": True,
+        "moved": moved,
+        "skipped_real": skipped_real,
+        "email": email,
+        "tenant_id": tid,
+        "ids": [d.id for d in rows if _driver_tenant_id(d) == tid],
+    }
 
 
 async def repair_achillio_home_drivers() -> dict:

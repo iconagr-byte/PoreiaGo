@@ -225,6 +225,23 @@ async def _require_admin_bearer(
             status_code=403,
             content={"detail": "Admin access required"},
         )
+    # SEAL: Achillio Travel JWT must not serve drivers/settings on poreiago.com
+    # (and the reverse). This was the path that showed the same οδηγός on both URLs.
+    try:
+        from middleware.domain_tenant import _is_platform_host, _request_host
+        from travel_platform.settings.office_host_guard import office_host_mismatch_detail
+
+        host = _request_host(request)
+        detail = await office_host_mismatch_detail(
+            host=host,
+            tenant_id=str(request.state.tenant_id),
+            roles=roles,
+            is_platform_host=_is_platform_host(host),
+        )
+        if detail:
+            return JSONResponse(status_code=403, content={"detail": detail})
+    except Exception:
+        pass
     return None
 
 

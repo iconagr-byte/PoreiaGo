@@ -129,15 +129,49 @@ async def login(request: Request, body: LoginRequest):
     from travel_platform.settings.login_audit_store import record_login_from_request
 
     email = (body.email or "").strip().lower()
+    # Host affinity: Achillio Travel URL → that office only.
+    # Platform URL (poreiago.com) must not silently open an Achillio session.
+    forced_tenant_id = body.tenant_id
+    reject_achillio_on_platform = False
+    try:
+        from middleware.domain_tenant import _is_platform_host, _request_host
+        from travel_platform.settings.office_host_guard import (
+            host_looks_like_achillio_travel,
+            login_host_forced_tenant_id,
+        )
+
+        host = _request_host(request)
+        platform = _is_platform_host(host)
+        if forced_tenant_id is None and not (body.tenant_slug or "").strip():
+            forced = await login_host_forced_tenant_id(host, is_platform_host=platform)
+            if forced is not None:
+                forced_tenant_id = forced
+            elif platform:
+                reject_achillio_on_platform = True
+        elif host_looks_like_achillio_travel(host) and forced_tenant_id is None:
+            forced = await login_host_forced_tenant_id(host, is_platform_host=False)
+            if forced is not None:
+                forced_tenant_id = forced
+    except Exception:
+        reject_achillio_on_platform = False
+
     async with AsyncSessionLocal() as db:
         try:
             token, refresh, user, tenant = await AuthService(db).login(
                 email=body.email,
                 password=body.password,
-                tenant_id=body.tenant_id,
+                tenant_id=forced_tenant_id,
                 tenant_slug=body.tenant_slug,
                 mfa_code=body.mfa_code,
             )
+            if reject_achillio_on_platform:
+                from app.services.tenant_modules import is_achillio_travel_office
+
+                if is_achillio_travel_office(tenant):
+                    raise ValueError(
+                        "Αυτός ο λογαριασμός ανήκει στο Achillio Travel — "
+                        "συνδεθείτε από https://www.achilliotravel.com/admin/login"
+                    )
             await db.commit()
         except ValueError as exc:
             await db.rollback()
