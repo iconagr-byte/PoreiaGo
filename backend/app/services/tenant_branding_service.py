@@ -135,12 +135,15 @@ class TenantBrandingService:
         ):
             display_name = "PoreiaGo"
 
-        checkout_default = (
-            f"https://www.{base_domain}"
-            if is_poreiago_platform_office(tenant)
-            else f"https://{subdomain_fqdn}"
+        from travel_platform.settings.checkout_base import (
+            is_localhost_checkout_url,
+            resolve_tenant_checkout_base,
         )
+
+        checkout_default = resolve_tenant_checkout_base(tenant, base_domain=base_domain)
         checkout = str(branding.get("checkout_base_url") or "").strip() or checkout_default
+        if is_localhost_checkout_url(checkout):
+            checkout = checkout_default
         if checkout and _is_achillio_travel_host(checkout) and is_poreiago_platform_office(tenant):
             checkout = checkout_default
 
@@ -292,7 +295,7 @@ class TenantBrandingService:
                 "logo_url": row.logo_url or "",
                 "css_injection_url": row.css_injection_url or "",
                 "css_injection_inline": row.css_injection_inline or "",
-                "checkout_base_url": row.checkout_base_url or f"http://localhost:5173",
+                "checkout_base_url": row.checkout_base_url or f"https://www.{base_domain}",
                 "dns_instructions": self._dns_instructions(
                     custom_domain or None,
                     f"{subdomain}.{base_domain}",
@@ -312,7 +315,7 @@ class TenantBrandingService:
                 "logo_url": "",
                 "css_injection_url": "",
                 "css_injection_inline": "",
-                "checkout_base_url": "http://localhost:5173",
+                "checkout_base_url": f"https://www.{base_domain}",
                 "dns_instructions": self._dns_instructions(None, f"{subdomain}.{base_domain}"),
             }
 

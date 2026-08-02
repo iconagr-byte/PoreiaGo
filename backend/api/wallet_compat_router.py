@@ -16,6 +16,8 @@ _DATA = Path(__file__).resolve().parents[1] / "data"
 _BRANDING_FILE = _DATA / "tenant_branding.json"
 _SETTINGS_FILE = Path(__file__).resolve().parents[1] / "platform" / "settings" / "platform_settings.json"
 
+_PROD_CHECKOUT = "https://www.poreiago.com"
+
 _DEFAULT_BRANDING = {
     "slug": "poreiago",
     "display_name": "PoreiaGo",
@@ -25,7 +27,7 @@ _DEFAULT_BRANDING = {
     "css_injection_url": "",
     "css_injection_inline": "",
     "verified_domain": True,
-    "checkout_base_url": "http://localhost:5173",
+    "checkout_base_url": _PROD_CHECKOUT,
     "updated_at": None,
 }
 
@@ -45,7 +47,7 @@ _DEFAULT_SETTINGS = {
     "smtp_from_email": "noreply@aerostride.app",
     "sms_sender_id": "AEROSTRIDE",
     "maintenance_mode": False,
-    "checkout_base_url": "http://localhost:5173",
+    "checkout_base_url": _PROD_CHECKOUT,
     "checkout_deposit_enabled": True,
     "checkout_deposit_percent": 30,
     "checkout_bank_transfer_enabled": True,
@@ -70,7 +72,7 @@ class BrandingAdminResponse(BaseModel):
     css_injection_url: str = ""
     css_injection_inline: str = ""
     verified_domain: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = _PROD_CHECKOUT
     updated_at: str | None = None
 
 
@@ -102,7 +104,7 @@ class PlatformSettingsResponse(BaseModel):
     smtp_from_email: str = "noreply@aerostride.app"
     sms_sender_id: str = "AEROSTRIDE"
     maintenance_mode: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = _PROD_CHECKOUT
     checkout_deposit_enabled: bool = True
     checkout_deposit_percent: int = 30
     checkout_bank_transfer_enabled: bool = True
@@ -166,8 +168,13 @@ def _heal_default_branding(merged: dict) -> dict:
     if domain == "achilliotravel.com" or domain.endswith(".achilliotravel.com"):
         out["custom_domain"] = ""
     checkout = str(out.get("checkout_base_url") or "").strip().lower()
-    if "achilliotravel.com" in checkout:
-        out["checkout_base_url"] = "https://www.poreiago.com"
+    if (
+        "achilliotravel.com" in checkout
+        or "localhost" in checkout
+        or "127.0.0.1" in checkout
+        or not checkout
+    ):
+        out["checkout_base_url"] = _PROD_CHECKOUT
     slug = str(out.get("slug") or "").strip().lower()
     if slug in {"admin-achillio-gr", "achillio-travel", "achilliotravel"}:
         out["slug"] = "poreiago"
@@ -192,7 +199,14 @@ def _branding_dict(host: str | None = None) -> dict:
 
 def _settings_dict() -> dict:
     disk = _read_json(_SETTINGS_FILE)
-    return {**_DEFAULT_SETTINGS, **disk}
+    merged = {**_DEFAULT_SETTINGS, **disk}
+    checkout = str(merged.get("checkout_base_url") or "").strip().lower()
+    if not checkout or "localhost" in checkout or "127.0.0.1" in checkout:
+        merged["checkout_base_url"] = _PROD_CHECKOUT
+        if disk and disk.get("checkout_base_url") != _PROD_CHECKOUT:
+            disk = {**disk, "checkout_base_url": _PROD_CHECKOUT}
+            _write_json(_SETTINGS_FILE, {**_DEFAULT_SETTINGS, **disk})
+    return merged
 
 
 @router.get("/api/branding/current", response_model=BrandingAdminResponse)

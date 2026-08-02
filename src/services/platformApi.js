@@ -25,7 +25,7 @@ export const DEFAULT_PLATFORM_SETTINGS = {
   smtp_from_email: 'noreply@poreiago.app',
   sms_sender_id: 'AEROSTRIDE',
   maintenance_mode: false,
-  checkout_base_url: 'http://localhost:5173',
+  checkout_base_url: 'https://www.poreiago.com',
   checkout_deposit_enabled: true,
   checkout_deposit_percent: 30,
   checkout_bank_transfer_enabled: true,
@@ -87,6 +87,11 @@ export function normalizePlatformSettings(form) {
   out.support_email = String(out.support_email || '').trim() || DEFAULT_PLATFORM_SETTINGS.support_email;
   out.smtp_from_email = String(out.smtp_from_email || '').trim() || DEFAULT_PLATFORM_SETTINGS.smtp_from_email;
   out.sms_sender_id = String(out.sms_sender_id || '').trim() || DEFAULT_PLATFORM_SETTINGS.sms_sender_id;
+  const checkout = String(out.checkout_base_url || '').trim().replace(/\/$/, '');
+  out.checkout_base_url =
+    !checkout || /localhost|127\.0\.0\.1/i.test(checkout)
+      ? productionCheckoutFallback()
+      : checkout;
   return out;
 }
 
@@ -99,11 +104,35 @@ function saveSettingsLocally(data) {
  * preferPublic: skip SaaS JWT (marketing homepage). Stale office tokens on
  * www.poreiago.com must not trip saasFetch → /admin/login.
  */
+function productionCheckoutFallback() {
+  try {
+    const host = String(window.location?.hostname || '').toLowerCase();
+    if (!host || host === 'localhost' || host === '127.0.0.1') {
+      return DEFAULT_PLATFORM_SETTINGS.checkout_base_url;
+    }
+    if (/(^|\.)achilliotravel\.com$/.test(host)) {
+      return 'https://www.achilliotravel.com';
+    }
+    return window.location.origin.replace(/\/$/, '') || DEFAULT_PLATFORM_SETTINGS.checkout_base_url;
+  } catch {
+    return DEFAULT_PLATFORM_SETTINGS.checkout_base_url;
+  }
+}
+
+function healLocalCheckout(data) {
+  const next = { ...DEFAULT_PLATFORM_SETTINGS, ...(data || {}) };
+  const url = String(next.checkout_base_url || '');
+  if (!url || /localhost|127\.0\.0\.1/i.test(url)) {
+    next.checkout_base_url = productionCheckoutFallback();
+  }
+  return next;
+}
+
 export async function fetchPlatformSettings(options = {}) {
   const preferPublic = Boolean(options.preferPublic);
   if (!preferPublic && getSaasToken()) {
     try {
-      const data = await saasFetch('/api/v1/settings/platform');
+      const data = healLocalCheckout(await saasFetch('/api/v1/settings/platform'));
       saveSettingsLocally(data);
       return data;
     } catch {
@@ -113,7 +142,7 @@ export async function fetchPlatformSettings(options = {}) {
   try {
     const res = await adminFetch('/api/admin/platform/settings');
     if (res.ok) {
-      const data = await res.json();
+      const data = healLocalCheckout(await res.json());
       saveSettingsLocally(data);
       return data;
     }
@@ -122,11 +151,11 @@ export async function fetchPlatformSettings(options = {}) {
   }
   try {
     const cached = localStorage.getItem(PLATFORM_SETTINGS_KEY);
-    if (cached) return JSON.parse(cached);
+    if (cached) return healLocalCheckout(JSON.parse(cached));
   } catch {
     /* ignore */
   }
-  return { ...DEFAULT_PLATFORM_SETTINGS };
+  return healLocalCheckout({ ...DEFAULT_PLATFORM_SETTINGS });
 }
 
 export async function updatePlatformSettings(patch) {

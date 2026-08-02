@@ -24,7 +24,7 @@ class PlatformSettingsResponse(BaseModel):
     smtp_from_email: str = "noreply@poreiago.app"
     sms_sender_id: str = "AEROSTRIDE"
     maintenance_mode: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = "https://www.poreiago.com"
     checkout_deposit_enabled: bool = True
     checkout_deposit_percent: int = 30
 
@@ -358,7 +358,7 @@ class BrandingAdminResponse(BaseModel):
     css_injection_url: str = ""
     css_injection_inline: str = ""
     verified_domain: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = "https://www.poreiago.com"
     updated_at: str | None = None
     # Present when Host maps to a Postgres tenant — used by guest booking lookup / wallet.
     tenant_id: str | None = None

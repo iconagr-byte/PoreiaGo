@@ -146,6 +146,7 @@ export default function PlatformSettingsPanel({ onOpenPayments }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // API + client heal localhost → office production origin (Achillio / PoreiaGo).
       setForm(await fetchPlatformSettings());
       setDirty(false);
     } catch (err) {

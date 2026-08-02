@@ -96,11 +96,18 @@ class AbandonedBookingRecoveryService(TenantScopedService):
             {"tenant_id": str(self._tenant_id), "cutoff": cutoff},
         )
         rows = result.mappings().all()
-        base_url = "https://app.aerostride.app"
+        from travel_platform.settings.checkout_base import (
+            PRODUCTION_PLATFORM_CHECKOUT,
+            heal_checkout_base_url,
+        )
+
+        base_url = PRODUCTION_PLATFORM_CHECKOUT
         try:
             from travel_platform.growth.branding_store import get_branding
 
-            base_url = get_branding().checkout_base_url or base_url
+            base_url = heal_checkout_base_url(
+                get_branding().checkout_base_url, fallback=PRODUCTION_PLATFORM_CHECKOUT
+            )
         except Exception:
             pass
         return [

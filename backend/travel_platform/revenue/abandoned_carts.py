@@ -168,7 +168,15 @@ async def scan_and_send_recovery(*, base_url: str | None = None, pending_minutes
             base_url = get_branding().checkout_base_url
         except Exception:
             cfg = get_platform_config()
-            base_url = getattr(cfg, "checkout_base_url", None) or "http://localhost:5173"
+            from travel_platform.settings.checkout_base import (
+                PRODUCTION_PLATFORM_CHECKOUT,
+                heal_checkout_base_url,
+            )
+
+            base_url = heal_checkout_base_url(
+                getattr(cfg, "checkout_base_url", None),
+                fallback=PRODUCTION_PLATFORM_CHECKOUT,
+            )
     candidates = find_recovery_candidates(pending_minutes=pending_minutes, base_url=base_url)
     sent = 0
     errors: list[str] = []

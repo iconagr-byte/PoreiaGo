@@ -515,7 +515,7 @@ class TenantPlatformSettingsResponse(BaseModel):
     smtp_from_email: str = "noreply@aerostride.app"
     sms_sender_id: str = "AEROSTRIDE"
     maintenance_mode: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = "https://www.poreiago.com"
     checkout_deposit_enabled: bool = True
     checkout_deposit_percent: int = 30
     checkout_bank_transfer_enabled: bool = True

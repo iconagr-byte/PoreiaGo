@@ -10,6 +10,11 @@ from pathlib import Path
 from typing import Any
 
 from app.core.data_paths import poreiago_data_dir, resolve_data_file
+from travel_platform.settings.checkout_base import (
+    PRODUCTION_PLATFORM_CHECKOUT,
+    heal_checkout_base_url,
+    is_localhost_checkout_url,
+)
 
 _LEGACY_DATA = Path(__file__).resolve().parents[2] / "data"
 DATA_DIR = poreiago_data_dir()
@@ -24,7 +29,7 @@ DEFAULT_BRANDING = {
     "css_injection_url": "",
     "css_injection_inline": "",
     "verified_domain": True,
-    "checkout_base_url": "http://localhost:5173",
+    "checkout_base_url": PRODUCTION_PLATFORM_CHECKOUT,
 }
 
 
@@ -38,7 +43,7 @@ class BrandingConfig:
     css_injection_url: str = ""
     css_injection_inline: str = ""
     verified_domain: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = PRODUCTION_PLATFORM_CHECKOUT
     updated_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -75,8 +80,12 @@ def _heal_platform_row(key: str, row: dict[str, Any]) -> dict[str, Any]:
         merged["custom_domain"] = ""
         merged["verified_domain"] = True
     checkout = str(merged.get("checkout_base_url") or "").strip().lower()
-    if "achilliotravel.com" in checkout:
-        merged["checkout_base_url"] = "https://www.poreiago.com"
+    if "achilliotravel.com" in checkout or is_localhost_checkout_url(checkout):
+        merged["checkout_base_url"] = PRODUCTION_PLATFORM_CHECKOUT
+    else:
+        merged["checkout_base_url"] = heal_checkout_base_url(
+            merged.get("checkout_base_url"), fallback=PRODUCTION_PLATFORM_CHECKOUT
+        )
     slug = str(merged.get("slug") or "").strip().lower()
     if slug in _ACHILLIO_TRAVEL_SLUGS:
         merged["slug"] = "poreiago"
@@ -91,7 +100,15 @@ def get_branding(tenant_key: str = "default") -> BrandingConfig:
     key = (tenant_key or "default").strip().lower() or "default"
     row = data.get(key) or data.get("default") or DEFAULT_BRANDING
     healed = _heal_platform_row(key if key in data else "default", dict(row))
-    return BrandingConfig(**{**DEFAULT_BRANDING, **healed})
+    merged = {**DEFAULT_BRANDING, **healed}
+    if key in _ACHILLIO_TRAVEL_SLUGS:
+        fallback = "https://www.achilliotravel.com"
+    else:
+        fallback = PRODUCTION_PLATFORM_CHECKOUT
+    merged["checkout_base_url"] = heal_checkout_base_url(
+        merged.get("checkout_base_url"), fallback=fallback
+    )
+    return BrandingConfig(**merged)
 
 
 def update_branding(tenant_key: str, patch: dict[str, Any]) -> BrandingConfig:
