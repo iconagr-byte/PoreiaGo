@@ -18,14 +18,15 @@ self.addEventListener('push', (event) => {
   }
 
   const isShift = payload.data?.type === 'driver_shift';
+  const isSos = payload.data?.type === 'sos' || String(payload.data?.alert_type || '').toUpperCase() === 'SOS';
   const isChat = payload.data?.type === 'driver_office_chat';
   const isLost = payload.data?.type === 'lost_item_report';
   const options = {
     body: payload.body,
     tag: payload.tag || 'aerostride',
-    renotify: Boolean(isShift || isChat || isLost || payload.renotify),
+    renotify: Boolean(isShift || isSos || isChat || isLost || payload.renotify),
     requireInteraction:
-      payload.requireInteraction === true || Boolean(isShift || isChat || isLost),
+      payload.requireInteraction === true || Boolean(isShift || isSos || isChat || isLost),
     data: {
       url:
         payload.url ||
@@ -33,12 +34,12 @@ self.addEventListener('push', (event) => {
           ? '/admin?tab=lost_found'
           : isChat
             ? '/admin?tab=driver_chat'
-            : isShift
+            : isShift || isSos
               ? '/admin?tab=fleet_live_map'
               : '/wallet'),
       ...(payload.data || {}),
     },
-    icon: isShift || isChat || isLost ? '/icons/driver-pwa-192.png' : '/vite.svg',
+    icon: isShift || isSos || isChat || isLost ? '/icons/driver-pwa-192.png' : '/vite.svg',
     badge: '/icons/driver-pwa-192.png',
   };
 
@@ -75,6 +76,9 @@ self.addEventListener('notificationclick', (event) => {
   let target = data.url || '/wallet';
   if (data.type === 'driver_shift' && data.tab) {
     target = `/admin?tab=${encodeURIComponent(data.tab)}`;
+  }
+  if (data.type === 'sos' || String(data.alert_type || '').toUpperCase() === 'SOS') {
+    target = data.url || '/admin?tab=fleet_live_map';
   }
   if (data.type === 'driver_office_chat') {
     const driverId = data.driver_id ? `&driverId=${encodeURIComponent(data.driver_id)}` : '';

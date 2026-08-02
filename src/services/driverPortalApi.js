@@ -351,17 +351,23 @@ export async function uploadDriverExpense({ amount, category, description, recei
   }
 }
 
+function sosErrorMessage(detail, fallback = 'Αποτυχία αποστολής SOS') {
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg);
+  return fallback;
+}
+
 export async function triggerSosAlert({ lat, lng, accuracy_m, photoFile, message }) {
   const session = getDriverSession();
+  // Never fake success — office must actually receive the alert.
   if (!session?.accessToken) {
-    console.warn('[SOS offline]', { lat, lng });
-    return { ok: true, message: 'SOS αποθηκεύτηκε τοπικά (offline)', alert_id: `local-${Date.now()}` };
+    throw new Error('Δεν είστε συνδεδεμένος — ξανασυνδεθείτε και ξαναστείλτε SOS');
   }
 
   if (photoFile) {
     const form = new FormData();
-    form.append('lat', String(lat));
-    form.append('lng', String(lng));
+    form.append('lat', String(lat ?? 0));
+    form.append('lng', String(lng ?? 0));
     if (accuracy_m != null) form.append('accuracy_m', String(accuracy_m));
     if (message) form.append('message', message);
     form.append('incident_type', 'sos');
@@ -372,46 +378,45 @@ export async function triggerSosAlert({ lat, lng, accuracy_m, photoFile, message
       body: form,
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'SOS failed');
+    if (!res.ok) throw new Error(sosErrorMessage(data.detail));
     return data;
   }
 
   const res = await fetch(`${API_BASE}/api/telemetry/sos`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lat, lng, accuracy_m, message, incident_type: 'sos' }),
+    body: JSON.stringify({
+      lat: lat ?? 0,
+      lng: lng ?? 0,
+      accuracy_m,
+      message,
+      incident_type: 'sos',
+    }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || 'SOS failed');
+  if (!res.ok) throw new Error(sosErrorMessage(data.detail));
   return data;
 }
 
 export async function reportDriverIssue(payload) {
   const session = getDriverSession();
   if (!session?.accessToken) {
-    console.info('[Driver Issue]', { ...payload, tripId: session?.tripId });
-    return { ok: true, ticketId: `INC-${Date.now()}` };
+    throw new Error('Δεν είστε συνδεδεμένος — ξανασυνδεθείτε για αναφορά');
   }
-  try {
-    const res = await fetch(`${API_BASE}/api/telemetry/sos`, {
-      method: 'POST',
-      headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        lat: payload.lat,
-        lng: payload.lng,
-        accuracy_m: payload.accuracy_m,
-        incident_type: payload.type || 'incident',
-        message: `Driver report: ${payload.type}`,
-      }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return { ok: true, ticketId: data.alert_id, alert_id: data.alert_id };
-    }
-  } catch {
-    /* fallback */
-  }
-  return { ok: true, ticketId: `INC-${Date.now()}` };
+  const res = await fetch(`${API_BASE}/api/telemetry/sos`, {
+    method: 'POST',
+    headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      lat: payload.lat ?? 0,
+      lng: payload.lng ?? 0,
+      accuracy_m: payload.accuracy_m,
+      incident_type: payload.type || 'incident',
+      message: `Driver report: ${payload.type}`,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(sosErrorMessage(data.detail, 'Αποτυχία αναφοράς'));
+  return { ok: true, ticketId: data.alert_id, alert_id: data.alert_id };
 }
 
 /** @deprecated use triggerSosAlert */

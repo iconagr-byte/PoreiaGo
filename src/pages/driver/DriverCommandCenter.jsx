@@ -57,6 +57,7 @@ function DriverHeader({
   chatUnread = 0,
   onOpenChat,
   onStartShift,
+  allowStartShift = true,
 }) {
   const name = session?.driverName || 'Οδηγός';
   const plate = session?.vehiclePlate || session?.vehicleCode;
@@ -120,7 +121,7 @@ function DriverHeader({
           >
             LIVE
           </span>
-        ) : (
+        ) : allowStartShift ? (
           <button
             type="button"
             className="driver-live-badge is-offline driver-live-badge--action"
@@ -130,6 +131,14 @@ function DriverHeader({
           >
             Offline
           </button>
+        ) : (
+          <span
+            className="driver-live-badge is-offline"
+            title="Βάρδια offline — το SOS δεν ξεκινά βάρδια"
+            aria-label="Βάρδια offline"
+          >
+            Offline
+          </span>
         )}
         <button type="button" onClick={onLogout} className="driver-header-btn shrink-0">
           {kicker === 'Pre-trip' ? 'Έξοδος' : 'Τέλος'}
@@ -388,6 +397,7 @@ export default function DriverCommandCenter() {
             chatUnread={chatUnread}
             onOpenChat={() => setTab('chat')}
             onStartShift={startShiftNow}
+            allowStartShift={tab !== 'sos'}
           />
 
           {tab !== 'home' && tab !== 'chat' && tab !== 'summary' ? (
