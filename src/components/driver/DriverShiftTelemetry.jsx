@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
 import IosPwaGpsGuidance from './IosPwaGpsGuidance.jsx';
 
@@ -8,18 +9,60 @@ export default function DriverShiftTelemetry({ shift }) {
   const session = getDriverSession();
   const {
     online,
+    starting,
     lastPing,
     gpsError,
     manifestSummary,
     backgroundWarning,
-    toggle,
+    goOnline,
+    goOffline,
     wakeLockSupported,
   } = shift;
+  const [confirmEnd, setConfirmEnd] = useState(false);
+
+  useEffect(() => {
+    if (!online) setConfirmEnd(false);
+  }, [online]);
+
+  useEffect(() => {
+    if (!confirmEnd) return undefined;
+    const id = window.setTimeout(() => setConfirmEnd(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [confirmEnd]);
+
+  const busy = Boolean(starting) && !lastPing;
+  const live = Boolean(online && lastPing);
+
+  const onPrimary = () => {
+    if (busy) return;
+    if (!online) {
+      void goOnline({ resume: false });
+      return;
+    }
+    // Avoid accidental end when Θέση tab auto-started the shift.
+    if (!confirmEnd) {
+      setConfirmEnd(true);
+      return;
+    }
+    setConfirmEnd(false);
+    void goOffline();
+  };
+
+  let primaryLabel = 'ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ';
+  let primaryClass = 'driver-btn-primary';
+  if (busy) {
+    primaryLabel = 'ΣΥΝΔΕΣΗ GPS…';
+    primaryClass = 'driver-shift-btn--busy';
+  } else if (online && confirmEnd) {
+    primaryLabel = 'ΕΠΙΒΕΒΑΙΩΣΗ ΤΕΛΟΥΣ';
+    primaryClass = 'bg-rose-600 text-white shadow-lg shadow-rose-900/40';
+  } else if (online) {
+    primaryLabel = 'ΤΕΛΟΣ ΒΑΡΔΙΑΣ';
+    primaryClass = 'bg-rose-600 text-white shadow-lg shadow-rose-900/40';
+  }
 
   return (
     <section className="driver-telemetry-card space-y-4">
-      <IosPwaGpsGuidance />
-
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-extrabold flex items-center gap-2">
@@ -27,46 +70,54 @@ export default function DriverShiftTelemetry({ shift }) {
             Ζωντανό GPS
           </h2>
           <p className="text-xs text-[var(--driver-muted)] mt-1 truncate">
-            Βάρδια #{session?.tripId || '—'}
+            {session?.tripTitle ||
+              (session?.tripId ? `Βάρδια #${session.tripId}` : 'Βάρδια')}
             {session?.destination ? ` · ${session.destination}` : ''}
           </p>
         </div>
         <span
           className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-            online ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-[var(--driver-muted)]'
+            live
+              ? 'bg-emerald-100 text-emerald-700'
+              : online
+                ? 'bg-amber-100 text-amber-800'
+                : 'bg-slate-100 text-[var(--driver-muted)]'
           }`}
         >
-          {online ? 'Online' : 'Offline'}
+          {live ? 'Online' : online ? 'Σύνδεση…' : 'Offline'}
         </span>
       </div>
 
       <button
         type="button"
-        onClick={toggle}
-        className={`driver-shift-btn transition-transform active:scale-[0.98] ${
-          online
-            ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40'
-            : 'driver-btn-primary'
-        }`}
+        onClick={onPrimary}
+        disabled={busy}
+        className={`driver-shift-btn transition-transform active:scale-[0.98] disabled:opacity-80 disabled:active:scale-100 ${primaryClass}`}
       >
-        {online ? 'ΤΕΛΟΣ ΒΑΡΔΙΑΣ' : 'ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ'}
+        {primaryLabel}
       </button>
 
       {!online ? (
         <p className="text-xs text-[var(--driver-muted)] leading-relaxed">
-          Πατήστε «Έναρξη βάρδιας» και επιτρέψτε την τοποθεσία. Περιμένετε «Σύνδεση θέσης OK» —
-          το στίγμα εμφανίζεται στον live χάρτη του γραφείου σε ~5–10 δευτ.
-          του γραφείου.
+          Ένα πάτημα ενεργοποιεί GPS και ενημερώνει τον live χάρτη του γραφείου. Επιτρέψτε την
+          τοποθεσία αν σας το ζητήσει το τηλέφωνο.
         </p>
-      ) : !lastPing ? (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
-          Αναμονή πρώτης θέσης GPS… Επιτρέψτε την τοποθεσία αν σας το ζητήσει το τηλέφωνο.
+      ) : busy || !lastPing ? (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed font-semibold">
+          Βάρδια ξεκίνησε — αναμονή πρώτης θέσης GPS…
+        </p>
+      ) : confirmEnd ? (
+        <p className="text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-xl p-3 leading-relaxed font-semibold">
+          Πατήστε ξανά «Επιβεβαίωση τέλους» για να σταματήσει το GPS.
         </p>
       ) : (
-        <p className="text-xs text-emerald-700 leading-relaxed">
+        <p className="text-xs text-emerald-700 leading-relaxed font-semibold">
           Το στίγμα σας είναι ζωντανό στον χάρτη του γραφείου.
         </p>
       )}
+
+      {/* Keep install tips below the primary action so start stays immediate. */}
+      {!online ? <IosPwaGpsGuidance /> : null}
 
       {gpsError ? <p className="text-sm text-rose-400">{gpsError}</p> : null}
       {backgroundWarning ? (

@@ -215,18 +215,18 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
         return false;
       }
 
-      if (!resume && iosEnv.needsInstallGuidance) {
-        toast(
-          'Στο iPhone προσθέστε την εφαρμογή στην Αρχική (βλ. οδηγίες παρακάτω) για αξιόπιστο GPS.',
-          { icon: '📱', duration: 6000 },
-        );
-      }
-
       startingRef.current = true;
       setStarting(true);
       setOnline(true);
       setShiftFlag(true);
       runningRef.current = true;
+
+      if (!resume) {
+        toast.success('Βάρδια ξεκίνησε', {
+          id: 'driver-shift-started',
+          duration: 2200,
+        });
+      }
 
       // CRITICAL: arm geolocation BEFORE any await — iOS drops permission without a
       // synchronous getCurrentPosition/watchPosition in the user-gesture stack.
@@ -235,11 +235,9 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
         onOpen: ({ transport } = {}) => {
           markOnline();
           if (resume) return;
-          if (transport === 'ws') {
-            toast.success('Σύνδεση telemetry OK');
-          } else if (transport === 'http' && !httpFallbackNotified) {
+          // Keep a single status line — don't pile connection toasts on top of start.
+          if (transport === 'http' && !httpFallbackNotified) {
             httpFallbackNotified = true;
-            toast.success('Σύνδεση θέσης OK');
           }
         },
         onError: (err) => {
@@ -297,13 +295,6 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       }
 
       markOnline();
-      if (!resume) {
-        toast('Η θέση σας θα εμφανιστεί στον live χάρτη του γραφείου', {
-          icon: '🗺️',
-          duration: 4000,
-          id: 'driver-shift-map-hint',
-        });
-      }
 
       // Non-critical side work AFTER GPS is armed.
       window.setTimeout(() => {
@@ -346,15 +337,12 @@ export function useDriverShiftSession({ driverName = 'Οδηγός', enabled = t
       requestWakeLock()
         .then((lock) => {
           wakeRef.current = lock;
-          if (!resume && !isWakeLockSupported()) {
-            toast('Wake Lock μη διαθέσιμο — κρατήστε την οθόνη ενεργή', { icon: 'ℹ️' });
-          }
         })
         .catch(() => {});
 
       return true;
     },
-    [goOffline, iosEnv.isIos, iosEnv.needsInstallGuidance, markOnline, sendPosition],
+    [goOffline, iosEnv.isIos, markOnline, sendPosition],
   );
 
   // Keep GPS running while the driver shell is active. Tab changes must not end the shift.

@@ -56,6 +56,7 @@ function DriverHeader({
   title,
   chatUnread = 0,
   onOpenChat,
+  onStartShift,
 }) {
   const name = session?.driverName || 'Οδηγός';
   const plate = session?.vehiclePlate || session?.vehicleCode;
@@ -111,13 +112,25 @@ function DriverHeader({
             <span className="driver-notif-badge">{unread > 99 ? '99+' : unread}</span>
           ) : null}
         </button>
-        <span
-          className={`driver-live-badge ${telemetryOnline ? 'is-live' : 'is-offline'}`}
-          title={telemetryOnline ? 'Ζωντανή μετάδοση GPS' : 'Εκτός σύνδεσης'}
-          aria-live="polite"
-        >
-          {telemetryOnline ? 'LIVE' : 'Offline'}
-        </span>
+        {telemetryOnline ? (
+          <span
+            className="driver-live-badge is-live"
+            title="Ζωντανή μετάδοση GPS"
+            aria-live="polite"
+          >
+            LIVE
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="driver-live-badge is-offline driver-live-badge--action"
+            title="Πατήστε για έναρξη βάρδιας"
+            aria-label="Έναρξη βάρδιας — ενεργοποίηση GPS"
+            onClick={() => onStartShift?.()}
+          >
+            Offline
+          </button>
+        )}
         <button type="button" onClick={onLogout} className="driver-header-btn shrink-0">
           {kicker === 'Pre-trip' ? 'Έξοδος' : 'Τέλος'}
         </button>
@@ -345,15 +358,22 @@ export default function DriverCommandCenter() {
           setAuthenticated(true);
           setProfileTick((n) => n + 1);
           window.setTimeout(() => {
-            toast.success('Σύνδεση για τη σημερινή βάρδια', {
+            toast.success('Συνδεθήκατε — πατήστε Έναρξη βάρδιας', {
               id: 'driver-shift-login',
-              duration: 2800,
+              duration: 3200,
             });
           }, 80);
         }}
       />
     );
   } else {
+    const startShiftNow = () => {
+      setTab('gps');
+      if (!shift.online) {
+        void shift.goOnline({ resume: false });
+      }
+    };
+
     body = (
       <div
         className={`driver-app ${deviceClass}`}
@@ -367,6 +387,7 @@ export default function DriverCommandCenter() {
             onLogout={logout}
             chatUnread={chatUnread}
             onOpenChat={() => setTab('chat')}
+            onStartShift={startShiftNow}
           />
 
           {tab !== 'home' && tab !== 'chat' && tab !== 'summary' ? (
@@ -405,6 +426,45 @@ export default function DriverCommandCenter() {
           <main className={`driver-shell driver-main ${tab === 'chat' ? 'driver-main--chat' : ''}`}>
             {tab === 'home' && (
               <>
+                {!telemetryOnline ? (
+                  <button
+                    type="button"
+                    onClick={startShiftNow}
+                    className="driver-home-start"
+                    aria-label="Έναρξη βάρδιας — ενεργοποίηση GPS"
+                  >
+                    <span className="driver-home-start-icon" aria-hidden>
+                      <span className="material-symbols-outlined">play_circle</span>
+                    </span>
+                    <span className="driver-home-start-copy">
+                      <span className="driver-home-start-title">Έναρξη βάρδιας</span>
+                      <span className="driver-home-start-sub">
+                        Ένα πάτημα · GPS στο γραφείο αμέσως
+                      </span>
+                    </span>
+                    <span className="material-symbols-outlined driver-home-start-chevron" aria-hidden>
+                      chevron_right
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setTab('gps')}
+                    className="driver-home-live"
+                    aria-label="Βάρδια ενεργή — άνοιγμα θέσης GPS"
+                  >
+                    <span className="driver-home-live-dot" aria-hidden />
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="block font-extrabold text-base text-emerald-900">
+                        Βάρδια ενεργή
+                      </span>
+                      <span className="block text-xs text-emerald-800/80 mt-0.5">
+                        GPS στον χάρτη του γραφείου · πατήστε για λεπτομέρειες
+                      </span>
+                    </span>
+                    <span className="material-symbols-outlined text-emerald-700">share_location</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setTab('chat')}
