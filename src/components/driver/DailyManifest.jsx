@@ -4,7 +4,10 @@ import {
   fetchDriverSchedule,
   fetchDriverTrip,
 } from '../../services/driverPortalApi.js';
-import { getDriverSession } from '../../lib/driver/driverSession.js';
+import {
+  getDriverSession,
+  hasOpenDriverTrip,
+} from '../../lib/driver/driverSession.js';
 import DriverBoardingSeatMap from './DriverBoardingSeatMap.jsx';
 import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
@@ -84,16 +87,19 @@ export default function DailyManifest() {
         fetchDriverSchedule().catch(() => []),
         fetchDriverManifest().catch(() => null),
       ]);
-      setTripMeta(trip);
-      const schedule =
-        (trip?.stops?.length ? trip.stops : null) ||
-        apiStops ||
-        getDriverSession()?.schedule ||
-        [];
-      setStops(schedule);
-      setManifest(man);
-      if (!trip && !man && !getDriverSession()?.tripId) {
-        setError('Δεν έχει συνδεθεί ταξίδι σε αυτή τη συνεδρία.');
+      if (!trip && !man) {
+        setTripMeta(null);
+        setManifest(null);
+        setStops([]);
+        setError('');
+      } else {
+        setTripMeta(trip);
+        const schedule =
+          (trip?.stops?.length ? trip.stops : null) ||
+          apiStops ||
+          [];
+        setStops(schedule);
+        setManifest(man);
       }
     } catch {
       setError('Αποτυχία φόρτωσης ταξιδιού. Δοκιμάστε ξανά.');
@@ -108,7 +114,11 @@ export default function DailyManifest() {
     inflightRef.current = true;
     try {
       const man = await fetchDriverManifest().catch(() => null);
-      if (man) setManifest(man);
+      setManifest(man);
+      if (!man && !hasOpenDriverTrip()) {
+        setTripMeta(null);
+        setStops([]);
+      }
     } finally {
       inflightRef.current = false;
     }
@@ -129,12 +139,21 @@ export default function DailyManifest() {
     const onUpdated = () => {
       if (!cancelled) refreshManifest();
     };
+    const onCleared = () => {
+      if (cancelled) return;
+      setTripMeta(null);
+      setManifest(null);
+      setStops([]);
+      setLoading(false);
+    };
     window.addEventListener('driver-manifest-updated', onUpdated);
+    window.addEventListener('driver-trip-cleared', onCleared);
 
     return () => {
       cancelled = true;
       clearInterval(id);
       window.removeEventListener('driver-manifest-updated', onUpdated);
+      window.removeEventListener('driver-trip-cleared', onCleared);
     };
   }, [session?.tripId, loadAll, refreshManifest]);
 
@@ -180,7 +199,10 @@ export default function DailyManifest() {
     );
   }
 
-  const hasTrip = Boolean(session?.tripId || tripMeta?.trip_id || manifest?.trip_id);
+  // Only show excursion + bus map when office opened / assigned a real trip.
+  const hasTrip = Boolean(
+    hasOpenDriverTrip(session) && (tripMeta?.trip_id || manifest?.trip_id),
+  );
 
   if (!hasTrip) {
     return (
@@ -189,8 +211,8 @@ export default function DailyManifest() {
           <p className="driver-card-label">Σημερινό δρομολόγιο</p>
           <h2 className="text-xl font-extrabold mt-1 tracking-tight">Χωρίς εκδρομή</h2>
           <p className="mt-2 text-sm font-semibold text-[var(--driver-muted)] leading-relaxed">
-            Το γραφείο δεν έχει ανοίξει / αναθέσει εκδρομή στη βάρδια σας ακόμα. Όταν εκδοθεί
-            Master QR ή ανατεθεί δρομολόγιο, θα εμφανιστεί εδώ.
+            Δεν φορτώνεται εκδρομή ούτε κάτοψη λεωφορείου μέχρι το γραφείο να ανοίξει /
+            αναθέσει δρομολόγιο (Master QR ή ανάθεση).
           </p>
           <button
             type="button"

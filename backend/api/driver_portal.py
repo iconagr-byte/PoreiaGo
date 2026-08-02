@@ -176,11 +176,17 @@ def _issue_driver_session(
     tenant_id: str,
     trip_id: int | None,
     expires_at: int | None = None,
+    trip_source: str | None = None,
 ) -> DriverSessionResponse:
     exp = expires_at or int(time.time()) + 24 * 3600
     tid = tenant_id or DEFAULT_TENANT
     profile = _profile_fields(driver_id)
     bound_trip = int(trip_id) if trip_id else None
+    # master_qr | live_fleet | None — legacy JWTs without this are treated as unbound.
+    source = (trip_source or "").strip() if bound_trip else None
+    if bound_trip and source not in ("master_qr", "live_fleet"):
+        source = None
+        bound_trip = None
     vehicle_code = (
         profile.get("vehicle_plate")
         or profile.get("vehicle_code")
@@ -191,6 +197,7 @@ def _issue_driver_session(
             "sub": driver_id or "master-qr-driver",
             "tenant_id": tid,
             "trip_id": bound_trip,
+            "trip_source": source,
             "roles": ["driver"],
             "scope": "manifest:read driver:scan",
             "exp": exp,
@@ -228,6 +235,30 @@ def _resolve_trip_for_driver(driver_id: str | None, tenant_id: str | None = None
                 return int(v.trip_id)
     except Exception:
         pass
+    return None
+
+
+def _session_has_open_trip(session_payload: dict) -> int | None:
+    """
+    Trip id only when office opened it (Master QR) or live fleet still assigns it.
+    Blocks legacy password JWTs that baked in demo Εκδρομή #1.
+    """
+    trip_id = int(session_payload.get("trip_id") or 0) or None
+    if not trip_id:
+        return None
+    source = str(session_payload.get("trip_source") or "").strip()
+    if source == "master_qr":
+        return trip_id
+    driver_id = str(
+        session_payload.get("driver_id") or session_payload.get("sub") or ""
+    ).strip()
+    if driver_id in ("", "master-qr-driver"):
+        return None
+    tenant_id = str(session_payload.get("tenant_id") or "") or None
+    live_trip = _resolve_trip_for_driver(driver_id, tenant_id)
+    if live_trip and int(live_trip) == int(trip_id):
+        return trip_id
+    # live_fleet source but assignment gone / offline — no excursion UI.
     return None
 
 
@@ -437,6 +468,7 @@ async def login_with_password(request: Request, body: DriverLoginBody):
         driver_id=driver.id,
         tenant_id=tenant_id,
         trip_id=trip_id,
+        trip_source="live_fleet" if trip_id else None,
     )
 
 
@@ -492,6 +524,7 @@ async def exchange_master_qr(request: Request, body: MasterQrExchangeBody):
             driver_id=driver_id,
             tenant_id=tenant_id,
             trip_id=trip_id,
+            trip_source="master_qr",
             expires_at=int(hybrid["expires_at"]) if hybrid.get("expires_at") else None,
         )
 
@@ -524,7 +557,7 @@ async def driver_me(session_payload: dict = Depends(require_driver_session)):
         driver_id = session_payload.get("driver_id")
     profile = _profile_fields(driver_id if driver_id and driver_id != "master-qr-driver" else None)
     driver = get_driver(driver_id) if driver_id and driver_id != "master-qr-driver" else None
-    trip_id = int(session_payload.get("trip_id") or 0) or None
+    trip_id = _session_has_open_trip(session_payload)
     ctx = _trip_context(trip_id) if trip_id else {}
     return DriverMeResponse(
         driver_id=driver_id if driver_id != "master-qr-driver" else None,
@@ -542,7 +575,7 @@ async def driver_trip(session_payload: dict = Depends(require_driver_session)):
     from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
     from travel_platform.operations.trip_ops_store import get_trip_ops
 
-    trip_id = int(session_payload.get("trip_id", 0))
+    trip_id = _session_has_open_trip(session_payload)
     if not trip_id:
         raise HTTPException(status_code=403, detail="No trip bound to session")
     tenant_id = str(session_payload.get("tenant_id") or "")
@@ -570,10 +603,10 @@ async def driver_trip(session_payload: dict = Depends(require_driver_session)):
 async def driver_manifest(
     session_payload: dict = Depends(require_driver_session),
 ):
-    """Boarding manifest only for trip_id embedded in session token."""
+    """Boarding manifest only for an office-opened / live-assigned trip."""
     from travel_platform.operations.boarding_office_sync import sync_trip_passengers_to_ticketing
 
-    trip_id = int(session_payload.get("trip_id", 0))
+    trip_id = _session_has_open_trip(session_payload)
     if not trip_id:
         raise HTTPException(status_code=403, detail="No trip bound to session")
     try:
@@ -588,14 +621,14 @@ async def driver_manifest(
 
 @router.get("/schedule")
 async def driver_schedule(session_payload: dict = Depends(require_driver_session)):
-    trip_id = int(session_payload.get("trip_id", 0))
+    trip_id = _session_has_open_trip(session_payload)
     ctx = _trip_context(trip_id) if trip_id else {}
     return {
         "trip_id": trip_id,
         "trip_title": ctx.get("trip_title"),
         "destination": ctx.get("destination"),
         "meeting_point": ctx.get("meeting_point"),
-        "stops": _build_daily_schedule(trip_id),
+        "stops": _build_daily_schedule(trip_id) if trip_id else [],
     }
 
 

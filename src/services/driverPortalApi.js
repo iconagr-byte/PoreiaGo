@@ -1,5 +1,6 @@
 import { API_BASE } from '../config/api.js';
 import {
+  clearDriverTripBinding,
   driverSessionHeaders,
   getActiveTripId,
   getDriverSession,
@@ -191,12 +192,15 @@ export async function fetchDriverManifest() {
       // flows (e.g. Scanner check-in) dispatch `driver-manifest-updated`.
       return data;
     }
-    // No trip on session (403) — do not invent local demo bookings for trip #1.
-    if (res.status === 403 || res.status === 404) return null;
+    // No open excursion — clear binding so κάτοψη / Εκδρομή #1 cannot linger.
+    if (res.status === 403 || res.status === 404) {
+      clearDriverTripBinding();
+      return null;
+    }
   } catch {
-    /* offline */
+    /* offline — never fall back to demo bookings without a live open trip */
   }
-  return loadCachedManifest(tripId) ?? null;
+  return null;
 }
 
 export async function fetchDriverSchedule() {
@@ -221,19 +225,15 @@ export async function fetchDriverTrip() {
       headers: driverSessionHeaders(),
     });
     if (res.ok) return res.json();
+    if (res.status === 403 || res.status === 404) {
+      clearDriverTripBinding();
+      return null;
+    }
   } catch {
     /* offline */
   }
-  const session = getDriverSession();
-  if (!session?.tripId) return null;
-  return {
-    trip_id: session.tripId,
-    trip_title: session.tripTitle,
-    destination: session.destination,
-    meeting_point: session.meetingPoint,
-    stops: session.schedule || [],
-    schedule: session.schedule || [],
-  };
+  // Do not invent trip meta from a stale session tripId (demo #1).
+  return null;
 }
 
 export async function cacheManifestForOffline(tripId, manifest) {

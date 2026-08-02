@@ -159,3 +159,34 @@ export function getActiveTripId() {
   // Never invent demo trip #1 — office must assign / open an excursion.
   return null;
 }
+
+/** Drop trip binding (keep auth) when office has not opened an excursion. */
+export function clearDriverTripBinding() {
+  const s = getDriverSession();
+  if (!s) return null;
+  const next = {
+    ...s,
+    tripId: null,
+    tripTitle: null,
+    destination: null,
+    meetingPoint: null,
+    schedule: [],
+  };
+  try {
+    writeSessionRaw(JSON.stringify(next));
+    sessionStorage.removeItem('driverActiveTripId');
+    localStorage.removeItem('driverActiveTripId');
+    // Drop offline demo manifests that painted Εκδρομή #1 + κάτοψη.
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('driver_manifest_'))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent('driver-trip-cleared'));
+  return next;
+}
+
+export function hasOpenDriverTrip(session = getDriverSession()) {
+  return Boolean(session?.tripId != null && Number(session.tripId) > 0);
+}

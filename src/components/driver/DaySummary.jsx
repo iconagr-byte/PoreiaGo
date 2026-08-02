@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchDriverManifest, getDaySummaryStats } from '../../services/driverPortalApi.js';
-import { getDriverSession } from '../../lib/driver/driverSession.js';
+import { getDriverSession, hasOpenDriverTrip } from '../../lib/driver/driverSession.js';
 import DriverBoardingSeatMap from './DriverBoardingSeatMap.jsx';
 
 function bookingLabel(p) {
@@ -18,24 +18,26 @@ export default function DaySummary() {
       fetchDriverManifest().then((m) => {
         if (cancelled) return;
         setManifest(m);
-        setStats(getDaySummaryStats(m));
+        setStats(m ? getDaySummaryStats(m) : null);
       });
     };
     load();
     window.addEventListener('driver-manifest-updated', load);
+    window.addEventListener('driver-trip-cleared', load);
     return () => {
       cancelled = true;
       window.removeEventListener('driver-manifest-updated', load);
+      window.removeEventListener('driver-trip-cleared', load);
     };
   }, []);
 
-  if (!session?.tripId && !manifest) {
+  if (!hasOpenDriverTrip(session) || !manifest) {
     return (
       <div className="driver-card text-center py-8">
         <p className="driver-card-label">Τέλος βάρδιας</p>
         <h2 className="text-xl font-extrabold tracking-tight mt-1">Χωρίς εκδρομή</h2>
         <p className="mt-2 text-sm font-semibold text-[var(--driver-muted)]">
-          Δεν υπάρχει ανοιχτή εκδρομή για σύνοψη σήμερα.
+          Δεν υπάρχει ανοιχτή εκδρομή — δεν εμφανίζεται κάτοψη λεωφορείου.
         </p>
       </div>
     );
@@ -64,12 +66,14 @@ export default function DaySummary() {
         <h2 className="text-2xl font-extrabold tracking-tight mt-1">Σύνοψη ημέρας</h2>
       </div>
 
-      <div className="driver-card">
-        <DriverBoardingSeatMap
-          manifest={manifest}
-          vehicleType={session?.vehicleType || manifest?.vehicle_type}
-        />
-      </div>
+      {manifest ? (
+        <div className="driver-card">
+          <DriverBoardingSeatMap
+            manifest={manifest}
+            vehicleType={session?.vehicleType || manifest?.vehicle_type}
+          />
+        </div>
+      ) : null}
 
       <div className="grid gap-3">
         {tiles.map((t) => (
