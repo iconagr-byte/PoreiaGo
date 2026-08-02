@@ -151,9 +151,8 @@ export default function DriverCommandCenter() {
   const session = useMemo(() => getDriverSession(), [authenticated, profileTick]);
 
   useEffect(() => {
-    if (!authenticated) {
-      clearDriverShiftLaunchState();
-    }
+    // Login / logout never inherits a previous shift — GPS starts only via button.
+    clearDriverShiftLaunchState();
   }, [authenticated]);
 
   const [onBreak, setOnBreak] = useState(false);
@@ -448,13 +447,7 @@ export default function DriverCommandCenter() {
                   key={t.id}
                   type="button"
                   className={tab === t.id ? 'active' : ''}
-                  onClick={() => {
-                    setTab(t.id);
-                    // Tab tap is a user gesture — best moment to start iOS GPS.
-                    if (t.id === 'gps' && !shift.online) {
-                      void shift.goOnline({ resume: false });
-                    }
-                  }}
+                  onClick={() => setTab(t.id)}
                   aria-label={
                     showChatBadge ? `${t.label}, ${chatUnread} νέα` : t.label
                   }
