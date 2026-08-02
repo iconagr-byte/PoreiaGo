@@ -9,6 +9,7 @@ import {
   uploadDriverPhoto,
 } from '../../services/platformApi.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
+import PasswordField from '../../components/PasswordField.jsx';
 
 const STATUS_LABELS = {
   active: 'Ενεργός',
@@ -50,6 +51,7 @@ export default function DriverFormPage() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
+  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     const role = localStorage.getItem('userRole');
@@ -92,37 +94,44 @@ export default function DriverFormPage() {
     };
   }, [driverId, isEdit, navigate]);
 
-  const setField = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+  const setField = (key) => (e) => {
+    setFormError('');
+    setForm((p) => ({ ...p, [key]: e.target.value }));
+  };
+
+  const fail = (msg) => {
+    setFormError(msg);
+    toast.error(msg, { duration: 6000, id: 'driver-form-error' });
+    return false;
+  };
 
   const validate = () => {
-    if (!form.name.trim()) {
-      toast.error('Συμπληρώστε το ονοματεπώνυμο');
-      return false;
+    if (!form.name.trim() || form.name.trim().length < 2) {
+      return fail('Συμπληρώστε ονοματεπώνυμο (τουλάχιστον 2 χαρακτήρες)');
     }
     if (!form.email.trim()) {
-      toast.error('Συμπληρώστε το email (όνομα χρήστη)');
-      return false;
+      return fail('Συμπληρώστε το email (όνομα χρήστη)');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      return fail('Το email δεν είναι έγκυρο');
     }
     if (!form.license_no.trim() || form.license_no.trim().length < 4) {
-      toast.error('Ο αριθμός άδειας πρέπει να έχει τουλάχιστον 4 χαρακτήρες');
-      return false;
+      return fail('Ο αριθμός άδειας πρέπει να έχει τουλάχιστον 4 χαρακτήρες');
     }
     if (!isEdit) {
       if (!form.password) {
-        toast.error('Ορίστε κωδικό για την εφαρμογή λεωφορείου');
-        return false;
+        return fail('Ορίστε κωδικό για την εφαρμογή λεωφορείου');
       }
     }
     if (form.password || form.password_confirm) {
       if (form.password.length < 4) {
-        toast.error('Ο κωδικός πρέπει να έχει τουλάχιστον 4 χαρακτήρες');
-        return false;
+        return fail('Ο κωδικός πρέπει να έχει τουλάχιστον 4 χαρακτήρες');
       }
       if (form.password !== form.password_confirm) {
-        toast.error('Οι κωδικοί δεν ταιριάζουν');
-        return false;
+        return fail('Οι κωδικοί δεν ταιριάζουν — ελέγξτε και τα δύο πεδία');
       }
     }
+    setFormError('');
     return true;
   };
 
@@ -149,6 +158,7 @@ export default function DriverFormPage() {
     if (form.password) body.password = form.password;
 
     setSaving(true);
+    setFormError('');
     try {
       if (isEdit) {
         await updateFleetDriver(driverId, body);
@@ -168,7 +178,8 @@ export default function DriverFormPage() {
         !raw || /failed to fetch|networkerror|load failed/i.test(raw)
           ? 'Αποτυχία αποθήκευσης — ελέγξτε σύνδεση / συνδεθείτε ξανά στο γραφείο'
           : raw;
-      toast.error(msg, { duration: 6000 });
+      setFormError(msg);
+      toast.error(msg, { duration: 7000, id: 'driver-form-error' });
     } finally {
       setSaving(false);
     }
@@ -213,8 +224,8 @@ export default function DriverFormPage() {
   const actions = (
     <div className="flex gap-3">
       <button
-        type="submit"
-        form="driver-account-form"
+        type="button"
+        onClick={() => void save()}
         disabled={saving}
         className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-primary text-white font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 disabled:opacity-60"
       >
@@ -239,6 +250,14 @@ export default function DriverFormPage() {
         noValidate
         className="max-w-3xl mx-auto space-y-5"
       >
+        {formError ? (
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800"
+          >
+            {formError}
+          </div>
+        ) : null}
         <section className="bg-sky-50 rounded-[24px] border border-sky-100 p-5 sm:p-6 space-y-4">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
@@ -287,32 +306,32 @@ export default function DriverFormPage() {
           </label>
 
           <div className="grid grid-cols-1 gap-4">
-            <label className="block text-sm">
-              <span className="font-bold text-gray-800">
-                Κωδικός εφαρμογής{!isEdit ? ' *' : ' (κενό = χωρίς αλλαγή)'}
-              </span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                minLength={4}
-                placeholder="τουλάχιστον 4 χαρακτήρες"
-                value={form.password}
-                onChange={setField('password')}
-                className={inputClass}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-bold text-gray-800">Επιβεβαίωση κωδικού</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                minLength={4}
-                placeholder="Επαναλάβετε τον κωδικό"
-                value={form.password_confirm}
-                onChange={setField('password_confirm')}
-                className={inputClass}
-              />
-            </label>
+            <PasswordField
+              id="driver-app-password"
+              label={`Κωδικός εφαρμογής${!isEdit ? ' *' : ' (κενό = χωρίς αλλαγή)'}`}
+              autoComplete="new-password"
+              minLength={4}
+              required={false}
+              placeholder="τουλάχιστον 4 χαρακτήρες"
+              value={form.password}
+              onChange={setField('password')}
+              inputClassName={inputClass}
+              labelClassName="block text-sm font-bold text-gray-800"
+              className="block text-sm"
+            />
+            <PasswordField
+              id="driver-app-password-confirm"
+              label="Επιβεβαίωση κωδικού"
+              autoComplete="new-password"
+              minLength={4}
+              required={false}
+              placeholder="Επαναλάβετε τον κωδικό"
+              value={form.password_confirm}
+              onChange={setField('password_confirm')}
+              inputClassName={inputClass}
+              labelClassName="block text-sm font-bold text-gray-800"
+              className="block text-sm"
+            />
           </div>
         </section>
 
