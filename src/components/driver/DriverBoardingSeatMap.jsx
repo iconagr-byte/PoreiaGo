@@ -51,7 +51,7 @@ function SeatCell({ seat, justBoarded, onSelect, selected }) {
 }
 
 /**
- * Read-only κάτοψη λεωφορείου για τη Σύνοψη οδηγού.
+ * Read-only κάτοψη λεωφορείου για το tab Κρατήσεις του οδηγού.
  * Οι θέσεις γεμίζουν με animation όταν γίνεται check-in.
  */
 export default function DriverBoardingSeatMap({ manifest, vehicleType, className = '' }) {
