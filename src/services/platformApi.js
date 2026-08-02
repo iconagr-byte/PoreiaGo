@@ -297,7 +297,9 @@ const _driversListCache = { key: '', at: 0, rows: null };
 const DRIVERS_LIST_TTL_MS = 20_000;
 
 export async function fetchFleetDrivers(status) {
-  const key = status || '';
+  // Cache key includes tenant so PoreiaGo / Achillio never share a list in-memory.
+  const tid = getSaasTenantId() || '';
+  const key = `${tid}|${status || ''}`;
   const now = Date.now();
   if (
     _driversListCache.rows &&

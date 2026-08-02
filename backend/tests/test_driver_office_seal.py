@@ -127,13 +127,34 @@ class DriverOfficeSealTests(unittest.TestCase):
                     }
                 )
 
-    def test_rehome_moves_driver_to_achillio(self):
+    def test_rehome_never_steals_from_real_office(self):
+        """SEAL: boot rehome must not move PoreiaGo ↔ Achillio drivers."""
         row = self._create(email="axilleas0@yahoo.gr", tenant_id=OFFICE_A)
+        result = store.rehome_driver_to_tenant("axilleas0@yahoo.gr", OFFICE_B)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["moved"], 0)
+        self.assertEqual(result.get("skipped_real"), 1)
+        store.reset_drivers_cache()
+        again = store.get_driver(row.id)
+        self.assertEqual(again.tenant_id, OFFICE_A)
+
+    def test_rehome_still_claims_demo_orphan(self):
+        orphan = store.create_driver(
+            {
+                "name": "Orphan Achilleas",
+                "license_no": f"LIC-{uuid4().hex[:8]}",
+                "email": "axilleas0@yahoo.gr",
+                "password": "BusPass99",
+                "status": "active",
+                "tenant_id": store.DEMO_TENANT_ID,
+                "_allow_demo_tenant": True,
+            }
+        )
         result = store.rehome_driver_to_tenant("axilleas0@yahoo.gr", OFFICE_B)
         self.assertTrue(result["ok"])
         self.assertEqual(result["moved"], 1)
         store.reset_drivers_cache()
-        again = store.get_driver(row.id)
+        again = store.get_driver(orphan.id)
         self.assertEqual(again.tenant_id, OFFICE_B)
 
 
