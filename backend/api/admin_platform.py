@@ -292,25 +292,83 @@ async def _demo_legacy_flags(
     return await _office_may_claim_demo_legacy(tenant_id)
 
 
+def _request_is_platform_host(request: Request | None) -> bool:
+    try:
+        from middleware.domain_tenant import _is_platform_host, _request_host
+
+        return bool(_is_platform_host(_request_host(request)))
+    except Exception:
+        return False
+
+
+def _request_is_impersonating(request: Request | None) -> bool:
+    if request is None:
+        return False
+    if bool(getattr(request.state, "impersonating", False)):
+        return True
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return False
+    try:
+        import jwt
+        from middleware.tenant import _jwt_settings
+
+        secret, algorithm, _ = _jwt_settings()
+        if not secret:
+            return False
+        payload = jwt.decode(auth[7:].strip(), secret, algorithms=[algorithm])
+        return bool(payload.get("impersonating"))
+    except Exception:
+        return False
+
+
 async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
     """
     Tenant + legacy flags for driver CRUD / list.
 
     Isolation rules:
-    1. Real office JWT always wins — never switch tenant via spoofable headers.
-    2. DEMO JWT on a *proxied* Achillio Host may remap to the Achillio office
-       (recovers broken Achillio sessions only).
-    3. DEMO legacy claim is Achillio-only (DB), fail-closed otherwise.
+    1. Achillio Travel Host → Achillio office only (never PoreiaGo drivers).
+    2. poreiago.com platform Host → never Achillio Travel drivers (remap / reject).
+    3. Real office JWT otherwise wins — never switch via spoofable headers.
+    4. DEMO JWT on Achillio Host may remap to Achillio (login recovery only).
+    5. DEMO legacy claim permanently disabled.
     """
     jwt_tid = str(_request_tenant_id(request) or "").strip() or str(DEMO_TENANT_ID)
+    impersonating = _request_is_impersonating(request)
 
-    # Customer / PoreiaGo / Achillio JWT — scope strictly to that tenant.
+    # Achillio Travel URL — drivers for that office only.
+    if _host_looks_like_achillio(request):
+        host_tid = await _resolve_achillio_tenant_id_from_request(request)
+        if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
+            return host_tid, False, False
+
+    # poreiago.com — never list/delete Achillio Travel drivers (test drivers stay here).
+    if _request_is_platform_host(request) and not impersonating:
+        if await _tenant_is_achillio_office(jwt_tid):
+            from fastapi import HTTPException
+
+            from travel_platform.settings.office_host_guard import (
+                resolve_poreiago_platform_tenant_id,
+            )
+
+            platform_tid = await resolve_poreiago_platform_tenant_id()
+            if platform_tid:
+                logger.warning(
+                    "SEAL: Achillio JWT on platform host remapped to PoreiaGo platform for drivers"
+                )
+                return platform_tid, False, False
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Ο λογαριασμός Achillio Travel ανοίγει μόνο από "
+                    "https://www.achilliotravel.com/admin — όχι από poreiago.com"
+                ),
+            )
+
     if jwt_tid != str(DEMO_TENANT_ID):
         include, claim = await _office_may_claim_demo_legacy(jwt_tid)
         return jwt_tid, include, claim
 
-    # DEMO JWT: only remap when the reverse-proxy Host is Achillio Travel.
-    # SEAL: never enable DEMO include/claim flags.
     if _host_looks_like_achillio(request):
         host_tid = await _resolve_achillio_tenant_id_from_request(request)
         if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
@@ -496,11 +554,12 @@ async def patch_driver(request: Request, driver_id: str, body: FleetDriverUpdate
 
 @router.delete("/drivers/{driver_id}", status_code=204)
 async def remove_driver(request: Request, driver_id: str):
+    """Delete only within the active office — never across PoreiaGo ↔ Achillio."""
     tenant_id, include_legacy, _claim = await _drivers_list_tenant_id(request)
     if not _driver_for_tenant(driver_id, tenant_id, allow_demo_legacy=include_legacy):
         raise HTTPException(status_code=404, detail="Driver not found")
     try:
-        delete_driver(driver_id)
+        delete_driver(driver_id, tenant_id=tenant_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Driver not found") from None
 
