@@ -45,6 +45,8 @@ const SCOPED_BASES = [
   'aerostride_seat_pricing_v1',
   'aerostride_platform_settings',
   'aerostride_telemetry_settings',
+  'aerostride_maintenance_events_v1',
+  'aerostride_fleet_resolved_alerts',
 ];
 
 /** True when BackOffice is using a SaaS JWT (real office session). */

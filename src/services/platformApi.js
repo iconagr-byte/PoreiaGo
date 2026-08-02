@@ -1,13 +1,22 @@
 import { API_BASE } from '../config/api.js';
 import { mockFleet } from '../data/mockData.js';
 import { fileToDriverPhotoDataUrl } from '../lib/drivers/driverPhoto.js';
+import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 import { adminBearerHeaders, adminFetch } from './adminApi.js';
 import { getSaasToken, getSaasTenantId, issueSaasMasterQr, saasFetch } from './saasApi.js';
 import { normalizeCheckoutSettings } from './checkoutSettingsApi.js';
 import { normalizeBankTransferSettings } from '../lib/payments/bankTransfer.js';
 
-const PLATFORM_SETTINGS_KEY = 'aerostride_platform_settings';
-const MAINT_EVENTS_KEY = 'aerostride_maintenance_events_v1';
+const PLATFORM_SETTINGS_KEY_BASE = 'aerostride_platform_settings';
+const MAINT_EVENTS_KEY_BASE = 'aerostride_maintenance_events_v1';
+
+function platformSettingsKey() {
+  return officeStorageKey(PLATFORM_SETTINGS_KEY_BASE);
+}
+
+function maintEventsKey() {
+  return officeStorageKey(MAINT_EVENTS_KEY_BASE);
+}
 
 export const DEFAULT_PLATFORM_SETTINGS = {
   company_name: 'PoreiaGo Travel',
@@ -91,7 +100,7 @@ export function normalizePlatformSettings(form) {
 }
 
 function saveSettingsLocally(data) {
-  localStorage.setItem(PLATFORM_SETTINGS_KEY, JSON.stringify(data));
+  localStorage.setItem(platformSettingsKey(), JSON.stringify(data));
 }
 
 /**
@@ -121,7 +130,7 @@ export async function fetchPlatformSettings(options = {}) {
     /* offline */
   }
   try {
-    const cached = localStorage.getItem(PLATFORM_SETTINGS_KEY);
+    const cached = localStorage.getItem(platformSettingsKey());
     if (cached) return JSON.parse(cached);
   } catch {
     /* ignore */
@@ -665,14 +674,19 @@ export async function fetchFleetAlerts(unresolvedOnly = true) {
   return [];
 }
 
-const RESOLVED_ALERTS_KEY = 'aerostride_fleet_resolved_alerts';
+const RESOLVED_ALERTS_KEY_BASE = 'aerostride_fleet_resolved_alerts';
+
+function resolvedAlertsKey() {
+  return officeStorageKey(RESOLVED_ALERTS_KEY_BASE);
+}
 
 function markAlertResolvedLocal(alertId) {
   try {
-    const raw = localStorage.getItem(RESOLVED_ALERTS_KEY);
+    const key = resolvedAlertsKey();
+    const raw = localStorage.getItem(key);
     const ids = raw ? JSON.parse(raw) : [];
     if (!ids.includes(alertId)) ids.push(alertId);
-    localStorage.setItem(RESOLVED_ALERTS_KEY, JSON.stringify(ids));
+    localStorage.setItem(key, JSON.stringify(ids));
   } catch {
     /* ignore */
   }
@@ -680,7 +694,7 @@ function markAlertResolvedLocal(alertId) {
 
 function filterUnresolvedLocal(alerts) {
   try {
-    const raw = localStorage.getItem(RESOLVED_ALERTS_KEY);
+    const raw = localStorage.getItem(resolvedAlertsKey());
     const resolved = raw ? new Set(JSON.parse(raw)) : new Set();
     return alerts.filter((a) => !resolved.has(a.id));
   } catch {
@@ -940,7 +954,7 @@ function getMockVehicles() {
 
 function readLocalMaintenanceEvents() {
   try {
-    const raw = localStorage.getItem(MAINT_EVENTS_KEY);
+    const raw = localStorage.getItem(maintEventsKey());
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -949,7 +963,7 @@ function readLocalMaintenanceEvents() {
 }
 
 function saveLocalMaintenanceEvents(events) {
-  localStorage.setItem(MAINT_EVENTS_KEY, JSON.stringify(events));
+  localStorage.setItem(maintEventsKey(), JSON.stringify(events));
 }
 
 function getLocalMaintenanceEvents(vehicleId) {

@@ -336,6 +336,7 @@ class AbandonedCartResponse(BaseModel):
     updated_at: str
     recovery_sent_at: str | None = None
     completed_at: str | None = None
+    tenant_id: str = ""
 
 
 class AbandonedScanRequest(BaseModel):

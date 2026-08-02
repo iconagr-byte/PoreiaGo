@@ -181,9 +181,17 @@ async def get_my_booking_fiscal(
     from app.services.customer_booking_fiscal_service import CustomerBookingFiscalService
 
     try:
+        from uuid import UUID as _UUID
+
+        fiscal_tid = None
+        try:
+            fiscal_tid = _UUID(str(tid))
+        except ValueError:
+            fiscal_tid = None
         fiscal = await CustomerBookingFiscalService().fetch_for_customer(
             booking_key=booking_id,
             customer_email=account["email"],
+            tenant_id=fiscal_tid,
         )
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc

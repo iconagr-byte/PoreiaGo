@@ -31,9 +31,26 @@ class AbandonedCart:
     updated_at: str
     recovery_sent_at: str | None = None
     completed_at: str | None = None
+    tenant_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _cart_from_row(row: dict[str, Any]) -> AbandonedCart:
+    allowed = set(AbandonedCart.__dataclass_fields__.keys())
+    return AbandonedCart(**{k: v for k, v in row.items() if k in allowed})
+
+
+def _tenant_matches(row: dict[str, Any], tenant_id: str | None) -> bool:
+    if not tenant_id:
+        return True
+    stored = str(row.get("tenant_id") or "").strip()
+    # Legacy rows without tenant_id stay visible only to PoreiaGo platform scans
+    # when explicitly requested with include_legacy=True via empty filter callers.
+    if not stored:
+        return False
+    return stored == str(tenant_id).strip()
 
 
 def _load() -> list[dict[str, Any]]:
@@ -64,13 +81,17 @@ def upsert_cart(
     passenger_email: str = "",
     passenger_phone: str = "",
     resume_token: str | None = None,
+    tenant_id: str = "",
 ) -> AbandonedCart:
     carts = _load()
     token = resume_token or secrets.token_urlsafe(16)
     now = datetime.now(timezone.utc).isoformat()
+    tid = str(tenant_id or "").strip()
 
     existing = next((c for c in carts if c.get("resume_token") == token), None)
     if existing:
+        if tid and existing.get("tenant_id") and str(existing.get("tenant_id")) != tid:
+            raise ValueError("Cart belongs to another office")
         existing.update(
             {
                 "trip_id": trip_id,
@@ -81,10 +102,11 @@ def upsert_cart(
                 "passenger_email": passenger_email,
                 "passenger_phone": passenger_phone,
                 "updated_at": now,
+                "tenant_id": tid or existing.get("tenant_id") or "",
             }
         )
         _save(carts)
-        return AbandonedCart(**existing)
+        return _cart_from_row(existing)
 
     cart_id = f"AC-{secrets.token_hex(4).upper()}"
     row = AbandonedCart(
@@ -99,6 +121,7 @@ def upsert_cart(
         passenger_phone=passenger_phone,
         created_at=now,
         updated_at=now,
+        tenant_id=tid,
     )
     carts.append(row.to_dict())
     _save(carts)
@@ -108,7 +131,7 @@ def upsert_cart(
 def get_by_resume_token(token: str) -> AbandonedCart | None:
     for c in _load():
         if c.get("resume_token") == token and not c.get("completed_at"):
-            return AbandonedCart(**c)
+            return _cart_from_row(c)
     return None
 
 
@@ -124,12 +147,18 @@ def mark_completed(resume_token: str) -> bool:
     return found
 
 
-def list_carts(*, include_completed: bool = False) -> list[AbandonedCart]:
+def list_carts(
+    *,
+    include_completed: bool = False,
+    tenant_id: str | None = None,
+) -> list[AbandonedCart]:
     out = []
     for c in _load():
         if c.get("completed_at") and not include_completed:
             continue
-        out.append(AbandonedCart(**c))
+        if tenant_id is not None and not _tenant_matches(c, tenant_id):
+            continue
+        out.append(_cart_from_row(c))
     out.sort(key=lambda x: x.updated_at, reverse=True)
     return out
 
@@ -138,13 +167,14 @@ def find_recovery_candidates(
     *,
     pending_minutes: int | None = None,
     base_url: str,
+    tenant_id: str | None = None,
 ) -> list[tuple[AbandonedCart, str]]:
     cfg = get_platform_config()
     minutes = pending_minutes if pending_minutes is not None else cfg.abandoned_pending_minutes
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=max(minutes, 0))
     candidates: list[tuple[AbandonedCart, str]] = []
 
-    for c in list_carts(include_completed=False):
+    for c in list_carts(include_completed=False, tenant_id=tenant_id):
         if c.recovery_sent_at:
             continue
         if not c.passenger_email and not c.passenger_phone:
@@ -160,18 +190,38 @@ def find_recovery_candidates(
     return candidates
 
 
-async def scan_and_send_recovery(*, base_url: str | None = None, pending_minutes: int | None = None) -> dict:
+def _heal_checkout_base(url: str | None) -> str:
+    raw = str(url or "").strip()
+    if not raw or "localhost" in raw.lower() or "127.0.0.1" in raw:
+        return "https://www.poreiago.com"
+    return raw.rstrip("/")
+
+
+async def scan_and_send_recovery(
+    *,
+    base_url: str | None = None,
+    pending_minutes: int | None = None,
+    tenant_id: str | None = None,
+    company_label: str = "PoreiaGo",
+) -> dict:
     if not base_url:
         try:
             from travel_platform.growth.branding_store import get_branding
 
-            base_url = get_branding().checkout_base_url
+            base_url = _heal_checkout_base(get_branding().checkout_base_url)
         except Exception:
             cfg = get_platform_config()
-            base_url = getattr(cfg, "checkout_base_url", None) or "http://localhost:5173"
-    candidates = find_recovery_candidates(pending_minutes=pending_minutes, base_url=base_url)
+            base_url = _heal_checkout_base(getattr(cfg, "checkout_base_url", None))
+    else:
+        base_url = _heal_checkout_base(base_url)
+    candidates = find_recovery_candidates(
+        pending_minutes=pending_minutes,
+        base_url=base_url,
+        tenant_id=tenant_id,
+    )
     sent = 0
     errors: list[str] = []
+    label = (company_label or "PoreiaGo").strip() or "PoreiaGo"
 
     carts = _load()
     for cart, checkout_url in candidates:
@@ -183,9 +233,7 @@ async def scan_and_send_recovery(*, base_url: str | None = None, pending_minutes
             f'<p><a href="{checkout_url}">Συνέχεια πληρωμής</a></p>'
             f"<p>Ποσό: €{cart.amount_eur:.2f}</p>"
         )
-        sms = (
-            f"Achillio: Ολοκληρώστε την κράτηση για {cart.trip_title}: {checkout_url}"
-        )
+        sms = f"{label}: Ολοκληρώστε την κράτηση για {cart.trip_title}: {checkout_url}"
         try:
             if cart.passenger_email:
                 await send_email(cart.passenger_email, subject, body)
