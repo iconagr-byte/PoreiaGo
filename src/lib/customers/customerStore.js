@@ -5,9 +5,39 @@ import {
 } from '../admin/officeTenantStore.js';
 
 const STORAGE_KEY_BASE = 'aerostride_customers_v1';
+const DELETED_KEY_BASE = 'aerostride_customers_deleted_v1';
 
 function storageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
+}
+
+function deletedStorageKey() {
+  return officeStorageKey(DELETED_KEY_BASE);
+}
+
+function loadDeletedEmails() {
+  try {
+    const raw = localStorage.getItem(deletedStorageKey());
+    if (!raw) return new Set();
+    const list = JSON.parse(raw);
+    return new Set(
+      (Array.isArray(list) ? list : [])
+        .map((e) => String(e || '').trim().toLowerCase())
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDeletedEmails(emails) {
+  localStorage.setItem(deletedStorageKey(), JSON.stringify([...emails]));
+}
+
+function isDeletedEmail(email) {
+  const key = String(email || '').trim().toLowerCase();
+  if (!key) return false;
+  return loadDeletedEmails().has(key);
 }
 
 function todayIsoDate() {
@@ -41,17 +71,24 @@ function saveStoredCustomers(list) {
 
 /** Authenticated office: only that tenant's stored customers (never mock seed). */
 export function loadAllCustomers() {
-  const stored = loadStoredCustomers();
+  const deleted = loadDeletedEmails();
+  const stored = loadStoredCustomers().filter(
+    (c) => !deleted.has(String(c.email || '').trim().toLowerCase()),
+  );
   if (isAuthenticatedOfficeSession()) {
     return [...stored].sort((a, b) => a.name.localeCompare(b.name, 'el'));
   }
 
   const byEmail = new Map();
   for (const c of mockCustomers) {
-    byEmail.set(c.email.toLowerCase(), { ...c });
+    const key = String(c.email || '').toLowerCase();
+    if (deleted.has(key)) continue;
+    byEmail.set(key, { ...c });
   }
   for (const c of stored) {
-    byEmail.set(c.email.toLowerCase(), { ...byEmail.get(c.email.toLowerCase()), ...c });
+    const key = String(c.email || '').toLowerCase();
+    if (deleted.has(key)) continue;
+    byEmail.set(key, { ...byEmail.get(key), ...c });
   }
   return [...byEmail.values()].sort((a, b) => a.name.localeCompare(b.name, 'el'));
 }
@@ -70,9 +107,45 @@ export function getCustomerById(id) {
  * Δημιουργία/ενημέρωση καρτέλας πελάτη (registration, checkout, login, admin).
  * @param {object} input
  */
+/**
+ * Soft-delete from the office πελατολόγιο.
+ * Keeps a tombstone so trip/rental sync does not immediately recreate the row.
+ * Manual add/edit via upsertCustomer clears the tombstone.
+ */
+export function deleteCustomer(idOrEmail) {
+  const needle = String(idOrEmail || '').trim();
+  if (!needle) return false;
+  const needleLower = needle.toLowerCase();
+  const all = loadAllCustomers();
+  const target = all.find(
+    (c) => c.id === needle || String(c.email || '').toLowerCase() === needleLower,
+  );
+  if (!target) return false;
+
+  const email = String(target.email || '').trim().toLowerCase();
+  const stored = loadStoredCustomers().filter(
+    (c) => c.id !== target.id && String(c.email || '').toLowerCase() !== email,
+  );
+  saveStoredCustomers(stored);
+
+  if (email) {
+    const deleted = loadDeletedEmails();
+    deleted.add(email);
+    saveDeletedEmails(deleted);
+  }
+  return true;
+}
+
 export function upsertCustomer(input) {
   const email = String(input.email || '').trim().toLowerCase();
   if (!email) return null;
+
+  // Manual create/edit brings the customer back.
+  const deleted = loadDeletedEmails();
+  if (deleted.has(email)) {
+    deleted.delete(email);
+    saveDeletedEmails(deleted);
+  }
 
   const stored = loadStoredCustomers();
   const useMocks = !isAuthenticatedOfficeSession();
@@ -161,6 +234,7 @@ export function syncCustomersFromBookings(bookings = []) {
   for (const booking of bookings || []) {
     const email = String(booking.email || booking.customerEmail || '').trim();
     if (!email || !email.includes('@')) continue;
+    if (isDeletedEmail(email)) continue;
     const existed = Boolean(getCustomerByEmail(email));
     const row = upsertCustomer({
       name: booking.customerName || booking.passenger_name || booking.passengerName || '',
@@ -182,6 +256,7 @@ export function syncCustomersFromRentalBookings(rentalBookings = []) {
   for (const booking of rentalBookings || []) {
     const email = String(booking.client_email || booking.clientEmail || '').trim();
     if (!email || !email.includes('@')) continue;
+    if (isDeletedEmail(email)) continue;
     const existed = Boolean(getCustomerByEmail(email));
     const row = ensureCustomerForRental({
       id: booking.client_id || booking.clientId || undefined,

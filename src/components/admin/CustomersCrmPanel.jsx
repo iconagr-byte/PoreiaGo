@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { loadAllCustomers } from '../../lib/customers/customerStore.js';
+import { deleteCustomer } from '../../lib/customers/customerStore.js';
 import { isPaid, isConfirmed } from '../../lib/bookingDisplay.js';
 import CustomerBookingCard from './CustomerBookingCard.jsx';
 import AddCustomerModal from './AddCustomerModal.jsx';
@@ -175,6 +175,7 @@ function CustomerDetail({
   onBack,
   openBookingTicket,
   onEdit,
+  onDelete,
 }) {
   const customer =
     customers.find((c) => c.id === selectedCustomer.id) ||
@@ -242,6 +243,14 @@ function CustomerDetail({
           >
             <span className="material-symbols-outlined text-[16px]">edit</span>
             Επεξεργασία
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete?.(customer)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100"
+          >
+            <span className="material-symbols-outlined text-[16px]">delete</span>
+            Διαγραφή
           </button>
         </div>
       </div>
@@ -484,6 +493,27 @@ export default function CustomersCrmPanel({
     setEditCustomer(null);
   };
 
+  const handleDelete = (customer) => {
+    if (!customer?.id && !customer?.email) return;
+    const label = customer.name || customer.email || 'πελάτη';
+    if (!window.confirm(`Διαγραφή πελάτη «${label}»;`)) return;
+    const ok = deleteCustomer(customer.id || customer.email);
+    if (!ok) {
+      toast.error('Δεν βρέθηκε ο πελάτης');
+      return;
+    }
+    if (
+      selectedCustomer &&
+      (selectedCustomer.id === customer.id ||
+        String(selectedCustomer.email || '').toLowerCase() ===
+          String(customer.email || '').toLowerCase())
+    ) {
+      setSelectedCustomer(null);
+    }
+    onCustomersChange?.(null);
+    toast.success('Ο πελάτης διαγράφηκε');
+  };
+
   if (selectedCustomer) {
     return (
       <>
@@ -495,6 +525,7 @@ export default function CustomersCrmPanel({
           onBack={() => setSelectedCustomer(null)}
           openBookingTicket={openBookingTicket}
           onEdit={setEditCustomer}
+          onDelete={handleDelete}
         />
         <AddCustomerModal
           open={Boolean(editCustomer)}
@@ -693,6 +724,12 @@ export default function CustomersCrmPanel({
                   onClick={() => copyText(customer.email, 'Email')}
                 />
                 <IconBtn icon="edit" label="Επεξεργασία" onClick={() => setEditCustomer(customer)} />
+                <IconBtn
+                  icon="delete"
+                  label="Διαγραφή"
+                  onClick={() => handleDelete(customer)}
+                  className="hover:!bg-rose-600 hover:!border-rose-600"
+                />
                 <button
                   type="button"
                   onClick={() => setSelectedCustomer(customer)}
@@ -812,6 +849,12 @@ export default function CustomersCrmPanel({
                           icon="person"
                           label="Προφίλ"
                           onClick={() => setSelectedCustomer(customer)}
+                        />
+                        <IconBtn
+                          icon="delete"
+                          label="Διαγραφή"
+                          onClick={() => handleDelete(customer)}
+                          className="hover:!bg-rose-600 hover:!border-rose-600"
                         />
                       </div>
                     </td>

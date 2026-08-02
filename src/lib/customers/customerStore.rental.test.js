@@ -3,6 +3,8 @@ import {
   ensureCustomerForRental,
   syncCustomersFromRentalBookings,
   getCustomerByEmail,
+  deleteCustomer,
+  loadAllCustomers,
 } from './customerStore.js';
 
 // jsdom-less: customerStore uses localStorage — polyfill for node.
@@ -41,5 +43,23 @@ assert.equal(people.length, 1);
 assert.equal(people[0].id, person.id);
 assert.equal(people[0].rental_booking_count, 1);
 assert.ok(people[0].rental_channels.includes('WALLET'));
+
+assert.equal(deleteCustomer(person.id), true);
+assert.equal(getCustomerByEmail(email), null);
+assert.ok(!loadAllCustomers().some((c) => c.email === email));
+// Sync must not resurrect a deleted CRM row.
+const afterDelete = syncCustomersFromRentalBookings([
+  {
+    client_name: 'Μαρία CRM',
+    client_email: email,
+    client_phone: '6900111222',
+    channel: 'WALLET',
+    rental_status: 'CONFIRMED',
+    total_cost: 50,
+    created_at: '2026-12-02T10:00:00+00:00',
+  },
+]);
+assert.equal(afterDelete.people.length, 0);
+assert.equal(getCustomerByEmail(email), null);
 
 console.log('customerStore rental CRM: OK');
