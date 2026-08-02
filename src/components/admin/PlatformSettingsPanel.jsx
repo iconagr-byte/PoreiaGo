@@ -536,7 +536,7 @@ export default function PlatformSettingsPanel({ onOpenPayments }) {
       <SectionCard
         id="notify"
         icon="mail"
-        title="Ειδοποιήσεις & integrations"
+        title="Ειδοποιήσεις"
         description="SMTP, SMS sender, Master QR διάρκεια και retries για webhooks."
         accent="bg-emerald-600"
       >
