@@ -5,7 +5,6 @@ import {
   fetchDriverTrip,
 } from '../../services/driverPortalApi.js';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
-import DriverBoardingSeatMap from './DriverBoardingSeatMap.jsx';
 import { LIVE_REFRESH_MS } from '../../lib/liveRefresh.js';
 
 const STATUS_LABEL = {
@@ -251,15 +250,6 @@ export default function DailyManifest() {
           </p>
         ) : null}
       </div>
-
-      {manifest ? (
-        <div className="driver-card">
-          <DriverBoardingSeatMap
-            manifest={manifest}
-            vehicleType={session?.vehicleType || tripMeta?.vehicle_type || manifest?.vehicle_type}
-          />
-        </div>
-      ) : null}
 
       <div className="driver-card">
         <h3 className="font-bold text-base mb-1 flex items-center justify-between gap-2">
