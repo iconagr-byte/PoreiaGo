@@ -1,5 +1,8 @@
 import { useState } from 'react';
 
+const DEFAULT_INPUT_CLASS =
+  'w-full px-4 py-3.5 pr-12 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container';
+
 export default function PasswordField({
   id,
   name,
@@ -10,14 +13,21 @@ export default function PasswordField({
   placeholder = '••••••••',
   required = true,
   minLength,
+  disabled = false,
+  inputClassName,
+  labelClassName = 'block text-sm font-bold',
+  className = 'space-y-2',
 }) {
   const [visible, setVisible] = useState(false);
   const controlled = value !== undefined;
+  const inputClass = inputClassName
+    ? `${inputClassName}${/\bpr-/.test(inputClassName) ? '' : ' pr-12'}`
+    : DEFAULT_INPUT_CLASS;
 
   return (
-    <div className="space-y-2">
+    <div className={className}>
       {label ? (
-        <label className="block text-sm font-bold" htmlFor={id}>
+        <label className={labelClassName} htmlFor={id}>
           {label}
         </label>
       ) : null}
@@ -29,8 +39,9 @@ export default function PasswordField({
           required={required}
           minLength={minLength}
           autoComplete={autoComplete}
+          disabled={disabled}
           {...(controlled ? { value, onChange } : { onChange })}
-          className="w-full px-4 py-3.5 pr-12 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
+          className={inputClass}
           placeholder={placeholder}
         />
         <button
