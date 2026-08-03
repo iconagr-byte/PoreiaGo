@@ -27,7 +27,7 @@ class PoreiagoHomeDriverContractTests(unittest.TestCase):
         self.assertIn("ensure_home_driver_on_tenant", api)
         self.assertIn("_POREIAGO_HOME_EMAILS", api)
         self.assertIn("_tenant_is_poreiago_platform", api)
-        self.assertIn("DEMO JWT / Achillio JWT / platform JWT", api)
+        self.assertIn("canonical PoreiaGo platform drivers", api)
 
     def test_deploy_and_boot_call_poreiago_repair(self) -> None:
         main = (ROOT / "backend" / "main.py").read_text(encoding="utf-8")
