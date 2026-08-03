@@ -20,6 +20,7 @@ export const BUS_NAV_IDS = new Set([
   'routes',
   'fleet',
   'drivers',
+  'bus_setup',
   'lost_found',
   'bookings',
   'driver_scan',

@@ -82,6 +82,7 @@ import OfficeSetupWizard, {
 } from '../components/admin/OfficeSetupWizard.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
 import DriversHub from '../components/admin/DriversHub.jsx';
+import BusSetupTools from '../components/admin/BusSetupTools.jsx';
 import LoyaltyRewardsPanel from '../components/admin/LoyaltyRewardsPanel.jsx';
 import SortableSidebarNav from '../components/admin/SortableSidebarNav.jsx';
 import DashboardKpiCard from '../components/admin/DashboardKpiCard.jsx';
@@ -1216,7 +1217,8 @@ export default function BackOffice() {
     />
   );
 
-  const renderDrivers = () => <DriversHub />;
+  const renderDrivers = () => <DriversHub showPageHeader={false} />;
+  const renderBusSetup = () => <BusSetupTools />;
 
   const renderFleet = () => {
     const rows = fleetVehicles.map((v) => ({
@@ -2402,6 +2404,7 @@ export default function BackOffice() {
                     />
                   )}
                   {activeTab === 'drivers' && renderDrivers()}
+                  {activeTab === 'bus_setup' && renderBusSetup()}
                   {activeTab === 'lost_found' && renderLostFound()}
                   {activeTab === 'bookings' && renderBookings()}
                 </BusesHub>

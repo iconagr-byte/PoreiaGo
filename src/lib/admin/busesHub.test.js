@@ -12,10 +12,12 @@ describe('busesHub', () => {
     expect(isBusesHubTab('fleet_ops')).toBe(true);
     expect(isBusesHubTab('fleet_kpis')).toBe(true);
     expect(isBusesHubTab('customers')).toBe(true);
+    expect(isBusesHubTab('bus_setup')).toBe(true);
   });
 
   it('sanitizes tab ids', () => {
     expect(sanitizeBusesHubTab('bookings')).toBe('bookings');
+    expect(sanitizeBusesHubTab('bus_setup')).toBe('bus_setup');
     expect(sanitizeBusesHubTab('fleet_kpis')).toBe('fleet_ops');
     expect(sanitizeBusesHubTab('nope')).toBe('routes');
   });
