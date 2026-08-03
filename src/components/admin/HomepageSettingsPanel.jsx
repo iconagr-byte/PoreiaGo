@@ -783,7 +783,8 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     setSaving(true);
     try {
       const result = await updateSiteAppearance(patch);
-      setForm((p) => ({ ...p, ...result.data }));
+      // Prefer the values we just saved if the API response omits layout keys.
+      setForm((p) => ({ ...p, ...result.data, ...patch }));
       if (result.offline) {
         toast.success('Αποθηκεύτηκε τοπικά — ο server δεν είναι διαθέσιμος αυτή τη στιγμή', {
           id: 'homepage-save-offline',
@@ -1367,7 +1368,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         )}
 
         {designPage === 'home' && section === 'header' && (
-          <form onSubmit={saveLayout}>
+          <form
+            onSubmit={patchForm(
+              { header_template: form.header_template },
+              'Το header αποθηκεύτηκε',
+            )}
+          >
             <PanelCard
               title="Πρότυπα Header"
               description="Η εμφάνιση της κορυφής της αρχικής — λογότυπο, πλοήγηση, στυλ."
