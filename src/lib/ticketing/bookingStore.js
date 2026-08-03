@@ -40,6 +40,7 @@ import {
   isAuthenticatedOfficeSession,
   officeStorageKey,
 } from '../admin/officeTenantStore.js';
+import { stripDemoBookings } from '../admin/demoCatalog.js';
 
 const STORAGE_KEY_BASE = 'aerostride_bookings_v1';
 
@@ -154,7 +155,20 @@ export function loadBookings() {
     const raw = localStorage.getItem(storageKey());
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        if (isAuthenticatedOfficeSession()) {
+          const clean = stripDemoBookings(parsed);
+          if (clean.length !== parsed.length) {
+            try {
+              saveBookings(clean);
+            } catch {
+              /* ignore */
+            }
+          }
+          return clean;
+        }
+        return parsed;
+      }
     }
   } catch {
     /* fall through */

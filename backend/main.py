@@ -18,6 +18,7 @@ from ticketing.db import init_ticketing_db, close_ticketing_db
 from ticketing.seed import seed_if_empty
 from ticketing.customer_bookings import seed_customer_bookings_if_empty
 from ticketing.lost_items import seed_lost_items_if_empty
+from ticketing.demo_catalog import allow_demo_seeds, purge_seed_demo_catalog
 
 
 # Explicit origins required when allow_credentials=True (browsers reject "*").
@@ -179,8 +180,15 @@ async def lifespan(app: FastAPI):
             "Production guard skipped: %s", exc
         )
     await init_ticketing_db()
-    await seed_if_empty()
-    await seed_customer_bookings_if_empty()
+    if allow_demo_seeds():
+        await seed_if_empty()
+        await seed_customer_bookings_if_empty()
+    else:
+        purged = await purge_seed_demo_catalog()
+        if purged.get("sqlite") or purged.get("postgres"):
+            __import__("logging").getLogger("poreiago.startup").info(
+                "Purged seed demo bookings: %s", purged
+            )
     try:
         await seed_lost_items_if_empty()
     except Exception as exc:

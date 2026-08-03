@@ -5,6 +5,7 @@ import { loadAllBookingsAsync, loadBookings, mergeBookingsIntoStore } from './bo
 import { CHECK_IN } from './constants.js';
 import { formatDepositPaymentStatus } from '../payments/depositPayment.js';
 import { localIdFromReference } from './bookingIds.js';
+import { stripDemoBookings } from '../admin/demoCatalog.js';
 
 /** Map SaaS API row → wallet/admin booking shape. */
 export function mapSaasBookingToLocal(row) {
@@ -117,7 +118,7 @@ export async function loadMergedBookings() {
           const keys = [b.saasBookingId, b.id, b.pnr].filter(Boolean).map(String);
           return keys.every((k) => !pgKeys.has(k));
         });
-        const merged = [...pg, ...localOnly];
+        const merged = stripDemoBookings([...pg, ...localOnly]);
         mergeBookingsIntoStore(merged);
         return merged;
       }
@@ -132,7 +133,7 @@ export async function loadMergedBookings() {
   try {
     const saas = await fetchSaasBookings();
     if (!Array.isArray(saas) || !saas.length) return local;
-    const merged = mergeByKey(local, saas.map(mapSaasBookingToLocal));
+    const merged = stripDemoBookings(mergeByKey(local, saas.map(mapSaasBookingToLocal)));
     mergeBookingsIntoStore(merged);
     return merged;
   } catch {

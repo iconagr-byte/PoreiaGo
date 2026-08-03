@@ -13,6 +13,7 @@ import {
   officeStorageKey,
 } from '../admin/officeTenantStore.js';
 import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
+import { stripDemoTrips } from '../admin/demoCatalog.js';
 
 const STORAGE_KEY_BASE = 'aerostride_trips_v1';
 
@@ -45,9 +46,17 @@ export function loadTrips() {
     /* ignore */
   }
 
-  // Authenticated office: never inject platform demo trips.
+  // Authenticated office: never inject platform demo trips; strip any leftover demos.
   if (isAuthenticatedOfficeSession()) {
-    return Array.isArray(base) ? base.map(normalizeTrip) : [];
+    const officeTrips = stripDemoTrips(Array.isArray(base) ? base.map(normalizeTrip) : []);
+    if (Array.isArray(base) && officeTrips.length !== base.length) {
+      try {
+        saveTrips(officeTrips);
+      } catch {
+        /* ignore */
+      }
+    }
+    return officeTrips;
   }
 
   // Marketing host: curated trips so /trip/:id works from homepage cards.
