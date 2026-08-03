@@ -54,7 +54,9 @@ export async function adminFetch(path, options = {}) {
         ...fetchOpts,
         headers: { ...baseHeaders, ...(fetchOpts.headers || {}) },
       });
-      if ([502, 503, 504].includes(res.status) && i < attempts - 1) {
+      if ([502, 503, 504, 404].includes(res.status) && i < attempts - 1) {
+        // 404 here is usually Traefik mid-deploy ("404 page not found"), not a
+        // real missing drivers route — retry like other bounce codes.
         await new Promise((r) => setTimeout(r, 450 * (i + 1)));
         continue;
       }

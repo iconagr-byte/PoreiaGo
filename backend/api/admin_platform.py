@@ -568,7 +568,13 @@ async def get_drivers(request: Request, status: str | None = None):
         include_demo_legacy=include_legacy,
         claim_demo_legacy=claim_legacy,
     )
-    return [_driver_response(d, enrich_safety=False) for d in rows]
+    out: list[FleetDriverResponse] = []
+    for d in rows:
+        try:
+            out.append(_driver_response(d, enrich_safety=False))
+        except Exception:
+            logger.exception("Skipping corrupt driver row %s", getattr(d, "id", "?"))
+    return out
 
 
 _DRIVER_PHOTO_DIR = Path(

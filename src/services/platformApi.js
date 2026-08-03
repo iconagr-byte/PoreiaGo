@@ -360,7 +360,7 @@ export async function fetchFleetDrivers(status) {
     }
     // Authenticated failures must not swap in demo mocks (hides real drivers e.g. Achilleas).
     if (getSaasToken()) {
-      if ([502, 503, 504].includes(res.status)) {
+      if ([404, 502, 503, 504].includes(res.status)) {
         throw new Error(
           'Ο server είναι προσωρινά εκτός (deploy). Περιμένετε λίγο και πατήστε Δοκιμή ξανά.',
         );
