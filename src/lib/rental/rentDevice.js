@@ -100,3 +100,25 @@ export function useRentPhone() {
   useEffect(() => subscribeRentPhoneViewport(setPhone), []);
   return phone;
 }
+
+/** phone | tablet | desktop — for My Wallet / Rent surface chrome. */
+export function resolveWalletSurface() {
+  if (typeof window === 'undefined') return 'desktop';
+  if (isRentPhoneViewport()) return 'phone';
+  if (isRentMobileViewport()) return 'tablet';
+  return 'desktop';
+}
+
+export function useWalletSurface() {
+  const [surface, setSurface] = useState(() => resolveWalletSurface());
+  useEffect(() => {
+    const sync = () => setSurface(resolveWalletSurface());
+    const unsubMobile = subscribeRentMobileViewport(sync);
+    const unsubPhone = subscribeRentPhoneViewport(sync);
+    return () => {
+      unsubMobile();
+      unsubPhone();
+    };
+  }, []);
+  return surface;
+}
