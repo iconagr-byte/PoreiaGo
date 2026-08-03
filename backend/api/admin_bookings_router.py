@@ -121,6 +121,13 @@ async def list_admin_bookings(
                 booking_to_admin_dict(b, fiscal_invoices=fiscal_by_booking.get(b.id, []))
                 for b in rows
             ]
+            from ticketing.demo_catalog import is_demo_booking_ref
+
+            items = [
+                item
+                for item in items
+                if not is_demo_booking_ref(item.get("pnr") or item.get("id"))
+            ]
             for item in items:
                 await _sync_sqlite_cache(item)
             return items

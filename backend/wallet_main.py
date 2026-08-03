@@ -34,6 +34,7 @@ from middleware.tenant import TenantContextMiddleware
 from ticketing.db import init_ticketing_db, close_ticketing_db
 from ticketing.customer_bookings import seed_customer_bookings_if_empty
 from ticketing.lost_items import seed_lost_items_if_empty
+from ticketing.demo_catalog import allow_demo_seeds, purge_seed_demo_catalog
 
 try:
     from app.api.router import saas_router
@@ -107,7 +108,10 @@ except ImportError:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_ticketing_db()
-    await seed_customer_bookings_if_empty()
+    if allow_demo_seeds():
+        await seed_customer_bookings_if_empty()
+    else:
+        await purge_seed_demo_catalog()
     await seed_lost_items_if_empty()
     await init_email_marketing_tables()
     await init_email_client_tables()
