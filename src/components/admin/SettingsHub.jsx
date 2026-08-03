@@ -46,7 +46,8 @@ function sortOfficeTabs(tabs) {
 }
 
 /**
- * Settings hub — secondary card rail + panel (main sidebar only has «Ρυθμίσεις»).
+ * Settings hub — secondary rail + panel (main sidebar only has «Ρυθμίσεις»).
+ * Superadmin: Πλατφόρμα SaaS as micro-icon grid, office as compact mini rows.
  */
 export default function SettingsHub({
   initialTab,
@@ -122,7 +123,7 @@ export default function SettingsHub({
               : 'opacity-100 translate-x-0 w-full max-w-none max-h-[2000px] lg:w-80 xl:w-[22rem] lg:sticky lg:top-3'
           }`}
         >
-          <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-4">
+          <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-3.5">
             <div className="px-1.5 pt-0.5">
               <p className="text-xs font-bold uppercase tracking-wide text-violet-700/80">
                 Ρυθμίσεις
@@ -156,75 +157,128 @@ export default function SettingsHub({
               })}
             </div>
 
-            {/* Desktop: card list */}
-            <div className="hidden lg:block space-y-4">
-              {grouped.map((section) => (
-                <div key={section.id} className="space-y-2">
-                  <p
-                    className={`px-1.5 text-[11px] font-bold uppercase tracking-wider ${
-                      section.id === 'platform' ? 'text-indigo-600/80' : 'text-on-surface-variant/70'
-                    }`}
+            {/* Desktop: platform micro-icons + office mini list */}
+            <div className="hidden lg:block space-y-3.5">
+              {grouped.map((section) => {
+                const isPlatform = section.id === 'platform';
+                const officeBelowPlatform = !isPlatform && superAdmin;
+                return (
+                  <div
+                    key={section.id}
+                    className={
+                      isPlatform
+                        ? 'rounded-2xl border border-indigo-100/90 bg-gradient-to-b from-indigo-50/70 to-white p-2.5 space-y-2'
+                        : officeBelowPlatform
+                          ? 'space-y-2 pt-1 border-t border-black/[0.05]'
+                          : 'space-y-2'
+                    }
                   >
-                    {section.label}
-                  </p>
-                  <ul className="space-y-1.5">
-                    {section.items.map((t) => {
-                      const active = t.id === tab;
-                      const platform = t.section === 'platform';
-                      return (
-                        <li key={t.id}>
-                          <button
-                            type="button"
-                            onClick={() => selectTab(t.id)}
-                            className={`w-full text-left flex items-center gap-3 rounded-2xl border px-3.5 py-3 transition ${
-                              active
-                                ? platform
-                                  ? 'border-indigo-300 bg-indigo-50 shadow-sm'
-                                  : 'border-violet-300 bg-violet-50 shadow-sm'
-                                : 'border-transparent bg-black/[0.02] hover:bg-black/[0.04] hover:border-black/[0.06]'
-                            }`}
-                          >
-                            <span
-                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                                active
-                                  ? platform
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'bg-violet-700 text-white'
-                                  : platform
-                                    ? 'bg-indigo-100 text-indigo-700'
-                                    : 'bg-violet-100 text-violet-700'
-                              }`}
-                            >
-                              <span
-                                className="material-symbols-outlined text-[22px]"
-                                style={{ fontVariationSettings: "'FILL' 1" }}
-                              >
-                                {t.icon}
-                              </span>
-                            </span>
-                            <span className="min-w-0">
-                              <span
-                                className={`block text-[15px] font-bold truncate ${
+                    <p
+                      className={`px-1 text-[10px] font-bold uppercase tracking-wider ${
+                        isPlatform ? 'text-indigo-600/90' : 'text-on-surface-variant/70'
+                      }`}
+                    >
+                      {section.label}
+                    </p>
+
+                    {isPlatform ? (
+                      <ul className="grid grid-cols-2 gap-1.5">
+                        {section.items.map((t) => {
+                          const active = t.id === tab;
+                          return (
+                            <li key={t.id}>
+                              <button
+                                type="button"
+                                onClick={() => selectTab(t.id)}
+                                title={TAB_HINTS[t.id] || t.label}
+                                className={`settings-hub-micro w-full flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 transition ${
                                   active
-                                    ? platform
-                                      ? 'text-indigo-950'
-                                      : 'text-violet-950'
-                                    : 'text-on-surface'
+                                    ? 'border-indigo-300 bg-white shadow-sm ring-1 ring-indigo-200/60'
+                                    : 'border-transparent bg-white/70 hover:bg-white hover:border-indigo-100'
                                 }`}
                               >
-                                {t.label}
-                              </span>
-                              <span className="block text-xs text-on-surface-variant truncate mt-0.5 leading-snug">
-                                {t.id === 'homepage' ? homepageHint : TAB_HINTS[t.id] || ''}
-                              </span>
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
+                                <span
+                                  className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                                    active
+                                      ? 'bg-indigo-600 text-white'
+                                      : 'bg-indigo-100/90 text-indigo-700'
+                                  }`}
+                                >
+                                  <span
+                                    className="material-symbols-outlined text-[17px]"
+                                    style={{ fontVariationSettings: "'FILL' 1" }}
+                                  >
+                                    {t.icon}
+                                  </span>
+                                </span>
+                                <span
+                                  className={`text-[11px] font-bold leading-tight text-center truncate w-full ${
+                                    active ? 'text-indigo-950' : 'text-slate-700'
+                                  }`}
+                                >
+                                  {t.label}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <ul className="space-y-1">
+                        {section.items.map((t) => {
+                          const active = t.id === tab;
+                          return (
+                            <li key={t.id}>
+                              <button
+                                type="button"
+                                onClick={() => selectTab(t.id)}
+                                title={
+                                  t.id === 'homepage' ? homepageHint : TAB_HINTS[t.id] || t.label
+                                }
+                                className={`w-full text-left flex items-center gap-2.5 rounded-xl border px-2.5 py-2 transition ${
+                                  active
+                                    ? 'border-violet-300 bg-violet-50 shadow-sm'
+                                    : 'border-transparent bg-black/[0.02] hover:bg-black/[0.04] hover:border-black/[0.06]'
+                                }`}
+                              >
+                                <span
+                                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                                    active
+                                      ? 'bg-violet-700 text-white'
+                                      : 'bg-violet-100 text-violet-700'
+                                  }`}
+                                >
+                                  <span
+                                    className="material-symbols-outlined text-[15px]"
+                                    style={{ fontVariationSettings: "'FILL' 1" }}
+                                  >
+                                    {t.icon}
+                                  </span>
+                                </span>
+                                <span
+                                  className={`min-w-0 flex-1 text-[13px] font-bold truncate ${
+                                    active ? 'text-violet-950' : 'text-on-surface'
+                                  }`}
+                                >
+                                  {t.label}
+                                </span>
+                                <span
+                                  className={`material-symbols-outlined text-[16px] shrink-0 ${
+                                    active ? 'text-violet-400' : 'text-slate-300'
+                                  }`}
+                                  aria-hidden
+                                >
+                                  chevron_right
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </aside>
