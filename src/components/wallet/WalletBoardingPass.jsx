@@ -33,7 +33,7 @@ export default function WalletBoardingPass({
           </span>
           <h2 className="wallet-pass-empty-title">Δεν έχετε ακόμα εισιτήριο</h2>
           <p className="wallet-pass-empty-copy">
-            Κάντε κράτηση στο site — μετά την πληρωμή δημιουργείτε My Wallet και εμφανίζεται εδώ το
+            Κάντε κράτηση στο site ή συνδέστε υπάρχουσα κράτηση με το ίδιο email — εδώ εμφανίζεται το
             QR επιβίβασης.
           </p>
           <button type="button" className="wallet-pass-cta" onClick={onBrowseTrips}>
