@@ -419,6 +419,7 @@ export default function BackOffice() {
   const [cashPaymentBooking, setCashPaymentBooking] = useState(null);
   const [cashPaymentSaving, setCashPaymentSaving] = useState(false);
   const [expandedTripBookings, setExpandedTripBookings] = useState(null);
+  const [bookingTripQuery, setBookingTripQuery] = useState('');
   const [fleetVehicles, setFleetVehicles] = useState([]);
   const [fleetCards, setFleetCards] = useState(null);
   const [fleetAlerts, setFleetAlerts] = useState([]);
@@ -1793,19 +1794,65 @@ export default function BackOffice() {
       );
     }
 
-    // Group bookings by excursion title (same product = one row; dates live inside).
-    const groupedBookings = bookings.reduce((acc, booking) => {
-      const tripTitle = String(booking.tripTitle || 'Εκδρομή').trim() || 'Εκδρομή';
-      if (!acc[tripTitle]) {
-        acc[tripTitle] = { tripTitle, bookings: [], dates: new Set() };
-      }
-      acc[tripTitle].bookings.push(booking);
-      if (booking.date) acc[tripTitle].dates.add(String(booking.date));
-      return acc;
-    }, {});
+    // All office trips appear (even with 0 bookings / drafts). Orphan booking titles stay listed too.
+    const officeTrips = Array.isArray(trips) ? trips : [];
+    const groupsByKey = {};
 
-    const sortedGroups = Object.entries(groupedBookings)
-      .map(([key, group]) => {
+    const ensureGroup = (key, tripTitle, trip = null) => {
+      if (!groupsByKey[key]) {
+        groupsByKey[key] = {
+          key,
+          tripTitle,
+          tripId: trip?.id ?? null,
+          draft: trip?.status === 'draft',
+          bookings: [],
+          dates: new Set(),
+        };
+      } else if (trip?.id && !groupsByKey[key].tripId) {
+        groupsByKey[key].tripId = trip.id;
+        groupsByKey[key].draft = trip.status === 'draft';
+      }
+      return groupsByKey[key];
+    };
+
+    for (const trip of officeTrips) {
+      const title = String(trip.title || 'Εκδρομή').trim() || 'Εκδρομή';
+      ensureGroup(`trip:${trip.id}`, title, trip);
+    }
+
+    for (const booking of bookings) {
+      const trip =
+        (booking.tripId && officeTrips.find((t) => String(t.id) === String(booking.tripId))) ||
+        officeTrips.find(
+          (t) =>
+            String(t.title || '').trim() === String(booking.tripTitle || '').trim() &&
+            String(booking.tripTitle || '').trim(),
+        ) ||
+        null;
+      const tripTitle = trip
+        ? String(trip.title || 'Εκδρομή').trim() || 'Εκδρομή'
+        : String(booking.tripTitle || 'Εκδρομή').trim() || 'Εκδρομή';
+      const key = trip ? `trip:${trip.id}` : `title:${tripTitle}`;
+      const group = ensureGroup(key, tripTitle, trip);
+      group.bookings.push(booking);
+      if (booking.date) group.dates.add(String(booking.date));
+      else if (trip?.departureTime) {
+        const d = String(trip.departureTime).slice(0, 10);
+        if (d) group.dates.add(d);
+      }
+    }
+
+    // Departure date hint for empty trips (no bookings yet).
+    for (const group of Object.values(groupsByKey)) {
+      if (group.dates.size === 0 && group.tripId) {
+        const trip = officeTrips.find((t) => t.id === group.tripId);
+        const d = trip?.departureTime ? String(trip.departureTime).slice(0, 10) : '';
+        if (d) group.dates.add(d);
+      }
+    }
+
+    const sortedGroups = Object.values(groupsByKey)
+      .map((group) => {
         const dates = [...group.dates].sort();
         const sortedBookings = [...group.bookings].sort((a, b) => {
           const da = String(a.date || '');
@@ -1816,17 +1863,33 @@ export default function BackOffice() {
             'el',
           );
         });
-        return [key, { ...group, dates, bookings: sortedBookings }];
+        return { ...group, dates, bookings: sortedBookings };
       })
-      .sort((a, b) => a[0].localeCompare(b[0], 'el'));
+      .sort((a, b) => {
+        // Trips with bookings first, then by title.
+        if (a.bookings.length !== b.bookings.length) {
+          return b.bookings.length - a.bookings.length;
+        }
+        return a.tripTitle.localeCompare(b.tripTitle, 'el');
+      });
+
+    const q = String(bookingTripQuery || '').trim().toLowerCase();
+    const visibleGroups = q
+      ? sortedGroups.filter(
+          (g) =>
+            g.tripTitle.toLowerCase().includes(q) ||
+            String(g.tripId || '').includes(q) ||
+            g.dates.some((d) => d.includes(q)),
+        )
+      : sortedGroups;
 
     return (
       <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in zoom-in-95 duration-300">
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-6">
           <div>
             <h2 className="font-headline-lg text-headline-lg font-bold tracking-tight text-on-surface mb-2">Διαχείριση Κρατήσεων ανά Ταξίδι</h2>
             <p className="font-body-md text-on-surface-variant max-w-2xl text-lg">
-              Επιλέξτε μια εκδρομή για manifest & κρατήσεις — όλες οι αναχωρήσεις μαζί.
+              Όλες οι εκδρομές του γραφείου — με ή χωρίς κρατήσεις. Manifest & θέσεις ανά ταξίδι.
               {bookingsLoading && ' Συγχρονισμός SaaS…'}
             </p>
           </div>
@@ -1834,22 +1897,49 @@ export default function BackOffice() {
             type="button"
             onClick={() => {
               setBookingsLoading(true);
+              setTrips(loadTrips());
               loadMergedBookings()
                 .then(setBookings)
                 .finally(() => setBookingsLoading(false));
             }}
-            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-bold hover:bg-gray-50 flex items-center gap-2"
+            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-bold hover:bg-gray-50 flex items-center gap-2 shrink-0"
           >
             <span className="material-symbols-outlined text-[18px]">sync</span>
             Ανανέωση
           </button>
         </div>
 
+        <div className="relative mb-4">
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
+            search
+          </span>
+          <input
+            type="search"
+            value={bookingTripQuery}
+            onChange={(e) => setBookingTripQuery(e.target.value)}
+            placeholder="Αναζήτηση εκδρομής (π.χ. Σωτηρα)…"
+            className="w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40"
+          />
+        </div>
+
+        {!visibleGroups.length ? (
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
+            <span className="material-symbols-outlined text-4xl text-slate-300">directions_bus</span>
+            <p className="mt-3 text-sm font-bold text-slate-800">
+              {q ? 'Καμία εκδρομή με αυτό το φίλτρο' : 'Δεν υπάρχουν εκδρομές'}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {q
+                ? 'Καθαρίστε την αναζήτηση ή ελέγξτε τον τίτλο στην καρτέλα Εκδρομές.'
+                : 'Δημιουργήστε μια εκδρομή από Εκδρομές για να εμφανιστεί εδώ.'}
+            </p>
+          </div>
+        ) : null}
+
         <div className="space-y-6">
-          {sortedGroups.map(([key, group]) => {
+          {visibleGroups.map((group) => {
+            const key = group.key;
             const isExpanded = expandedTripBookings === key;
-            const confirmedCount = group.bookings.filter(b => b.status === 'Επιβεβαιωμένη' || b.status === 'Ολοκληρώθηκε').length;
-            const pendingCount = group.bookings.length - confirmedCount;
             const totalRevenue = group.bookings.reduce((sum, b) => sum + (b.price || 0), 0);
             const dateLabel =
               group.dates.length === 0
@@ -1865,16 +1955,23 @@ export default function BackOffice() {
                   className={`p-6 cursor-pointer hover:bg-gray-50 flex items-center justify-between transition-colors ${isExpanded ? 'border-b border-gray-100 bg-gray-50/50' : ''}`}
                   onClick={() => setExpandedTripBookings(isExpanded ? null : key)}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-[24px]">directions_bus</span>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-lg">{group.tripTitle}</h3>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-gray-900 text-lg truncate flex items-center gap-2">
+                        {group.tripTitle}
+                        {group.draft ? (
+                          <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                            Πρόχειρο
+                          </span>
+                        ) : null}
+                      </h3>
                       <p className="text-sm text-gray-500 font-medium">{dateLabel}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-8">
+                  <div className="flex items-center gap-8 shrink-0">
                     <div className="hidden md:flex gap-6 text-sm">
                       <div className="text-center">
                         <span className="block text-gray-500 font-bold uppercase tracking-wider text-[10px] mb-1">Κρατήσεις</span>
@@ -1903,6 +2000,7 @@ export default function BackOffice() {
                             e.stopPropagation();
                             try {
                               const trip =
+                                (group.tripId && getTripById(group.tripId)) ||
                                 trips.find((t) => t.title === group.tripTitle) ||
                                 getTripById(group.bookings[0]?.tripId);
                               exportTripManifestPdf({
@@ -1930,6 +2028,14 @@ export default function BackOffice() {
                           Εξαγωγή PDF
                         </button>
                       </div>
+                      {!group.bookings.length ? (
+                        <div className="px-6 py-10 text-center">
+                          <p className="text-sm font-bold text-slate-700">Δεν υπάρχουν κρατήσεις ακόμη</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Η εκδρομή είναι διαθέσιμη για επιλογή — οι θέσεις θα εμφανιστούν μόλις γίνουν κρατήσεις.
+                          </p>
+                        </div>
+                      ) : (
                       <table className="min-w-full divide-y divide-gray-100">
                         <thead>
                           <tr>
@@ -2058,6 +2164,7 @@ export default function BackOffice() {
                           })}
                         </tbody>
                       </table>
+                      )}
                     </div>
                   </div>
                 )}
