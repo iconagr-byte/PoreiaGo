@@ -21,30 +21,75 @@ export default function WalletBoardingPass({
   passengerName = '',
   onOpenDetails,
   onBrowseTrips,
+  onOpenBookings,
+  onOpenRent,
   onQrChange,
   offline = false,
 }) {
   if (!booking) {
     return (
-      <section className="wallet-pass-empty">
+      <section className="wallet-pass-empty" aria-label="My Wallet">
+        <div className="wallet-pass-empty-visual" aria-hidden>
+          <div className="wallet-pass-empty-orb" />
+          <div className="wallet-pass-empty-faux">
+            <span className="wallet-pass-empty-faux-brand">Board</span>
+            <span className="material-symbols-outlined wallet-pass-empty-faux-qr">qr_code_2</span>
+            <span className="wallet-pass-empty-faux-line" />
+            <span className="wallet-pass-empty-faux-line wallet-pass-empty-faux-line--short" />
+          </div>
+        </div>
+
         <div className="wallet-pass-empty-inner">
-          <span className="material-symbols-outlined wallet-pass-empty-icon" aria-hidden>
-            confirmation_number
-          </span>
-          <h2 className="wallet-pass-empty-title">Δεν έχετε ακόμα εισιτήριο</h2>
+          <p className="wallet-pass-empty-kicker">My Wallet</p>
+          <h2 className="wallet-pass-empty-title">Το εισιτήριό σας,<br />πάντα μαζί σας</h2>
           <p className="wallet-pass-empty-copy">
-            Κάντε κράτηση στο site — μετά την πληρωμή δημιουργείτε My Wallet και εμφανίζεται εδώ το
-            QR επιβίβασης.
+            Κλείστε εκδρομή ή προσθέστε υπάρχουσα κράτηση — το QR επιβίβασης εμφανίζεται εδώ, έτοιμο
+            για τον οδηγό.
           </p>
+
           <button type="button" className="wallet-pass-cta" onClick={onBrowseTrips}>
             Δείτε εκδρομές
             <span className="material-symbols-outlined" aria-hidden>
               arrow_forward
             </span>
           </button>
+
           <Link to="/my-booking" className="wallet-pass-empty-secondary">
+            <span className="material-symbols-outlined" aria-hidden>
+              confirmation_number
+            </span>
             Έχω ήδη κωδικό κράτησης
           </Link>
+
+          <div className="wallet-pass-empty-shortcuts">
+            <button type="button" className="wallet-pass-empty-chip" onClick={onOpenBookings}>
+              <span className="material-symbols-outlined" aria-hidden>
+                event_note
+              </span>
+              Κρατήσεις
+            </button>
+            <button type="button" className="wallet-pass-empty-chip" onClick={onOpenRent}>
+              <span className="material-symbols-outlined" aria-hidden>
+                directions_car
+              </span>
+              Ενοικίαση
+            </button>
+          </div>
+
+          <ol className="wallet-pass-empty-steps">
+            <li>
+              <span>1</span>
+              Κράτηση
+            </li>
+            <li>
+              <span>2</span>
+              Wallet
+            </li>
+            <li>
+              <span>3</span>
+              QR
+            </li>
+          </ol>
         </div>
       </section>
     );

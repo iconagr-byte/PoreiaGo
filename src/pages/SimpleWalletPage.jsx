@@ -34,7 +34,6 @@ import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
 import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
-import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { useRentMobile } from '../lib/rental/rentDevice.js';
@@ -222,8 +221,9 @@ function WalletAuthenticatedApp() {
       .then((data) => {
         if (cancelled) return;
         const brand = resolveOfficeBrand(data || {});
-        const name = brand.displayName || brand.name;
-        if (name) setBrandLabel(name);
+        const name = String(brand.displayName || brand.name || '').trim();
+        // Keep product name in the wallet chrome — never a bare «Γραφείο».
+        if (name && !/^(γραφείο|γραφειο|office)$/i.test(name)) setBrandLabel(name);
       })
       .catch(() => {});
     return () => {
@@ -309,13 +309,18 @@ function WalletAuthenticatedApp() {
       <div className="wallet-app">
         <header className="wallet-topbar">
           <button type="button" className="wallet-topbar-btn" onClick={() => navigate('/')}>
-            <span className="material-symbols-outlined text-[20px]" aria-hidden>
-              arrow_back
+            <span className="material-symbols-outlined" aria-hidden>
+              chevron_left
             </span>
             Αρχική
           </button>
           <div className="wallet-topbar-brand">
-            <OfficeBrandMark className="h-8" variant="light" fallbackLabel="My Wallet" asLink={false} />
+            <span className="wallet-brand-mark">
+              <span className="wallet-brand-mark-badge" aria-hidden>
+                <span className="material-symbols-outlined">confirmation_number</span>
+              </span>
+              <span className="wallet-brand-mark-text">My Wallet</span>
+            </span>
           </div>
           <button
             type="button"
@@ -325,7 +330,7 @@ function WalletAuthenticatedApp() {
               navigate('/login', { replace: true, state: { from: '/wallet' } });
             }}
           >
-            <span className="material-symbols-outlined text-[20px]" aria-hidden>
+            <span className="material-symbols-outlined" aria-hidden>
               logout
             </span>
             Έξοδος
@@ -383,6 +388,14 @@ function WalletAuthenticatedApp() {
                 passengerName={displayPassenger}
                 onOpenDetails={openTicket}
                 onBrowseTrips={() => navigate('/')}
+                onOpenBookings={() => {
+                  setActiveTab('bookings');
+                  setSelectedBookingId(null);
+                }}
+                onOpenRent={() => {
+                  setActiveTab('rentals');
+                  setSelectedBookingId(null);
+                }}
                 onQrChange={handleQrChange}
                 offline={usingOfflinePass}
               />
