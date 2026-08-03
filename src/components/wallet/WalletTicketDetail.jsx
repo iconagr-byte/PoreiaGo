@@ -2,7 +2,7 @@
  * Step 2 — customer ticket detail (boarding-pass style, not admin panel).
  */
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TicketQrCode from '../TicketQrCode.jsx';
 import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
@@ -12,7 +12,7 @@ import { isPaid, statusStyle, parsePaymentMethod, hasDepositBalance } from '../.
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
 import { fiscalReceiptPrintPath } from '../../lib/fiscal/fiscalReceiptPrint.js';
 import { sendTicketEmail } from '../../services/ticketingApi.js';
-import { ticketPrintPath } from '../../lib/ticketing/printTicket.js';
+import { startWalletTicketPrint } from '../../lib/ticketing/printTicket.js';
 
 function tripImageFor(booking, coverImage) {
   return coverImage || '/images/hero-bus-achillio.png';
@@ -26,11 +26,18 @@ export default function WalletTicketDetail({
   onBack,
   onBookingUpdated,
 }) {
+  const navigate = useNavigate();
   const [emailSending, setEmailSending] = useState(false);
+  const [printBusy, setPrintBusy] = useState(false);
+  const paid = booking ? isPaid(booking) : false;
+
+  useCustomerFiscalPoll(booking, {
+    enabled: Boolean(booking) && paid,
+    onUpdated: onBookingUpdated,
+  });
 
   if (!booking) return null;
 
-  const paid = isPaid(booking);
   const st = statusStyle(booking);
   const pay = parsePaymentMethod(booking);
   const pnr = booking.pnr || booking.ticketRef || booking.id;
@@ -40,10 +47,28 @@ export default function WalletTicketDetail({
   const name = passengerName || booking.passengerName || booking.customerName || booking.name || '—';
   const cover = tripImageFor(booking, coverImage);
 
-  useCustomerFiscalPoll(booking, {
-    enabled: paid,
-    onUpdated: onBookingUpdated,
-  });
+  const handlePrint = async () => {
+    if (printBusy) return;
+    setPrintBusy(true);
+    try {
+      const mode = await startWalletTicketPrint({
+        booking,
+        tripTitle: booking.tripTitle,
+        coverImage,
+        brandLabel,
+        navigate,
+      });
+      if (mode === 'download') {
+        toast.success('Κατέβηκε το εισιτήριο — άνοιξέ το για Εκτύπωση / PDF');
+      } else if (mode === 'popup') {
+        toast.success('Άνοιξε το παράθυρο εκτύπωσης');
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Αποτυχία εκτύπωσης');
+    } finally {
+      setPrintBusy(false);
+    }
+  };
 
   const handleEmail = async () => {
     const email = String(booking.email || '').trim();
@@ -234,13 +259,18 @@ export default function WalletTicketDetail({
       </section>
 
       <div className="wallet-ticket-actions">
-        <WalletDeviceSave booking={booking} />
-        <Link to={ticketPrintPath(booking.id, { autoPrint: true })} className="wallet-pass-cta">
+        <WalletDeviceSave booking={booking} brandLabel={brandLabel} coverImage={coverImage} />
+        <button
+          type="button"
+          className="wallet-pass-cta"
+          onClick={handlePrint}
+          disabled={printBusy}
+        >
           <span className="material-symbols-outlined" aria-hidden>
-            print
+            {printBusy ? 'hourglass_empty' : 'print'}
           </span>
-          Εκτύπωση / PDF
-        </Link>
+          {printBusy ? 'Προετοιμασία…' : 'Εκτύπωση / PDF'}
+        </button>
         <button
           type="button"
           className="wallet-pass-secondary wallet-ticket-email"

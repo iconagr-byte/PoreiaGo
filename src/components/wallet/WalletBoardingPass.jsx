@@ -1,12 +1,15 @@
 /**
  * Step 1 My Wallet home — one boarding pass as the hero composition.
  */
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import TicketQrCode from '../TicketQrCode.jsx';
 import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
 import WalletDeviceSave from './WalletDeviceSave.jsx';
 import { isPaid, statusStyle } from '../../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
+import { startWalletTicketPrint } from '../../lib/ticketing/printTicket.js';
 
 function formatTripWhen(booking) {
   const date = booking?.date || '—';
@@ -24,6 +27,9 @@ export default function WalletBoardingPass({
   onQrChange,
   offline = false,
 }) {
+  const navigate = useNavigate();
+  const [printBusy, setPrintBusy] = useState(false);
+
   if (!booking) {
     return (
       <section className="wallet-pass-empty">
@@ -130,7 +136,7 @@ export default function WalletBoardingPass({
         </div>
 
         <div className="wallet-pass-actions">
-          <WalletDeviceSave booking={booking} />
+          <WalletDeviceSave booking={booking} brandLabel={brandLabel} coverImage={coverImage} />
           {paid && booking.tripId ? (
             <PassengerTrackCTA booking={booking} showEta={false} />
           ) : (
@@ -146,12 +152,33 @@ export default function WalletBoardingPass({
             >
               Λεπτομέρειες
             </button>
-            <Link
-              to={`/ticket/print/${encodeURIComponent(booking.id)}?print=1`}
+            <button
+              type="button"
               className="wallet-pass-secondary"
+              disabled={printBusy}
+              onClick={async () => {
+                if (printBusy) return;
+                setPrintBusy(true);
+                try {
+                  const mode = await startWalletTicketPrint({
+                    booking,
+                    tripTitle: booking.tripTitle,
+                    coverImage,
+                    brandLabel,
+                    navigate,
+                  });
+                  if (mode === 'download') {
+                    toast.success('Κατέβηκε το εισιτήριο — άνοιξέ το για PDF');
+                  }
+                } catch (err) {
+                  toast.error(err?.message || 'Αποτυχία εκτύπωσης');
+                } finally {
+                  setPrintBusy(false);
+                }
+              }}
             >
-              PDF
-            </Link>
+              {printBusy ? '…' : 'PDF'}
+            </button>
           </div>
         </div>
       </div>

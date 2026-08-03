@@ -4,9 +4,18 @@
  */
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { formatMoney } from '../lib/currency/multiCurrency.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
+import {
+  canUseWindowPrint,
+  consumeTicketPrintStash,
+  downloadTicketHtml,
+  isStandaloneApp,
+  stashTicketForPrint,
+  triggerBrowserPrint,
+} from '../lib/ticketing/printTicket.js';
 import '../styles/wallet-pass.css';
 import '../styles/ticket-print.css';
 
@@ -112,6 +121,66 @@ function TicketPassCard({ booking, tripTitle, brandLabel, coverImage }) {
   );
 }
 
+function passOuterHtml({ booking, tripTitle, brandLabel }) {
+  const pnr = booking.pnr || booking.ticketRef || booking.id;
+  const passenger =
+    booking.customerName || booking.passengerName || booking.name || '—';
+  const seat = booking.seat || '—';
+  const dateStr = booking.date
+    ? new Date(`${booking.date}T12:00:00`).toLocaleDateString('el-GR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '—';
+  const qrValue = booking._printQr || String(pnr);
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrValue)}&margin=10`;
+  const price =
+    booking.price != null ? formatMoney(booking.price, booking.currency || 'EUR') : '—';
+  const esc = (s) =>
+    String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  return `<!DOCTYPE html>
+<html lang="el"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Εισιτήριο ${esc(pnr)}</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;padding:20px;background:#f1f5f9;color:#0f172a}
+.card{max-width:26rem;margin:0 auto;background:#fff;border-radius:1.2rem;overflow:hidden;border:1px solid #e2e8f0}
+.hero{background:linear-gradient(145deg,#1e3a5f,#0f4c81);color:#fff;padding:1.25rem 1.1rem}
+.brand{font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+h1{margin:.35rem 0 0;font-size:1.25rem}
+.when{margin:.4rem 0 0;font-size:.85rem;opacity:.9}
+.body{padding:1rem 1.1rem 1.25rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:.85rem}
+.k{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8}
+.v{font-weight:700;margin-top:.15rem}
+.qr{text-align:center;margin-top:1rem;padding-top:1rem;border-top:1px dashed #e2e8f0}
+.toolbar{display:flex;justify-content:center;gap:.5rem;margin-bottom:1rem}
+button{border:0;border-radius:999px;padding:.7rem 1.1rem;background:#0f172a;color:#fff;font-weight:700}
+@media print{.toolbar{display:none}body{background:#fff;padding:0}.card{border:0}}
+</style></head><body>
+<div class="toolbar"><button type="button" onclick="window.print()">Εκτύπωση / PDF</button></div>
+<div class="card">
+  <div class="hero"><div class="brand">${esc(brandLabel)}</div><h1>${esc(tripTitle)}</h1>
+  <p class="when">${esc(dateStr)}${booking.time ? ` · ${esc(booking.time)}` : ''}</p></div>
+  <div class="body">
+    <div class="grid">
+      <div><div class="k">Επιβάτης</div><div class="v">${esc(passenger)}</div></div>
+      <div><div class="k">Θέση</div><div class="v">${esc(seat)}</div></div>
+      <div><div class="k">Κωδικός</div><div class="v">${esc(pnr)}</div></div>
+      <div><div class="k">Ποσό</div><div class="v">${esc(price)}</div></div>
+    </div>
+    <div class="qr"><img src="${qrSrc}" width="200" height="200" alt="QR" /><p class="v" style="letter-spacing:.12em;margin:.6rem 0 0">${esc(pnr)}</p></div>
+  </div>
+</div>
+</body></html>`;
+}
+
 export default function TicketPrintPage() {
   const { bookingId: rawId } = useParams();
   const [searchParams] = useSearchParams();
@@ -141,20 +210,34 @@ export default function TicketPrintPage() {
     let cancelled = false;
     (async () => {
       try {
+        const stash = consumeTicketPrintStash(bookingId);
         const mod = await import('../lib/ticketing/bookingStore.js');
         const { getTripById, loadTrips } = await import('../lib/trips/tripStore.js');
         const { mockBookings } = await import('../data/mockData.js');
         const { issueSignedQrToken } = await import('../lib/ticketing/qrToken.js');
+        const { loadLastPass } = await import('../lib/wallet/lastPassSnapshot.js');
 
-        const booking =
-          mod.getBookingById(bookingId) || mockBookings.find((b) => b.id === bookingId);
+        let booking =
+          stash?.booking ||
+          mod.getBookingById(bookingId) ||
+          mockBookings.find((b) => b.id === bookingId) ||
+          null;
+
+        if (!booking) {
+          const last = loadLastPass();
+          if (last?.booking?.id && String(last.booking.id) === String(bookingId)) {
+            booking = last.booking;
+          }
+        }
+
         if (!booking) {
           if (!cancelled) setLoadError('notfound');
           return;
         }
+
         loadTrips();
         const trip = getTripById(booking.tripId);
-        let printQr = booking.pnr || booking.id;
+        let printQr = stash?.printQr || booking.pnr || booking.id;
         if (mod.isBookingPaid(booking)) {
           try {
             printQr = await issueSignedQrToken(booking);
@@ -165,8 +248,10 @@ export default function TicketPrintPage() {
         if (!cancelled) {
           setResolved({
             booking: { ...booking, _printQr: printQr },
-            tripTitle: trip?.title || booking.tripTitle || 'Εκδρομή',
-            coverImage: trip?.image || '/images/hero-bus-achillio.png',
+            tripTitle: stash?.tripTitle || trip?.title || booking.tripTitle || 'Εκδρομή',
+            coverImage:
+              stash?.coverImage || trip?.image || '/images/hero-bus-achillio.png',
+            brandLabel: stash?.brandLabel || '',
           });
         }
       } catch (err) {
@@ -182,9 +267,48 @@ export default function TicketPrintPage() {
 
   useEffect(() => {
     if (!autoPrint || !resolved) return undefined;
-    const t = window.setTimeout(() => window.print(), 450);
+    if (!canUseWindowPrint()) {
+      toast('Στο app πατήστε «Λήψη HTML» και μετά Εκτύπωση / PDF.', { icon: '📄', duration: 4500 });
+      return undefined;
+    }
+    const t = window.setTimeout(() => {
+      triggerBrowserPrint();
+    }, 450);
     return () => window.clearTimeout(t);
   }, [autoPrint, resolved]);
+
+  const handlePrint = () => {
+    if (triggerBrowserPrint()) return;
+    // Standalone / blocked — download self-contained ticket
+    if (!resolved) return;
+    const html = passOuterHtml({
+      booking: resolved.booking,
+      tripTitle: resolved.tripTitle,
+      brandLabel: resolved.brandLabel || brandLabel,
+    });
+    const pnr = resolved.booking.pnr || resolved.booking.ticketRef || resolved.booking.id;
+    downloadTicketHtml(html, `eisitirio-${pnr}.html`);
+    toast.success('Κατέβηκε το εισιτήριο — άνοιξέ το και επίλεξε Εκτύπωση / PDF');
+  };
+
+  const handleDownload = () => {
+    if (!resolved) return;
+    stashTicketForPrint({
+      booking: resolved.booking,
+      tripTitle: resolved.tripTitle,
+      coverImage: resolved.coverImage,
+      brandLabel: resolved.brandLabel || brandLabel,
+      printQr: resolved.booking._printQr,
+    });
+    const html = passOuterHtml({
+      booking: resolved.booking,
+      tripTitle: resolved.tripTitle,
+      brandLabel: resolved.brandLabel || brandLabel,
+    });
+    const pnr = resolved.booking.pnr || resolved.booking.ticketRef || resolved.booking.id;
+    downloadTicketHtml(html, `eisitirio-${pnr}.html`);
+    toast.success('Αρχείο έτοιμο για άνοιγμα / PDF');
+  };
 
   if (!bookingId || bookingId === 'demo') {
     return <Navigate to="/my-booking" replace />;
@@ -224,19 +348,31 @@ export default function TicketPrintPage() {
     );
   }
 
+  const label = resolved.brandLabel || brandLabel;
+
   return (
     <div className="wallet-app ticket-print-shell">
       <div className="ticket-print-toolbar no-print-ticket">
         <div>
           <h1 className="ticket-print-toolbar-title">Εισιτήριο</h1>
-          <p className="ticket-print-toolbar-copy">Εκτύπωση ή Αποθήκευση ως PDF</p>
+          <p className="ticket-print-toolbar-copy">
+            {isStandaloneApp()
+              ? 'Στο εγκατεστημένο app: Λήψη HTML → άνοιγμα → Εκτύπωση / PDF'
+              : 'Εκτύπωση ή Αποθήκευση ως PDF'}
+          </p>
         </div>
         <div className="ticket-print-toolbar-actions">
-          <button type="button" className="wallet-pass-cta" onClick={() => window.print()}>
+          <button type="button" className="wallet-pass-cta" onClick={handlePrint}>
             <span className="material-symbols-outlined" aria-hidden>
               print
             </span>
             Εκτύπωση / PDF
+          </button>
+          <button type="button" className="wallet-pass-secondary wallet-ticket-email" onClick={handleDownload}>
+            <span className="material-symbols-outlined" aria-hidden>
+              download
+            </span>
+            Λήψη HTML
           </button>
           <Link to="/wallet" className="wallet-pass-secondary wallet-ticket-email">
             Πίσω στο My Wallet
@@ -247,7 +383,7 @@ export default function TicketPrintPage() {
       <TicketPassCard
         booking={resolved.booking}
         tripTitle={resolved.tripTitle}
-        brandLabel={brandLabel}
+        brandLabel={label}
         coverImage={resolved.coverImage}
       />
     </div>
