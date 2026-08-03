@@ -348,7 +348,7 @@ export const ADMIN_NAV_ITEMS = {
   },
   customers: {
     id: 'customers',
-    label: 'Πελάτες',
+    label: 'Πελάτες λεωφορείων',
     icon: 'group',
     filled: true,
     type: 'tab',

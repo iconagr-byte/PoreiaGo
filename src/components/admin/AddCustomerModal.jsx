@@ -69,7 +69,13 @@ function formFromCustomer(customer) {
 }
 
 /** Modal — δημιουργία / επεξεργασία πελάτη στο πελατολόγιο. */
-export default function AddCustomerModal({ open, onClose, onCreated, customer = null }) {
+export default function AddCustomerModal({
+  open,
+  onClose,
+  onCreated,
+  customer = null,
+  serviceScope = 'buses',
+}) {
   const [form, setForm] = useState(EMPTY);
   const [tagDraft, setTagDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -128,6 +134,7 @@ export default function AddCustomerModal({ open, onClose, onCreated, customer = 
         notes: form.notes.trim(),
         tier: form.tier,
         source: form.source,
+        serviceScope: customer?.serviceScope || serviceScope,
         marketingOptIn: form.marketingOptIn,
         tags: form.tags,
       });

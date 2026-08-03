@@ -10,7 +10,7 @@ import {
 describe('navServiceScope', () => {
   it('classifies shared vs buses vs rent', () => {
     expect(navItemServiceScope('dashboard')).toBe('shared');
-    expect(navItemServiceScope('customers')).toBe('shared');
+    expect(navItemServiceScope('customers')).toBe('buses');
     expect(navItemServiceScope('routes')).toBe('buses');
     expect(navItemServiceScope('fleet')).toBe('buses');
     expect(navItemServiceScope('fleet_rental_vehicles')).toBe('rent');

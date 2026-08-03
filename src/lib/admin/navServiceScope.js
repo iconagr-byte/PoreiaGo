@@ -8,7 +8,6 @@ export const NAV_SERVICE_MODE_KEY = 'poreiago_admin_nav_service_mode_v1';
 /** Items that apply to both buses and rentals. */
 export const SHARED_NAV_IDS = new Set([
   'dashboard',
-  'customers',
   'loyalty',
   'fleet_live_map',
   'email',
@@ -17,6 +16,7 @@ export const SHARED_NAV_IDS = new Set([
 
 /** Bus / trips-only left-nav ids (plus fleet-ops hub). */
 export const BUS_NAV_IDS = new Set([
+  'customers',
   'routes',
   'fleet',
   'drivers',

@@ -13,6 +13,13 @@ export const BUSES_HUB_TABS = [
     accent: 'emerald',
   },
   {
+    id: 'customers',
+    label: 'Πελάτες λεωφορείων',
+    description: 'CRM επιβατών — χωριστά από ενοικιάσεις',
+    icon: 'group',
+    accent: 'violet',
+  },
+  {
     id: 'fleet',
     label: 'Στόλος λεωφορείων',
     description: 'Οχήματα, πινακίδες και κατάσταση',
