@@ -292,11 +292,13 @@ export default function SortableSidebarNav({
   const renderRow = (item, sectionId, { nested = false } = {}) => {
     const dragging = dragState.draggingId === item.id;
     const shared = isSharedNavItem(item);
+    const accent = shared ? 'shared' : navAccent(item);
+    const asBusCard = !shared && !nested && sectionId === 'main';
     return (
       <div
         className={`admin-nav-row ${dragging ? 'admin-nav-row-dragging' : ''} ${
           nested ? 'admin-nav-row-nested' : ''
-        }`}
+        } ${asBusCard ? 'admin-nav-row--card' : ''}`}
       >
         {!rentOnly ? (
           <span
@@ -315,11 +317,11 @@ export default function SortableSidebarNav({
         <button
           type="button"
           onClick={() => handleClick(item)}
-          className={buttonClass(item)}
-          data-accent={shared ? 'shared' : navAccent(item)}
+          className={`${buttonClass(item)}${asBusCard ? ' admin-nav-btn--card' : ''}`}
+          data-accent={accent}
           title={shared ? `${item.label} · λεωφορεία & ενοικιάσεις` : item.label}
         >
-          <span className="admin-nav-icon">
+          <span className={`admin-nav-icon${asBusCard ? ' admin-nav-icon--tile' : ''}`}>
             <span
               className="material-symbols-outlined"
               style={item.filled ? { fontVariationSettings: "'FILL' 1" } : undefined}
@@ -329,6 +331,11 @@ export default function SortableSidebarNav({
           </span>
           <span className="admin-nav-label">{item.label}</span>
           {shared && showServiceSwitch ? <DualScopeBadge /> : null}
+          {asBusCard ? (
+            <span className="material-symbols-outlined admin-nav-row-chevron" aria-hidden>
+              chevron_right
+            </span>
+          ) : null}
         </button>
       </div>
     );
@@ -588,20 +595,27 @@ export default function SortableSidebarNav({
         <button
           type="button"
           onClick={() => openSettings(settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB)}
-          className={`admin-nav-btn w-full admin-nav-btn--shared ${
-            settingsActive ? 'admin-nav-btn-active' : ''
+          className={`admin-nav-service-card admin-nav-service-card--settings${
+            settingsActive ? ' is-active' : ''
           }`}
-          data-accent="shared"
           title="Ρυθμίσεις · κοινό για λεωφορεία & ενοικιάσεις"
           aria-current={settingsActive ? 'page' : undefined}
         >
-          <span className="admin-nav-icon">
+          <span className="admin-nav-service-card-icon" aria-hidden>
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
               settings
             </span>
           </span>
-          <span className="admin-nav-label">Ρυθμίσεις</span>
-          {showServiceSwitch ? <DualScopeBadge /> : null}
+          <span className="admin-nav-service-card-copy">
+            <span className="admin-nav-service-card-kicker">Γραφείο</span>
+            <span className="admin-nav-service-card-title">Ρυθμίσεις</span>
+            <span className="admin-nav-service-card-sub">
+              {showServiceSwitch ? 'Λεωφορεία & ενοικιάσεις' : 'Εμφάνιση · πληρωμές · συμβόλαια'}
+            </span>
+          </span>
+          <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
+            chevron_right
+          </span>
         </button>
       </div>
     </nav>
