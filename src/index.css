@@ -464,6 +464,12 @@
 .admin-nav-row--card {
   min-height: 2.75rem;
   margin-bottom: 0.3rem;
+  align-items: stretch;
+}
+
+.admin-nav-row--card .admin-nav-grip {
+  height: auto;
+  min-height: 2.75rem;
 }
 
 .admin-nav-row-dragging {
