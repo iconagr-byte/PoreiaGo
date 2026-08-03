@@ -61,19 +61,29 @@ export default function SettingsHub({
   const [tab, setTab] = useState(() =>
     sanitizeSettingsSubTab(initialTab, superAdmin, officeMode),
   );
+  /** When designing the page, collapse the settings card rail for more canvas. */
+  const [railOpen, setRailOpen] = useState(() => {
+    const initial = sanitizeSettingsSubTab(initialTab, superAdmin, officeMode);
+    return initial !== 'homepage';
+  });
 
   useEffect(() => {
     if (initialTab) {
-      setTab(sanitizeSettingsSubTab(initialTab, superAdmin, officeMode));
+      const next = sanitizeSettingsSubTab(initialTab, superAdmin, officeMode);
+      setTab(next);
+      setRailOpen(next !== 'homepage');
     }
   }, [initialTab, superAdmin, officeMode]);
 
   const activeTab = tabs.find((t) => t.id === tab);
+  const designMode = tab === 'homepage';
 
   const selectTab = (id) => {
     const next = sanitizeSettingsSubTab(id, superAdmin, officeMode);
     setTab(next);
     onSubTabChange?.(next);
+    // Entering design → fade rail out for space; leaving → bring it back.
+    setRailOpen(next !== 'homepage');
   };
 
   const grouped = useMemo(() => {
@@ -103,8 +113,15 @@ export default function SettingsHub({
   return (
     <div className="settings-hub animate-in fade-in duration-300 w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
-        {/* Secondary settings rail — larger, flush left */}
-        <aside className="w-full lg:w-80 xl:w-[22rem] shrink-0 lg:sticky lg:top-3 self-start">
+        {/* Secondary settings rail — fades out in design mode for more canvas */}
+        <aside
+          aria-hidden={designMode && !railOpen}
+          className={`shrink-0 self-start overflow-hidden transition-[opacity,transform,width,margin,padding,max-height] duration-150 ease-out ${
+            designMode && !railOpen
+              ? 'pointer-events-none opacity-0 -translate-x-1 max-h-0 w-0 max-w-0 m-0 p-0 lg:sticky lg:top-3'
+              : 'opacity-100 translate-x-0 w-full max-w-none max-h-[2000px] lg:w-80 xl:w-[22rem] lg:sticky lg:top-3'
+          }`}
+        >
           <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-4">
             <div className="px-1.5 pt-0.5">
               <p className="text-xs font-bold uppercase tracking-wide text-violet-700/80">
@@ -222,34 +239,58 @@ export default function SettingsHub({
               </h2>
               <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">{tabHint}</p>
             </div>
-            {activeTab ? (
-              <div
-                className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border ${
-                  superAdmin && activeTab.section === 'platform'
-                    ? 'bg-indigo-500/[0.08] border-indigo-500/15'
-                    : 'bg-violet-500/[0.08] border-violet-500/15'
-                }`}
-              >
-                <span
-                  className={`material-symbols-outlined text-[20px] ${
+            <div className="flex items-center gap-2 shrink-0">
+              {designMode && !railOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setRailOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-violet-200 bg-violet-50 text-violet-800 text-xs font-bold hover:bg-violet-100 transition"
+                  title="Εμφάνιση μενού ρυθμίσεων"
+                >
+                  <span className="material-symbols-outlined text-[16px]">menu_open</span>
+                  Μενού ρυθμίσεων
+                </button>
+              ) : null}
+              {designMode && railOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setRailOpen(false)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-black/[0.08] bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition"
+                  title="Απόκρυψη μενού για περισσότερο χώρο"
+                >
+                  <span className="material-symbols-outlined text-[16px]">menu</span>
+                  Περισσότερος χώρος
+                </button>
+              ) : null}
+              {activeTab ? (
+                <div
+                  className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border ${
                     superAdmin && activeTab.section === 'platform'
-                      ? 'text-indigo-700'
-                      : 'text-violet-700'
+                      ? 'bg-indigo-500/[0.08] border-indigo-500/15'
+                      : 'bg-violet-500/[0.08] border-violet-500/15'
                   }`}
                 >
-                  {activeTab.icon}
-                </span>
-                <span
-                  className={`text-sm font-bold ${
-                    superAdmin && activeTab.section === 'platform'
-                      ? 'text-indigo-800'
-                      : 'text-violet-800'
-                  }`}
-                >
-                  {activeTab.label}
-                </span>
-              </div>
-            ) : null}
+                  <span
+                    className={`material-symbols-outlined text-[20px] ${
+                      superAdmin && activeTab.section === 'platform'
+                        ? 'text-indigo-700'
+                        : 'text-violet-700'
+                    }`}
+                  >
+                    {activeTab.icon}
+                  </span>
+                  <span
+                    className={`text-sm font-bold ${
+                      superAdmin && activeTab.section === 'platform'
+                        ? 'text-indigo-800'
+                        : 'text-violet-800'
+                    }`}
+                  >
+                    {activeTab.label}
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <SettingsTabPanels
