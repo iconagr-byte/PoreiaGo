@@ -101,16 +101,16 @@ export default function SettingsHub({
       : TAB_HINTS[tab] || 'Επιλέξτε ενότητα από τις κάρτες αριστερά';
 
   return (
-    <div className="settings-hub animate-in fade-in duration-300">
-      <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 items-start">
-        {/* Secondary settings rail — cards */}
-        <aside className="w-full lg:w-[17.5rem] xl:w-72 shrink-0 lg:sticky lg:top-4">
-          <div className="rounded-[28px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3 sm:p-3.5 space-y-4">
+    <div className="settings-hub animate-in fade-in duration-300 w-full">
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
+        {/* Secondary settings rail — larger, flush left */}
+        <aside className="w-full lg:w-80 xl:w-[22rem] shrink-0 lg:sticky lg:top-3 self-start">
+          <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-4">
             <div className="px-1.5 pt-0.5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-violet-700/80">
+              <p className="text-xs font-bold uppercase tracking-wide text-violet-700/80">
                 Ρυθμίσεις
               </p>
-              <p className="text-sm font-bold text-on-surface mt-0.5">
+              <p className="text-base font-bold text-on-surface mt-0.5">
                 {superAdmin ? 'Πλατφόρμα & γραφείο' : 'Γραφείο'}
               </p>
             </div>
@@ -142,15 +142,15 @@ export default function SettingsHub({
             {/* Desktop: card list */}
             <div className="hidden lg:block space-y-4">
               {grouped.map((section) => (
-                <div key={section.id} className="space-y-1.5">
+                <div key={section.id} className="space-y-2">
                   <p
-                    className={`px-1.5 text-[10px] font-bold uppercase tracking-wider ${
+                    className={`px-1.5 text-[11px] font-bold uppercase tracking-wider ${
                       section.id === 'platform' ? 'text-indigo-600/80' : 'text-on-surface-variant/70'
                     }`}
                   >
                     {section.label}
                   </p>
-                  <ul className="space-y-1">
+                  <ul className="space-y-1.5">
                     {section.items.map((t) => {
                       const active = t.id === tab;
                       const platform = t.section === 'platform';
@@ -159,7 +159,7 @@ export default function SettingsHub({
                           <button
                             type="button"
                             onClick={() => selectTab(t.id)}
-                            className={`w-full text-left flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition ${
+                            className={`w-full text-left flex items-center gap-3 rounded-2xl border px-3.5 py-3 transition ${
                               active
                                 ? platform
                                   ? 'border-indigo-300 bg-indigo-50 shadow-sm'
@@ -168,7 +168,7 @@ export default function SettingsHub({
                             }`}
                           >
                             <span
-                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                                 active
                                   ? platform
                                     ? 'bg-indigo-600 text-white'
@@ -179,7 +179,7 @@ export default function SettingsHub({
                               }`}
                             >
                               <span
-                                className="material-symbols-outlined text-[20px]"
+                                className="material-symbols-outlined text-[22px]"
                                 style={{ fontVariationSettings: "'FILL' 1" }}
                               >
                                 {t.icon}
@@ -187,7 +187,7 @@ export default function SettingsHub({
                             </span>
                             <span className="min-w-0">
                               <span
-                                className={`block text-sm font-bold truncate ${
+                                className={`block text-[15px] font-bold truncate ${
                                   active
                                     ? platform
                                       ? 'text-indigo-950'
@@ -197,7 +197,7 @@ export default function SettingsHub({
                               >
                                 {t.label}
                               </span>
-                              <span className="block text-[11px] text-on-surface-variant truncate mt-0.5 leading-snug">
+                              <span className="block text-xs text-on-surface-variant truncate mt-0.5 leading-snug">
                                 {t.id === 'homepage' ? homepageHint : TAB_HINTS[t.id] || ''}
                               </span>
                             </span>

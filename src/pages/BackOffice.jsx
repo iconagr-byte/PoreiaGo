@@ -2163,8 +2163,8 @@ export default function BackOffice() {
                 ? 'flex-1 overflow-auto p-4 md:p-5 lg:p-6'
                 : activeTab === 'fleet_live_map'
                   ? 'flex-1 overflow-auto p-2 sm:p-3 md:p-4'
-                : activeTab === 'fleet_ops' || activeTab === 'fleet_rental'
-                  ? 'flex-1 overflow-auto p-3 sm:p-4 md:pl-4 md:pr-5 md:py-5'
+                : activeTab === 'fleet_ops' || activeTab === 'fleet_rental' || activeTab === 'settings'
+                  ? 'flex-1 overflow-auto p-3 sm:p-4 md:pl-2 md:pr-5 md:py-5'
                 : 'flex-1 overflow-auto p-margin-mobile md:p-margin-desktop'
           }
         >
@@ -2175,7 +2175,8 @@ export default function BackOffice() {
               activeTab === 'dashboard' ||
               activeTab === 'fleet_live_map' ||
               activeTab === 'fleet_ops' ||
-              activeTab === 'fleet_rental'
+              activeTab === 'fleet_rental' ||
+              activeTab === 'settings'
                 ? 'w-full min-w-0'
                 : 'max-w-container-max mx-auto'
             }
@@ -2187,7 +2188,7 @@ export default function BackOffice() {
             {activeTab === 'fleet' && renderFleet()}
             {activeTab === 'drivers' && renderDrivers()}
             {activeTab === 'settings' && (
-              <div className="pb-stack-lg max-w-7xl">
+              <div className="pb-stack-lg w-full">
                 <ImpersonationBanner />
                 <SettingsHub
                   initialTab={settingsSubTab}
