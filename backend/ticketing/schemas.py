@@ -76,3 +76,15 @@ class TicketEmailRequest(BaseModel):
     payment_method: str | None = None
     payment_status: str | None = None
     phone: str | None = None
+    trip_id: int | str | None = None
+    tripId: int | str | None = None
+    luggage: str | None = None
+    dietary: str | None = None
+    amount_paid: float | None = None
+    balance_due: float | None = None
+    invoice_number: str | None = None
+    extras: list[dict[str, Any]] | None = None
+    extras_summary: str | None = None
+    notes: str | None = None
+    public_base_url: str | None = None
+    custom_domain: str | None = None

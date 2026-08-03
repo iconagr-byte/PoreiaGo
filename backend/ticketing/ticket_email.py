@@ -45,12 +45,72 @@ def _magic_cta_block(magic_url: str | None) -> str:
     """
 
 
+def _extras_block(payload: dict) -> str:
+    summary = str(payload.get("extras_summary") or "").strip()
+    extras = payload.get("extras")
+    if not summary and isinstance(extras, list) and extras:
+        parts = []
+        for line in extras:
+            if not isinstance(line, dict):
+                continue
+            title = str(line.get("title") or line.get("name") or "").strip()
+            if not title:
+                continue
+            qty = line.get("qty") or line.get("quantity") or 1
+            try:
+                qty_n = int(qty)
+            except (TypeError, ValueError):
+                qty_n = 1
+            parts.append(f"{title} ×{qty_n}" if qty_n > 1 else title)
+        summary = " · ".join(parts)
+    if not summary:
+        return ""
+    return f"""
+              <tr><td style="padding:4px 0;"><strong>Υπηρεσίες:</strong> {summary}</td></tr>
+    """
+
+
+def _optional_detail_rows(payload: dict) -> str:
+    rows = []
+    luggage = str(payload.get("luggage") or "").strip()
+    dietary = str(payload.get("dietary") or "").strip()
+    notes = str(payload.get("notes") or "").strip()
+    invoice = str(payload.get("invoice_number") or "").strip()
+    amount_paid = payload.get("amount_paid")
+    balance_due = payload.get("balance_due")
+    if luggage:
+        rows.append(f'<tr><td style="padding:4px 0;"><strong>Αποσκευές:</strong> {luggage}</td></tr>')
+    if dietary:
+        rows.append(f'<tr><td style="padding:4px 0;"><strong>Διατροφή:</strong> {dietary}</td></tr>')
+    if notes:
+        rows.append(f'<tr><td style="padding:4px 0;"><strong>Σημειώσεις:</strong> {notes}</td></tr>')
+    if invoice:
+        rows.append(f'<tr><td style="padding:4px 0;"><strong>Τιμολόγιο:</strong> {invoice}</td></tr>')
+    try:
+        if amount_paid is not None and float(amount_paid) > 0:
+            rows.append(
+                f'<tr><td style="padding:4px 0;"><strong>Πληρώθηκε:</strong> €{float(amount_paid):.2f}</td></tr>'
+            )
+    except (TypeError, ValueError):
+        pass
+    try:
+        if balance_due is not None and float(balance_due) > 0:
+            rows.append(
+                f'<tr><td style="padding:4px 0;"><strong>Υπόλοιπο:</strong> €{float(balance_due):.2f}</td></tr>'
+            )
+    except (TypeError, ValueError):
+        pass
+    rows.append(_extras_block(payload))
+    return "".join(rows)
+
+
 def build_ticket_email_html(payload: dict) -> str:
     pnr = payload.get("pnr") or payload.get("booking_id") or "—"
     price = payload.get("price")
     price_str = f"€{float(price):.2f}" if price is not None else "—"
     payment = payload.get("payment_method") or payload.get("payment_status") or "—"
     magic_url = payload.get("magic_url") or ""
+    extra_rows = _optional_detail_rows(payload)
 
     return f"""<!DOCTYPE html>
 <html lang="el">
@@ -70,7 +130,8 @@ def build_ticket_email_html(payload: dict) -> str:
           <td style="padding:32px;">
             <p style="margin:0 0 8px;color:#64748b;font-size:13px;">Αγαπητέ/ή <strong style="color:#0f172a;">{payload.get("customer_name") or "επιβάτη"}</strong>,</p>
             <p style="margin:0 0 24px;color:#64748b;font-size:14px;line-height:1.6;">
-              Η κράτησή σας επιβεβαιώθηκε. Ανοίξτε το My Wallet για το QR επιβίβασης.
+              Η κράτησή σας επιβεβαιώθηκε. Παρακάτω θα βρείτε όλα τα στοιχεία και το QR επιβίβασης.
+              Μπορείτε επίσης να ανοίξετε το My Wallet από τον σύνδεσμο.
             </p>
             {_magic_cta_block(magic_url)}
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
@@ -98,6 +159,7 @@ def build_ticket_email_html(payload: dict) -> str:
             <div style="text-align:center;padding:20px;border:2px dashed #e2e8f0;border-radius:16px;margin-bottom:24px;">
               <img src="{_qr_img_url(pnr)}" width="160" height="160" alt="QR εισιτηρίου" style="display:block;margin:0 auto 12px;" />
               <div style="font-family:monospace;font-weight:bold;letter-spacing:.12em;">{pnr}</div>
+              <p style="margin:10px 0 0;font-size:12px;color:#94a3b8;">Δείξτε το QR στον οδηγό κατά την επιβίβαση</p>
             </div>
             {track_link_email_block(payload.get("passenger_track_url"))}
             <table width="100%" style="background:#f8fafc;border-radius:12px;padding:16px;font-size:13px;color:#475569;">
@@ -105,6 +167,7 @@ def build_ticket_email_html(payload: dict) -> str:
               <tr><td style="padding:4px 0;"><strong>Πληρωμή:</strong> {payment}</td></tr>
               <tr><td style="padding:4px 0;"><strong>Email:</strong> {payload.get("email") or "—"}</td></tr>
               <tr><td style="padding:4px 0;"><strong>Τηλέφωνο:</strong> {payload.get("phone") or "—"}</td></tr>
+              {extra_rows}
             </table>
           </td>
         </tr>

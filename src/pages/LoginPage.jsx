@@ -20,7 +20,9 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import { sendWalletClaimBookingEmail } from '../lib/wallet/sendClaimBookingEmail.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
+import toast from 'react-hot-toast';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -107,9 +109,30 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const finishLogin = (email, profile = {}, accessToken = null) => {
     loginAsCustomer(email, profile, accessToken);
     const hadClaim = Boolean(claim);
+    const claimBookingId = highlightBooking || claim?.bookingId || claim?.reference || '';
     clearWalletClaim();
+
+    if (hadClaim && claimBookingId && !rentIntent) {
+      sendWalletClaimBookingEmail({
+        bookingId: claimBookingId,
+        reference: claim?.reference,
+        email,
+        name: profile?.name || claim?.name,
+        phone: claim?.phone,
+      })
+        .then((res) => {
+          if (res?.skipped) return;
+          if (res?.logged_only) {
+            toast.success(`Καταγράφηκε αποστολή εισιτηρίου → ${res.email}`);
+          } else if (res?.ok) {
+            toast.success(`Στάλθηκε email με την κράτηση στο ${res.email}`);
+          }
+        })
+        .catch(() => {});
+    }
+
     const homeState = walletHomeNavState({
-      highlightBooking,
+      highlightBooking: claimBookingId || highlightBooking,
       fromClaim: hadClaim,
     });
     // Rent: always bump location state so /rent gate remounts into the app.
