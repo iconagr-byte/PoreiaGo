@@ -1538,7 +1538,7 @@
   background: rgba(0, 0, 0, 0.08);
 }
 
-/* Desktop / laptop / tablet: full-bleed stage, form card centered — no inner scroll */
+/* Desktop / laptop: left info · centered card · right “how it works” */
 .wallet-auth-stage--desktop .wallet-auth-shell {
   width: 100%;
   min-height: 100dvh;
@@ -1548,16 +1548,16 @@
 }
 
 .wallet-auth-stage--desktop .wallet-auth-scroll {
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
   padding: clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 1.75rem);
-  max-width: 1080px;
+  max-width: 1180px;
   margin: 0 auto;
   width: 100%;
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 420px);
-  gap: clamp(1.25rem, 3vw, 2.5rem);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px) minmax(0, 1fr);
+  gap: clamp(1.25rem, 2.5vw, 2.25rem);
   align-content: center;
   overflow: visible;
 }
@@ -1566,25 +1566,43 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: stretch;
   min-width: 0;
   width: 100%;
 }
 
 .wallet-auth-stage--desktop .wallet-auth-card {
   width: 100%;
-  max-width: 420px;
+  max-width: none;
+  margin-inline: auto;
 }
 
-/* Tablet portrait: slightly tighter card + padding */
+/* Tablet portrait: left copy + centered form (hide right column) */
 @media (min-width: 701px) and (max-width: 1100px) {
   .wallet-auth-stage--desktop .wallet-auth-scroll {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 400px);
+    grid-template-columns: minmax(220px, 1fr) minmax(300px, 420px);
     max-width: 920px;
-    gap: 1.5rem;
+    gap: 1.5rem 1.75rem;
+  }
+
+  .wallet-auth-stage--desktop .wallet-auth-aside--right {
+    display: none;
   }
 
   .wallet-auth-card {
     padding: 1.35rem 1.2rem 1.25rem;
+  }
+}
+
+/* Landscape tablets wide enough: keep three columns */
+@media (min-width: 901px) and (max-width: 1100px) and (orientation: landscape) {
+  .wallet-auth-stage--desktop .wallet-auth-scroll {
+    grid-template-columns: minmax(180px, 1fr) minmax(300px, 400px) minmax(180px, 1fr);
+    max-width: 1100px;
+  }
+
+  .wallet-auth-stage--desktop .wallet-auth-aside--right {
+    display: flex;
   }
 }
 
@@ -1630,6 +1648,15 @@
   justify-content: center;
   color: #f5f5f7;
   padding: 0.5rem 0.25rem;
+}
+
+.wallet-auth-aside--right {
+  text-align: left;
+}
+
+.wallet-auth-aside-title--sm {
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  font-weight: 700;
 }
 
 .wallet-auth-aside-kicker {
@@ -1713,8 +1740,54 @@
 }
 
 .wallet-auth-aside-note strong {
-  color: #6ee7b7;
+  color: #93c5fd;
   font-weight: 700;
+}
+
+.wallet-auth-aside-steps {
+  list-style: none;
+  margin: 1.35rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.wallet-auth-aside-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.wallet-auth-aside-step {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(59, 130, 246, 0.28);
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.wallet-auth-aside-steps strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.wallet-auth-aside-steps span {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: rgba(245, 245, 247, 0.68);
 }
 
 .wallet-phone-stage--desktop {
