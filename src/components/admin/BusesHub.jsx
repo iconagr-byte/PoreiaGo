@@ -38,7 +38,8 @@ const CHIP_ACTIVE = {
 };
 
 /**
- * Buses hub — sidebar card «Λεωφορεία» opens this menu on the right.
+ * Buses hub — sidebar card «Λεωφορεία» opens this menu on the right
+ * (same pattern as SettingsHub / RentDeskHub).
  */
 export default function BusesHub({ activeTab, onNavigate, children }) {
   const railTab = sanitizeBusesHubTab(activeTab);
@@ -52,13 +53,11 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
   return (
     <div className="buses-hub animate-in fade-in duration-300 w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
-        <aside className="w-full lg:w-[15.5rem] xl:w-64 shrink-0 lg:sticky lg:top-3 self-start">
-          <div className="rounded-[24px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-2.5 sm:p-3 space-y-3">
+        <aside className="w-full lg:w-80 xl:w-[22rem] shrink-0 lg:sticky lg:top-3 self-start">
+          <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-4">
             <div className="px-1.5 pt-0.5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-sky-700/80">
-                Λεωφορεία
-              </p>
-              <p className="text-sm font-bold text-on-surface mt-0.5">Εκδρομές & στόλος</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-sky-700/80">Λεωφορεία</p>
+              <p className="text-base font-bold text-on-surface mt-0.5">Εκδρομές & στόλος</p>
             </div>
 
             <div className="flex lg:hidden gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5">
@@ -83,7 +82,7 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
               })}
             </div>
 
-            <ul className="hidden lg:block space-y-1">
+            <ul className="hidden lg:block space-y-1.5">
               {BUSES_HUB_TABS.map((t) => {
                 const isActive = t.id === railTab;
                 const accent = t.accent || 'sky';
@@ -92,21 +91,21 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
                     <button
                       type="button"
                       onClick={() => selectTab(t.id)}
-                      className={`w-full text-left flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition ${
+                      className={`w-full text-left flex items-center gap-3 rounded-2xl border px-3.5 py-3 transition ${
                         isActive
                           ? RAIL_ACTIVE[accent] || RAIL_ACTIVE.sky
                           : 'border-transparent bg-black/[0.02] hover:bg-black/[0.04] hover:border-black/[0.06]'
                       }`}
                     >
                       <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                           isActive
                             ? RAIL_ICON_ACTIVE[accent] || RAIL_ICON_ACTIVE.sky
                             : RAIL_ICON_IDLE[accent] || RAIL_ICON_IDLE.sky
                         }`}
                       >
                         <span
-                          className="material-symbols-outlined text-[20px]"
+                          className="material-symbols-outlined text-[22px]"
                           style={{ fontVariationSettings: "'FILL' 1" }}
                         >
                           {t.icon}
@@ -114,13 +113,13 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
                       </span>
                       <span className="min-w-0">
                         <span
-                          className={`block text-sm font-bold truncate ${
+                          className={`block text-[15px] font-bold truncate ${
                             isActive ? 'text-slate-950' : 'text-on-surface'
                           }`}
                         >
                           {t.label}
                         </span>
-                        <span className="block text-[11px] text-on-surface-variant truncate mt-0.5 leading-snug">
+                        <span className="block text-xs text-on-surface-variant truncate mt-0.5 leading-snug">
                           {t.description}
                         </span>
                       </span>
