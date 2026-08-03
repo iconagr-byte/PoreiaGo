@@ -2366,6 +2366,11 @@ export default function BackOffice() {
                       setActiveTab('fleet_ops');
                       return;
                     }
+                    // Always land on CRM list home (not a stuck customer detail).
+                    if (next === 'customers') {
+                      handleAdminTabChange('customers');
+                      return;
+                    }
                     setActiveTab(next);
                   }}
                 >
