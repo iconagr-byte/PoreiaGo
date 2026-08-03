@@ -1,4 +1,4 @@
-"""Contract: driver login must not auto-start GPS / tachograph."""
+"""Contract: driver login / tab navigation must not auto-start GPS / tachograph."""
 
 from __future__ import annotations
 
@@ -28,6 +28,17 @@ class DriverNoShiftAutostartTests(unittest.TestCase):
         self.assertIn("clearDriverShiftLaunchState", session)
         self.assertIn("return false", session)
         self.assertIn("Έναρξη βάρδιας", session)
+
+    def test_nav_tabs_do_not_autostart_shift(self) -> None:
+        """Αρχική / Θέση / Scan / … — shift only via explicit Έναρξη βάρδιας."""
+        cmd = (
+            ROOT / "src" / "pages" / "driver" / "DriverCommandCenter.jsx"
+        ).read_text(encoding="utf-8")
+        # Old bug: opening GPS tab called goOnline automatically.
+        self.assertNotIn("if (t.id === 'gps' && !shift.online)", cmd)
+        self.assertIn("Never auto-start shift on tab enter", cmd)
+        self.assertIn("startShiftNow", cmd)
+        self.assertIn("void shift.goOnline({ resume: false })", cmd)
 
 
 if __name__ == "__main__":
