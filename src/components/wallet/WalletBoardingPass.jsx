@@ -61,20 +61,26 @@ export default function WalletBoardingPass({
             Έχω ήδη κωδικό κράτησης
           </Link>
 
-          <div className="wallet-pass-empty-shortcuts">
-            <button type="button" className="wallet-pass-empty-chip" onClick={onOpenBookings}>
-              <span className="material-symbols-outlined" aria-hidden>
-                event_note
-              </span>
-              Κρατήσεις
-            </button>
-            <button type="button" className="wallet-pass-empty-chip" onClick={onOpenRent}>
-              <span className="material-symbols-outlined" aria-hidden>
-                directions_car
-              </span>
-              Ενοικίαση
-            </button>
-          </div>
+          {typeof onOpenBookings === 'function' || typeof onOpenRent === 'function' ? (
+            <div className="wallet-pass-empty-shortcuts">
+              {typeof onOpenBookings === 'function' ? (
+                <button type="button" className="wallet-pass-empty-chip" onClick={onOpenBookings}>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    event_note
+                  </span>
+                  Κρατήσεις
+                </button>
+              ) : null}
+              {typeof onOpenRent === 'function' ? (
+                <button type="button" className="wallet-pass-empty-chip" onClick={onOpenRent}>
+                  <span className="material-symbols-outlined" aria-hidden>
+                    directions_car
+                  </span>
+                  Ενοικίαση
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           <ol className="wallet-pass-empty-steps">
             <li>

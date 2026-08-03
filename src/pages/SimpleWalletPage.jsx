@@ -375,8 +375,10 @@ function WalletAuthenticatedApp() {
             ) : null}
 
             {loadingBookings && !displayBooking ? (
-              <div className="wallet-pass-empty">
+              <div className="wallet-pass-empty wallet-pass-empty--loading" aria-busy="true">
                 <div className="wallet-pass-empty-inner">
+                  <span className="wallet-loading-dot" aria-hidden />
+                  <p className="wallet-pass-empty-kicker">My Wallet</p>
                   <p className="wallet-pass-empty-copy">Φόρτωση εισιτηρίου…</p>
                 </div>
               </div>
@@ -443,9 +445,20 @@ function WalletAuthenticatedApp() {
               </p>
 
               {bookings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-                  <Link to="/" className="wallet-btn wallet-btn-primary">
+                <div className="wallet-tab-empty">
+                  <span className="material-symbols-outlined wallet-tab-empty-icon" aria-hidden>
+                    event_note
+                  </span>
+                  <p className="wallet-tab-empty-title">Καμία κράτηση ακόμα</p>
+                  <p className="wallet-tab-empty-copy">
+                    Κλείστε εκδρομή ή προσθέστε κράτηση με κωδικό — εμφανίζεται εδώ μαζί με το
+                    εισιτήριο.
+                  </p>
+                  <Link to="/" className="wallet-btn wallet-btn-primary wallet-btn-block">
                     Κράτηση εκδρομής
+                  </Link>
+                  <Link to="/my-booking" className="wallet-pass-empty-secondary">
+                    Έχω ήδη κωδικό κράτησης
                   </Link>
                 </div>
               ) : (
