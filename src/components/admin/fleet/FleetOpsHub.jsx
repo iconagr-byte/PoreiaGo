@@ -59,6 +59,8 @@ export default function FleetOpsHub({
   onOpenLiveMap,
   onOpenFleet,
   onOpenPayments,
+  /** When true, hide the left rail (parent BusesHub already shows the menu). */
+  embedded = false,
 }) {
   const [tab, setTab] = useState(() => sanitizeFleetOpsSubTab(initialTab));
 
@@ -73,6 +75,66 @@ export default function FleetOpsHub({
     setTab(next);
     onSubTabChange?.(next);
   };
+
+  const header = (
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
+          {active.label}
+        </h2>
+        <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">{active.description}</p>
+      </div>
+      <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border bg-sky-500/[0.08] border-sky-500/15">
+        <span className="material-symbols-outlined text-[20px] text-sky-700">{active.icon}</span>
+        <span className="text-sm font-bold text-sky-800">{active.label}</span>
+      </div>
+    </div>
+  );
+
+  const subtabChips = (
+    <div className="flex gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5">
+      {FLEET_OPS_HUB_TABS.map((t) => {
+        const isActive = t.id === tab;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => selectTab(t.id)}
+            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold border transition ${
+              isActive
+                ? CHIP_ACTIVE[t.accent] || CHIP_ACTIVE.sky
+                : 'bg-white text-on-surface-variant border-black/[0.08]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">{t.icon}</span>
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const body = (
+    <FleetOpsHubPanel
+      tab={tab || DEFAULT_FLEET_OPS_TAB}
+      chatFocusDriverId={chatFocusDriverId}
+      onOpenLiveMap={onOpenLiveMap}
+      onOpenFleet={onOpenFleet}
+      onOpenPayments={onOpenPayments}
+      onOpenCalendar={() => selectTab('fleet_calendar')}
+      onOpenDocuments={() => selectTab('fleet_documents')}
+    />
+  );
+
+  if (embedded) {
+    return (
+      <div className="fleet-ops-hub fleet-ops-hub--embedded animate-in fade-in duration-300 w-full space-y-5">
+        {header}
+        {subtabChips}
+        {body}
+      </div>
+    );
+  }
 
   return (
     <div className="fleet-ops-hub animate-in fade-in duration-300 w-full">
@@ -157,30 +219,8 @@ export default function FleetOpsHub({
         </aside>
 
         <div className="min-w-0 flex-1 space-y-5 w-full">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
-                {active.label}
-              </h2>
-              <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">{active.description}</p>
-            </div>
-            <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border bg-sky-500/[0.08] border-sky-500/15">
-              <span className="material-symbols-outlined text-[20px] text-sky-700">
-                {active.icon}
-              </span>
-              <span className="text-sm font-bold text-sky-800">{active.label}</span>
-            </div>
-          </div>
-
-          <FleetOpsHubPanel
-            tab={tab || DEFAULT_FLEET_OPS_TAB}
-            chatFocusDriverId={chatFocusDriverId}
-            onOpenLiveMap={onOpenLiveMap}
-            onOpenFleet={onOpenFleet}
-            onOpenPayments={onOpenPayments}
-            onOpenCalendar={() => selectTab('fleet_calendar')}
-            onOpenDocuments={() => selectTab('fleet_documents')}
-          />
+          {header}
+          {body}
         </div>
       </div>
     </div>

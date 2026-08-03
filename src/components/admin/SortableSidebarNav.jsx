@@ -17,6 +17,11 @@ import {
   sanitizeFleetOpsSubTab,
 } from '../../lib/admin/fleetOpsHub.js';
 import {
+  DEFAULT_BUSES_HUB_TAB,
+  isBusesHubTab,
+  sanitizeBusesHubTab,
+} from '../../lib/admin/busesHub.js';
+import {
   isSharedNavItem,
   loadNavServiceMode,
   NAV_SERVICE_MODES,
@@ -146,15 +151,6 @@ export default function SortableSidebarNav({
     [mainItems, serviceMode],
   );
 
-  const busItems = useMemo(
-    () =>
-      mainItems.filter(
-        (item) =>
-          !isSharedNavItem(item) && navItemVisibleInServiceMode(item, serviceMode),
-      ),
-    [mainItems, serviceMode],
-  );
-
   const persistLayout = useCallback(
     (next) => {
       if (rentOnly) return;
@@ -225,6 +221,15 @@ export default function SortableSidebarNav({
     onTabChange?.('fleet_ops');
   };
 
+  const openBusesHub = (tabId) => {
+    const next = sanitizeBusesHubTab(tabId || DEFAULT_BUSES_HUB_TAB);
+    if (next === 'fleet_ops' || isFleetOpsSubTab(next)) {
+      openFleetOps(next === 'fleet_ops' ? fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB : next);
+      return;
+    }
+    onTabChange?.(next);
+  };
+
   const openRentDesk = (subTab) => {
     onFleetRentalTabChange?.(sanitizeRentDeskTab(subTab));
     onTabChange?.('fleet_rental');
@@ -259,18 +264,16 @@ export default function SortableSidebarNav({
     onTabChange?.(tabId);
   };
 
-  const fleetOpsActive = activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab);
+  const busesHubActive = !rentOnly && isBusesHubTab(activeTab);
 
   const buttonClass = (item) => {
     const isRentSubActive =
       item.type === 'fleet_rental_subtab' &&
       activeTab === 'fleet_rental' &&
       sanitizeRentDeskTab(fleetRentalTab) === item.fleetRentalTab;
-    const isFleetOpsRow =
-      item.type === 'tab' && (item.tab === 'fleet_ops' || item.id === 'fleet_ops') && fleetOpsActive;
     const isTabActive = item.type === 'tab' && activeTab === item.tab;
     const isEmailActive = item.type === 'email' && activeTab === 'email';
-    const isActive = isRentSubActive || isFleetOpsRow || isTabActive || isEmailActive;
+    const isActive = isRentSubActive || isTabActive || isEmailActive;
 
     const classes = ['admin-nav-btn'];
     if (isActive) classes.push('admin-nav-btn-active');
@@ -280,11 +283,10 @@ export default function SortableSidebarNav({
 
   const settingsActive = activeTab === 'settings';
   const rentDeskActive = activeTab === 'fleet_rental';
-  const showBusZone = !rentOnly && serviceMode !== 'rent' && busItems.length > 0;
   const showSharedZone = sharedItems.length > 0;
-  const showFleetOpsPin = !rentOnly && serviceMode !== 'rent';
+  const showBusesPin = !rentOnly && serviceMode !== 'rent';
   const showRentPin = rentEnabled && (rentOnly || serviceMode !== 'buses');
-  const menuLooksEmpty = !rentOnly && !showSharedZone && !showBusZone;
+  const menuLooksEmpty = !rentOnly && !showSharedZone && !showBusesPin;
 
   const navAccent = (item) =>
     item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
@@ -292,13 +294,11 @@ export default function SortableSidebarNav({
   const renderRow = (item, sectionId, { nested = false } = {}) => {
     const dragging = dragState.draggingId === item.id;
     const shared = isSharedNavItem(item);
-    const accent = shared ? 'shared' : navAccent(item);
-    const asBusCard = !shared && !nested && sectionId === 'main';
     return (
       <div
         className={`admin-nav-row ${dragging ? 'admin-nav-row-dragging' : ''} ${
           nested ? 'admin-nav-row-nested' : ''
-        } ${asBusCard ? 'admin-nav-row--card' : ''}`}
+        }`}
       >
         {!rentOnly ? (
           <span
@@ -317,11 +317,11 @@ export default function SortableSidebarNav({
         <button
           type="button"
           onClick={() => handleClick(item)}
-          className={`${buttonClass(item)}${asBusCard ? ' admin-nav-btn--card' : ''}`}
-          data-accent={accent}
+          className={buttonClass(item)}
+          data-accent={shared ? 'shared' : navAccent(item)}
           title={shared ? `${item.label} · λεωφορεία & ενοικιάσεις` : item.label}
         >
-          <span className={`admin-nav-icon${asBusCard ? ' admin-nav-icon--tile' : ''}`}>
+          <span className="admin-nav-icon">
             <span
               className="material-symbols-outlined"
               style={item.filled ? { fontVariationSettings: "'FILL' 1" } : undefined}
@@ -331,11 +331,6 @@ export default function SortableSidebarNav({
           </span>
           <span className="admin-nav-label">{item.label}</span>
           {shared && showServiceSwitch ? <DualScopeBadge /> : null}
-          {asBusCard ? (
-            <span className="material-symbols-outlined admin-nav-row-chevron" aria-hidden>
-              chevron_right
-            </span>
-          ) : null}
         </button>
       </div>
     );
@@ -487,15 +482,12 @@ export default function SortableSidebarNav({
               </div>
             ) : null}
 
-            {showBusZone ? (
-              <div className="admin-nav-zone admin-nav-zone--buses">
-                <ZoneHeader
-                  tone="buses"
-                  icon="directions_bus"
-                  title="Λεωφορεία"
-                  subtitle="Εκδρομές, στόλος, GPS & KPIs"
-                />
-                {renderItemList(busItems, 'main')}
+            {showBusesPin && !showSharedZone ? (
+              <div className="admin-nav-zone admin-nav-zone--rent-hint">
+                <p className="admin-nav-rent-hint-text">
+                  Τα εργαλεία λεωφορείων ανοίγουν από την κάρτα <strong>Λεωφορεία</strong> κάτω —
+                  εκδρομές, στόλος, GPS και οδηγοί στα δεξιά.
+                </p>
               </div>
             ) : null}
 
@@ -504,6 +496,14 @@ export default function SortableSidebarNav({
                 <p className="admin-nav-rent-hint-text">
                   Τα εργαλεία ενοικίασης ανοίγουν από την κάρτα <strong>Ενοικιάσεις</strong> κάτω.
                   Για εκδρομές / οδηγούς πατήστε <strong>Όλα</strong> ή <strong>Λεωφ.</strong> πάνω.
+                </p>
+              </div>
+            ) : null}
+
+            {showServiceSwitch && serviceMode === 'buses' ? (
+              <div className="admin-nav-zone admin-nav-zone--rent-hint">
+                <p className="admin-nav-rent-hint-text">
+                  Ανοίξτε την κάρτα <strong>Λεωφορεία</strong> κάτω — το μενού εμφανίζεται δεξιά.
                 </p>
               </div>
             ) : null}
@@ -566,15 +566,17 @@ export default function SortableSidebarNav({
           </button>
         ) : null}
 
-        {showFleetOpsPin ? (
+        {showBusesPin ? (
           <button
             type="button"
-            onClick={() => openFleetOps(fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB)}
+            onClick={() =>
+              openBusesHub(busesHubActive ? activeTab : 'fleet_ops')
+            }
             className={`admin-nav-service-card admin-nav-service-card--buses${
-              fleetOpsActive ? ' is-active' : ''
+              busesHubActive ? ' is-active' : ''
             }`}
-            title="Λειτουργίες στόλου λεωφορείων"
-            aria-current={fleetOpsActive ? 'page' : undefined}
+            title="Λεωφορεία — εκδρομές, στόλος, GPS"
+            aria-current={busesHubActive ? 'page' : undefined}
           >
             <span className="admin-nav-service-card-icon" aria-hidden>
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>

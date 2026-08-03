@@ -58,6 +58,11 @@ import {
   isFleetOpsSubTab,
   sanitizeFleetOpsSubTab,
 } from '../lib/admin/fleetOpsHub.js';
+import {
+  DEFAULT_BUSES_HUB_TAB,
+  isBusesHubTab,
+  sanitizeBusesHubTab,
+} from '../lib/admin/busesHub.js';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import OfficeLogoChangeModal from '../components/admin/OfficeLogoChangeModal.jsx';
 import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
@@ -67,6 +72,7 @@ import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
 import FleetOpsHubNav from '../components/admin/fleet/FleetOpsHubNav.jsx';
 import FleetOpsHub from '../components/admin/fleet/FleetOpsHub.jsx';
 import RentDeskHub from '../components/admin/fleet/RentDeskHub.jsx';
+import BusesHub from '../components/admin/BusesHub.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
 import OfficeSetupWizard, {
@@ -2163,7 +2169,7 @@ export default function BackOffice() {
                 ? 'flex-1 overflow-auto p-4 md:p-5 lg:p-6'
                 : activeTab === 'fleet_live_map'
                   ? 'flex-1 overflow-auto p-2 sm:p-3 md:p-4'
-                : activeTab === 'fleet_ops' || activeTab === 'fleet_rental'
+                : isBusesHubTab(activeTab) || activeTab === 'fleet_rental'
                   ? 'flex-1 overflow-auto p-3 sm:p-4 md:pl-4 md:pr-5 md:py-5'
                 : 'flex-1 overflow-auto p-margin-mobile md:p-margin-desktop'
           }
@@ -2174,18 +2180,15 @@ export default function BackOffice() {
               activeTab === 'email_templates' ||
               activeTab === 'dashboard' ||
               activeTab === 'fleet_live_map' ||
-              activeTab === 'fleet_ops' ||
+              isBusesHubTab(activeTab) ||
               activeTab === 'fleet_rental'
                 ? 'w-full min-w-0'
                 : 'max-w-container-max mx-auto'
             }
           >
             {activeTab === 'dashboard' && renderDashboard()}
-            {activeTab === 'routes' && renderRoutes()}
             {activeTab === 'customers' && renderCustomers()}
             {activeTab === 'loyalty' && <LoyaltyRewardsPanel />}
-            {activeTab === 'fleet' && renderFleet()}
-            {activeTab === 'drivers' && renderDrivers()}
             {activeTab === 'settings' && (
               <div className="pb-stack-lg max-w-7xl">
                 <ImpersonationBanner />
@@ -2206,19 +2209,40 @@ export default function BackOffice() {
                 <FleetLiveMapWebSocket />
               </div>
             )}
-            {activeTab === 'fleet_ops' && (
+            {isBusesHubTab(activeTab) && (
               <div className="pb-stack-lg w-full">
-                <FleetOpsHub
-                  initialTab={fleetOpsSubTab}
-                  onSubTabChange={setFleetOpsSubTab}
-                  chatFocusDriverId={chatFocusDriverId}
-                  onOpenLiveMap={() => setActiveTab('fleet_live_map')}
-                  onOpenFleet={() => setActiveTab('fleet')}
-                  onOpenPayments={() => {
-                    setSettingsSubTab('payments');
-                    setActiveTab('settings');
+                <BusesHub
+                  activeTab={sanitizeBusesHubTab(activeTab)}
+                  onNavigate={(id) => {
+                    const next = sanitizeBusesHubTab(id || DEFAULT_BUSES_HUB_TAB);
+                    if (next === 'fleet_ops') {
+                      setFleetOpsSubTab(sanitizeFleetOpsSubTab(fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB));
+                      setActiveTab('fleet_ops');
+                      return;
+                    }
+                    setActiveTab(next);
                   }}
-                />
+                >
+                  {activeTab === 'routes' && renderRoutes()}
+                  {activeTab === 'fleet' && renderFleet()}
+                  {(activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab)) && (
+                    <FleetOpsHub
+                      embedded
+                      initialTab={fleetOpsSubTab}
+                      onSubTabChange={setFleetOpsSubTab}
+                      chatFocusDriverId={chatFocusDriverId}
+                      onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+                      onOpenFleet={() => setActiveTab('fleet')}
+                      onOpenPayments={() => {
+                        setSettingsSubTab('payments');
+                        setActiveTab('settings');
+                      }}
+                    />
+                  )}
+                  {activeTab === 'drivers' && renderDrivers()}
+                  {activeTab === 'lost_found' && renderLostFound()}
+                  {activeTab === 'bookings' && renderBookings()}
+                </BusesHub>
               </div>
             )}
             {activeTab === 'fleet_rental' && (
@@ -2236,7 +2260,6 @@ export default function BackOffice() {
                 />
               </div>
             )}
-            {activeTab === 'lost_found' && renderLostFound()}
             {activeTab === 'email' && (
               <EmailHub
                 intent={emailIntent}
@@ -2249,7 +2272,6 @@ export default function BackOffice() {
                 rentEnabled={rentMenuVisible}
               />
             )}
-            {activeTab === 'bookings' && renderBookings()}
           </div>
         </div>
       </main>
