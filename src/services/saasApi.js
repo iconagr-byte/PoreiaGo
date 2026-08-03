@@ -22,9 +22,11 @@ function notifySaasSessionChanged() {
 
 async function parseError(res) {
   if ([502, 503, 504].includes(res.status)) {
-    throw new Error(
+    const e = new Error(
       'Ο server είναι προσωρινά εκτός (deploy/αναβάθμιση). Περιμένετε ~1 λεπτό και δοκιμάστε ξανά.',
     );
+    e.status = res.status;
+    throw e;
   }
   const raw = await res.text().catch(() => '');
   let err = {};
@@ -32,19 +34,29 @@ async function parseError(res) {
     err = raw ? JSON.parse(raw) : {};
   } catch {
     if (/bad gateway|gateway time-out|503|502|504/i.test(raw)) {
-      throw new Error(
+      const e = new Error(
         'Ο server είναι προσωρινά εκτός (deploy/αναβάθμιση). Περιμένετε ~1 λεπτό και δοκιμάστε ξανά.',
       );
+      e.status = res.status;
+      throw e;
     }
   }
   let detail = err.detail ?? res.statusText ?? 'Request failed';
+  let code = null;
+  let seats = null;
   if (Array.isArray(detail)) {
     detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
   } else if (typeof detail === 'object' && detail) {
-    detail = JSON.stringify(detail);
+    code = detail.code || null;
+    seats = detail.seats || null;
+    detail = detail.message || JSON.stringify(detail);
   }
   const msg = String(detail || '').trim();
-  throw new Error(msg || `Αποτυχία αίτησης (${res.status})`);
+  const e = new Error(msg || `Αποτυχία αίτησης (${res.status})`);
+  e.status = res.status;
+  if (code) e.code = code;
+  if (seats) e.seats = seats;
+  throw e;
 }
 
 export function getSaasToken() {
@@ -310,6 +322,18 @@ export async function saasCreateGuestBooking(payload) {
       deposit_percent: payload.depositPercent ?? null,
     }),
   });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Public B2C — occupied seat codes for a trip (no passenger PII). */
+export async function fetchOccupiedSeats(externalTripId, tenantId) {
+  const tid = tenantId || getSaasTenantId();
+  const params = new URLSearchParams({
+    external_trip_id: String(externalTripId),
+  });
+  if (tid) params.set('tenant_id', tid);
+  const res = await fetch(`${API_BASE}/api/v1/bookings/occupied-seats?${params}`);
   if (!res.ok) await parseError(res);
   return res.json();
 }

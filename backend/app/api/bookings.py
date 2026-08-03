@@ -9,7 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas import BookingCreate, BookingResponse, GuestBookingCreate, GuestBookingLookup
+from app.api.schemas import (
+    BookingCreate,
+    BookingResponse,
+    GuestBookingCreate,
+    GuestBookingLookup,
+    OccupiedSeatsResponse,
+)
 from app.core.auth_deps import (
     apply_tenant_rls,
     get_client_ip,
@@ -24,6 +30,11 @@ from app.models.audit import AuditAction
 from app.models.booking import Booking, BookingStatus, PaymentStatus
 from app.models.user import UserRole
 from app.services.audit_service import AuditService
+from app.services.seat_occupancy import (
+    conflicting_seats,
+    load_occupied_seats_for_trip,
+    normalize_seat_code,
+)
 
 router = APIRouter(prefix="/bookings", tags=["SaaS Bookings"])
 
@@ -107,6 +118,29 @@ async def lookup_guest_booking(body: GuestBookingLookup, request: Request):
         return booking
 
 
+@router.get("/occupied-seats", response_model=OccupiedSeatsResponse)
+async def get_occupied_seats(
+    request: Request,
+    external_trip_id: int,
+    tenant_id: UUID | None = None,
+):
+    """Public B2C seat map — returns occupied seat codes only (no passenger data)."""
+    tid = await _resolve_guest_tenant(request, tenant_id)
+    async with AsyncSessionLocal() as db:
+        await apply_tenant_rls(db, tid)
+        taken = await load_occupied_seats_for_trip(
+            db,
+            tenant_id=tid,
+            external_trip_id=external_trip_id,
+        )
+    seats = sorted(taken)
+    return OccupiedSeatsResponse(
+        external_trip_id=external_trip_id,
+        seats=seats,
+        count=len(seats),
+    )
+
+
 @router.post(
     "/guest",
     response_model=BookingResponse,
@@ -119,10 +153,24 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
     total = Decimal(str(body.total_eur if body.total_eur is not None else body.amount_eur))
     paid_now = Decimal(str(body.amount_eur))
     balance = Decimal(str(body.balance_due)) if body.balance_due is not None else max(total - paid_now, Decimal("0"))
+    requested_seats = [
+        normalize_seat_code(s)
+        for s in (body.seats or [])
+        if normalize_seat_code(s)
+    ]
+    if not requested_seats and body.seat_label:
+        requested_seats = [
+            normalize_seat_code(part)
+            for part in str(body.seat_label).split(",")
+            if normalize_seat_code(part)
+        ]
+    seat_label = body.seat_label or (", ".join(requested_seats) if requested_seats else None)
+    if seat_label and len(seat_label) > 128:
+        seat_label = seat_label[:128]
     metadata = {
         "external_trip_id": body.external_trip_id,
         "trip_title": body.trip_title,
-        "seats": body.seats or [],
+        "seats": requested_seats,
         "payment_method": body.payment_method,
         "phone": body.phone,
         "source": "website_checkout",
@@ -144,6 +192,23 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         payment_status = PaymentStatus.PARTIAL if paid_now > 0 else PaymentStatus.PENDING
     async with AsyncSessionLocal() as db:
         await apply_tenant_rls(db, tenant_id)
+        if body.external_trip_id is not None and requested_seats:
+            occupied = await load_occupied_seats_for_trip(
+                db,
+                tenant_id=tenant_id,
+                external_trip_id=int(body.external_trip_id),
+                for_update=True,
+            )
+            clashes = conflicting_seats(requested_seats, occupied)
+            if clashes:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    detail={
+                        "message": f"Οι θέσεις είναι ήδη κατειλημμένες: {', '.join(clashes)}",
+                        "code": "seat_conflict",
+                        "seats": clashes,
+                    },
+                )
         booking = Booking(
             tenant_id=tenant_id,
             trip_id=None,
@@ -151,7 +216,7 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
             reference_code=ref,
             status=booking_status,
             payment_status=payment_status,
-            seat_label=body.seat_label,
+            seat_label=seat_label,
             passenger_name=body.passenger_name,
             passenger_email=body.passenger_email,
             total_price=total,
@@ -205,7 +270,7 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
             meta = metadata
             trip_id = int(meta.get("external_trip_id") or 1)
             seats = meta.get("seats") or []
-            seat_label = body.seat_label or (", ".join(seats) if seats else "—")
+            seat_label = seat_label or (", ".join(seats) if seats else "—")
             await upsert_ticket_booking(
                 local_id=f"B-{ref}",
                 trip_id=trip_id,

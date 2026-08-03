@@ -8,33 +8,20 @@ import toast from 'react-hot-toast';
 import { listPublishedTrips, loadTrips } from '../../lib/trips/tripStore.js';
 import { getLayoutForVehicle } from '../../lib/seats/busLayouts.js';
 import { resolveTripSeatMapTheme } from '../../lib/seats/seatMapThemes.js';
+import {
+  findSeatConflicts,
+  normalizeSeatCode,
+  seatsTakenForTrip,
+} from '../../lib/seats/occupiedSeats.js';
 import { loadBookings, createBookingFromCheckout, recordCashPayment } from '../../lib/ticketing/bookingStore.js';
 import { PAYMENT_PLAN_FULL, roundMoney } from '../../lib/payments/depositPayment.js';
 import LuxuryBusSeatMap from '../seats/LuxuryBusSeatMap.jsx';
 import SeatSelectionAside from '../seats/SeatSelectionAside.jsx';
 
-function seatsTakenForTrip(tripId, bookings) {
-  const taken = new Set();
-  const tid = String(tripId ?? '');
-  for (const b of bookings || []) {
-    if (String(b.tripId ?? '') !== tid) continue;
-    const status = String(b.status || '').toLowerCase();
-    if (status.includes('ακυρ') || status === 'cancelled' || status === 'refunded') continue;
-    const list = Array.isArray(b.seats)
-      ? b.seats
-      : String(b.seat || '')
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-    list.forEach((s) => taken.add(String(s).trim()));
-  }
-  return taken;
-}
-
 /** Map seats for LuxuryBusSeatMap — real occupancy from office bookings. */
 function buildMapSeats(trip, bookings) {
   const layout = getLayoutForVehicle(trip?.vehicleType);
-  const taken = seatsTakenForTrip(trip?.id, bookings);
+  const taken = seatsTakenForTrip(trip, bookings);
   const unit = Number(trip?.price) || 0;
   const seats = [];
   for (let row = 1; row <= layout.rows; row += 1) {
@@ -46,7 +33,7 @@ function buildMapSeats(trip, bookings) {
         row,
         col,
         isVip: layout.vipRows.includes(row),
-        status: taken.has(number) ? 'BOOKED' : 'AVAILABLE',
+        status: taken.has(normalizeSeatCode(number)) ? 'BOOKED' : 'AVAILABLE',
         priceEur: unit,
       });
     }
@@ -108,7 +95,15 @@ export default function OfficeExcursionBookingModal({
 
   const liveBookings = useMemo(() => {
     if (!open) return [];
-    return Array.isArray(bookingsProp) && bookingsProp.length ? bookingsProp : loadBookings();
+    // Prefer prop when present; always merge fresh local so concurrent desk bookings show.
+    const fromProp = Array.isArray(bookingsProp) ? bookingsProp : [];
+    const local = loadBookings();
+    if (!fromProp.length) return local;
+    const map = new Map();
+    for (const b of [...local, ...fromProp]) {
+      map.set(b.saasBookingId || b.id, b);
+    }
+    return [...map.values()];
   }, [open, bookingsProp, bookingsTick]);
 
   const filteredTrips = useMemo(() => {
@@ -184,6 +179,16 @@ export default function OfficeExcursionBookingModal({
     }
     if (!selectedSeats.length) {
       toast.error('Επιλέξτε τουλάχιστον μία θέση');
+      return;
+    }
+    const freshTaken = seatsTakenForTrip(trip, loadBookings());
+    const conflicts = findSeatConflicts(selectedSeats, freshTaken);
+    if (conflicts.length) {
+      toast.error(`Οι θέσεις είναι ήδη κατειλημμένες: ${conflicts.join(', ')}`);
+      setBookingsTick((n) => n + 1);
+      setSelectedSeats((prev) =>
+        prev.filter((s) => !conflicts.includes(normalizeSeatCode(s))),
+      );
       return;
     }
     setBusy(true);
