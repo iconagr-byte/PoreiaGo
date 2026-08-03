@@ -46,6 +46,7 @@ import {
   rentCategoryLabel,
   RENT_CATEGORY_OPTIONS,
 } from '../../../lib/rental/rentVehicleCategories.js';
+import { LIVE_REFRESH_MS } from '../../../lib/liveRefresh.js';
 import '../../../styles/rental-admin-apple.css';
 
 const TABS = RENT_DESK_TABS;
@@ -231,6 +232,29 @@ export default function FleetRentalPanel({
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Soft live refresh on paperwork / inspections — signatures from tablet or remote
+  // must appear without a full page reload.
+  useEffect(() => {
+    if (tab !== 'paperwork' && tab !== 'inspections') return undefined;
+    let cancelled = false;
+    const softReload = async () => {
+      try {
+        const [b, i] = await Promise.all([fetchRentalBookings(), fetchRentalInspections()]);
+        if (cancelled) return;
+        setBookings(b);
+        setInspections(i);
+      } catch {
+        /* keep last good snapshot */
+      }
+    };
+    softReload();
+    const id = window.setInterval(softReload, LIVE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [tab]);
 
   const activeBookings = useMemo(
     () => bookings.filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.rental_status)),
@@ -1241,6 +1265,13 @@ export default function FleetRentalPanel({
               return [updated, ...prev];
             });
             void reload();
+          }}
+          onInspectionsUpdated={(fresh, bookingId) => {
+            if (!bookingId || !Array.isArray(fresh)) return;
+            setInspections((prev) => {
+              const others = (prev || []).filter((i) => i.rental_booking_id !== bookingId);
+              return [...fresh, ...others];
+            });
           }}
           onToast={(kind, message) => {
             if (kind === 'error') toast.error(message);
