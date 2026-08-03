@@ -252,6 +252,26 @@ def booking_to_admin_dict(
     else:
         payment_status = meta.get("payment_status") or status.value.upper()
 
+    taxes = float(meta.get("taxes") if meta.get("taxes") is not None else round(total_eur * 0.24, 2))
+    base_price = float(
+        meta.get("base_price") if meta.get("base_price") is not None else round(total_eur - taxes, 2)
+    )
+
+    trip_date = created.strftime("%Y-%m-%d") if created else ""
+    trip_time = created.strftime("%H:%M") if created else ""
+    dep_raw = meta.get("departure_at")
+    if dep_raw:
+        try:
+            dep = datetime.fromisoformat(str(dep_raw).replace("Z", "+00:00"))
+            trip_date = dep.strftime("%Y-%m-%d")
+            trip_time = dep.strftime("%H:%M")
+        except ValueError:
+            pass
+
+    boarding = meta.get("boarding_pass_issued")
+    if boarding is None:
+        boarding = paid or status in (BookingStatus.CONFIRMED, BookingStatus.PAID, BookingStatus.BOARDED)
+
     result = {
         "id": local_id_from_reference(booking.reference_code),
         "saasBookingId": str(booking.id),
@@ -260,8 +280,8 @@ def booking_to_admin_dict(
         "customerId": str(booking.customer_user_id) if booking.customer_user_id else None,
         "tripTitle": meta.get("trip_title") or "—",
         "tripId": trip_id,
-        "date": created.strftime("%Y-%m-%d") if created else "",
-        "time": created.strftime("%H:%M") if created else "",
+        "date": trip_date,
+        "time": trip_time,
         "seats": seats,
         "seat": booking.seat_label or ", ".join(seats),
         "price": total_eur,
@@ -271,6 +291,8 @@ def booking_to_admin_dict(
         "paymentPlan": payment_plan,
         "depositPercent": deposit_percent if balance_due > 0 else None,
         "balanceDueMethod": meta.get("balance_due_method"),
+        "basePrice": base_price,
+        "taxes": taxes,
         "status": greek_status,
         "checkInStatus": check_in_status,
         "checkedIn": checked_in,
@@ -278,9 +300,16 @@ def booking_to_admin_dict(
         "email": booking.passenger_email or "",
         "paymentStatus": payment_status,
         "paymentMethod": meta.get("payment_method") or "Online",
+        "paymentDate": meta.get("payment_date")
+        or (created.strftime("%Y-%m-%d %H:%M:%S") if created and amount_paid > 0 else None),
+        "transactionId": meta.get("transaction_id") or f"TXN-{booking.id}",
+        "invoiceNumber": meta.get("invoice_number")
+        or f"INV-{(booking.reference_code or '').replace('BK-', '')}",
         "pnr": booking.reference_code,
-        "boardingPassIssued": paid,
+        "ticketRef": meta.get("ticket_ref") or booking.reference_code,
+        "boardingPassIssued": bool(boarding),
         "bookingSource": meta.get("source") or "Postgres",
+        "agentName": meta.get("agent_name") or "",
         "passenger_vat_id": booking.passenger_vat_id,
         "notes": booking.notes,
         "tenant_id": str(booking.tenant_id) if getattr(booking, "tenant_id", None) else None,

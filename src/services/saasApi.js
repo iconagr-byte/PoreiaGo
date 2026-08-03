@@ -320,6 +320,9 @@ export async function saasCreateGuestBooking(payload) {
       total_eur: payload.totalEur ?? null,
       balance_due: payload.balanceDue ?? null,
       deposit_percent: payload.depositPercent ?? null,
+      source: payload.source ?? null,
+      agent_name: payload.agentName ?? null,
+      departure_at: payload.departureAt ?? null,
     }),
   });
   if (!res.ok) await parseError(res);

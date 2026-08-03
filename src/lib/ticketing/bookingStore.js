@@ -411,13 +411,16 @@ export async function createBookingFromCheckout({
         amountEur: paidNow,
         externalTripId: trip.id,
         tripTitle: trip.title,
-        paymentMethod: paymentMethodMeta,
+        paymentMethod: paymentMethod || paymentMethodMeta,
         phone: passenger.phone.trim(),
         seats: seatList,
         paymentPlan,
         totalEur: total,
         balanceDue: remaining,
         depositPercent: pct,
+        source: bookingSource || 'Website (B2C)',
+        agentName: agentName || 'Online Auto',
+        departureAt: trip.departureTime || null,
       });
       const booking = applyBankTransferPending(
         buildLocalBooking({
@@ -607,6 +610,19 @@ export async function recordCashPayment(bookingId, payload = {}) {
       ? { ...saved, lastCashAmount: payload.amount }
       : saved;
     mergeBookingsIntoStore([normalized]);
+    try {
+      const sync = await syncTicketForBoarding({
+        ...normalized,
+        paymentStatus: normalized.paymentStatus || 'PAID',
+      });
+      if (sync?.ticket_ref) {
+        updateBooking(normalized.id, { ticketRef: sync.ticket_ref, boardingPassIssued: true });
+        normalized.ticketRef = sync.ticket_ref;
+        normalized.boardingPassIssued = true;
+      }
+    } catch (syncErr) {
+      console.warn('[cash] ticket re-sync failed', syncErr);
+    }
     notifyPaymentConfirmationSafe(normalized, { event: PAYMENT_NOTIFY_EVENTS.CASH_PAYMENT });
     return normalized;
   } catch (err) {
