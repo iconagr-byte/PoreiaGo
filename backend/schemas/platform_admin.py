@@ -427,6 +427,11 @@ class DriverShiftPushRequest(BaseModel):
     driver_id: str | None = None
     message: str | None = Field(default=None, max_length=240)
     trip_title: str | None = Field(default=None, max_length=120)
+    frontend_base: str | None = Field(
+        default=None,
+        max_length=300,
+        description="Public driver app origin for magic-link auth_url",
+    )
 
 
 class DriverShiftPushResponse(BaseModel):
