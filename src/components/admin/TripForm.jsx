@@ -7,7 +7,6 @@ import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripI
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import LocationPicker from './LocationPicker.jsx';
-import HybridTimelineBuilder from './hybrid/HybridTimelineBuilder.jsx';
 import HybridCostCalculator from './hybrid/HybridCostCalculator.jsx';
 import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
@@ -949,14 +948,6 @@ export default function TripForm({
             </button>
           </div>
         </div>
-      </Section>
-
-      <Section
-        icon="connecting_airports"
-        title="Hybrid χρονολόγιο (έδαφος + αέρας)"
-        hint="Συνδυάστε hotel transfer, πτήσεις και τοπικά van σε ενιαία ακολουθία."
-      >
-        <HybridTimelineBuilder formData={formData} setFormData={setFormData} tripId={tripId} />
       </Section>
 
       <Section
