@@ -547,6 +547,20 @@ export async function createFleetVehicle(payload) {
   return res.json();
 }
 
+/** Upload fleet bus photo — returns `{ ok, url }` for public_image_url / gallery_urls. */
+export async function uploadFleetVehiclePhoto(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await adminFetch('/api/admin/platform/fleet/vehicles/photo-upload', {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    await parseError(res);
+  }
+  return res.json();
+}
+
 export async function fetchFleetVehicle(vehicleId) {
   const res = await adminFetch(
     `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}`,

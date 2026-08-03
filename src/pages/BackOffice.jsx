@@ -68,6 +68,7 @@ import {
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import OfficeLogoChangeModal from '../components/admin/OfficeLogoChangeModal.jsx';
 import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
+import FleetVehiclesBoard from '../components/admin/FleetVehiclesBoard.jsx';
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
 import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
@@ -1395,154 +1396,22 @@ export default function BackOffice() {
           }}
         />
 
-        <p className="text-xs text-on-surface-variant">
-          Κλικ σε γραμμή για πάνελ ανάλυσης · διπλό κλικ για πλήρες προφίλ οχήματος.
-        </p>
-
-        {/* Detailed Table (Hybrid Bottom) */}
-        <div
-          id="fleet-vehicle-table"
-          className="bg-white rounded-[32px] shadow-sm border border-black/[0.05] flex flex-col overflow-hidden"
-        >
-          <div className="flex-1 overflow-x-auto p-2">
-            <table className="min-w-full divide-y divide-gray-100">
-              <thead>
-                <tr>
-                  <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Όχημα</th>
-                  <th className="px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Κατάσταση</th>
-                  <th className="px-6 py-4 bg-white text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Χιλιόμετρα</th>
-                  <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Service</th>
-                  <th className="px-6 py-4 bg-white text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Οικονομικά (Έσοδα/Έξοδα)</th>
-                  <th className="px-4 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-16"> </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-16 text-center">
-                      <span className="material-symbols-outlined text-4xl text-gray-300 mb-3 block">directions_bus</span>
-                      <p className="font-bold text-gray-900 mb-1">Δεν υπάρχουν οχήματα στον στόλο</p>
-                      <p className="text-sm text-gray-500 mb-4">
-                        Πρόσθεσε λεωφορείο, coach ή van για να ξεκινήσεις.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setAddVehicleOpen(true)}
-                        className="px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-bold inline-flex items-center gap-2"
-                      >
-                        <span className="material-symbols-outlined text-sm">add</span>
-                        Νέο όχημα
-                      </button>
-                    </td>
-                  </tr>
-                )}
-                {rows.map(bus => {
-                  const kmUntilService = Number(bus.nextServiceKm || 0) - Number(bus.kilometers || 0);
-                  const needsServiceSoon = kmUntilService < 5000 || bus.service_status === 'Warning' || bus.service_status === 'Urgent';
-                  const isVan = String(bus.type || '').toLowerCase().includes('van');
-                  
-                  return (
-                    <tr
-                      key={bus.id}
-                      onClick={() => setSelectedFleetVehicleId(bus.id)}
-                      onDoubleClick={() => navigate(`/admin/fleet/${bus.id}`)}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer group"
-                      title="Κλικ για ανάλυση / διπλό κλικ για προφίλ"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl bg-surface-container-low text-primary flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                            <span className="material-symbols-outlined text-[24px]">
-                              {isVan ? 'airport_shuttle' : 'directions_bus'}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="font-bold text-gray-900">{bus.name} <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full ml-2">{bus.type} • {bus.seats} Θέσεις</span></div>
-                            <div className="text-sm font-mono text-gray-500 mt-0.5">{bus.licensePlate} • ID: {bus.id}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
-                          bus.status === 'Ενεργό' ? 'bg-green-50 text-green-700 border border-green-200' :
-                          'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                          {bus.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="font-bold text-gray-900">{Number(bus.kilometers || 0).toLocaleString()} km</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-left">
-                        <div className="text-sm text-gray-900">Τελευταίο: {bus.lastService}</div>
-                        <div className={`text-xs mt-1 flex items-center gap-1 ${needsServiceSoon && bus.status === 'Ενεργό' ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                          {needsServiceSoon && bus.status === 'Ενεργό' && <span className="material-symbols-outlined text-[14px]">warning</span>}
-                          Επόμενο σε {kmUntilService.toLocaleString()} km
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="font-bold text-emerald-600 mb-1">+€{bus.financials.revenue.toLocaleString()}</div>
-                        <div className="font-bold text-rose-500 text-xs">-€{bus.financials.expenses.toLocaleString()}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-center">
-                        <button
-                          type="button"
-                          disabled={deletingFleetId === bus.id}
-                          onClick={(e) => handleDeleteFleetVehicle(e, bus.id, bus.name)}
-                          className="p-2 rounded-full text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity disabled:opacity-40"
-                          title="Διαγραφή οχήματος"
-                          aria-label={`Διαγραφή ${bus.name}`}
-                        >
-                          <span className="material-symbols-outlined text-[20px]">delete</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {selectedFleetVehicleId && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl border border-black/[0.05] p-5">
-              <div className="text-xs text-gray-500 font-bold uppercase mb-1">Αναφορά κόστους (6 μήνες)</div>
-              <div className="text-2xl font-bold text-primary mb-3">€{Number(fleetCostReport?.total || 0).toLocaleString('el-GR')}</div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">Συντήρηση</span><span className="font-semibold">€{Number(fleetCostReport?.maintenance_total || 0).toLocaleString('el-GR')}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Καύσιμα</span><span className="font-semibold">€{Number(fleetCostReport?.fuel_total || 0).toLocaleString('el-GR')}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Ασφάλιση</span><span className="font-semibold">€{Number(fleetCostReport?.insurance_total || 0).toLocaleString('el-GR')}</span></div>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-black/[0.05] p-5">
-              <div className="text-xs text-gray-500 font-bold uppercase mb-1">Απόσβεση</div>
-              <div className="text-2xl font-bold text-emerald-600 mb-1">€{Number(fleetDepreciation?.estimated_book_value || 0).toLocaleString('el-GR')}</div>
-              <div className="text-sm text-gray-500">Εκτιμώμενη λογιστική αξία</div>
-              <div className="mt-3 text-sm text-gray-700">
-                Ηλικία: <span className="font-semibold">{fleetDepreciation?.age_years ?? '-'} έτη</span>
-              </div>
-              <div className="text-sm text-gray-700">
-                Συντελεστής χιλιομέτρων: <span className="font-semibold">{fleetDepreciation?.mileage_factor ?? '-'}</span>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-black/[0.05] p-5">
-              <div className="text-xs text-gray-500 font-bold uppercase mb-2">Τελευταία service</div>
-              <div className="space-y-2 max-h-40 overflow-auto">
-                {fleetVehicleEvents.slice(0, 4).map((e) => (
-                  <div key={e.id} className="rounded-xl bg-slate-50 p-2.5">
-                    <div className="text-sm font-semibold text-gray-900">{e.service_type} · €{Number(e.cost || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">{e.event_date} · {e.shop_or_mechanic || '—'}</div>
-                  </div>
-                ))}
-                {fleetVehicleEvents.length === 0 && (
-                  <p className="text-sm text-gray-500">Δεν υπάρχουν καταγεγραμμένα service events.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <FleetVehiclesBoard
+          vehicles={fleetVehicles}
+          selectedId={selectedFleetVehicleId}
+          onSelect={setSelectedFleetVehicleId}
+          onDelete={handleDeleteFleetVehicle}
+          deletingId={deletingFleetId}
+          costReport={fleetCostReport}
+          depreciation={fleetDepreciation}
+          events={fleetVehicleEvents}
+          onVehicleUpdated={(updated) => {
+            if (!updated?.id) return;
+            setFleetVehicles((prev) =>
+              prev.map((v) => (v.id === updated.id ? { ...v, ...updated } : v)),
+            );
+          }}
+        />
 
         {serviceModalOpen && (
           <div className="fixed inset-0 z-[210] bg-black/40 flex items-center justify-center p-4">

@@ -1,12 +1,24 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { createFleetVehicle } from '../../services/platformApi.js';
+import { createFleetVehicle, uploadFleetVehiclePhoto } from '../../services/platformApi.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 const CATEGORIES = [
   { id: 'Luxury Coach', label: 'Luxury Coach', seats: 50 },
   { id: 'Premium Express', label: 'Premium Express', seats: 32 },
   { id: 'Standard', label: 'Standard Coach', seats: 55 },
   { id: 'Van', label: 'Van / Minibus', seats: 9 },
+];
+
+const AMENITY_PRESETS = [
+  'Wi-Fi onboard',
+  'USB θύρες',
+  'Κλιματισμός',
+  'Θέρμανση',
+  'Ανακλινόμενα καθίσματα',
+  'WC onboard',
+  'Ψυγείο',
+  'Αποσκευές',
 ];
 
 const EMPTY = {
@@ -20,11 +32,18 @@ const EMPTY = {
   seat_count: 55,
   show_on_website: true,
   public_summary: '',
+  service_interval_km: 15000,
+  purchase_price: 100000,
+  amenities: ['Κλιματισμός', 'USB θύρες'],
+  public_image_url: '',
+  gallery_urls: [],
 };
 
 export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
 
   if (!open) return null;
 
@@ -33,6 +52,33 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
   const onCategory = (category) => {
     const meta = CATEGORIES.find((c) => c.id === category) || CATEGORIES[2];
     setForm((f) => ({ ...f, category, seat_count: meta.seats }));
+  };
+
+  const onPickPhotos = async (fileList) => {
+    if (!fileList?.length) return;
+    setUploading(true);
+    try {
+      const uploaded = [];
+      for (const file of Array.from(fileList).slice(0, 6)) {
+        const res = await uploadFleetVehiclePhoto(file);
+        if (res?.url) uploaded.push(res.url);
+      }
+      if (!uploaded.length) throw new Error('Δεν ανέβηκε καμία φωτογραφία');
+      setForm((f) => {
+        const gallery_urls = [...(f.gallery_urls || []), ...uploaded];
+        return {
+          ...f,
+          gallery_urls,
+          public_image_url: f.public_image_url || uploaded[0],
+        };
+      });
+      toast.success(uploaded.length > 1 ? `Προστέθηκαν ${uploaded.length} φωτογραφίες` : 'Προστέθηκε φωτογραφία');
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία ανεβάσματος');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
 
   const onSubmit = async (e) => {
@@ -58,6 +104,11 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
         seat_count: Number(form.seat_count) || 9,
         show_on_website: Boolean(form.show_on_website),
         public_summary: form.public_summary.trim(),
+        service_interval_km: Number(form.service_interval_km) || 15000,
+        purchase_price: Number(form.purchase_price) || 0,
+        amenities: form.amenities || [],
+        public_image_url: form.public_image_url || '',
+        gallery_urls: form.gallery_urls || [],
       });
       toast.success(`Προστέθηκε: ${vehicle.make} ${vehicle.model}`);
       setForm(EMPTY);
@@ -109,6 +160,75 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
                 {c.label}
               </button>
             ))}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-gray-700">Φωτογραφίες</span>
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={() => fileRef.current?.click()}
+                className="text-xs font-bold text-sky-700 hover:underline disabled:opacity-50"
+              >
+                {uploading ? 'Ανέβασμα…' : '+ Προσθήκη'}
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => onPickPhotos(e.target.files)}
+              />
+            </div>
+            {form.gallery_urls?.length ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {form.gallery_urls.map((url) => (
+                  <div
+                    key={url}
+                    className={`relative w-20 h-14 rounded-xl overflow-hidden border shrink-0 ${
+                      url === form.public_image_url
+                        ? 'border-sky-500 ring-2 ring-sky-200'
+                        : 'border-black/[0.08]'
+                    }`}
+                  >
+                    <img
+                      src={resolveSiteAssetUrl(url)}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                      onClick={() =>
+                        setForm((f) => {
+                          const gallery_urls = f.gallery_urls.filter((u) => u !== url);
+                          return {
+                            ...f,
+                            gallery_urls,
+                            public_image_url:
+                              f.public_image_url === url
+                                ? gallery_urls[0] || ''
+                                : f.public_image_url,
+                          };
+                        })
+                      }
+                    >
+                      <span className="material-symbols-outlined text-[12px]">close</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="w-full rounded-2xl border border-dashed border-slate-300 py-6 text-sm text-slate-500 hover:bg-slate-50"
+              >
+                Σύρε ή επίλεξε φωτογραφίες του λεωφορείου
+              </button>
+            )}
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -186,6 +306,27 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
                 onChange={(e) => setField('seat_count', e.target.value)}
               />
             </label>
+            <label className="block text-sm">
+              <span className="font-bold text-gray-700">Διάστημα service (km)</span>
+              <input
+                type="number"
+                min={1000}
+                className="mt-1 w-full rounded-xl border px-3 py-2"
+                value={form.service_interval_km}
+                onChange={(e) => setField('service_interval_km', e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-bold text-gray-700">Τιμή αγοράς (€)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                className="mt-1 w-full rounded-xl border px-3 py-2"
+                value={form.purchase_price}
+                onChange={(e) => setField('purchase_price', e.target.value)}
+              />
+            </label>
             <label className="block text-sm sm:col-span-2">
               <span className="font-bold text-gray-700">Σύντομη περιγραφή (website)</span>
               <input
@@ -195,6 +336,35 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
                 onChange={(e) => setField('public_summary', e.target.value)}
               />
             </label>
+            <div className="sm:col-span-2">
+              <div className="text-sm font-bold text-gray-700 mb-2">Παροχές</div>
+              <div className="flex flex-wrap gap-2">
+                {AMENITY_PRESETS.map((name) => {
+                  const on = form.amenities.includes(name);
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          amenities: on
+                            ? f.amenities.filter((a) => a !== name)
+                            : [...f.amenities, name],
+                        }))
+                      }
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border ${
+                        on
+                          ? 'bg-sky-600 text-white border-sky-600'
+                          : 'bg-white text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <label className="flex items-center gap-2 text-sm font-bold text-gray-700 sm:col-span-2">
               <input
                 type="checkbox"
