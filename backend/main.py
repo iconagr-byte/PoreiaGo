@@ -78,8 +78,12 @@ except ImportError:
 
 try:
     from api.admin_platform import router as admin_platform_router
-except ImportError:
+except Exception as exc:
     admin_platform_router = None
+    __import__("logging").getLogger("poreiago.boot").exception(
+        "CRITICAL: admin_platform router failed to import — /api/admin/platform/drivers will 404: %s",
+        exc,
+    )
 
 try:
     from api.admin_telemetry import router as admin_telemetry_router

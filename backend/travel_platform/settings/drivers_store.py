@@ -278,6 +278,17 @@ _ACHILLIO_HOME_EMAILS = frozenset(
     }
 )
 
+# Profiles used only when a home driver row is missing entirely (recreate).
+_ACHILLIO_HOME_PROFILES: dict[str, dict] = {
+    "axilleas0@yahoo.gr": {
+        "name": "Αχιλλέας Χαραλαμπίδης",
+        "license_no": "AXILLEAS-HOME-LIC",
+        "phone": "+306900000001",
+        # Admin can reset from Οδηγοί → Επεξεργασία; default unlocks /driver login.
+        "password": DEFAULT_DRIVER_PASSWORD,
+    },
+}
+
 
 def find_drivers_by_email(email: str) -> list[FleetDriver]:
     needle = _normalize_username(email)
@@ -292,10 +303,11 @@ def find_drivers_by_email(email: str) -> list[FleetDriver]:
 
 def rehome_driver_to_tenant(email: str, tenant_id: str, *, only_from_demo: bool = True) -> dict:
     """
-    Move DEMO orphan rows with this email onto ``tenant_id``.
+    Move driver rows with this email onto ``tenant_id``.
 
-    SEAL: never steal a driver from a real office (PoreiaGo ↔ Achillio).
-    Boot repair may only claim DEMO leftovers.
+    Default SEAL: only DEMO orphans (never steal from a real office).
+    Known Achillio home emails may pass ``only_from_demo=False`` so boot repair
+    can pull Achilleas back from PoreiaGo/DEMO after a cross-office mishap.
     """
     tid = _normalize_tenant_id(tenant_id)
     if not tid or tid == DEMO_TENANT_ID:
@@ -339,8 +351,85 @@ def rehome_driver_to_tenant(email: str, tenant_id: str, *, only_from_demo: bool 
     }
 
 
+def ensure_home_driver_on_tenant(email: str, tenant_id: str) -> dict:
+    """
+    Make sure a known home driver exists on ``tenant_id``.
+
+    1) Force-rehome any existing row (even from another real office).
+    2) If missing entirely, recreate from ``_ACHILLIO_HOME_PROFILES``.
+    """
+    email_n = _normalize_username(email)
+    tid = _normalize_tenant_id(tenant_id)
+    if not email_n or not tid or tid == DEMO_TENANT_ID:
+        return {"ok": False, "reason": "invalid_args", "email": email}
+
+    existing = find_drivers_by_email(email_n)
+    if existing:
+        report = rehome_driver_to_tenant(email_n, tid, only_from_demo=False)
+        on_home = [d for d in find_drivers_by_email(email_n) if _driver_tenant_id(d) == tid]
+        return {
+            "ok": True,
+            "action": "rehomed" if report.get("moved") else "already_home",
+            "email": email_n,
+            "tenant_id": tid,
+            "ids": [d.id for d in on_home],
+            "rehome": report,
+        }
+
+    profile = _ACHILLIO_HOME_PROFILES.get(email_n)
+    if not profile:
+        return {"ok": False, "reason": "no_profile", "email": email_n}
+
+    # License may collide with a leftover row — uniquify once.
+    license_no = str(profile.get("license_no") or "HOME-LIC")
+    try:
+        created = create_driver(
+            {
+                "name": profile.get("name") or email_n,
+                "license_no": license_no,
+                "phone": profile.get("phone") or "",
+                "email": email_n,
+                "password": profile.get("password") or DEFAULT_DRIVER_PASSWORD,
+                "status": "active",
+                "tenant_id": tid,
+                "_allow_demo_tenant": False,
+            }
+        )
+    except ValueError as exc:
+        # Retry with a unique license if the fixed one is taken.
+        if "άδειας" in str(exc) or "license" in str(exc).lower():
+            created = create_driver(
+                {
+                    "name": profile.get("name") or email_n,
+                    "license_no": f"{license_no}-{uuid4().hex[:6].upper()}",
+                    "phone": profile.get("phone") or "",
+                    "email": email_n,
+                    "password": profile.get("password") or DEFAULT_DRIVER_PASSWORD,
+                    "status": "active",
+                    "tenant_id": tid,
+                }
+            )
+        else:
+            return {"ok": False, "reason": "create_failed", "detail": str(exc), "email": email_n}
+
+    logger.warning(
+        "ENSURE home driver created %s (%s) on tenant %s",
+        created.id,
+        created.email,
+        tid,
+    )
+    return {
+        "ok": True,
+        "action": "created",
+        "email": email_n,
+        "tenant_id": tid,
+        "ids": [created.id],
+        "password_reset_to_default": True,
+    }
+
+
 async def repair_achillio_home_drivers() -> dict:
-    """Boot repair: known Achillio drivers must not stay on PoreiaGo/DEMO."""
+    """Boot repair: known Achillio drivers must not stay on PoreiaGo/DEMO — recreate if gone."""
     try:
         from sqlalchemy import select
 
@@ -366,7 +455,7 @@ async def repair_achillio_home_drivers() -> dict:
 
     reports = []
     for email in _ACHILLIO_HOME_EMAILS:
-        reports.append(rehome_driver_to_tenant(email, achillio_tid))
+        reports.append(ensure_home_driver_on_tenant(email, achillio_tid))
     return {"ok": True, "achillio_tenant_id": achillio_tid, "reports": reports}
 
 
