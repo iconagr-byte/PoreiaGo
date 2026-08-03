@@ -121,8 +121,14 @@
 }
 
 .admin-nav-zone--shared {
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(255, 255, 255, 0.4) 100%);
-  border: 1px solid color-mix(in srgb, #94a3b8 16%, transparent);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid color-mix(in srgb, #94a3b8 18%, transparent);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  padding: 0.55rem 0.4rem 0.45rem;
+}
+
+.admin-nav-zone--shared-cards {
+  padding-bottom: 0.55rem;
 }
 
 .admin-nav-zone--buses {
@@ -197,7 +203,7 @@
   line-height: 1.2;
 }
 
-/* Dual bus+car badge on shared items */
+/* Dual bus+car badge on shared items (legacy / flat list) */
 .admin-nav-dual-badge {
   display: inline-flex;
   align-items: center;
@@ -231,7 +237,42 @@
   font-variation-settings: 'FILL' 1;
 }
 
+/* Compact “Κοινό” chip on card-style shared rows */
+.admin-nav-shared-chip {
+  flex-shrink: 0;
+  margin-left: 0.25rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid color-mix(in srgb, #94a3b8 22%, transparent);
+  line-height: 1.2;
+}
+
+.admin-nav-btn--mini-card .admin-nav-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-nav-btn--mini-card .admin-nav-mini-chevron {
+  margin-left: 0.1rem;
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn-active .admin-nav-shared-chip,
+.admin-nav-btn--mini-card:hover .admin-nav-shared-chip {
+  background: #e2e8f0;
+  color: #475569;
+}
+
 .admin-nav-btn--shared {
+  padding-right: 0.4rem;
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn--shared {
   padding-right: 0.4rem;
 }
 
@@ -242,8 +283,26 @@
   border-color: color-mix(in srgb, #94a3b8 28%, transparent);
 }
 
+.admin-nav-btn--mini-card[data-accent='shared']:hover,
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='shared'] {
+  background: #fff;
+  border-color: color-mix(in srgb, #64748b 32%, transparent);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+}
+
 .admin-nav-btn[data-accent='shared'] .admin-nav-icon {
   color: #64748b;
+}
+
+.admin-nav-btn--mini-card[data-accent='shared'] .admin-nav-icon--circle {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='shared'] .admin-nav-icon--circle {
+  background: #cbd5e1;
+  color: #334155;
 }
 
 /* Pinned service cards (Rent / Fleet ops) */
@@ -278,13 +337,13 @@
   border-radius: 50%;
   pointer-events: none;
   filter: blur(18px);
-  opacity: 0.55;
+  opacity: 0.35;
 }
 
 .admin-nav-service-card--rent {
-  background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 55%, #ecfeff 100%);
-  border-color: color-mix(in srgb, #14b8a6 28%, transparent);
-  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.08);
+  background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 70%);
+  border-color: color-mix(in srgb, #14b8a6 22%, transparent);
+  box-shadow: 0 2px 10px rgba(13, 148, 136, 0.06);
 }
 
 .admin-nav-service-card--rent .admin-nav-service-card-glow {
@@ -293,29 +352,31 @@
 
 .admin-nav-service-card--rent.is-active,
 .admin-nav-service-card--rent:hover {
-  border-color: color-mix(in srgb, #0f766e 45%, transparent);
-  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.14);
+  border-color: color-mix(in srgb, #0f766e 40%, transparent);
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.12);
 }
 
 .admin-nav-service-card--buses {
-  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 60%);
-  border-color: color-mix(in srgb, #0ea5e9 22%, transparent);
+  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 70%);
+  border-color: color-mix(in srgb, #0ea5e9 20%, transparent);
+  box-shadow: 0 2px 10px rgba(14, 165, 233, 0.05);
 }
 
 .admin-nav-service-card--buses.is-active,
 .admin-nav-service-card--buses:hover {
-  border-color: color-mix(in srgb, #0369a1 40%, transparent);
+  border-color: color-mix(in srgb, #0369a1 38%, transparent);
   box-shadow: 0 4px 14px rgba(14, 165, 233, 0.12);
 }
 
 .admin-nav-service-card--settings {
-  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 55%, #f1f5f9 100%);
-  border-color: color-mix(in srgb, #64748b 22%, transparent);
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 70%);
+  border-color: color-mix(in srgb, #64748b 20%, transparent);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
 .admin-nav-service-card--settings.is-active,
 .admin-nav-service-card--settings:hover {
-  border-color: color-mix(in srgb, #334155 38%, transparent);
+  border-color: color-mix(in srgb, #334155 36%, transparent);
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
 }
 

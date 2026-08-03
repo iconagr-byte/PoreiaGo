@@ -182,7 +182,7 @@ export default function RegisterPage() {
               ? 'Δημιουργήστε λογαριασμό για ενοικίαση οχήματος — ξεχωριστά από τα λεωφορεία.'
               : claim
                 ? 'Δημιουργήστε λογαριασμό για να δείτε το εισιτήριο και το QR επιβίβασης'
-                : 'Δημιουργήστε λογαριασμό μόνο για ταξίδια με λεωφορείο'}
+                : 'Ο λογαριασμός μαζεύει εισιτήρια και QR. Αν έχετε ήδη κράτηση, μπορείτε να τη βρείτε χωρίς εγγραφή.'}
           </p>
           <p className={hintClass}>
             {rentIntent ? (
@@ -315,7 +315,15 @@ export default function RegisterPage() {
             Σύνδεση
           </Link>
         </p>
-        {!rentIntent ? (
+        {!rentIntent && !claim ? (
+          <div className="mt-5 rounded-2xl border border-[#0071e3]/18 bg-[#0071e3]/8 px-4 py-3 text-center text-sm">
+            <p className="font-semibold text-[#1d1d1f] mb-1">Έχετε ήδη κράτηση;</p>
+            <p className="text-xs text-[#6e6e73] mb-2">Βρείτε την χωρίς λογαριασμό.</p>
+            <Link to="/my-booking" className={linkClass}>
+              Εύρεση κράτησης λεωφορείου
+            </Link>
+          </div>
+        ) : !rentIntent ? (
           <p className="text-xs text-center mt-4">
             <Link to="/my-booking" className={linkClass}>
               Εύρεση κράτησης χωρίς λογαριασμό
