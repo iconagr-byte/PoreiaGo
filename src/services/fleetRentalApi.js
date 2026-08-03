@@ -1,5 +1,6 @@
 import { API_BASE } from '../config/api.js';
 import { getSaasToken, saasAuthHeaders } from './saasApi.js';
+import { adminBearerHeaders, adminFetch } from './adminApi.js';
 
 async function rentalFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}/api/admin/platform/fleet-rental${path}`, {
@@ -86,16 +87,22 @@ export async function fetchRentalLiveOverlays() {
 export async function uploadRentalInspectionPhoto(file) {
   const form = new FormData();
   form.append('file', file);
-  const token = getSaasToken();
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(`${API_BASE}/api/admin/platform/fleet-rental/inspections/photo-upload`, {
+  // Must use bearer-only headers — Content-Type: application/json breaks multipart.
+  const res = await adminFetch('/api/admin/platform/fleet-rental/inspections/photo-upload', {
     method: 'POST',
-    headers,
+    headers: adminBearerHeaders(),
     body: form,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.detail || 'Αποτυχία ανεβάσματος φωτογραφίας');
+    const detail = data?.detail;
+    const msg =
+      typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d) => d.msg || d).join(', ')
+          : data?.message || 'Αποτυχία ανεβάσματος φωτογραφίας';
+    throw new Error(msg);
   }
   return data;
 }
@@ -230,11 +237,9 @@ export async function uploadRentalDocument(vehicleId, file, { kind = 'registrati
   form.append('file', file);
   const params = new URLSearchParams({ kind });
   if (expiresAt) params.set('expires_at', expiresAt);
-  const token = getSaasToken();
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(
-    `${API_BASE}/api/admin/platform/fleet-rental/vehicles/${encodeURIComponent(vehicleId)}/documents?${params}`,
-    { method: 'POST', headers, body: form },
+  const res = await adminFetch(
+    `/api/admin/platform/fleet-rental/vehicles/${encodeURIComponent(vehicleId)}/documents?${params}`,
+    { method: 'POST', headers: adminBearerHeaders(), body: form },
   );
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
