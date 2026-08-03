@@ -328,10 +328,15 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
 
     Isolation rules:
     1. Achillio Travel Host → Achillio office only (never PoreiaGo drivers).
-    2. poreiago.com platform Host → never Achillio Travel drivers (remap / reject).
-    3. Real office JWT otherwise wins — never switch via spoofable headers.
-    4. DEMO JWT on Achillio Host may remap to Achillio (login recovery only).
-    5. DEMO legacy claim permanently disabled.
+    2. Achillio Travel JWT → always that office's drivers (even if the admin
+       tab is open on www.poreiago.com). Remapping to the empty platform list
+       made Achilleas look «lost».
+    3. PoreiaGo platform JWT on poreiago.com → platform drivers only (never
+       Achillio rows). Empty list is expected until they create platform drivers
+       or open Achillio admin for the bus office.
+    4. Real office JWT otherwise wins — never switch via spoofable headers.
+    5. DEMO JWT on Achillio Host may remap to Achillio (login recovery only).
+    6. DEMO legacy claim permanently disabled.
     """
     jwt_tid = str(_request_tenant_id(request) or "").strip() or str(DEMO_TENANT_ID)
     impersonating = _request_is_impersonating(request)
@@ -342,37 +347,10 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
         if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
             return host_tid, False, False
 
-    # www.poreiago.com page — never list/delete Achillio Travel drivers.
-    # Shared api.* Host is ignored (JWT scopes); do not remap on api.poreiago.com.
-    if _request_is_platform_host(request) and not impersonating:
-        from fastapi import HTTPException
-        from middleware.domain_tenant import _request_host
-        from travel_platform.settings.office_host_guard import (
-            host_is_platform_marketing,
-            host_is_shared_api,
-            resolve_poreiago_platform_tenant_id,
-        )
-
-        host = _request_host(request)
-        if (
-            host
-            and not host_is_shared_api(host)
-            and host_is_platform_marketing(host, is_platform_host=True)
-            and await _tenant_is_achillio_office(jwt_tid)
-        ):
-            platform_tid = await resolve_poreiago_platform_tenant_id()
-            if platform_tid:
-                logger.warning(
-                    "SEAL: Achillio JWT on PoreiaGo page remapped to platform for drivers"
-                )
-                return platform_tid, False, False
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "Ο λογαριασμός Achillio Travel ανοίγει μόνο από "
-                    "https://www.achilliotravel.com/admin — όχι από poreiago.com"
-                ),
-            )
+    # Achillio office JWT must keep Achillio drivers on any host (including
+    # www.poreiago.com). Platform JWT must never see/delete them.
+    if not impersonating and await _tenant_is_achillio_office(jwt_tid):
+        return jwt_tid, False, False
 
     if jwt_tid != str(DEMO_TENANT_ID):
         include, claim = await _office_may_claim_demo_legacy(jwt_tid)
