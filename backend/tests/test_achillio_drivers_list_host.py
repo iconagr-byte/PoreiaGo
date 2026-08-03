@@ -52,8 +52,8 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(include)
         self.assertFalse(claim)
 
-    async def test_achillio_jwt_on_poreiago_remaps_to_platform(self):
-        """SEAL: Achillio JWT on poreiago.com never lists/deletes Achillio drivers."""
+    async def test_achillio_jwt_on_poreiago_keeps_achillio_drivers(self):
+        """Achillio JWT must still list Achilleas on www.poreiago.com (no empty remap)."""
         achillio = str(uuid4())
         platform = str(uuid4())
         req = SimpleNamespace(
@@ -69,8 +69,8 @@ class AchillioDriversListHostTests(unittest.IsolatedAsyncioTestCase):
                     ):
                         tid, include, claim = await ap._drivers_list_tenant_id(req)
 
-        self.assertEqual(tid, platform)
-        self.assertNotEqual(tid, achillio)
+        self.assertEqual(tid, achillio)
+        self.assertNotEqual(tid, platform)
         self.assertFalse(include)
         self.assertFalse(claim)
 
