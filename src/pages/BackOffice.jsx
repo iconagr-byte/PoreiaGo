@@ -2,10 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchAllLostItems, updateLostItemStatus } from '../services/lostItemsApi.js';
 import {
-  loadAllCustomers,
+  loadCustomersByService,
   getCustomerByEmail,
   syncCustomersFromBookings,
   syncCustomersFromRentalBookings,
+  CUSTOMER_SERVICE_BUSES,
+  CUSTOMER_SERVICE_RENT,
 } from '../lib/customers/customerStore.js';
 import { fetchRentalBookings, fetchRentalSummary } from '../services/fleetRentalApi.js';
 import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
@@ -158,7 +160,10 @@ export default function BackOffice() {
     return fromQuery || location.state?.driverId || null;
   });
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [customers, setCustomers] = useState(() => loadAllCustomers());
+  const [customerServiceScope, setCustomerServiceScope] = useState(CUSTOMER_SERVICE_BUSES);
+  const [customers, setCustomers] = useState(() =>
+    loadCustomersByService(CUSTOMER_SERVICE_BUSES),
+  );
   const [rentalBookings, setRentalBookings] = useState([]);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -172,6 +177,14 @@ export default function BackOffice() {
   const officeMode = officeModeFromModules(officeModules);
   const rentMenuVisible = shouldShowRentMenu(officeModules);
   const rentOnly = officeMode === 'rent_only';
+  useEffect(() => {
+    if (rentOnly) setCustomerServiceScope(CUSTOMER_SERVICE_RENT);
+  }, [rentOnly]);
+
+  const refreshCustomersForScope = (scope = customerServiceScope) => {
+    setCustomers(loadCustomersByService(scope));
+  };
+
   useEffect(() => {
     let cancelled = false;
     const refresh = () => {
@@ -337,26 +350,36 @@ export default function BackOffice() {
     };
   }, [activeTab, location.key]);
 
-  // Πελατολόγιο: hydrate from trip + rental bookings into CRM people.
+  // Πελατολόγιο: hydrate buses vs rent CRM separately (never mix lists).
   useEffect(() => {
     if (activeTab !== 'customers' && activeTab !== 'fleet_rental') return;
     let cancelled = false;
+    const scope =
+      activeTab === 'fleet_rental' || rentOnly
+        ? CUSTOMER_SERVICE_RENT
+        : customerServiceScope;
     loadMergedBookings()
       .then((merged) => {
         if (cancelled) return;
         setBookings(merged);
         syncCustomersFromBookings(merged);
-        setCustomers(loadAllCustomers());
+        if (scope === CUSTOMER_SERVICE_BUSES) {
+          setCustomers(loadCustomersByService(CUSTOMER_SERVICE_BUSES));
+        }
       })
       .catch(() => {
-        if (!cancelled) setCustomers(loadAllCustomers());
+        if (!cancelled && scope === CUSTOMER_SERVICE_BUSES) {
+          setCustomers(loadCustomersByService(CUSTOMER_SERVICE_BUSES));
+        }
       });
     fetchRentalBookings()
       .then((rows) => {
         if (cancelled) return;
         setRentalBookings(rows);
         syncCustomersFromRentalBookings(rows);
-        setCustomers(loadAllCustomers());
+        if (scope === CUSTOMER_SERVICE_RENT) {
+          setCustomers(loadCustomersByService(CUSTOMER_SERVICE_RENT));
+        }
       })
       .catch(() => {
         if (!cancelled) setRentalBookings([]);
@@ -364,7 +387,7 @@ export default function BackOffice() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, location.key]);
+  }, [activeTab, location.key, customerServiceScope, rentOnly]);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -458,8 +481,10 @@ export default function BackOffice() {
 
   const openCustomerProfile = (booking) => {
     if (!booking) return;
-    const fromMock = getCustomerByEmail(booking.email) ||
-      loadAllCustomers().find(
+    const scope = CUSTOMER_SERVICE_BUSES;
+    const fromMock =
+      getCustomerByEmail(booking.email, scope) ||
+      loadCustomersByService(scope).find(
         (c) =>
           c.id === booking.customerId ||
           (booking.customerName && c.name === booking.customerName),
@@ -471,20 +496,29 @@ export default function BackOffice() {
       points: 0,
       tier: 'Silver',
       joinDate: '—',
+      serviceScope: scope,
     };
     setSelectedBooking(null);
+    setCustomerServiceScope(scope);
+    setCustomers(loadCustomersByService(scope));
     setSelectedCustomer(customer);
     setActiveTab('customers');
   };
 
-  /** Sidebar / header: always land on the customers list (leave profile detail). */
+  /** Sidebar / header: land on the matching service CRM list. */
   const goToCustomersHome = () => {
+    const scope = rentOnly ? CUSTOMER_SERVICE_RENT : CUSTOMER_SERVICE_BUSES;
+    setCustomerServiceScope(scope);
+    setCustomers(loadCustomersByService(scope));
     setSelectedCustomer(null);
     setActiveTab('customers');
   };
 
   const handleAdminTabChange = (tab) => {
     if (tab === 'customers') {
+      const scope = rentOnly ? CUSTOMER_SERVICE_RENT : CUSTOMER_SERVICE_BUSES;
+      setCustomerServiceScope(scope);
+      setCustomers(loadCustomersByService(scope));
       setSelectedCustomer(null);
     }
     setActiveTab(tab);
@@ -1159,15 +1193,16 @@ export default function BackOffice() {
       setSelectedCustomer={setSelectedCustomer}
       bookings={bookings}
       rentalBookings={rentalBookings}
+      serviceScope={customerServiceScope}
       onAddCustomer={() => setAddCustomerOpen(true)}
-      onCustomersChange={() => setCustomers(loadAllCustomers())}
+      onCustomersChange={() => refreshCustomersForScope(customerServiceScope)}
       onBookingsChange={() => {
         setBookingsLoading(true);
         loadMergedBookings()
           .then(setBookings)
           .catch(() => setBookings(loadBookings()))
           .finally(() => setBookingsLoading(false));
-        setCustomers(loadAllCustomers());
+        refreshCustomersForScope(customerServiceScope);
       }}
       openBookingTicket={openBookingTicket}
     />
@@ -1911,8 +1946,8 @@ export default function BackOffice() {
                         <tbody className="divide-y divide-gray-100">
                           {group.bookings.map(booking => {
                             const customerData =
-                              getCustomerByEmail(booking.email) ||
-                              loadAllCustomers().find((c) => c.id === booking.customerId);
+                              getCustomerByEmail(booking.email, CUSTOMER_SERVICE_BUSES) ||
+                              loadCustomersByService(CUSTOMER_SERVICE_BUSES).find((c) => c.id === booking.customerId);
                             const balanceDue =
                               Number(booking.balanceDue) ||
                               Math.max(0, Number(booking.price || 0) - Number(booking.amountPaid || 0));
@@ -2110,9 +2145,10 @@ export default function BackOffice() {
 
       <AddCustomerModal
         open={addCustomerOpen}
+        serviceScope={customerServiceScope}
         onClose={() => setAddCustomerOpen(false)}
         onCreated={(row) => {
-          setCustomers(loadAllCustomers());
+          refreshCustomersForScope(customerServiceScope);
           setSelectedCustomer(row);
         }}
       />
@@ -2188,7 +2224,7 @@ export default function BackOffice() {
             }
           >
             {activeTab === 'dashboard' && renderDashboard()}
-            {activeTab === 'customers' && renderCustomers()}
+            {activeTab === 'customers' && (rentOnly || customerServiceScope === CUSTOMER_SERVICE_RENT) && renderCustomers()}
             {activeTab === 'loyalty' && <LoyaltyRewardsPanel />}
             {activeTab === 'settings' && (
               <div className="pb-stack-lg w-full">
@@ -2226,6 +2262,10 @@ export default function BackOffice() {
                     setActiveTab(next);
                   }}
                 >
+                  {activeTab === 'customers' &&
+                    customerServiceScope === CUSTOMER_SERVICE_BUSES &&
+                    !rentOnly &&
+                    renderCustomers()}
                   {activeTab === 'routes' && renderRoutes()}
                   {activeTab === 'fleet' && renderFleet()}
                   {(activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab)) && (
@@ -2256,8 +2296,9 @@ export default function BackOffice() {
                   initialTab={fleetRentalTab}
                   onOpenLiveMap={() => setActiveTab('fleet_live_map')}
                   onOpenCustomer={(person) => {
-                    setSelectedCustomer(person);
-                    setCustomers(loadAllCustomers());
+                    setCustomerServiceScope(CUSTOMER_SERVICE_RENT);
+                    setCustomers(loadCustomersByService(CUSTOMER_SERVICE_RENT));
+                    setSelectedCustomer({ ...person, serviceScope: CUSTOMER_SERVICE_RENT });
                     setActiveTab('customers');
                   }}
                 />

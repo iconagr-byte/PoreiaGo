@@ -3,6 +3,7 @@ import { isFleetOpsSubTab } from '../../lib/admin/fleetOpsHub.js';
 
 const RAIL_ACTIVE = {
   emerald: 'border-emerald-300 bg-emerald-50 shadow-sm',
+  violet: 'border-violet-300 bg-violet-50 shadow-sm',
   sky: 'border-sky-300 bg-sky-50 shadow-sm',
   cyan: 'border-cyan-300 bg-cyan-50 shadow-sm',
   indigo: 'border-indigo-300 bg-indigo-50 shadow-sm',
@@ -12,6 +13,7 @@ const RAIL_ACTIVE = {
 
 const RAIL_ICON_ACTIVE = {
   emerald: 'bg-emerald-600 text-white',
+  violet: 'bg-violet-600 text-white',
   sky: 'bg-sky-600 text-white',
   cyan: 'bg-cyan-600 text-white',
   indigo: 'bg-indigo-600 text-white',
@@ -21,6 +23,7 @@ const RAIL_ICON_ACTIVE = {
 
 const RAIL_ICON_IDLE = {
   emerald: 'bg-emerald-100 text-emerald-700',
+  violet: 'bg-violet-100 text-violet-700',
   sky: 'bg-sky-100 text-sky-700',
   cyan: 'bg-cyan-100 text-cyan-800',
   indigo: 'bg-indigo-100 text-indigo-700',
@@ -30,6 +33,7 @@ const RAIL_ICON_IDLE = {
 
 const CHIP_ACTIVE = {
   emerald: 'bg-emerald-600 text-white border-emerald-600',
+  violet: 'bg-violet-600 text-white border-violet-600',
   sky: 'bg-sky-600 text-white border-sky-600',
   cyan: 'bg-cyan-600 text-white border-cyan-600',
   indigo: 'bg-indigo-600 text-white border-indigo-600',

@@ -338,7 +338,9 @@ export default function SortableSidebarNav({
               {item.icon}
             </span>
           </span>
-          <span className="admin-nav-label">{item.label}</span>
+          <span className="admin-nav-label">
+            {rentOnly && item.id === 'customers' ? 'Πελάτες' : item.label}
+          </span>
           {shared && showServiceSwitch ? (
             cardStyle ? <SharedScopeChip /> : <DualScopeBadge />
           ) : null}

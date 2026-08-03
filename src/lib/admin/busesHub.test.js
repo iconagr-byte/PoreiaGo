@@ -11,7 +11,7 @@ describe('busesHub', () => {
     expect(isBusesHubTab('routes')).toBe(true);
     expect(isBusesHubTab('fleet_ops')).toBe(true);
     expect(isBusesHubTab('fleet_kpis')).toBe(true);
-    expect(isBusesHubTab('customers')).toBe(false);
+    expect(isBusesHubTab('customers')).toBe(true);
   });
 
   it('sanitizes tab ids', () => {

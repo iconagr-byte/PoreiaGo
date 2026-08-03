@@ -6,9 +6,9 @@
 export const RENT_DESK_TABS = [
   {
     id: 'clients',
-    label: 'Πελάτες /rent',
+    label: 'Πελάτες ενοικιάσεων',
     icon: 'groups',
-    description: 'CRM πελατών ενοικίασης',
+    description: 'CRM πελατών ενοικίασης — χωριστά από λεωφορεία',
     accent: 'teal',
     group: 'desk',
   },
