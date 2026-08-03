@@ -65,6 +65,14 @@ export function buildPaymentStatusLabel(plan, methodId, depositPercent = DEFAULT
     }
     return 'PENDING (Bank Transfer)';
   }
+  if (methodId === 'cash_office') {
+    return plan === PAYMENT_PLAN_DEPOSIT ? `DEPOSIT ${pct}% (Μετρητά — γκισέ)` : 'PAID (Μετρητά — γκισέ γραφείου)';
+  }
+  if (methodId === 'cash_on_bus') {
+    return plan === PAYMENT_PLAN_DEPOSIT
+      ? `DEPOSIT ${pct}% (Μετρητά στο λεωφορείο)`
+      : 'PENDING (Μετρητά στο λεωφορείο)';
+  }
   const method =
     methodId === 'card'
       ? 'Credit Card'
@@ -84,6 +92,16 @@ export function buildPaymentMethodLabel(plan, methodId, depositPercent = DEFAULT
     return plan === PAYMENT_PLAN_DEPOSIT
       ? `Τραπεζική μεταφορά · προκαταβολή ${pct}%`
       : 'Τραπεζική μεταφορά';
+  }
+  if (methodId === 'cash_office') {
+    return plan === PAYMENT_PLAN_DEPOSIT
+      ? `Μετρητά — γκισέ · προκαταβολή ${pct}%`
+      : 'Μετρητά — γκισέ γραφείου';
+  }
+  if (methodId === 'cash_on_bus') {
+    return plan === PAYMENT_PLAN_DEPOSIT
+      ? `Μετρητά στο λεωφορείο · προκαταβολή ${pct}%`
+      : 'Μετρητά στο λεωφορείο';
   }
   const method =
     methodId === 'card'

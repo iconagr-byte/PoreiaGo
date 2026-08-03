@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { deleteCustomer } from '../../lib/customers/customerStore.js';
+import { deleteCustomer, loadAllCustomers } from '../../lib/customers/customerStore.js';
 import { isPaid, isConfirmed } from '../../lib/bookingDisplay.js';
 import CustomerBookingCard from './CustomerBookingCard.jsx';
 import AddCustomerModal from './AddCustomerModal.jsx';
+import OfficeExcursionBookingModal from './OfficeExcursionBookingModal.jsx';
 
 const TIERS = ['all', 'VIP', 'Platinum', 'Gold', 'Silver'];
 const ACTIVITY = [
@@ -176,6 +177,7 @@ function CustomerDetail({
   openBookingTicket,
   onEdit,
   onDelete,
+  onAddExcursion,
 }) {
   const customer =
     customers.find((c) => c.id === selectedCustomer.id) ||
@@ -328,16 +330,34 @@ function CustomerDetail({
       </div>
 
       <div className="space-y-4">
-        <h3 className="font-semibold text-lg flex items-center gap-2.5 px-1 tracking-tight">
-          <span className="w-9 h-9 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
-            <span className="material-symbols-outlined text-[20px]">confirmation_number</span>
-          </span>
-          Εκδρομές
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+          <h3 className="font-semibold text-lg flex items-center gap-2.5 tracking-tight">
+            <span className="w-9 h-9 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
+              <span className="material-symbols-outlined text-[20px]">confirmation_number</span>
+            </span>
+            Εκδρομές
+          </h3>
+          <button
+            type="button"
+            onClick={() => onAddExcursion?.(customer)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[16px]">add</span>
+            Προσθήκη εκδρομής
+          </button>
+        </div>
         {customerBookings.length === 0 ? (
-          <p className="p-8 text-center text-zinc-500 bg-zinc-50 rounded-3xl border border-zinc-100">
-            Δεν υπάρχουν καταγεγραμμένες κρατήσεις εκδρομών.
-          </p>
+          <div className="p-8 text-center bg-zinc-50 rounded-3xl border border-zinc-100 space-y-3">
+            <p className="text-zinc-500">Δεν υπάρχουν καταγεγραμμένες κρατήσεις εκδρομών.</p>
+            <button
+              type="button"
+              onClick={() => onAddExcursion?.(customer)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-bold bg-sky-600 text-white hover:bg-sky-700"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              Προσθήκη εκδρομής από το γραφείο
+            </button>
+          </div>
         ) : (
           customerBookings.map((b) => (
             <CustomerBookingCard
@@ -419,6 +439,7 @@ export default function CustomersCrmPanel({
   rentalBookings = [],
   onAddCustomer,
   onCustomersChange,
+  onBookingsChange,
   openBookingTicket,
 }) {
   const [query, setQuery] = useState('');
@@ -426,6 +447,7 @@ export default function CustomersCrmPanel({
   const [activityFilter, setActivityFilter] = useState('all');
   const [sortBy, setSortBy] = useState('activity');
   const [editCustomer, setEditCustomer] = useState(null);
+  const [addExcursionOpen, setAddExcursionOpen] = useState(false);
 
   const enriched = useMemo(() => {
     return customers.map((c) => {
@@ -526,12 +548,23 @@ export default function CustomersCrmPanel({
           openBookingTicket={openBookingTicket}
           onEdit={setEditCustomer}
           onDelete={handleDelete}
+          onAddExcursion={() => setAddExcursionOpen(true)}
         />
         <AddCustomerModal
           open={Boolean(editCustomer)}
           customer={editCustomer}
           onClose={() => setEditCustomer(null)}
           onCreated={handleSaved}
+        />
+        <OfficeExcursionBookingModal
+          open={addExcursionOpen}
+          customer={selectedCustomer}
+          bookings={bookings}
+          onClose={() => setAddExcursionOpen(false)}
+          onCreated={() => {
+            onBookingsChange?.();
+            onCustomersChange?.(null);
+          }}
         />
       </>
     );

@@ -1155,6 +1155,14 @@ export default function BackOffice() {
       rentalBookings={rentalBookings}
       onAddCustomer={() => setAddCustomerOpen(true)}
       onCustomersChange={() => setCustomers(loadAllCustomers())}
+      onBookingsChange={() => {
+        setBookingsLoading(true);
+        loadMergedBookings()
+          .then(setBookings)
+          .catch(() => setBookings(loadBookings()))
+          .finally(() => setBookingsLoading(false));
+        setCustomers(loadAllCustomers());
+      }}
       openBookingTicket={openBookingTicket}
     />
   );
