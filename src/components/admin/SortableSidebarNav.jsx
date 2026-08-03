@@ -525,17 +525,6 @@ export default function SortableSidebarNav({
             ) : null}
           </>
         )}
-
-        {!rentOnly ? (
-          <button
-            type="button"
-            onClick={resetMenu}
-            className="w-full text-center text-[11px] font-bold text-slate-400 hover:text-slate-700 py-1"
-            title="Επαναφορά προεπιλεγμένου μενού"
-          >
-            Επαναφορά μενού
-          </button>
-        ) : null}
       </div>
 
       {/* Pinned hubs — Λεωφορεία · Ενοικιάσεις · Ρυθμίσεις */}
