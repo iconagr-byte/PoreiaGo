@@ -250,6 +250,29 @@ async def _tenant_is_achillio_office(tenant_id: str) -> bool:
         return False
 
 
+async def _tenant_is_poreiago_platform(tenant_id: str) -> bool:
+    """DB lookup — PoreiaGo platform / Master office (slug achillio seed, etc.)."""
+    tid = str(tenant_id or "").strip()
+    if not tid or tid == str(DEMO_TENANT_ID):
+        return False
+    try:
+        from uuid import UUID
+
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import is_poreiago_platform_office
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Tenant).where(Tenant.id == UUID(tid)).limit(1))
+            tenant = result.scalar_one_or_none()
+            return bool(tenant and is_poreiago_platform_office(tenant))
+    except Exception:
+        logger.debug("PoreiaGo platform lookup failed for %s", tid, exc_info=True)
+        return False
+
+
 async def _resolve_achillio_tenant_id_from_request(request: Request | None) -> str | None:
     """Map Achillio custom-domain Host → office tenant UUID (proxy Host only)."""
     if request is None or not _host_looks_like_achillio(request):
@@ -328,8 +351,9 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
 
     Isolation rules:
     1. Achillio Travel Host → Achillio office only (never PoreiaGo drivers).
-    2. poreiago.com platform Host → never Achillio Travel drivers (remap / reject).
-    3. Real office JWT otherwise wins — never switch via spoofable headers.
+    2. www.poreiago.com → canonical PoreiaGo platform drivers for DEMO /
+       Achillio JWT / platform JWT (so Achilleas is never «missing»).
+    3. Real customer-office JWT otherwise wins — never switch via spoofable headers.
     4. DEMO JWT on Achillio Host may remap to Achillio (login recovery only).
     5. DEMO legacy claim permanently disabled.
     """
@@ -342,10 +366,9 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
         if host_tid and host_tid != str(DEMO_TENANT_ID) and await _tenant_is_achillio_office(host_tid):
             return host_tid, False, False
 
-    # www.poreiago.com page — never list/delete Achillio Travel drivers.
-    # Shared api.* Host is ignored (JWT scopes); do not remap on api.poreiago.com.
+    # www.poreiago.com — always list the canonical platform drivers for Master
+    # / DEMO / Achillio sessions so Achilleas (home on PoreiaGo) is visible.
     if _request_is_platform_host(request) and not impersonating:
-        from fastapi import HTTPException
         from middleware.domain_tenant import _request_host
         from travel_platform.settings.office_host_guard import (
             host_is_platform_marketing,
@@ -358,21 +381,22 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
             host
             and not host_is_shared_api(host)
             and host_is_platform_marketing(host, is_platform_host=True)
-            and await _tenant_is_achillio_office(jwt_tid)
         ):
-            platform_tid = await resolve_poreiago_platform_tenant_id()
-            if platform_tid:
-                logger.warning(
-                    "SEAL: Achillio JWT on PoreiaGo page remapped to platform for drivers"
-                )
-                return platform_tid, False, False
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "Ο λογαριασμός Achillio Travel ανοίγει μόνο από "
-                    "https://www.achilliotravel.com/admin — όχι από poreiago.com"
-                ),
+            use_platform = (
+                jwt_tid == str(DEMO_TENANT_ID)
+                or await _tenant_is_achillio_office(jwt_tid)
+                or await _tenant_is_poreiago_platform(jwt_tid)
             )
+            if use_platform:
+                platform_tid = await resolve_poreiago_platform_tenant_id()
+                if platform_tid:
+                    if platform_tid != jwt_tid:
+                        logger.info(
+                            "Drivers list on PoreiaGo host: JWT %s → platform %s",
+                            jwt_tid,
+                            platform_tid,
+                        )
+                    return str(platform_tid), False, False
 
     if jwt_tid != str(DEMO_TENANT_ID):
         include, claim = await _office_may_claim_demo_legacy(jwt_tid)
@@ -562,6 +586,24 @@ async def get_login_audits(
 @router.get("/drivers", response_model=list[FleetDriverResponse])
 async def get_drivers(request: Request, status: str | None = None):
     tenant_id, include_legacy, claim_legacy = await _drivers_list_tenant_id(request)
+    # Soft ensure on every list for the PoreiaGo platform office — Achilleas
+    # must not look «lost» after a rehome / empty JWT mismatch.
+    try:
+        from travel_platform.settings.drivers_store import (
+            _POREIAGO_HOME_EMAILS,
+            ensure_home_driver_on_tenant,
+        )
+        from travel_platform.settings.office_host_guard import (
+            resolve_poreiago_platform_tenant_id,
+        )
+
+        platform_tid = await resolve_poreiago_platform_tenant_id()
+        if platform_tid and str(tenant_id) == str(platform_tid):
+            for email in _POREIAGO_HOME_EMAILS:
+                ensure_home_driver_on_tenant(email, str(platform_tid))
+    except Exception:
+        logger.debug("PoreiaGo home-driver soft ensure skipped", exc_info=True)
+
     rows = list_drivers_for_office(
         tenant_id,
         status,
