@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class WalletPwaOfflineContractTests(unittest.TestCase):
     def test_wallet_sw_and_manifest_exist(self):
         sw = (ROOT / "public" / "wallet-pwa" / "sw.js").read_text(encoding="utf-8")
-        self.assertIn("poreiago-wallet-v2", sw)
+        self.assertIn("poreiago-wallet-v3", sw)
         self.assertIn("/wallet-pwa/offline.html", sw)
         self.assertIn("pathname.startsWith('/wallet')", sw)
 
