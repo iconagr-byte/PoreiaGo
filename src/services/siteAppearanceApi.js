@@ -47,9 +47,10 @@ export const DEFAULT_SITE_APPEARANCE = {
   footer_contact_phone: '',
   footer_address: '',
   rent_office_name: '',
-  rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
+  rent_hero_kicker: 'Επωφελήσου από την ενοικίαση',
+  rent_hero_title: 'Το όχημά σας, με πραγματικά οφέλη',
   rent_hero_copy:
-    'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
+    'Σύγκρινε μοντέλα, κλείσε online και πάρε χάρτη παραλαβής, ασφάλεια και υποστήριξη — όλα στο Wallet σου.',
   rent_guest_hero_title: 'Δες τον στόλο πριν κλείσεις',
   rent_guest_hero_copy: '',
   rent_cta_label: 'Βρες όχημα',
