@@ -1,4 +1,4 @@
-"""Achilleas home email must stay on Achillio — force rehome + recreate if missing."""
+"""Achilleas home email must stay on PoreiaGo platform — force rehome + recreate if missing."""
 
 from __future__ import annotations
 
@@ -28,17 +28,17 @@ class AchilleasHomeEnsureTests(unittest.TestCase):
         self._tmpdir.cleanup()
 
     def test_ensure_creates_when_missing(self):
-        result = store.ensure_home_driver_on_tenant(HOME_EMAIL, OFFICE_ACHILLIO)
+        result = store.ensure_home_driver_on_tenant(HOME_EMAIL, OFFICE_POREIAGO)
         self.assertTrue(result["ok"])
         self.assertEqual(result["action"], "created")
         rows = store.find_drivers_by_email(HOME_EMAIL)
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0].tenant_id, OFFICE_ACHILLIO)
+        self.assertEqual(rows[0].tenant_id, OFFICE_POREIAGO)
         self.assertEqual(rows[0].name, "Αχιλλέας Χαραλαμπίδης")
-        listed = store.list_drivers_for_office(OFFICE_ACHILLIO)
+        listed = store.list_drivers_for_office(OFFICE_POREIAGO)
         self.assertEqual([d.email for d in listed], [HOME_EMAIL])
 
-    def test_ensure_pulls_back_from_poreiago(self):
+    def test_ensure_pulls_back_from_achillio(self):
         stranded = store.create_driver(
             {
                 "name": "Αχιλλέας Χαραλαμπίδης",
@@ -46,18 +46,18 @@ class AchilleasHomeEnsureTests(unittest.TestCase):
                 "email": HOME_EMAIL,
                 "password": "BusPass99",
                 "status": "active",
-                "tenant_id": OFFICE_POREIAGO,
+                "tenant_id": OFFICE_ACHILLIO,
             }
         )
-        result = store.ensure_home_driver_on_tenant(HOME_EMAIL, OFFICE_ACHILLIO)
+        result = store.ensure_home_driver_on_tenant(HOME_EMAIL, OFFICE_POREIAGO)
         self.assertTrue(result["ok"])
         self.assertEqual(result["action"], "rehomed")
         store.reset_drivers_cache()
         again = store.get_driver(stranded.id)
-        self.assertEqual(again.tenant_id, OFFICE_ACHILLIO)
-        self.assertEqual(store.list_drivers_for_office(OFFICE_POREIAGO), [])
+        self.assertEqual(again.tenant_id, OFFICE_POREIAGO)
+        self.assertEqual(store.list_drivers_for_office(OFFICE_ACHILLIO), [])
         self.assertEqual(
-            [d.id for d in store.list_drivers_for_office(OFFICE_ACHILLIO)],
+            [d.id for d in store.list_drivers_for_office(OFFICE_POREIAGO)],
             [stranded.id],
         )
 
