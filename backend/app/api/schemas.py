@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class LoginRequest(BaseModel):
@@ -57,13 +57,14 @@ class GuestBookingLookup(BaseModel):
 
 
 class GuestBookingCreate(BaseModel):
-    """B2C checkout — no JWT; tenant_id scopes the organization."""
+    """B2C / office checkout — no JWT; tenant_id scopes the organization."""
 
     tenant_id: UUID
     passenger_name: str
     passenger_email: EmailStr | None = None
     seat_label: str | None = None
-    amount_eur: Decimal = Field(gt=0)
+    # 0 allowed for pay-on-bus holds when total_eur > 0 (office walk-in).
+    amount_eur: Decimal = Field(ge=0)
     external_trip_id: int | None = None
     trip_title: str | None = None
     payment_method: str | None = None
@@ -73,6 +74,18 @@ class GuestBookingCreate(BaseModel):
     total_eur: Decimal | None = None
     balance_due: Decimal | None = None
     deposit_percent: int | None = Field(None, ge=5, le=90)
+    source: str | None = None
+    agent_name: str | None = None
+    departure_at: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_amounts(self):
+        total = self.total_eur if self.total_eur is not None else self.amount_eur
+        if total is None or total <= 0:
+            raise ValueError("Το σύνολο κράτησης πρέπει να είναι μεγαλύτερο από 0.")
+        if self.amount_eur > total:
+            raise ValueError("Το ποσό πληρωμής δεν μπορεί να υπερβαίνει το σύνολο.")
+        return self
 
 
 class OccupiedSeatsResponse(BaseModel):

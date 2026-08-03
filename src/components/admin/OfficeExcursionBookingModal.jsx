@@ -199,8 +199,8 @@ export default function OfficeExcursionBookingModal({
         trip,
         seats,
         total,
-        amountPaid: 0,
-        balanceDue: total,
+        amountPaid: payNow ? total : 0,
+        balanceDue: payNow ? 0 : total,
         paymentPlan: PAYMENT_PLAN_FULL,
         passenger: {
           name: customer.name || email,
@@ -212,7 +212,8 @@ export default function OfficeExcursionBookingModal({
         agentName: 'Γραφείο',
       });
 
-      if (payNow && total > 0) {
+      // Only record cash when create left an unpaid balance (legacy path).
+      if (payNow && total > 0 && Number(booking.balanceDue) > 0) {
         try {
           booking = await recordCashPayment(booking.id, {
             amount: total,

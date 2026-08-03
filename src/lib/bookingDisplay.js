@@ -4,11 +4,14 @@ import { bookingBalanceDue } from './payments/paymentSecurity.js';
 
 export function isPaid(booking) {
   const ps = String(booking.paymentStatus || '').toUpperCase();
+  if (ps.includes('PENDING') && Number(booking.balanceDue) > 0) {
+    return false;
+  }
   return (
     ps.includes('PAID') ||
     ps.includes('DEPOSIT') ||
     ps.includes('ΠΡΟΚΑΤΑΒΟΛ') ||
-    booking.status === 'Επιβεβαιωμένη' ||
+    Number(booking.amountPaid) > 0 ||
     booking.status === 'Ολοκληρώθηκε'
   );
 }
@@ -45,11 +48,14 @@ export function parsePaymentMethod(booking) {
       icon: 'savings',
     };
   }
-  if (ps.includes('Cash') || ps.includes('Μετρητά')) return { label: 'Μετρητά', icon: 'payments' };
+  if (ps.includes('Cash') || ps.includes('Μετρητά') || ps.includes('γκισέ') || ps.includes('λεωφορείο')) {
+    return { label: ps.includes('PAID') || ps.includes('Πληρ') ? 'Μετρητά' : (ps || 'Μετρητά'), icon: 'payments' };
+  }
   if (ps.includes('PENDING') || ps === 'PENDING') return { label: 'Εκκρεμής πληρωμή', icon: 'hourglass_empty' };
   if (ps.includes('Transfer') || ps.includes('Τράπεζ') || ps.includes('Έμβασμα')) {
     return { label: 'Τραπεζική μεταφορά', icon: 'account_balance' };
   }
+  if (ps.includes('PAID (SaaS)') || ps.includes('SaaS')) return { label: 'PAID (SaaS)', icon: 'verified' };
   return { label: ps || '—', icon: 'payment' };
 }
 

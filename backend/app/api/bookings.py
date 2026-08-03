@@ -147,7 +147,7 @@ async def get_occupied_seats(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_guest_booking(body: GuestBookingCreate, request: Request):
-    """Public B2C checkout — tenant from Host when possible; body.tenant_id must match."""
+    """Public B2C / office checkout — tenant from Host when possible; body.tenant_id must match."""
     tenant_id = await _resolve_guest_tenant(request, body.tenant_id)
     ref = f"BK-{secrets.token_hex(4).upper()}"
     total = Decimal(str(body.total_eur if body.total_eur is not None else body.amount_eur))
@@ -167,29 +167,63 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
     seat_label = body.seat_label or (", ".join(requested_seats) if requested_seats else None)
     if seat_label and len(seat_label) > 128:
         seat_label = seat_label[:128]
+
+    taxes = round(float(total) * 0.24, 2)
+    base_price = round(float(total) - taxes, 2)
+    source = (body.source or "website_checkout").strip() or "website_checkout"
+    agent_name = (body.agent_name or "").strip() or None
+    pay_method = body.payment_method
+    if balance > 0 and pay_method in (None, "", "cash", "cash_driver", "cash_on_bus"):
+        balance_method = "cash_on_bus"
+    elif balance > 0 and pay_method in ("cash_office", "cash_at_office"):
+        balance_method = "cash_at_office"
+    else:
+        balance_method = None
+
+    if paid_now <= 0 and balance > 0:
+        if pay_method in ("cash_on_bus", "cash", "cash_driver"):
+            payment_status_label = "PENDING (Μετρητά στο λεωφορείο)"
+        elif pay_method in ("cash_office", "cash_at_office"):
+            payment_status_label = "PENDING (Μετρητά — γκισέ)"
+        else:
+            payment_status_label = "PENDING"
+    elif balance > 0:
+        payment_status_label = f"DEPOSIT {int(body.deposit_percent or 30)}% (Online)"
+    elif pay_method in ("cash_office", "cash_at_office", "cash_on_bus", "cash", "cash_driver"):
+        payment_status_label = "PAID (Μετρητά — γκισέ)" if "office" in str(pay_method) else "PAID (Μετρητά)"
+    else:
+        payment_status_label = "PAID (SaaS)"
+
     metadata = {
         "external_trip_id": body.external_trip_id,
         "trip_title": body.trip_title,
         "seats": requested_seats,
-        "payment_method": body.payment_method,
+        "payment_method": pay_method,
         "phone": body.phone,
-        "source": "website_checkout",
+        "source": source,
+        "agent_name": agent_name,
+        "departure_at": body.departure_at,
         "payment_plan": body.payment_plan,
         "total_eur": float(total),
         "amount_paid": float(paid_now),
         "balance_due": float(balance),
-        "balance_due_method": (
-            "cash_on_bus"
-            if balance > 0 and body.payment_method in (None, "", "cash", "cash_driver")
-            else ("cash_at_office" if balance > 0 and body.payment_method == "cash_office" else None)
-        ),
+        "balance_due_method": balance_method,
         "deposit_percent": int(body.deposit_percent or 30) if balance > 0 else None,
+        "base_price": base_price,
+        "taxes": taxes,
+        "payment_status": payment_status_label,
+        "boarding_pass_issued": True,
+        "ticket_ref": ref,
     }
     booking_status = BookingStatus.PAID
     payment_status = PaymentStatus.PAID
     if balance > 0:
         booking_status = BookingStatus.CONFIRMED
         payment_status = PaymentStatus.PARTIAL if paid_now > 0 else PaymentStatus.PENDING
+    elif paid_now <= 0:
+        booking_status = BookingStatus.CONFIRMED
+        payment_status = PaymentStatus.PENDING
+
     async with AsyncSessionLocal() as db:
         await apply_tenant_rls(db, tenant_id)
         if body.external_trip_id is not None and requested_seats:
@@ -227,28 +261,37 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         db.add(booking)
         await db.flush()
 
-        try:
-            from app.services.aade_queue_service import AadeQueueService
+        metadata["transaction_id"] = f"TXN-{booking.id}"
+        metadata["invoice_number"] = f"INV-{ref.replace('BK-', '')}"
+        if paid_now > 0:
+            from datetime import datetime, timezone
 
-            vat_base = float(body.amount_eur) / 1.24
-            await AadeQueueService(db).enqueue_invoice(
-                tenant_id=tenant_id,
-                booking_id=booking.id,
-                payload={
-                    "amount_eur": float(body.amount_eur),
-                    "vat_rate": 24.0,
-                    "customer_country": "GR",
-                    "line_items": [
-                        {
-                            "description": body.trip_title or "Εισιτήριο εκδρομής",
-                            "amount": round(vat_base, 2),
-                        }
-                    ],
-                },
-                idempotency_key=f"guest-{booking.id}",
-            )
-        except Exception:
-            pass
+            metadata["payment_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        booking.metadata_json = dict(metadata)
+
+        if paid_now > 0:
+            try:
+                from app.services.aade_queue_service import AadeQueueService
+
+                vat_base = float(paid_now) / 1.24
+                await AadeQueueService(db).enqueue_invoice(
+                    tenant_id=tenant_id,
+                    booking_id=booking.id,
+                    payload={
+                        "amount_eur": float(paid_now),
+                        "vat_rate": 24.0,
+                        "customer_country": "GR",
+                        "line_items": [
+                            {
+                                "description": body.trip_title or "Εισιτήριο εκδρομής",
+                                "amount": round(vat_base, 2),
+                            }
+                        ],
+                    },
+                    idempotency_key=f"guest-{booking.id}",
+                )
+            except Exception:
+                pass
 
         await AuditService(db).record(
             tenant_id=tenant_id,
@@ -259,24 +302,30 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
             resource_id=str(booking.id),
             ip_address=await get_client_ip(request),
             user_agent=request.headers.get("User-Agent"),
-            after_state={"status": booking.status.value, "reference_code": ref, "guest": True},
+            after_state={"status": booking.status.value, "reference_code": ref, "guest": True, "source": source},
         )
         await db.commit()
         await db.refresh(booking)
 
         try:
+            from api.admin_booking_mapper import local_id_from_reference
             from ticketing.saas_sync import upsert_ticket_booking
 
             meta = metadata
             trip_id = int(meta.get("external_trip_id") or 1)
             seats = meta.get("seats") or []
-            seat_label = seat_label or (", ".join(seats) if seats else "—")
+            ticket_seat = seat_label or (", ".join(seats) if seats else "—")
+            ticket_pay = (
+                "PAID"
+                if paid_now >= total and total > 0
+                else ("DEPOSIT" if paid_now > 0 else "PENDING")
+            )
             await upsert_ticket_booking(
-                local_id=f"B-{ref}",
+                local_id=local_id_from_reference(ref),
                 trip_id=trip_id,
                 customer_name=body.passenger_name,
-                seat_number=seat_label,
-                payment_status="PAID",
+                seat_number=ticket_seat,
+                payment_status=ticket_pay,
                 phone=body.phone,
                 saas_booking_id=str(booking.id),
                 email=body.passenger_email,

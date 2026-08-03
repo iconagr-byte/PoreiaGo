@@ -13,12 +13,27 @@ export function mapSaasBookingToLocal(row) {
   const trip = loadTrips().find((t) => t.id === tripId);
   const seats = meta.seats || (row.seat_label ? row.seat_label.split(',').map((s) => s.trim()) : []);
   const created = row.created_at ? new Date(row.created_at) : new Date();
+  let tripDate = created.toISOString().slice(0, 10);
+  let tripTime = created.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
+  if (meta.departure_at) {
+    try {
+      const dep = new Date(meta.departure_at);
+      if (!Number.isNaN(dep.getTime())) {
+        tripDate = dep.toISOString().slice(0, 10);
+        tripTime = dep.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
+      }
+    } catch {
+      /* keep created */
+    }
+  }
   const status = String(row.status || '').toLowerCase();
   const paid = ['paid', 'confirmed', 'boarded'].includes(status);
   const totalEur = Number(meta.total_eur) || Number(row.amount_eur) || 0;
   const amountPaid = Number(meta.amount_paid) || Number(row.amount_eur) || 0;
   const balanceDue = Number(meta.balance_due) || 0;
   const depositPercent = Number(meta.deposit_percent) || (balanceDue > 0 ? 30 : 0);
+  const taxes = Number(meta.taxes) || Math.round(totalEur * 0.24 * 100) / 100;
+  const basePrice = Number(meta.base_price) || Math.round((totalEur - taxes) * 100) / 100;
 
   return {
     id: localIdFromReference(row.reference_code || meta.local_id || ''),
@@ -28,8 +43,8 @@ export function mapSaasBookingToLocal(row) {
     customerId: null,
     tripTitle: meta.trip_title || trip?.title || '—',
     tripId: tripId || trip?.id || 0,
-    date: created.toISOString().slice(0, 10),
-    time: created.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' }),
+    date: tripDate,
+    time: tripTime,
     seats,
     seat: row.seat_label || seats.join(', '),
     price: totalEur,
@@ -38,21 +53,29 @@ export function mapSaasBookingToLocal(row) {
     paymentPlan: meta.payment_plan || (balanceDue > 0 ? 'deposit' : 'full'),
     depositPercent: balanceDue > 0 ? depositPercent : null,
     balanceDueMethod: meta.balance_due_method || null,
+    basePrice,
+    taxes,
     status: paid ? 'Επιβεβαιωμένη' : row.status,
     checkInStatus: CHECK_IN.NONE,
     checkedIn: false,
     phone: meta.phone || '',
     email: row.passenger_email || '',
     paymentStatus:
-      balanceDue > 0
+      meta.payment_status ||
+      (balanceDue > 0
         ? formatDepositPaymentStatus(depositPercent)
         : paid
           ? 'PAID (SaaS)'
-          : row.status,
+          : row.status),
     paymentMethod: meta.payment_method || 'Online',
+    paymentDate: meta.payment_date || null,
+    transactionId: meta.transaction_id || (row.id ? `TXN-${row.id}` : null),
+    invoiceNumber: meta.invoice_number || null,
     pnr: row.reference_code,
-    boardingPassIssued: paid,
-    bookingSource: 'Website (SaaS)',
+    ticketRef: meta.ticket_ref || row.reference_code,
+    boardingPassIssued: meta.boarding_pass_issued !== false,
+    bookingSource: meta.source || 'Website (SaaS)',
+    agentName: meta.agent_name || '',
   };
 }
 
@@ -77,17 +100,26 @@ function mergeByKey(local, remote) {
   );
 }
 
-/** Postgres admin API → cache; fallback SQLite / SaaS JWT / localStorage. */
+/** Postgres admin API → cache; keep local-only rows until they sync. */
 export async function loadMergedBookings() {
   const authenticated = Boolean(getSaasToken());
 
   try {
     const pg = await fetchAdminBookings();
     if (Array.isArray(pg)) {
-      // Authenticated office with empty PG must stay empty (no mock seed).
       if (authenticated || pg.length) {
-        mergeBookingsIntoStore(pg);
-        return pg;
+        const local = loadBookings();
+        const pgKeys = new Set(
+          pg.flatMap((b) => [b.saasBookingId, b.id, b.pnr].filter(Boolean).map(String)),
+        );
+        const localOnly = local.filter((b) => {
+          if (b.syncedToSaas) return false;
+          const keys = [b.saasBookingId, b.id, b.pnr].filter(Boolean).map(String);
+          return keys.every((k) => !pgKeys.has(k));
+        });
+        const merged = [...pg, ...localOnly];
+        mergeBookingsIntoStore(merged);
+        return merged;
       }
     }
   } catch (err) {
