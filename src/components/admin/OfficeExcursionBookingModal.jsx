@@ -1,13 +1,17 @@
 /**
  * Desk flow: add an excursion booking to a CRM customer
  * (trip → seats → office cash / pay on bus).
+ * Seat step uses the same LuxuryBusSeatMap as storefront booking.
  */
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { listPublishedTrips, loadTrips } from '../../lib/trips/tripStore.js';
 import { getLayoutForVehicle } from '../../lib/seats/busLayouts.js';
+import { resolveTripSeatMapTheme } from '../../lib/seats/seatMapThemes.js';
 import { loadBookings, createBookingFromCheckout, recordCashPayment } from '../../lib/ticketing/bookingStore.js';
 import { PAYMENT_PLAN_FULL, roundMoney } from '../../lib/payments/depositPayment.js';
+import LuxuryBusSeatMap from '../seats/LuxuryBusSeatMap.jsx';
+import SeatSelectionAside from '../seats/SeatSelectionAside.jsx';
 
 function seatsTakenForTrip(tripId, bookings) {
   const taken = new Set();
@@ -27,17 +31,23 @@ function seatsTakenForTrip(tripId, bookings) {
   return taken;
 }
 
-function buildSeatChoices(trip, bookings) {
+/** Map seats for LuxuryBusSeatMap — real occupancy from office bookings. */
+function buildMapSeats(trip, bookings) {
   const layout = getLayoutForVehicle(trip?.vehicleType);
   const taken = seatsTakenForTrip(trip?.id, bookings);
+  const unit = Number(trip?.price) || 0;
   const seats = [];
   for (let row = 1; row <= layout.rows; row += 1) {
     for (const col of layout.cols) {
       const number = `${row}${col}`;
       seats.push({
+        id: number,
         number,
+        row,
+        col,
         isVip: layout.vipRows.includes(row),
-        taken: taken.has(number),
+        status: taken.has(number) ? 'BOOKED' : 'AVAILABLE',
+        priceEur: unit,
       });
     }
   }
@@ -113,13 +123,22 @@ export default function OfficeExcursionBookingModal({
     );
   }, [trips, query]);
 
-  const seatChoices = useMemo(
-    () => (trip ? buildSeatChoices(trip, liveBookings) : []),
+  const layout = useMemo(
+    () => (trip ? getLayoutForVehicle(trip.vehicleType) : null),
+    [trip],
+  );
+  const mapSeats = useMemo(
+    () => (trip ? buildMapSeats(trip, liveBookings) : []),
     [trip, liveBookings],
   );
   const availableSeats = useMemo(
-    () => seatChoices.filter((s) => !s.taken).map((s) => s.number),
-    [seatChoices],
+    () => mapSeats.filter((s) => s.status !== 'BOOKED').map((s) => s.number),
+    [mapSeats],
+  );
+  const seatTheme = useMemo(() => (trip ? resolveTripSeatMapTheme(trip) : null), [trip]);
+  const selectedSeatRows = useMemo(
+    () => mapSeats.filter((s) => selectedSeats.includes(s.id)),
+    [mapSeats, selectedSeats],
   );
 
   const unitPrice = Number(trip?.price) || 0;
@@ -141,10 +160,11 @@ export default function OfficeExcursionBookingModal({
   const email = String(customer.email || '').trim();
   const canBook = Boolean(email);
 
-  const toggleSeat = (number, taken) => {
-    if (taken || busy) return;
+  const toggleSeat = (seat) => {
+    if (busy || !seat || seat.status === 'BOOKED') return;
+    const id = seat.id || seat.number;
     setSelectedSeats((prev) =>
-      prev.includes(number) ? prev.filter((s) => s !== number) : [...prev, number],
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
     );
   };
 
@@ -196,7 +216,6 @@ export default function OfficeExcursionBookingModal({
             note: 'Πληρωμή γκισέ από προφίλ πελάτη',
           });
         } catch (cashErr) {
-          // Booking exists — staff can record cash later from the ticket.
           console.warn('[office-excursion] cash record failed', cashErr);
           toast.error(
             cashErr.message ||
@@ -222,6 +241,9 @@ export default function OfficeExcursionBookingModal({
     }
   };
 
+  const modalWidth =
+    step === 2 ? 'sm:max-w-4xl lg:max-w-5xl' : step === 3 ? 'sm:max-w-lg' : 'sm:max-w-xl';
+
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <button
@@ -230,7 +252,9 @@ export default function OfficeExcursionBookingModal({
         aria-label="Κλείσιμο"
         onClick={() => !busy && onClose?.()}
       />
-      <div className="relative w-full sm:max-w-xl max-h-[92vh] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl border border-slate-200 flex flex-col">
+      <div
+        className={`relative w-full ${modalWidth} max-h-[94vh] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl border border-slate-200 flex flex-col transition-[max-width] duration-200`}
+      >
         <header className="shrink-0 px-5 pt-5 pb-3 border-b border-slate-100 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-wider text-sky-700">Γραφείο</p>
@@ -335,15 +359,8 @@ export default function OfficeExcursionBookingModal({
             </>
           ) : null}
 
-          {step === 2 && trip ? (
+          {step === 2 && trip && layout ? (
             <>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="font-bold text-slate-900">{trip.title}</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {formatTripWhen(trip)} · €{unitPrice.toFixed(0)} / θέση · {availableSeats.length}{' '}
-                  διαθέσιμες
-                </p>
-              </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -368,39 +385,58 @@ export default function OfficeExcursionBookingModal({
                   Καθαρισμός
                 </button>
               </div>
-              <div className="flex flex-wrap gap-1.5 max-h-56 overflow-y-auto p-1">
-                {seatChoices.map((s) => {
-                  const on = selectedSeats.includes(s.number);
-                  return (
-                    <button
-                      key={s.number}
-                      type="button"
-                      disabled={s.taken}
-                      onClick={() => toggleSeat(s.number, s.taken)}
-                      className={`min-w-[2.75rem] h-9 rounded-lg text-xs font-bold tabular-nums border transition ${
-                        s.taken
-                          ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed'
-                          : on
-                            ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
-                            : s.isVip
-                              ? 'bg-amber-50 text-amber-900 border-amber-200 hover:border-amber-400'
-                              : 'bg-white text-slate-700 border-slate-200 hover:border-sky-300'
-                      }`}
-                      title={s.taken ? 'Κλεισμένη' : s.isVip ? 'VIP' : 'Διαθέσιμη'}
-                    >
-                      {s.number}
-                    </button>
-                  );
-                })}
+
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_minmax(0,13rem)] gap-4 items-start">
+                <SeatSelectionAside
+                  compact
+                  trip={trip}
+                  layout={layout}
+                  seatTheme={seatTheme}
+                  seats={mapSeats}
+                  tripBasePrice={unitPrice}
+                  selectedSeatRows={selectedSeatRows}
+                  availableCount={availableSeats.length}
+                  className="order-2 lg:order-1"
+                />
+
+                <div className="order-1 lg:order-2 flex justify-center">
+                  <LuxuryBusSeatMap
+                    layout={layout}
+                    seats={mapSeats}
+                    selectedSeats={selectedSeats}
+                    onSeatClick={toggleSeat}
+                    availableCount={availableSeats.length}
+                    vehicleType={trip.vehicleType}
+                    theme={seatTheme}
+                    showSeatPopup={false}
+                  />
+                </div>
+
+                <div className="order-3 rounded-2xl border border-slate-200 bg-white shadow-sm p-4 space-y-3 lg:sticky lg:top-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Η κράτησή σας
+                  </p>
+                  <div className="flex justify-between gap-2 text-sm">
+                    <span className="text-slate-500">Θέσεις</span>
+                    <span className="font-bold text-slate-900 text-right">
+                      {selectedSeats.length ? selectedSeats.join(', ') : '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2 text-sm">
+                    <span className="text-slate-500">Τιμή / θέση</span>
+                    <span className="font-semibold text-slate-800">€{unitPrice.toFixed(0)}</span>
+                  </div>
+                  <div className="border-t border-slate-100 pt-3 flex justify-between gap-2">
+                    <span className="font-bold text-slate-900">Σύνολο</span>
+                    <span className="font-bold text-sky-800 tabular-nums text-lg">
+                      €{total.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    Ίδιο κάθισμα με την online κράτηση — κλεισμένες θέσεις από υπάρχουσες κρατήσεις.
+                  </p>
+                </div>
               </div>
-              {selectedSeats.length ? (
-                <p className="text-sm font-semibold text-slate-700">
-                  Επιλεγμένες: {selectedSeats.join(', ')} ·{' '}
-                  <span className="text-sky-800">€{total.toFixed(2)}</span>
-                </p>
-              ) : (
-                <p className="text-sm text-slate-500">Πατήστε θέσεις ή «1 θέση» / «2 θέσεις».</p>
-              )}
             </>
           ) : null}
 
@@ -482,7 +518,9 @@ export default function OfficeExcursionBookingModal({
             >
               {busy ? (
                 <>
-                  <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                  <span className="material-symbols-outlined text-[18px] animate-spin">
+                    progress_activity
+                  </span>
                   Αποθήκευση…
                 </>
               ) : (
