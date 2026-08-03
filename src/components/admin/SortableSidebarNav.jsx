@@ -45,6 +45,14 @@ function DualScopeBadge() {
   );
 }
 
+function SharedScopeChip() {
+  return (
+    <span className="admin-nav-shared-chip" title="Λεωφορεία & Ενοικιάσεις" aria-label="Κοινό">
+      Κοινό
+    </span>
+  );
+}
+
 function ZoneHeader({ tone, icon, title, subtitle }) {
   return (
     <div className={`admin-nav-zone-head admin-nav-zone-head--${tone}`}>
@@ -266,7 +274,7 @@ export default function SortableSidebarNav({
 
   const busesHubActive = !rentOnly && isBusesHubTab(activeTab);
 
-  const buttonClass = (item) => {
+  const buttonClass = (item, { cardStyle = false } = {}) => {
     const isRentSubActive =
       item.type === 'fleet_rental_subtab' &&
       activeTab === 'fleet_rental' &&
@@ -278,6 +286,7 @@ export default function SortableSidebarNav({
     const classes = ['admin-nav-btn'];
     if (isActive) classes.push('admin-nav-btn-active');
     if (isSharedNavItem(item)) classes.push('admin-nav-btn--shared');
+    if (cardStyle) classes.push('admin-nav-btn--mini-card');
     return classes.join(' ');
   };
 
@@ -291,14 +300,14 @@ export default function SortableSidebarNav({
   const navAccent = (item) =>
     item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
 
-  const renderRow = (item, sectionId, { nested = false } = {}) => {
+  const renderRow = (item, sectionId, { nested = false, cardStyle = false } = {}) => {
     const dragging = dragState.draggingId === item.id;
     const shared = isSharedNavItem(item);
     return (
       <div
         className={`admin-nav-row ${dragging ? 'admin-nav-row-dragging' : ''} ${
           nested ? 'admin-nav-row-nested' : ''
-        }`}
+        }${cardStyle ? ' admin-nav-row--mini-card' : ''}`}
       >
         {!rentOnly ? (
           <span
@@ -317,11 +326,11 @@ export default function SortableSidebarNav({
         <button
           type="button"
           onClick={() => handleClick(item)}
-          className={buttonClass(item)}
+          className={buttonClass(item, { cardStyle })}
           data-accent={shared ? 'shared' : navAccent(item)}
           title={shared ? `${item.label} · λεωφορεία & ενοικιάσεις` : item.label}
         >
-          <span className="admin-nav-icon">
+          <span className={`admin-nav-icon${cardStyle ? ' admin-nav-icon--circle' : ''}`}>
             <span
               className="material-symbols-outlined"
               style={item.filled ? { fontVariationSettings: "'FILL' 1" } : undefined}
@@ -330,7 +339,14 @@ export default function SortableSidebarNav({
             </span>
           </span>
           <span className="admin-nav-label">{item.label}</span>
-          {shared && showServiceSwitch ? <DualScopeBadge /> : null}
+          {shared && showServiceSwitch ? (
+            cardStyle ? <SharedScopeChip /> : <DualScopeBadge />
+          ) : null}
+          {cardStyle ? (
+            <span className="material-symbols-outlined admin-nav-mini-chevron" aria-hidden>
+              chevron_right
+            </span>
+          ) : null}
         </button>
       </div>
     );
@@ -352,14 +368,14 @@ export default function SortableSidebarNav({
     [displayLayout.main],
   );
 
-  const renderItemList = (items, sectionId) => {
+  const renderItemList = (items, sectionId, { cardStyle = false } = {}) => {
     const isDropTarget = !rentOnly && dragState.draggingId && dragState.section === sectionId;
     const toLayoutIndex = (visualIndex) =>
       sectionId === 'main' ? resolveMainDropIndex(items, visualIndex) : visualIndex;
 
     return (
       <ul
-        className="admin-nav-list"
+        className={`admin-nav-list${cardStyle ? ' admin-nav-list--mini-cards' : ''}`}
         onDragOver={(e) => {
           if (rentOnly || !dragState.draggingId) return;
           e.preventDefault();
@@ -391,7 +407,7 @@ export default function SortableSidebarNav({
                   handleDrop(sectionId, layoutIdx);
                 }}
               >
-                {renderRow(item, sectionId)}
+                {renderRow(item, sectionId, { cardStyle })}
               </div>
             </li>
           );
@@ -468,19 +484,19 @@ export default function SortableSidebarNav({
         {rentOnly ? (
           <div className="admin-nav-zone admin-nav-zone--shared">
             <ZoneHeader tone="shared" icon="apartment" title="Γραφείο" subtitle="Κοινά εργαλεία" />
-            {renderItemList(mainItems, 'main')}
+            {renderItemList(mainItems, 'main', { cardStyle: true })}
           </div>
         ) : (
           <>
             {showSharedZone ? (
-              <div className="admin-nav-zone admin-nav-zone--shared">
+              <div className="admin-nav-zone admin-nav-zone--shared admin-nav-zone--shared-cards">
                 <ZoneHeader
                   tone="shared"
                   icon="hub"
                   title="Κοινά"
                   subtitle="Λεωφορεία & ενοικιάσεις"
                 />
-                {renderItemList(sharedItems, 'main')}
+                {renderItemList(sharedItems, 'main', { cardStyle: true })}
               </div>
             ) : null}
 
