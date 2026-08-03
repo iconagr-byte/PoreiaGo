@@ -7,6 +7,7 @@ const RAIL_ACTIVE = {
   sky: 'border-sky-300 bg-sky-50 shadow-sm',
   cyan: 'border-cyan-300 bg-cyan-50 shadow-sm',
   indigo: 'border-indigo-300 bg-indigo-50 shadow-sm',
+  amber: 'border-amber-300 bg-amber-50 shadow-sm',
   rose: 'border-rose-300 bg-rose-50 shadow-sm',
   blue: 'border-blue-300 bg-blue-50 shadow-sm',
 };
@@ -17,6 +18,7 @@ const RAIL_ICON_ACTIVE = {
   sky: 'bg-sky-600 text-white',
   cyan: 'bg-cyan-600 text-white',
   indigo: 'bg-indigo-600 text-white',
+  amber: 'bg-amber-600 text-white',
   rose: 'bg-rose-600 text-white',
   blue: 'bg-blue-600 text-white',
 };
@@ -27,6 +29,7 @@ const RAIL_ICON_IDLE = {
   sky: 'bg-sky-100 text-sky-700',
   cyan: 'bg-cyan-100 text-cyan-800',
   indigo: 'bg-indigo-100 text-indigo-700',
+  amber: 'bg-amber-100 text-amber-800',
   rose: 'bg-rose-100 text-rose-700',
   blue: 'bg-blue-100 text-blue-700',
 };
@@ -37,6 +40,7 @@ const CHIP_ACTIVE = {
   sky: 'bg-sky-600 text-white border-sky-600',
   cyan: 'bg-cyan-600 text-white border-cyan-600',
   indigo: 'bg-indigo-600 text-white border-indigo-600',
+  amber: 'bg-amber-600 text-white border-amber-600',
   rose: 'bg-rose-600 text-white border-rose-600',
   blue: 'bg-blue-600 text-white border-blue-600',
 };

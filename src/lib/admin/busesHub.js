@@ -41,6 +41,13 @@ export const BUSES_HUB_TABS = [
     accent: 'indigo',
   },
   {
+    id: 'bus_setup',
+    label: 'Master QR & PWA',
+    description: 'Είσοδος οδηγού και εγκατάσταση στο κινητό',
+    icon: 'qr_code_2',
+    accent: 'amber',
+  },
+  {
     id: 'lost_found',
     label: 'Απωλεσθέντα',
     description: 'Αναφορές επιβατών',
