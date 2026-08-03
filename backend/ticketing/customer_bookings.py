@@ -78,7 +78,10 @@ async def list_bookings_for_email(
     rows = await cursor.fetchall()
     items = [_row_to_booking(r) for r in rows]
     if tid:
-        return [b for b in items if _booking_tenant(b) == tid]
+        # Keep rows stamped to this office. Also keep legacy unscoped rows that
+        # already matched in SQL (tenant_id NULL) so walk-ins aren't hidden
+        # before the next Postgres pull stamps them.
+        return [b for b in items if (_booking_tenant(b) or tid) == tid]
     return items
 
 

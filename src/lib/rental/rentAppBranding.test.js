@@ -5,7 +5,18 @@ import { DEFAULT_RENT_APP_BRANDING, resolveRentAppBranding } from './rentAppBran
 
 const empty = resolveRentAppBranding({});
 console.assert(empty.brandLabel === 'Ενοικίαση', 'default brand');
+console.assert(
+  empty.heroKicker === DEFAULT_RENT_APP_BRANDING.rent_hero_kicker,
+  'default hero kicker speaks to customer',
+);
 console.assert(empty.title === DEFAULT_RENT_APP_BRANDING.rent_hero_title, 'default title');
+
+const genericOffice = resolveRentAppBranding({ rent_office_name: 'Γραφείο' });
+console.assert(genericOffice.brandLabel === 'Ενοικίαση', 'generic office brand');
+console.assert(
+  genericOffice.heroKicker === 'Επωφελήσου από την ενοικίαση',
+  'generic office hero is benefit copy',
+);
 
 const office = resolveRentAppBranding({
   rent_office_name: 'Achillio Rent',
@@ -13,6 +24,10 @@ const office = resolveRentAppBranding({
   rent_hero_copy: 'Γρήγορα και ασφαλή.',
 });
 console.assert(office.brandLabel === 'Achillio Rent', 'custom office');
+console.assert(
+  office.heroKicker === DEFAULT_RENT_APP_BRANDING.rent_hero_kicker,
+  'named office still uses benefit kicker in hero',
+);
 console.assert(office.title === 'Κλείσε αυτοκίνητο σήμερα', 'custom title');
 console.assert(office.isCustomized === true, 'customized flag');
 
