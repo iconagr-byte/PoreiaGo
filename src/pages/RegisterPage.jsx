@@ -157,7 +157,6 @@ export default function RegisterPage() {
     ? 'material-symbols-outlined rent-auth-icon'
     : 'material-symbols-outlined wallet-auth-icon';
   const leadClass = rentIntent ? 'rent-auth-lead' : 'wallet-auth-lead';
-  const hintClass = rentIntent ? 'rent-auth-hint' : 'wallet-auth-hint';
   const linkClass = rentIntent ? 'rent-auth-link' : 'wallet-auth-link';
   const submitClass = rentIntent ? 'rent-auth-submit' : 'wallet-auth-submit';
 
