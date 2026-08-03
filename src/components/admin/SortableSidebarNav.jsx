@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  loadNavLayout,
+  ensureFactoryNavReset,
   moveNavItem,
   navItemsFromIds,
   navLayoutForOfficeMode,
+  NAV_FACTORY_RESET_KEY,
+  resetNavLayoutToDefault,
   saveNavLayout,
 } from '../../lib/admin/sidebarNav.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, sanitizeSettingsSubTab } from '../../lib/admin/settingsTabs.js';
@@ -71,7 +73,7 @@ export default function SortableSidebarNav({
   const superAdmin = isSaasSuperAdmin();
   const rentOnly = officeMode === 'rent_only';
   const showServiceSwitch = rentEnabled && !rentOnly;
-  const [layout, setLayout] = useState(() => loadNavLayout(superAdmin));
+  const [layout, setLayout] = useState(() => ensureFactoryNavReset(superAdmin));
   const [storedServiceMode, setStoredServiceMode] = useState(() => loadNavServiceMode());
   const [dragState, setDragState] = useState({
     section: null,
@@ -84,16 +86,35 @@ export default function SortableSidebarNav({
   const [layoutRole, setLayoutRole] = useState(superAdmin);
   if (layoutRole !== superAdmin) {
     setLayoutRole(superAdmin);
-    setLayout(loadNavLayout(superAdmin));
+    setLayout(ensureFactoryNavReset(superAdmin));
   }
 
-  // Persist repaired layout (rescues items stuck in orphaned fleet_ops bucket).
+  // Persist repaired layout + force service mode Όλα once after factory reset.
   useEffect(() => {
     if (rentOnly) return;
-    const repaired = loadNavLayout(superAdmin);
+    const repaired = ensureFactoryNavReset(superAdmin);
     setLayout(repaired);
     saveNavLayout(superAdmin, repaired);
+    try {
+      const bootKey = `${NAV_FACTORY_RESET_KEY}_mode_boot`;
+      if (localStorage.getItem(bootKey) !== '1') {
+        localStorage.setItem(bootKey, '1');
+        setStoredServiceMode('all');
+        saveNavServiceMode('all');
+      }
+    } catch {
+      setStoredServiceMode('all');
+      saveNavServiceMode('all');
+    }
   }, [superAdmin, rentOnly]);
+
+  const resetMenu = useCallback(() => {
+    const next = resetNavLayoutToDefault(superAdmin);
+    setLayout(next);
+    setStoredServiceMode('all');
+    saveNavServiceMode('all');
+    toast.success('Το μενού επανήλθε');
+  }, [superAdmin]);
 
   const serviceMode = rentOnly
     ? 'rent'
@@ -261,7 +282,9 @@ export default function SortableSidebarNav({
   const rentDeskActive = activeTab === 'fleet_rental';
   const showBusZone = !rentOnly && serviceMode !== 'rent' && busItems.length > 0;
   const showSharedZone = sharedItems.length > 0;
+  const showFleetOpsPin = !rentOnly && serviceMode !== 'rent';
   const showRentPin = rentEnabled && (rentOnly || serviceMode !== 'buses');
+  const menuLooksEmpty = !rentOnly && !showSharedZone && !showBusZone;
 
   const navAccent = (item) =>
     item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
@@ -472,13 +495,39 @@ export default function SortableSidebarNav({
             {showServiceSwitch && serviceMode === 'rent' ? (
               <div className="admin-nav-zone admin-nav-zone--rent-hint">
                 <p className="admin-nav-rent-hint-text">
-                  Τα εργαλεία ενοικίασης ανοίγουν από την κάρτα <strong>Ενοικιάσεις</strong> κάτω —
-                  πελάτες /rent, οχήματα, ημερολόγιο.
+                  Τα εργαλεία ενοικίασης ανοίγουν από την κάρτα <strong>Ενοικιάσεις</strong> κάτω.
+                  Για εκδρομές / οδηγούς πατήστε <strong>Όλα</strong> ή <strong>Λεωφ.</strong> πάνω.
                 </p>
+              </div>
+            ) : null}
+
+            {menuLooksEmpty ? (
+              <div className="admin-nav-zone admin-nav-zone--rent-hint">
+                <p className="admin-nav-rent-hint-text mb-2">
+                  Το μενού φαίνεται άδειο. Επαναφέρετε την προεπιλογή.
+                </p>
+                <button
+                  type="button"
+                  onClick={resetMenu}
+                  className="w-full rounded-xl bg-slate-900 text-white text-xs font-bold py-2.5 hover:bg-slate-800"
+                >
+                  Επαναφορά μενού
+                </button>
               </div>
             ) : null}
           </>
         )}
+
+        {!rentOnly ? (
+          <button
+            type="button"
+            onClick={resetMenu}
+            className="w-full text-center text-[11px] font-bold text-slate-400 hover:text-slate-700 py-1"
+            title="Επαναφορά προεπιλεγμένου μενού"
+          >
+            Επαναφορά μενού
+          </button>
+        ) : null}
       </div>
 
       {/* Pinned hubs */}
@@ -503,6 +552,32 @@ export default function SortableSidebarNav({
               <span className="admin-nav-service-card-kicker">Υπηρεσία</span>
               <span className="admin-nav-service-card-title">Ενοικιάσεις</span>
               <span className="admin-nav-service-card-sub">Desk · στόλος · /rent app</span>
+            </span>
+            <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
+              chevron_right
+            </span>
+          </button>
+        ) : null}
+
+        {showFleetOpsPin ? (
+          <button
+            type="button"
+            onClick={() => openFleetOps(fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB)}
+            className={`admin-nav-service-card admin-nav-service-card--buses${
+              fleetOpsActive ? ' is-active' : ''
+            }`}
+            title="Λειτουργίες στόλου λεωφορείων"
+            aria-current={fleetOpsActive ? 'page' : undefined}
+          >
+            <span className="admin-nav-service-card-icon" aria-hidden>
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                directions_bus
+              </span>
+            </span>
+            <span className="admin-nav-service-card-copy">
+              <span className="admin-nav-service-card-kicker">Λεωφορεία</span>
+              <span className="admin-nav-service-card-title">Λειτουργίες Στόλου</span>
+              <span className="admin-nav-service-card-sub">GPS · KPIs · ημερολόγιο</span>
             </span>
             <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
               chevron_right
