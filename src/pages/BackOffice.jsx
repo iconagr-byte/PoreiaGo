@@ -1879,8 +1879,12 @@ export default function BackOffice() {
                 {isExpanded && (
                   <div className="animate-in fade-in slide-in-from-top-4 duration-300">
                     <div className="bg-white">
-                      <div className="px-6 py-4 bg-gray-50/50 flex justify-between items-center border-b border-gray-100">
+                      <div className="px-6 py-4 bg-gray-50/50 flex justify-between items-center border-b border-gray-100 gap-3 flex-wrap">
                         <span className="text-sm font-bold text-gray-600">Λίστα Επιβατών (Manifest)</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">
+                            Σύρετε οριζόντια για MARK · Μετρητά · Check-in
+                          </span>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1914,6 +1918,7 @@ export default function BackOffice() {
                           <span className="material-symbols-outlined text-[18px]">download</span>
                           Εξαγωγή PDF
                         </button>
+                        </div>
                       </div>
                       {!group.bookings.length ? (
                         <div className="px-6 py-10 text-center">
@@ -1923,17 +1928,22 @@ export default function BackOffice() {
                           </p>
                         </div>
                       ) : (
-                      <table className="min-w-full divide-y divide-gray-100">
+                      <div className="overflow-x-auto overscroll-x-contain">
+                        <table className="min-w-[64rem] w-full divide-y divide-gray-100">
                         <thead>
                           <tr>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Αναχώρηση</th>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Όνομα Πελάτη</th>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Θέση</th>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Boarding Pass</th>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Τιμή</th>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">MARK / Πάροχος</th>
-                            <th className="px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Ενέργειες</th>
-                            <th className="px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Check-in</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                              Αναχώρηση
+                            </th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[12rem]">
+                              Όνομα Πελάτη
+                            </th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Θέση</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Boarding Pass</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Τιμή</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">MARK / Πάροχος</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Ενέργειες</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Check-in</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -1951,10 +1961,10 @@ export default function BackOffice() {
                                 className={`hover:bg-gray-50 transition-colors cursor-pointer group ${booking.checkedIn ? 'bg-green-50/30' : ''}`}
                                 onDoubleClick={() => setSelectedBooking(booking)}
                               >
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   <div className="font-bold text-gray-900 text-sm">{booking.date || '—'}</div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   <div className="font-bold text-gray-900 text-base flex items-center gap-2">
                                     <button
                                       type="button"
@@ -1988,10 +1998,10 @@ export default function BackOffice() {
                                     Προβολή εισιτηρίου
                                   </button>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   <div className="font-bold text-primary">{booking.seat}</div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   {booking.boardingPassIssued ? (
                                     <span className="inline-flex items-center gap-1 text-xs font-bold text-gray-600">
                                       <span className="material-symbols-outlined text-[16px] text-green-500">qr_code</span> Εκδόθηκε
@@ -2000,7 +2010,7 @@ export default function BackOffice() {
                                     <span className="text-xs text-gray-400 font-medium">Όχι Ακόμα</span>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   <div className="font-bold text-gray-900">€{Number(booking.price || 0).toFixed(2)}</div>
                                   {balanceDue > 0 && (
                                     <div className="text-xs font-bold text-amber-700 mt-1">
@@ -2008,10 +2018,10 @@ export default function BackOffice() {
                                     </div>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   <FiscalMarkCell booking={booking} />
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
                                   {showCash ? (
                                     <button
                                       type="button"
@@ -2029,7 +2039,7 @@ export default function BackOffice() {
                                     <span className="text-xs text-gray-400 font-medium">—</span>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
                                   {booking.checkedIn ? (
                                     <button 
                                       onClick={(e) => handleCheckIn(e, booking.id)}
@@ -2050,7 +2060,8 @@ export default function BackOffice() {
                             );
                           })}
                         </tbody>
-                      </table>
+                        </table>
+                      </div>
                       )}
                     </div>
                   </div>
