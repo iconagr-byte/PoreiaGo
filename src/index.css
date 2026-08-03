@@ -308,6 +308,17 @@
   box-shadow: 0 4px 14px rgba(14, 165, 233, 0.12);
 }
 
+.admin-nav-service-card--settings {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 55%, #f1f5f9 100%);
+  border-color: color-mix(in srgb, #64748b 22%, transparent);
+}
+
+.admin-nav-service-card--settings.is-active,
+.admin-nav-service-card--settings:hover {
+  border-color: color-mix(in srgb, #334155 38%, transparent);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
+}
+
 .admin-nav-service-card-icon {
   width: 2.15rem;
   height: 2.15rem;
@@ -334,6 +345,12 @@
   box-shadow: 0 4px 10px rgba(2, 132, 199, 0.22);
 }
 
+.admin-nav-service-card--settings .admin-nav-service-card-icon {
+  background: linear-gradient(160deg, #64748b, #334155);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(51, 65, 85, 0.22);
+}
+
 .admin-nav-service-card-copy {
   flex: 1;
   min-width: 0;
@@ -356,6 +373,10 @@
 
 .admin-nav-service-card--buses .admin-nav-service-card-kicker {
   color: #0369a1;
+}
+
+.admin-nav-service-card--settings .admin-nav-service-card-kicker {
+  color: #475569;
 }
 
 .admin-nav-service-card-title {
@@ -384,6 +405,10 @@
 
 .admin-nav-service-card--buses .admin-nav-service-card-chevron {
   color: #7dd3fc;
+}
+
+.admin-nav-service-card--settings .admin-nav-service-card-chevron {
+  color: #94a3b8;
 }
 
 .admin-nav-scroll {
@@ -434,6 +459,11 @@
   min-height: 2.25rem;
   border-radius: 0.625rem;
   transition: opacity 0.15s ease;
+}
+
+.admin-nav-row--card {
+  min-height: 2.75rem;
+  margin-bottom: 0.3rem;
 }
 
 .admin-nav-row-dragging {
@@ -495,6 +525,49 @@
 .admin-nav-btn:hover {
   background: var(--color-surface-container-low);
   color: var(--color-primary);
+}
+
+/* Bus-zone rows — same language as Λειτουργίες Στόλου service card */
+.admin-nav-btn--card {
+  min-height: 2.75rem;
+  padding: 0.4rem 0.45rem 0.4rem 0.35rem;
+  border-radius: 0.85rem;
+  border-color: color-mix(in srgb, var(--color-outline) 22%, transparent);
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  gap: 0.55rem;
+}
+
+.admin-nav-btn--card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.admin-nav-btn--card.admin-nav-btn-active {
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
+}
+
+.admin-nav-icon--tile {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, currentColor 12%, #fff);
+}
+
+.admin-nav-icon--tile .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.admin-nav-row-chevron {
+  font-size: 1.125rem;
+  color: #cbd5e1;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.admin-nav-btn--card.admin-nav-btn-active .admin-nav-row-chevron,
+.admin-nav-btn--card:hover .admin-nav-row-chevron {
+  color: currentColor;
+  opacity: 0.55;
 }
 
 .admin-nav-icon {
