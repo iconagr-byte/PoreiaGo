@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
-from uuid import uuid4
-
-from app.models.booking import BookingStatus
 from app.services.seat_occupancy import (
     booking_matches_external_trip,
     conflicting_seats,
