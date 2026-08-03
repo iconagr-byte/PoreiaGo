@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   loadNavLayout,
@@ -86,6 +86,14 @@ export default function SortableSidebarNav({
     setLayoutRole(superAdmin);
     setLayout(loadNavLayout(superAdmin));
   }
+
+  // Persist repaired layout (rescues items stuck in orphaned fleet_ops bucket).
+  useEffect(() => {
+    if (rentOnly) return;
+    const repaired = loadNavLayout(superAdmin);
+    setLayout(repaired);
+    saveNavLayout(superAdmin, repaired);
+  }, [superAdmin, rentOnly]);
 
   const serviceMode = rentOnly
     ? 'rent'
