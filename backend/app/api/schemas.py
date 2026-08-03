@@ -444,8 +444,29 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_slider_slides: list[dict] = []
     homepage_theme_id: str = "aegean_classic"
     accent_color: str = "#0ea5e9"
+    secondary_color: str = "#1e3a5f"
+    surface_color: str = "#f8fafc"
     show_fleet_section: bool = True
     show_why_us_section: bool = True
+    header_template: str = "glass_dark"
+    hero_template: str = "fullscreen_overlay"
+    trips_layout_template: str = "grid_three"
+    trip_card_template: str = "premium"
+    footer_template: str = "classic_columns"
+    rent_fleet_layout_template: str = "rent_grid_three"
+    rent_fleet_card_template: str = "rent_premium"
+    intl_trips_layout_template: str = "editorial_stack"
+    intl_trip_card_template: str = "abroad_horizontal"
+    trips_section_eyebrow: str = "Ανακαλύψτε"
+    trips_section_title: str = "Εκδρομές στην Ελλάδα"
+    trips_section_subtitle: str = (
+        "Ημερήσιες και πολυήμερες διαδρομές με premium στόλο — κράτηση θέσης online."
+    )
+    intl_section_eyebrow: str = "Διεθνή δρομολόγια"
+    intl_section_title: str = "Ταξίδια προς το Εξωτερικό"
+    intl_section_subtitle: str = (
+        "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
+    )
 
 
 class TenantSiteAppearanceUpdate(BaseModel):
@@ -493,8 +514,25 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_slider_slides: list[dict] | None = None
     homepage_theme_id: str | None = None
     accent_color: str | None = None
+    secondary_color: str | None = None
+    surface_color: str | None = None
     show_fleet_section: bool | None = None
     show_why_us_section: bool | None = None
+    header_template: str | None = None
+    hero_template: str | None = None
+    trips_layout_template: str | None = None
+    trip_card_template: str | None = None
+    footer_template: str | None = None
+    rent_fleet_layout_template: str | None = None
+    rent_fleet_card_template: str | None = None
+    intl_trips_layout_template: str | None = None
+    intl_trip_card_template: str | None = None
+    trips_section_eyebrow: str | None = None
+    trips_section_title: str | None = None
+    trips_section_subtitle: str | None = None
+    intl_section_eyebrow: str | None = None
+    intl_section_title: str | None = None
+    intl_section_subtitle: str | None = None
 
 
 class TenantPlatformSettingsResponse(BaseModel):

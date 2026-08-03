@@ -77,14 +77,29 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_slider_slides": [],
     "homepage_theme_id": "aegean_classic",
     "accent_color": "#0ea5e9",
+    "secondary_color": "#1e3a5f",
+    "surface_color": "#f8fafc",
     "show_fleet_section": True,
     "show_why_us_section": True,
+    "header_template": "glass_dark",
+    "hero_template": "fullscreen_overlay",
     "trips_layout_template": "grid_three",
     "trip_card_template": "premium",
+    "footer_template": "classic_columns",
     "intl_trips_layout_template": "editorial_stack",
     "intl_trip_card_template": "abroad_horizontal",
     "rent_fleet_layout_template": "rent_grid_three",
     "rent_fleet_card_template": "rent_premium",
+    "trips_section_eyebrow": "Ανακαλύψτε",
+    "trips_section_title": "Εκδρομές στην Ελλάδα",
+    "trips_section_subtitle": (
+        "Ημερήσιες και πολυήμερες διαδρομές με premium στόλο — κράτηση θέσης online."
+    ),
+    "intl_section_eyebrow": "Διεθνή δρομολόγια",
+    "intl_section_title": "Ταξίδια προς το Εξωτερικό",
+    "intl_section_subtitle": (
+        "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
+    ),
 }
 
 _PLATFORM_BRAND_RE = re.compile(r"^(aerostride|poreiago)$", re.I)

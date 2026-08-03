@@ -1367,7 +1367,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         )}
 
         {designPage === 'home' && section === 'header' && (
-          <form onSubmit={saveLayout}>
+          <form
+            onSubmit={patchForm(
+              { header_template: form.header_template },
+              'Το header αποθηκεύτηκε',
+            )}
+          >
             <PanelCard
               title="Πρότυπα Header"
               description="Η εμφάνιση της κορυφής της αρχικής — λογότυπο, πλοήγηση, στυλ."

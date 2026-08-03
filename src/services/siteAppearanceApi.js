@@ -171,7 +171,8 @@ export async function updateSiteAppearance(patch) {
         method: 'PUT',
         body: JSON.stringify(patch),
       });
-      const merged = finalizeAppearance(data);
+      // Keep client patch on top — older API schemas may omit layout keys.
+      const merged = finalizeAppearance({ ...data, ...patch });
       cacheLocally(merged);
       return { data: merged, source: data.storage_source === 'postgres' ? 'postgres' : 'server', offline: false };
     } catch (saasErr) {
