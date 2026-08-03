@@ -7,12 +7,12 @@ import {
 import { settingsTabToNavItem } from './settingsSidebar.js';
 import { buildRentDeskNavItems, RENT_DESK_NAV_IDS } from './rentDeskNav.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v11';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v12';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 
-/** Hub subtabs (open via «Λειτουργίες στόλου» under Λεωφορεία — not a separate pin). */
+/** Hub subtabs only — never shown as top-level sidebar rows. */
 export const FLEET_OPS_ONLY_IDS = [
   'fleet_kpis',
   'driver_chat',
@@ -22,6 +22,22 @@ export const FLEET_OPS_ONLY_IDS = [
   'fleet_documents',
   'fleet_expenses',
   'fleet_digest',
+];
+
+const FLEET_OPS_ONLY_SET = new Set(FLEET_OPS_ONLY_IDS);
+
+/** Core left-nav rows that must always remain reachable in «main». */
+const CRITICAL_MAIN_IDS = [
+  'dashboard',
+  'fleet_live_map',
+  'routes',
+  'customers',
+  'fleet',
+  'fleet_ops',
+  'drivers',
+  'lost_found',
+  'bookings',
+  'email',
 ];
 
 /** Platform SaaS tabs (Tenants, SaaS Infra, Backup, Growth) — superadmin only. */
@@ -108,7 +124,11 @@ function allKnownNavIds(isSuperAdmin) {
   return new Set(SECTION_KEYS.flatMap((key) => defaults[key] || []));
 }
 
-/** Preserve free cross-section placement; only drop unknown / forbidden ids. */
+/**
+ * Preserve free cross-section placement; only drop unknown / forbidden ids.
+ * Also rescue menu rows that were dragged into the orphaned «fleet_ops» bucket
+ * (that section is no longer rendered as a sidebar zone).
+ */
 function migrateNavLayout(layout, isSuperAdmin) {
   const defaults = getDefaultNavLayout(isSuperAdmin);
   const known = allKnownNavIds(isSuperAdmin);
@@ -122,6 +142,14 @@ function migrateNavLayout(layout, isSuperAdmin) {
       if (!known.has(id)) continue;
       if (!isSuperAdmin && PLATFORM_ID_SET.has(id)) continue;
       if (seen.has(id)) continue;
+
+      // fleet_ops section may only hold hub subtabs — everything else belongs in main.
+      if (section === 'fleet_ops' && !FLEET_OPS_ONLY_SET.has(id)) {
+        seen.add(id);
+        next.main.push(id);
+        continue;
+      }
+
       seen.add(id);
       next[section].push(id);
     }
@@ -140,6 +168,29 @@ function migrateNavLayout(layout, isSuperAdmin) {
       next[section].push(id);
     }
   }
+
+  // Guarantee core office tools are always in main (repair empty / wiped menus).
+  for (const id of CRITICAL_MAIN_IDS) {
+    if (!known.has(id) || seen.has(id)) continue;
+    if (next.main.includes(id)) continue;
+    seen.add(id);
+    next.main.push(id);
+  }
+  for (const id of CRITICAL_MAIN_IDS) {
+    if (next.main.includes(id)) continue;
+    // Was only in another section — pull into main.
+    for (const section of SECTION_KEYS) {
+      if (section === 'main') continue;
+      const idx = next[section].indexOf(id);
+      if (idx < 0) continue;
+      next[section].splice(idx, 1);
+      next.main.push(id);
+      break;
+    }
+  }
+
+  // Keep fleet_ops bucket = hub subtabs only.
+  next.fleet_ops = FLEET_OPS_ONLY_IDS.filter((id) => known.has(id));
 
   return next;
 }
@@ -170,6 +221,7 @@ export function loadNavLayout(isSuperAdmin) {
   const storageKey = layoutStorageKey(isSuperAdmin);
   const legacyKeys = [
     storageKey,
+    isSuperAdmin ? 'aerostride_admin_nav_layout_v11_super' : 'aerostride_admin_nav_layout_v11',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v10_super' : 'aerostride_admin_nav_layout_v10',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v9_super' : 'aerostride_admin_nav_layout_v9',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v7_super' : 'aerostride_admin_nav_layout_v7',
