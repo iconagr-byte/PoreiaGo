@@ -430,7 +430,7 @@ export default function SortableSidebarNav({
         }
       }}
     >
-      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-2.5 py-2 space-y-3 admin-nav-scroll">
+      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-2.5 pt-4 pb-2 space-y-3 admin-nav-scroll">
         {showServiceSwitch ? (
           <div className="admin-nav-mode-switch" role="tablist" aria-label="Υπηρεσία μενού">
             {NAV_SERVICE_MODES.map((mode) => {

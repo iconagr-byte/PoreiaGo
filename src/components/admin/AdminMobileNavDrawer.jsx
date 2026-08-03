@@ -53,23 +53,24 @@ export default function AdminMobileNavDrawer({
         onClick={onClose}
       />
       <aside className="absolute inset-y-0 left-0 w-[min(100%,22rem)] bg-surface-container-lowest shadow-2xl border-r border-black/[0.06] flex flex-col animate-in slide-in-from-left duration-200">
-        <div className="flex items-center justify-between gap-3 p-4 border-b border-black/[0.05]">
+        <div className="flex items-center justify-between gap-3 px-5 pt-6 pb-5 border-b border-black/[0.05]">
           <button
             type="button"
-            className="group flex items-center gap-2 min-w-0 text-left rounded-xl hover:bg-slate-50 p-1 -m-1"
+            className="group flex items-center gap-3 min-w-0 text-left rounded-xl hover:bg-slate-50 p-2 -m-1"
             onClick={() => onEditLogo?.()}
             aria-label="Αλλαγή λογοτύπου εταιρείας"
             title="Αλλαγή λογοτύπου"
           >
             <OfficeBrandMark
-              className="h-8"
+              className="min-h-12"
               variant="light"
               asLink={false}
               fallbackLabel="Γραφείο"
               refreshKey={brandRefreshKey}
               preferAdmin
+              minHeightPx={52}
             />
-            <span className="material-symbols-outlined text-[18px] text-slate-300 group-hover:text-primary shrink-0">
+            <span className="material-symbols-outlined text-[20px] text-slate-300 group-hover:text-primary shrink-0">
               edit
             </span>
           </button>

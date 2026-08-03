@@ -5,7 +5,7 @@ import {
   fetchSiteAppearance,
   resolveSiteAssetUrl,
 } from '../../services/siteAppearanceApi.js';
-import { officeLogoImageStyle, resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
+import { officeLogoImageStyle, resolveOfficeBrand, clampLogoHeight } from '../../lib/branding/officeBrand.js';
 import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
 import { OFFICE_BRAND_CHANGED_EVENT } from '../admin/OfficeLogoChangeModal.jsx';
 
@@ -22,6 +22,8 @@ export default function OfficeBrandMark({
   fallbackLabel = 'Γραφείο',
   refreshKey = 0,
   preferAdmin = false,
+  /** Optional minimum height for admin sidebar / drawers (px). */
+  minHeightPx,
 }) {
   const [appearance, setAppearance] = useState({});
   const [brand, setBrand] = useState(() => resolveOfficeBrand({}));
@@ -57,7 +59,13 @@ export default function OfficeBrandMark({
   const logoSrc = brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();
   const label = brand.displayName || brand.name || fallbackLabel || (onTenant ? 'Γραφείο' : 'PoreiaGo');
-  const logoStyle = officeLogoImageStyle(appearance);
+  const resolvedHeight =
+    minHeightPx != null
+      ? Math.max(clampLogoHeight(appearance.logo_height_px), clampLogoHeight(minHeightPx))
+      : undefined;
+  const logoStyle = officeLogoImageStyle(
+    resolvedHeight != null ? { ...appearance, logo_height_px: resolvedHeight } : appearance,
+  );
 
   const inner = logoSrc ? (
     <span className={`inline-flex items-center gap-2 ${className}`}>
@@ -75,13 +83,13 @@ export default function OfficeBrandMark({
       } ${className}`}
     >
       <span
-        className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ${
-          isDark ? 'bg-white/20 text-white' : 'bg-slate-900 text-white'
-        }`}
+        className={`flex items-center justify-center rounded-lg text-xs font-bold ${
+          minHeightPx != null ? 'h-11 w-11 text-sm' : 'h-8 w-8'
+        } ${isDark ? 'bg-white/20 text-white' : 'bg-slate-900 text-white'}`}
       >
         {(label || 'Γ').charAt(0).toUpperCase()}
       </span>
-      <span className="text-base">{label}</span>
+      <span className={minHeightPx != null ? 'text-lg' : 'text-base'}>{label}</span>
     </span>
   );
 
