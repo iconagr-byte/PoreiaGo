@@ -1,4 +1,13 @@
-import { BUSES_HUB_TABS, DEFAULT_BUSES_HUB_TAB, sanitizeBusesHubTab } from '../../lib/admin/busesHub.js';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  BUSES_HUB_TABS,
+  DEFAULT_BUSES_HUB_TAB,
+  busesHubTabsInOrder,
+  loadBusesHubOrder,
+  moveBusesHubTab,
+  sanitizeBusesHubTab,
+  saveBusesHubOrder,
+} from '../../lib/admin/busesHub.js';
 import { isFleetOpsSubTab } from '../../lib/admin/fleetOpsHub.js';
 
 const RAIL_ACTIVE = {
@@ -47,15 +56,60 @@ const CHIP_ACTIVE = {
 
 /**
  * Buses hub — sidebar card «Λεωφορεία» opens this menu on the right
- * (same pattern as SettingsHub / RentDeskHub).
+ * (same pattern as SettingsHub / RentDeskHub). Rail order is drag-and-drop.
  */
 export default function BusesHub({ activeTab, onNavigate, children }) {
   const railTab = sanitizeBusesHubTab(activeTab);
-  const active = BUSES_HUB_TABS.find((t) => t.id === railTab) || BUSES_HUB_TABS[0];
+  const [order, setOrder] = useState(() => loadBusesHubOrder());
+  const [draggingId, setDraggingId] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
+
+  const tabs = useMemo(() => busesHubTabsInOrder(order), [order]);
+  const active = tabs.find((t) => t.id === railTab) || BUSES_HUB_TABS[0];
   const inFleetOps = activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab);
 
   const selectTab = (id) => {
     onNavigate?.(id || DEFAULT_BUSES_HUB_TAB);
+  };
+
+  const persistOrder = useCallback((next) => {
+    const saved = saveBusesHubOrder(next);
+    setOrder(saved);
+  }, []);
+
+  const onDragStart = (id, event) => {
+    event.dataTransfer.effectAllowed = 'move';
+    try {
+      event.dataTransfer.setData('text/plain', id);
+    } catch {
+      /* ignore */
+    }
+    setDraggingId(id);
+    setOverIndex(order.indexOf(id));
+  };
+
+  const clearDrag = () => {
+    setDraggingId(null);
+    setOverIndex(null);
+  };
+
+  const onDropAt = (index, event) => {
+    event.preventDefault();
+    const fromId =
+      draggingId ||
+      (() => {
+        try {
+          return event.dataTransfer.getData('text/plain');
+        } catch {
+          return '';
+        }
+      })();
+    if (!fromId) {
+      clearDrag();
+      return;
+    }
+    persistOrder(moveBusesHubTab(order, fromId, index));
+    clearDrag();
   };
 
   return (
@@ -66,10 +120,13 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
             <div className="px-1.5 pt-0.5">
               <p className="text-xs font-bold uppercase tracking-wide text-sky-700/80">Λεωφορεία</p>
               <p className="text-base font-bold text-on-surface mt-0.5">Εκδρομές & στόλος</p>
+              <p className="text-[11px] text-on-surface-variant mt-1 hidden lg:block">
+                Σύρετε ⋮⋮ για αλλαγή σειράς μενού
+              </p>
             </div>
 
             <div className="flex lg:hidden gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5">
-              {BUSES_HUB_TABS.map((t) => {
+              {tabs.map((t) => {
                 const isActive = t.id === railTab;
                 const accent = t.accent || 'sky';
                 return (
@@ -91,50 +148,101 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
             </div>
 
             <ul className="hidden lg:block space-y-1.5">
-              {BUSES_HUB_TABS.map((t) => {
+              {tabs.map((t, index) => {
                 const isActive = t.id === railTab;
                 const accent = t.accent || 'sky';
+                const dragging = draggingId === t.id;
+                const showDropBefore = draggingId && overIndex === index && draggingId !== t.id;
                 return (
                   <li key={t.id}>
-                    <button
-                      type="button"
-                      onClick={() => selectTab(t.id)}
-                      className={`w-full text-left flex items-center gap-3 rounded-2xl border px-3.5 py-3 transition ${
-                        isActive
-                          ? RAIL_ACTIVE[accent] || RAIL_ACTIVE.sky
-                          : 'border-transparent bg-black/[0.02] hover:bg-black/[0.04] hover:border-black/[0.06]'
+                    {showDropBefore ? (
+                      <div
+                        className="h-1.5 mb-1 rounded-full bg-sky-400/80"
+                        aria-hidden
+                      />
+                    ) : null}
+                    <div
+                      className={`flex items-stretch gap-1 rounded-2xl transition ${
+                        dragging ? 'opacity-50' : ''
                       }`}
+                      onDragOver={(e) => {
+                        if (!draggingId) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const mid = rect.top + rect.height / 2;
+                        setOverIndex(e.clientY < mid ? index : index + 1);
+                      }}
+                      onDrop={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const mid = rect.top + rect.height / 2;
+                        onDropAt(e.clientY < mid ? index : index + 1, e);
+                      }}
                     >
-                      <span
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(e) => onDragStart(t.id, e)}
+                        onDragEnd={clearDrag}
+                        className="shrink-0 w-8 self-stretch rounded-xl text-slate-400 hover:text-slate-700 hover:bg-black/[0.04] flex items-center justify-center cursor-grab active:cursor-grabbing"
+                        title="Σύρετε για αλλαγή σειράς"
+                        aria-label={`Μετακίνηση ${t.label}`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">drag_indicator</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => selectTab(t.id)}
+                        className={`min-w-0 flex-1 text-left flex items-center gap-3 rounded-2xl border px-3 py-3 transition ${
                           isActive
-                            ? RAIL_ICON_ACTIVE[accent] || RAIL_ICON_ACTIVE.sky
-                            : RAIL_ICON_IDLE[accent] || RAIL_ICON_IDLE.sky
+                            ? RAIL_ACTIVE[accent] || RAIL_ACTIVE.sky
+                            : 'border-transparent bg-black/[0.02] hover:bg-black/[0.04] hover:border-black/[0.06]'
                         }`}
                       >
                         <span
-                          className="material-symbols-outlined text-[22px]"
-                          style={{ fontVariationSettings: "'FILL' 1" }}
-                        >
-                          {t.icon}
-                        </span>
-                      </span>
-                      <span className="min-w-0">
-                        <span
-                          className={`block text-[15px] font-bold truncate ${
-                            isActive ? 'text-slate-950' : 'text-on-surface'
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            isActive
+                              ? RAIL_ICON_ACTIVE[accent] || RAIL_ICON_ACTIVE.sky
+                              : RAIL_ICON_IDLE[accent] || RAIL_ICON_IDLE.sky
                           }`}
                         >
-                          {t.label}
+                          <span
+                            className="material-symbols-outlined text-[22px]"
+                            style={{ fontVariationSettings: "'FILL' 1" }}
+                          >
+                            {t.icon}
+                          </span>
                         </span>
-                        <span className="block text-xs text-on-surface-variant truncate mt-0.5 leading-snug">
-                          {t.description}
+                        <span className="min-w-0">
+                          <span
+                            className={`block text-[15px] font-bold truncate ${
+                              isActive ? 'text-slate-950' : 'text-on-surface'
+                            }`}
+                          >
+                            {t.label}
+                          </span>
+                          <span className="block text-xs text-on-surface-variant truncate mt-0.5 leading-snug">
+                            {t.description}
+                          </span>
                         </span>
-                      </span>
-                    </button>
+                      </button>
+                    </div>
                   </li>
                 );
               })}
+              {draggingId && overIndex === tabs.length ? (
+                <li>
+                  <div
+                    className="h-1.5 mt-1 rounded-full bg-sky-400/80"
+                    aria-hidden
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setOverIndex(tabs.length);
+                    }}
+                    onDrop={(e) => onDropAt(tabs.length, e)}
+                  />
+                </li>
+              ) : null}
             </ul>
           </div>
         </aside>
