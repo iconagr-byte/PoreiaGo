@@ -10,8 +10,6 @@ import LocationPicker from './LocationPicker.jsx';
 import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
 import HybridRoomingExtras from './hybrid/HybridRoomingExtras.jsx';
-import HybridSupplierCosts from './hybrid/HybridSupplierCosts.jsx';
-import HybridRebookWhatsApp from './hybrid/HybridRebookWhatsApp.jsx';
 import {
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
@@ -984,22 +982,6 @@ export default function TripForm({
         hint="Δωμάτια ξενοδοχείου και ασφάλεια / έξτρα ανά επιβάτη."
       >
         <HybridRoomingExtras formData={formData} setFormData={setFormData} />
-      </Section>
-
-      <Section
-        icon="receipt_long"
-        title="Supplier cost sheets"
-        hint="Κόστος αεροπορικής / λεωφορείου / ξενοδοχείου με αναφορά αρχείου."
-      >
-        <HybridSupplierCosts formData={formData} setFormData={setFormData} />
-      </Section>
-
-      <Section
-        icon="sms"
-        title="Rebook & WhatsApp templates"
-        hint="Πρόταση εναλλακτικής πτήσης και εγκεκριμένα πρότυπα μηνυμάτων."
-      >
-        <HybridRebookWhatsApp formData={formData} setFormData={setFormData} tripId={tripId} />
       </Section>
 
       <Section
