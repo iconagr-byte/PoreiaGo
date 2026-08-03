@@ -22,6 +22,13 @@ class PoreiagoHomeDriverContractTests(unittest.TestCase):
             store,
         )
 
+    def test_drivers_list_soft_ensures_achilleas(self) -> None:
+        api = (ROOT / "backend" / "api" / "admin_platform.py").read_text(encoding="utf-8")
+        self.assertIn("ensure_home_driver_on_tenant", api)
+        self.assertIn("_POREIAGO_HOME_EMAILS", api)
+        self.assertIn("_tenant_is_poreiago_platform", api)
+        self.assertIn("canonical PoreiaGo platform drivers", api)
+
     def test_deploy_and_boot_call_poreiago_repair(self) -> None:
         main = (ROOT / "backend" / "main.py").read_text(encoding="utf-8")
         deploy = (ROOT / "deploy" / "scripts" / "vm-deploy-all.sh").read_text(
