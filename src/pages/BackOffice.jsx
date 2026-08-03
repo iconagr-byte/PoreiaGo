@@ -2040,24 +2040,25 @@ export default function BackOffice() {
       )}
     <div className="bg-surface text-on-surface h-screen flex overflow-hidden relative">
       <aside className="w-[17.5rem] xl:w-80 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0 relative z-20">
-        <div className="px-4 pt-4 pb-2">
+        <div className="shrink-0 px-5 pt-7 pb-6 mb-1 border-b border-black/[0.05]">
           <button
             type="button"
-            className="group block text-left w-full rounded-xl hover:bg-slate-50/80 p-1.5 -m-1.5 transition-colors"
+            className="group block text-left w-full rounded-xl hover:bg-slate-50/80 p-2.5 -m-1 transition-colors"
             onClick={() => setLogoModalOpen(true)}
             aria-label="Αλλαγή λογοτύπου εταιρείας"
             title="Αλλαγή λογοτύπου"
           >
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-3 min-h-[3.5rem]">
               <OfficeBrandMark
-                className="h-9"
+                className="min-h-14"
                 variant="light"
                 asLink={false}
                 fallbackLabel="Γραφείο"
                 refreshKey={brandRefreshKey}
                 preferAdmin
+                minHeightPx={56}
               />
-              <span className="material-symbols-outlined text-[18px] text-slate-300 group-hover:text-primary transition-colors shrink-0">
+              <span className="material-symbols-outlined text-[20px] text-slate-300 group-hover:text-primary transition-colors shrink-0">
                 edit
               </span>
             </span>

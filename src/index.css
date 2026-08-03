@@ -409,7 +409,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--color-on-surface-variant) 70%, transparent);
-  padding: 0 0.5rem 0.625rem;
+  padding: 0.25rem 0.5rem 0.75rem;
   margin: 0;
 }
 
