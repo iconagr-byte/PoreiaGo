@@ -386,9 +386,8 @@ export default function OfficeExcursionBookingModal({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_minmax(0,13rem)] gap-4 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,13rem)] gap-4 items-start">
                 <SeatSelectionAside
-                  compact
                   trip={trip}
                   layout={layout}
                   seatTheme={seatTheme}
