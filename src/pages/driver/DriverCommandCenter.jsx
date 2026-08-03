@@ -364,6 +364,8 @@ export default function DriverCommandCenter() {
       <MasterQrGate
         onAuthenticated={() => {
           resetDriverEntryAlerts().catch(() => {});
+          // Login never starts a shift — clear any stale flag before shell mounts.
+          clearDriverShiftLaunchState();
           setAuthenticated(true);
           setProfileTick((n) => n + 1);
           window.setTimeout(() => {
@@ -531,8 +533,8 @@ export default function DriverCommandCenter() {
                   type="button"
                   className={tab === t.id ? 'active' : ''}
                   onClick={() => {
+                    // Tab enter (Αρχική / Θέση / Scan / Chat / SOS / Ημέρα) never starts shift.
                     setTab(t.id);
-                    // Never auto-start shift on tab enter — only explicit «Έναρξη βάρδιας».
                   }}
                   aria-label={
                     showChatBadge ? `${t.label}, ${chatUnread} νέα` : t.label

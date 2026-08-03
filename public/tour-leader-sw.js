@@ -1,7 +1,7 @@
 /**
  * Tour Leader luggage PWA — offline shell + cache for /tour routes.
  */
-const CACHE = 'poreiago-tour-leader-v1';
+const CACHE = 'poreiago-tour-leader-v2';
 const OFFLINE_URL = '/tour-leader-offline.html';
 
 const PRECACHE_URLS = [OFFLINE_URL];
