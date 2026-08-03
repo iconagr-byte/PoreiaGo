@@ -86,13 +86,6 @@ export async function notifyFlightDelay(flightId, payload = {}) {
   });
 }
 
-export async function calculateYieldRemote(payload) {
-  return hybridFetch('/api/v1/operations/hybrid/yield', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
 /** Aviationstack / Twilio readiness (booleans only — no secrets). */
 export async function fetchHybridProvidersStatus() {
   return hybridFetch('/api/v1/operations/hybrid/providers');
