@@ -130,6 +130,8 @@ export async function loadBookingsForCustomer(email) {
   }
 
   try {
+    // POST sync upserts local rows and pulls office/guest Postgres bookings
+    // for this login email + Host office (e.g. «Σωτηρα» walk-ins).
     const synced = await syncMyBookingsToServer(localForUser);
     mergeBookingsIntoStore(synced);
     return loadBookings().filter((b) => String(b.email || '').toLowerCase() === key);

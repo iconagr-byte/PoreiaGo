@@ -213,7 +213,8 @@ function WalletAuthenticatedApp() {
     return () => {
       cancelled = true;
     };
-  }, [email, focusId]);
+    // Also refresh when opening ticket/bookings tabs so Postgres walk-ins appear.
+  }, [email, focusId, activeTab]);
 
   useEffect(() => {
     let cancelled = false;
