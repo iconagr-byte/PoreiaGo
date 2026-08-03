@@ -5,9 +5,11 @@
 
 export const DEFAULT_RENT_APP_BRANDING = {
   rent_office_name: '',
-  rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
+  rent_hero_title: 'Το όχημά σας, με πραγματικά οφέλη',
   rent_hero_copy:
-    'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
+    'Σύγκρινε μοντέλα, κλείσε online και πάρε χάρτη παραλαβής, ασφάλεια και υποστήριξη — όλα στο Wallet σου.',
+  /** Customer-facing line above the hero title (never a bare «Γραφείο»). */
+  rent_hero_kicker: 'Επωφελήσου από την ενοικίαση',
   rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου & van',
   rent_guest_hero_title_accent: 'για όλο το ταξίδι σας',
   rent_guest_hero_copy: '',
@@ -18,17 +20,27 @@ export const DEFAULT_RENT_APP_BRANDING = {
 const OBSOLETE_RENT_GUEST_HERO_COPY =
   'Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.';
 
+/** Generic labels that should not headline the customer-facing hero. */
+const GENERIC_OFFICE_LABEL =
+  /^(γραφείο|γραφειο|ενοικίαση|ενοικιαση|office|rent|rent wallet|my wallet)$/i;
+
+export function isGenericRentOfficeLabel(label) {
+  return !String(label || '').trim() || GENERIC_OFFICE_LABEL.test(String(label).trim());
+}
+
 /**
  * @param {object} appearance
  * @param {{ guest?: boolean }} [opts]
  */
 export function resolveRentAppBranding(appearance = {}, opts = {}) {
   const guest = Boolean(opts.guest);
-  const office =
+  const officeRaw =
     String(appearance.rent_office_name || '').trim() ||
     String(appearance.footer_brand_name || '').trim() ||
     String(appearance.display_name || '').trim() ||
-    'Ενοικίαση';
+    '';
+
+  const office = isGenericRentOfficeLabel(officeRaw) ? 'Ενοικίαση' : officeRaw;
 
   const title = guest
     ? String(appearance.rent_guest_hero_title || '').trim() ||
@@ -51,9 +63,16 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     String(appearance.rent_cta_label || '').trim() ||
     DEFAULT_RENT_APP_BRANDING.rent_cta_label;
 
+  // Hero always speaks to the customer about rental benefits — not «Γραφείο».
+  const heroKicker =
+    String(appearance.rent_hero_kicker || '').trim() ||
+    DEFAULT_RENT_APP_BRANDING.rent_hero_kicker;
+
   return {
     officeName: office,
     brandLabel: office,
+    /** Customer-facing line above the hero title. */
+    heroKicker,
     title,
     titleAccent,
     copy,
@@ -61,7 +80,8 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     isCustomized: Boolean(
       String(appearance.rent_office_name || '').trim() ||
         String(appearance.rent_hero_title || '').trim() ||
-        String(appearance.rent_hero_copy || '').trim(),
+        String(appearance.rent_hero_copy || '').trim() ||
+        String(appearance.rent_hero_kicker || '').trim(),
     ),
   };
 }

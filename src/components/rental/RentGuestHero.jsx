@@ -14,6 +14,7 @@ import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
  */
 export default function RentGuestHero({
   brandLabel = 'Ενοικίαση',
+  heroKicker,
   title,
   titleAccent,
   copy,
@@ -80,7 +81,9 @@ export default function RentGuestHero({
       </div>
 
       <div className="rent-hero-landing-inner">
-        <p className="rent-hero-brand rent-hero-brand--landing">{brandLabel}</p>
+        <p className="rent-hero-brand rent-hero-brand--landing">
+          {heroKicker || brandLabel}
+        </p>
 
         <h1 className="rent-hero-landing-title">
           {headline}{' '}
