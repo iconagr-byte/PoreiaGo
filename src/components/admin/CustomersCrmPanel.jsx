@@ -222,12 +222,12 @@ function CustomerDetail({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-600 hover:text-zinc-900 transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-bold bg-white border border-zinc-200 text-zinc-800 shadow-sm hover:bg-zinc-50 transition-colors"
         >
-          <span className="w-9 h-9 rounded-full bg-white border border-zinc-200 shadow-sm flex items-center justify-center">
+          <span className="w-8 h-8 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center">
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
           </span>
-          Πίσω στον κατάλογο
+          Πίσω
         </button>
         <div className="flex items-center gap-2">
           {customer.phone ? (

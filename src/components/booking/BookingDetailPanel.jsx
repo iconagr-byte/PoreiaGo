@@ -104,9 +104,19 @@ export default function BookingDetailPanel({
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 text-sm font-bold text-white/90 hover:text-white transition-colors"
+          className={
+            fullPage
+              ? 'inline-flex items-center gap-2 text-sm font-bold text-white/90 hover:text-white transition-colors'
+              : 'inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-bold bg-white border border-zinc-200 text-zinc-800 shadow-sm hover:bg-zinc-50 transition-colors'
+          }
         >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          {fullPage ? (
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          ) : (
+            <span className="w-8 h-8 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            </span>
+          )}
           {mode === 'admin' ? 'Πίσω στις Κρατήσεις' : 'Πίσω στις κρατήσεις'}
         </button>
       )}

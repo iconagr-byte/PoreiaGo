@@ -523,12 +523,21 @@ export default function BackOffice() {
     setActiveTab('customers');
   };
 
+  /** Buses hub «Κρατήσεις» — always the bookings list home (not a stuck ticket). */
+  const goToBookingsHome = () => {
+    setSelectedBooking(null);
+    setActiveTab('bookings');
+  };
+
   const handleAdminTabChange = (tab) => {
     if (tab === 'customers') {
       const scope = rentOnly ? CUSTOMER_SERVICE_RENT : CUSTOMER_SERVICE_BUSES;
       setCustomerServiceScope(scope);
       setCustomers(loadCustomersByService(scope));
       setSelectedCustomer(null);
+    }
+    if (tab === 'bookings') {
+      setSelectedBooking(null);
     }
     setActiveTab(tab);
   };
@@ -909,7 +918,7 @@ export default function BackOffice() {
             </div>
             <button
               type="button"
-              onClick={() => setActiveTab('bookings')}
+              onClick={goToBookingsHome}
               className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
             >
               Όλες
@@ -2378,6 +2387,11 @@ export default function BackOffice() {
                     // Always land on CRM list home (not a stuck customer detail).
                     if (next === 'customers') {
                       handleAdminTabChange('customers');
+                      return;
+                    }
+                    // Always land on bookings list home (not a stuck ticket detail).
+                    if (next === 'bookings') {
+                      goToBookingsHome();
                       return;
                     }
                     setActiveTab(next);
