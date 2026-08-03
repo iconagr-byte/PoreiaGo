@@ -9,7 +9,9 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
+import { sendWalletClaimBookingEmail } from '../lib/wallet/sendClaimBookingEmail.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
+import toast from 'react-hot-toast';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -104,14 +106,38 @@ export default function RegisterPage() {
         result.access_token,
       );
       const hadClaim = Boolean(claim);
+      const claimBookingId = highlightBooking || claim?.bookingId || claim?.reference || '';
       clearWalletClaim();
+
+      // Email the passenger their booking + QR to the address they just registered.
+      if (hadClaim && claimBookingId && !rentIntent) {
+        sendWalletClaimBookingEmail({
+          bookingId: claimBookingId,
+          reference: claim?.reference,
+          email: result.email || email,
+          name: result.name || name,
+          phone: claim?.phone,
+        })
+          .then((res) => {
+            if (res?.skipped) return;
+            if (res?.logged_only) {
+              toast.success(`Καταγράφηκε αποστολή εισιτηρίου → ${res.email}`);
+            } else if (res?.ok) {
+              toast.success(`Στάλθηκε email με την κράτηση στο ${res.email}`);
+            }
+          })
+          .catch(() => {
+            /* non-blocking — wallet still opens */
+          });
+      }
+
       if (rentIntent) {
         navigate(redirectTo, { replace: true });
       } else {
         navigate(redirectTo === '/wallet' || redirectTo.startsWith('/wallet') ? redirectTo : '/wallet', {
           replace: true,
           state: walletHomeNavState({
-            highlightBooking,
+            highlightBooking: claimBookingId || highlightBooking,
             fromClaim: hadClaim,
           }),
         });
