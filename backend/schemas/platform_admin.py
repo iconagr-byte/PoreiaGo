@@ -171,6 +171,7 @@ class VehicleProfileResponse(BaseModel):
     seat_count: int = 49
     amenities: list[str] = []
     public_image_url: str = ""
+    gallery_urls: list[str] = []
     public_summary: str = ""
     show_on_website: bool = True
     documents: list[dict] = []
@@ -203,6 +204,7 @@ class VehicleCreate(BaseModel):
     seat_count: int = Field(49, ge=8, le=80)
     amenities: list[str] = Field(default_factory=list)
     public_image_url: str = ""
+    gallery_urls: list[str] = Field(default_factory=list)
     public_summary: str = ""
     show_on_website: bool = True
 
@@ -228,6 +230,7 @@ class VehicleUpdate(BaseModel):
     seat_count: int | None = Field(None, ge=8, le=80)
     amenities: list[str] | None = None
     public_image_url: str | None = None
+    gallery_urls: list[str] | None = None
     public_summary: str | None = None
     show_on_website: bool | None = None
 

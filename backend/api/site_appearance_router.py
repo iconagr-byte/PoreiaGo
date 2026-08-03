@@ -616,6 +616,27 @@ async def get_driver_photo(filename: str):
     )
 
 
+@router.get("/api/site/fleet-photos/{filename}")
+async def get_fleet_vehicle_photo(filename: str):
+    """Public fleet bus photo for admin list, detail, map, and website showcase."""
+    import os
+    import re
+
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", filename) or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    data_root = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data")
+    path = (data_root / "uploads" / "fleet_photos" / filename).resolve()
+    allowed_root = (data_root / "uploads" / "fleet_photos").resolve()
+    if not str(path).startswith(str(allowed_root)) or not path.is_file():
+        raise HTTPException(status_code=404, detail="Photo not found")
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=604800, immutable"},
+    )
+
+
 @router.get("/api/site/rental-photos/{filename}")
 async def get_rental_damage_photo(filename: str):
     """Public rental check-in/out damage selfie for admin desk."""

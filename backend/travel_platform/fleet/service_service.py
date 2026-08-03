@@ -113,6 +113,7 @@ class Vehicle:
     seat_count: int = 49
     amenities: list[str] = field(default_factory=list)
     public_image_url: str = ""
+    gallery_urls: list[str] = field(default_factory=list)
     public_summary: str = ""
     show_on_website: bool = True
     tenant_id: str = DEMO_TENANT_ID
@@ -270,6 +271,11 @@ class ServiceService:
                 seat_count=int(r.get("seat_count") or _default_seats(str(r.get("category") or "Standard"))),
                 amenities=list(r.get("amenities") or _default_amenities(str(r.get("category") or "Standard"))),
                 public_image_url=str(r.get("public_image_url") or ""),
+                gallery_urls=[
+                    str(u).strip()
+                    for u in (r.get("gallery_urls") or [])
+                    if str(u).strip()
+                ],
                 public_summary=str(r.get("public_summary") or ""),
                 show_on_website=bool(r.get("show_on_website", True)),
                 # Legacy rows without tenant_id belong to the demo office only.
@@ -444,11 +450,20 @@ class ServiceService:
             seat_count=int(payload.get("seat_count") or _default_seats(category)),
             amenities=list(payload.get("amenities") or _default_amenities(category)),
             public_image_url=str(payload.get("public_image_url") or ""),
+            gallery_urls=[
+                str(u).strip()
+                for u in (payload.get("gallery_urls") or [])
+                if str(u).strip()
+            ],
             public_summary=str(payload.get("public_summary") or ""),
             show_on_website=bool(payload.get("show_on_website", True)),
             tenant_id=_normalize_tenant_id(payload.get("tenant_id")),
             documents=list(payload.get("documents") or []),
         )
+        if v.public_image_url and v.public_image_url not in v.gallery_urls:
+            v.gallery_urls = [v.public_image_url, *v.gallery_urls]
+        elif not v.public_image_url and v.gallery_urls:
+            v.public_image_url = v.gallery_urls[0]
         self._vehicles[v.id] = v
         self._persist()
         return self._vehicle_response(v)
@@ -475,10 +490,17 @@ class ServiceService:
                 setattr(v, key, int(value))
             elif key == "amenities" and isinstance(value, list):
                 setattr(v, key, [str(a).strip() for a in value if str(a).strip()])
+            elif key == "gallery_urls" and isinstance(value, list):
+                urls = [str(u).strip() for u in value if str(u).strip()]
+                setattr(v, key, urls)
+                if urls and not (patch.get("public_image_url") or v.public_image_url):
+                    v.public_image_url = urls[0]
             elif key == "show_on_website":
                 setattr(v, key, bool(value))
             elif key in {"category", "public_image_url", "public_summary"}:
                 setattr(v, key, str(value).strip())
+                if key == "public_image_url" and value and str(value).strip() not in (v.gallery_urls or []):
+                    v.gallery_urls = [str(value).strip(), *(v.gallery_urls or [])]
             elif key in {"current_odometer", "last_service_mileage", "next_service_threshold", "purchase_price", "fuel_cost_total", "insurance_cost_total"}:
                 setattr(v, key, float(value))
             elif hasattr(v, key):

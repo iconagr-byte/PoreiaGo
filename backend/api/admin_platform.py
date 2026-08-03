@@ -692,6 +692,44 @@ async def post_fleet_vehicle(request: Request, body: VehicleCreate):
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+_FLEET_PHOTO_DIR = Path(
+    os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[1] / "data"
+) / "uploads" / "fleet_photos"
+_MAX_FLEET_PHOTO_BYTES = 8 * 1024 * 1024
+
+
+@router.post("/fleet/vehicles/photo-upload")
+async def upload_fleet_vehicle_photo(file: UploadFile = File(...)):
+    """Admin upload — returns a public URL for vehicle public_image_url / gallery."""
+    from travel_platform.media.image_optimize import optimize_driver_photo
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Άδειο αρχείο")
+    if len(content) > _MAX_FLEET_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Η εικόνα είναι πολύ μεγάλη (μέγ. 8 MB)")
+
+    optimized = optimize_driver_photo(content, max_side=1600, quality=84)
+    if optimized.ext == ".bin":
+        raise HTTPException(status_code=400, detail="Μη έγκυρη εικόνα")
+    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "", Path(file.filename or "bus").stem)[:40] or "bus"
+    filename = f"{safe_stem}-{uuid.uuid4().hex}{optimized.ext}"
+
+    _FLEET_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _FLEET_PHOTO_DIR / filename
+    out_path.write_bytes(optimized.content)
+    url = f"/api/site/fleet-photos/{filename}"
+    return {
+        "ok": True,
+        "url": url,
+        "filename": filename,
+        "bytes": len(optimized.content),
+        "content_type": optimized.content_type,
+    }
+
+
 @router.get("/fleet/vehicles/{vehicle_id}", response_model=VehicleProfileResponse)
 async def get_fleet_vehicle(request: Request, vehicle_id: str):
     row = service_service.get_vehicle(vehicle_id, tenant_id=_request_tenant_id(request))

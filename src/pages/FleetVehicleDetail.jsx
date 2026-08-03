@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import AdminLayout from '../components/AdminLayout';
@@ -6,9 +6,27 @@ import {
   fetchFleetVehicle,
   fetchMaintenanceEvents,
   updateFleetVehicle,
+  uploadFleetVehiclePhoto,
 } from '../services/platformApi.js';
+import { resolveSiteAssetUrl } from '../services/siteAppearanceApi.js';
 
 const CATEGORIES = ['Luxury Coach', 'Premium Express', 'Standard', 'Van'];
+
+const AMENITY_PRESETS = [
+  'Wi-Fi onboard',
+  'USB θύρες',
+  'USB & 220V',
+  'Κλιματισμός',
+  'Θέρμανση',
+  'Ανακλινόμενα καθίσματα',
+  'Ανακλινόμενα leather seats',
+  'WC onboard',
+  'Ψυγείο',
+  'Mini bar',
+  'Αποσκευές',
+  'Ευέλικτες θέσεις',
+  'Μεγάλοι αποθηκευτικοί χώροι',
+];
 
 function statusLabel(serviceStatus) {
   if (serviceStatus === 'Urgent') return 'Σε Service';
@@ -16,15 +34,28 @@ function statusLabel(serviceStatus) {
   return 'Ενεργό';
 }
 
+function galleryFrom(vehicle) {
+  const urls = [];
+  for (const u of vehicle?.gallery_urls || []) {
+    if (u && !urls.includes(u)) urls.push(u);
+  }
+  if (vehicle?.public_image_url && !urls.includes(vehicle.public_image_url)) {
+    urls.unshift(vehicle.public_image_url);
+  }
+  return urls.filter((u) => u && !String(u).includes('hero-bus-achillio'));
+}
+
 export default function FleetVehicleDetail() {
   const { vehicleId } = useParams();
   const navigate = useNavigate();
+  const fileRef = useRef(null);
   const [vehicle, setVehicle] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +80,10 @@ export default function FleetVehicleDetail() {
         public_summary: v.public_summary || '',
         show_on_website: Boolean(v.show_on_website),
         service_interval_km: v.service_interval_km || 15000,
+        purchase_price: v.purchase_price || 0,
+        amenities: Array.isArray(v.amenities) ? [...v.amenities] : [],
+        public_image_url: v.public_image_url || '',
+        gallery_urls: galleryFrom(v),
       });
       const ev = await fetchMaintenanceEvents(vehicleId);
       setEvents(ev);
@@ -80,6 +115,7 @@ export default function FleetVehicleDetail() {
         seat_count: Number(form.seat_count),
         current_odometer: Number(form.current_odometer),
         service_interval_km: Number(form.service_interval_km),
+        purchase_price: Number(form.purchase_price),
         legal_deadline: form.legal_deadline || null,
         insurance_due_date: form.insurance_due_date || null,
       });
@@ -90,6 +126,67 @@ export default function FleetVehicleDetail() {
       toast.error(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onPickPhotos = async (fileList) => {
+    if (!fileList?.length) return;
+    setUploading(true);
+    try {
+      const uploaded = [];
+      for (const file of Array.from(fileList).slice(0, 8)) {
+        const res = await uploadFleetVehiclePhoto(file);
+        if (res?.url) uploaded.push(res.url);
+      }
+      if (!uploaded.length) throw new Error('Δεν ανέβηκε καμία φωτογραφία');
+      const existing = galleryFrom(vehicle);
+      const gallery_urls = [...existing, ...uploaded.filter((u) => !existing.includes(u))];
+      const public_image_url = vehicle.public_image_url || uploaded[0];
+      const updated = await updateFleetVehicle(vehicleId, { gallery_urls, public_image_url });
+      setVehicle(updated);
+      setForm((f) =>
+        f
+          ? {
+              ...f,
+              gallery_urls,
+              public_image_url,
+            }
+          : f,
+      );
+      toast.success(
+        uploaded.length > 1 ? `Προστέθηκαν ${uploaded.length} φωτογραφίες` : 'Προστέθηκε φωτογραφία',
+      );
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία ανεβάσματος');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const setCover = async (url) => {
+    try {
+      const updated = await updateFleetVehicle(vehicleId, { public_image_url: url });
+      setVehicle(updated);
+      toast.success('Ορίστηκε ως κύρια φωτογραφία');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const removePhoto = async (url) => {
+    const next = galleryFrom(vehicle).filter((u) => u !== url);
+    const public_image_url =
+      vehicle.public_image_url === url ? next[0] || '' : vehicle.public_image_url || '';
+    try {
+      const updated = await updateFleetVehicle(vehicleId, {
+        gallery_urls: next,
+        public_image_url,
+      });
+      setVehicle(updated);
+      toast.success('Η φωτογραφία αφαιρέθηκε');
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -121,6 +218,9 @@ export default function FleetVehicleDetail() {
     0,
     Math.min(100, (Number(vehicle.current_odometer || 0) / threshold) * 100),
   );
+  const cover = galleryFrom(vehicle)[0]
+    ? resolveSiteAssetUrl(vehicle.public_image_url || galleryFrom(vehicle)[0])
+    : '';
 
   const header = (
     <div className="flex items-center justify-between w-full gap-4">
@@ -140,96 +240,171 @@ export default function FleetVehicleDetail() {
           Προφίλ Οχήματος
         </h1>
       </div>
-      <button
-        type="button"
-        onClick={() => setEditing((x) => !x)}
-        className="px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold"
-      >
-        {editing ? 'Ακύρωση' : 'Επεξεργασία'}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+          className="px-4 py-2 rounded-full border text-sm font-bold disabled:opacity-50"
+        >
+          {uploading ? 'Ανέβασμα…' : 'Φωτογραφίες'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing((x) => !x)}
+          className="px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold"
+        >
+          {editing ? 'Ακύρωση' : 'Παραμετροποίηση'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => onPickPhotos(e.target.files)}
+        />
+      </div>
     </div>
   );
 
   return (
     <AdminLayout activeTab="fleet" title={header}>
       <div className="max-w-container-max mx-auto pb-16 space-y-8">
-        <div className="bg-white rounded-[32px] border border-black/[0.05] shadow-sm p-8">
-          <div className="flex flex-col sm:flex-row gap-6">
-            <div className="w-28 h-28 rounded-2xl bg-surface-container-low text-primary flex items-center justify-center shadow-sm shrink-0">
-              <span className="material-symbols-outlined text-[56px]">
-                {isVan ? 'airport_shuttle' : 'directions_bus'}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-3 mb-2">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {vehicle.make} {vehicle.model}
-                </h2>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
-                    vehicle.service_status === 'OK'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'
-                  }`}
-                >
-                  {statusLabel(vehicle.service_status)}
+        <div className="bg-white rounded-[32px] border border-black/[0.05] shadow-sm overflow-hidden">
+          <div className="relative aspect-[21/9] max-h-72 bg-slate-100">
+            {cover ? (
+              <img src={cover} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-primary">
+                <span className="material-symbols-outlined text-[72px]">
+                  {isVan ? 'airport_shuttle' : 'directions_bus'}
                 </span>
               </div>
-              <p className="text-sm font-mono text-gray-500 mb-6">
-                {vehicle.plate_number} · ID: {vehicle.id}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                <div>
-                  <div className="text-xs font-bold text-gray-400 uppercase mb-1">Κατηγορία</div>
-                  <div className="font-bold text-gray-900">{vehicle.category}</div>
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-gray-400 uppercase mb-1">Θέσεις</div>
-                  <div className="font-bold text-gray-900">{vehicle.seat_count}</div>
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-gray-400 uppercase mb-1">Χιλιόμετρα</div>
-                  <div className="font-bold text-gray-900">
-                    {Number(vehicle.current_odometer || 0).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-gray-400 uppercase mb-1">Έτος</div>
-                  <div className="font-bold text-gray-900">{vehicle.year}</div>
+            )}
+          </div>
+          <div className="p-6 sm:p-8">
+            <div className="flex flex-wrap items-center gap-3 mb-2">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {vehicle.make} {vehicle.model}
+              </h2>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
+                  vehicle.service_status === 'OK'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}
+              >
+                {statusLabel(vehicle.service_status)}
+              </span>
+            </div>
+            <p className="text-sm font-mono text-gray-500 mb-4">
+              {vehicle.plate_number} · ID: {vehicle.id}
+            </p>
+
+            {galleryFrom(vehicle).length > 0 ? (
+              <div className="flex gap-2 overflow-x-auto mb-6 pb-1">
+                {galleryFrom(vehicle).map((url) => {
+                  const src = resolveSiteAssetUrl(url);
+                  const isCover = url === vehicle.public_image_url;
+                  return (
+                    <div
+                      key={url}
+                      className={`relative w-24 h-16 rounded-xl overflow-hidden border shrink-0 ${
+                        isCover ? 'border-sky-500 ring-2 ring-sky-200' : 'border-black/[0.08]'
+                      }`}
+                    >
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 opacity-0 hover:opacity-100 bg-black/40 flex items-center justify-center gap-1 transition-opacity">
+                        {!isCover ? (
+                          <button
+                            type="button"
+                            onClick={() => setCover(url)}
+                            className="p-1 rounded-full bg-white/90"
+                            title="Κύρια"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">star</span>
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(url)}
+                          className="p-1 rounded-full bg-white/90 text-rose-700"
+                          title="Αφαίρεση"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Κατηγορία</div>
+                <div className="font-bold text-gray-900">{vehicle.category}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Θέσεις</div>
+                <div className="font-bold text-gray-900">{vehicle.seat_count}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Χιλιόμετρα</div>
+                <div className="font-bold text-gray-900">
+                  {Number(vehicle.current_odometer || 0).toLocaleString('el-GR')}
                 </div>
               </div>
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Έτος</div>
+                <div className="font-bold text-gray-900">{vehicle.year}</div>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-8 bg-surface-container-low rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase mb-1">ΚΤΕΟ</div>
-              <div className="font-bold text-gray-900">{vehicle.legal_deadline || '—'}</div>
-            </div>
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase mb-1">Ασφάλεια</div>
-              <div className="font-bold text-gray-900">{vehicle.insurance_due_date || '—'}</div>
-            </div>
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase mb-1">Τελευταίο service</div>
-              <div className="font-bold text-gray-900">{vehicle.last_service_date || '—'}</div>
-            </div>
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase mb-1">Έως επόμενο</div>
-              <div className="font-bold text-gray-900">{kmLeft.toLocaleString()} km</div>
-            </div>
-          </div>
+            {(vehicle.amenities || []).length > 0 ? (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {vehicle.amenities.map((a) => (
+                  <span
+                    key={a}
+                    className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700"
+                  >
+                    {a}
+                  </span>
+                ))}
+              </div>
+            ) : null}
 
-          <div className="mt-6">
-            <div className="flex justify-between text-xs font-bold text-gray-500 mb-2">
-              <span>Πρόοδος προς service</span>
-              <span>{Math.round(serviceProgress)}%</span>
+            <div className="mt-8 bg-surface-container-low rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">ΚΤΕΟ</div>
+                <div className="font-bold text-gray-900">{vehicle.legal_deadline || '—'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Ασφάλεια</div>
+                <div className="font-bold text-gray-900">{vehicle.insurance_due_date || '—'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Τελευταίο service</div>
+                <div className="font-bold text-gray-900">{vehicle.last_service_date || '—'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Έως επόμενο</div>
+                <div className="font-bold text-gray-900">{kmLeft.toLocaleString('el-GR')} km</div>
+              </div>
             </div>
-            <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-              <div
-                className={`h-full rounded-full ${kmLeft < 2000 ? 'bg-rose-500' : 'bg-primary'}`}
-                style={{ width: `${serviceProgress}%` }}
-              />
+
+            <div className="mt-6">
+              <div className="flex justify-between text-xs font-bold text-gray-500 mb-2">
+                <span>Πρόοδος προς service</span>
+                <span>{Math.round(serviceProgress)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${kmLeft < 2000 ? 'bg-rose-500' : 'bg-primary'}`}
+                  style={{ width: `${serviceProgress}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -239,7 +414,7 @@ export default function FleetVehicleDetail() {
             onSubmit={onSave}
             className="bg-white rounded-[32px] border p-6 grid sm:grid-cols-2 gap-4"
           >
-            <h3 className="sm:col-span-2 font-bold text-lg">Επεξεργασία στοιχείων</h3>
+            <h3 className="sm:col-span-2 font-bold text-lg">Παραμετροποίηση λεωφορείου</h3>
             {[
               ['make', 'Μάρκα'],
               ['model', 'Μοντέλο'],
@@ -301,6 +476,27 @@ export default function FleetVehicleDetail() {
               />
             </label>
             <label className="text-sm font-bold text-gray-700">
+              Διάστημα service (km)
+              <input
+                type="number"
+                min={1000}
+                className="mt-1 w-full rounded-xl border px-3 py-2"
+                value={form.service_interval_km}
+                onChange={(e) => setForm((f) => ({ ...f, service_interval_km: e.target.value }))}
+              />
+            </label>
+            <label className="text-sm font-bold text-gray-700">
+              Τιμή αγοράς (€)
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                className="mt-1 w-full rounded-xl border px-3 py-2"
+                value={form.purchase_price}
+                onChange={(e) => setForm((f) => ({ ...f, purchase_price: e.target.value }))}
+              />
+            </label>
+            <label className="text-sm font-bold text-gray-700">
               ΚΤΕΟ έως
               <input
                 type="date"
@@ -326,6 +522,35 @@ export default function FleetVehicleDetail() {
                 onChange={(e) => setForm((f) => ({ ...f, public_summary: e.target.value }))}
               />
             </label>
+            <div className="sm:col-span-2">
+              <div className="text-sm font-bold text-gray-700 mb-2">Παροχές / ανέσεις</div>
+              <div className="flex flex-wrap gap-2">
+                {AMENITY_PRESETS.map((name) => {
+                  const on = form.amenities.includes(name);
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          amenities: on
+                            ? f.amenities.filter((a) => a !== name)
+                            : [...f.amenities, name],
+                        }))
+                      }
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border ${
+                        on
+                          ? 'bg-sky-600 text-white border-sky-600'
+                          : 'bg-white text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <label className="flex items-center gap-2 text-sm font-bold text-gray-700 sm:col-span-2">
               <input
                 type="checkbox"
