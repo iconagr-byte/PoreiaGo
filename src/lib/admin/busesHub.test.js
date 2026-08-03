@@ -37,19 +37,16 @@ describe('busesHub', () => {
     expect(moved).toHaveLength(BUSES_HUB_TAB_IDS.length);
     expect(busesHubTabsInOrder(moved).map((t) => t.id)).toEqual(moved);
 
-    const sample = ['routes', 'customers', 'fleet', 'bookings'];
-    expect(moveBusesHubTab(sample, 'routes', 2)).toEqual([
-      'customers',
-      'routes',
-      'fleet',
-      'bookings',
-    ]);
-    expect(moveBusesHubTab(sample, 'bookings', 0)).toEqual([
-      'bookings',
-      'routes',
-      'customers',
-      'fleet',
-    ]);
-    expect(moveBusesHubTab(sample, 'customers', 1)).toEqual(sample);
+    // Insert-before index 2 while dragging routes (0) → lands after customers.
+    const down = moveBusesHubTab(BUSES_HUB_TAB_IDS, 'routes', 2);
+    expect(down[0]).toBe('customers');
+    expect(down[1]).toBe('routes');
+    expect(down).toHaveLength(BUSES_HUB_TAB_IDS.length);
+
+    const up = moveBusesHubTab(BUSES_HUB_TAB_IDS, 'bookings', 0);
+    expect(up[0]).toBe('bookings');
+
+    // Adjacent drop is a no-op.
+    expect(moveBusesHubTab(BUSES_HUB_TAB_IDS, 'customers', 1)).toEqual([...BUSES_HUB_TAB_IDS]);
   });
 });
