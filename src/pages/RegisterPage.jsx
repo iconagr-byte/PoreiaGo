@@ -179,29 +179,10 @@ export default function RegisterPage() {
           </h1>
           <p className={leadClass}>
             {rentIntent
-              ? 'Δημιουργήστε λογαριασμό για ενοικίαση οχήματος — ξεχωριστά από τα λεωφορεία.'
+              ? 'Δημιουργήστε λογαριασμό για ενοικίαση οχήματος'
               : claim
                 ? 'Δημιουργήστε λογαριασμό για να δείτε το εισιτήριο και το QR επιβίβασης'
-                : 'Ο λογαριασμός μαζεύει εισιτήρια και QR. Αν έχετε ήδη κράτηση, μπορείτε να τη βρείτε χωρίς εγγραφή.'}
-          </p>
-          <p className={hintClass}>
-            {rentIntent ? (
-              <>
-                Τα λεωφορεία είναι στο{' '}
-                <Link to="/login" className={linkClass}>
-                  My Wallet
-                </Link>{' '}
-                (μπλε, /login).
-              </>
-            ) : (
-              <>
-                Η ενοικίαση είναι στο{' '}
-                <Link to="/rent/login" className={linkClass}>
-                  Rent Wallet
-                </Link>{' '}
-                (πράσινο, /rent/login).
-              </>
-            )}
+                : 'Δημιουργήστε λογαριασμό για εισιτήρια λεωφορείου'}
           </p>
         </div>
 
@@ -315,18 +296,10 @@ export default function RegisterPage() {
             Σύνδεση
           </Link>
         </p>
-        {!rentIntent && !claim ? (
-          <div className="mt-5 rounded-2xl border border-[#0071e3]/18 bg-[#0071e3]/8 px-4 py-3 text-center text-sm">
-            <p className="font-semibold text-[#1d1d1f] mb-1">Έχετε ήδη κράτηση;</p>
-            <p className="text-xs text-[#6e6e73] mb-2">Βρείτε την χωρίς λογαριασμό.</p>
-            <Link to="/my-booking" className={linkClass}>
-              Εύρεση κράτησης λεωφορείου
-            </Link>
-          </div>
-        ) : !rentIntent ? (
+        {!rentIntent ? (
           <p className="text-xs text-center mt-4">
             <Link to="/my-booking" className={linkClass}>
-              Εύρεση κράτησης χωρίς λογαριασμό
+              Εύρεση κράτησης λεωφορείου
             </Link>
           </p>
         ) : (

@@ -247,55 +247,12 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           {bookingPayContinue
             ? 'Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή — θα επιστρέψετε στη σελίδα πληρωμής.'
             : rentIntent
-              ? 'Σύνδεση για ενοικίαση οχήματος — ξεχωριστή εφαρμογή από τα λεωφορεία.'
+              ? 'Σύνδεση για ενοικίαση οχήματος'
               : claim
                 ? 'Συνδεθείτε για να δείτε το εισιτήριο της κράτησής σας'
-                : 'Ο λογαριασμός μαζεύει τα εισιτήριά σας. Αν έχετε ήδη κράτηση, βρείτε την χωρίς εγγραφή.'}
+                : 'Σύνδεση για εισιτήρια & QR επιβίβασης'}
         </p>
-        {!rentIntent && !claim && !bookingPayContinue ? (
-          <p className={hintClass}>
-            Η κράτηση γίνεται χωρίς λογαριασμό. Ο λογαριασμός χρειάζεται μόνο για να τα ανοίγετε μαζί στο κινητό.
-          </p>
-        ) : (
-          <p className={hintClass}>
-            {rentIntent ? (
-              <>
-                Τα λεωφορεία είναι στο{' '}
-                <Link to="/login" className={linkClass}>
-                  My Wallet
-                </Link>{' '}
-                (μπλε) — διεύθυνση <span className="font-mono text-[0.85em]">/login</span>.
-              </>
-            ) : (
-              <>
-                Η ενοικίαση είναι στο{' '}
-                <Link to="/rent/login" className={linkClass}>
-                  Rent Wallet
-                </Link>{' '}
-                (πράσινο) — διεύθυνση <span className="font-mono text-[0.85em]">/rent/login</span>.
-              </>
-            )}
-          </p>
-        )}
       </div>
-
-      {!rentIntent && !claim && !bookingPayContinue ? (
-        <div className="mb-5 rounded-2xl border border-[#0071e3]/20 bg-[#0071e3]/10 px-4 py-3.5 text-sm text-center">
-          <p className="font-bold text-[#1d1d1f] mb-1">Έχετε ήδη κράτηση;</p>
-          <p className="text-[#6e6e73] text-xs mb-3 leading-relaxed">
-            Δεν χρειάζεται λογαριασμός — βρείτε την με email ή κωδικό κράτησης.
-          </p>
-          <Link
-            to="/my-booking"
-            className="inline-flex items-center justify-center gap-1.5 w-full rounded-xl bg-[#0071e3] text-white font-semibold text-sm py-2.5 hover:bg-[#0077ed] transition-colors"
-          >
-            <span className="material-symbols-outlined text-[18px]" aria-hidden>
-              confirmation_number
-            </span>
-            Εύρεση κράτησης λεωφορείου
-          </Link>
-        </div>
-      ) : null}
 
       {claim && !rentIntent ? (
         <div className="mb-5 rounded-2xl border border-[#0071e3]/20 bg-[#0071e3]/8 px-4 py-3 text-sm">
@@ -377,41 +334,26 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       </form>
 
       <p className="text-sm text-center text-[#6e6e73] mt-5">
-        {rentIntent ? (
-          <>
-            Δεν έχετε λογαριασμό;{' '}
-            <Link to="/rent/register" state={{ from: '/rent/wallet' }} className={linkClass}>
-              Δημιουργία λογαριασμού
-            </Link>
-          </>
-        ) : (
-          <>
-            Θέλετε τα εισιτήρια μαζί στο κινητό;{' '}
-            <Link to="/register" state={registerState} className={linkClass}>
-              Δημιουργία λογαριασμού
-            </Link>
-          </>
-        )}
+        Δεν έχετε λογαριασμό;{' '}
+        <Link
+          to={rentIntent ? '/rent/register' : '/register'}
+          state={rentIntent ? { from: '/rent/wallet' } : registerState}
+          className={linkClass}
+        >
+          {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
+        </Link>
       </p>
-      {rentIntent ? (
-        <p className="text-xs text-center mt-3">
-          <Link to="/rent/my-booking" className={linkClass}>
-            Εύρεση κράτησης ενοικίασης
-          </Link>
-        </p>
-      ) : claim || bookingPayContinue ? (
+      {!rentIntent ? (
         <p className="text-xs text-center mt-3">
           <Link to="/my-booking" className={linkClass}>
             Εύρεση κράτησης λεωφορείου
           </Link>
         </p>
       ) : (
-        <p className="text-xs text-center mt-3 text-[#8e8e93]">
-          Η ενοικίαση είναι στο{' '}
-          <Link to="/rent/login" className={linkClass}>
-            Rent Wallet
+        <p className="text-xs text-center mt-3">
+          <Link to="/rent/my-booking" className={linkClass}>
+            Εύρεση κράτησης ενοικίασης
           </Link>
-          .
         </p>
       )}
     </>
@@ -507,14 +449,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
                     </div>
                   </li>
                 </ol>
-                <p className="rent-auth-aside-note">
-                  Μόνο ενοικιάσεις — <strong>/rent/login</strong> και <strong>/rent/wallet</strong>.
-                  Λεωφορεία:{' '}
-                  <Link to="/login" className="rent-auth-link rent-auth-link--on-dark">
-                    My Wallet
-                  </Link>{' '}
-                  (μπλε, <strong>/login</strong>).
-                </p>
               </aside>
             ) : null}
           </div>
@@ -531,22 +465,12 @@ export default function LoginPage({ rentEntrance = false } = {}) {
             <aside className="wallet-auth-aside" aria-label="Σχετικά με το My Wallet λεωφορείων">
               <p className="wallet-auth-aside-kicker">My Wallet · Λεωφορεία</p>
               <h2 className="wallet-auth-aside-title">
-                Έχετε κράτηση;<br />ή μαζέψτε τα εισιτήρια
+                Τα εισιτήριά σας,<br />πάντα στο κινητό
               </h2>
               <p className="wallet-auth-aside-lead">
-                Η κράτηση γίνεται χωρίς λογαριασμό. Ο λογαριασμός είναι για να συγκεντρώνετε
-                εισιτήρια, QR επιβίβασης και ιστορικό — όταν τα χρειάζεστε μαζί.
+                Κρατήσεις λεωφορείου, QR επιβίβασης και ιστορικό ταξιδιών σε ένα μέρος.
               </p>
               <ul className="wallet-auth-aside-list">
-                <li>
-                  <span className="material-symbols-outlined" aria-hidden>
-                    search
-                  </span>
-                  <div>
-                    <strong>Βρείτε την κράτηση</strong>
-                    <span>Με email ή κωδικό — χωρίς εγγραφή.</span>
-                  </div>
-                </li>
                 <li>
                   <span className="material-symbols-outlined" aria-hidden>
                     qr_code_2
@@ -567,6 +491,15 @@ export default function LoginPage({ rentEntrance = false } = {}) {
                 </li>
                 <li>
                   <span className="material-symbols-outlined" aria-hidden>
+                    notifications_active
+                  </span>
+                  <div>
+                    <strong>Ενημερώσεις διαδρομής</strong>
+                    <span>Ειδοποιήσεις για αλλαγές και υπενθυμίσεις.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="material-symbols-outlined" aria-hidden>
                     lock
                   </span>
                   <div>
@@ -575,14 +508,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
                   </div>
                 </li>
               </ul>
-              <p className="wallet-auth-aside-note">
-                Μόνο λεωφορεία — διεύθυνση <strong>/login</strong> και <strong>/wallet</strong>.
-                Ενοικίαση οχήματος:{' '}
-                <Link to="/rent/login" className="wallet-auth-link">
-                  Rent Wallet
-                </Link>{' '}
-                (πράσινο, <strong>/rent/login</strong>).
-              </p>
             </aside>
           ) : null}
           <div className="wallet-auth-panel">
