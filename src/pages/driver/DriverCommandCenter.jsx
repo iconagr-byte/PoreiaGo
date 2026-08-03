@@ -532,10 +532,7 @@ export default function DriverCommandCenter() {
                   className={tab === t.id ? 'active' : ''}
                   onClick={() => {
                     setTab(t.id);
-                    // Tab tap is a user gesture — best moment to start iOS GPS.
-                    if (t.id === 'gps' && !shift.online) {
-                      void shift.goOnline({ resume: false });
-                    }
+                    // Never auto-start shift on tab enter — only explicit «Έναρξη βάρδιας».
                   }}
                   aria-label={
                     showChatBadge ? `${t.label}, ${chatUnread} νέα` : t.label

@@ -39,7 +39,7 @@ export default function DriverShiftTelemetry({ shift }) {
       void goOnline({ resume: false });
       return;
     }
-    // Avoid accidental end when Θέση tab auto-started the shift.
+    // Two-tap confirm so Θέση tab never ends a shift by accident.
     if (!confirmEnd) {
       setConfirmEnd(true);
       return;
