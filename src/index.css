@@ -461,17 +461,6 @@
   transition: opacity 0.15s ease;
 }
 
-.admin-nav-row--card {
-  min-height: 2.75rem;
-  margin-bottom: 0.3rem;
-  align-items: stretch;
-}
-
-.admin-nav-row--card .admin-nav-grip {
-  height: auto;
-  min-height: 2.75rem;
-}
-
 .admin-nav-row-dragging {
   opacity: 0.42;
 }
@@ -531,49 +520,6 @@
 .admin-nav-btn:hover {
   background: var(--color-surface-container-low);
   color: var(--color-primary);
-}
-
-/* Bus-zone rows — same language as Λειτουργίες Στόλου service card */
-.admin-nav-btn--card {
-  min-height: 2.75rem;
-  padding: 0.4rem 0.45rem 0.4rem 0.35rem;
-  border-radius: 0.85rem;
-  border-color: color-mix(in srgb, var(--color-outline) 22%, transparent);
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  gap: 0.55rem;
-}
-
-.admin-nav-btn--card:hover {
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-}
-
-.admin-nav-btn--card.admin-nav-btn-active {
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
-}
-
-.admin-nav-icon--tile {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.65rem;
-  background: color-mix(in srgb, currentColor 12%, #fff);
-}
-
-.admin-nav-icon--tile .material-symbols-outlined {
-  font-size: 1.15rem;
-}
-
-.admin-nav-row-chevron {
-  font-size: 1.125rem;
-  color: #cbd5e1;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.admin-nav-btn--card.admin-nav-btn-active .admin-nav-row-chevron,
-.admin-nav-btn--card:hover .admin-nav-row-chevron {
-  color: currentColor;
-  opacity: 0.55;
 }
 
 .admin-nav-icon {
