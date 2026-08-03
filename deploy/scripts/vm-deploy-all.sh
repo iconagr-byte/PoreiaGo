@@ -242,14 +242,14 @@ if [[ "$api_ok" -ne 1 ]]; then
   exit 1
 fi
 
-echo "==> Ensure Achilleas home driver on Achillio Travel"
+echo "==> Ensure Achilleas home driver on PoreiaGo platform"
 $COMPOSE exec -T api-blue python - <<'PY' \
   || echo "WARNING: Achilleas home ensure failed (API lifespan will retry)"
 import asyncio
-from travel_platform.settings.drivers_store import repair_achillio_home_drivers
+from travel_platform.settings.drivers_store import repair_poreiago_home_drivers
 
 async def main():
-    result = await repair_achillio_home_drivers()
+    result = await repair_poreiago_home_drivers()
     print(result)
 
 asyncio.run(main())

@@ -271,15 +271,17 @@ def _normalize_username(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
-# Emails that must live on Achillio Travel after the cross-office fiasco.
-_ACHILLIO_HOME_EMAILS = frozenset(
+# Emails that must live on the PoreiaGo platform office (not Achillio Travel).
+_POREIAGO_HOME_EMAILS = frozenset(
     {
         "axilleas0@yahoo.gr",
     }
 )
+# Back-compat alias — older call sites / tests.
+_ACHILLIO_HOME_EMAILS = _POREIAGO_HOME_EMAILS
 
 # Profiles used only when a home driver row is missing entirely (recreate).
-_ACHILLIO_HOME_PROFILES: dict[str, dict] = {
+_POREIAGO_HOME_PROFILES: dict[str, dict] = {
     "axilleas0@yahoo.gr": {
         "name": "Αχιλλέας Χαραλαμπίδης",
         "license_no": "AXILLEAS-HOME-LIC",
@@ -288,6 +290,7 @@ _ACHILLIO_HOME_PROFILES: dict[str, dict] = {
         "password": DEFAULT_DRIVER_PASSWORD,
     },
 }
+_ACHILLIO_HOME_PROFILES = _POREIAGO_HOME_PROFILES
 
 
 def find_drivers_by_email(email: str) -> list[FleetDriver]:
@@ -306,8 +309,8 @@ def rehome_driver_to_tenant(email: str, tenant_id: str, *, only_from_demo: bool 
     Move driver rows with this email onto ``tenant_id``.
 
     Default SEAL: only DEMO orphans (never steal from a real office).
-    Known Achillio home emails may pass ``only_from_demo=False`` so boot repair
-    can pull Achilleas back from PoreiaGo/DEMO after a cross-office mishap.
+    Known PoreiaGo home emails may pass ``only_from_demo=False`` so boot repair
+    can pull Achilleas back from Achillio Travel / DEMO onto PoreiaGo.
     """
     tid = _normalize_tenant_id(tenant_id)
     if not tid or tid == DEMO_TENANT_ID:
@@ -356,7 +359,7 @@ def ensure_home_driver_on_tenant(email: str, tenant_id: str) -> dict:
     Make sure a known home driver exists on ``tenant_id``.
 
     1) Force-rehome any existing row (even from another real office).
-    2) If missing entirely, recreate from ``_ACHILLIO_HOME_PROFILES``.
+    2) If missing entirely, recreate from ``_POREIAGO_HOME_PROFILES``.
     """
     email_n = _normalize_username(email)
     tid = _normalize_tenant_id(tenant_id)
@@ -376,7 +379,7 @@ def ensure_home_driver_on_tenant(email: str, tenant_id: str) -> dict:
             "rehome": report,
         }
 
-    profile = _ACHILLIO_HOME_PROFILES.get(email_n)
+    profile = _POREIAGO_HOME_PROFILES.get(email_n)
     if not profile:
         return {"ok": False, "reason": "no_profile", "email": email_n}
 
@@ -428,35 +431,39 @@ def ensure_home_driver_on_tenant(email: str, tenant_id: str) -> dict:
     }
 
 
-async def repair_achillio_home_drivers() -> dict:
-    """Boot repair: known Achillio drivers must not stay on PoreiaGo/DEMO — recreate if gone."""
+async def repair_poreiago_home_drivers() -> dict:
+    """
+    Boot repair: known home drivers (Achilleas) must live on PoreiaGo platform —
+    pull them off Achillio Travel / DEMO and recreate if missing.
+    """
     try:
-        from sqlalchemy import select
-
-        from app.core.database import AsyncSessionLocal
-        from app.models.tenant import Tenant
-        from app.services.tenant_modules import is_achillio_travel_office
+        from travel_platform.settings.office_host_guard import (
+            resolve_poreiago_platform_tenant_id,
+        )
     except Exception as exc:
         return {"ok": False, "reason": f"imports:{exc}"}
 
-    achillio_tid: str | None = None
     try:
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Tenant).limit(50))
-            for tenant in result.scalars().all():
-                if is_achillio_travel_office(tenant):
-                    achillio_tid = str(tenant.id)
-                    break
+        platform_tid = await resolve_poreiago_platform_tenant_id()
     except Exception as exc:
         return {"ok": False, "reason": f"db:{exc}"}
 
-    if not achillio_tid:
-        return {"ok": False, "reason": "achillio_tenant_missing"}
+    if not platform_tid or platform_tid == DEMO_TENANT_ID:
+        return {"ok": False, "reason": "poreiago_platform_tenant_missing"}
 
     reports = []
-    for email in _ACHILLIO_HOME_EMAILS:
-        reports.append(ensure_home_driver_on_tenant(email, achillio_tid))
-    return {"ok": True, "achillio_tenant_id": achillio_tid, "reports": reports}
+    for email in _POREIAGO_HOME_EMAILS:
+        reports.append(ensure_home_driver_on_tenant(email, platform_tid))
+    return {
+        "ok": True,
+        "poreiago_tenant_id": platform_tid,
+        "reports": reports,
+    }
+
+
+async def repair_achillio_home_drivers() -> dict:
+    """Deprecated alias — Achilleas home is PoreiaGo, not Achillio Travel."""
+    return await repair_poreiago_home_drivers()
 
 
 def _load_from_disk() -> tuple[dict[str, FleetDriver], float] | None:

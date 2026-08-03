@@ -269,15 +269,15 @@ async def lifespan(app: FastAPI):
             "Seed demo driver purge / SEAL skipped: %s", exc
         )
     try:
-        from travel_platform.settings.drivers_store import repair_achillio_home_drivers
+        from travel_platform.settings.drivers_store import repair_poreiago_home_drivers
 
-        repaired = await repair_achillio_home_drivers()
+        repaired = await repair_poreiago_home_drivers()
         __import__("logging").getLogger("poreiago.startup").info(
-            "Achillio driver rehome: %s", repaired
+            "PoreiaGo home driver rehome: %s", repaired
         )
     except Exception as exc:
         __import__("logging").getLogger("poreiago.startup").warning(
-            "Achillio driver rehome skipped: %s", exc
+            "PoreiaGo home driver rehome skipped: %s", exc
         )
     try:
         from app.core.database import AsyncSessionLocal
