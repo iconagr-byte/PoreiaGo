@@ -522,6 +522,67 @@
   color: var(--color-primary);
 }
 
+/* Λεωφορεία zone — mini-cards */
+.admin-nav-list--mini-cards {
+  gap: 0.4rem;
+}
+
+.admin-nav-row--mini-card {
+  min-height: 2.85rem;
+  align-items: stretch;
+}
+
+.admin-nav-row--mini-card .admin-nav-grip {
+  height: auto;
+  min-height: 2.85rem;
+  align-self: center;
+}
+
+.admin-nav-btn--mini-card {
+  min-height: 2.85rem;
+  padding: 0.45rem 0.5rem 0.45rem 0.4rem;
+  border-radius: 0.85rem;
+  border-color: color-mix(in srgb, var(--color-outline) 20%, transparent);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  gap: 0.55rem;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.admin-nav-btn--mini-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  background: #fff;
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn-active {
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
+}
+
+.admin-nav-icon--circle {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, currentColor 14%, #fff);
+}
+
+.admin-nav-icon--circle .material-symbols-outlined {
+  font-size: 1.1rem;
+}
+
+.admin-nav-mini-chevron {
+  font-size: 1.125rem;
+  color: #cbd5e1;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn-active .admin-nav-mini-chevron,
+.admin-nav-btn--mini-card:hover .admin-nav-mini-chevron {
+  color: currentColor;
+  opacity: 0.5;
+}
+
 .admin-nav-icon {
   width: 1.375rem;
   height: 1.375rem;
