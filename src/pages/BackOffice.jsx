@@ -299,7 +299,14 @@ export default function BackOffice() {
 
   useEffect(() => {
     if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
+      const tab = location.state.activeTab;
+      if (tab === 'customers') {
+        const scope = rentOnly ? CUSTOMER_SERVICE_RENT : CUSTOMER_SERVICE_BUSES;
+        setCustomerServiceScope(scope);
+        setCustomers(loadCustomersByService(scope));
+        setSelectedCustomer(null);
+      }
+      setActiveTab(tab);
     }
     if (location.state?.driverId) {
       setChatFocusDriverId(location.state.driverId);
@@ -2364,6 +2371,11 @@ export default function BackOffice() {
                         sanitizeFleetOpsSubTab(fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB),
                       );
                       setActiveTab('fleet_ops');
+                      return;
+                    }
+                    // Always land on CRM list home (not a stuck customer detail).
+                    if (next === 'customers') {
+                      handleAdminTabChange('customers');
                       return;
                     }
                     setActiveTab(next);
