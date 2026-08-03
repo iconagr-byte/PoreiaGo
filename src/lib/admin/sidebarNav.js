@@ -7,8 +7,10 @@ import {
 import { settingsTabToNavItem } from './settingsSidebar.js';
 import { buildRentDeskNavItems, RENT_DESK_NAV_IDS } from './rentDeskNav.js';
 
-export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v12';
+export const NAV_LAYOUT_STORAGE_KEY = 'aerostride_admin_nav_layout_v13';
 export const NAV_ORDER_STORAGE_KEY = 'aerostride_admin_nav_order';
+/** One-shot factory reset so broken local layouts cannot hide the sidebar. */
+export const NAV_FACTORY_RESET_KEY = 'poreiago_admin_nav_factory_reset_v13';
 
 export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 
@@ -221,6 +223,7 @@ export function loadNavLayout(isSuperAdmin) {
   const storageKey = layoutStorageKey(isSuperAdmin);
   const legacyKeys = [
     storageKey,
+    isSuperAdmin ? 'aerostride_admin_nav_layout_v12_super' : 'aerostride_admin_nav_layout_v12',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v11_super' : 'aerostride_admin_nav_layout_v11',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v10_super' : 'aerostride_admin_nav_layout_v10',
     isSuperAdmin ? 'aerostride_admin_nav_layout_v9_super' : 'aerostride_admin_nav_layout_v9',
@@ -266,6 +269,60 @@ export function loadNavLayout(isSuperAdmin) {
 export function saveNavLayout(isSuperAdmin, layout) {
   const safe = migrateNavLayout(layout || getDefaultNavLayout(isSuperAdmin), isSuperAdmin);
   localStorage.setItem(layoutStorageKey(isSuperAdmin), JSON.stringify(safe));
+}
+
+/** Wipe all known layout keys and write a clean default menu. */
+export function resetNavLayoutToDefault(isSuperAdmin) {
+  const defaults = getDefaultNavLayout(isSuperAdmin);
+  const keys = [
+    layoutStorageKey(isSuperAdmin),
+    layoutStorageKey(!isSuperAdmin),
+    'aerostride_admin_nav_layout_v13',
+    'aerostride_admin_nav_layout_v13_super',
+    'aerostride_admin_nav_layout_v12',
+    'aerostride_admin_nav_layout_v12_super',
+    'aerostride_admin_nav_layout_v11',
+    'aerostride_admin_nav_layout_v11_super',
+    'aerostride_admin_nav_layout_v10',
+    'aerostride_admin_nav_layout_v10_super',
+    'aerostride_admin_nav_layout_v9',
+    'aerostride_admin_nav_layout_v9_super',
+    'aerostride_admin_nav_layout_v7',
+    'aerostride_admin_nav_layout_v7_super',
+    'aerostride_admin_nav_layout_v6',
+    'aerostride_admin_nav_layout_v6_super',
+    NAV_ORDER_STORAGE_KEY,
+    `${NAV_ORDER_STORAGE_KEY}_super`,
+  ];
+  for (const key of keys) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+  }
+  saveNavLayout(isSuperAdmin, defaults);
+  try {
+    localStorage.setItem(NAV_FACTORY_RESET_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+  return defaults;
+}
+
+/**
+ * One-shot hard reset for browsers that still have a broken custom layout.
+ * Returns the layout to use (fresh defaults when reset runs).
+ */
+export function ensureFactoryNavReset(isSuperAdmin) {
+  try {
+    if (localStorage.getItem(NAV_FACTORY_RESET_KEY) === '1') {
+      return loadNavLayout(isSuperAdmin);
+    }
+  } catch {
+    /* fall through to reset */
+  }
+  return resetNavLayoutToDefault(isSuperAdmin);
 }
 
 export const ADMIN_NAV_ITEMS = {
