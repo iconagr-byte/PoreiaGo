@@ -245,6 +245,8 @@ function buildLocalBooking({
   extras = [],
   extrasTotal = 0,
   seatSubtotal = null,
+  bookingSource = 'Website (B2C)',
+  agentName = 'Online Auto',
 }) {
   const email = passenger.email.trim().toLowerCase();
   const customer = ensureCustomerForPassenger(passenger);
@@ -258,7 +260,12 @@ function buildLocalBooking({
   const taxes = Math.round(total * 0.24 * 100) / 100;
   const basePrice = Math.round((total - taxes) * 100) / 100;
   const now = new Date();
-  const paymentLabel = buildPaymentStatusLabel(paymentPlan, paymentMethod, pct);
+  let paymentLabel = buildPaymentStatusLabel(paymentPlan, paymentMethod, pct);
+  // Unpaid office / bus cash reservations must not look PAID.
+  if (paidNow <= 0 && remaining > 0) {
+    if (paymentMethod === 'cash_on_bus') paymentLabel = 'PENDING (Μετρητά στο λεωφορείο)';
+    else if (paymentMethod === 'cash_office') paymentLabel = 'PENDING (Μετρητά — γκισέ)';
+  }
   const paymentMethodLabel = buildPaymentMethodLabel(paymentPlan, paymentMethod, pct);
   const extrasList = Array.isArray(extras) ? extras : [];
   const extrasSum = roundMoney(extrasTotal || extrasList.reduce((s, x) => s + (Number(x.lineTotalEur) || 0), 0));
@@ -322,8 +329,8 @@ function buildLocalBooking({
     invoiceNumber: `INV-${now.getFullYear()}-${String(Date.now()).slice(-6)}`,
     basePrice,
     taxes,
-    bookingSource: 'Website (B2C)',
-    agentName: 'Online Auto',
+    bookingSource: bookingSource || 'Website (B2C)',
+    agentName: agentName || 'Online Auto',
     syncedToSaas: Boolean(saasMeta?.syncedToSaas),
   };
 }
@@ -371,6 +378,8 @@ export async function createBookingFromCheckout({
   extras = [],
   extrasTotal = 0,
   seatSubtotal = null,
+  bookingSource,
+  agentName,
 }) {
   const seatList = seats.split(',').map((s) => s.trim()).filter(Boolean);
   const pct = normalizeDepositPercent(depositPercent);
@@ -419,6 +428,8 @@ export async function createBookingFromCheckout({
           extras: extrasList,
           extrasTotal: extrasSum,
           seatSubtotal: seatsTotal,
+          bookingSource,
+          agentName,
           saasMeta: {
             saasBookingId: api.id,
             referenceCode: api.reference_code,
@@ -479,6 +490,8 @@ export async function createBookingFromCheckout({
         extras: extrasList,
         extrasTotal: extrasSum,
         seatSubtotal: seatsTotal,
+        bookingSource,
+        agentName,
         saasMeta: null,
       }),
       {
