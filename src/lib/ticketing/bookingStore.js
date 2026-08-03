@@ -6,6 +6,7 @@ import {
   saasCreateGuestBooking,
   syncTicketForBoarding,
 } from '../../services/saasApi.js';
+import { findSeatConflicts, seatsTakenForTrip } from '../seats/occupiedSeats.js';
 import { dispatchPartnerEvent } from '../../services/growthApi.js';
 import { API_BASE } from '../../config/api.js';
 import { getCustomerToken } from '../auth.js';
@@ -382,6 +383,10 @@ export async function createBookingFromCheckout({
   agentName,
 }) {
   const seatList = seats.split(',').map((s) => s.trim()).filter(Boolean);
+  const localConflicts = findSeatConflicts(seatList, seatsTakenForTrip(trip, loadBookings()));
+  if (localConflicts.length) {
+    throw new Error(`Οι θέσεις είναι ήδη κατειλημμένες: ${localConflicts.join(', ')}`);
+  }
   const pct = normalizeDepositPercent(depositPercent);
   const split = computeDepositSplit(total, pct);
   const paidNow = roundMoney(
@@ -471,6 +476,14 @@ export async function createBookingFromCheckout({
       notifyPaymentConfirmationSafe(saved, { paymentMethod, paymentPlan });
       return saved;
     } catch (err) {
+      // Seat conflict / validation — never invent a local double booking.
+      if (
+        err?.status === 409 ||
+        err?.code === 'seat_conflict' ||
+        /κατειλημ|seat.?conflict|θέσε/i.test(String(err?.message || ''))
+      ) {
+        throw err;
+      }
       console.warn('[checkout] SaaS booking failed, using localStorage', err);
     }
   }

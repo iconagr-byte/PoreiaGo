@@ -63,6 +63,7 @@ PUBLIC_PATHS = {
     "/api/v1/telemetry/update",
     "/api/v1/bookings/guest",
     "/api/v1/bookings/lookup",
+    "/api/v1/bookings/occupied-seats",
 }
 
 # Swagger only in non-production (FastAPI also disables docs_url there).

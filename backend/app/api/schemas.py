@@ -75,6 +75,14 @@ class GuestBookingCreate(BaseModel):
     deposit_percent: int | None = Field(None, ge=5, le=90)
 
 
+class OccupiedSeatsResponse(BaseModel):
+    """Public B2C — seat codes only (no passenger PII)."""
+
+    external_trip_id: int
+    seats: list[str] = Field(default_factory=list)
+    count: int = 0
+
+
 class BookingResponse(BaseModel):
     id: UUID
     tenant_id: UUID
