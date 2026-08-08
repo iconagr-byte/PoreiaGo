@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { exchangeMasterQr } from '../../services/driverPortalApi.js';
-import { clearDriverShiftLaunchState } from '../../lib/driver/useDriverShiftSession.js';
+import { applyDriverShiftInvite } from '../../lib/driver/applyDriverShiftInvite.js';
 import '../../styles/driver-app.css';
 
 /**
  * Magic-link receiver — /driver/auth?token=…
- * Zero-friction login after scanning dashboard QR (opens URL on phone).
+ * Zero-friction login after scanning dashboard QR or tapping office Push.
  */
 export default function DriverAuthPage() {
   const [searchParams] = useSearchParams();
@@ -28,9 +27,8 @@ export default function DriverAuthPage() {
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        await exchangeMasterQr(token);
+        await applyDriverShiftInvite({ token });
         // Do not auto-start GPS/tachograph — driver must tap «Έναρξη βάρδιας».
-        clearDriverShiftLaunchState();
         if (!cancelled) {
           navigate('/driver', { replace: true });
         }
@@ -39,7 +37,7 @@ export default function DriverAuthPage() {
           setError(e.message || 'Αποτυχία σύνδεσης. Το QR μπορεί να έληξε.');
         }
       }
-    }, 1000);
+    }, 280);
 
     return () => {
       cancelled = true;

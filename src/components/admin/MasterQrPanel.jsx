@@ -85,19 +85,40 @@ export default function MasterQrPanel({ compact = false }) {
       toast.error('Επιλέξτε εκδρομή');
       return;
     }
+    if (!driverId.trim()) {
+      toast.error('Επιλέξτε οδηγό για Push στο κινητό του', { duration: 5000 });
+      return;
+    }
     const trip = getTripById(id) || trips.find((t) => Number(t.id) === id);
     setPushLoading(true);
     try {
+      // Ensure Postgres has the trip before minting Master QR / invite.
+      if (trip) {
+        try {
+          await syncTripsToPostgres([trip]);
+        } catch {
+          /* hybrid local still works */
+        }
+      }
       const result = await notifyDriverShiftPush({
         tripId: id,
-        driverId: driverId.trim() || undefined,
+        driverId: driverId.trim(),
         tripTitle: trip?.title,
-        message: trip?.title ? `${trip.title} — πάτα για σύνδεση στη βάρδια` : undefined,
+        message: trip?.title
+          ? `${trip.title} — φορτώνεται στο app του οδηγού`
+          : 'Νέα εκδρομή — άνοιξε το app οδηγού',
+        frontendBase: typeof window !== 'undefined' ? window.location.origin : undefined,
       });
       if (result.push?.reason === 'no_driver_subscriptions') {
-        toast.error('Ο οδηγός δεν έχει ενεργοποιήσει push στο /driver', { duration: 7000 });
+        toast.error(
+          'Ο οδηγός δεν έχει ενεργοποιήσει ειδοποιήσεις στο /driver (άνοιξε το app μία φορά)',
+          { duration: 8000 },
+        );
       } else if (result.ok) {
-        toast.success(`Push στάλθηκε · ${result.push?.sent || 0}`);
+        toast.success(
+          `Push στάλθηκε · η εκδρομή φορτώνει στο app του οδηγού (${result.push?.sent || 0})`,
+          { duration: 5000 },
+        );
         setIssued({
           trip_id: result.trip_id,
           auth_url: result.auth_url,
@@ -145,14 +166,14 @@ export default function MasterQrPanel({ compact = false }) {
           </select>
         </label>
         <label className="block">
-          <span className="text-[12px] font-medium text-zinc-500">Οδηγός (προαιρετικά)</span>
+          <span className="text-[12px] font-medium text-zinc-500">Οδηγός (απαιτείται για Push)</span>
           <select
             value={driverId}
             onChange={(e) => setDriverId(e.target.value)}
             className={fieldClass}
             disabled={driversLoading}
           >
-            <option value="">Χωρίς συγκεκριμένο οδηγό</option>
+            <option value="">Επιλέξτε οδηγό…</option>
             {drivers.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}

@@ -1,7 +1,7 @@
 /**
  * Driver Command Center — cache manifest, offline σελίδα, PWA assets.
  */
-const CACHE = 'aerostride-driver-v8';
+const CACHE = 'aerostride-driver-v9';
 const MANIFEST_PREFIX = '/driver-cache/manifest/';
 const OFFLINE_URL = '/driver-offline.html';
 const APP_SHELL = '/index.html';
@@ -124,6 +124,24 @@ self.addEventListener('push', (event) => {
         /* ignore */
       }
       await self.registration.showNotification(payload.title || 'PoreiaGo Οδηγός', options);
+
+      // If the driver app is already open, bind the excursion immediately
+      // (office «Push») — do not wait for a tray tap.
+      const invite = payload.data?.type === 'driver_shift_invite';
+      if (invite) {
+        const list = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+        const msg = {
+          type: 'DRIVER_SHIFT_INVITE',
+          auth_url: payload.data?.auth_url || payload.url,
+          trip_id: payload.data?.trip_id,
+          url: payload.url,
+        };
+        for (const client of list) {
+          if (client.url.includes('/driver')) {
+            client.postMessage(msg);
+          }
+        }
+      }
     })(),
   );
 });
@@ -135,21 +153,42 @@ self.addEventListener('notificationclick', (event) => {
   if (data.type === 'driver_office_chat') {
     target = data.url || '/driver?tab=chat';
   }
-  if (target.startsWith('/')) {
-    target = `${self.location.origin}${target}`;
-  }
+  const absTarget = target.startsWith('/')
+    ? `${self.location.origin}${target}`
+    : target;
+  const isShiftInvite =
+    data.type === 'driver_shift_invite' ||
+    String(target).includes('/driver/auth') ||
+    String(data.auth_url || '').includes('/driver/auth');
+  const inviteMsg = {
+    type: isShiftInvite ? 'DRIVER_SHIFT_INVITE' : 'DRIVER_NOTIFICATION_OPENED',
+    auth_url: data.auth_url || target,
+    trip_id: data.trip_id,
+    url: target,
+  };
   event.waitUntil(
     clearAllNotifications().then(() =>
       clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-        for (const client of list) {
-          if ('focus' in client && client.url.includes('/driver')) {
-            client.postMessage({ type: 'DRIVER_NOTIFICATION_OPENED' });
-            if (client.navigate) client.navigate(target);
-            return client.focus();
-          }
+        const driverClients = list.filter((c) => c.url.includes('/driver'));
+        if (driverClients.length) {
+          return Promise.all(
+            driverClients.map((client) => {
+              client.postMessage(inviteMsg);
+              // Prefer in-app exchange (DRIVER_SHIFT_INVITE) over navigate —
+              // Client.navigate is unreliable on iOS PWAs.
+              if (!isShiftInvite && client.navigate) {
+                try {
+                  client.navigate(absTarget);
+                } catch {
+                  /* ignore */
+                }
+              }
+              return 'focus' in client ? client.focus() : undefined;
+            }),
+          );
         }
         if (clients.openWindow) {
-          return clients.openWindow(target);
+          return clients.openWindow(absTarget);
         }
         return undefined;
       }),

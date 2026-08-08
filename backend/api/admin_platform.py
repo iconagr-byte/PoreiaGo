@@ -1186,8 +1186,17 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest, request: Reques
     _spawn_passenger_sync(body.trip_id, str(result.get("tenant_id") or tenant_id))
     auth_url = result.get("auth_url") or result.get("qr_content")
     qr_token = result.get("qr_token")
+    # Prefer admin UI origin so the magic link opens the same host the office uses.
+    frontend_base = (body.frontend_base or "").strip().rstrip("/") or None
+    if frontend_base and (
+        not frontend_base.startswith("http://") and not frontend_base.startswith("https://")
+    ):
+        frontend_base = None
     if qr_token:
-        auth_url = build_driver_auth_url(qr_token, base_url=driver_app_public_base())
+        auth_url = build_driver_auth_url(
+            qr_token,
+            base_url=frontend_base or driver_app_public_base(),
+        )
 
     push_result = await send_driver_shift_invite_push(
         tenant_id=str(result["tenant_id"]),
