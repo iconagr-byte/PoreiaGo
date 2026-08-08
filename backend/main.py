@@ -148,6 +148,11 @@ except ImportError:
     email_tracking_router = None
 
 try:
+    from api.newsletter_public_router import router as newsletter_public_router
+except ImportError:
+    newsletter_public_router = None
+
+try:
     from api.email_retry_router import router as email_retry_router
 except ImportError:
     email_retry_router = None
@@ -478,6 +483,8 @@ if email_mailbox_router:
     app.include_router(email_mailbox_router)
 if email_tracking_router:
     app.include_router(email_tracking_router)
+if newsletter_public_router:
+    app.include_router(newsletter_public_router)
 if email_retry_router:
     app.include_router(email_retry_router)
 
