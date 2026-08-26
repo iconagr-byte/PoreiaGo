@@ -13,23 +13,25 @@
 
 ### Contabo / Nginx Proxy Manager
 
-Αν το VPS έχει ήδη NPM στα ports 80/443:
+Αν το VPS έχει ήδη **Nginx Proxy Manager** στα ports 80/443 (π.χ. Contabo `169.58.199.186`),
+το deploy **δεν** ξεκινά Traefik — αλλιώς παίρνεις `Bind for 0.0.0.0:80 failed`.
 
-1. Στο `deploy/.env.prod` βάλε:
+1. Στο `deploy/.env.prod` (συνιστάται· αλλιώς auto-detect από container/image ή κατειλημμένο :80):
    ```
    USE_NPM=1
    EDGE_PROXY=npm
    ```
-   (Το script το γράφει αυτόματα αν βρει container `nginx-proxy*`.)
 
-2. NPM proxy hosts:
+2. NPM proxy hosts (Forward to):
    | Domain | Forward |
    |--------|---------|
    | `api.poreiago.com` | `127.0.0.1:8004` |
    | `poreiago.com`, `www.poreiago.com` | `127.0.0.1:8003` |
 
 3. Το `deploy/docker-compose.npm.yml` δημοσιεύει API→8004 και frontend→8003.
-   Αν υπάρχει ήδη `poreiago-frontend` στο 8003, το κρατάει και ανανεώνει μόνο το `dist/`.
+   Αν υπάρχει ήδη `poreiago-frontend` στο 8003, το κρατάει και ανανεώνει το `dist/`.
+
+4. Μετά το merge στο `main`: **Actions → Deploy VPS → Run workflow**.
 
 Live **Aviationstack / Twilio** keys: βάλε τα στο `deploy/.env.prod` (δες `deploy/HYBRID-PROVIDERS.md`).
 Χωρίς keys το hybrid μένει σε stub mode.

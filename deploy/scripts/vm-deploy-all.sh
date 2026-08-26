@@ -26,7 +26,7 @@ fi
 echo "==> Deploy lock acquired"
 
 # Edge proxy: Traefik (default) or Nginx Proxy Manager (Contabo / shared VPS).
-# Prefer explicit .env.prod (USE_NPM=1 / EDGE_PROXY=npm); else auto-detect nginx-proxy*.
+# Prefer explicit .env.prod (USE_NPM=1 / EDGE_PROXY=npm); else auto-detect NPM.
 detect_edge_proxy() {
   local explicit=""
   if [[ -f "$ENV_FILE" ]]; then
@@ -46,9 +46,20 @@ detect_edge_proxy() {
       return 0
     fi
   fi
-  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qiE 'nginx-proxy|npm[_-]'; then
+  # Container name / image: jc21 NPM, nginxproxymanager_*, npm-*, etc.
+  if docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null \
+    | grep -qiE 'nginx-proxy-manager|nginxproxymanager|jc21/nginx-proxy|npm[_-]|[_-]npm([[:space:]]|$)'; then
     echo "npm"
     return 0
+  fi
+  # Contabo / shared VPS: :80 already held by something other than Traefik → use NPM path.
+  if host_port_in_use 80; then
+    local who80=""
+    who80="$(docker ps --filter publish=80 --format '{{.Names}}' 2>/dev/null | head -1 || true)"
+    if [[ -z "$who80" ]] || ! grep -qiE 'traefik' <<<"$who80"; then
+      echo "npm"
+      return 0
+    fi
   fi
   echo "traefik"
 }
@@ -65,6 +76,27 @@ host_port_in_use() {
     return $?
   fi
   return 1
+}
+
+# Refresh static assets into an external frontend container (not compose frontend).
+refresh_external_frontend_dist() {
+  local cid="$1"
+  local dist="$REPO_ROOT/dist"
+  [[ -n "$cid" && -d "$dist" ]] || return 0
+  local mounts=""
+  mounts="$(docker inspect "$cid" --format '{{range .Mounts}}{{.Source}} {{end}}' 2>/dev/null || true)"
+  if grep -qF "$REPO_ROOT/dist" <<<"$mounts" 2>/dev/null \
+    || grep -qE '/opt/poreiago/dist([[:space:]]|$)' <<<"$mounts" 2>/dev/null; then
+    echo "  frontend bind-mounts dist/ — already refreshed by npm build"
+    return 0
+  fi
+  echo "  copying dist/ into frontend container html root…"
+  if docker exec "$cid" test -d /usr/share/nginx/html 2>/dev/null; then
+    docker cp "$dist/." "$cid:/usr/share/nginx/html/" 2>/dev/null \
+      || echo "  WARN: docker cp dist → /usr/share/nginx/html failed"
+  else
+    echo "  WARN: no /usr/share/nginx/html in frontend — skip dist copy"
+  fi
 }
 
 configure_compose_for_edge() {
@@ -227,12 +259,13 @@ $COMPOSE --profile bundled-db up -d --force-recreate --no-deps worker celery-bea
 
 FE_CID=""
 if [[ "$EDGE_PROXY" == "npm" ]]; then
-  # Prefer existing host frontend on NPM_APP_PORT (e.g. poreiago-frontend); dist/ is refreshed by npm build.
+  # Prefer existing host frontend on NPM_APP_PORT (e.g. poreiago-frontend); refresh dist into it.
   if host_port_in_use "$NPM_APP_PORT"; then
-    echo "==> Port ${NPM_APP_PORT} already in use — keep existing frontend; dist/ refreshed by build"
+    echo "==> Port ${NPM_APP_PORT} already in use — keep existing frontend"
     FE_CID="$(docker ps --filter "publish=${NPM_APP_PORT}" --format '{{.ID}}' | head -1 || true)"
     if [[ -n "$FE_CID" ]]; then
       echo "  frontend container: $(docker inspect -f '{{.Name}}' "$FE_CID" | sed 's#^/##')"
+      refresh_external_frontend_dist "$FE_CID"
     fi
   else
     echo "==> Starting compose frontend on :${NPM_APP_PORT}"
@@ -282,6 +315,7 @@ for i in $(seq 1 40); do
     && curl -sf "http://127.0.0.1:${NPM_API_PORT}/health" >/dev/null 2>&1; then
     echo "  API healthy on localhost:${NPM_API_PORT} (NPM upstream)"
     api_ok=1
+    break
   fi
   # Prefer same-origin www /health (nginx → api-blue). Fall back to api.* host.
   if curl -sf "$APP_ORIGIN_HEALTH/health" >/dev/null 2>&1; then
