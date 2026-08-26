@@ -411,8 +411,11 @@ async def _drivers_list_tenant_id(request: Request) -> tuple[str, bool, bool]:
 
 
 def _user_response(u) -> PlatformUserResponse:
+    # In-memory PlatformUser or dict from Postgres adapter
+    if isinstance(u, dict):
+        return PlatformUserResponse(**u)
     return PlatformUserResponse(
-        id=u.id,
+        id=u.id if isinstance(u.id, str) else str(u.id),
         email=u.email,
         name=u.name,
         role=u.role,
@@ -420,6 +423,130 @@ def _user_response(u) -> PlatformUserResponse:
         last_login_at=u.last_login_at,
         created_at=u.created_at,
     )
+
+
+def _parse_tenant_uuid(request: Request):
+    from uuid import UUID
+
+    raw = str(_request_tenant_id(request) or "").strip()
+    if not raw:
+        return None
+    try:
+        return UUID(raw)
+    except ValueError:
+        return None
+
+
+@router.get("/users", response_model=list[PlatformUserResponse])
+async def get_users(request: Request):
+    tid = _parse_tenant_uuid(request)
+    if tid is not None:
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import list_tenant_users, user_to_platform_dict
+
+        async with AsyncSessionLocal() as db:
+            users = await list_tenant_users(db, tid)
+            return [_user_response(user_to_platform_dict(u)) for u in users]
+    return [_user_response(u) for u in list_users()]
+
+
+@router.post("/users", response_model=PlatformUserResponse, status_code=201)
+async def post_user(request: Request, body: PlatformUserCreate):
+    tid = _parse_tenant_uuid(request)
+    if tid is not None:
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import create_tenant_user, user_to_platform_dict
+
+        try:
+            async with AsyncSessionLocal() as db:
+                u = await create_tenant_user(
+                    db,
+                    tenant_id=tid,
+                    email=body.email,
+                    name=body.name,
+                    role=body.role,
+                    password=body.password,
+                )
+                await db.commit()
+                return _user_response(user_to_platform_dict(u))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        u = create_user(
+            email=body.email,
+            name=body.name,
+            role=body.role,
+            password=body.password,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return _user_response(u)
+
+
+@router.patch("/users/{user_id}", response_model=PlatformUserResponse)
+async def patch_user(request: Request, user_id: str, body: PlatformUserUpdate):
+    tid = _parse_tenant_uuid(request)
+    if tid is not None:
+        from uuid import UUID
+
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import update_tenant_user, user_to_platform_dict
+
+        try:
+            uid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="User not found") from None
+        try:
+            async with AsyncSessionLocal() as db:
+                u = await update_tenant_user(
+                    db,
+                    tenant_id=tid,
+                    user_id=uid,
+                    patch=body.model_dump(exclude_unset=True),
+                )
+                await db.commit()
+                return _user_response(user_to_platform_dict(u))
+        except KeyError:
+            raise HTTPException(status_code=404, detail="User not found") from None
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        u = update_user(user_id, body.model_dump(exclude_unset=True))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="User not found") from None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return _user_response(u)
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def remove_user(request: Request, user_id: str):
+    tid = _parse_tenant_uuid(request)
+    if tid is not None:
+        from uuid import UUID
+
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import delete_tenant_user
+
+        try:
+            uid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="User not found") from None
+        try:
+            async with AsyncSessionLocal() as db:
+                await delete_tenant_user(db, tenant_id=tid, user_id=uid)
+                await db.commit()
+            return Response(status_code=204)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="User not found") from None
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        delete_user(user_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="User not found") from None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 def _settings_response_from_dict(data: dict) -> PlatformSettingsResponse:
@@ -525,46 +652,6 @@ async def patch_settings(request: Request, body: PlatformSettingsUpdate):
 
         update_branding("default", {"checkout_base_url": patch["checkout_base_url"]})
     return _settings_response_from_dict(s.__dict__)
-
-
-@router.get("/users", response_model=list[PlatformUserResponse])
-async def get_users():
-    return [_user_response(u) for u in list_users()]
-
-
-@router.post("/users", response_model=PlatformUserResponse, status_code=201)
-async def post_user(body: PlatformUserCreate):
-    try:
-        u = create_user(
-            email=body.email,
-            name=body.name,
-            role=body.role,
-            password=body.password,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    return _user_response(u)
-
-
-@router.patch("/users/{user_id}", response_model=PlatformUserResponse)
-async def patch_user(user_id: str, body: PlatformUserUpdate):
-    try:
-        u = update_user(user_id, body.model_dump(exclude_unset=True))
-    except KeyError:
-        raise HTTPException(status_code=404, detail="User not found") from None
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    return _user_response(u)
-
-
-@router.delete("/users/{user_id}", status_code=204)
-async def remove_user(user_id: str):
-    try:
-        delete_user(user_id)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="User not found") from None
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/login-audits")
