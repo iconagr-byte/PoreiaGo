@@ -311,6 +311,46 @@ async def _heal_subscription_plan_column(session: Any) -> None:
         logger.exception("Could not heal subscriptions.plan column")
 
 
+async def _heal_legacy_tenant_name_column(session: Any) -> None:
+    """
+    Contabo legacy schema still has tenants.name NOT NULL.
+
+    The ORM maps legal_name only, so INSERT leaves name=null and fails. Drop the
+    NOT NULL constraint when the column exists, then backfill from legal_name/slug.
+    """
+    from sqlalchemy import text
+
+    try:
+        await session.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                  IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'tenants'
+                      AND column_name = 'name'
+                  ) THEN
+                    BEGIN
+                      ALTER TABLE tenants ALTER COLUMN name DROP NOT NULL;
+                    EXCEPTION WHEN OTHERS THEN
+                      NULL;
+                    END;
+                    UPDATE tenants
+                       SET name = COALESCE(NULLIF(BTRIM(name), ''), legal_name, slug)
+                     WHERE name IS NULL OR BTRIM(COALESCE(name, '')) = '';
+                  END IF;
+                END $$;
+                """
+            )
+        )
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        logger.exception("Could not heal legacy tenants.name column")
+
+
 def _tenant_noload_options():
     from sqlalchemy.orm import noload
 
@@ -346,6 +386,7 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
     admin_upserted = False
 
     await _heal_subscription_plan_column(session)
+    await _heal_legacy_tenant_name_column(session)
     opts = _tenant_noload_options()
 
     # Free the custom domain from any non-Achillio office (esp. platform seed).
@@ -402,6 +443,20 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
         )
         session.add(office)
         await session.flush()
+        # Contabo legacy: keep tenants.name in sync with legal_name when present.
+        try:
+            await session.execute(
+                text(
+                    "UPDATE tenants SET name = COALESCE(name, :n) "
+                    "WHERE id = :id AND EXISTS ("
+                    "  SELECT 1 FROM information_schema.columns"
+                    "  WHERE table_schema = 'public' AND table_name = 'tenants'"
+                    "    AND column_name = 'name')"
+                ),
+                {"n": "Achillio Travel", "id": office.id},
+            )
+        except Exception:
+            logger.debug("tenants.name backfill skipped", exc_info=True)
         created = True
         domain_set = True
         logger.info("Created Achillio Travel office slug=%s", office.slug)
