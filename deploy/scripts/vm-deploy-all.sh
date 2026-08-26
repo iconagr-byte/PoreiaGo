@@ -107,9 +107,12 @@ repair_external_frontend_nginx() {
   [[ -n "$cid" && -f "$conf" ]] || return 0
   echo "==> Repair external frontend nginx (/api → api-blue)"
   docker network connect aerostride-prod_edge "$cid" 2>/dev/null || true
-  if ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
-    echo "  WARN: could not copy frontend.conf into container"
-    return 0
+  # Compose bind-mounts frontend.conf:ro — docker cp hits "device or resource busy".
+  if docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$cid" \
+    | grep -qx '/etc/nginx/conf.d/default.conf'; then
+    echo "  conf bind-mounted from host — reload only"
+  elif ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
+    echo "  WARN: could not copy frontend.conf into container — reload anyway"
   fi
   if docker exec "$cid" nginx -t 2>/dev/null; then
     docker exec "$cid" nginx -s reload 2>/dev/null || true

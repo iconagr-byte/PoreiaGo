@@ -94,9 +94,23 @@ else
 
   if [[ -f "$NGINX_CONF" ]]; then
     echo "==> Installing frontend.conf (same-origin /api → api-blue)"
-    docker cp "$NGINX_CONF" "$FE_CID:/etc/nginx/conf.d/default.conf"
-    docker exec "$FE_CID" nginx -t
-    docker exec "$FE_CID" nginx -s reload
+    # Compose mounts deploy/nginx/frontend.conf → default.conf:ro — docker cp
+    # then fails with "device or resource busy". Host file is already the source;
+    # only docker cp into non-mounted frontends (e.g. legacy poreiago-frontend).
+    if docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$FE_CID" \
+      | grep -qx '/etc/nginx/conf.d/default.conf'; then
+      echo "  conf is bind-mounted from host — skip docker cp, reload only"
+    else
+      if ! docker cp "$NGINX_CONF" "$FE_CID:/etc/nginx/conf.d/default.conf"; then
+        echo "WARN: docker cp failed (busy/ro mount?) — will still try nginx reload"
+      fi
+    fi
+    if docker exec "$FE_CID" nginx -t; then
+      docker exec "$FE_CID" nginx -s reload
+      echo "  nginx reloaded"
+    else
+      echo "WARN: nginx -t failed — check $NGINX_CONF and container image"
+    fi
   else
     echo "WARN: missing $NGINX_CONF"
   fi
