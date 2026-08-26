@@ -99,6 +99,31 @@ refresh_external_frontend_dist() {
   fi
 }
 
+# Contabo poreiago-frontend often only serves static files — POST /api → 405.
+# Install repo frontend.conf so /api + /ws + /health proxy to api-blue.
+repair_external_frontend_nginx() {
+  local cid="$1"
+  local conf="$DEPLOY_DIR/nginx/frontend.conf"
+  [[ -n "$cid" && -f "$conf" ]] || return 0
+  echo "==> Repair external frontend nginx (/api → api-blue)"
+  docker network connect aerostride-prod_edge "$cid" 2>/dev/null || true
+  if ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
+    echo "  WARN: could not copy frontend.conf into container"
+    return 0
+  fi
+  if docker exec "$cid" nginx -t 2>/dev/null; then
+    docker exec "$cid" nginx -s reload 2>/dev/null || true
+    echo "  nginx reloaded with same-origin /api proxy"
+  else
+    echo "  WARN: nginx -t failed after conf copy — check container image"
+  fi
+  if docker exec "$cid" wget -qO- --timeout=5 http://127.0.0.1/health 2>/dev/null | grep -q '"status"'; then
+    echo "  frontend /health → api-blue OK"
+  else
+    echo "  WARN: frontend /health still not JSON — api-blue may be off the edge network"
+  fi
+}
+
 configure_compose_for_edge() {
   EDGE_PROXY="$(detect_edge_proxy)"
   COMPOSE="docker compose --env-file $ENV_FILE -f $DEPLOY_DIR/docker-compose.prod.yml"
@@ -266,6 +291,7 @@ if [[ "$EDGE_PROXY" == "npm" ]]; then
     if [[ -n "$FE_CID" ]]; then
       echo "  frontend container: $(docker inspect -f '{{.Name}}' "$FE_CID" | sed 's#^/##')"
       refresh_external_frontend_dist "$FE_CID"
+      repair_external_frontend_nginx "$FE_CID"
     fi
   else
     echo "==> Starting compose frontend on :${NPM_APP_PORT}"
@@ -290,17 +316,20 @@ echo "==> DB migrations (alembic → hybrid flights/meta, trip_coordinates / Pos
 $COMPOSE exec -T api-blue alembic upgrade head \
   || echo "WARNING: alembic upgrade failed — will retry ensure on API lifespan"
 
-echo "==> Ensure Rent modules (Achillio off / PoreiaGo platform on — never global wipe)"
+echo "==> Ensure Achillio Travel office + Rent modules (Achillio off / PoreiaGo on)"
 $COMPOSE exec -T api-blue python - <<'PY' \
-  || echo "WARNING: rent module policy sync failed (API lifespan will retry)"
+  || echo "WARNING: office policy sync failed (API lifespan will retry)"
 from app.core.database import AsyncSessionLocal
-from app.services.tenant_modules import ensure_known_office_rent_modules
+from app.services.tenant_modules import (
+    ensure_achillio_travel_office,
+    ensure_known_office_rent_modules,
+)
 import asyncio
 
 async def main():
     async with AsyncSessionLocal() as session:
-        result = await ensure_known_office_rent_modules(session)
-        print(result)
+        print("achillio:", await ensure_achillio_travel_office(session))
+        print("rent:", await ensure_known_office_rent_modules(session))
 
 asyncio.run(main())
 PY
@@ -408,10 +437,19 @@ PY
 
 echo "==> Custom domain / edge check"
 if [[ "$EDGE_PROXY" == "npm" ]]; then
-  echo "  NPM owns TLS — check proxy hosts in NPM UI (api→:${NPM_API_PORT}, www→:${NPM_APP_PORT})"
+  echo "  NPM owns TLS — check proxy hosts in NPM UI (api→:${NPM_API_PORT}, www+achillio→:${NPM_APP_PORT})"
   curl -sI "http://127.0.0.1:${NPM_APP_PORT}/" 2>/dev/null | head -5 || true
   curl -s "http://127.0.0.1:${NPM_API_PORT}/health" 2>/dev/null | head -c 200 || true
   echo
+  # Same-origin /api must return JSON — otherwise Achillio/PoreiaGo admin login 405s.
+  if [[ -n "${FE_CID:-}" ]]; then
+    if docker exec "$FE_CID" wget -qO- --timeout=5 http://127.0.0.1/health 2>/dev/null | grep -q '"status"'; then
+      echo "  frontend /health → api-blue OK"
+    else
+      echo "  WARNING: frontend /health not proxying — re-running nginx repair"
+      repair_external_frontend_nginx "$FE_CID"
+    fi
+  fi
 else
   $COMPOSE logs traefik --tail 120 2>/dev/null | grep -iE 'acme|achillio|error|certificate' || true
   curl -skI -H 'Host: www.achilliotravel.com' https://127.0.0.1/ 2>/dev/null | head -8 || true

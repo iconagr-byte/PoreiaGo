@@ -123,6 +123,34 @@ async def dev_login(request: Request, body: LoginRequest):
     )
 
 
+def _browser_office_host(request: Request) -> str:
+    """
+    When the SPA calls the shared API (api.poreiago.com), Host is the API — not the
+    office page. Prefer Origin / Referer so Achillio Travel login from
+    www.achilliotravel.com still forces the Achillio office JWT.
+    """
+    from middleware.domain_tenant import _request_host
+    from travel_platform.settings.office_host_guard import host_is_shared_api
+
+    host = _request_host(request)
+    if not host_is_shared_api(host):
+        return host
+    for header in ("origin", "referer"):
+        raw = (request.headers.get(header) or "").strip()
+        if not raw:
+            continue
+        try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+            cand = (parsed.hostname or "").strip().lower()
+        except Exception:
+            cand = ""
+        if cand:
+            return cand
+    return host
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(request: Request, body: LoginRequest):
     """Login with email + password. Tenant is resolved automatically (optional tenant_slug)."""
@@ -133,24 +161,28 @@ async def login(request: Request, body: LoginRequest):
     # - Achillio Travel URL → Achillio office JWT only
     # - poreiago.com → PoreiaGo platform JWT (never Achillio Travel session)
     # Same email/password can open both desks; tenant_id always follows Host.
+    # Shared API host (api.*) uses Origin/Referer so Contabo builds with
+    # VITE_API_BASE=https://api.poreiago.com still open the correct office.
     forced_tenant_id = body.tenant_id
     mirror_missing_user = False
     try:
         from uuid import UUID as _UUID
 
-        from middleware.domain_tenant import _is_platform_host, _request_host
+        from middleware.domain_tenant import _is_platform_host
         from travel_platform.settings.office_host_guard import (
             host_looks_like_achillio_travel,
             login_host_forced_tenant_id,
             resolve_poreiago_platform_tenant_id,
         )
 
-        host = _request_host(request)
+        host = _browser_office_host(request)
         platform = _is_platform_host(host)
         if forced_tenant_id is None and not (body.tenant_slug or "").strip():
             forced = await login_host_forced_tenant_id(host, is_platform_host=platform)
             if forced is not None:
                 forced_tenant_id = forced
+                # Same operator may only have a PoreiaGo membership — copy onto Achillio.
+                mirror_missing_user = True
             elif platform:
                 platform_tid = await resolve_poreiago_platform_tenant_id()
                 if platform_tid:
@@ -160,6 +192,7 @@ async def login(request: Request, body: LoginRequest):
             forced = await login_host_forced_tenant_id(host, is_platform_host=False)
             if forced is not None:
                 forced_tenant_id = forced
+                mirror_missing_user = True
     except Exception:
         mirror_missing_user = False
 
