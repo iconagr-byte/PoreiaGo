@@ -43,7 +43,7 @@ echo "==> API container: $(docker inspect -f '{{.Name}}' "$API_CID" | sed 's#^/#
 
 # Schema drift heal (subscriptions.plan missing → login/ensure 500).
 echo "==> Heal subscriptions.plan if missing"
-docker exec "$API_CID" python - <<'PY' || echo "WARN: schema heal skipped"
+docker exec -i "$API_CID" python - <<'PY' || echo "WARN: schema heal skipped"
 import asyncio
 from sqlalchemy import text
 from app.core.database import AsyncSessionLocal
@@ -60,8 +60,25 @@ async def main():
 asyncio.run(main())
 PY
 
+# Prefer host checkout of ensure logic (API image may lag behind git pull).
+echo "==> Sync ensure modules from host git into API container"
+for rel in \
+  app/services/tenant_modules.py \
+  travel_platform/settings/office_host_guard.py \
+  app/api/auth.py \
+  app/services/auth_service.py
+do
+  src="$REPO_ROOT/backend/$rel"
+  if [[ -f "$src" ]]; then
+    docker cp "$src" "$API_CID:/app/$rel" 2>/dev/null \
+      || echo "WARN: could not docker cp $rel into API (using image copy)"
+  fi
+done
+
 # Pass optional admin credentials into the one-shot python (not logged).
-docker exec \
+# IMPORTANT: docker exec -i so the heredoc reaches python stdin.
+echo "==> ensure_achillio_travel_office (slug=admin-achillio-gr)"
+docker exec -i \
   -e ACHILLIO_ADMIN_EMAIL="${ACHILLIO_ADMIN_EMAIL:-}" \
   -e ACHILLIO_ADMIN_PASSWORD="${ACHILLIO_ADMIN_PASSWORD:-}" \
   "$API_CID" python - <<'PY'
@@ -79,6 +96,12 @@ async def main():
 asyncio.run(main())
 PY
 
+echo
+echo "Login as Achillio Travel OFFICE (not PoreiaGo superadmin seed):"
+echo "  URL:  https://www.achilliotravel.com/admin/login"
+echo "  Company code: admin-achillio-gr   (or leave empty on www.achilliotravel.com)"
+echo "  Do NOT use company code 'achillio' — that is the PoreiaGo platform seed."
+echo
 # --- 2) Frontend nginx /api proxy ---
 FE_CID="$(docker ps --filter publish="${NPM_APP_PORT}" --format '{{.ID}}' | head -1 || true)"
 if [[ -z "$FE_CID" ]]; then

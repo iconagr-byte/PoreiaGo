@@ -177,7 +177,15 @@ async def login(request: Request, body: LoginRequest):
 
         host = _browser_office_host(request)
         platform = _is_platform_host(host)
-        if forced_tenant_id is None and not (body.tenant_slug or "").strip():
+        # On achilliotravel.com never honour company code ``achillio`` (PoreiaGo
+        # platform seed / superadmin) — always force the Achillio Travel office.
+        slug_in = (body.tenant_slug or "").strip().lower()
+        if host_looks_like_achillio_travel(host) and forced_tenant_id is None:
+            forced = await login_host_forced_tenant_id(host, is_platform_host=False)
+            if forced is not None:
+                forced_tenant_id = forced
+                mirror_missing_user = True
+        elif forced_tenant_id is None and not slug_in:
             forced = await login_host_forced_tenant_id(host, is_platform_host=platform)
             if forced is not None:
                 forced_tenant_id = forced
@@ -188,11 +196,6 @@ async def login(request: Request, body: LoginRequest):
                 if platform_tid:
                     forced_tenant_id = _UUID(str(platform_tid))
                     mirror_missing_user = True
-        elif host_looks_like_achillio_travel(host) and forced_tenant_id is None:
-            forced = await login_host_forced_tenant_id(host, is_platform_host=False)
-            if forced is not None:
-                forced_tenant_id = forced
-                mirror_missing_user = True
     except Exception:
         mirror_missing_user = False
 
