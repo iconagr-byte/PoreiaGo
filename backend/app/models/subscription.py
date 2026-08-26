@@ -56,7 +56,7 @@ class Subscription(Base, TimestampMixin):
     metered_buses: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     metered_trips: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    tenant = relationship("Tenant", back_populates="subscription", lazy="selectin")
+    tenant = relationship("Tenant", back_populates="subscription", lazy="select")
 
 
 class UsageSnapshot(Base):

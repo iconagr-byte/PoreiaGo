@@ -294,6 +294,33 @@ ACHILLIO_TRAVEL_CANONICAL_SLUG = "admin-achillio-gr"
 ACHILLIO_TRAVEL_CANONICAL_DOMAIN = "achilliotravel.com"
 
 
+async def _heal_subscription_plan_column(session: Any) -> None:
+    """Contabo DBs sometimes miss subscriptions.plan — ADD COLUMN IF NOT EXISTS."""
+    from sqlalchemy import text
+
+    try:
+        await session.execute(
+            text(
+                "ALTER TABLE IF EXISTS subscriptions "
+                "ADD COLUMN IF NOT EXISTS plan VARCHAR(32) NOT NULL DEFAULT 'starter'"
+            )
+        )
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        logger.exception("Could not heal subscriptions.plan column")
+
+
+def _tenant_noload_options():
+    from sqlalchemy.orm import noload
+
+    return (
+        noload(Tenant.users),
+        noload(Tenant.bookings),
+        noload(Tenant.subscription),
+    )
+
+
 async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
     """
     Idempotent: ensure the real Achillio Travel office exists and owns achilliotravel.com.
@@ -318,8 +345,11 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
     poison_cleared = 0
     admin_upserted = False
 
+    await _heal_subscription_plan_column(session)
+    opts = _tenant_noload_options()
+
     # Free the custom domain from any non-Achillio office (esp. platform seed).
-    result = await session.execute(select(Tenant))
+    result = await session.execute(select(Tenant).options(*opts))
     for tenant in list(result.scalars().all()):
         domain = _tenant_domain(tenant)
         if not domain or "achilliotravel.com" not in domain:
@@ -335,16 +365,19 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
 
     # Prefer canonical slug; else any existing Achillio Travel classifier hit.
     result = await session.execute(
-        select(Tenant).where(
+        select(Tenant)
+        .options(*opts)
+        .where(
             or_(
                 Tenant.slug == ACHILLIO_TRAVEL_CANONICAL_SLUG,
                 Tenant.subdomain == ACHILLIO_TRAVEL_CANONICAL_SLUG,
             )
-        ).limit(1)
+        )
+        .limit(1)
     )
     office = result.scalar_one_or_none()
     if office is None:
-        result = await session.execute(select(Tenant).limit(120))
+        result = await session.execute(select(Tenant).options(*opts).limit(120))
         for tenant in result.scalars().all():
             if is_achillio_travel_office(tenant):
                 office = tenant
@@ -460,7 +493,7 @@ async def ensure_known_office_rent_modules(session: Any) -> dict[str, int]:
     except Exception:
         logger.exception("ensure_achillio_travel_office failed")
 
-    result = await session.execute(select(Tenant))
+    result = await session.execute(select(Tenant).options(*_tenant_noload_options()))
     tenants = list(result.scalars().all())
     disabled = 0
     enabled = 0

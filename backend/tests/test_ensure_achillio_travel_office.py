@@ -18,15 +18,16 @@ from app.services.tenant_modules import (
 class EnsureAchillioTravelOfficeTests(unittest.IsolatedAsyncioTestCase):
     async def test_creates_office_when_missing(self):
         session = AsyncMock()
-        # 1) poison scan (empty), 2) slug lookup miss, 3) classifier scan empty
+        # 1) schema heal, 2) poison scan (empty), 3) slug lookup miss, 4) classifier scan empty
         empty = MagicMock()
         empty.scalars.return_value.all.return_value = []
         miss = MagicMock()
         miss.scalar_one_or_none.return_value = None
-        session.execute = AsyncMock(side_effect=[empty, miss, empty])
+        session.execute = AsyncMock(side_effect=[None, empty, miss, empty])
         session.add = MagicMock()
         session.flush = AsyncMock()
         session.commit = AsyncMock()
+        session.rollback = AsyncMock()
 
         with patch("middleware.domain_tenant.clear_host_resolve_cache"):
             result = await ensure_achillio_travel_office(session)
@@ -65,8 +66,10 @@ class EnsureAchillioTravelOfficeTests(unittest.IsolatedAsyncioTestCase):
         hit.scalar_one_or_none.return_value = office
 
         session = AsyncMock()
-        session.execute = AsyncMock(side_effect=[poison_scan, hit])
+        # 1) schema heal, 2) poison scan, 3) slug hit
+        session.execute = AsyncMock(side_effect=[None, poison_scan, hit])
         session.commit = AsyncMock()
+        session.rollback = AsyncMock()
 
         with patch(
             "app.services.tenant_modules.apply_known_office_rent_policy",

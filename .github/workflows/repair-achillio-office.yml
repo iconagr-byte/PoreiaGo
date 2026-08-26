@@ -1,0 +1,45 @@
+name: Repair Achillio office (Contabo)
+
+# One-shot SSH repair: ensure admin-achillio-gr + optional admin password reset.
+# Secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY (same as Deploy VPS).
+# Optional inputs: admin email + password (never logged; not committed).
+
+on:
+  workflow_dispatch:
+    inputs:
+      admin_email:
+        description: "Achillio admin email to upsert (optional)"
+        required: false
+        default: ""
+        type: string
+      admin_password:
+        description: "Temporary password (≥8 chars, optional)"
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: repair-achillio-office
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repair Achillio Travel office + optional admin password
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            cd /opt/poreiago
+            git fetch origin main || true
+            git checkout main || true
+            git pull --ff-only origin main || true
+            export ACHILLIO_ADMIN_EMAIL='${{ inputs.admin_email }}'
+            export ACHILLIO_ADMIN_PASSWORD='${{ inputs.admin_password }}'
+            bash deploy/scripts/repair-achillio-office.sh
