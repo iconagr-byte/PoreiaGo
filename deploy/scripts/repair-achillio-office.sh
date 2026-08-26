@@ -117,13 +117,9 @@ else
 
   if [[ -f "$NGINX_CONF" ]]; then
     echo "==> Installing frontend.conf (same-origin /api → api-blue)"
-<<<<<<< HEAD
-    # Compose mounts frontend.conf:ro — docker cp → "device or resource busy".
-=======
     # Compose mounts deploy/nginx/frontend.conf → default.conf:ro — docker cp
     # then fails with "device or resource busy". Host file is already the source;
     # only docker cp into non-mounted frontends (e.g. legacy poreiago-frontend).
->>>>>>> origin/main
     if docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$FE_CID" \
       | grep -qx '/etc/nginx/conf.d/default.conf'; then
       echo "  conf is bind-mounted from host — skip docker cp, reload only"
