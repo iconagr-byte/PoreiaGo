@@ -81,7 +81,7 @@ export default function UsersManagementPanel() {
     <div className="space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-3">
         <p className="text-sm text-gray-500">
-          Διαχείριση λογαριασμών admin, οδηγών και πρακτόρων.
+          Λογαριασμοί backoffice αυτού του γραφείου (είσοδος με email/κωδικό). Στην επεξεργασία μπορείτε να ορίσετε νέο κωδικό.
         </p>
         <button
           type="button"
