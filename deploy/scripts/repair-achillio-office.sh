@@ -43,7 +43,7 @@ echo "==> API container: $(docker inspect -f '{{.Name}}' "$API_CID" | sed 's#^/#
 
 # Schema drift heal (subscriptions.plan missing → login/ensure 500).
 echo "==> Heal subscriptions.plan if missing"
-docker exec "$API_CID" python - <<'PY' || echo "WARN: schema heal skipped"
+docker exec -i "$API_CID" python - <<'PY' || echo "WARN: schema heal skipped"
 import asyncio
 from sqlalchemy import text
 from app.core.database import AsyncSessionLocal
@@ -61,6 +61,7 @@ asyncio.run(main())
 PY
 
 # Prefer host checkout of ensure logic (API image may lag behind git pull).
+echo "==> Sync ensure modules from host git into API container"
 for rel in \
   app/services/tenant_modules.py \
   travel_platform/settings/office_host_guard.py \
@@ -75,7 +76,9 @@ do
 done
 
 # Pass optional admin credentials into the one-shot python (not logged).
-docker exec \
+# IMPORTANT: docker exec -i so the heredoc reaches python stdin.
+echo "==> ensure_achillio_travel_office (slug=admin-achillio-gr)"
+docker exec -i \
   -e ACHILLIO_ADMIN_EMAIL="${ACHILLIO_ADMIN_EMAIL:-}" \
   -e ACHILLIO_ADMIN_PASSWORD="${ACHILLIO_ADMIN_PASSWORD:-}" \
   "$API_CID" python - <<'PY'
@@ -114,9 +117,21 @@ else
 
   if [[ -f "$NGINX_CONF" ]]; then
     echo "==> Installing frontend.conf (same-origin /api → api-blue)"
-    docker cp "$NGINX_CONF" "$FE_CID:/etc/nginx/conf.d/default.conf"
-    docker exec "$FE_CID" nginx -t
-    docker exec "$FE_CID" nginx -s reload
+    # Compose mounts frontend.conf:ro — docker cp → "device or resource busy".
+    if docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$FE_CID" \
+      | grep -qx '/etc/nginx/conf.d/default.conf'; then
+      echo "  conf is bind-mounted from host — skip docker cp, reload only"
+    else
+      if ! docker cp "$NGINX_CONF" "$FE_CID:/etc/nginx/conf.d/default.conf"; then
+        echo "WARN: docker cp failed (busy/ro mount?) — will still try nginx reload"
+      fi
+    fi
+    if docker exec "$FE_CID" nginx -t; then
+      docker exec "$FE_CID" nginx -s reload
+      echo "  nginx reloaded"
+    else
+      echo "WARN: nginx -t failed — check $NGINX_CONF and container image"
+    fi
   else
     echo "WARN: missing $NGINX_CONF"
   fi
