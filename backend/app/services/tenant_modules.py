@@ -290,13 +290,175 @@ def apply_known_office_rent_policy(tenant: Any) -> dict[str, Any] | None:
     return None
 
 
+ACHILLIO_TRAVEL_CANONICAL_SLUG = "admin-achillio-gr"
+ACHILLIO_TRAVEL_CANONICAL_DOMAIN = "achilliotravel.com"
+
+
+async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
+    """
+    Idempotent: ensure the real Achillio Travel office exists and owns achilliotravel.com.
+
+    - Creates slug=admin-achillio-gr when missing (production Contabo often only
+      had the PoreiaGo seed slug=achillio, so Host seal blocked every login).
+    - Sets custom_domain=achilliotravel.com on that office only.
+    - Clears poisoned achilliotravel.com from the PoreiaGo platform seed.
+    - Optionally upserts an admin user when ACHILLIO_ADMIN_EMAIL + password
+      are provided via env (never hardcodes secrets in the repo).
+    """
+    import os
+    from uuid import uuid4
+
+    from sqlalchemy import or_, select, text
+
+    from app.models.user import User, UserRole
+    from app.services.auth_service import hash_password
+
+    created = False
+    domain_set = False
+    poison_cleared = 0
+    admin_upserted = False
+
+    # Free the custom domain from any non-Achillio office (esp. platform seed).
+    result = await session.execute(select(Tenant))
+    for tenant in list(result.scalars().all()):
+        domain = _tenant_domain(tenant)
+        if not domain or "achilliotravel.com" not in domain:
+            continue
+        if is_achillio_travel_office(tenant):
+            continue
+        tenant.custom_domain = None
+        poison_cleared += 1
+        logger.info(
+            "Cleared poisoned achilliotravel.com from slug=%s before Achillio ensure",
+            _tenant_slug(tenant),
+        )
+
+    # Prefer canonical slug; else any existing Achillio Travel classifier hit.
+    result = await session.execute(
+        select(Tenant).where(
+            or_(
+                Tenant.slug == ACHILLIO_TRAVEL_CANONICAL_SLUG,
+                Tenant.subdomain == ACHILLIO_TRAVEL_CANONICAL_SLUG,
+            )
+        ).limit(1)
+    )
+    office = result.scalar_one_or_none()
+    if office is None:
+        result = await session.execute(select(Tenant).limit(120))
+        for tenant in result.scalars().all():
+            if is_achillio_travel_office(tenant):
+                office = tenant
+                break
+
+    if office is None:
+        office = Tenant(
+            id=uuid4(),
+            slug=ACHILLIO_TRAVEL_CANONICAL_SLUG,
+            legal_name="Achillio Travel",
+            subdomain=ACHILLIO_TRAVEL_CANONICAL_SLUG,
+            custom_domain=ACHILLIO_TRAVEL_CANONICAL_DOMAIN,
+            plan=TenantPlan.PROFESSIONAL,
+            is_active=True,
+            settings_json=json.dumps(
+                initial_settings_for_plan(
+                    TenantPlan.PROFESSIONAL,
+                    office_name="Achillio Travel",
+                ),
+                ensure_ascii=False,
+            ),
+        )
+        session.add(office)
+        await session.flush()
+        created = True
+        domain_set = True
+        logger.info("Created Achillio Travel office slug=%s", office.slug)
+    else:
+        if not str(getattr(office, "legal_name", "") or "").strip():
+            office.legal_name = "Achillio Travel"
+        current = _tenant_domain(office)
+        if current != ACHILLIO_TRAVEL_CANONICAL_DOMAIN:
+            office.custom_domain = ACHILLIO_TRAVEL_CANONICAL_DOMAIN
+            domain_set = True
+            logger.info(
+                "Bound custom_domain=%s on Achillio Travel slug=%s",
+                ACHILLIO_TRAVEL_CANONICAL_DOMAIN,
+                _tenant_slug(office),
+            )
+        # Keep Rent off for Achillio Travel.
+        updated = apply_known_office_rent_policy(office)
+        if updated is not None:
+            office.settings_json = json.dumps(updated, ensure_ascii=False)
+
+    admin_email = (os.getenv("ACHILLIO_ADMIN_EMAIL") or "").strip().lower()
+    admin_password = os.getenv("ACHILLIO_ADMIN_PASSWORD") or ""
+    if admin_email and admin_password and len(admin_password) >= 8:
+        try:
+            await session.execute(text("SET LOCAL row_security = off"))
+        except Exception:
+            pass
+        existing = await session.execute(
+            select(User).where(
+                User.tenant_id == office.id,
+                User.email == admin_email,
+            ).limit(1)
+        )
+        user = existing.scalar_one_or_none()
+        if user is None:
+            user = User(
+                id=uuid4(),
+                tenant_id=office.id,
+                email=admin_email,
+                password_hash=hash_password(admin_password),
+                full_name=admin_email.split("@")[0],
+                roles=[
+                    UserRole.TENANT_ADMIN.value,
+                    UserRole.DISPATCHER.value,
+                    UserRole.SUPERADMIN.value,
+                ],
+                is_active=True,
+                mfa_enabled=False,
+            )
+            session.add(user)
+            admin_upserted = True
+            logger.info("Created Achillio Travel admin %s", admin_email)
+        else:
+            user.password_hash = hash_password(admin_password)
+            user.is_active = True
+            admin_upserted = True
+            logger.info("Reset Achillio Travel admin password for %s", admin_email)
+
+    await session.commit()
+    try:
+        from middleware.domain_tenant import clear_host_resolve_cache
+
+        clear_host_resolve_cache()
+    except Exception:
+        pass
+
+    return {
+        "created": created,
+        "domain_set": domain_set,
+        "poison_cleared": poison_cleared,
+        "admin_upserted": admin_upserted,
+        "slug": _tenant_slug(office),
+        "tenant_id": str(office.id),
+        "custom_domain": office.custom_domain or "",
+    }
+
+
 async def ensure_known_office_rent_modules(session: Any) -> dict[str, int]:
     """
     Idempotent: Achillio Travel → Rent off; PoreiaGo platform → Rent on.
 
     Scoped to known offices only — never mass-disables Rent.
+    Also ensures the Achillio Travel office + custom_domain mapping exists.
     """
     from sqlalchemy import select
+
+    try:
+        await ensure_achillio_travel_office(session)
+    except Exception:
+        logger.exception("ensure_achillio_travel_office failed")
 
     result = await session.execute(select(Tenant))
     tenants = list(result.scalars().all())

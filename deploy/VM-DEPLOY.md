@@ -27,11 +27,30 @@
    |--------|---------|
    | `api.poreiago.com` | `127.0.0.1:8004` |
    | `poreiago.com`, `www.poreiago.com` | `127.0.0.1:8003` |
+   | `www.achilliotravel.com`, `achilliotravel.com` | `127.0.0.1:8003` |
 
 3. Το `deploy/docker-compose.npm.yml` δημοσιεύει API→8004 και frontend→8003.
-   Αν υπάρχει ήδη `poreiago-frontend` στο 8003, το κρατάει και ανανεώνει το `dist/`.
+   Αν υπάρχει ήδη `poreiago-frontend` στο 8003, το κρατάει, ανανεώνει το `dist/`
+   **και** εγκαθιστά το `deploy/nginx/frontend.conf` ώστε το `/api` να πηγαίνει στο api-blue
+   (χωρίς αυτό το Contabo έδινε 405 στο login).
 
 4. Μετά το merge στο `main`: **Actions → Deploy VPS → Run workflow**.
+
+### Achillio Travel backoffice δεν ανοίγει
+
+Γρήγορο repair στο Contabo (ασφαλές για poreiago.com):
+
+```bash
+cd /opt/poreiago
+# Προαιρετικά — νέος/reset admin μόνο για Achillio Travel (μην το βάλεις στο git):
+# export ACHILLIO_ADMIN_EMAIL='axilleas0@yahoo.gr'
+# export ACHILLIO_ADMIN_PASSWORD='…'
+bash deploy/scripts/repair-achillio-office.sh
+```
+
+Το script: δημιουργεί/διορθώνει το γραφείο `admin-achillio-gr` με
+`custom_domain=achilliotravel.com`, καθαρίζει poisoned domain από το seed `achillio`,
+και φτιάχνει το nginx `/api` proxy.
 
 Live **Aviationstack / Twilio** keys: βάλε τα στο `deploy/.env.prod` (δες `deploy/HYBRID-PROVIDERS.md`).
 Χωρίς keys το hybrid μένει σε stub mode.
@@ -105,20 +124,24 @@ cd /opt/poreiago && RUN_SEED=1 bash deploy/scripts/vm-deploy-all.sh
 
 ## Custom domain SSL (π.χ. Achillio)
 
-Το `https://www.achilliotravel.com` έχει έγκυρο Let's Encrypt. Αν ο browser δείχνει
+Το `https://www.achilliotravel.com` πρέπει να δείχνει στο **Contabo** (`169.58.199.186`)
+μέσω CNAME στο `www.poreiago.com` (ή A record στο ίδιο IP). Αν ο browser δείχνει
 **«Μη ασφαλής σύνδεση»** στο `https://achilliotravel.com` (χωρίς www), το apex A record
-ακόμα δείχνει στο παλιό hosting (intechs), όχι στο VPS.
+ακόμα δείχνει στο παλιό hosting (GCP / intechs), όχι στο VPS.
 
 Στο DNS του domain (intechs / όπου είναι τα NS):
 
 | Τύπος | Όνομα | Τιμή |
 |-------|--------|------|
-| A | `@` (achilliotravel.com) | `34.141.98.145` |
+| A | `@` (achilliotravel.com) | `169.58.199.186` |
 | CNAME | `www` | `www.poreiago.com` |
 
-Μετά το DNS (συνήθως λίγα λεπτά–ώρες), κάνε restart το API ή αποθήκευσε ξανά το
-custom domain στο Super Admin — το Traefik θα εκδώσει πιστοποιητικό και για το apex.
-Βεβαιώσου ότι στο `deploy/.env.prod` υπάρχει `PLATFORM_INGRESS_IP=34.141.98.145`.
+Μετά το DNS (συνήθως λίγα λεπτά–ώρες), στο NPM πρόσθεσε Proxy Host για το apex
+(ή redirect → www) με SSL Let’s Encrypt. Στο Postgres το `tenants.custom_domain`
+πρέπει να είναι `achilliotravel.com` **μόνο** στο γραφείο Achillio Travel
+(`admin-achillio-gr`) — τρέξε `repair-achillio-office.sh` αν λείπει.
+
+Παλιό GCP IP `34.141.98.145` **μην** το αφήνεις στο apex — το HTTPS αποτυγχάνει.
 
 ## Secrets
 
