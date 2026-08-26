@@ -223,6 +223,25 @@ class AuthService:
         }
         if not (set(roles) & admin_roles):
             roles = [UserRole.TENANT_ADMIN.value]
+        # Achillio Travel office must not inherit PoreiaGo platform superadmin.
+        try:
+            from app.services.tenant_modules import is_achillio_travel_office
+
+            t_result = await self._session.execute(
+                select(Tenant)
+                .options(*_TENANT_NO_HEAVY)
+                .where(Tenant.id == target_tenant_id)
+                .limit(1),
+            )
+            target = t_result.scalar_one_or_none()
+            if target and is_achillio_travel_office(target):
+                roles = [
+                    r
+                    for r in roles
+                    if str(r).lower() != UserRole.SUPERADMIN.value
+                ] or [UserRole.TENANT_ADMIN.value, UserRole.DISPATCHER.value]
+        except Exception:
+            pass
 
         user = User(
             tenant_id=target_tenant_id,
@@ -264,7 +283,8 @@ class AuthService:
             raise ValueError("Λάθος email ή κωδικός")
         if len(matches) > 1:
             raise ValueError(
-                "Το email ανήκει σε πολλές εταιρείες — συμπληρώστε τον κωδικό εταιρείας (π.χ. achillio)",
+                "Το email ανήκει σε πολλές εταιρείες — συμπληρώστε τον κωδικό εταιρείας "
+                "(π.χ. admin-achillio-gr για Achillio Travel, όχι achillio)",
             )
         return matches[0].tenant_id
 

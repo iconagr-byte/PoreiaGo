@@ -437,6 +437,7 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
         )
         user = existing.scalar_one_or_none()
         if user is None:
+            # Office admin only — never platform superadmin (slug=achillio seed).
             user = User(
                 id=uuid4(),
                 tenant_id=office.id,
@@ -446,7 +447,6 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
                 roles=[
                     UserRole.TENANT_ADMIN.value,
                     UserRole.DISPATCHER.value,
-                    UserRole.SUPERADMIN.value,
                 ],
                 is_active=True,
                 mfa_enabled=False,

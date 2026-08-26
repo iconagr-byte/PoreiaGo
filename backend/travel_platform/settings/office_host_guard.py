@@ -119,7 +119,11 @@ async def office_host_mismatch_detail(
 
 
 async def login_host_forced_tenant_id(host: str, *, is_platform_host: bool) -> Any | None:
-    """When Host is Achillio Travel, force login onto that office tenant."""
+    """When Host is Achillio Travel, force login onto that office tenant.
+
+    Creates the canonical ``admin-achillio-gr`` office if Contabo only has the
+    PoreiaGo seed slug=``achillio`` (which is NOT Achillio Travel).
+    """
     if is_platform_host or not host_looks_like_achillio_travel(host):
         return None
     try:
@@ -127,15 +131,31 @@ async def login_host_forced_tenant_id(host: str, *, is_platform_host: bool) -> A
 
         from app.core.database import AsyncSessionLocal
         from app.models.tenant import Tenant
-        from app.services.tenant_modules import is_achillio_travel_office
+        from app.services.tenant_modules import (
+            ensure_achillio_travel_office,
+            is_achillio_travel_office,
+        )
     except Exception:
         return None
+
+    async def _find(db: Any) -> Any | None:
+        result = await db.execute(select(Tenant).limit(120))
+        for tenant in result.scalars().all():
+            if is_achillio_travel_office(tenant):
+                return tenant.id
+        return None
+
     try:
         async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Tenant).limit(80))
-            for tenant in result.scalars().all():
-                if is_achillio_travel_office(tenant):
-                    return tenant.id
+            found = await _find(db)
+            if found is not None:
+                return found
+            try:
+                await ensure_achillio_travel_office(db)
+            except Exception:
+                logger.exception("ensure_achillio_travel_office during host login failed")
+                return None
+            return await _find(db)
     except Exception:
         logger.debug("login host tenant resolve failed", exc_info=True)
     return None

@@ -60,6 +60,20 @@ async def main():
 asyncio.run(main())
 PY
 
+# Prefer host checkout of ensure logic (API image may lag behind git pull).
+for rel in \
+  app/services/tenant_modules.py \
+  travel_platform/settings/office_host_guard.py \
+  app/api/auth.py \
+  app/services/auth_service.py
+do
+  src="$REPO_ROOT/backend/$rel"
+  if [[ -f "$src" ]]; then
+    docker cp "$src" "$API_CID:/app/$rel" 2>/dev/null \
+      || echo "WARN: could not docker cp $rel into API (using image copy)"
+  fi
+done
+
 # Pass optional admin credentials into the one-shot python (not logged).
 docker exec \
   -e ACHILLIO_ADMIN_EMAIL="${ACHILLIO_ADMIN_EMAIL:-}" \
@@ -79,6 +93,12 @@ async def main():
 asyncio.run(main())
 PY
 
+echo
+echo "Login as Achillio Travel OFFICE (not PoreiaGo superadmin seed):"
+echo "  URL:  https://www.achilliotravel.com/admin/login"
+echo "  Company code: admin-achillio-gr   (or leave empty on www.achilliotravel.com)"
+echo "  Do NOT use company code 'achillio' — that is the PoreiaGo platform seed."
+echo
 # --- 2) Frontend nginx /api proxy ---
 FE_CID="$(docker ps --filter publish="${NPM_APP_PORT}" --format '{{.ID}}' | head -1 || true)"
 if [[ -z "$FE_CID" ]]; then
