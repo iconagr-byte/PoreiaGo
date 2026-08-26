@@ -6,10 +6,32 @@
 
 1. `git fetch` + `reset --hard origin/main` (όχι `git pull` — αποφεύγει conflicts από παλιές χειροκίνητες αλλαγές στο VM)
 2. Ρυθμίζει `.env.prod` (domains, Redis/Celery, VAPID push keys, hybrid provider placeholders)
-3. Διορθώνει Traefik (ACME email, απενεργοποίηση λάθος dynamic configs)
+3. Επιλέγει edge proxy: **Traefik** (default) ή **Nginx Proxy Manager** (`USE_NPM=1` / auto-detect `nginx-proxy*`)
 4. `npm run build` frontend
 5. `docker build` API
-6. `docker compose up` (Traefik, API, frontend, Postgres, Redis)
+6. `docker compose up` (API, frontend, Postgres, Redis — Traefik μόνο αν δεν τρέχει NPM)
+
+### Contabo / Nginx Proxy Manager
+
+Αν το VPS έχει ήδη **Nginx Proxy Manager** στα ports 80/443 (π.χ. Contabo `169.58.199.186`),
+το deploy **δεν** ξεκινά Traefik — αλλιώς παίρνεις `Bind for 0.0.0.0:80 failed`.
+
+1. Στο `deploy/.env.prod` (συνιστάται· αλλιώς auto-detect από container/image ή κατειλημμένο :80):
+   ```
+   USE_NPM=1
+   EDGE_PROXY=npm
+   ```
+
+2. NPM proxy hosts (Forward to):
+   | Domain | Forward |
+   |--------|---------|
+   | `api.poreiago.com` | `127.0.0.1:8004` |
+   | `poreiago.com`, `www.poreiago.com` | `127.0.0.1:8003` |
+
+3. Το `deploy/docker-compose.npm.yml` δημοσιεύει API→8004 και frontend→8003.
+   Αν υπάρχει ήδη `poreiago-frontend` στο 8003, το κρατάει και ανανεώνει το `dist/`.
+
+4. Μετά το merge στο `main`: **Actions → Deploy VPS → Run workflow**.
 
 Live **Aviationstack / Twilio** keys: βάλε τα στο `deploy/.env.prod` (δες `deploy/HYBRID-PROVIDERS.md`).
 Χωρίς keys το hybrid μένει σε stub mode.

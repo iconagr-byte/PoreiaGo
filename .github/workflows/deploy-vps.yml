@@ -1,6 +1,8 @@
 name: Deploy VPS (Hetzner — cheap)
 
-# Push main → SSH deploy to poreiago VM
+# Push main → SSH deploy to poreiago VM (also Contabo with Nginx Proxy Manager).
+# Contabo: set USE_NPM=1 / EDGE_PROXY=npm in deploy/.env.prod (or auto-detect) —
+# see deploy/VM-DEPLOY.md § Contabo / Nginx Proxy Manager. Skips Traefik on :80/:443.
 # REQUIRED repo secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY
 # OPTIONAL: GOOGLE_CLIENT_ID — My Wallet Google Sign-In (see deploy/GOOGLE-SIGNIN.md)
 # Setup: deploy/VM-DEPLOY.md § GitHub Actions
