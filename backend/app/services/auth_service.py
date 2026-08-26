@@ -8,6 +8,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 
 from app.core.config import get_settings
 from app.core.tenant_rls import apply_tenant_rls
@@ -16,6 +17,13 @@ from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 from app.services.mfa_service import MfaService
 from app.services.refresh_token_service import RefreshTokenService
+
+# Contabo schema drift must not 500 login when Tenant rows are fetched.
+_TENANT_NO_HEAVY = (
+    noload(Tenant.users),
+    noload(Tenant.bookings),
+    noload(Tenant.subscription),
+)
 
 
 def hash_password(password: str) -> str:
@@ -50,7 +58,7 @@ class AuthService:
         mfa_code: str | None = None,
     ) -> tuple[str, str, User]:
         tenant_result = await self._session.execute(
-            select(Tenant).where(Tenant.id == tenant_id),
+            select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.id == tenant_id),
         )
         tenant = tenant_result.scalar_one_or_none()
         if not tenant:
@@ -146,7 +154,9 @@ class AuthService:
                 password=password,
                 mfa_code=mfa_code,
             )
-        tenant_result = await self._session.execute(select(Tenant).where(Tenant.id == resolved_id))
+        tenant_result = await self._session.execute(
+            select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.id == resolved_id),
+        )
         tenant = tenant_result.scalar_one()
         return token, refresh, user, tenant
 
@@ -171,7 +181,10 @@ class AuthService:
 
             for candidate in matches:
                 t_result = await self._session.execute(
-                    select(Tenant).where(Tenant.id == candidate.tenant_id).limit(1),
+                    select(Tenant)
+                    .options(*_TENANT_NO_HEAVY)
+                    .where(Tenant.id == candidate.tenant_id)
+                    .limit(1),
                 )
                 t = t_result.scalar_one_or_none()
                 if t and not is_achillio_travel_office(t):
@@ -238,7 +251,9 @@ class AuthService:
 
         slug = (tenant_slug or "").strip().lower()
         if slug:
-            result = await self._session.execute(select(Tenant).where(Tenant.slug == slug))
+            result = await self._session.execute(
+                select(Tenant).options(*_TENANT_NO_HEAVY).where(Tenant.slug == slug),
+            )
             tenant = result.scalar_one_or_none()
             if not tenant:
                 raise ValueError("Άγνωστος κωδικός εταιρείας")

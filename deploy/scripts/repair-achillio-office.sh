@@ -41,6 +41,25 @@ if [[ -z "$API_CID" ]]; then
 fi
 echo "==> API container: $(docker inspect -f '{{.Name}}' "$API_CID" | sed 's#^/##')"
 
+# Schema drift heal (subscriptions.plan missing → login/ensure 500).
+echo "==> Heal subscriptions.plan if missing"
+docker exec "$API_CID" python - <<'PY' || echo "WARN: schema heal skipped"
+import asyncio
+from sqlalchemy import text
+from app.core.database import AsyncSessionLocal
+
+async def main():
+    async with AsyncSessionLocal() as session:
+        await session.execute(text(
+            "ALTER TABLE IF EXISTS subscriptions "
+            "ADD COLUMN IF NOT EXISTS plan VARCHAR(32) NOT NULL DEFAULT 'starter'"
+        ))
+        await session.commit()
+        print("subscriptions.plan: ok")
+
+asyncio.run(main())
+PY
+
 # Pass optional admin credentials into the one-shot python (not logged).
 docker exec \
   -e ACHILLIO_ADMIN_EMAIL="${ACHILLIO_ADMIN_EMAIL:-}" \
