@@ -34,7 +34,7 @@ import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 
 function DualScopeBadge() {
   return (
-    <span className="admin-nav-dual-badge" title="Εκδρομές & Ενοικιάσεις" aria-label="Κοινό · εκδρομές & ενοικιάσεις">
+    <span className="admin-nav-dual-badge" title="Γραφείο — όλες οι υπηρεσίες" aria-label="Γραφείο">
       <span className="admin-nav-dual-badge-icon" aria-hidden>
         <span className="material-symbols-outlined">directions_bus</span>
       </span>
@@ -47,8 +47,8 @@ function DualScopeBadge() {
 
 function SharedScopeChip() {
   return (
-    <span className="admin-nav-shared-chip" title="Εκδρομές & Ενοικιάσεις" aria-label="Κοινό">
-      Κοινό
+    <span className="admin-nav-shared-chip" title="Γραφείο — κεντρικά εργαλεία" aria-label="Γραφείο">
+      Γραφείο
     </span>
   );
 }
@@ -499,7 +499,7 @@ export default function SortableSidebarNav({
 
         {rentOnly ? (
           <div className="admin-nav-zone admin-nav-zone--shared">
-            <ZoneHeader tone="shared" icon="apartment" title="Γραφείο" subtitle="Κοινά εργαλεία" />
+            <ZoneHeader tone="shared" icon="apartment" title="Γραφείο" subtitle="Κεντρικά εργαλεία" />
             {renderItemList(mainItems, 'main', { cardStyle: true })}
           </div>
         ) : (
@@ -509,8 +509,8 @@ export default function SortableSidebarNav({
                 <ZoneHeader
                   tone="shared"
                   icon="hub"
-                  title="Κοινά"
-                  subtitle="Εκδρομές & ενοικιάσεις"
+                  title="Γραφείο"
+                  subtitle="Κεντρικά εργαλεία"
                 />
                 {renderItemList(sharedItems, 'main', { cardStyle: true })}
               </div>
