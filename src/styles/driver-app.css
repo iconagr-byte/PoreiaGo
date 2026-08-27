@@ -1814,6 +1814,10 @@ html.driver-route body {
   max-width: 22rem;
 }
 
+.driver-gate.is-tablet.is-landscape[data-gate-mode='qr'] .driver-gate-brand-extras {
+  display: none;
+}
+
 .driver-gate.is-tablet.is-landscape .driver-gate-card {
   margin: 0;
   border: 0;
