@@ -76,7 +76,7 @@ export default function MasterQrGate({ onAuthenticated }) {
       <div className="driver-gate-glow driver-gate-glow--bl" aria-hidden />
 
       <div className="driver-gate-panel">
-        <div className="text-center mb-6">
+        <header className="driver-gate-brand text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl driver-brand-icon mb-4">
             <span
               className="material-symbols-outlined text-[36px]"
@@ -92,7 +92,7 @@ export default function MasterQrGate({ onAuthenticated }) {
             {mode === 'password' ? 'Είσοδος βάρδιας' : 'Master QR'}
           </h1>
           <p
-            className="text-sm mt-2 leading-relaxed max-w-xs mx-auto"
+            className="driver-gate-brand-sub text-sm mt-2 leading-relaxed max-w-xs mx-auto"
             style={{ color: 'var(--driver-muted)' }}
           >
             {mode === 'password' ? (
@@ -104,7 +104,7 @@ export default function MasterQrGate({ onAuthenticated }) {
               </>
             )}
           </p>
-        </div>
+        </header>
 
         <div className="driver-gate-card space-y-4">
           {mode === 'password' ? (
