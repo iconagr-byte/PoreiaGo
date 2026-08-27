@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TemplatePicker from './homepage/TemplatePicker.jsx';
@@ -27,6 +27,8 @@ import {
 import { pushHomepagePreviewDraft } from '../../lib/homepage/homepagePreview.js';
 import { pageSliderPatch } from '../../lib/homepage/pageSlider.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
+import { fileToLogoDataUrl } from '../../lib/branding/logoImage.js';
+import { getSaasToken } from '../../services/saasApi.js';
 import {
   clearSiteAsset,
   DEFAULT_SITE_APPEARANCE,
@@ -133,15 +135,22 @@ function LogoBlock({
   const [previewTone, setPreviewTone] = useState('light');
   const [dragOver, setDragOver] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
+  const fileInputRef = useRef(null);
   const height = clampLogoHeight(form.logo_height_px);
   const maxWidth = clampLogoMaxWidth(form.logo_max_width_px);
   const logoStyle = officeLogoImageStyle(form);
   const brandName = (form.footer_brand_name || '').trim();
   const showName = form.logo_show_name !== false;
 
+  const pickFile = () => {
+    if (uploading) return;
+    fileInputRef.current?.click();
+  };
+
   const onDropFile = (e) => {
     e.preventDefault();
     setDragOver(false);
+    if (uploading) return;
     const file = e.dataTransfer?.files?.[0];
     if (!file) return;
     onUpload({ target: { files: [file], value: '' } });
@@ -188,9 +197,21 @@ function LogoBlock({
           </div>
 
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Ανέβασμα λογοτύπου"
             className={`relative h-44 rounded-xl overflow-hidden border flex items-center justify-center px-4 transition ${
-              dragOver ? 'border-sky-400 bg-sky-50' : 'border-slate-200'
+              uploading ? 'cursor-wait opacity-80' : 'cursor-pointer'
+            } ${
+              dragOver ? 'border-sky-400 bg-sky-50' : 'border-slate-200 hover:border-sky-300'
             } ${previewTone === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}
+            onClick={pickFile}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                pickFile();
+              }
+            }}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOver(true);
@@ -198,8 +219,16 @@ function LogoBlock({
             onDragLeave={() => setDragOver(false)}
             onDrop={onDropFile}
           >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={TRIP_COVER_ACCEPT}
+              className="hidden"
+              disabled={uploading}
+              onChange={onUpload}
+            />
             {previewUrl ? (
-              <span className="inline-flex items-center gap-2.5 max-w-full">
+              <span className="inline-flex items-center gap-2.5 max-w-full pointer-events-none">
                 <img src={previewUrl} alt="" style={logoStyle} className="object-contain drop-shadow-sm" />
                 {showName && brandName ? (
                   <span
@@ -213,7 +242,7 @@ function LogoBlock({
               </span>
             ) : (
               <div
-                className={`flex flex-col items-center gap-1 ${
+                className={`flex flex-col items-center gap-1 pointer-events-none ${
                   previewTone === 'dark' ? 'text-slate-500' : 'text-slate-400'
                 }`}
               >
@@ -232,17 +261,15 @@ function LogoBlock({
         {/* Controls */}
         <div className="min-w-0 space-y-4">
           <div className="flex flex-wrap gap-2">
-            <label className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold cursor-pointer hover:bg-slate-800">
+            <button
+              type="button"
+              onClick={pickFile}
+              disabled={uploading}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold cursor-pointer hover:bg-slate-800 disabled:opacity-50"
+            >
               <span className="material-symbols-outlined text-[18px]">upload</span>
               {hasCustom ? 'Αλλαγή' : 'Ανέβασμα'}
-              <input
-                type="file"
-                accept={TRIP_COVER_ACCEPT}
-                className="hidden"
-                disabled={uploading}
-                onChange={onUpload}
-              />
-            </label>
+            </button>
             {hasCustom && (
               <>
                 <button
@@ -871,9 +898,22 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     const file = e instanceof File ? e : e?.target?.files?.[0];
     if (e && !(e instanceof File) && e?.target && 'value' in e.target) e.target.value = '';
     if (!file) return;
+    const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
     const setUploading = kind === 'logo' ? setUploadingLogo : setUploadingHero;
     setUploading(true);
     try {
+      // Compress once → show immediately → persist (SaaS offices store data URL in Postgres).
+      if (getSaasToken()) {
+        const url =
+          kind === 'hero' ? await fileToTripCoverDataUrl(file) : await fileToLogoDataUrl(file);
+        setForm((p) => ({ ...p, [key]: url }));
+        const saved = await updateSiteAppearance({ [key]: url });
+        // Keep the just-uploaded URL on top — scrubbers must not wipe a fresh office upload.
+        setForm((p) => ({ ...p, ...saved.data, [key]: url }));
+        toast.success(kind === 'logo' ? 'Το λογότυπο ενημερώθηκε' : 'Η φωτογραφία hero ενημερώθηκε');
+        return;
+      }
+
       let toSend = file;
       if (kind === 'hero') {
         const dataUrl = await fileToTripCoverDataUrl(file);
@@ -884,8 +924,16 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       setForm((p) => ({ ...p, ...result.appearance }));
       toast.success(kind === 'logo' ? 'Το λογότυπο ενημερώθηκε' : 'Η φωτογραφία hero ενημερώθηκε');
     } catch (err) {
-      if (err.message === 'AUTH_EXPIRED') return;
-      toast.error(err.message || 'Αποτυχία ανεβάσματος');
+      if (err.message === 'AUTH_EXPIRED') {
+        toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά και δοκιμάστε το ανέβασμα');
+        return;
+      }
+      const msg = String(err.message || '');
+      if (/heic|heif|decode|μη έγκυρη|could not decode|invalid image/i.test(msg)) {
+        toast.error('Μη υποστηριζόμενη εικόνα — δοκιμάστε JPG ή PNG');
+        return;
+      }
+      toast.error(msg || 'Αποτυχία ανεβάσματος');
     } finally {
       setUploading(false);
     }
