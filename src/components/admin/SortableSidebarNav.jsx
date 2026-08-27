@@ -342,7 +342,7 @@ export default function SortableSidebarNav({
           onClick={() => handleClick(item)}
           className={buttonClass(item, { cardStyle })}
           data-accent={accent}
-          title={shared ? `${item.label} · εκδρομές & ενοικιάσεις` : item.label}
+          title={shared ? `${item.label} · γραφείο` : item.label}
         >
           <span className={`admin-nav-icon${cardStyle ? ' admin-nav-icon--circle' : ''}`}>
             <span
