@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { officeLogoImageStyle, resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
 import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
