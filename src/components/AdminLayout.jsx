@@ -70,7 +70,7 @@ function NavList({ activeTab, fleetRentalTab, onNavigate, onItemClick }) {
         },
         {
           id: 'bus',
-          label: 'Λεωφορεία',
+          label: 'Εκδρομές',
           items: BUS_NAV_ITEMS.filter((i) =>
             ['dashboard', 'fleet', 'bookings'].includes(i.id),
           ),

@@ -118,8 +118,8 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
         <aside className="w-full lg:w-80 xl:w-[22rem] shrink-0 lg:sticky lg:top-3 self-start">
           <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-4">
             <div className="px-1.5 pt-0.5">
-              <p className="text-xs font-bold uppercase tracking-wide text-sky-700/80">Λεωφορεία</p>
-              <p className="text-base font-bold text-on-surface mt-0.5">Εκδρομές & στόλος</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-sky-700/80">Εκδρομές</p>
+              <p className="text-base font-bold text-on-surface mt-0.5">Στόλος & κρατήσεις</p>
               <p className="text-[11px] text-on-surface-variant mt-1 hidden lg:block">
                 Σύρετε ⋮⋮ για αλλαγή σειράς μενού
               </p>

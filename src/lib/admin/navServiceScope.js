@@ -41,14 +41,14 @@ export const NAV_SERVICE_MODES = [
     label: 'Όλα',
     short: 'Όλα',
     icon: 'widgets',
-    hint: 'Λεωφορεία + Ενοικιάσεις',
+    hint: 'Εκδρομές + Ενοικιάσεις',
   },
   {
     id: 'buses',
-    label: 'Λεωφορεία',
-    short: 'Λεωφ.',
+    label: 'Εκδρομές',
+    short: 'Εκδ.',
     icon: 'directions_bus',
-    hint: 'Εκδρομές & στόλος λεωφορείων',
+    hint: 'Στόλος, GPS και κρατήσεις',
   },
   {
     id: 'rent',
