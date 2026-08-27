@@ -110,10 +110,10 @@ export const STITCH_EXTRA_TEMPLATES = [
       header(IMG.promoBeach, 'Cyber Monday'),
       text(`<p style="margin:0 0 8px 0;font-size:12px;font-weight:700;color:#005d90;letter-spacing:0.08em;">💻 CYBER MONDAY</p>
 <h1 style="margin:0 0 12px 0;font-size:26px;font-weight:700;color:#005d90;">Online αποκλειστικά -35%</h1>
-<p style="margin:0;font-size:16px;line-height:1.6;color:#404850;">Κλείστε από τον υπολογιστή ή το κινητό σας — bonus πόντοι loyalty για κάθε κράτηση.</p>`),
+<p style="margin:0;font-size:16px;line-height:1.6;color:#404850;">Κλείστε από τον υπολογιστή ή το κινητό σας — αποκλειστικές online τιμές για κάθε κράτηση.</p>`),
       cta('Δες online deals', 'http://localhost:5173/trips', TRAVEL_BLUE_CTA),
       image(IMG.promoFlash, 'Flash online'),
-      text(`<p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#7d5800;">🎁 +500 πόντοι loyalty</p>
+      text(`<p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#7d5800;">⚡ Flash deal</p>
 <p style="margin:0;font-size:15px;color:#404850;">Ισχύει για όλες τις online κρατήσεις μέχρι τα μεσάνυχτα.</p>`),
       cta('Κράτηση τώρα', 'http://localhost:5173/trips', FLASH_CTA),
     ],
