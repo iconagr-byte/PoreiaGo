@@ -8,8 +8,6 @@ import {
   scrubAchillioBrandForPlatformHost,
 } from '../lib/branding/platformStorefrontGuard.js';
 import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
-import { fileToLogoDataUrl } from '../lib/branding/logoImage.js';
-import { fileToTripCoverDataUrl } from '../lib/trips/tripImage.js';
 
 // v3: tenant-scoped cache — never reuse Achillio Travel brand across offices.
 const STORAGE_KEY_BASE = 'aerostride_site_appearance_v3';
@@ -227,20 +225,36 @@ async function updateSiteAppearanceLegacy(patch) {
 }
 
 export async function uploadSiteAsset(kind, file) {
-  // SaaS / office tenants: persist logo in Postgres site_appearance so the
-  // storefront (host-resolved) actually receives it. File-store upload alone
-  // only updates the shared platform JSON and was invisible on office sites.
+  // SaaS / office tenants: multipart upload to tenant-scoped disk + short URL
+  // in Postgres. Data URLs in settings_json caused 500s on large logos.
   if (getSaasToken()) {
-    const url =
-      kind === 'hero' ? await fileToTripCoverDataUrl(file) : await fileToLogoDataUrl(file);
-    const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
-    const saved = await updateSiteAppearance({ [key]: url });
-    return {
-      ok: true,
-      kind,
-      url,
-      appearance: saved.data,
-    };
+    const form = new FormData();
+    form.append('file', file);
+    const token = getSaasToken();
+    const res = await fetch(
+      `${API_BASE}/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
+      {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      },
+    );
+    if (isAuthFailureStatus(res.status)) {
+      handleAuthFailure();
+      throw new Error('AUTH_EXPIRED');
+    }
+    if (!res.ok) await parseError(res);
+    const data = await res.json();
+    if (data.appearance) {
+      const merged = finalizeAppearance(data.appearance);
+      if (data.url) {
+        const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
+        merged[key] = data.url;
+      }
+      cacheLocally(merged);
+      return { ...data, appearance: merged };
+    }
+    return data;
   }
 
   const form = new FormData();
@@ -261,10 +275,26 @@ export async function uploadSiteAsset(kind, file) {
 
 export async function clearSiteAsset(kind) {
   if (getSaasToken()) {
-    const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
-    const value = kind === 'logo' ? '' : DEFAULT_SITE_APPEARANCE.hero_image_url;
-    const saved = await updateSiteAppearance({ [key]: value });
-    return { ok: true, appearance: saved.data };
+    const token = getSaasToken();
+    const res = await fetch(
+      `${API_BASE}/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
+      {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      },
+    );
+    if (isAuthFailureStatus(res.status)) {
+      handleAuthFailure();
+      throw new Error('AUTH_EXPIRED');
+    }
+    if (!res.ok) await parseError(res);
+    const data = await res.json();
+    if (data.appearance) {
+      const merged = finalizeAppearance(data.appearance);
+      cacheLocally(merged);
+      return { ok: true, appearance: merged };
+    }
+    return { ok: true, appearance: data.appearance };
   }
 
   const res = await adminFetch(

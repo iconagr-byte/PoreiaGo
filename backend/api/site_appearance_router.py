@@ -616,6 +616,28 @@ async def get_driver_photo(filename: str):
     )
 
 
+@router.get("/api/site/office-assets/{tenant_id}/{kind}/{filename}")
+async def get_office_site_asset(tenant_id: str, kind: str, filename: str):
+    """Public office logo/hero for storefront + admin preview."""
+    from uuid import UUID
+
+    from app.services.tenant_office_asset_service import resolve_office_asset_path
+
+    try:
+        tid = UUID(str(tenant_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid tenant") from exc
+    path = resolve_office_asset_path(tid, kind, filename)
+    if not path:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @router.get("/api/site/fleet-photos/{filename}")
 async def get_fleet_vehicle_photo(filename: str):
     """Public fleet bus photo for admin list, detail, map, and website showcase."""
