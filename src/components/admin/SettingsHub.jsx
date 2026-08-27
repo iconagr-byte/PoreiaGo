@@ -285,67 +285,86 @@ export default function SettingsHub({
 
         {/* Panel content */}
         <div className="min-w-0 flex-1 space-y-5 w-full">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
-                {activeTab?.label ||
-                  (superAdmin ? 'Ρυθμίσεις πλατφόρμας' : 'Ρυθμίσεις γραφείου')}
-              </h2>
-              <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">{tabHint}</p>
+          {!designMode ? (
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
+                  {activeTab?.label ||
+                    (superAdmin ? 'Ρυθμίσεις πλατφόρμας' : 'Ρυθμίσεις γραφείου')}
+                </h2>
+                <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">{tabHint}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {activeTab ? (
+                  <div
+                    className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border ${
+                      superAdmin && activeTab.section === 'platform'
+                        ? 'bg-indigo-500/[0.08] border-indigo-500/15'
+                        : 'bg-violet-500/[0.08] border-violet-500/15'
+                    }`}
+                  >
+                    <span
+                      className={`material-symbols-outlined text-[20px] ${
+                        superAdmin && activeTab.section === 'platform'
+                          ? 'text-indigo-700'
+                          : 'text-violet-700'
+                      }`}
+                    >
+                      {activeTab.icon}
+                    </span>
+                    <span
+                      className={`text-sm font-bold ${
+                        superAdmin && activeTab.section === 'platform'
+                          ? 'text-indigo-800'
+                          : 'text-violet-800'
+                      }`}
+                    >
+                      {activeTab.label}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {designMode && !railOpen ? (
-                <button
-                  type="button"
-                  onClick={() => setRailOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-violet-200 bg-violet-50 text-violet-800 text-xs font-bold hover:bg-violet-100 transition"
-                  title="Εμφάνιση μενού ρυθμίσεων"
-                >
-                  <span className="material-symbols-outlined text-[16px]">menu_open</span>
-                  Μενού ρυθμίσεων
-                </button>
-              ) : null}
-              {designMode && railOpen ? (
-                <button
-                  type="button"
-                  onClick={() => setRailOpen(false)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-black/[0.08] bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition"
-                  title="Απόκρυψη μενού για περισσότερο χώρο"
-                >
-                  <span className="material-symbols-outlined text-[16px]">menu</span>
-                  Περισσότερος χώρος
-                </button>
-              ) : null}
-              {activeTab ? (
-                <div
-                  className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border ${
-                    superAdmin && activeTab.section === 'platform'
-                      ? 'bg-indigo-500/[0.08] border-indigo-500/15'
-                      : 'bg-violet-500/[0.08] border-violet-500/15'
-                  }`}
-                >
-                  <span
-                    className={`material-symbols-outlined text-[20px] ${
-                      superAdmin && activeTab.section === 'platform'
-                        ? 'text-indigo-700'
-                        : 'text-violet-700'
-                    }`}
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#86868b]">
+                  Σχεδιασμός σελίδας
+                </p>
+                <h2 className="text-xl font-bold text-[#1d1d1f] tracking-tight mt-0.5">
+                  Διαμόρφωση custom σελίδας
+                </h2>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {designMode && !railOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setRailOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-black/[0.08] bg-white text-slate-700 text-xs font-bold hover:bg-[#f5f5f7] transition"
+                    title="Εμφάνιση μενού ρυθμίσεων"
                   >
-                    {activeTab.icon}
-                  </span>
-                  <span
-                    className={`text-sm font-bold ${
-                      superAdmin && activeTab.section === 'platform'
-                        ? 'text-indigo-800'
-                        : 'text-violet-800'
-                    }`}
+                    <span className="material-symbols-outlined text-[16px]">menu_open</span>
+                    Μενού ρυθμίσεων
+                  </button>
+                ) : null}
+                {designMode && railOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setRailOpen(false)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-black/[0.08] bg-white text-slate-700 text-xs font-bold hover:bg-[#f5f5f7] transition"
+                    title="Απόκρυψη μενού για περισσότερο χώρο"
                   >
-                    {activeTab.label}
-                  </span>
+                    <span className="material-symbols-outlined text-[16px]">menu</span>
+                    Περισσότερος χώρος
+                  </button>
+                ) : null}
+                <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-[#5e5ce6]/10 border border-[#5e5ce6]/20">
+                  <span className="material-symbols-outlined text-[20px] text-[#5e5ce6]">palette</span>
+                  <span className="text-sm font-bold text-[#5e5ce6]">Σχεδιασμός σελίδων</span>
                 </div>
-              ) : null}
+              </div>
             </div>
-          </div>
+          )}
 
           <SettingsTabPanels
             tab={tab || defaultTab}

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TemplatePicker from './homepage/TemplatePicker.jsx';
 import ThemeGallery from './homepage/ThemeGallery.jsx';
+import PageDesignWizardShell from './homepage/PageDesignWizardShell.jsx';
+import DesignLivePreview from './homepage/DesignLivePreview.jsx';
+import '../../styles/page-design-wizard.css';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
 import PageSliderEditor from './homepage/PageSliderEditor.jsx';
@@ -104,15 +107,15 @@ function sanitizeDesignPage(value) {
 
 function PanelCard({ title, description, children, action }) {
   return (
-    <div className="bg-white rounded-[24px] border border-black/[0.06] shadow-sm overflow-hidden">
-      <div className="px-6 py-5 border-b border-black/[0.04] bg-gradient-to-r from-slate-50 to-white flex flex-wrap items-start justify-between gap-4">
+    <div className="page-design-wizard__panel">
+      <div className="page-design-wizard__panel-head">
         <div>
-          <h4 className="font-bold text-gray-900 text-lg">{title}</h4>
-          {description && <p className="text-xs text-gray-500 mt-1 max-w-2xl">{description}</p>}
+          <h4 className="page-design-wizard__panel-title">{title}</h4>
+          {description && <p className="page-design-wizard__panel-desc">{description}</p>}
         </div>
         {action}
       </div>
-      <div className="p-6">{children}</div>
+      <div className="page-design-wizard__panel-body">{children}</div>
     </div>
   );
 }
@@ -373,11 +376,7 @@ function LogoBlock({
 
 function SaveButton({ saving, label = 'Αποθήκευση' }) {
   return (
-    <button
-      type="submit"
-      disabled={saving}
-      className="px-6 py-2.5 rounded-full bg-primary text-white text-sm font-bold disabled:opacity-60 hover:opacity-90 transition-opacity"
-    >
+    <button type="submit" disabled={saving} className="page-design-wizard__save">
       {saving ? 'Αποθήκευση…' : label}
     </button>
   );
@@ -633,27 +632,29 @@ function OverviewSummary({ form }) {
   ];
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {items.map((item) => (
         <div
           key={item.label}
-          className={`rounded-2xl border p-4 ${
-            item.highlight
-              ? 'border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 to-violet-50'
-              : 'border-black/[0.06] bg-gradient-to-br from-white to-slate-50'
-          }`}
+          className={`pdw-summary-tile${item.highlight ? ' is-highlight' : ''}`}
         >
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{item.label}</p>
-          <p className="font-bold text-gray-900 mt-1">{item.value}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#86868b]">{item.label}</p>
+          <p className="font-bold text-[#1d1d1f] mt-1">{item.value}</p>
         </div>
       ))}
     </div>
   );
 }
 
+function sanitizeSection(value, sections) {
+  const ids = sections.map((s) => s.id);
+  return ids.includes(value) ? value : 'overview';
+}
+
 export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromQuery = searchParams.get('page') || searchParams.get('designPage');
+  const sectionFromQuery = searchParams.get('section');
   const [modules, setModules] = useState(DEFAULT_OFFICE_MODULES);
   const [modulesReady, setModulesReady] = useState(false);
   const officeMode = officeModeFromModules(modules);
@@ -698,6 +699,28 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     }
   }, [modulesReady, modules, initialDesignPage, pageFromQuery, officeMode, setSearchParams]);
 
+  const navSections = designPage === 'rent' ? RENT_SECTIONS : HOME_SECTIONS;
+
+  const selectSection = useCallback(
+    (id) => {
+      const next = sanitizeSection(id, navSections);
+      setSection(next);
+      const params = new URLSearchParams(searchParams);
+      if (next === 'overview') params.delete('section');
+      else params.set('section', next);
+      setSearchParams(params, { replace: true });
+    },
+    [navSections, searchParams, setSearchParams],
+  );
+
+  useEffect(() => {
+    if (!sectionFromQuery) return;
+    setSection((prev) => {
+      const next = sanitizeSection(sectionFromQuery, navSections);
+      return prev === next ? prev : next;
+    });
+  }, [sectionFromQuery, navSections]);
+
   const selectDesignPage = (id) => {
     const next = resolveDesignPageForModules(id, modules);
     setDesignPage(next);
@@ -706,6 +729,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     if (next === 'rent') params.set('page', 'rent');
     else params.delete('page');
     params.delete('designPage');
+    params.delete('section');
     setSearchParams(params, { replace: true });
   };
 
@@ -715,8 +739,9 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     return true;
   });
   const canSwitchPages = availablePages.length > 1;
-  const navSections = designPage === 'rent' ? RENT_SECTIONS : HOME_SECTIONS;
   const activePageMeta = DESIGN_PAGES.find((p) => p.id === designPage) || availablePages[0] || DESIGN_PAGES[0];
+  const showLivePreview = designPage === 'home' && ['overview', 'themes', 'general', 'header', 'hero'].includes(section);
+  const previewRefreshKey = form.homepage_theme_id + form.header_template + form.hero_template + form.accent_color;
   const onPlatformHost = isPlatformMarketingHost();
   const previewTo =
     onPlatformHost && activePageMeta.platformPreviewTo
@@ -888,125 +913,16 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     form.hero_image_url && form.hero_image_url !== DEFAULT_SITE_APPEARANCE.hero_image_url;
 
   if (loading) {
-    return <p className="text-sm text-gray-500 py-4">Φόρτωση ρυθμίσεων εμφάνισης…</p>;
+    return (
+      <div className="page-design-wizard">
+        <p className="text-sm text-[#6e6e73] py-4">Φόρτωση ρυθμίσεων εμφάνισης…</p>
+      </div>
+    );
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row gap-6 min-w-0">
-      <nav className="lg:w-72 shrink-0">
-        <div className="lg:sticky lg:top-4 space-y-2">
-          <div
-            className={`rounded-2xl text-white p-4 mb-4 shadow-lg bg-gradient-to-br ${
-              designPage === 'rent'
-                ? 'from-teal-700 via-cyan-700 to-sky-900 shadow-teal-500/20'
-                : 'from-sky-700 via-indigo-700 to-slate-800 shadow-sky-500/20'
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Διαμόρφωση</p>
-              <span className="inline-flex items-center gap-1 rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-bold text-white/90">
-                <span className="material-symbols-outlined text-[12px]">workspace_premium</span>
-                {officeMode === 'both' ? '2 σελίδες' : '1 σελίδα'}
-              </span>
-            </div>
-            <p className="font-bold text-lg mt-0.5">{activePageMeta.title}</p>
-            <p className="text-xs text-white/75 mt-2 leading-relaxed">{activePageMeta.blurb}</p>
-            <p className="mt-2 text-[11px] font-semibold text-white/65">{contractBadge}</p>
-
-            {canSwitchPages ? (
-              <div className="mt-4 space-y-1.5" role="tablist" aria-label="Σελίδα προς σχεδιασμό">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-white/60 px-0.5">
-                  Ποια σελίδα σχεδιάζεις;
-                </p>
-                {availablePages.map((p) => {
-                  const active = designPage === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => selectDesignPage(p.id)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition ${
-                        active
-                          ? 'bg-white text-slate-900 shadow-md'
-                          : 'bg-white/10 text-white hover:bg-white/15'
-                      }`}
-                    >
-                      <span
-                        className={`flex h-9 w-9 items-center justify-center rounded-lg shrink-0 ${
-                          active ? 'bg-slate-900 text-white' : 'bg-black/20 text-white'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[18px]">{p.icon}</span>
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-bold leading-tight">{p.label}</span>
-                        <span
-                          className={`block text-[11px] mt-0.5 leading-snug ${
-                            active ? 'text-slate-500' : 'text-white/70'
-                          }`}
-                        >
-                          {p.id === 'home' ? 'Αρχική εκδρομών' : 'App /rent'}
-                        </span>
-                      </span>
-                      {active ? (
-                        <span className="material-symbols-outlined text-[18px] text-emerald-600">
-                          check_circle
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="mt-4 rounded-xl bg-black/20 border border-white/10 px-3 py-2.5 flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
-                  <span className="material-symbols-outlined text-[18px]">{activePageMeta.icon}</span>
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold">{activePageMeta.label}</p>
-                  <p className="text-[11px] text-white/70 mt-0.5">
-                    Μόνο αυτή η σελίδα στο συμβόλαιό σου
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <Link
-              to={previewTo}
-              target="_blank"
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-2 rounded-full transition-colors"
-            >
-              <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-              {previewLabel}
-            </Link>
-          </div>
-
-          <div className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
-            {navSections.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setSection(s.id)}
-                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-                  section === s.id
-                    ? 'bg-white text-primary shadow-md ring-1 ring-primary/15'
-                    : 'text-gray-500 hover:text-gray-800 hover:bg-white/80'
-                }`}
-              >
-                <span className={`w-8 h-8 rounded-lg ${s.accent} text-white flex items-center justify-center shrink-0`}>
-                  <span className="material-symbols-outlined text-[18px]">{s.icon}</span>
-                </span>
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
-
-      <div className="flex-1 min-w-0 space-y-6">
+  const sectionContent = (
+    <div className={`page-design-wizard__split${showLivePreview ? ' has-preview' : ''}`}>
+      <div className="space-y-6 min-w-0">
         {designPage === 'rent' ? (
           <>
             {section === 'overview' && (
@@ -1060,7 +976,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   <div className="grid sm:grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => setSection('fleet')}
+                      onClick={() => selectSection('fleet')}
                       className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
                     >
                       <span className="w-11 h-11 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0">
@@ -1077,7 +993,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSection('copy')}
+                      onClick={() => selectSection('copy')}
                       className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
                     >
                       <span className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -1090,7 +1006,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSection('slider')}
+                      onClick={() => selectSection('slider')}
                       className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
                     >
                       <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -1209,13 +1125,13 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => setSection(s.id)}
-                    className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-primary/30 hover:shadow-md text-left transition-all bg-white group"
+                    onClick={() => selectSection(s.id)}
+                    className="pdw-quick-tile w-full"
                   >
-                    <span className={`w-10 h-10 rounded-xl ${s.accent} text-white flex items-center justify-center group-hover:scale-105 transition-transform`}>
+                    <span className="pdw-quick-tile__icon">
                       <span className="material-symbols-outlined">{s.icon}</span>
                     </span>
-                    <span className="font-bold text-gray-900">{s.label}</span>
+                    <span className="font-bold text-[#1d1d1f]">{s.label}</span>
                   </button>
                 ))}
               </div>
@@ -1278,7 +1194,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                       </p>
                       <button
                         type="button"
-                        onClick={() => setSection('themes')}
+                        onClick={() => selectSection('themes')}
                         className="text-xs font-bold text-primary hover:underline mt-1"
                       >
                         Αλλαγή θέματος →
@@ -1764,7 +1680,30 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
           </form>
         )}
       </div>
-      </div>
+      {showLivePreview ? (
+        <DesignLivePreview previewTo={previewTo} refreshKey={previewRefreshKey} />
+      ) : null}
+    </div>
+  );
+
+  return (
+    <div className="page-design-wizard">
+      <PageDesignWizardShell
+        designPage={designPage}
+        activePageMeta={activePageMeta}
+        canSwitchPages={canSwitchPages}
+        availablePages={availablePages}
+        contractBadge={contractBadge}
+        officeMode={officeMode}
+        navSections={navSections}
+        section={section}
+        onSelectPage={selectDesignPage}
+        onSelectSection={selectSection}
+        previewTo={previewTo}
+        previewLabel={previewLabel}
+      >
+        {sectionContent}
+      </PageDesignWizardShell>
     </div>
   );
 }

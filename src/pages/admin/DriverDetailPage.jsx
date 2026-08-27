@@ -202,7 +202,7 @@ export default function DriverDetailPage() {
 
   if (loading && !driver) {
     return (
-      <AdminLayout activeTab="settings" title={header}>
+      <AdminLayout activeTab="settings" title={header} hideSidebar>
         <p className="text-on-surface-variant">Φόρτωση προφίλ…</p>
       </AdminLayout>
     );
@@ -210,7 +210,7 @@ export default function DriverDetailPage() {
 
   if (!driver) {
     return (
-      <AdminLayout activeTab="settings" title={header}>
+      <AdminLayout activeTab="settings" title={header} hideSidebar>
         <div className="max-w-lg mx-auto text-center py-16 bg-white rounded-[32px] border shadow-sm">
           <span className="material-symbols-outlined text-5xl text-gray-300 mb-4">person_off</span>
           <p className="text-on-surface-variant mb-4">Δεν βρέθηκε ο οδηγός.</p>
@@ -231,7 +231,7 @@ export default function DriverDetailPage() {
   const licenseUrgent = licenseDays != null && licenseDays < 30;
 
   return (
-    <AdminLayout activeTab="settings" title={header}>
+    <AdminLayout activeTab="settings" title={header} hideSidebar>
       <div className="max-w-5xl mx-auto pb-16 space-y-6">
         <div className="bg-surface-container-lowest rounded-[32px] border border-black/[0.05] shadow-sm p-6 md:p-8">
           <div className="flex flex-col md:flex-row gap-6 md:gap-8">
