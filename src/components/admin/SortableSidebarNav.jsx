@@ -57,7 +57,6 @@ function SharedScopeChip() {
 const SHARED_NAV_ACCENTS = {
   dashboard: 'indigo',
   fleet_live_map: 'emerald',
-  loyalty: 'amber',
   email: 'sky',
   email_templates: 'violet',
 };

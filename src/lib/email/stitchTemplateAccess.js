@@ -84,5 +84,8 @@ export function filterStitchCategories(categories, access) {
 
 /** Hide templates that require a missing contract. */
 export function filterStitchTemplates(templates, access) {
-  return (templates || []).filter((tpl) => isStitchTemplateUnlocked(tpl, access));
+  return (templates || []).filter((tpl) => {
+    if (tpl?.hidden) return false;
+    return isStitchTemplateUnlocked(tpl, access);
+  });
 }

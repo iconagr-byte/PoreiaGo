@@ -85,6 +85,7 @@ import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
 import DriversHub from '../components/admin/DriversHub.jsx';
 import BusSetupTools from '../components/admin/BusSetupTools.jsx';
 import LoyaltyRewardsPanel from '../components/admin/LoyaltyRewardsPanel.jsx';
+import { LOYALTY_UI_ENABLED } from '../lib/admin/loyaltyUi.js';
 import SortableSidebarNav from '../components/admin/SortableSidebarNav.jsx';
 import DashboardKpiCard from '../components/admin/DashboardKpiCard.jsx';
 import TemplateSearch from '../components/admin/TemplateSearch.jsx';
@@ -210,14 +211,17 @@ export default function BackOffice() {
   }, [rentOnly, officeMode, activeTab]);
 
   useEffect(() => {
-    // If Rent is not available for this session, never stay on rent desk tab.
-    // Achillio Travel stays blocked; PoreiaGo Super Admin / platform keeps access.
     if (rentMenuVisible) return;
     if (activeTab === 'fleet_rental') {
       toast.error('Το Rent δεν είναι ενεργό για αυτό το γραφείο');
       setActiveTab('dashboard');
     }
   }, [rentMenuVisible, activeTab]);
+
+  useEffect(() => {
+    if (LOYALTY_UI_ENABLED) return;
+    if (activeTab === 'loyalty') setActiveTab('dashboard');
+  }, [activeTab]);
 
   useEffect(() => {
     if (!rentOnly || activeTab !== 'dashboard') return undefined;
@@ -2230,7 +2234,7 @@ export default function BackOffice() {
           >
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'customers' && (rentOnly || customerServiceScope === CUSTOMER_SERVICE_RENT) && renderCustomers()}
-            {activeTab === 'loyalty' && <LoyaltyRewardsPanel />}
+            {LOYALTY_UI_ENABLED && activeTab === 'loyalty' && <LoyaltyRewardsPanel />}
             {activeTab === 'settings' && (
               <div className="pb-stack-lg w-full">
                 <ImpersonationBanner />
