@@ -519,7 +519,7 @@ export default function SortableSidebarNav({
             {showBusesPin && !showSharedZone ? (
               <div className="admin-nav-zone admin-nav-zone--rent-hint">
                 <p className="admin-nav-rent-hint-text">
-                  Ανοίξτε την κάρτα <strong>Εκδρομές</strong> κάτω — το μενού εμφανίζεται δεξιά.
+                  Ανοίξτε τη <strong>Διαχείριση Λεωφορείων</strong> κάτω — το μενού εμφανίζεται δεξιά.
                 </p>
               </div>
             ) : null}
@@ -536,7 +536,7 @@ export default function SortableSidebarNav({
             {showServiceSwitch && serviceMode === 'buses' ? (
               <div className="admin-nav-zone admin-nav-zone--rent-hint">
                 <p className="admin-nav-rent-hint-text">
-                  Ανοίξτε την κάρτα <strong>Εκδρομές</strong> κάτω — στόλος και GPS στα δεξιά.
+                  Ανοίξτε τη <strong>Διαχείριση Λεωφορείων</strong> κάτω — στόλος και GPS στα δεξιά.
                 </p>
               </div>
             ) : null}
@@ -565,10 +565,11 @@ export default function SortableSidebarNav({
           <button
             type="button"
             onClick={() => openBusesHub(busesHubActive ? activeTab : DEFAULT_BUSES_HUB_TAB)}
-            className={`admin-nav-service-card admin-nav-service-card--buses${
+            className={`admin-nav-service-card admin-nav-service-card--buses admin-nav-service-card--single${
               busesHubActive ? ' is-active' : ''
             }`}
-            title="Εκδρομές — στόλος, GPS, κρατήσεις"
+            title="Διαχείριση Λεωφορείων"
+            aria-label="Διαχείριση Λεωφορείων"
             aria-current={busesHubActive ? 'page' : undefined}
           >
             <span className="admin-nav-service-card-icon" aria-hidden>
@@ -577,9 +578,7 @@ export default function SortableSidebarNav({
               </span>
             </span>
             <span className="admin-nav-service-card-copy">
-              <span className="admin-nav-service-card-kicker">Υπηρεσία</span>
-              <span className="admin-nav-service-card-title">Εκδρομές</span>
-              <span className="admin-nav-service-card-sub">Στόλος · GPS · κρατήσεις</span>
+              <span className="admin-nav-service-card-title">Διαχείριση Λεωφορείων</span>
             </span>
             <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
               chevron_right
