@@ -754,6 +754,54 @@ html.driver-route body {
   margin-bottom: 1.5rem;
 }
 
+.driver-gate-brand-extras {
+  display: none;
+}
+
+.driver-gate-lead {
+  margin: 1.25rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  font-weight: 600;
+  color: #334155;
+}
+
+.driver-gate-features {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.driver-gate-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  font-weight: 600;
+  color: #475569;
+}
+
+.driver-gate-features .material-symbols-outlined {
+  font-size: 1.125rem;
+  color: var(--driver-accent);
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.driver-gate-footnote {
+  margin: 1.1rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(29, 78, 216, 0.12);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  font-weight: 600;
+  color: #64748b;
+}
+
 .driver-gate-card {
   background: #ffffff;
   border: 1px solid var(--driver-border);
@@ -1688,14 +1736,16 @@ html.driver-route body {
   width: auto !important;
 }
 
-/* Login gate on tablet / desktop — fill the viewport and adapt layout */
+/* Login gate on tablet / desktop — center in viewport */
 .driver-gate.is-tablet {
   --driver-max-w: min(26rem, 100%);
-  justify-content: center;
-  align-items: center;
-  padding-top: max(2rem, env(safe-area-inset-top, 0px));
-  padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
-  padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  padding: max(2rem, env(safe-area-inset-top, 0px)) max(1.5rem, env(safe-area-inset-left, 0px))
+    max(2rem, env(safe-area-inset-bottom, 0px));
   padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
 }
 
@@ -1704,48 +1754,68 @@ html.driver-route body {
   margin: 0;
 }
 
-/* Landscape tablet + desktop: one unified card, brand | form */
+/* Landscape tablet + desktop: unified card, brand | form */
 .driver-gate.is-tablet.is-landscape {
-  --driver-max-w: min(52rem, calc(100% - 2rem));
+  --driver-max-w: min(54rem, calc(100% - 2.5rem));
 }
 
 .driver-gate.is-tablet.is-landscape .driver-gate-panel {
-  width: min(52rem, 100%);
+  width: min(54rem, 100%);
   display: grid;
-  grid-template-columns: minmax(14rem, 0.95fr) minmax(16rem, 1.15fr);
+  grid-template-columns: minmax(16rem, 1fr) minmax(18rem, 1.05fr);
   align-items: stretch;
   background: #fff;
   border: 1px solid var(--driver-border);
-  border-radius: 1.75rem;
+  border-radius: 1.85rem;
   box-shadow:
-    0 24px 56px rgba(15, 23, 42, 0.1),
-    0 2px 0 rgba(255, 255, 255, 0.8) inset;
+    0 28px 64px rgba(15, 23, 42, 0.11),
+    0 2px 0 rgba(255, 255, 255, 0.85) inset;
   overflow: hidden;
-  min-height: min(26rem, calc(100dvh - 4rem));
+  min-height: min(32rem, calc(100dvh - 3rem));
+  max-height: calc(100dvh - 3rem);
 }
 
 .driver-gate.is-tablet.is-landscape .driver-gate-brand {
   margin-bottom: 0;
   text-align: left;
-  padding: 2rem 1.75rem;
+  padding: 2.25rem 2rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
   background:
-    radial-gradient(circle at 20% 0%, rgba(29, 78, 216, 0.12), transparent 55%),
+    radial-gradient(circle at 18% 0%, rgba(29, 78, 216, 0.14), transparent 52%),
+    radial-gradient(circle at 90% 100%, rgba(234, 179, 8, 0.08), transparent 45%),
     linear-gradient(165deg, #f8fbff 0%, #eef4ff 100%);
   border-right: 1px solid var(--driver-border);
 }
 
 .driver-gate.is-tablet.is-landscape .driver-gate-brand .inline-flex {
   margin-left: 0;
+  width: 3.75rem;
+  height: 3.75rem;
+}
+
+.driver-gate.is-tablet.is-landscape .driver-gate-brand h1 {
+  font-size: 1.75rem;
+  line-height: 1.15;
 }
 
 .driver-gate.is-tablet.is-landscape .driver-gate-brand-sub {
   margin-left: 0;
   margin-right: 0;
-  max-width: 16rem;
+  max-width: 20rem;
+  font-size: 0.9375rem;
+}
+
+.driver-gate.is-tablet.is-landscape .driver-gate-brand-extras {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+}
+
+.driver-gate.is-tablet.is-landscape[data-gate-mode='qr'] .driver-gate-brand-extras {
+  display: none;
 }
 
 .driver-gate.is-tablet.is-landscape .driver-gate-card {
@@ -1753,7 +1823,7 @@ html.driver-route body {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  padding: 2rem 1.75rem;
+  padding: 2.25rem 2rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1761,17 +1831,21 @@ html.driver-route body {
   background: #fff;
 }
 
-/* CSS fallback when JS device class lags (desktop browser resize) */
-@media (min-width: 900px) and (orientation: landscape) {
-  .driver-gate:not(.is-phone) {
-    justify-content: center;
-    align-items: center;
-  }
-}
-
 @media (min-width: 1100px) {
   .driver-gate.is-tablet.is-landscape .driver-gate-panel {
-    width: min(56rem, 100%);
-    min-height: min(28rem, calc(100dvh - 5rem));
+    width: min(58rem, calc(100% - 3rem));
+    min-height: min(34rem, calc(100dvh - 4rem));
+  }
+
+  .driver-gate.is-tablet.is-landscape .driver-gate-brand {
+    padding: 2.75rem 2.5rem;
+  }
+
+  .driver-gate.is-tablet.is-landscape .driver-gate-brand h1 {
+    font-size: 2rem;
+  }
+
+  .driver-gate.is-tablet.is-landscape .driver-gate-card {
+    padding: 2.75rem 2.5rem;
   }
 }

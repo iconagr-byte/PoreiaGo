@@ -71,6 +71,7 @@ export default function MasterQrGate({ onAuthenticated }) {
       className={`driver-gate ${deviceClass}`}
       data-device-form={device.form}
       data-orientation={device.orientation}
+      data-gate-mode={mode}
     >
       <div className="driver-gate-glow driver-gate-glow--tr" aria-hidden />
       <div className="driver-gate-glow driver-gate-glow--bl" aria-hidden />
@@ -104,6 +105,35 @@ export default function MasterQrGate({ onAuthenticated }) {
               </>
             )}
           </p>
+
+          <div className="driver-gate-brand-extras">
+            <p className="driver-gate-lead">
+              Η εφαρμογή οδηγού για εκδρομές — GPS, επιβίβαση και επικοινωνία με το γραφείο σε ένα μέρος.
+            </p>
+            <ul className="driver-gate-features">
+              <li>
+                <span className="material-symbols-outlined" aria-hidden>
+                  my_location
+                </span>
+                Ζωντανή θέση στον χάρτη μετά την έναρξη βάρδιας
+              </li>
+              <li>
+                <span className="material-symbols-outlined" aria-hidden>
+                  qr_code_scanner
+                </span>
+                Σάρωση εισιτηρίων & λίστα επιβατών
+              </li>
+              <li>
+                <span className="material-symbols-outlined" aria-hidden>
+                  chat
+                </span>
+                Μηνύματα & ειδοποιήσεις από το γραφείο
+              </li>
+            </ul>
+            <p className="driver-gate-footnote">
+              Η σύνδεση δεν ξεκινά αυτόματα τη βάρδια — μετά την είσοδο πατήστε «Έναρξη βάρδιας».
+            </p>
+          </div>
         </header>
 
         <div className="driver-gate-card space-y-4">
