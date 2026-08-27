@@ -34,7 +34,7 @@ import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 
 function DualScopeBadge() {
   return (
-    <span className="admin-nav-dual-badge" title="Λεωφορεία & Ενοικιάσεις" aria-label="Κοινό · λεωφορεία & ενοικιάσεις">
+    <span className="admin-nav-dual-badge" title="Εκδρομές & Ενοικιάσεις" aria-label="Κοινό · εκδρομές & ενοικιάσεις">
       <span className="admin-nav-dual-badge-icon" aria-hidden>
         <span className="material-symbols-outlined">directions_bus</span>
       </span>
@@ -47,7 +47,7 @@ function DualScopeBadge() {
 
 function SharedScopeChip() {
   return (
-    <span className="admin-nav-shared-chip" title="Λεωφορεία & Ενοικιάσεις" aria-label="Κοινό">
+    <span className="admin-nav-shared-chip" title="Εκδρομές & Ενοικιάσεις" aria-label="Κοινό">
       Κοινό
     </span>
   );
@@ -496,7 +496,7 @@ export default function SortableSidebarNav({
                   tone="shared"
                   icon="hub"
                   title="Κοινά"
-                  subtitle="Λεωφορεία & ενοικιάσεις"
+                  subtitle="Εκδρομές & ενοικιάσεις"
                 />
                 {renderItemList(sharedItems, 'main', { cardStyle: true })}
               </div>
@@ -505,7 +505,7 @@ export default function SortableSidebarNav({
             {showBusesPin && !showSharedZone ? (
               <div className="admin-nav-zone admin-nav-zone--rent-hint">
                 <p className="admin-nav-rent-hint-text">
-                  Ανοίξτε την κάρτα <strong>Λεωφορεία</strong> κάτω — το μενού εμφανίζεται δεξιά.
+                  Ανοίξτε την κάρτα <strong>Εκδρομές</strong> κάτω — το μενού εμφανίζεται δεξιά.
                 </p>
               </div>
             ) : null}
@@ -522,7 +522,7 @@ export default function SortableSidebarNav({
             {showServiceSwitch && serviceMode === 'buses' ? (
               <div className="admin-nav-zone admin-nav-zone--rent-hint">
                 <p className="admin-nav-rent-hint-text">
-                  Ανοίξτε την κάρτα <strong>Λεωφορεία</strong> κάτω — Εκδρομές, στόλος και GPS στα δεξιά.
+                  Ανοίξτε την κάρτα <strong>Εκδρομές</strong> κάτω — στόλος και GPS στα δεξιά.
                 </p>
               </div>
             ) : null}
@@ -545,7 +545,7 @@ export default function SortableSidebarNav({
         )}
       </div>
 
-      {/* Pinned hubs — Λεωφορεία · Ενοικιάσεις · Ρυθμίσεις */}
+      {/* Pinned hubs — Εκδρομές · Ενοικιάσεις · Ρυθμίσεις */}
       <div className="shrink-0 border-t border-black/[0.06] px-2.5 py-2.5 bg-white/80 backdrop-blur-sm space-y-2">
         {showBusesPin ? (
           <button
@@ -554,7 +554,7 @@ export default function SortableSidebarNav({
             className={`admin-nav-service-card admin-nav-service-card--buses${
               busesHubActive ? ' is-active' : ''
             }`}
-            title="Λεωφορεία — εκδρομές, στόλος, GPS"
+            title="Εκδρομές — στόλος, GPS, κρατήσεις"
             aria-current={busesHubActive ? 'page' : undefined}
           >
             <span className="admin-nav-service-card-icon" aria-hidden>
@@ -564,8 +564,8 @@ export default function SortableSidebarNav({
             </span>
             <span className="admin-nav-service-card-copy">
               <span className="admin-nav-service-card-kicker">Υπηρεσία</span>
-              <span className="admin-nav-service-card-title">Λεωφορεία</span>
-              <span className="admin-nav-service-card-sub">Εκδρομές · στόλος · GPS</span>
+              <span className="admin-nav-service-card-title">Εκδρομές</span>
+              <span className="admin-nav-service-card-sub">Στόλος · GPS · κρατήσεις</span>
             </span>
             <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
               chevron_right
@@ -618,7 +618,7 @@ export default function SortableSidebarNav({
             <span className="admin-nav-service-card-kicker">Γραφείο</span>
             <span className="admin-nav-service-card-title">Ρυθμίσεις</span>
             <span className="admin-nav-service-card-sub">
-              {showServiceSwitch ? 'Λεωφορεία & ενοικιάσεις' : 'Εμφάνιση · πληρωμές · συμβόλαια'}
+              {showServiceSwitch ? 'Εκδρομές & ενοικιάσεις' : 'Εμφάνιση · πληρωμές · συμβόλαια'}
             </span>
           </span>
           <span className="material-symbols-outlined admin-nav-service-card-chevron" aria-hidden>
