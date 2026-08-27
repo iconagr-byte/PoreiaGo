@@ -128,7 +128,11 @@ def _is_platform_logo(url: str | None) -> bool:
     if not value:
         return True
     # Real tenant uploads — never treat as platform placeholder.
-    if value.startswith("data:image/") or value.startswith("/api/site/assets/"):
+    if (
+        value.startswith("data:image/")
+        or value.startswith("/api/site/assets/")
+        or value.startswith("/api/site/office-assets/")
+    ):
         return False
     return bool(_PLATFORM_LOGO_RE.search(value))
 
@@ -158,6 +162,7 @@ def _is_opaque_uploaded_logo(url: str | None) -> bool:
     return (
         value.startswith("data:image/")
         or value.startswith("/api/site/assets/")
+        or value.startswith("/api/site/office-assets/")
         or "/uploads/site/" in value
         or value.startswith("uploads/site/")
     )

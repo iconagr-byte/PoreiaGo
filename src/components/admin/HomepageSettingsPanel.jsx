@@ -28,7 +28,6 @@ import { pushHomepagePreviewDraft } from '../../lib/homepage/homepagePreview.js'
 import { pageSliderPatch } from '../../lib/homepage/pageSlider.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
 import { fileToLogoDataUrl } from '../../lib/branding/logoImage.js';
-import { getSaasToken } from '../../services/saasApi.js';
 import {
   clearSiteAsset,
   DEFAULT_SITE_APPEARANCE,
@@ -902,26 +901,22 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     const setUploading = kind === 'logo' ? setUploadingLogo : setUploadingHero;
     setUploading(true);
     try {
-      // Compress once → show immediately → persist (SaaS offices store data URL in Postgres).
-      if (getSaasToken()) {
-        const url =
+      // Optimistic local preview while the server compresses + stores the file.
+      try {
+        const preview =
           kind === 'hero' ? await fileToTripCoverDataUrl(file) : await fileToLogoDataUrl(file);
-        setForm((p) => ({ ...p, [key]: url }));
-        const saved = await updateSiteAppearance({ [key]: url });
-        // Keep the just-uploaded URL on top — scrubbers must not wipe a fresh office upload.
-        setForm((p) => ({ ...p, ...saved.data, [key]: url }));
-        toast.success(kind === 'logo' ? 'Το λογότυπο ενημερώθηκε' : 'Η φωτογραφία hero ενημερώθηκε');
-        return;
+        setForm((p) => ({ ...p, [key]: preview }));
+      } catch {
+        /* preview optional */
       }
 
-      let toSend = file;
-      if (kind === 'hero') {
-        const dataUrl = await fileToTripCoverDataUrl(file);
-        const blob = await (await fetch(dataUrl)).blob();
-        toSend = new File([blob], 'hero.jpg', { type: 'image/jpeg' });
-      }
-      const result = await uploadSiteAsset(kind, toSend);
-      setForm((p) => ({ ...p, ...result.appearance }));
+      const result = await uploadSiteAsset(kind, file);
+      const url = result?.url;
+      setForm((p) => ({
+        ...p,
+        ...(result?.appearance || {}),
+        ...(url ? { [key]: url } : {}),
+      }));
       toast.success(kind === 'logo' ? 'Το λογότυπο ενημερώθηκε' : 'Η φωτογραφία hero ενημερώθηκε');
     } catch (err) {
       if (err.message === 'AUTH_EXPIRED') {
@@ -929,8 +924,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         return;
       }
       const msg = String(err.message || '');
-      if (/heic|heif|decode|μη έγκυρη|could not decode|invalid image/i.test(msg)) {
+      if (/heic|heif|decode|μη έγκυρη|could not decode|invalid image|μόνο αρχεία/i.test(msg)) {
         toast.error('Μη υποστηριζόμενη εικόνα — δοκιμάστε JPG ή PNG');
+        return;
+      }
+      if (/internal server error|αποτυχία αποθήκευσης|αποτυχία επεξεργασίας/i.test(msg)) {
+        toast.error('Σφάλμα server στο ανέβασμα — δοκιμάστε μικρότερο JPG/PNG');
         return;
       }
       toast.error(msg || 'Αποτυχία ανεβάσματος');
@@ -1561,17 +1560,29 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
 
         {designPage === 'home' && section === 'branding' && (
           <form
-            onSubmit={patchForm(
-              {
-                logo_url: form.logo_url,
+            onSubmit={(e) => {
+              // Never PUT multi-hundred-KB data: URLs — they 500 the branding API.
+              // File upload already persists short /api/site/office-assets/… URLs.
+              const patch = {
                 logo_height_px: clampLogoHeight(form.logo_height_px),
                 logo_max_width_px: clampLogoMaxWidth(form.logo_max_width_px),
                 logo_show_name: form.logo_show_name !== false,
-                hero_image_url: form.hero_image_url,
                 hero_image_focal: form.hero_image_focal || 'center',
-              },
-              'Οι ρυθμίσεις λογοτύπου αποθηκεύτηκαν',
-            )}
+              };
+              const logo = String(form.logo_url || '');
+              const hero = String(form.hero_image_url || '');
+              if (logo && !logo.startsWith('data:')) patch.logo_url = logo;
+              if (hero && !hero.startsWith('data:')) patch.hero_image_url = hero;
+              if (logo.startsWith('data:') || hero.startsWith('data:')) {
+                toast.error(
+                  'Το λογότυπο/hero δεν έχει ανέβει ακόμα — πατήστε Ανέβασμα και περιμένετε επιτυχία',
+                  { id: 'homepage-save-err' },
+                );
+                e.preventDefault();
+                return;
+              }
+              return patchForm(patch, 'Οι ρυθμίσεις λογοτύπου αποθηκεύτηκαν')(e);
+            }}
           >
             <PanelCard
               title="Λογότυπο & εικόνες"
