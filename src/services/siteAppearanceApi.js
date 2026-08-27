@@ -171,8 +171,15 @@ export async function updateSiteAppearance(patch) {
         method: 'PUT',
         body: JSON.stringify(patch),
       });
-      // Keep client patch on top — older API schemas may omit layout keys.
+      // Keep client patch on top — older API schemas may omit layout keys;
+      // never let host scrubbers wipe a logo/hero the office just uploaded.
       const merged = finalizeAppearance({ ...data, ...patch });
+      if (Object.prototype.hasOwnProperty.call(patch, 'logo_url') && patch.logo_url) {
+        merged.logo_url = patch.logo_url;
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'hero_image_url') && patch.hero_image_url) {
+        merged.hero_image_url = patch.hero_image_url;
+      }
       cacheLocally(merged);
       return { data: merged, source: data.storage_source === 'postgres' ? 'postgres' : 'server', offline: false };
     } catch (saasErr) {
