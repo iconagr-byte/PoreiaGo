@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { officeLogoImageStyle, resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
+import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
+import OfficeLoginLink from './OfficeLoginLink.jsx';
 
 function FooterBrandBlock({ siteAppearance, tone = 'light' }) {
   const brand = resolveOfficeBrand(siteAppearance);
@@ -28,16 +30,17 @@ function FooterBrandBlock({ siteAppearance, tone = 'light' }) {
   );
 }
 
-function DiscreetOfficeLogin({ tone = 'light' }) {
-  const className =
-    tone === 'dark'
-      ? 'text-[11px] font-medium text-white/35 hover:text-white/60 transition-colors'
-      : 'text-[11px] font-medium text-secondary/55 hover:text-secondary transition-colors';
+function FooterOfficeLogin({ tone = 'light' }) {
+  if (typeof window !== 'undefined' && !isTenantStorefrontHost()) {
+    return null;
+  }
   return (
-    <div className="mt-8 pt-4 border-t border-black/[0.04] flex justify-center sm:justify-end">
-      <Link to="/admin/login" className={className} title="Σύνδεση για το γραφείο">
-        Σύνδεση γραφείου
-      </Link>
+    <div
+      className={`mt-8 pt-4 flex justify-center sm:justify-end ${
+        tone === 'dark' ? 'border-t border-white/10' : 'border-t border-black/[0.04]'
+      }`}
+    >
+      <OfficeLoginLink variant={tone === 'dark' ? 'dark' : 'light'} density="footer" />
     </div>
   );
 }
@@ -84,7 +87,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
         <div className="max-w-container-max mx-auto px-margin-desktop flex flex-col items-center">
           <FooterBrandBlock siteAppearance={siteAppearance} />
           <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-secondary">{links}</div>
-          <DiscreetOfficeLogin />
+          <FooterOfficeLogin />
         </div>
       </footer>
     );
@@ -102,13 +105,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
             <div className="flex flex-wrap gap-6 items-start md:justify-end text-sm text-white/80">{links}</div>
           </div>
           <div className="mt-8 pt-4 border-t border-white/10 flex justify-center sm:justify-end">
-            <Link
-              to="/admin/login"
-              className="text-[11px] font-medium text-white/35 hover:text-white/60 transition-colors"
-              title="Σύνδεση για το γραφείο"
-            >
-              Σύνδεση γραφείου
-            </Link>
+            <OfficeLoginLink variant="dark" density="footer" />
           </div>
         </div>
       </footer>
@@ -130,7 +127,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
             </div>
             <div className="flex flex-wrap gap-4 items-start text-sm text-secondary">{links}</div>
           </div>
-          <DiscreetOfficeLogin />
+          <FooterOfficeLogin />
         </div>
       </footer>
     );
@@ -162,7 +159,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
             <FooterBrandBlock siteAppearance={siteAppearance} />
             <div className="flex flex-wrap gap-6 justify-start md:justify-end text-sm text-secondary">{links}</div>
           </div>
-          <DiscreetOfficeLogin />
+          <FooterOfficeLogin />
         </div>
       </footer>
     );
@@ -185,13 +182,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
           </div>
           <div className="flex flex-wrap items-center gap-4">
             {links}
-            <Link
-              to="/admin/login"
-              className="text-[11px] font-medium text-secondary/55 hover:text-secondary transition-colors"
-              title="Σύνδεση για το γραφείο"
-            >
-              Σύνδεση γραφείου
-            </Link>
+            <OfficeLoginLink variant="light" density="footer" />
           </div>
         </div>
       </footer>
@@ -215,7 +206,7 @@ export default function StorefrontFooter({ siteAppearance, templateId = 'classic
             {links}
           </div>
         </div>
-        <DiscreetOfficeLogin />
+        <FooterOfficeLogin />
       </div>
     </footer>
   );

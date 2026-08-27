@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCustomerToken, isCustomer } from '../../lib/auth.js';
 import StorefrontBrand from './StorefrontBrand.jsx';
+import OfficeLoginLink from './OfficeLoginLink.jsx';
+import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
 
 const HEADER_STYLES = {
   glass_dark: {
@@ -129,6 +131,9 @@ export default function StorefrontHeader({
     ? 'md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white'
     : 'md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.08] bg-black/[0.03] text-slate-800';
 
+  const showOfficeLogin =
+    typeof window !== 'undefined' ? isTenantStorefrontHost() : false;
+
   const wrapClass = `${style.wrap} ${scrolled ? style.wrapScrolled : style.wrapTop}`.trim();
 
   const closeMenu = () => setMenuOpen(false);
@@ -179,6 +184,9 @@ export default function StorefrontHeader({
               <span className="tabular-nums tracking-tight">{phone}</span>
             </a>
           ) : null}
+          {showOfficeLogin ? (
+            <OfficeLoginLink variant={style.variant} density="header" />
+          ) : null}
           <Link
             to={walletLink.to}
             state={walletLink.state}
@@ -193,6 +201,13 @@ export default function StorefrontHeader({
         </nav>
 
         <div className="flex md:hidden items-center gap-2">
+          {showOfficeLogin ? (
+            <OfficeLoginLink
+              variant={style.variant}
+              density="header"
+              className="!px-2.5 !py-1.5 !text-xs !gap-1"
+            />
+          ) : null}
           <Link
             to={walletLink.to}
             state={walletLink.state}
@@ -277,6 +292,16 @@ export default function StorefrontHeader({
               >
                 Η κράτησή μου
               </Link>
+            ) : null}
+            {showOfficeLogin ? (
+              <div className="pt-2 mt-1 border-t border-black/[0.06]">
+                <OfficeLoginLink
+                  variant={isDark ? 'dark' : 'light'}
+                  density="header"
+                  onNavigate={closeMenu}
+                  className="w-full justify-center"
+                />
+              </div>
             ) : null}
           </nav>
         </div>
