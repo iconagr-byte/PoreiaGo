@@ -123,12 +123,14 @@ export default function AdminLayout({
   title,
   children,
   footer,
+  hideSidebar = false,
 }) {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="bg-surface text-on-surface h-dvh max-h-dvh flex overflow-hidden">
+      {!hideSidebar ? (
       <aside className="w-64 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0">
         <div className="p-6">
           <button
@@ -146,8 +148,9 @@ export default function AdminLayout({
           onNavigate={navigate}
         />
       </aside>
+      ) : null}
 
-      {mobileOpen ? (
+      {!hideSidebar && mobileOpen ? (
         <div className="fixed inset-0 z-[80] md:hidden" role="dialog" aria-modal="true">
           <button
             type="button"
@@ -179,14 +182,16 @@ export default function AdminLayout({
       <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {title && (
           <header className="min-h-16 sm:h-20 glass-overlay border-b border-black/[0.05] flex items-center gap-3 px-4 sm:px-margin-desktop shrink-0 py-3">
-            <button
-              type="button"
-              className="md:hidden w-11 h-11 rounded-full bg-white border border-black/[0.08] shadow-sm flex items-center justify-center shrink-0"
-              aria-label="Άνοιγμα μενού"
-              onClick={() => setMobileOpen(true)}
-            >
-              <span className="material-symbols-outlined">menu</span>
-            </button>
+            {!hideSidebar ? (
+              <button
+                type="button"
+                className="md:hidden w-11 h-11 rounded-full bg-white border border-black/[0.08] shadow-sm flex items-center justify-center shrink-0"
+                aria-label="Άνοιγμα μενού"
+                onClick={() => setMobileOpen(true)}
+              >
+                <span className="material-symbols-outlined">menu</span>
+              </button>
+            ) : null}
             <div className="min-w-0 flex-1">{title}</div>
           </header>
         )}
