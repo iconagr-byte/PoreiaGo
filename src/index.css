@@ -121,9 +121,13 @@
 }
 
 .admin-nav-zone--shared {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  border: 1px solid color-mix(in srgb, #94a3b8 18%, transparent);
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(139, 92, 246, 0.18), transparent 48%),
+    radial-gradient(circle at 92% 12%, rgba(14, 165, 233, 0.14), transparent 44%),
+    radial-gradient(circle at 70% 100%, rgba(251, 191, 36, 0.12), transparent 40%),
+    linear-gradient(165deg, #eef2ff 0%, #f5f3ff 45%, #ecfdf5 100%);
+  border: 1px solid color-mix(in srgb, #a78bfa 36%, transparent);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.1);
   padding: 0.55rem 0.4rem 0.45rem;
 }
 
@@ -172,8 +176,17 @@
 }
 
 .admin-nav-zone-head--shared .admin-nav-zone-icon {
-  background: #e2e8f0;
-  color: #475569;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.admin-nav-zone-head--shared .admin-nav-zone-title {
+  color: #4f46e5;
+}
+
+.admin-nav-zone-head--shared .admin-nav-zone-sub {
+  color: #7c3aed;
 }
 
 .admin-nav-zone-head--buses .admin-nav-zone-icon {
@@ -241,15 +254,15 @@
 .admin-nav-shared-chip {
   flex-shrink: 0;
   margin-left: 0.25rem;
-  padding: 0.12rem 0.4rem;
+  padding: 0.12rem 0.45rem;
   border-radius: 999px;
   font-size: 0.5625rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #64748b;
-  background: #f1f5f9;
-  border: 1px solid color-mix(in srgb, #94a3b8 22%, transparent);
+  color: #6d28d9;
+  background: linear-gradient(135deg, #ede9fe, #fce7f3);
+  border: 1px solid color-mix(in srgb, #a855f7 35%, transparent);
   line-height: 1.2;
 }
 
@@ -264,8 +277,9 @@
 
 .admin-nav-btn--mini-card.admin-nav-btn-active .admin-nav-shared-chip,
 .admin-nav-btn--mini-card:hover .admin-nav-shared-chip {
-  background: #e2e8f0;
-  color: #475569;
+  background: linear-gradient(135deg, #ddd6fe, #fbcfe8);
+  color: #5b21b6;
+  border-color: color-mix(in srgb, #9333ea 40%, transparent);
 }
 
 .admin-nav-btn--shared {
@@ -276,33 +290,118 @@
   padding-right: 0.4rem;
 }
 
-.admin-nav-btn[data-accent='shared']:hover,
-.admin-nav-btn-active[data-accent='shared'] {
-  background: #f8fafc;
-  color: #334155;
-  border-color: color-mix(in srgb, #94a3b8 28%, transparent);
+/* Shared rows use per-item accents (indigo/emerald/…) — keep light tinted hover */
+.admin-nav-btn--mini-card.admin-nav-btn--shared:hover,
+.admin-nav-btn--mini-card.admin-nav-btn--shared.admin-nav-btn-active {
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
 }
 
-.admin-nav-btn--mini-card[data-accent='shared']:hover,
-.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='shared'] {
-  background: #fff;
-  border-color: color-mix(in srgb, #64748b 32%, transparent);
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-  color: #0f172a;
+.admin-nav-btn--mini-card .admin-nav-icon--circle {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.admin-nav-btn[data-accent='shared'] .admin-nav-icon {
-  color: #64748b;
+.admin-nav-btn--mini-card[data-accent='indigo'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #c7d2fe, #a5b4fc);
+  color: #3730a3;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='emerald'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #a7f3d0, #6ee7b7);
+  color: #065f46;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='violet'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #ddd6fe, #c4b5fd);
+  color: #5b21b6;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='sky'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #bae6fd, #7dd3fc);
+  color: #075985;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='cyan'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #a5f3fc, #67e8f9);
+  color: #155e75;
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='rose'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #fecdd3, #fda4af);
+  color: #9f1239;
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='amber'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #fde68a, #fcd34d);
+  color: #92400e;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+.admin-nav-btn--mini-card[data-accent='blue'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #bfdbfe, #93c5fd);
+  color: #1e40af;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='teal'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #99f6e4, #5eead4);
+  color: #115e59;
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='orange'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #fed7aa, #fdba74);
+  color: #9a3412;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.28);
 }
 
-.admin-nav-btn--mini-card[data-accent='shared'] .admin-nav-icon--circle {
-  background: #e2e8f0;
-  color: #475569;
+/* Soft resting tint so Κοινά cards aren’t flat white */
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='indigo'] {
+  background: linear-gradient(135deg, #f8faff, #fff);
+  border-color: color-mix(in srgb, #818cf8 22%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='emerald'] {
+  background: linear-gradient(135deg, #f6fffb, #fff);
+  border-color: color-mix(in srgb, #34d399 22%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='amber'] {
+  background: linear-gradient(135deg, #fffdf5, #fff);
+  border-color: color-mix(in srgb, #fbbf24 26%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='sky'] {
+  background: linear-gradient(135deg, #f5fbff, #fff);
+  border-color: color-mix(in srgb, #38bdf8 22%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='violet'] {
+  background: linear-gradient(135deg, #faf8ff, #fff);
+  border-color: color-mix(in srgb, #a78bfa 24%, transparent);
 }
 
-.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='shared'] .admin-nav-icon--circle {
-  background: #cbd5e1;
-  color: #334155;
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='indigo'],
+.admin-nav-btn--mini-card[data-accent='indigo']:hover {
+  background: linear-gradient(135deg, #eef2ff, #fff);
+  border-color: color-mix(in srgb, #6366f1 35%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='emerald'],
+.admin-nav-btn--mini-card[data-accent='emerald']:hover {
+  background: linear-gradient(135deg, #ecfdf5, #fff);
+  border-color: color-mix(in srgb, #10b981 35%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='amber'],
+.admin-nav-btn--mini-card[data-accent='amber']:hover {
+  background: linear-gradient(135deg, #fffbeb, #fff);
+  border-color: color-mix(in srgb, #f59e0b 40%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='sky'],
+.admin-nav-btn--mini-card[data-accent='sky']:hover {
+  background: linear-gradient(135deg, #f0f9ff, #fff);
+  border-color: color-mix(in srgb, #0ea5e9 35%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='violet'],
+.admin-nav-btn--mini-card[data-accent='violet']:hover {
+  background: linear-gradient(135deg, #f5f3ff, #fff);
+  border-color: color-mix(in srgb, #8b5cf6 35%, transparent);
 }
 
 /* Pinned service cards (Rent / Fleet ops) */

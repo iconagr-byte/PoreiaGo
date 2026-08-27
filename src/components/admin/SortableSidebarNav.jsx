@@ -53,6 +53,15 @@ function SharedScopeChip() {
   );
 }
 
+/** Per-item color for shared (Κοινά) rows — avoids flat grey “μουντά” look. */
+const SHARED_NAV_ACCENTS = {
+  dashboard: 'indigo',
+  fleet_live_map: 'emerald',
+  loyalty: 'amber',
+  email: 'sky',
+  email_templates: 'violet',
+};
+
 function ZoneHeader({ tone, icon, title, subtitle }) {
   return (
     <div className={`admin-nav-zone-head admin-nav-zone-head--${tone}`}>
@@ -297,12 +306,17 @@ export default function SortableSidebarNav({
   const showRentPin = rentEnabled && (rentOnly || serviceMode !== 'buses');
   const menuLooksEmpty = !rentOnly && !showSharedZone && !showBusesPin;
 
-  const navAccent = (item) =>
-    item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
+  const navAccent = (item) => {
+    if (isSharedNavItem(item)) {
+      return SHARED_NAV_ACCENTS[item.id] || item.accent || 'violet';
+    }
+    return item.accent || (item.variant === 'rose' ? 'rose' : item.variant === 'driver' ? 'teal' : 'indigo');
+  };
 
   const renderRow = (item, sectionId, { nested = false, cardStyle = false } = {}) => {
     const dragging = dragState.draggingId === item.id;
     const shared = isSharedNavItem(item);
+    const accent = navAccent(item);
     return (
       <div
         className={`admin-nav-row ${dragging ? 'admin-nav-row-dragging' : ''} ${
@@ -327,8 +341,8 @@ export default function SortableSidebarNav({
           type="button"
           onClick={() => handleClick(item)}
           className={buttonClass(item, { cardStyle })}
-          data-accent={shared ? 'shared' : navAccent(item)}
-          title={shared ? `${item.label} · λεωφορεία & ενοικιάσεις` : item.label}
+          data-accent={accent}
+          title={shared ? `${item.label} · εκδρομές & ενοικιάσεις` : item.label}
         >
           <span className={`admin-nav-icon${cardStyle ? ' admin-nav-icon--circle' : ''}`}>
             <span
