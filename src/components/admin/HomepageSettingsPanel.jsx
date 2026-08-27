@@ -28,6 +28,7 @@ import { pushHomepagePreviewDraft } from '../../lib/homepage/homepagePreview.js'
 import { pageSliderPatch } from '../../lib/homepage/pageSlider.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
 import { fileToLogoDataUrl } from '../../lib/branding/logoImage.js';
+import { dataUrlToFile } from '../../lib/branding/dataUrlToFile.js';
 import {
   clearSiteAsset,
   DEFAULT_SITE_APPEARANCE,
@@ -898,6 +899,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     if (e && !(e instanceof File) && e?.target && 'value' in e.target) e.target.value = '';
     if (!file) return;
     const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
+    const previousUrl = kind === 'logo' ? form.logo_url : form.hero_image_url;
     const setUploading = kind === 'logo' ? setUploadingLogo : setUploadingHero;
     setUploading(true);
     try {
@@ -912,13 +914,16 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
 
       const result = await uploadSiteAsset(kind, file);
       const url = result?.url;
+      if (!url) throw new Error('Δεν επιστράφηκε URL από τον server');
       setForm((p) => ({
         ...p,
         ...(result?.appearance || {}),
-        ...(url ? { [key]: url } : {}),
+        [key]: url,
       }));
       toast.success(kind === 'logo' ? 'Το λογότυπο ενημερώθηκε' : 'Η φωτογραφία hero ενημερώθηκε');
     } catch (err) {
+      // Roll back optimistic data: preview so Save is not stuck.
+      setForm((p) => ({ ...p, [key]: previousUrl }));
       if (err.message === 'AUTH_EXPIRED') {
         toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά και δοκιμάστε το ανέβασμα');
         return;
@@ -928,7 +933,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         toast.error('Μη υποστηριζόμενη εικόνα — δοκιμάστε JPG ή PNG');
         return;
       }
-      if (/internal server error|αποτυχία αποθήκευσης|αποτυχία επεξεργασίας/i.test(msg)) {
+      if (/internal server error|αποτυχία αποθήκευσης|αποτυχία επεξεργασίας|404/i.test(msg)) {
         toast.error('Σφάλμα server στο ανέβασμα — δοκιμάστε μικρότερο JPG/PNG');
         return;
       }
@@ -1560,28 +1565,52 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
 
         {designPage === 'home' && section === 'branding' && (
           <form
-            onSubmit={(e) => {
-              // Never PUT multi-hundred-KB data: URLs — they 500 the branding API.
-              // File upload already persists short /api/site/office-assets/… URLs.
+            onSubmit={async (e) => {
+              e.preventDefault();
+              // Migrate legacy data: URLs (or stuck optimistic previews) via file upload,
+              // then save sizing. Never PUT huge data URLs into Postgres.
               const patch = {
                 logo_height_px: clampLogoHeight(form.logo_height_px),
                 logo_max_width_px: clampLogoMaxWidth(form.logo_max_width_px),
                 logo_show_name: form.logo_show_name !== false,
                 hero_image_focal: form.hero_image_focal || 'center',
               };
-              const logo = String(form.logo_url || '');
-              const hero = String(form.hero_image_url || '');
-              if (logo && !logo.startsWith('data:')) patch.logo_url = logo;
-              if (hero && !hero.startsWith('data:')) patch.hero_image_url = hero;
-              if (logo.startsWith('data:') || hero.startsWith('data:')) {
-                toast.error(
-                  'Το λογότυπο/hero δεν έχει ανέβει ακόμα — πατήστε Ανέβασμα και περιμένετε επιτυχία',
-                  { id: 'homepage-save-err' },
-                );
-                e.preventDefault();
-                return;
+              let logo = String(form.logo_url || '');
+              let hero = String(form.hero_image_url || '');
+              setSaving(true);
+              try {
+                if (logo.startsWith('data:')) {
+                  setUploadingLogo(true);
+                  const file = await dataUrlToFile(logo, 'logo');
+                  const result = await uploadSiteAsset('logo', file);
+                  if (!result?.url) throw new Error('Αποτυχία ανεβάσματος λογοτύπου');
+                  logo = result.url;
+                  setForm((p) => ({ ...p, ...(result.appearance || {}), logo_url: logo }));
+                }
+                if (hero.startsWith('data:')) {
+                  setUploadingHero(true);
+                  const file = await dataUrlToFile(hero, 'hero');
+                  const result = await uploadSiteAsset('hero', file);
+                  if (!result?.url) throw new Error('Αποτυχία ανεβάσματος hero');
+                  hero = result.url;
+                  setForm((p) => ({ ...p, ...(result.appearance || {}), hero_image_url: hero }));
+                }
+                if (logo && !logo.startsWith('data:')) patch.logo_url = logo;
+                if (hero && !hero.startsWith('data:')) patch.hero_image_url = hero;
+                const result = await updateSiteAppearance(patch);
+                setForm((p) => ({ ...p, ...result.data, ...patch }));
+                toast.success('Οι ρυθμίσεις λογοτύπου αποθηκεύτηκαν', { id: 'homepage-save-ok' });
+              } catch (err) {
+                if (err.message === 'AUTH_EXPIRED') {
+                  toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά', { id: 'homepage-save-err' });
+                } else {
+                  toast.error(err.message || 'Αποτυχία αποθήκευσης', { id: 'homepage-save-err' });
+                }
+              } finally {
+                setUploadingLogo(false);
+                setUploadingHero(false);
+                setSaving(false);
               }
-              return patchForm(patch, 'Οι ρυθμίσεις λογοτύπου αποθηκεύτηκαν')(e);
             }}
           >
             <PanelCard

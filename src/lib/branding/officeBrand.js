@@ -20,9 +20,10 @@ export function isPlatformPlaceholderCopyright(text) {
 export function isPlatformPlaceholderLogo(url) {
   const value = String(url || '').trim();
   if (!value) return true;
-  // Tenant uploads (data URLs, absolute CDN, /api/site/assets/…) are valid.
+  // Tenant uploads (data URLs, absolute CDN, /api/site/assets/…, office-assets) are valid.
   if (value.startsWith('data:image/')) return false;
   if (value.startsWith('/api/site/assets/')) return false;
+  if (value.startsWith('/api/site/office-assets/')) return false;
   return PLATFORM_LOGO_RE.test(value);
 }
 

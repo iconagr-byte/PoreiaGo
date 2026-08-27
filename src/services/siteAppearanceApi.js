@@ -230,14 +230,9 @@ export async function uploadSiteAsset(kind, file) {
   if (getSaasToken()) {
     const form = new FormData();
     form.append('file', file);
-    const token = getSaasToken();
-    const res = await fetch(
-      `${API_BASE}/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
-      {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: form,
-      },
+    const res = await adminFetch(
+      `/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
+      { method: 'POST', body: form, retries: 3 },
     );
     if (isAuthFailureStatus(res.status)) {
       handleAuthFailure();
@@ -275,13 +270,9 @@ export async function uploadSiteAsset(kind, file) {
 
 export async function clearSiteAsset(kind) {
   if (getSaasToken()) {
-    const token = getSaasToken();
-    const res = await fetch(
-      `${API_BASE}/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
-      {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      },
+    const res = await adminFetch(
+      `/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
+      { method: 'DELETE', retries: 3 },
     );
     if (isAuthFailureStatus(res.status)) {
       handleAuthFailure();

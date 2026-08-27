@@ -182,15 +182,24 @@ async def upload_site_appearance_asset(
     file: UploadFile = File(...),
 ):
     """Store logo/hero on disk and persist a short URL in tenant site_appearance."""
+    from travel_platform.media.image_optimize import looks_like_image, sniff_image_ext
+
     kind_norm = str(kind or "").strip().lower()
     if kind_norm not in _ASSET_KINDS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid asset kind")
-    if not file.content_type or not file.content_type.startswith("image/"):
+    content = await file.read()
+    ctype = str(file.content_type or "").strip().lower()
+    # Some browsers omit Content-Type on <input type=file> — sniff magic bytes.
+    if not looks_like_image(content, content_type=ctype, filename=file.filename):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)",
         )
-    content = await file.read()
+    if sniff_image_ext(content) == ".heic" or "heic" in ctype or "heif" in ctype:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Τα HEIC δεν υποστηρίζονται — αποθηκεύστε ως JPG ή PNG",
+        )
     try:
         saved = save_office_asset(
             tenant_id,

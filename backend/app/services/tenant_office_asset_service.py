@@ -46,7 +46,7 @@ def save_office_asset(
     max_side = 640 if kind == "logo" else 1600
     quality = 86 if kind == "logo" else 84
     optimized = optimize_driver_photo(content, max_side=max_side, quality=quality)
-    if optimized.ext == ".bin":
+    if optimized.ext in (".bin", ".heic"):
         raise ValueError("Μη έγκυρη εικόνα — δοκιμάστε JPG ή PNG")
 
     folder = tenant_asset_dir(tenant_id)
