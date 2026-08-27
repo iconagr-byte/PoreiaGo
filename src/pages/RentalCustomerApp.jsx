@@ -25,7 +25,7 @@ import {
   rentHomeCategoryFilters,
 } from '../lib/rental/rentVehicleCategories.js';
 import { rememberRentVehicle } from '../lib/rental/rentBookingExtras.js';
-import { writeRentBookingPrefs } from '../lib/rental/rentBookingSearch.js';
+import { readRentBookingPrefs, writeRentBookingPrefs } from '../lib/rental/rentBookingSearch.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
