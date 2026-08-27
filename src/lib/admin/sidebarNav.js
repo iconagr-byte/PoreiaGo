@@ -50,7 +50,6 @@ export const DEFAULT_MAIN_NAV_ORDER = [
   'fleet_live_map',
   'routes',
   'customers',
-  'loyalty',
   'fleet',
   'fleet_ops',
   'drivers',
@@ -67,7 +66,6 @@ export const DEFAULT_RENT_NAV_ORDER = [...RENT_DESK_NAV_IDS];
 export const RENT_ONLY_MAIN_NAV_ORDER = [
   'dashboard',
   'customers',
-  'loyalty',
   'fleet_live_map',
   'email',
   'email_templates',
@@ -100,6 +98,8 @@ export const LEGACY_NAV_IDS = new Set([
   'fleet_rental',
   'settings_telematics',
   'hybrid_sla',
+  // Miles+Bonus / Επιβραβεύσεις — hidden from sidebar (code kept, not deleted).
+  'loyalty',
 ]);
 
 const PLATFORM_IDS = PLATFORM_NAV_IDS;

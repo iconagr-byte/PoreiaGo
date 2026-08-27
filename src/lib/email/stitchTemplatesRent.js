@@ -106,6 +106,7 @@ export const STITCH_RENT_TEMPLATES = [
     id: 'rent-loyalty-offer',
     category: 'rent',
     requiresModule: 'rent',
+    hidden: true,
     name: 'Επαναλαμβανόμενοι πελάτες',
     subtitle: 'Έκπτωση για την επόμενη κράτηση /rent',
     thumb: THUMB.promo,

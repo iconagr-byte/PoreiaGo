@@ -34,6 +34,7 @@ describe('stitchTemplateAccess', () => {
         { id: 'a', category: 'promotions' },
         { id: 'b', requiresModule: 'newsletter' },
         { id: 'c', requiresModule: 'rent' },
+        { id: 'd', category: 'rent', hidden: true },
       ],
       access,
     );

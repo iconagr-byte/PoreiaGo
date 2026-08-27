@@ -5,6 +5,7 @@ import { isPaid, isConfirmed } from '../../lib/bookingDisplay.js';
 import CustomerBookingCard from './CustomerBookingCard.jsx';
 import AddCustomerModal from './AddCustomerModal.jsx';
 import OfficeExcursionBookingModal from './OfficeExcursionBookingModal.jsx';
+import { LOYALTY_UI_ENABLED } from '../../lib/admin/loyaltyUi.js';
 
 const TIERS = ['all', 'VIP', 'Platinum', 'Gold', 'Silver'];
 const ACTIVITY_BUSES = [
@@ -105,8 +106,7 @@ function exportCsv(rows) {
     'Email',
     'Τηλέφωνο',
     'Εταιρεία',
-    'Tier',
-    'AeroMiles',
+    ...(LOYALTY_UI_ENABLED ? ['Tier', 'AeroMiles'] : []),
     'Εκδρομές',
     'Ενοικιάσεις',
     'Τζίρος',
@@ -119,8 +119,7 @@ function exportCsv(rows) {
       c.email,
       c.phone,
       c.company,
-      c.tier,
-      c.points ?? 0,
+      ...(LOYALTY_UI_ENABLED ? [c.tier, c.points ?? 0] : []),
       c.tripCount,
       c.rentalCount,
       Number(c.totalSpend || 0).toFixed(2),
@@ -312,7 +311,9 @@ function CustomerDetail({
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'AeroMiles', value: customer.points ?? 0, tone: 'text-amber-700 bg-amber-50 border-amber-100', icon: 'stars' },
+          ...(LOYALTY_UI_ENABLED
+            ? [{ label: 'AeroMiles', value: customer.points ?? 0, tone: 'text-amber-700 bg-amber-50 border-amber-100', icon: 'stars' }]
+            : []),
           {
             label: isRent ? 'Ενοικιάσεις' : 'Επιβεβαιωμένες',
             value: isRent
@@ -692,7 +693,7 @@ export default function CustomersCrmPanel({
               <option value="joined">Νεότεροι</option>
               <option value="name">Όνομα</option>
               <option value="tier">Tier</option>
-              <option value="points">AeroMiles</option>
+              {LOYALTY_UI_ENABLED ? <option value="points">AeroMiles</option> : null}
             </select>
           </label>
         </div>
@@ -776,7 +777,9 @@ export default function CustomersCrmPanel({
                       ) : (
                         <span>{customer.tripCount} εκδ.</span>
                       )}
-                      <span className="text-amber-600">{customer.points ?? 0} mi</span>
+                      {LOYALTY_UI_ENABLED ? (
+                        <span className="text-amber-600">{customer.points ?? 0} mi</span>
+                      ) : null}
                       <span className="text-zinc-800">{formatMoney(customer.totalSpend)}</span>
                     </div>
                   </div>
@@ -821,7 +824,10 @@ export default function CustomersCrmPanel({
           <table className="min-w-full">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50/80">
-                {['Πελάτης', 'Επικοινωνία', 'Tier', 'Κρατήσεις', 'Τζίρος', 'Miles', 'Εγγραφή', ''].map(
+                {(LOYALTY_UI_ENABLED
+                  ? ['Πελάτης', 'Επικοινωνία', 'Tier', 'Κρατήσεις', 'Τζίρος', 'Miles', 'Εγγραφή', '']
+                  : ['Πελάτης', 'Επικοινωνία', 'Tier', 'Κρατήσεις', 'Τζίρος', 'Εγγραφή', '']
+                ).map(
                   (h) => (
                     <th
                       key={h || 'actions'}
@@ -838,13 +844,13 @@ export default function CustomersCrmPanel({
             <tbody>
               {enriched.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={LOYALTY_UI_ENABLED ? 8 : 7}>
                     <EmptyState onAdd={onAddCustomer} />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={LOYALTY_UI_ENABLED ? 8 : 7}>
                     <NoResults onClear={clearFilters} />
                   </td>
                 </tr>
@@ -899,9 +905,11 @@ export default function CustomersCrmPanel({
                     <td className="px-4 py-3.5 text-right font-bold text-zinc-900 tabular-nums text-sm">
                       {formatMoney(customer.totalSpend)}
                     </td>
+                    {LOYALTY_UI_ENABLED ? (
                     <td className="px-4 py-3.5 text-right font-bold text-amber-600 tabular-nums text-sm">
                       {customer.points ?? 0}
                     </td>
+                    ) : null}
                     <td className="px-4 py-3.5 text-right text-sm text-zinc-500 whitespace-nowrap">
                       {formatJoin(customer.joinDate)}
                     </td>
