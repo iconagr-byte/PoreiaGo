@@ -90,6 +90,13 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const [footerAddress, setFooterAddress] = useState('');
   const [siteAppearance, setSiteAppearance] = useState(null);
   const [pickupLocations, setPickupLocations] = useState([]);
+  const [heroPickup, setHeroPickup] = useState(() => {
+    try {
+      return String(readRentBookingPrefs()?.pickup_location || '').trim();
+    } catch {
+      return '';
+    }
+  });
   const [homeFleet, setHomeFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [homeCategory, setHomeCategory] = useState('');
