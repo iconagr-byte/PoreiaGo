@@ -7,10 +7,17 @@ html.driver-route body {
   overflow-x: hidden;
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
+  height: 100%;
+  min-height: 100dvh;
 }
 
 html.driver-route body {
   touch-action: manipulation;
+}
+
+html.driver-route #root {
+  min-height: 100dvh;
+  height: 100%;
 }
 
 .driver-app {
@@ -700,17 +707,20 @@ html.driver-route body {
   --driver-border: rgba(15, 23, 42, 0.08);
   --driver-pad-x: max(1rem, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
 
+  box-sizing: border-box;
+  width: 100%;
+  height: 100dvh;
+  height: 100svh;
   min-height: 100dvh;
   min-height: -webkit-fill-available;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   padding: max(1.5rem, env(safe-area-inset-top, 0px)) var(--driver-pad-x)
     max(1.5rem, env(safe-area-inset-bottom, 0px));
   position: relative;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   color: var(--driver-text);
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   background:
@@ -747,7 +757,8 @@ html.driver-route body {
   max-width: var(--driver-max-w);
   position: relative;
   z-index: 1;
-  margin: auto 0;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .driver-gate-brand {
@@ -1736,14 +1747,9 @@ html.driver-route body {
   width: auto !important;
 }
 
-/* Login gate on tablet / desktop — center in viewport */
+/* Login gate on tablet / desktop — centered, no forced empty height */
 .driver-gate.is-tablet {
   --driver-max-w: min(26rem, 100%);
-  display: grid;
-  place-items: center;
-  align-content: center;
-  min-height: 100dvh;
-  min-height: -webkit-fill-available;
   padding: max(2rem, env(safe-area-inset-top, 0px)) max(1.5rem, env(safe-area-inset-left, 0px))
     max(2rem, env(safe-area-inset-bottom, 0px));
   padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
@@ -1751,7 +1757,6 @@ html.driver-route body {
 
 .driver-gate.is-tablet .driver-gate-panel {
   width: min(26rem, 100%);
-  margin: 0;
 }
 
 /* Landscape tablet + desktop: unified card, brand | form */
@@ -1771,8 +1776,9 @@ html.driver-route body {
     0 28px 64px rgba(15, 23, 42, 0.11),
     0 2px 0 rgba(255, 255, 255, 0.85) inset;
   overflow: hidden;
-  min-height: min(32rem, calc(100dvh - 3rem));
+  height: auto;
   max-height: calc(100dvh - 3rem);
+  max-height: calc(100svh - 3rem);
 }
 
 .driver-gate.is-tablet.is-landscape .driver-gate-brand {
@@ -1827,14 +1833,14 @@ html.driver-route body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  height: 100%;
+  height: auto;
+  align-self: center;
   background: #fff;
 }
 
 @media (min-width: 1100px) {
   .driver-gate.is-tablet.is-landscape .driver-gate-panel {
     width: min(58rem, calc(100% - 3rem));
-    min-height: min(34rem, calc(100dvh - 4rem));
   }
 
   .driver-gate.is-tablet.is-landscape .driver-gate-brand {
@@ -1847,5 +1853,22 @@ html.driver-route body {
 
   .driver-gate.is-tablet.is-landscape .driver-gate-card {
     padding: 2.75rem 2.5rem;
+  }
+}
+
+/* Very short viewports: allow scroll instead of clipping */
+@media (max-height: 640px) {
+  .driver-gate {
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    justify-content: flex-start;
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .driver-gate.is-tablet.is-landscape .driver-gate-panel {
+    max-height: none;
   }
 }
