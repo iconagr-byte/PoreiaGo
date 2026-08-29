@@ -84,6 +84,10 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "logo_url": "",
     "logo_height_px": 40,
     "logo_max_width_px": 180,
+    "logo_radius_px": 0,
+    "logo_padding_px": 0,
+    "logo_bg_mode": "none",
+    "logo_shadow": False,
     "logo_show_name": True,
     "hero_image_url": "",
     "hero_image_focal": "center",
@@ -445,6 +449,21 @@ class TenantSiteAppearanceService:
                 updated["logo_max_width_px"] = max(60, min(400, int(updated["logo_max_width_px"])))
         except (TypeError, ValueError):
             updated["logo_max_width_px"] = 180
+        try:
+            if "logo_radius_px" in updated:
+                updated["logo_radius_px"] = max(0, min(48, int(updated["logo_radius_px"])))
+        except (TypeError, ValueError):
+            updated["logo_radius_px"] = 0
+        try:
+            if "logo_padding_px" in updated:
+                updated["logo_padding_px"] = max(0, min(24, int(updated["logo_padding_px"])))
+        except (TypeError, ValueError):
+            updated["logo_padding_px"] = 0
+        if "logo_bg_mode" in updated:
+            mode = str(updated.get("logo_bg_mode") or "none").strip().lower()
+            updated["logo_bg_mode"] = mode if mode in ("none", "white", "soft", "dark") else "none"
+        if "logo_shadow" in updated:
+            updated["logo_shadow"] = bool(updated["logo_shadow"])
         if "logo_show_name" in updated:
             updated["logo_show_name"] = bool(updated["logo_show_name"])
         # Persist only appearance keys — drop enrichment helpers.
@@ -460,7 +479,15 @@ class TenantSiteAppearanceService:
             settings["site_appearance"]["logo_url"] = updated.get("logo_url", "")
             settings["site_appearance"]["hero_image_url"] = updated.get("hero_image_url", "")
             # Re-apply size toggles after deep prune (they are never huge).
-            for size_key in ("logo_height_px", "logo_max_width_px", "logo_show_name"):
+            for size_key in (
+                "logo_height_px",
+                "logo_max_width_px",
+                "logo_radius_px",
+                "logo_padding_px",
+                "logo_bg_mode",
+                "logo_shadow",
+                "logo_show_name",
+            ):
                 if size_key in updated:
                     settings["site_appearance"][size_key] = updated[size_key]
         tenant.settings_json = _safe_settings_json(settings)
@@ -478,6 +505,10 @@ class TenantSiteAppearanceService:
                         "hero_image_url",
                         "logo_height_px",
                         "logo_max_width_px",
+                        "logo_radius_px",
+                        "logo_padding_px",
+                        "logo_bg_mode",
+                        "logo_shadow",
                         "logo_show_name",
                         "footer_brand_name",
                         "rent_office_name",

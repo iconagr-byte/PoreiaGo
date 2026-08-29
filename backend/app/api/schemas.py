@@ -424,6 +424,10 @@ class TenantSiteAppearanceResponse(BaseModel):
     logo_url: str = ""
     logo_height_px: int = 40
     logo_max_width_px: int = 180
+    logo_radius_px: int = 0
+    logo_padding_px: int = 0
+    logo_bg_mode: str = "none"
+    logo_shadow: bool = False
     logo_show_name: bool = True
     hero_image_url: str = ""
     hero_image_focal: str = "center"
@@ -494,6 +498,10 @@ class TenantSiteAppearanceUpdate(BaseModel):
     logo_url: str | None = None
     logo_height_px: int | None = Field(default=None, ge=20, le=96)
     logo_max_width_px: int | None = Field(default=None, ge=60, le=400)
+    logo_radius_px: int | None = Field(default=None, ge=0, le=48)
+    logo_padding_px: int | None = Field(default=None, ge=0, le=24)
+    logo_bg_mode: str | None = None
+    logo_shadow: bool | None = None
     logo_show_name: bool | None = None
     hero_image_url: str | None = None
     hero_image_focal: str | None = None

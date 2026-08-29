@@ -80,6 +80,10 @@ DEFAULT_SITE_APPEARANCE = {
     "logo_url": "",
     "logo_height_px": 40,
     "logo_max_width_px": 180,
+    "logo_radius_px": 0,
+    "logo_padding_px": 0,
+    "logo_bg_mode": "none",
+    "logo_shadow": False,
     "logo_show_name": True,
     "hero_image_url": "",
     "hero_image_focal": "center",
@@ -168,6 +172,10 @@ class SiteAppearanceResponse(BaseModel):
     logo_url: str = ""
     logo_height_px: int = 40
     logo_max_width_px: int = 180
+    logo_radius_px: int = 0
+    logo_padding_px: int = 0
+    logo_bg_mode: str = "none"
+    logo_shadow: bool = False
     logo_show_name: bool = True
     hero_image_url: str = ""
     hero_image_focal: str = "center"
@@ -266,6 +274,10 @@ class SiteAppearanceUpdate(BaseModel):
     logo_url: str | None = None
     logo_height_px: int | None = None
     logo_max_width_px: int | None = None
+    logo_radius_px: int | None = None
+    logo_padding_px: int | None = None
+    logo_bg_mode: str | None = None
+    logo_shadow: bool | None = None
     logo_show_name: bool | None = None
     hero_image_url: str | None = None
     hero_image_focal: str | None = None
@@ -347,6 +359,21 @@ def _clamp_logo_fields(data: dict) -> dict:
             out["logo_max_width_px"] = max(60, min(400, int(out["logo_max_width_px"])))
         except (TypeError, ValueError):
             out["logo_max_width_px"] = 180
+    if "logo_radius_px" in out and out["logo_radius_px"] is not None:
+        try:
+            out["logo_radius_px"] = max(0, min(48, int(out["logo_radius_px"])))
+        except (TypeError, ValueError):
+            out["logo_radius_px"] = 0
+    if "logo_padding_px" in out and out["logo_padding_px"] is not None:
+        try:
+            out["logo_padding_px"] = max(0, min(24, int(out["logo_padding_px"])))
+        except (TypeError, ValueError):
+            out["logo_padding_px"] = 0
+    if "logo_bg_mode" in out and out["logo_bg_mode"] is not None:
+        mode = str(out.get("logo_bg_mode") or "none").strip().lower()
+        out["logo_bg_mode"] = mode if mode in ("none", "white", "soft", "dark") else "none"
+    if "logo_shadow" in out and out["logo_shadow"] is not None:
+        out["logo_shadow"] = bool(out["logo_shadow"])
     if "logo_show_name" in out and out["logo_show_name"] is not None:
         out["logo_show_name"] = bool(out["logo_show_name"])
     return out

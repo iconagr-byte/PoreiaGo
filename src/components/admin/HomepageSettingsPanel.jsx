@@ -39,6 +39,9 @@ import {
 import {
   clampLogoHeight,
   clampLogoMaxWidth,
+  clampLogoPadding,
+  clampLogoRadius,
+  normalizeLogoBgMode,
   officeLogoImageStyle,
 } from '../../lib/branding/officeBrand.js';
 import {
@@ -129,14 +132,16 @@ function LogoBlock({
   hasCustom,
   onUpload,
   onClear,
-  onApplyUrl,
 }) {
   const [previewTone, setPreviewTone] = useState('light');
   const [dragOver, setDragOver] = useState(false);
-  const [urlDraft, setUrlDraft] = useState('');
   const fileInputRef = useRef(null);
   const height = clampLogoHeight(form.logo_height_px);
   const maxWidth = clampLogoMaxWidth(form.logo_max_width_px);
+  const radius = clampLogoRadius(form.logo_radius_px);
+  const padding = clampLogoPadding(form.logo_padding_px);
+  const bgMode = normalizeLogoBgMode(form.logo_bg_mode);
+  const shadowOn = form.logo_shadow === true;
   const logoStyle = officeLogoImageStyle(form);
   const brandName = (form.footer_brand_name || '').trim();
   const showName = form.logo_show_name !== false;
@@ -155,14 +160,6 @@ function LogoBlock({
     onUpload({ target: { files: [file], value: '' } });
   };
 
-  const copyUrl = () => {
-    if (!previewUrl) return;
-    navigator.clipboard?.writeText(previewUrl).then(
-      () => toast.success('Το URL αντιγράφηκε'),
-      () => toast.error('Αποτυχία αντιγραφής'),
-    );
-  };
-
   return (
     <div className="rounded-2xl border border-black/[0.06] bg-white overflow-hidden">
       <div className="px-5 py-4 border-b border-black/[0.04] bg-slate-50/80">
@@ -173,7 +170,6 @@ function LogoBlock({
       </div>
 
       <div className="p-5 grid lg:grid-cols-[240px_1fr] gap-6">
-        {/* Preview */}
         <div className="space-y-2.5 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -228,7 +224,7 @@ function LogoBlock({
             />
             {previewUrl ? (
               <span className="inline-flex items-center gap-2.5 max-w-full pointer-events-none">
-                <img src={previewUrl} alt="" style={logoStyle} className="object-contain drop-shadow-sm" />
+                <img src={previewUrl} alt="" style={logoStyle} className="object-contain" />
                 {showName && brandName ? (
                   <span
                     className={`font-bold text-sm truncate ${
@@ -257,7 +253,6 @@ function LogoBlock({
           </div>
         </div>
 
-        {/* Controls */}
         <div className="min-w-0 space-y-4">
           <div className="flex flex-wrap gap-2">
             <button
@@ -270,31 +265,19 @@ function LogoBlock({
               {hasCustom ? 'Αλλαγή' : 'Ανέβασμα'}
             </button>
             {hasCustom && (
-              <>
-                <button
-                  type="button"
-                  onClick={copyUrl}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                >
-                  <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                  Αντιγραφή
-                </button>
-                <button
-                  type="button"
-                  onClick={onClear}
-                  disabled={uploading}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
-                >
-                  Αφαίρεση
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={onClear}
+                disabled={uploading}
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+              >
+                Αφαίρεση
+              </button>
             )}
           </div>
 
-          {/* Size */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Μέγεθος</p>
-
             <div>
               <div className="flex items-center justify-between gap-3 mb-2">
                 <span className="text-sm font-semibold text-slate-800">Ύψος</span>
@@ -311,12 +294,7 @@ function LogoBlock({
                 onChange={(e) => setForm((p) => ({ ...p, logo_height_px: Number(e.target.value) }))}
                 className="w-full h-1.5 rounded-full appearance-none bg-slate-200 accent-slate-900 cursor-pointer"
               />
-              <div className="flex justify-between mt-1 text-[10px] font-medium text-slate-400">
-                <span>20</span>
-                <span>96</span>
-              </div>
             </div>
-
             <div>
               <div className="flex items-center justify-between gap-3 mb-2">
                 <span className="text-sm font-semibold text-slate-800 whitespace-nowrap">Μέγ. πλάτος</span>
@@ -333,14 +311,118 @@ function LogoBlock({
                 onChange={(e) => setForm((p) => ({ ...p, logo_max_width_px: Number(e.target.value) }))}
                 className="w-full h-1.5 rounded-full appearance-none bg-slate-200 accent-slate-900 cursor-pointer"
               />
-              <div className="flex justify-between mt-1 text-[10px] font-medium text-slate-400">
-                <span>60</span>
-                <span>400</span>
-              </div>
             </div>
           </div>
 
-          {/* Name toggle */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Στυλ</p>
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <span className="text-sm font-semibold text-slate-800">Στρογγύλεμα</span>
+                <span className="tabular-nums text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-0.5">
+                  {radius}px
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={48}
+                step={2}
+                value={radius}
+                onChange={(e) => setForm((p) => ({ ...p, logo_radius_px: Number(e.target.value) }))}
+                className="w-full h-1.5 rounded-full appearance-none bg-slate-200 accent-slate-900 cursor-pointer"
+              />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[
+                  { label: 'Ορθό', value: 0 },
+                  { label: 'Ήπιο', value: 8 },
+                  { label: 'Στρογγυλό', value: 16 },
+                  { label: 'Κύκλος', value: 48 },
+                ].map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, logo_radius_px: preset.value }))}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                      radius === preset.value
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <span className="text-sm font-semibold text-slate-800">Εσωτερικό κενό</span>
+                <span className="tabular-nums text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-0.5">
+                  {padding}px
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={24}
+                step={2}
+                value={padding}
+                onChange={(e) => setForm((p) => ({ ...p, logo_padding_px: Number(e.target.value) }))}
+                className="w-full h-1.5 rounded-full appearance-none bg-slate-200 accent-slate-900 cursor-pointer"
+              />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800 mb-2">Φόντο</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'none', label: 'Κανένα' },
+                  { id: 'white', label: 'Λευκό' },
+                  { id: 'soft', label: 'Απαλό' },
+                  { id: 'dark', label: 'Σκούρο' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, logo_bg_mode: opt.id }))}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                      bgMode === opt.id
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={shadowOn}
+              onClick={() => setForm((p) => ({ ...p, logo_shadow: !p.logo_shadow }))}
+              className={`w-full flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                shadowOn ? 'border-slate-900/15 bg-white' : 'border-slate-200 bg-white hover:bg-slate-50'
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">Ήπια σκιά</p>
+                <p className="text-xs text-slate-500 mt-0.5">Δίνει βάθος στο λογότυπο</p>
+              </div>
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                  shadowOn ? 'bg-slate-900' : 'bg-slate-300'
+                }`}
+                aria-hidden
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    shadowOn ? 'translate-x-5' : ''
+                  }`}
+                />
+              </span>
+            </button>
+          </div>
+
           <button
             type="button"
             role="switch"
@@ -369,31 +451,6 @@ function LogoBlock({
               />
             </span>
           </button>
-
-          {/* URL */}
-          <div className="rounded-xl border border-slate-200 p-3 space-y-2">
-            <p className="text-xs font-semibold text-slate-600">Επικόλληση URL εικόνας</p>
-            <div className="flex gap-2">
-              <input
-                type="url"
-                value={urlDraft}
-                onChange={(e) => setUrlDraft(e.target.value)}
-                placeholder="https://…/logo.png"
-                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/10"
-              />
-              <button
-                type="button"
-                disabled={!urlDraft.trim()}
-                onClick={() => {
-                  onApplyUrl?.(urlDraft.trim());
-                  setUrlDraft('');
-                }}
-                className="shrink-0 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-40"
-              >
-                ΟΚ
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -1568,6 +1625,10 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               const patch = {
                 logo_height_px: clampLogoHeight(form.logo_height_px),
                 logo_max_width_px: clampLogoMaxWidth(form.logo_max_width_px),
+                logo_radius_px: clampLogoRadius(form.logo_radius_px),
+                logo_padding_px: clampLogoPadding(form.logo_padding_px),
+                logo_bg_mode: normalizeLogoBgMode(form.logo_bg_mode),
+                logo_shadow: form.logo_shadow === true,
                 logo_show_name: form.logo_show_name !== false,
                 hero_image_focal: form.hero_image_focal || 'center',
               };
@@ -1601,6 +1662,10 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   const sizeOnly = {
                     logo_height_px: patch.logo_height_px,
                     logo_max_width_px: patch.logo_max_width_px,
+                    logo_radius_px: patch.logo_radius_px,
+                    logo_padding_px: patch.logo_padding_px,
+                    logo_bg_mode: patch.logo_bg_mode,
+                    logo_shadow: patch.logo_shadow,
                     logo_show_name: patch.logo_show_name,
                     hero_image_focal: patch.hero_image_focal,
                   };
@@ -1626,7 +1691,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
           >
             <PanelCard
               title="Λογότυπο & εικόνες"
-              description="Μέγεθος, προεπισκόπηση light/dark, URL και hero φωτογραφία."
+              description="Μέγεθος, στρογγύλεμα, φόντο και hero φωτογραφία."
               action={<SaveButton saving={saving} label="Αποθήκευση λογοτύπου" />}
             >
               <div className="space-y-6">
@@ -1638,10 +1703,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   hasCustom={hasCustomLogo}
                   onUpload={(e) => handleImageUpload('logo', e)}
                   onClear={() => handleClearAsset('logo')}
-                  onApplyUrl={(url) => {
-                    setForm((p) => ({ ...p, logo_url: url }));
-                    toast.success('Το URL ορίστηκε — πατήστε Αποθήκευση');
-                  }}
                 />
                 <HeroImageBlock
                   previewUrl={heroPreview}
