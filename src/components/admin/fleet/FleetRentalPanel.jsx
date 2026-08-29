@@ -979,7 +979,20 @@ export default function FleetRentalPanel({
               <p className="p-6 text-sm text-gray-500">Καμία κράτηση σε αυτό το φίλτρο.</p>
             ) : (
               filteredBookings.map((b) => (
-                <article key={b.id} className="px-4 py-3 flex flex-wrap items-start justify-between gap-3">
+                <article
+                  key={b.id}
+                  role="button"
+                  tabIndex={0}
+                  title="Διπλό κλικ για άνοιγμα χαρτούρας"
+                  onDoubleClick={() => openPaperwork(b.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openPaperwork(b.id);
+                    }
+                  }}
+                  className="px-4 py-3 flex flex-wrap items-start justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
+                >
                   <div className="min-w-0 space-y-1">
                     <p className="font-bold text-sm text-gray-900">
                       {b.client_name} · {b.vehicle_plate || b.vehicle_model || '—'}
