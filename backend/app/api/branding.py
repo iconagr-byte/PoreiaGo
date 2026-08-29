@@ -217,6 +217,7 @@ async def upload_site_appearance_asset(
         ) from exc
 
     key = "logo_url" if kind_norm == "logo" else "hero_image_url"
+    persist_warning = None
     try:
         appearance = await TenantSiteAppearanceService(db).update_appearance(
             tenant_id,
@@ -224,13 +225,26 @@ async def upload_site_appearance_asset(
             actor_email=None,
         )
     except Exception as exc:
-        logger.exception("Failed to persist office asset URL")
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Αποτυχία αποθήκευσης URL",
-        ) from exc
+        logger.exception(
+            "Failed to persist office asset URL for tenant %s kind=%s url=%s",
+            tenant_id,
+            kind_norm,
+            saved.get("url"),
+        )
+        # File is already on disk. Return the URL so the UI can show the logo and
+        # the client can retry a light PUT without re-uploading the file.
+        persist_warning = f"{type(exc).__name__}: {exc}"
+        appearance = {key: saved["url"]}
 
-    return {
+    if isinstance(appearance, dict):
+        for heavy in ("logo_url", "hero_image_url"):
+            val = str(appearance.get(heavy) or "")
+            if val.startswith("data:") and len(val) > 8000:
+                appearance[heavy] = saved["url"] if heavy == key else ""
+        if key not in appearance or not appearance.get(key):
+            appearance[key] = saved["url"]
+
+    payload = {
         "ok": True,
         "kind": kind_norm,
         "url": saved["url"],
@@ -238,6 +252,9 @@ async def upload_site_appearance_asset(
         "content_type": saved["content_type"],
         "appearance": appearance,
     }
+    if persist_warning:
+        payload["persist_warning"] = persist_warning[:240]
+    return payload
 
 
 @router.delete("/site-appearance/upload/{kind}")

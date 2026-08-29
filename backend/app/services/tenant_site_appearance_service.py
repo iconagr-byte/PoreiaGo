@@ -15,6 +15,42 @@ from app.models.audit import AuditAction
 from app.models.tenant import Tenant
 from app.services.audit_service import AuditService
 
+# data: URLs larger than this poison settings_json and break logo saves.
+_MAX_INLINE_DATA_URL = 8_000
+
+
+def _is_oversized_data_url(value: Any) -> bool:
+    text = str(value or "")
+    return text.startswith("data:") and len(text) > _MAX_INLINE_DATA_URL
+
+
+def _prune_oversized_media(data: dict[str, Any]) -> dict[str, Any]:
+    """Drop multi-hundred-KB data: URLs so Postgres appearance writes stay healthy."""
+    out = {**data}
+    for key in ("logo_url", "hero_image_url"):
+        if _is_oversized_data_url(out.get(key)):
+            out[key] = ""
+    for slides_key in ("home_slider_slides", "rent_slider_slides"):
+        slides = out.get(slides_key)
+        if not isinstance(slides, list):
+            continue
+        cleaned = []
+        for slide in slides:
+            if not isinstance(slide, dict):
+                cleaned.append(slide)
+                continue
+            item = {**slide}
+            for img_key in ("image_url", "src", "url", "background_url"):
+                if _is_oversized_data_url(item.get(img_key)):
+                    item[img_key] = ""
+            cleaned.append(item)
+        out[slides_key] = cleaned
+    return out
+
+
+def _safe_settings_json(settings: dict[str, Any]) -> str:
+    return json.dumps(settings, ensure_ascii=False, default=str)
+
 DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "logo_url": "",
     "logo_height_px": 40,
@@ -331,6 +367,9 @@ class TenantSiteAppearanceService:
         settings = _parse_settings(tenant.settings_json)
         current = settings.get("site_appearance")
         base = current if isinstance(current, dict) else {}
+        # Strip legacy inline data: logos/heroes that blow up settings_json writes.
+        base = _prune_oversized_media(base)
+        patch = _prune_oversized_media(dict(patch or {}))
         updated = _scrub_platform_placeholders({**DEFAULT_SITE_APPEARANCE, **base, **patch})
         updated = _sanitize_poreiago_platform_appearance(updated, tenant)
         # Keep an explicit non-Achillio upload even if legal_name still drifted.
@@ -338,6 +377,10 @@ class TenantSiteAppearanceService:
             explicit = str(patch.get("logo_url") or "").strip()
             if explicit and not _looks_like_achillio_brand(explicit):
                 updated["logo_url"] = explicit
+        if "hero_image_url" in patch:
+            explicit_hero = str(patch.get("hero_image_url") or "").strip()
+            if explicit_hero and not _looks_like_achillio_brand(explicit_hero):
+                updated["hero_image_url"] = explicit_hero
         # Clamp logo sizing if present.
         try:
             if "logo_height_px" in updated:
@@ -355,20 +398,33 @@ class TenantSiteAppearanceService:
         updated.pop("display_name", None)
         updated.pop("storage_source", None)
         updated.pop("tenant_slug", None)
+        updated = _prune_oversized_media(updated)
         settings["site_appearance"] = updated
-        tenant.settings_json = json.dumps(settings, ensure_ascii=False)
+        tenant.settings_json = _safe_settings_json(settings)
         await self._session.flush()
-        await self._audit.record(
-            tenant_id=tenant_id,
-            actor_id=None,
-            actor_email=actor_email or "tenant_admin",
-            action=AuditAction.UPDATE,
-            resource_type="site_appearance",
-            resource_id=str(tenant_id),
-            detail="Updated homepage appearance",
-        )
-        result = await self.get_appearance(tenant_id)
-        return result
+        try:
+            await self._audit.record(
+                tenant_id=tenant_id,
+                actor_id=None,
+                actor_email=actor_email or "tenant_admin",
+                action=AuditAction.UPDATE,
+                resource_type="site_appearance",
+                resource_id=str(tenant_id),
+                detail="Updated homepage appearance",
+            )
+        except Exception:
+            # Never block logo/theme saves on audit table issues.
+            pass
+        try:
+            return await self.get_appearance(tenant_id)
+        except Exception:
+            # File/URL already persisted — return a minimal successful payload.
+            return {
+                **DEFAULT_SITE_APPEARANCE,
+                **updated,
+                "storage_source": "postgres",
+                "tenant_slug": getattr(tenant, "slug", None),
+            }
 
     async def _get_tenant(self, tenant_id: UUID) -> Tenant:
         result = await self._session.execute(select(Tenant).where(Tenant.id == tenant_id))

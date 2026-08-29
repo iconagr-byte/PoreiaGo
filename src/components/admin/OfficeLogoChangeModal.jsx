@@ -153,7 +153,26 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
     setBusy(true);
     try {
       const result = await uploadSiteAsset('logo', file);
-      const next = result?.appearance || { ...appearanceRef.current, logo_url: result?.url };
+      const url = result?.url;
+      if (!url) throw new Error('Δεν επιστράφηκε URL από τον server');
+      let next = {
+        ...(appearanceRef.current || {}),
+        ...(result?.appearance || {}),
+        logo_url: url,
+      };
+      // If server saved the file but failed to write settings_json, attach URL lightly.
+      if (result?.persist_warning) {
+        try {
+          const saved = await updateSiteAppearance({ logo_url: url });
+          next = {
+            ...next,
+            ...(appearanceFromAdminPayload(saved?.data) || {}),
+            logo_url: url,
+          };
+        } catch {
+          /* still show the uploaded file URL */
+        }
+      }
       setAppearance(next);
       appearanceRef.current = next;
       notifyOfficeBrandChanged();
