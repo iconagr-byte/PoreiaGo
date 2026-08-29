@@ -162,17 +162,36 @@ export default function SuperAdminPanel() {
       if (plan !== 'all') params.plan = plan;
       if (status === 'active') params.isActive = true;
       if (status === 'suspended') params.isActive = false;
-      const [ov, list] = await Promise.all([
-        fetchPlatformOverview(),
-        fetchPlatformTenants(params),
-      ]);
-      let items = list.items || [];
-      if (status === 'trial') {
-        items = items.filter((t) => String(t.subscription?.status || '').toLowerCase() === 'trialing');
+
+      // Load independently — one endpoint failing must not blank the whole page.
+      const ovResult = await fetchPlatformOverview().then(
+        (ov) => ({ ok: true, ov }),
+        (err) => ({ ok: false, err }),
+      );
+      const listResult = await fetchPlatformTenants(params).then(
+        (list) => ({ ok: true, list }),
+        (err) => ({ ok: false, err }),
+      );
+
+      if (ovResult.ok) {
+        setOverview(ovResult.ov);
       }
-      setOverview(ov);
-      setTenants(items);
-      setTotal(list.total ?? items.length);
+      if (listResult.ok) {
+        let items = listResult.list.items || [];
+        if (status === 'trial') {
+          items = items.filter((t) => String(t.subscription?.status || '').toLowerCase() === 'trialing');
+        }
+        setTenants(items);
+        setTotal(listResult.list.total ?? items.length);
+      } else {
+        setTenants([]);
+        setTotal(0);
+      }
+
+      const firstErr = !listResult.ok ? listResult.err : !ovResult.ok ? ovResult.err : null;
+      if (firstErr) {
+        toast.error(firstErr.message || 'Αποτυχία φόρτωσης γραφείων');
+      }
     } catch (e) {
       toast.error(e.message || 'Αποτυχία φόρτωσης γραφείων');
     } finally {

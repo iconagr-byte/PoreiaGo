@@ -12,7 +12,6 @@ from uuid import UUID, uuid4
 import redis.asyncio as aioredis
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
 from app.models.booking import Booking
@@ -24,6 +23,10 @@ from olympus.tenant.schema_provision import provision_tenant_schema
 from app.models.user import User, UserRole
 from app.services.auth_service import hash_password
 from app.services.billing_service import BillingService
+from app.services.tenant_modules import (
+    _heal_subscription_plan_column,
+    _tenant_noload_options,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -137,24 +140,52 @@ class PlatformAdminService:
         }
 
     async def overview(self) -> dict:
+        # Heal lagging Contabo schemas before any subscription join/load.
+        await _heal_subscription_plan_column(self._session)
         billing = await BillingService(self._session).platform_analytics()
         health = await self.health()
 
-        recent = await self._session.execute(
-            select(Tenant)
-            .options(selectinload(Tenant.subscription))
-            .order_by(Tenant.created_at.desc())
-            .limit(5),
-        )
-        recent_tenants = [self._tenant_summary(t) for t in recent.scalars().all()]
+        recent_tenants: list[dict] = []
+        try:
+            recent = await self._session.execute(
+                select(Tenant)
+                .options(*_tenant_noload_options())
+                .order_by(Tenant.created_at.desc())
+                .limit(5),
+            )
+            recent_rows = list(recent.scalars().all())
+            subs = await self._safe_subscriptions_by_tenant_ids([t.id for t in recent_rows])
+            recent_tenants = [self._tenant_summary(t, subscription=subs.get(t.id)) for t in recent_rows]
+        except Exception:
+            logger.exception("platform overview recent_tenants failed")
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
 
         await _rls_off(self._session)
-        total_users = int(
-            await self._session.scalar(select(func.count()).select_from(User)) or 0,
-        )
-        total_bookings = int(
-            await self._session.scalar(select(func.count()).select_from(Booking)) or 0,
-        )
+        total_users = 0
+        total_bookings = 0
+        try:
+            total_users = int(
+                await self._session.scalar(select(func.count()).select_from(User)) or 0,
+            )
+        except Exception:
+            logger.exception("platform overview total_users failed")
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
+        try:
+            total_bookings = int(
+                await self._session.scalar(select(func.count()).select_from(Booking)) or 0,
+            )
+        except Exception:
+            logger.exception("platform overview total_bookings failed")
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
 
         return {
             "health_status": health["status"],
@@ -164,17 +195,49 @@ class PlatformAdminService:
             "recent_tenants": recent_tenants,
         }
 
-    def _tenant_summary(self, tenant: Tenant) -> dict:
-        sub = tenant.subscription
+    def _tenant_summary(self, tenant: Tenant, *, subscription: Subscription | None = None) -> dict:
+        sub = subscription
         return {
             "id": str(tenant.id),
             "slug": tenant.slug,
             "legal_name": tenant.legal_name,
-            "plan": tenant.plan.value,
+            "plan": tenant.plan.value if hasattr(tenant.plan, "value") else str(tenant.plan),
             "is_active": tenant.is_active,
             "subscription_status": sub.status.value if sub else None,
             "created_at": tenant.created_at.isoformat() if tenant.created_at else None,
         }
+
+    async def _safe_subscriptions_by_tenant_ids(
+        self,
+        tenant_ids: list[UUID],
+    ) -> dict[UUID, Subscription]:
+        """Load subscriptions without crashing when Contabo schema lags."""
+        if not tenant_ids:
+            return {}
+        try:
+            result = await self._session.execute(
+                select(Subscription).where(Subscription.tenant_id.in_(tenant_ids)),
+            )
+            return {s.tenant_id: s for s in result.scalars().all()}
+        except Exception:
+            logger.exception("subscription load failed — healing plan column and retrying")
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
+            await _heal_subscription_plan_column(self._session)
+            try:
+                result = await self._session.execute(
+                    select(Subscription).where(Subscription.tenant_id.in_(tenant_ids)),
+                )
+                return {s.tenant_id: s for s in result.scalars().all()}
+            except Exception:
+                logger.exception("subscription load still failing after heal")
+                try:
+                    await self._session.rollback()
+                except Exception:
+                    pass
+                return {}
 
     async def list_tenants(
         self,
@@ -186,8 +249,10 @@ class PlatformAdminService:
         plan: TenantPlan | None = None,
         subscription_status: SubscriptionStatus | None = None,
     ) -> tuple[list[dict], int]:
+        await _heal_subscription_plan_column(self._session)
         limit = min(max(limit, 1), 100)
-        stmt = select(Tenant).options(selectinload(Tenant.subscription))
+        # Never selectinload(subscription): missing subscriptions.plan → HTTP 500.
+        stmt = select(Tenant).options(*_tenant_noload_options())
         count_stmt = select(func.count()).select_from(Tenant)
 
         if q:
@@ -220,13 +285,19 @@ class PlatformAdminService:
         result = await self._session.execute(
             stmt.order_by(Tenant.created_at.desc()).offset(offset).limit(limit),
         )
-        items = [self._tenant_detail(t, include_counts=False) for t in result.scalars().unique().all()]
+        tenants = list(result.scalars().unique().all())
+        subs = await self._safe_subscriptions_by_tenant_ids([t.id for t in tenants])
+        items = [
+            self._tenant_detail(t, include_counts=False, subscription=subs.get(t.id))
+            for t in tenants
+        ]
         return items, total
 
     async def get_tenant(self, tenant_id: UUID) -> dict | None:
+        await _heal_subscription_plan_column(self._session)
         result = await self._session.execute(
             select(Tenant)
-            .options(selectinload(Tenant.subscription))
+            .options(*_tenant_noload_options())
             .where(Tenant.id == tenant_id),
         )
         tenant = result.scalar_one_or_none()
@@ -235,27 +306,44 @@ class PlatformAdminService:
         return await self._tenant_detail_async(tenant)
 
     async def _tenant_detail_async(self, tenant: Tenant) -> dict:
-        detail = self._tenant_detail(tenant, include_counts=True)
+        subs = await self._safe_subscriptions_by_tenant_ids([tenant.id])
+        detail = self._tenant_detail(
+            tenant,
+            include_counts=True,
+            subscription=subs.get(tenant.id),
+        )
         from app.core.auth_deps import apply_tenant_rls
 
-        await apply_tenant_rls(self._session, tenant.id)
-        detail["user_count"] = int(
-            await self._session.scalar(
-                select(func.count()).select_from(User).where(User.tenant_id == tenant.id),
+        try:
+            await apply_tenant_rls(self._session, tenant.id)
+            detail["user_count"] = int(
+                await self._session.scalar(
+                    select(func.count()).select_from(User).where(User.tenant_id == tenant.id),
+                )
+                or 0,
             )
-            or 0,
-        )
-        detail["booking_count"] = int(
-            await self._session.scalar(
-                select(func.count()).select_from(Booking).where(Booking.tenant_id == tenant.id),
+            detail["booking_count"] = int(
+                await self._session.scalar(
+                    select(func.count()).select_from(Booking).where(Booking.tenant_id == tenant.id),
+                )
+                or 0,
             )
-            or 0,
-        )
+        except Exception:
+            logger.exception("tenant detail counts failed for %s", tenant.id)
+            detail["user_count"] = detail.get("user_count") or 0
+            detail["booking_count"] = detail.get("booking_count") or 0
         return detail
 
-    def _tenant_detail(self, tenant: Tenant, *, include_counts: bool) -> dict:
-        sub = tenant.subscription
+    def _tenant_detail(
+        self,
+        tenant: Tenant,
+        *,
+        include_counts: bool,
+        subscription: Subscription | None = None,
+    ) -> dict:
+        sub = subscription
         ops = _ops_from_settings(_parse_settings(tenant.settings_json))
+        plan_value = tenant.plan.value if hasattr(tenant.plan, "value") else str(tenant.plan)
         out = {
             "id": tenant.id,
             "slug": tenant.slug,
@@ -263,7 +351,7 @@ class PlatformAdminService:
             "vat_number": tenant.vat_number,
             "subdomain": tenant.subdomain,
             "custom_domain": tenant.custom_domain,
-            "plan": tenant.plan.value,
+            "plan": plan_value,
             "is_active": tenant.is_active,
             "stripe_customer_id": tenant.stripe_customer_id,
             "created_at": tenant.created_at,
@@ -279,7 +367,7 @@ class PlatformAdminService:
         if sub:
             out["subscription"] = {
                 "status": sub.status.value,
-                "plan": sub.plan.value,
+                "plan": sub.plan.value if hasattr(sub.plan, "value") else str(sub.plan or plan_value),
                 "stripe_subscription_id": sub.stripe_subscription_id,
                 "current_period_end": sub.current_period_end,
                 "trial_ends_at": sub.trial_ends_at,
