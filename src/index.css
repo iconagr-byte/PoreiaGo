@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+/* Fast fade when switching admin hub menus / panels */
+@keyframes admin-menu-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.admin-menu-fade {
+  animation: admin-menu-fade-in 140ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-menu-fade {
+    animation: none;
+  }
+}
+
 /* Admin sidebar — τμήματα μενού */
 .admin-sidebar-nav {
   background: transparent;
