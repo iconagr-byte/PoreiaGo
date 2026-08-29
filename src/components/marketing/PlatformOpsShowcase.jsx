@@ -30,33 +30,39 @@ export default function PlatformOpsShowcase() {
         <p className="pg-apple-subtitle mt-5 max-w-[640px] mx-auto">{PLATFORM_OPS_COPY.subtitle}</p>
 
         <nav
-          className="mt-8 flex flex-wrap justify-center gap-2.5"
+          className="mt-8 flex flex-col items-center gap-3"
           aria-label="Προεπισκόπηση ενοτήτων"
         >
-          <a href="#platform-trips" className="pg-apple-chip">
-            <span className="material-symbols-outlined" aria-hidden>
-              map
-            </span>
-            Εκδρομές
-          </a>
-          <a href="#platform-abroad" className="pg-apple-chip">
-            <span className="material-symbols-outlined" aria-hidden>
-              public
-            </span>
-            Εξωτερικό
-          </a>
-          <a href="#our-fleet" className="pg-apple-chip">
-            <span className="material-symbols-outlined" aria-hidden>
-              directions_bus
-            </span>
-            Στόλος λεωφορείων
-          </a>
-          <Link to="/rent" className="pg-apple-chip">
-            <span className="material-symbols-outlined" aria-hidden>
-              car_rental
-            </span>
-            Ενοικιάσεις οχημάτων
-          </Link>
+          <div className="flex flex-wrap justify-center gap-2.5" role="group" aria-label="Λεωφορεία">
+            <span className="pg-apple-chip-label">Λεωφορεία</span>
+            <a href="#platform-trips" className="pg-apple-chip">
+              <span className="material-symbols-outlined" aria-hidden>
+                map
+              </span>
+              Εκδρομές
+            </a>
+            <a href="#platform-abroad" className="pg-apple-chip">
+              <span className="material-symbols-outlined" aria-hidden>
+                public
+              </span>
+              Εξωτερικό
+            </a>
+            <a href="#our-fleet" className="pg-apple-chip">
+              <span className="material-symbols-outlined" aria-hidden>
+                directions_bus
+              </span>
+              Στόλος
+            </a>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2.5" role="group" aria-label="Ενοικιάσεις">
+            <span className="pg-apple-chip-label pg-apple-chip-label--rent">Ενοικιάσεις</span>
+            <Link to="/rent" className="pg-apple-chip pg-apple-chip--rent">
+              <span className="material-symbols-outlined" aria-hidden>
+                car_rental
+              </span>
+              Σελίδα ενοικιάσεων
+            </Link>
+          </div>
         </nav>
       </div>
 

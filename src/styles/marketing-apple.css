@@ -42,6 +42,22 @@
   color: var(--pg-apple-muted);
 }
 
+.pg-apple-chip-label {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  padding: 0.35rem 0.15rem 0.35rem 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pg-apple-muted);
+}
+
+.pg-apple-chip-label--rent {
+  color: #0f766e;
+}
+
 .pg-apple-chip {
   display: inline-flex;
   align-items: center;
@@ -56,6 +72,17 @@
   letter-spacing: -0.01em;
   transition: background 0.2s ease, box-shadow 0.2s ease;
   text-decoration: none;
+}
+
+.pg-apple-chip--rent {
+  background: rgba(13, 148, 136, 0.1);
+  border-color: rgba(13, 148, 136, 0.28);
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.pg-apple-chip--rent .material-symbols-outlined {
+  color: #0d9488;
 }
 
 .pg-apple-chip:hover {
