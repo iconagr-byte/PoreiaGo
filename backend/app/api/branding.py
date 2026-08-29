@@ -113,6 +113,13 @@ async def update_branding_settings(
     return TenantBrandingSettingsResponse(**data)
 
 
+def _appearance_response_payload(data: dict) -> TenantSiteAppearanceResponse:
+    """Build response model — ignore unknown/extra keys from Postgres bags."""
+    fields = TenantSiteAppearanceResponse.model_fields
+    clean = {k: data[k] for k in fields if k in data}
+    return TenantSiteAppearanceResponse(**clean)
+
+
 @router.get("/site-appearance", response_model=TenantSiteAppearanceResponse)
 async def get_site_appearance(
     db: Annotated[AsyncSession, Depends(get_platform_db)],
@@ -127,7 +134,7 @@ async def get_site_appearance(
         logger.exception("Site appearance GET failed")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load appearance") from exc
     try:
-        return TenantSiteAppearanceResponse(**data)
+        return _appearance_response_payload(data)
     except Exception as exc:
         logger.exception("Site appearance response validation failed")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid appearance data") from exc
@@ -152,8 +159,9 @@ async def update_site_appearance(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Χρησιμοποιήστε Ανέβασμα αρχείου για λογότυπο/hero (όχι data URL)",
             )
+    svc = TenantSiteAppearanceService(db)
     try:
-        data = await TenantSiteAppearanceService(db).update_appearance(
+        data = await svc.update_appearance(
             tenant_id,
             patch,
             actor_email=actor_email,
@@ -161,16 +169,35 @@ async def update_site_appearance(
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except Exception as exc:
-        logger.exception("Site appearance PUT failed for tenant %s", tenant_id)
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Αποτυχία αποθήκευσης εμφάνισης",
-        ) from exc
+        logger.exception("Site appearance PUT failed for tenant %s — retrying after rollback", tenant_id)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        try:
+            data = await svc.update_appearance(
+                tenant_id,
+                patch,
+                actor_email=actor_email,
+            )
+        except Exception as retry_exc:
+            logger.exception("Site appearance PUT retry failed for tenant %s", tenant_id)
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Αποτυχία αποθήκευσης εμφάνισης",
+            ) from retry_exc
     try:
-        return TenantSiteAppearanceResponse(**data)
+        return _appearance_response_payload(data)
     except Exception as exc:
         logger.exception("Site appearance response validation failed after update")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid appearance data") from exc
+        # Settings were written — return a permissive payload so the UI keeps the logo.
+        try:
+            return _appearance_response_payload({**DEFAULT_SITE_APPEARANCE, **(data or {}), **patch})
+        except Exception:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid appearance data",
+            ) from exc
 
 
 @router.post("/site-appearance/upload/{kind}")

@@ -1593,8 +1593,23 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 }
                 if (logo && !logo.startsWith('data:')) patch.logo_url = logo;
                 if (hero && !hero.startsWith('data:')) patch.hero_image_url = hero;
-                const result = await updateSiteAppearance(patch);
-                setForm((p) => ({ ...p, ...result.data, ...patch }));
+                let result;
+                try {
+                  result = await updateSiteAppearance(patch);
+                } catch (firstErr) {
+                  // Sizing-only retry — logo file may already be on disk/Postgres.
+                  const sizeOnly = {
+                    logo_height_px: patch.logo_height_px,
+                    logo_max_width_px: patch.logo_max_width_px,
+                    logo_show_name: patch.logo_show_name,
+                    hero_image_focal: patch.hero_image_focal,
+                  };
+                  if (logo && !logo.startsWith('data:')) sizeOnly.logo_url = logo;
+                  result = await updateSiteAppearance(sizeOnly).catch(() => {
+                    throw firstErr;
+                  });
+                }
+                setForm((p) => ({ ...p, ...result.data, ...patch, logo_url: logo || p.logo_url }));
                 toast.success('Οι ρυθμίσεις λογοτύπου αποθηκεύτηκαν', { id: 'homepage-save-ok' });
               } catch (err) {
                 if (err.message === 'AUTH_EXPIRED') {

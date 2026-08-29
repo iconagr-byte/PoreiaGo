@@ -59,6 +59,16 @@ class PruneOversizedMediaTests(unittest.TestCase):
         self.assertNotIn("BBBBB", raw)
         self.assertIn("office-assets", raw)
 
+    def test_prune_huge_non_data_strings(self):
+        from app.services.tenant_site_appearance_service import _prune_huge_strings
+
+        blob = "x" * 25_000
+        cleaned = _prune_huge_strings(
+            {"rent_notify_email_body": f"data:text/html;base64,{blob}", "ok": "short"}
+        )
+        self.assertEqual(cleaned["rent_notify_email_body"], "")
+        self.assertEqual(cleaned["ok"], "short")
+
 
 if __name__ == "__main__":
     unittest.main()
