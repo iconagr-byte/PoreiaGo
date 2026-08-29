@@ -347,7 +347,7 @@ class TenantBrandingService:
     ) -> dict[str, Any]:
         ingress = self._olympus.get("ingress_cname", "ingress.olympus-saas.com")
         base_domain = self._olympus["base_domain"]
-        ingress_ip = (os.getenv("PLATFORM_INGRESS_IP") or "34.141.98.145").strip()
+        ingress_ip = (os.getenv("PLATFORM_INGRESS_IP") or "169.58.199.186").strip()
         notes = [
             f"Το subdomain {subdomain_fqdn} λειτουργεί αυτόματα (wildcard SSL).",
             "Για δικό σας domain: CNAME το www → www.poreiago.com (ή στον ingress).",
