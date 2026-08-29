@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import SettingsTabPanels from './SettingsTabPanels.jsx';
 import AdminMenuFade from './AdminMenuFade.jsx';
+import AdminResizableRail from './AdminResizableRail.jsx';
 import {
   DEFAULT_PLATFORM_TAB,
   DEFAULT_TENANT_SETTINGS_TAB,
@@ -116,12 +117,12 @@ export default function SettingsHub({
     <div className="settings-hub w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
         {/* Secondary settings rail — fades out in design mode for more canvas */}
-        <aside
-          aria-hidden={designMode && !railOpen}
-          className={`shrink-0 self-start overflow-hidden transition-[opacity,transform,width,margin,padding,max-height] duration-150 ease-out ${
-            designMode && !railOpen
-              ? 'pointer-events-none opacity-0 -translate-x-1 max-h-0 w-0 max-w-0 m-0 p-0 lg:sticky lg:top-3'
-              : 'opacity-100 translate-x-0 w-full max-w-none max-h-[2000px] lg:w-80 xl:w-[22rem] lg:sticky lg:top-3'
+        <AdminResizableRail
+          storageKey="poreiago_settings_hub_rail_w"
+          defaultWidth={336}
+          collapsed={designMode && !railOpen}
+          className={`overflow-hidden transition-[opacity,transform,max-height] duration-150 ease-out ${
+            designMode && !railOpen ? 'max-h-0' : 'max-h-[2000px]'
           }`}
         >
           <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-3.5">
@@ -282,7 +283,7 @@ export default function SettingsHub({
               })}
             </div>
           </div>
-        </aside>
+        </AdminResizableRail>
 
         {/* Panel content */}
         <AdminMenuFade panelKey={tab || defaultTab} className="min-w-0 flex-1 space-y-5 w-full">

@@ -7,6 +7,7 @@ import {
 } from '../../../lib/admin/rentDeskNav.js';
 import FleetRentalPanel from './FleetRentalPanel.jsx';
 import AdminMenuFade from '../AdminMenuFade.jsx';
+import AdminResizableRail from '../AdminResizableRail.jsx';
 
 const RAIL_ACTIVE = {
   teal: 'border-teal-300 bg-teal-50 shadow-sm',
@@ -86,7 +87,12 @@ export default function RentDeskHub({
   return (
     <div className="rent-desk-hub w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
-        <aside className="w-full lg:w-[15.5rem] xl:w-64 shrink-0 lg:sticky lg:top-3 self-start">
+        <AdminResizableRail
+          storageKey="poreiago_rent_desk_rail_w"
+          defaultWidth={256}
+          minWidth={200}
+          maxWidth={420}
+        >
           <div className="rounded-[24px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-2.5 sm:p-3 space-y-3">
             <div className="px-1.5 pt-0.5">
               <p className="text-[11px] font-bold uppercase tracking-wide text-teal-700/80">
@@ -173,7 +179,7 @@ export default function RentDeskHub({
               ))}
             </div>
           </div>
-        </aside>
+        </AdminResizableRail>
 
         <AdminMenuFade panelKey={tab || DEFAULT_RENT_DESK_TAB} className="min-w-0 flex-1 space-y-4 w-full">
           <div className="flex flex-wrap items-start justify-between gap-3">

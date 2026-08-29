@@ -10,6 +10,7 @@ import {
 } from '../../lib/admin/busesHub.js';
 import { isFleetOpsSubTab } from '../../lib/admin/fleetOpsHub.js';
 import AdminMenuFade from './AdminMenuFade.jsx';
+import AdminResizableRail from './AdminResizableRail.jsx';
 
 const RAIL_ACTIVE = {
   emerald: 'border-emerald-300 bg-emerald-50 shadow-sm',
@@ -116,13 +117,13 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
   return (
     <div className="buses-hub w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
-        <aside className="w-full lg:w-80 xl:w-[22rem] shrink-0 lg:sticky lg:top-3 self-start">
+        <AdminResizableRail storageKey="poreiago_buses_hub_rail_w" defaultWidth={336}>
           <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-4">
             <div className="px-1.5 pt-0.5">
               <p className="text-xs font-bold uppercase tracking-wide text-sky-700/80">Εκδρομές</p>
               <p className="text-base font-bold text-on-surface mt-0.5">Στόλος & κρατήσεις</p>
               <p className="text-[11px] text-on-surface-variant mt-1 hidden lg:block">
-                Σύρετε ⋮⋮ για αλλαγή σειράς μενού
+                Σύρετε ⋮⋮ για σειρά · άκρη δεξιά για πλάτος
               </p>
             </div>
 
@@ -246,7 +247,7 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
               ) : null}
             </ul>
           </div>
-        </aside>
+        </AdminResizableRail>
 
         <AdminMenuFade panelKey={railTab} className="min-w-0 flex-1 space-y-5 w-full">
           {!inFleetOps ? (

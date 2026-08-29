@@ -13,6 +13,7 @@ import FleetDocumentsPanel from './FleetDocumentsPanel.jsx';
 import FleetExpensesPanel from './FleetExpensesPanel.jsx';
 import FleetDigestPanel from './FleetDigestPanel.jsx';
 import AdminMenuFade from '../AdminMenuFade.jsx';
+import AdminResizableRail from '../AdminResizableRail.jsx';
 
 const RAIL_ACTIVE = {
   violet: 'border-violet-300 bg-violet-50 shadow-sm',
@@ -140,7 +141,12 @@ export default function FleetOpsHub({
   return (
     <div className="fleet-ops-hub w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
-        <aside className="w-full lg:w-[15.5rem] xl:w-64 shrink-0 lg:sticky lg:top-3 self-start">
+        <AdminResizableRail
+          storageKey="poreiago_fleet_ops_rail_w"
+          defaultWidth={256}
+          minWidth={200}
+          maxWidth={420}
+        >
           <div className="rounded-[24px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-2.5 sm:p-3 space-y-3">
             <div className="px-1.5 pt-0.5">
               <p className="text-[11px] font-bold uppercase tracking-wide text-sky-700/80">
@@ -217,7 +223,7 @@ export default function FleetOpsHub({
               })}
             </ul>
           </div>
-        </aside>
+        </AdminResizableRail>
 
         <AdminMenuFade panelKey={tab || DEFAULT_FLEET_OPS_TAB} className="min-w-0 flex-1 space-y-5 w-full">
           {header}

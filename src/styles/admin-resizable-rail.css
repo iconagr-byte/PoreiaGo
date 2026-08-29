@@ -1,0 +1,78 @@
+/* Draggable width for admin hub left rails */
+
+.admin-resizable-rail {
+  position: relative;
+}
+
+@media (min-width: 1024px) {
+  .admin-resizable-rail {
+    width: var(--admin-rail-width, 20rem);
+    max-width: min(var(--admin-rail-width, 20rem), 48vw);
+  }
+
+  .admin-resizable-rail--collapsed {
+    width: 0 !important;
+    max-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    transform: translateX(-4px);
+  }
+}
+
+.admin-resizable-rail-inner {
+  height: 100%;
+}
+
+.admin-resizable-rail-handle {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .admin-resizable-rail-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0.75rem;
+    bottom: 0.75rem;
+    right: -0.55rem;
+    z-index: 4;
+    width: 0.9rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .admin-resizable-rail-grip {
+    width: 0.28rem;
+    height: min(4.5rem, 40%);
+    min-height: 2.75rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.22);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
+    transition: background 0.15s ease, height 0.15s ease, transform 0.15s ease;
+  }
+
+  .admin-resizable-rail-handle:hover .admin-resizable-rail-grip,
+  .admin-resizable-rail-handle:focus-visible .admin-resizable-rail-grip {
+    background: rgba(14, 165, 233, 0.85);
+    height: min(5.5rem, 48%);
+    transform: scaleX(1.15);
+  }
+
+  .admin-resizable-rail-handle:active .admin-resizable-rail-grip {
+    background: rgba(2, 132, 199, 0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-resizable-rail-grip {
+    transition: none;
+  }
+}
