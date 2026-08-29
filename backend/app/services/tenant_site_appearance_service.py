@@ -48,8 +48,20 @@ def _prune_oversized_media(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _prune_oversized_data_urls_deep(value: Any) -> Any:
+    """Recursively strip huge data: URLs from any settings_json subtree (branding, etc.)."""
+    if isinstance(value, dict):
+        return {k: _prune_oversized_data_urls_deep(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_prune_oversized_data_urls_deep(v) for v in value]
+    if _is_oversized_data_url(value):
+        return ""
+    return value
+
+
 def _safe_settings_json(settings: dict[str, Any]) -> str:
-    return json.dumps(settings, ensure_ascii=False, default=str)
+    cleaned = _prune_oversized_data_urls_deep(settings)
+    return json.dumps(cleaned, ensure_ascii=False, default=str)
 
 DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "logo_url": "",
@@ -400,6 +412,12 @@ class TenantSiteAppearanceService:
         updated.pop("tenant_slug", None)
         updated = _prune_oversized_media(updated)
         settings["site_appearance"] = updated
+        # Also strip legacy data: blobs under branding/theme — they poison the
+        # whole settings_json column and make logo uploads return HTTP 500.
+        settings = _prune_oversized_data_urls_deep(settings)
+        if isinstance(settings.get("site_appearance"), dict):
+            settings["site_appearance"]["logo_url"] = updated.get("logo_url", "")
+            settings["site_appearance"]["hero_image_url"] = updated.get("hero_image_url", "")
         tenant.settings_json = _safe_settings_json(settings)
         await self._session.flush()
         try:

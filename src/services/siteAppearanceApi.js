@@ -85,7 +85,17 @@ export const DEFAULT_SITE_APPEARANCE = {
 
 async function parseError(res) {
   const err = await res.json().catch(() => ({}));
-  throw new Error(err.detail || res.statusText || 'Request failed');
+  let detail = err.detail || res.statusText || 'Request failed';
+  if (Array.isArray(detail)) {
+    detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
+  } else if (typeof detail === 'object' && detail) {
+    detail = detail.message || JSON.stringify(detail);
+  }
+  const raw = String(detail || '').trim();
+  if (/internal server error/i.test(raw) || res.status >= 500) {
+    throw new Error('Σφάλμα server — δοκιμάστε μικρότερο JPG/PNG ή κάντε επανασύνδεση');
+  }
+  throw new Error(raw || 'Request failed');
 }
 
 function cacheLocally(data) {

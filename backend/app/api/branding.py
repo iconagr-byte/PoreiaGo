@@ -218,12 +218,18 @@ async def upload_site_appearance_asset(
 
     key = "logo_url" if kind_norm == "logo" else "hero_image_url"
     persist_warning = None
-    try:
-        appearance = await TenantSiteAppearanceService(db).update_appearance(
+    appearance: dict = {}
+    svc = TenantSiteAppearanceService(db)
+
+    async def _persist_url() -> dict:
+        return await svc.update_appearance(
             tenant_id,
             {key: saved["url"]},
             actor_email=None,
         )
+
+    try:
+        appearance = await _persist_url()
     except Exception as exc:
         logger.exception(
             "Failed to persist office asset URL for tenant %s kind=%s url=%s",
@@ -231,10 +237,28 @@ async def upload_site_appearance_asset(
             kind_norm,
             saved.get("url"),
         )
-        # File is already on disk. Return the URL so the UI can show the logo and
-        # the client can retry a light PUT without re-uploading the file.
-        persist_warning = f"{type(exc).__name__}: {exc}"
-        appearance = {key: saved["url"]}
+        # Critical: a failed flush leaves the AsyncSession unusable. Without
+        # rollback, get_platform_db() commit → bare "Internal Server Error".
+        try:
+            await db.rollback()
+        except Exception:
+            logger.exception("Rollback after appearance persist failure")
+        try:
+            appearance = await _persist_url()
+            persist_warning = f"retried_after_{type(exc).__name__}"
+        except Exception as retry_exc:
+            logger.exception(
+                "Retry persist office asset URL failed for tenant %s kind=%s",
+                tenant_id,
+                kind_norm,
+            )
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            # File is already on disk — return URL so the UI can attach it.
+            persist_warning = f"{type(retry_exc).__name__}: {retry_exc}"
+            appearance = {key: saved["url"]}
 
     if isinstance(appearance, dict):
         for heavy in ("logo_url", "hero_image_url"):
