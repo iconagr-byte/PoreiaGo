@@ -25,6 +25,7 @@ import {
 import { PROVIDERS, detectProvider } from '../../../lib/email/emailProviderPresets.js';
 import EmailConnectWizard from './EmailConnectWizard.jsx';
 import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
+import EmailConnectionResult from './EmailConnectionResult.jsx';
 
 const EMPTY = {
   label: '',
@@ -304,16 +305,17 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           (imapFail && isMailTimeoutMessage(r.imap?.error)) ||
           (smtpFail && isMailTimeoutMessage(r.smtp?.error));
         if (timeout) {
-          const hint = mailTimeoutHintEl({
-            mailHost: form.imap_host || form.smtp_host,
-            imapPort: Number(form.imap_port) || 993,
-            smtpPort: Number(form.smtp_port) || 465,
-          });
+          const mailHost = form.imap_host || form.smtp_host;
+          const imapPort = Number(form.imap_port) || 993;
+          const smtpPort = Number(form.smtp_port) || 465;
           setTestResult({
             ok: false,
             message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
-            hint,
+            hint: mailTimeoutHintEl({ mailHost, imapPort, smtpPort }),
             timeout: true,
+            mailHost,
+            imapPort,
+            smtpPort,
           });
           toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
         } else {
@@ -370,16 +372,17 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       } else {
         const timeout = built.imapHostFail || built.smtpHostFail;
         if (timeout) {
-          const hint = mailTimeoutHintEl({
-            mailHost: acc.imap_host || acc.smtp_host,
-            imapPort: Number(acc.imap_port) || 993,
-            smtpPort: Number(acc.smtp_port) || 465,
-          });
+          const mailHost = acc.imap_host || acc.smtp_host;
+          const imapPort = Number(acc.imap_port) || 993;
+          const smtpPort = Number(acc.smtp_port) || 465;
           setTestResult({
             ok: false,
             message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
-            hint,
+            hint: mailTimeoutHintEl({ mailHost, imapPort, smtpPort }),
             timeout: true,
+            mailHost,
+            imapPort,
+            smtpPort,
           });
           toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
         } else {
@@ -739,24 +742,16 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                       }
                     />
                     {testResult && !testing ? (
-                      <div
-                        className={`mt-2 rounded-xl border px-3 py-2 text-body-sm ${
-                          testResult.ok
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                            : 'border-rose-200 bg-rose-50 text-rose-900'
-                        }`}
-                      >
-                        <p className="font-bold">
-                          {testResult.ok ? 'Έλεγχος επιτυχής' : 'Έλεγχος απέτυχε'}
-                        </p>
-                        {testResult.message ? (
-                          <p className="mt-1 whitespace-pre-wrap">{testResult.message}</p>
-                        ) : null}
-                        {!testResult.ok && testResult.hint ? (
-                          <p className="mt-1 text-label-sm opacity-90 whitespace-pre-wrap">
-                            {testResult.hint}
-                          </p>
-                        ) : null}
+                      <div className="mt-2">
+                        <EmailConnectionResult
+                          ok={testResult.ok}
+                          message={testResult.message}
+                          hint={testResult.hint}
+                          timeout={testResult.timeout}
+                          mailHost={testResult.mailHost || a.imap_host || a.smtp_host}
+                          imapPort={testResult.imapPort || a.imap_port}
+                          smtpPort={testResult.smtpPort || a.smtp_port}
+                        />
                       </div>
                     ) : null}
                   </div>
@@ -1094,40 +1089,15 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                 />
               ) : null}
               {testResult ? (
-            <div
-              className={`rounded-2xl border px-4 py-3 ${
-                testResult.ok
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                  : 'border-rose-200 bg-rose-50 text-rose-900'
-              }`}
-              role="status"
-            >
-              <p className="text-label-md font-bold">
-                {testResult.ok ? 'Έλεγχος επιτυχής' : 'Έλεγχος απέτυχε'}
-              </p>
-              <p className="mt-1 text-body-sm whitespace-pre-wrap">{testResult.message}</p>
-              {!testResult.ok && testResult.hint ? (
-                <p className="mt-1 text-label-sm opacity-90 whitespace-pre-wrap">{testResult.hint}</p>
-              ) : null}
-              {testResult.timeout && testResult.hint ? (
-                <button
-                  type="button"
-                  className="mt-2 text-label-sm font-bold underline"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(testResult.hint);
-                      toast.success('Αντιγράφηκε για τον πάροχο hosting', {
-                        id: 'email-conn-copy',
-                      });
-                    } catch {
-                      toast.error('Αποτυχία αντιγραφής', { id: 'email-conn-copy' });
-                    }
-                  }}
-                >
-                  Αντιγραφή κειμένου για hosting
-                </button>
-              ) : null}
-            </div>
+                <EmailConnectionResult
+                  ok={testResult.ok}
+                  message={testResult.message}
+                  hint={testResult.hint}
+                  timeout={testResult.timeout}
+                  mailHost={testResult.mailHost || form.imap_host || form.smtp_host}
+                  imapPort={testResult.imapPort || form.imap_port}
+                  smtpPort={testResult.smtpPort || form.smtp_port}
+                />
               ) : null}
             </div>
           ) : null}

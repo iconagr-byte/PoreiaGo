@@ -13,6 +13,8 @@ import {
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
 } from '../../../lib/email/mailReachability.js';
+import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
+import EmailConnectionResult from './EmailConnectionResult.jsx';
 
 const fieldClass =
   'mt-1.5 w-full rounded-xl border border-outline-variant/80 bg-surface px-3.5 py-2.5 text-body-md text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15';
@@ -239,12 +241,17 @@ export default function EmailConnectWizard({
         setTestMsg({ ok: true, text: 'IMAP & SMTP επιτυχία — μπορείτε να αποθηκεύσετε' });
         toast.success('IMAP & SMTP OK', { id: 'email-conn-test' });
       } else if (imapHostFail || smtpHostFail) {
-        const text = mailTimeoutHintEl({
-          mailHost: account.imap_host || account.smtp_host,
-          imapPort: Number(account.imap_port) || 993,
-          smtpPort: Number(account.smtp_port) || 465,
+        const mailHost = account.imap_host || account.smtp_host;
+        const imapPort = Number(account.imap_port) || 993;
+        const smtpPort = Number(account.smtp_port) || 465;
+        setTestMsg({
+          ok: false,
+          timeout: true,
+          text: mailTimeoutHintEl({ mailHost, imapPort, smtpPort }),
+          mailHost,
+          imapPort,
+          smtpPort,
         });
-        setTestMsg({ ok: false, text, timeout: true });
         toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
       } else {
         const text = [imapOk ? null : `IMAP: ${imapErr}`, smtpOk ? null : `SMTP: ${smtpErr}`]
@@ -308,6 +315,9 @@ export default function EmailConnectWizard({
             imapPort: Number(account.imap_port) || 993,
             smtpPort: Number(account.smtp_port) || 465,
           }),
+          mailHost: account.imap_host || account.smtp_host,
+          imapPort: Number(account.imap_port) || 993,
+          smtpPort: Number(account.smtp_port) || 465,
         });
         toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test' });
       } else {
@@ -639,83 +649,23 @@ export default function EmailConnectWizard({
           </div>
 
           {(testing || checks.length > 0) && (
-            <div
-              className="rounded-2xl border border-black/[0.08] bg-white/90 px-3.5 py-3 shadow-sm"
-              role="status"
-              aria-live="polite"
-            >
-              <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#0071e3]">
-                {testing ? 'Έλεγχος σε εξέλιξη' : 'Αποτέλεσμα ελέγχου'}
-              </p>
-              <ul className="mt-2 space-y-1.5">
-                {checks.map((c) => {
-                  const icon =
-                    c.status === 'ok'
-                      ? '✓'
-                      : c.status === 'fail'
-                        ? '✕'
-                        : c.status === 'skip'
-                          ? '–'
-                          : c.status === 'running'
-                            ? '●'
-                            : '○';
-                  const color =
-                    c.status === 'ok'
-                      ? 'text-emerald-700'
-                      : c.status === 'fail'
-                        ? 'text-rose-700'
-                        : c.status === 'skip'
-                          ? 'text-[#86868b]'
-                          : c.status === 'running'
-                            ? 'text-[#0071e3]'
-                            : 'text-[#86868b]';
-                  return (
-                    <li
-                      key={c.id}
-                      className="flex items-start gap-2 rounded-xl bg-[#f5f5f7]/80 px-2.5 py-2 text-[13px]"
-                    >
-                      <span className={`mt-0.5 w-4 shrink-0 text-center font-bold ${color}`}>{icon}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-[#1d1d1f]">{c.label}</span>
-                        {c.detail ? (
-                          <span className={`mt-0.5 block text-[12px] leading-snug ${color}`}>{c.detail}</span>
-                        ) : null}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+            <EmailConnectionCheckList
+              checks={checks}
+              testing={testing}
+              title={testing ? 'Έλεγχος σε εξέλιξη' : 'Αποτέλεσμα ελέγχου'}
+            />
           )}
 
           {testMsg && (
-            <div
-              className={`rounded-xl border px-3 py-2 text-body-sm whitespace-pre-wrap ${
-                testMsg.ok
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                  : 'border-rose-200 bg-rose-50 text-rose-900'
-              }`}
-            >
-              {testMsg.text}
-              {testMsg.timeout ? (
-                <button
-                  type="button"
-                  className="mt-2 block text-label-sm font-bold underline"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(testMsg.text);
-                      toast.success('Αντιγράφηκε για τον πάροχο hosting', {
-                        id: 'email-conn-copy',
-                      });
-                    } catch {
-                      toast.error('Αποτυχία αντιγραφής', { id: 'email-conn-copy' });
-                    }
-                  }}
-                >
-                  Αντιγραφή κειμένου για hosting
-                </button>
-              ) : null}
-            </div>
+            <EmailConnectionResult
+              ok={testMsg.ok}
+              message={testMsg.timeout ? undefined : testMsg.text}
+              hint={undefined}
+              timeout={testMsg.timeout}
+              mailHost={testMsg.mailHost}
+              imapPort={testMsg.imapPort}
+              smtpPort={testMsg.smtpPort}
+            />
           )}
 
           <div className="flex flex-wrap justify-between gap-2 pt-2">

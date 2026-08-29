@@ -24,10 +24,34 @@ export function hostingWhitelistRequest({
   );
 }
 
-export function mailTimeoutHintEl({ mailHost, imapPort, smtpPort } = {}) {
-  return (
-    'Δεν είναι λάθος κωδικός — ο mail server δεν απαντά από τον server της εφαρμογής. ' +
-    'Στείλτε στον πάροχο hosting (cPanel / Intechs) το παρακάτω αίτημα whitelist.\n\n' +
-    hostingWhitelistRequest({ mailHost, imapPort, smtpPort })
-  );
+/** Structured guide for timeout / firewall UI (copyable request + fact chips). */
+export function mailTimeoutGuide({ mailHost, imapPort, smtpPort } = {}) {
+  const host = String(mailHost || 'mail.achilliotravel.com').trim() || 'mail.achilliotravel.com';
+  const imap = Number(imapPort) || 993;
+  const smtp = Number(smtpPort) || 465;
+  const request = hostingWhitelistRequest({ mailHost: host, imapPort: imap, smtpPort: smtp });
+  return {
+    title: 'Ο mail server δεν απαντά',
+    summary:
+      'Δεν είναι λάθος κωδικός. Ο διακομιστής email μπλοκάρει τη σύνδεση από τον server της εφαρμογής.',
+    nextStep: 'Στείλτε στον πάροχο hosting (cPanel / Intechs) το παρακάτω αίτημα whitelist.',
+    request,
+    facts: [
+      { id: 'ip', label: 'IP εφαρμογής', value: APP_MAIL_EGRESS_IP, copy: APP_MAIL_EGRESS_IP },
+      { id: 'host', label: 'Mail host', value: host, copy: host },
+      { id: 'imap', label: 'IMAP', value: String(imap), copy: String(imap) },
+      { id: 'smtp', label: 'SMTP', value: String(smtp), copy: String(smtp) },
+    ],
+    steps: [
+      'Αντιγράψτε το αίτημα whitelist',
+      'Στείλτε το στον πάροχο hosting / cPanel',
+      'Μόλις ανοίξουν τις θύρες, πατήστε ξανά «Έλεγχος»',
+    ],
+  };
+}
+
+/** Full hint text (summary + request) — used for clipboard / legacy callers. */
+export function mailTimeoutHintEl(opts = {}) {
+  const g = mailTimeoutGuide(opts);
+  return `${g.summary} ${g.nextStep}\n\n${g.request}`;
 }
