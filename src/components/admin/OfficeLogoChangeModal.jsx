@@ -179,7 +179,12 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
       onSaved?.();
       toast.success('Το λογότυπο ενημερώθηκε');
     } catch (err) {
-      toast.error(err.message || 'Αποτυχία ανεβάσματος');
+      const msg = String(err.message || '');
+      if (/internal server error|σφάλμα server/i.test(msg)) {
+        toast.error('Σφάλμα server στο ανέβασμα — δοκιμάστε JPG/PNG έως 2MB');
+      } else {
+        toast.error(msg || 'Αποτυχία ανεβάσματος');
+      }
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
