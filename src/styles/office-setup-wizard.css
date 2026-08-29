@@ -279,6 +279,170 @@
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
 }
 
+.office-setup-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.35rem;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--os-stroke);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.office-setup-logo-drop {
+  flex: 0 0 auto;
+  width: 4.75rem;
+  height: 4.75rem;
+  border-radius: 1.1rem;
+  border: 1.5px dashed rgba(0, 0, 0, 0.14);
+  background: #fff;
+  padding: 0.35rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.office-setup-logo-drop:hover:not(:disabled) {
+  border-color: rgba(0, 113, 227, 0.45);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
+}
+
+.office-setup-logo-drop:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.office-setup-logo-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.office-setup-logo-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--os-tertiary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.office-setup-logo-plus {
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--os-blue);
+}
+
+.office-setup-logo-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.office-setup-logo-copy strong {
+  font-size: 0.92rem;
+  letter-spacing: -0.02em;
+}
+
+.office-setup-logo-copy p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--os-secondary);
+  line-height: 1.35;
+}
+
+.office-setup-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.office-setup-logo-actions .office-setup-btn {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+.office-setup-theme-grid {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.45rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 560px) {
+  .office-setup-theme-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.office-setup-theme-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+  border-radius: 16px;
+  border: 1.5px solid var(--os-stroke);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.65rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.office-setup-theme-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0, 113, 227, 0.28);
+}
+
+.office-setup-theme-card.is-active {
+  border-color: var(--os-blue);
+  box-shadow: 0 0 0 3px var(--os-blue-soft);
+}
+
+.office-setup-theme-swatch {
+  flex: 0 0 auto;
+  width: 2.65rem;
+  height: 2.65rem;
+  border-radius: 0.85rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.office-setup-theme-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.office-setup-theme-meta strong {
+  font-size: 0.88rem;
+  letter-spacing: -0.02em;
+  color: var(--os-ink);
+}
+
+.office-setup-theme-meta span {
+  font-size: 0.74rem;
+  color: var(--os-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.office-setup-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 1.1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--os-stroke);
+}
+
 .office-setup-feature-row {
   display: grid;
   gap: 0.75rem;

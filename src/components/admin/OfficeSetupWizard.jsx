@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   fetchPlatformSettings,
@@ -13,11 +13,25 @@ import {
 import {
   fetchAdminSiteAppearance,
   updateSiteAppearance,
+  uploadSiteAsset,
 } from '../../services/siteAppearanceApi.js';
 import { createRentalVehicle } from '../../services/fleetRentalApi.js';
+import {
+  getHomepageThemeById,
+  themeToAppearancePatch,
+} from '../../lib/homepage/homepageThemes.js';
 import EmailConnectWizard from './email/EmailConnectWizard.jsx';
 import FiscalProviderActivateWizard from './FiscalProviderActivateWizard.jsx';
 import '../../styles/office-setup-wizard.css';
+
+/** Curated presets for fast onboarding — full gallery lives in Σχεδιασμός σελίδων. */
+const ONBOARD_THEME_IDS = [
+  'aegean_classic',
+  'mediterranean_sun',
+  'island_minimal',
+  'luxury_coach',
+];
+const ONBOARD_THEMES = ONBOARD_THEME_IDS.map((id) => getHomepageThemeById(id));
 
 const STORAGE_KEY = 'poreiago_office_setup_v1';
 
@@ -111,12 +125,16 @@ export default function OfficeSetupWizard({
 
   const [brand, setBrand] = useState({
     accent: ACCENTS[0].color,
+    theme_id: ONBOARD_THEME_IDS[0],
+    logo_url: '',
     footer_brand_name: '',
     footer_contact_phone: '',
     footer_address: '',
     rent_office_name: '',
     hero_title: '',
   });
+  const [logoBusy, setLogoBusy] = useState(false);
+  const logoInputRef = useRef(null);
 
   const [pay, setPay] = useState({
     bank_name: '',
@@ -181,6 +199,8 @@ export default function OfficeSetupWizard({
             rent_office_name: appearance.rent_office_name || '',
             hero_title: appearance.hero_title || '',
             accent: appearance.accent_color || b.accent,
+            logo_url: appearance.logo_url || '',
+            theme_id: appearance.homepage_theme_id || b.theme_id,
           }));
         }
         const bank = payments?.bank_accounts?.find((a) => a.is_default) || payments?.bank_accounts?.[0];
@@ -242,15 +262,20 @@ export default function OfficeSetupWizard({
     setBusy(true);
     try {
       const name = brand.footer_brand_name.trim() || office.company_name.trim();
-      await updateSiteAppearance({
+      const theme = getHomepageThemeById(brand.theme_id);
+      const patch = {
+        ...themeToAppearancePatch(theme),
         footer_brand_name: name,
         footer_contact_email: office.support_email.trim(),
         footer_contact_phone: brand.footer_contact_phone.trim(),
         footer_address: brand.footer_address.trim(),
         rent_office_name: (brand.rent_office_name || name).trim(),
         hero_title: brand.hero_title.trim() || undefined,
-        accent_color: brand.accent,
-      });
+        // Keep accent if user fine-tuned after picking a theme
+        accent_color: brand.accent || theme.palette.primary,
+        logo_url: brand.logo_url || '',
+      };
+      await updateSiteAppearance(patch);
       setCompleted((c) => ({ ...c, brand: true }));
       return true;
     } catch (err) {
@@ -259,6 +284,43 @@ export default function OfficeSetupWizard({
     } finally {
       setBusy(false);
     }
+  };
+
+  const onLogoFile = async (file) => {
+    if (!file || !file.type?.startsWith('image/')) {
+      toast.error('Επιλέξτε εικόνα (JPG, PNG, WebP)');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error('Το logo πρέπει να είναι έως 8MB');
+      return;
+    }
+    setLogoBusy(true);
+    try {
+      const result = await uploadSiteAsset('logo', file);
+      const url = result?.url || result?.appearance?.logo_url || '';
+      if (!url) throw new Error('Δεν επιστράφηκε URL logo');
+      setBrand((b) => ({ ...b, logo_url: url }));
+      toast.success('Logo ανέβηκε');
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία ανεβάσματος logo');
+    } finally {
+      setLogoBusy(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
+
+  const selectTheme = (theme) => {
+    setBrand((b) => ({
+      ...b,
+      theme_id: theme.id,
+      accent: theme.palette.primary,
+    }));
+  };
+
+  const openHomepagePreview = () => {
+    const url = '/storefront?preview=1';
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const savePayments = async () => {
@@ -432,8 +494,8 @@ export default function OfficeSetupWizard({
                 <div className="office-setup-feature-row">
                   <div className="office-setup-feature">
                     <div className="office-setup-feature-icon">1</div>
-                    <strong>Ταυτότητα</strong>
-                    <p>Επωνυμία, επικοινωνία και ζώνη ώρας του γραφείου.</p>
+                    <strong>Ταυτότητα &amp; αρχική</strong>
+                    <p>Επωνυμία, logo, θέμα ιστοσελίδας και επικοινωνία.</p>
                   </div>
                   <div className="office-setup-feature">
                     <div
@@ -442,7 +504,7 @@ export default function OfficeSetupWizard({
                     >
                       2
                     </div>
-                    <strong>Email & πληρωμές</strong>
+                    <strong>Email &amp; πληρωμές</strong>
                     <p>Προσωπικό mailbox και IBAN χωρίς ticket σε hosting.</p>
                   </div>
                   <div className="office-setup-feature">
@@ -528,11 +590,94 @@ export default function OfficeSetupWizard({
                 <p className="office-setup-eyebrow">Εμφάνιση</p>
                 <h2 className="office-setup-title">Η πρώτη εντύπωση του brand σας</h2>
                 <p className="office-setup-subtitle">
-                  Χρώμα και στοιχεία επικοινωνίας για storefront και Rent app.
+                  Logo, θέμα αρχικής και στοιχεία επικοινωνίας. Περισσότερα αργότερα στο{' '}
+                  <strong>Σχεδιασμός σελίδων</strong>.
                 </p>
-                <div className="office-setup-grid cols-2">
+
+                <div className="office-setup-logo-row">
+                  <button
+                    type="button"
+                    className="office-setup-logo-drop"
+                    disabled={logoBusy || busy}
+                    onClick={() => logoInputRef.current?.click()}
+                    aria-label="Ανέβασμα logo"
+                  >
+                    {brand.logo_url ? (
+                      <img src={brand.logo_url} alt="" className="office-setup-logo-preview" />
+                    ) : (
+                      <span className="office-setup-logo-placeholder">
+                        <span className="office-setup-logo-plus">+</span>
+                        <span>{logoBusy ? 'Ανέβασμα…' : 'Logo'}</span>
+                      </span>
+                    )}
+                  </button>
+                  <div className="office-setup-logo-copy">
+                    <strong>Logo γραφείου</strong>
+                    <p>PNG ή JPG — εμφανίζεται στο header της αρχικής.</p>
+                    <div className="office-setup-logo-actions">
+                      <button
+                        type="button"
+                        className="office-setup-btn office-setup-btn-ghost"
+                        disabled={logoBusy || busy}
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        {brand.logo_url ? 'Αλλαγή' : 'Ανέβασμα'}
+                      </button>
+                      {brand.logo_url ? (
+                        <button
+                          type="button"
+                          className="office-setup-btn office-setup-btn-ghost"
+                          disabled={logoBusy || busy}
+                          onClick={() => setBrand((b) => ({ ...b, logo_url: '' }))}
+                        >
+                          Αφαίρεση
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    hidden
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void onLogoFile(file);
+                    }}
+                  />
+                </div>
+
+                <div className="office-setup-field" style={{ marginTop: '1.25rem' }}>
+                  <label>Θέμα αρχικής</label>
+                  <div className="office-setup-theme-grid">
+                    {ONBOARD_THEMES.map((theme) => {
+                      const active = brand.theme_id === theme.id;
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          className={`office-setup-theme-card${active ? ' is-active' : ''}`}
+                          onClick={() => selectTheme(theme)}
+                        >
+                          <span
+                            className="office-setup-theme-swatch"
+                            style={{
+                              background: `linear-gradient(135deg, ${theme.palette.primary} 0%, ${theme.palette.secondary} 55%, ${theme.palette.hero} 100%)`,
+                            }}
+                          />
+                          <span className="office-setup-theme-meta">
+                            <strong>{theme.nameEl || theme.name}</strong>
+                            <span>{theme.mood}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="office-setup-grid cols-2" style={{ marginTop: '0.85rem' }}>
                   <div className="office-setup-field" style={{ gridColumn: '1 / -1' }}>
-                    <label>Χρώμα έμφασης</label>
+                    <label>Χρώμα έμφασης (προαιρετικό)</label>
                     <div className="office-setup-swatches">
                       {ACCENTS.map((a) => (
                         <button
@@ -584,6 +729,19 @@ export default function OfficeSetupWizard({
                       />
                     </div>
                   )}
+                </div>
+
+                <div className="office-setup-preview-row">
+                  <button
+                    type="button"
+                    className="office-setup-btn office-setup-btn-ghost"
+                    onClick={openHomepagePreview}
+                  >
+                    Προεπισκόπηση αρχικής
+                  </button>
+                  <p className="office-setup-hint" style={{ margin: 0 }}>
+                    Ολοκληρώστε λεπτομέρειες αργότερα από Ρυθμίσεις → Σχεδιασμός σελίδων.
+                  </p>
                 </div>
               </>
             )}
