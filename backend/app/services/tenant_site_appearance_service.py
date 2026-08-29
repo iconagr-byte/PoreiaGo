@@ -297,7 +297,7 @@ def _platform_appearance_needs_persist(
 
 def _enrich_from_tenant(data: dict[str, Any], tenant: Tenant, settings: dict[str, Any]) -> dict[str, Any]:
     """Fill empty brand/logo from office legal name + branding settings."""
-    from app.services.tenant_modules import is_poreiago_platform_office
+    from app.services.tenant_modules import is_achillio_travel_office, is_poreiago_platform_office
 
     out = {**data}
     branding = settings.get("branding") if isinstance(settings.get("branding"), dict) else {}
@@ -310,11 +310,23 @@ def _enrich_from_tenant(data: dict[str, Any], tenant: Tenant, settings: dict[str
         office_name = "PoreiaGo"
 
     branding_logo = str(theme_cfg.get("logoUrl") or branding.get("logo_url") or "").strip()
-    if _is_platform_logo(branding_logo) or _looks_like_achillio_brand(branding_logo):
+    # Achillio Travel may legitimately use URLs/paths containing "achillio".
+    # Only scrub Achillio-looking logos away from non-Achillio offices.
+    achillio_office = is_achillio_travel_office(tenant)
+    if (not achillio_office) and (
+        _is_platform_logo(branding_logo) or _looks_like_achillio_brand(branding_logo)
+    ):
+        branding_logo = ""
+    elif achillio_office and _is_platform_logo(branding_logo):
         branding_logo = ""
 
     current_logo = str(out.get("logo_url") or "").strip()
-    if _is_platform_logo(current_logo) or _looks_like_achillio_brand(current_logo):
+    if (not achillio_office) and (
+        _is_platform_logo(current_logo) or _looks_like_achillio_brand(current_logo)
+    ):
+        out["logo_url"] = ""
+        current_logo = ""
+    elif achillio_office and _is_platform_logo(current_logo):
         out["logo_url"] = ""
         current_logo = ""
 

@@ -158,6 +158,17 @@ export async function fetchAdminSiteAppearance() {
     try {
       const data = await saasFetch('/api/v1/branding/site-appearance');
       const merged = finalizeAppearance(data);
+      // Keep a just-uploaded office-assets logo if the GET came back empty
+      // (persist race) or scrub wiped it before tenant_slug was present.
+      const cached = loadCached();
+      if (
+        !merged.logo_url &&
+        cached?.logo_url &&
+        (String(cached.logo_url).startsWith('/api/site/office-assets/') ||
+          String(cached.logo_url).startsWith('/api/site/assets/'))
+      ) {
+        merged.logo_url = cached.logo_url;
+      }
       cacheLocally(merged);
       return merged;
     } catch {
