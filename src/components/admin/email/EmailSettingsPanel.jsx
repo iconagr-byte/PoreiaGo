@@ -63,7 +63,7 @@ function Field({ id, label, hint, children }) {
 
 function syncErrorDisplay(error) {
   const msg = String(error || '');
-  if (/poreiago|intechs|34\.141\.98\.145|imap\.gmail\.com|whitelist|app password|forward/i.test(msg)) {
+  if (/poreiago|intechs|34\.141\.98\.145|169\.58\.199\.186|imap\.gmail\.com|whitelist|app password|forward/i.test(msg)) {
     return 'IMAP σύνδεση: timeout — δεν ήταν δυνατή η σύνδεση στον mail server (θύρα 993/143). Ελέγξτε host, ότι ο λογαριασμός IMAP είναι ενεργός, και ότι ο πάροχος email επιτρέπει εξωτερικές συνδέσεις.';
   }
   return msg;

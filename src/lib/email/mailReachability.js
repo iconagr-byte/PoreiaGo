@@ -1,6 +1,7 @@
 /** Shared copy when the app server cannot TCP to the customer mail host. */
 
-export const APP_MAIL_EGRESS_IP = '34.141.98.145';
+/** Outbound IP of the live API host (Contabo VPS — www/api.poreiago.com). Not the old GCP IP. */
+export const APP_MAIL_EGRESS_IP = '169.58.199.186';
 
 export function isMailTimeoutMessage(msg) {
   return /timeout|timed out|δεν ήταν δυνατή η σύνδεση|Errno 110|μη προσβάσιμος/i.test(
