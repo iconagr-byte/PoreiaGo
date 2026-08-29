@@ -4,7 +4,6 @@ import toast from 'react-hot-toast';
 import TemplatePicker from './homepage/TemplatePicker.jsx';
 import ThemeGallery from './homepage/ThemeGallery.jsx';
 import PageDesignWizardShell from './homepage/PageDesignWizardShell.jsx';
-import DesignLivePreview from './homepage/DesignLivePreview.jsx';
 import '../../styles/page-design-wizard.css';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
@@ -767,8 +766,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   });
   const canSwitchPages = availablePages.length > 1;
   const activePageMeta = DESIGN_PAGES.find((p) => p.id === designPage) || availablePages[0] || DESIGN_PAGES[0];
-  const showLivePreview = designPage === 'home' && ['overview', 'themes', 'general', 'header', 'hero'].includes(section);
-  const previewRefreshKey = form.homepage_theme_id + form.header_template + form.hero_template + form.accent_color;
   const onPlatformHost = isPlatformMarketingHost();
   const previewTo =
     onPlatformHost && activePageMeta.platformPreviewTo
@@ -973,8 +970,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   }
 
   const sectionContent = (
-    <div className={`page-design-wizard__split${showLivePreview ? ' has-preview' : ''}`}>
-      <div className="space-y-6 min-w-0">
+    <div className="space-y-6 min-w-0">
         {designPage === 'rent' ? (
           <>
             {section === 'overview' && (
@@ -1768,10 +1764,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
           </form>
         )}
       </div>
-      {showLivePreview ? (
-        <DesignLivePreview previewTo={previewTo} refreshKey={previewRefreshKey} />
-      ) : null}
-    </div>
   );
 
   return (
