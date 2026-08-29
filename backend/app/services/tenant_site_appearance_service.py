@@ -444,6 +444,53 @@ class TenantSiteAppearanceService:
                 "tenant_slug": getattr(tenant, "slug", None),
             }
 
+    async def force_set_media_url(
+        self,
+        tenant_id: UUID,
+        *,
+        logo_url: str | None = None,
+        hero_image_url: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Minimal logo/hero URL write — prune poison, set short URL, skip heavy merges.
+
+        Used by multipart upload after disk save so Achillio Travel logos survive
+        even when a full appearance patch previously blew up settings_json.
+        """
+        tenant = await self._get_tenant(tenant_id)
+        settings = _prune_oversized_data_urls_deep(_parse_settings(tenant.settings_json))
+        raw = settings.get("site_appearance")
+        appearance = _prune_oversized_media(
+            {**DEFAULT_SITE_APPEARANCE, **(raw if isinstance(raw, dict) else {})}
+        )
+        if logo_url is not None:
+            appearance["logo_url"] = str(logo_url).strip()
+        if hero_image_url is not None:
+            appearance["hero_image_url"] = str(hero_image_url).strip()
+        # Do not run platform Achillio scrub here — upload already scoped to JWT tenant.
+        appearance.pop("display_name", None)
+        appearance.pop("storage_source", None)
+        appearance.pop("tenant_slug", None)
+        settings["site_appearance"] = appearance
+        branding = settings.get("branding") if isinstance(settings.get("branding"), dict) else {}
+        if logo_url is not None:
+            branding = {**branding, "logo_url": str(logo_url).strip()}
+            settings["branding"] = branding
+            theme = settings.get("theme") if isinstance(settings.get("theme"), dict) else {}
+            if theme:
+                settings["theme"] = {**theme, "logoUrl": str(logo_url).strip()}
+        tenant.settings_json = _safe_settings_json(settings)
+        await self._session.flush()
+        try:
+            return await self.get_appearance(tenant_id)
+        except Exception:
+            return {
+                **DEFAULT_SITE_APPEARANCE,
+                **appearance,
+                "storage_source": "postgres",
+                "tenant_slug": getattr(tenant, "slug", None),
+            }
+
     async def _get_tenant(self, tenant_id: UUID) -> Tenant:
         result = await self._session.execute(select(Tenant).where(Tenant.id == tenant_id))
         tenant = result.scalar_one_or_none()

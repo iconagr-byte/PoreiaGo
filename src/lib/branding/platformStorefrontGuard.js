@@ -45,6 +45,11 @@ export function isAchillioTravelAppearance(appearance = {}) {
 export function scrubAchillioBrandForPlatformHost(appearance = {}, opts = {}) {
   const force = Boolean(opts.force);
   const slug = appearance?.tenant_slug;
+  // Real customer offices (incl. Achillio Travel) keep branding even when the
+  // admin UI runs on www.poreiago.com — only scrub platform seed / marketing.
+  if (!force && slug && !isPoreiagoPlatformTenantSlug(slug)) {
+    return appearance;
+  }
   const shouldScrub =
     force ||
     isPlatformMarketingHost() ||

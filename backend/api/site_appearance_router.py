@@ -536,18 +536,31 @@ async def get_public_checkout_settings(request: Request):
 
 
 @router.get("/api/site/appearance", response_model=SiteAppearanceResponse)
-async def get_public_site_appearance(host: str | None = Query(default=None)):
+async def get_public_site_appearance(
+    request: Request,
+    host: str | None = Query(default=None),
+):
     purge_mistaken_platform_logo()
 
+    # Prefer explicit ?host=, else the browser Host (custom domains like achilliotravel.com).
+    effective_host = (host or "").strip() or (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or ""
+    ).split(",")[0].strip()
+    if effective_host:
+        # Strip port if present.
+        effective_host = effective_host.split(":")[0].strip().lower()
+
     # Prefer tenant homepage from Postgres when Host maps to an office.
-    if host:
+    if effective_host:
         try:
             from app.core.database import AsyncSessionLocal
             from olympus.tenant.domain_resolver import DomainResolver
             from app.services.tenant_site_appearance_service import TenantSiteAppearanceService
 
             async with AsyncSessionLocal() as session:
-                resolved = await DomainResolver(session).resolve(host)
+                resolved = await DomainResolver(session).resolve(effective_host)
                 if resolved:
                     data = await TenantSiteAppearanceService(session).get_appearance(resolved.tenant_id)
                     # Drop internal keys not in response model.
@@ -557,7 +570,7 @@ async def get_public_site_appearance(host: str | None = Query(default=None)):
             pass
 
         # Custom / office host without DB row — never serve PoreiaGo platform logo.
-        if not _is_platform_host(host):
+        if not _is_platform_host(effective_host):
             data = {**DEFAULT_SITE_APPEARANCE, **_read_appearance()}
             logo = str(data.get("logo_url") or "")
             if _is_platform_placeholder_logo(logo):
@@ -568,7 +581,7 @@ async def get_public_site_appearance(host: str | None = Query(default=None)):
     # Platform marketing hosts: never auto-fill logo from the shared uploads/site
     # file store. That path resurrected the Achillion Travel mark after logo_url
     # was cleared in JSON. Explicit admin uploads still set logo_url on write.
-    if not _is_platform_host(host) and not data.get("logo_url"):
+    if not _is_platform_host(effective_host) and not data.get("logo_url"):
         api_logo = _asset_api_url("logo")
         if api_logo:
             data["logo_url"] = api_logo
@@ -576,7 +589,7 @@ async def get_public_site_appearance(host: str | None = Query(default=None)):
         api_hero = _asset_api_url("hero")
         if api_hero:
             data["hero_image_url"] = api_hero
-    if _is_platform_host(host):
+    if _is_platform_host(effective_host):
         data = _scrub_achillio_from_platform_appearance(data)
     return SiteAppearanceResponse(**data)
 

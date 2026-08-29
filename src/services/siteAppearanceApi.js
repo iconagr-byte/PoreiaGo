@@ -250,12 +250,14 @@ export async function uploadSiteAsset(kind, file) {
     }
     if (!res.ok) await parseError(res);
     const data = await res.json();
-    if (data.appearance) {
-      const merged = finalizeAppearance(data.appearance);
-      if (data.url) {
-        const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
-        merged[key] = data.url;
-      }
+    if (data.appearance || data.url) {
+      const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
+      const merged = finalizeAppearance({
+        ...(data.appearance || {}),
+        [key]: data.url || data.appearance?.[key] || '',
+      });
+      // Always pin the uploaded URL after finalize (marketing-host scrub must not win).
+      if (data.url) merged[key] = data.url;
       cacheLocally(merged);
       return { ...data, appearance: merged };
     }
