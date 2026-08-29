@@ -1028,7 +1028,12 @@ export default function FleetRentalPanel({
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div
+                    className="flex flex-wrap gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
                     <button
                       type="button"
                       className="text-xs font-bold text-teal-800"
