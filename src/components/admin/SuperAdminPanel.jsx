@@ -183,14 +183,31 @@ export default function SuperAdminPanel() {
         }
         setTenants(items);
         setTotal(listResult.list.total ?? items.length);
+      } else if (ovResult.ok && Array.isArray(ovResult.ov?.recent_tenants) && ovResult.ov.recent_tenants.length) {
+        // Partial recovery: show recent offices from overview when list endpoint fails.
+        const recent = ovResult.ov.recent_tenants.map((t) => ({
+          id: t.id,
+          slug: t.slug,
+          legal_name: t.legal_name || t.slug,
+          plan: t.plan || 'starter',
+          is_active: t.is_active !== false,
+          subscription: t.subscription_status
+            ? { status: t.subscription_status, plan: t.plan || 'starter' }
+            : null,
+          created_at: t.created_at,
+        }));
+        setTenants(recent);
+        setTotal(recent.length);
       } else {
         setTenants([]);
         setTotal(0);
       }
 
-      const firstErr = !listResult.ok ? listResult.err : !ovResult.ok ? ovResult.err : null;
-      if (firstErr) {
-        toast.error(firstErr.message || 'Αποτυχία φόρτωσης γραφείων');
+      const msgs = [];
+      if (!listResult.ok) msgs.push(listResult.err?.message || 'Λίστα γραφείων');
+      if (!ovResult.ok) msgs.push(ovResult.err?.message || 'Επισκόπηση');
+      if (msgs.length) {
+        toast.error(msgs.join(' · '));
       }
     } catch (e) {
       toast.error(e.message || 'Αποτυχία φόρτωσης γραφείων');
