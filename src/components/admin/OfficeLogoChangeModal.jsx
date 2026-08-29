@@ -11,9 +11,13 @@ import { resolveOfficeBrand } from '../../lib/branding/officeBrand.js';
 
 export const OFFICE_BRAND_CHANGED_EVENT = 'poreiago-office-brand-changed';
 
-export function notifyOfficeBrandChanged() {
+export function notifyOfficeBrandChanged(patch = null) {
   try {
-    window.dispatchEvent(new CustomEvent(OFFICE_BRAND_CHANGED_EVENT));
+    window.dispatchEvent(
+      new CustomEvent(OFFICE_BRAND_CHANGED_EVENT, {
+        detail: patch && typeof patch === 'object' ? patch : null,
+      }),
+    );
   } catch {
     /* ignore */
   }
@@ -175,7 +179,15 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
       }
       setAppearance(next);
       appearanceRef.current = next;
-      notifyOfficeBrandChanged();
+      notifyOfficeBrandChanged({
+        logo_url: url,
+        footer_brand_name: next.footer_brand_name || brandNameRef.current,
+        rent_office_name: next.rent_office_name,
+        tenant_slug: next.tenant_slug,
+        logo_height_px: next.logo_height_px,
+        logo_max_width_px: next.logo_max_width_px,
+        logo_show_name: next.logo_show_name,
+      });
       onSaved?.();
       toast.success('Το λογότυπο ενημερώθηκε');
     } catch (err) {
@@ -198,7 +210,11 @@ export default function OfficeLogoChangeModal({ open, onClose, onSaved }) {
       const next = result?.appearance || { ...appearanceRef.current, logo_url: '' };
       setAppearance(next);
       appearanceRef.current = next;
-      notifyOfficeBrandChanged();
+      notifyOfficeBrandChanged({
+        logo_url: '',
+        footer_brand_name: next.footer_brand_name,
+        tenant_slug: next.tenant_slug,
+      });
       onSaved?.();
       toast.success('Το λογότυπο αφαιρέθηκε');
     } catch (err) {
