@@ -10,7 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import redis.asyncio as aioredis
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import bindparam, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -140,10 +140,29 @@ class PlatformAdminService:
         }
 
     async def overview(self) -> dict:
-        # Heal lagging Contabo schemas before any subscription join/load.
-        await _heal_subscription_plan_column(self._session)
-        billing = await BillingService(self._session).platform_analytics()
-        health = await self.health()
+        billing = {
+            "mrr_cents": 0,
+            "mrr_eur": 0.0,
+            "total_tenants": 0,
+            "active_tenants": 0,
+            "trial_tenants": 0,
+            "past_due_tenants": 0,
+            "churn_rate_hint": 0.0,
+        }
+        try:
+            billing = await BillingService(self._session).platform_analytics()
+        except Exception:
+            logger.exception("platform overview billing failed")
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
+
+        health = {"status": "unknown"}
+        try:
+            health = await self.health()
+        except Exception:
+            logger.exception("platform overview health failed")
 
         recent_tenants: list[dict] = []
         try:
@@ -154,14 +173,17 @@ class PlatformAdminService:
                 .limit(5),
             )
             recent_rows = list(recent.scalars().all())
-            subs = await self._safe_subscriptions_by_tenant_ids([t.id for t in recent_rows])
-            recent_tenants = [self._tenant_summary(t, subscription=subs.get(t.id)) for t in recent_rows]
+            subs = await self._safe_subscription_maps([t.id for t in recent_rows])
+            recent_tenants = [
+                self._tenant_summary(t, subscription=subs.get(t.id)) for t in recent_rows
+            ]
         except Exception:
             logger.exception("platform overview recent_tenants failed")
             try:
                 await self._session.rollback()
             except Exception:
                 pass
+            recent_tenants = await self._list_tenants_raw_fallback(limit=5)
 
         await _rls_off(self._session)
         total_users = 0
@@ -188,56 +210,172 @@ class PlatformAdminService:
                 pass
 
         return {
-            "health_status": health["status"],
+            "health_status": health.get("status") or "unknown",
             "billing": billing,
             "total_users": total_users,
             "total_bookings": total_bookings,
             "recent_tenants": recent_tenants,
         }
 
-    def _tenant_summary(self, tenant: Tenant, *, subscription: Subscription | None = None) -> dict:
-        sub = subscription
+    def _tenant_summary(self, tenant: Tenant, *, subscription: dict | None = None) -> dict:
+        sub = subscription or {}
+        plan = tenant.plan.value if hasattr(tenant.plan, "value") else str(tenant.plan or "starter")
         return {
             "id": str(tenant.id),
-            "slug": tenant.slug,
-            "legal_name": tenant.legal_name,
-            "plan": tenant.plan.value if hasattr(tenant.plan, "value") else str(tenant.plan),
-            "is_active": tenant.is_active,
-            "subscription_status": sub.status.value if sub else None,
+            "slug": tenant.slug or "",
+            "legal_name": tenant.legal_name or tenant.slug or "Office",
+            "plan": plan,
+            "is_active": bool(tenant.is_active),
+            "subscription_status": sub.get("status"),
             "created_at": tenant.created_at.isoformat() if tenant.created_at else None,
         }
 
-    async def _safe_subscriptions_by_tenant_ids(
+    async def _safe_subscription_maps(
         self,
         tenant_ids: list[UUID],
-    ) -> dict[UUID, Subscription]:
-        """Load subscriptions without crashing when Contabo schema lags."""
+    ) -> dict[UUID, dict]:
+        """
+        Load subscription fields via raw SQL — never ORM SELECT *.
+
+        Contabo DBs often miss subscriptions.plan; ORM mapping then 500s.
+        """
         if not tenant_ids:
             return {}
         try:
             result = await self._session.execute(
-                select(Subscription).where(Subscription.tenant_id.in_(tenant_ids)),
+                text(
+                    """
+                    SELECT tenant_id,
+                           status,
+                           stripe_subscription_id,
+                           current_period_end,
+                           trial_ends_at,
+                           COALESCE(base_amount_cents, 0) AS base_amount_cents,
+                           COALESCE(cancel_at_period_end, false) AS cancel_at_period_end
+                    FROM subscriptions
+                    WHERE tenant_id IN :ids
+                    """
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": list(tenant_ids)},
             )
-            return {s.tenant_id: s for s in result.scalars().all()}
+            out: dict[UUID, dict] = {}
+            for row in result.mappings().all():
+                tid = row["tenant_id"]
+                if not isinstance(tid, UUID):
+                    tid = UUID(str(tid))
+                out[tid] = {
+                    "status": str(row["status"] or ""),
+                    "plan": "starter",
+                    "stripe_subscription_id": row["stripe_subscription_id"],
+                    "current_period_end": row["current_period_end"],
+                    "trial_ends_at": row["trial_ends_at"],
+                    "base_amount_cents": int(row["base_amount_cents"] or 0),
+                    "cancel_at_period_end": bool(row["cancel_at_period_end"]),
+                }
+            return out
         except Exception:
-            logger.exception("subscription load failed — healing plan column and retrying")
+            logger.exception("raw subscription load failed")
             try:
                 await self._session.rollback()
             except Exception:
                 pass
-            await _heal_subscription_plan_column(self._session)
+            # Best-effort heal, then retry once.
+            try:
+                await _heal_subscription_plan_column(self._session)
+            except Exception:
+                pass
             try:
                 result = await self._session.execute(
-                    select(Subscription).where(Subscription.tenant_id.in_(tenant_ids)),
+                    text(
+                        """
+                        SELECT tenant_id, status
+                        FROM subscriptions
+                        WHERE tenant_id IN :ids
+                        """
+                    ).bindparams(bindparam("ids", expanding=True)),
+                    {"ids": list(tenant_ids)},
                 )
-                return {s.tenant_id: s for s in result.scalars().all()}
+                out = {}
+                for row in result.mappings().all():
+                    tid = row["tenant_id"]
+                    if not isinstance(tid, UUID):
+                        tid = UUID(str(tid))
+                    out[tid] = {
+                        "status": str(row["status"] or ""),
+                        "plan": "starter",
+                        "stripe_subscription_id": None,
+                        "current_period_end": None,
+                        "trial_ends_at": None,
+                        "base_amount_cents": 0,
+                        "cancel_at_period_end": False,
+                    }
+                return out
             except Exception:
-                logger.exception("subscription load still failing after heal")
+                logger.exception("raw subscription load still failing")
                 try:
                     await self._session.rollback()
                 except Exception:
                     pass
                 return {}
+
+    async def _list_tenants_raw_fallback(self, *, limit: int = 50, offset: int = 0) -> list[dict]:
+        """Last-resort list when Tenant ORM mapping cannot load."""
+        try:
+            result = await self._session.execute(
+                text(
+                    """
+                    SELECT id,
+                           slug,
+                           COALESCE(NULLIF(BTRIM(legal_name), ''), slug, 'Office') AS legal_name,
+                           vat_number,
+                           COALESCE(NULLIF(BTRIM(subdomain), ''), slug, 'office') AS subdomain,
+                           custom_domain,
+                           COALESCE(plan, 'starter') AS plan,
+                           COALESCE(is_active, true) AS is_active,
+                           stripe_customer_id,
+                           created_at,
+                           updated_at,
+                           suspended_at,
+                           suspended_reason
+                    FROM tenants
+                    ORDER BY created_at DESC NULLS LAST
+                    OFFSET :offset LIMIT :limit
+                    """
+                ),
+                {"offset": offset, "limit": limit},
+            )
+            items = []
+            for row in result.mappings().all():
+                items.append(
+                    {
+                        "id": row["id"],
+                        "slug": row["slug"] or "",
+                        "legal_name": row["legal_name"] or row["slug"] or "Office",
+                        "vat_number": row["vat_number"],
+                        "subdomain": row["subdomain"] or row["slug"] or "office",
+                        "custom_domain": row["custom_domain"],
+                        "plan": str(row["plan"] or "starter"),
+                        "is_active": bool(row["is_active"]),
+                        "stripe_customer_id": row["stripe_customer_id"],
+                        "created_at": row["created_at"],
+                        "updated_at": row["updated_at"],
+                        "subscription": None,
+                        "contact_email": None,
+                        "contact_phone": None,
+                        "admin_notes": None,
+                        "suspended_at": row["suspended_at"],
+                        "suspended_reason": row["suspended_reason"],
+                        "domain_in_registry": bool(row["custom_domain"]),
+                    }
+                )
+            return items
+        except Exception:
+            logger.exception("raw tenants fallback failed")
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
+            return []
 
     async def list_tenants(
         self,
@@ -249,64 +387,84 @@ class PlatformAdminService:
         plan: TenantPlan | None = None,
         subscription_status: SubscriptionStatus | None = None,
     ) -> tuple[list[dict], int]:
-        await _heal_subscription_plan_column(self._session)
         limit = min(max(limit, 1), 100)
-        # Never selectinload(subscription): missing subscriptions.plan → HTTP 500.
-        stmt = select(Tenant).options(*_tenant_noload_options())
-        count_stmt = select(func.count()).select_from(Tenant)
+        try:
+            # Never selectinload(subscription): missing subscriptions.plan → HTTP 500.
+            stmt = select(Tenant).options(*_tenant_noload_options())
+            count_stmt = select(func.count()).select_from(Tenant)
 
-        if q:
-            pattern = f"%{q.strip()}%"
-            filt = or_(
-                Tenant.slug.ilike(pattern),
-                Tenant.legal_name.ilike(pattern),
-                Tenant.subdomain.ilike(pattern),
+            if q:
+                pattern = f"%{q.strip()}%"
+                filt = or_(
+                    Tenant.slug.ilike(pattern),
+                    Tenant.legal_name.ilike(pattern),
+                    Tenant.subdomain.ilike(pattern),
+                )
+                stmt = stmt.where(filt)
+                count_stmt = count_stmt.where(filt)
+
+            if is_active is not None:
+                stmt = stmt.where(Tenant.is_active.is_(is_active))
+                count_stmt = count_stmt.where(Tenant.is_active.is_(is_active))
+
+            if plan is not None:
+                stmt = stmt.where(Tenant.plan == plan)
+                count_stmt = count_stmt.where(Tenant.plan == plan)
+
+            if subscription_status is not None:
+                # Status-only join — do not pull Subscription ORM entities.
+                stmt = stmt.join(Subscription, Subscription.tenant_id == Tenant.id).where(
+                    Subscription.status == subscription_status,
+                )
+                count_stmt = count_stmt.join(
+                    Subscription, Subscription.tenant_id == Tenant.id,
+                ).where(Subscription.status == subscription_status)
+
+            total = int(await self._session.scalar(count_stmt) or 0)
+            result = await self._session.execute(
+                stmt.order_by(Tenant.created_at.desc()).offset(offset).limit(limit),
             )
-            stmt = stmt.where(filt)
-            count_stmt = count_stmt.where(filt)
-
-        if is_active is not None:
-            stmt = stmt.where(Tenant.is_active.is_(is_active))
-            count_stmt = count_stmt.where(Tenant.is_active.is_(is_active))
-
-        if plan is not None:
-            stmt = stmt.where(Tenant.plan == plan)
-            count_stmt = count_stmt.where(Tenant.plan == plan)
-
-        if subscription_status is not None:
-            stmt = stmt.join(Subscription, Subscription.tenant_id == Tenant.id).where(
-                Subscription.status == subscription_status,
-            )
-            count_stmt = count_stmt.join(
-                Subscription, Subscription.tenant_id == Tenant.id,
-            ).where(Subscription.status == subscription_status)
-
-        total = int(await self._session.scalar(count_stmt) or 0)
-        result = await self._session.execute(
-            stmt.order_by(Tenant.created_at.desc()).offset(offset).limit(limit),
-        )
-        tenants = list(result.scalars().unique().all())
-        subs = await self._safe_subscriptions_by_tenant_ids([t.id for t in tenants])
-        items = [
-            self._tenant_detail(t, include_counts=False, subscription=subs.get(t.id))
-            for t in tenants
-        ]
-        return items, total
+            tenants = list(result.scalars().unique().all())
+            subs = await self._safe_subscription_maps([t.id for t in tenants])
+            items = [
+                self._tenant_detail(t, include_counts=False, subscription=subs.get(t.id))
+                for t in tenants
+            ]
+            return items, total
+        except Exception:
+            logger.exception("ORM list_tenants failed — using raw SQL fallback")
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
+            items = await self._list_tenants_raw_fallback(limit=limit, offset=offset)
+            return items, len(items)
 
     async def get_tenant(self, tenant_id: UUID) -> dict | None:
-        await _heal_subscription_plan_column(self._session)
-        result = await self._session.execute(
-            select(Tenant)
-            .options(*_tenant_noload_options())
-            .where(Tenant.id == tenant_id),
-        )
-        tenant = result.scalar_one_or_none()
-        if not tenant:
+        try:
+            result = await self._session.execute(
+                select(Tenant)
+                .options(*_tenant_noload_options())
+                .where(Tenant.id == tenant_id),
+            )
+            tenant = result.scalar_one_or_none()
+            if not tenant:
+                return None
+            return await self._tenant_detail_async(tenant)
+        except Exception:
+            logger.exception("get_tenant ORM failed for %s", tenant_id)
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
+            rows = await self._list_tenants_raw_fallback(limit=200, offset=0)
+            for row in rows:
+                if str(row.get("id")) == str(tenant_id):
+                    return row
             return None
-        return await self._tenant_detail_async(tenant)
 
     async def _tenant_detail_async(self, tenant: Tenant) -> dict:
-        subs = await self._safe_subscriptions_by_tenant_ids([tenant.id])
+        subs = await self._safe_subscription_maps([tenant.id])
         detail = self._tenant_detail(
             tenant,
             include_counts=True,
@@ -330,6 +488,10 @@ class PlatformAdminService:
             )
         except Exception:
             logger.exception("tenant detail counts failed for %s", tenant.id)
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
             detail["user_count"] = detail.get("user_count") or 0
             detail["booking_count"] = detail.get("booking_count") or 0
         return detail
@@ -339,20 +501,38 @@ class PlatformAdminService:
         tenant: Tenant,
         *,
         include_counts: bool,
-        subscription: Subscription | None = None,
+        subscription: dict | Subscription | None = None,
     ) -> dict:
-        sub = subscription
+        sub_map: dict | None
+        if isinstance(subscription, Subscription):
+            sub_map = {
+                "status": subscription.status.value,
+                "plan": (
+                    subscription.plan.value
+                    if hasattr(subscription.plan, "value")
+                    else str(subscription.plan or "starter")
+                ),
+                "stripe_subscription_id": subscription.stripe_subscription_id,
+                "current_period_end": subscription.current_period_end,
+                "trial_ends_at": subscription.trial_ends_at,
+                "base_amount_cents": subscription.base_amount_cents,
+                "cancel_at_period_end": subscription.cancel_at_period_end,
+            }
+        else:
+            sub_map = subscription
+
         ops = _ops_from_settings(_parse_settings(tenant.settings_json))
-        plan_value = tenant.plan.value if hasattr(tenant.plan, "value") else str(tenant.plan)
+        plan_value = tenant.plan.value if hasattr(tenant.plan, "value") else str(tenant.plan or "starter")
+        slug = (tenant.slug or "").strip() or "office"
         out = {
             "id": tenant.id,
-            "slug": tenant.slug,
-            "legal_name": tenant.legal_name,
+            "slug": slug,
+            "legal_name": (tenant.legal_name or "").strip() or slug,
             "vat_number": tenant.vat_number,
-            "subdomain": tenant.subdomain,
+            "subdomain": (tenant.subdomain or "").strip() or slug,
             "custom_domain": tenant.custom_domain,
             "plan": plan_value,
-            "is_active": tenant.is_active,
+            "is_active": bool(tenant.is_active),
             "stripe_customer_id": tenant.stripe_customer_id,
             "created_at": tenant.created_at,
             "updated_at": tenant.updated_at,
@@ -364,15 +544,15 @@ class PlatformAdminService:
             "suspended_reason": tenant.suspended_reason,
             "domain_in_registry": bool(tenant.custom_domain),
         }
-        if sub:
+        if sub_map:
             out["subscription"] = {
-                "status": sub.status.value,
-                "plan": sub.plan.value if hasattr(sub.plan, "value") else str(sub.plan or plan_value),
-                "stripe_subscription_id": sub.stripe_subscription_id,
-                "current_period_end": sub.current_period_end,
-                "trial_ends_at": sub.trial_ends_at,
-                "base_amount_cents": sub.base_amount_cents,
-                "cancel_at_period_end": sub.cancel_at_period_end,
+                "status": str(sub_map.get("status") or "trialing"),
+                "plan": str(sub_map.get("plan") or plan_value),
+                "stripe_subscription_id": sub_map.get("stripe_subscription_id"),
+                "current_period_end": sub_map.get("current_period_end"),
+                "trial_ends_at": sub_map.get("trial_ends_at"),
+                "base_amount_cents": int(sub_map.get("base_amount_cents") or 0),
+                "cancel_at_period_end": bool(sub_map.get("cancel_at_period_end")),
             }
         if include_counts:
             out["user_count"] = 0

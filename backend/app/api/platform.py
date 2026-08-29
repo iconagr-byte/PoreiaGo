@@ -36,7 +36,19 @@ router.include_router(olympus_tls_router)
 
 
 def _tenant_model(data: dict) -> PlatformTenantSummary:
-    return PlatformTenantSummary(**data)
+    payload = dict(data or {})
+    slug = str(payload.get("slug") or "office").strip() or "office"
+    payload["slug"] = slug
+    payload["legal_name"] = str(payload.get("legal_name") or "").strip() or slug
+    payload["subdomain"] = str(payload.get("subdomain") or "").strip() or slug
+    payload["plan"] = str(payload.get("plan") or "starter")
+    payload["is_active"] = bool(payload.get("is_active", True))
+    payload.setdefault("domain_in_registry", bool(payload.get("custom_domain")))
+    try:
+        return PlatformTenantSummary(**payload)
+    except Exception as exc:
+        # Never 500 the whole list because one row fails validation.
+        raise ValueError(f"Invalid tenant payload for {slug}: {exc}") from exc
 
 
 @router.get("/health", response_model=PlatformHealthResponse)
@@ -53,9 +65,33 @@ async def platform_overview(
     db: Annotated[AsyncSession, Depends(get_platform_db)],
     _: Annotated[None, Depends(require_superadmin)],
 ):
-    data = await PlatformAdminService(db).overview()
-    data["billing"] = BillingAnalyticsResponse(**data["billing"])
-    return PlatformOverviewResponse(**data)
+    try:
+        data = await PlatformAdminService(db).overview()
+        try:
+            data["billing"] = BillingAnalyticsResponse(**(data.get("billing") or {}))
+        except Exception:
+            data["billing"] = BillingAnalyticsResponse(
+                mrr_cents=0,
+                mrr_eur=0.0,
+                total_tenants=0,
+                active_tenants=0,
+                trial_tenants=0,
+                past_due_tenants=0,
+                churn_rate_hint=0.0,
+            )
+        return PlatformOverviewResponse(
+            health_status=str(data.get("health_status") or "unknown"),
+            billing=data["billing"],
+            total_users=int(data.get("total_users") or 0),
+            total_bookings=int(data.get("total_bookings") or 0),
+            recent_tenants=list(data.get("recent_tenants") or []),
+        )
+    except Exception as exc:
+        # Soft-fail — Super Admin UI must still open.
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Platform overview unavailable: {exc}",
+        ) from exc
 
 
 @router.get("/billing/analytics", response_model=BillingAnalyticsResponse)
@@ -93,20 +129,32 @@ async def list_tenants(
         status_enum = SubscriptionStatus(subscription_status) if subscription_status else None
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    items, total = await PlatformAdminService(db).list_tenants(
-        offset=offset,
-        limit=limit,
-        q=q,
-        is_active=is_active,
-        plan=plan_enum,
-        subscription_status=status_enum,
-    )
-    return PlatformTenantListResponse(
-        items=[_tenant_model(i) for i in items],
-        total=total,
-        offset=offset,
-        limit=limit,
-    )
+    try:
+        items, total = await PlatformAdminService(db).list_tenants(
+            offset=offset,
+            limit=limit,
+            q=q,
+            is_active=is_active,
+            plan=plan_enum,
+            subscription_status=status_enum,
+        )
+        safe_items: list[PlatformTenantSummary] = []
+        for row in items:
+            try:
+                safe_items.append(_tenant_model(row))
+            except Exception:
+                continue
+        return PlatformTenantListResponse(
+            items=safe_items,
+            total=total,
+            offset=offset,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Tenant list unavailable: {exc}",
+        ) from exc
 
 
 @router.get("/tenants/{tenant_id}", response_model=PlatformTenantSummary)
