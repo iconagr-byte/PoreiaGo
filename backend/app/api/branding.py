@@ -220,13 +220,13 @@ async def upload_site_appearance_asset(
     persist_warning = None
     appearance: dict = {}
     svc = TenantSiteAppearanceService(db)
+    patch = {key: saved["url"]}
 
     async def _persist_url() -> dict:
-        return await svc.update_appearance(
-            tenant_id,
-            {key: saved["url"]},
-            actor_email=None,
-        )
+        # Prefer minimal writer — full update_appearance can choke on legacy bags.
+        if kind_norm == "logo":
+            return await svc.force_set_media_url(tenant_id, logo_url=saved["url"])
+        return await svc.force_set_media_url(tenant_id, hero_image_url=saved["url"])
 
     try:
         appearance = await _persist_url()
@@ -244,8 +244,12 @@ async def upload_site_appearance_asset(
         except Exception:
             logger.exception("Rollback after appearance persist failure")
         try:
-            appearance = await _persist_url()
-            persist_warning = f"retried_after_{type(exc).__name__}"
+            appearance = await svc.update_appearance(
+                tenant_id,
+                patch,
+                actor_email=None,
+            )
+            persist_warning = f"retried_update_after_{type(exc).__name__}"
         except Exception as retry_exc:
             logger.exception(
                 "Retry persist office asset URL failed for tenant %s kind=%s",
