@@ -59,8 +59,25 @@ def _prune_oversized_data_urls_deep(value: Any) -> Any:
     return value
 
 
+_MAX_SETTINGS_STRING = 20_000
+
+
+def _prune_huge_strings(value: Any, *, max_len: int = _MAX_SETTINGS_STRING) -> Any:
+    """Drop/truncate pathological strings (inline base64 HTML, etc.) that poison writes."""
+    if isinstance(value, dict):
+        return {k: _prune_huge_strings(v, max_len=max_len) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_prune_huge_strings(v, max_len=max_len) for v in value]
+    if isinstance(value, str) and len(value) > max_len:
+        head = value[:80].lower()
+        if value.startswith("data:") or "base64" in head or ";base64," in value[:200]:
+            return ""
+        return value[:max_len]
+    return value
+
+
 def _safe_settings_json(settings: dict[str, Any]) -> str:
-    cleaned = _prune_oversized_data_urls_deep(settings)
+    cleaned = _prune_huge_strings(_prune_oversized_data_urls_deep(settings))
     return json.dumps(cleaned, ensure_ascii=False, default=str)
 
 DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
@@ -396,14 +413,26 @@ class TenantSiteAppearanceService:
         patch = _prune_oversized_media(dict(patch or {}))
         updated = _scrub_platform_placeholders({**DEFAULT_SITE_APPEARANCE, **base, **patch})
         updated = _sanitize_poreiago_platform_appearance(updated, tenant)
-        # Keep an explicit non-Achillio upload even if legal_name still drifted.
+        # Keep an explicit upload — Achillio Travel logos may contain "achillio" in the path.
+        from app.services.tenant_modules import is_achillio_travel_office
+
         if "logo_url" in patch:
             explicit = str(patch.get("logo_url") or "").strip()
-            if explicit and not _looks_like_achillio_brand(explicit):
+            if explicit and (
+                is_achillio_travel_office(tenant)
+                or not _looks_like_achillio_brand(explicit)
+                or explicit.startswith("/api/site/office-assets/")
+                or explicit.startswith("/api/site/assets/")
+            ):
                 updated["logo_url"] = explicit
         if "hero_image_url" in patch:
             explicit_hero = str(patch.get("hero_image_url") or "").strip()
-            if explicit_hero and not _looks_like_achillio_brand(explicit_hero):
+            if explicit_hero and (
+                is_achillio_travel_office(tenant)
+                or not _looks_like_achillio_brand(explicit_hero)
+                or explicit_hero.startswith("/api/site/office-assets/")
+                or explicit_hero.startswith("/api/site/assets/")
+            ):
                 updated["hero_image_url"] = explicit_hero
         # Clamp logo sizing if present.
         try:
@@ -426,12 +455,58 @@ class TenantSiteAppearanceService:
         settings["site_appearance"] = updated
         # Also strip legacy data: blobs under branding/theme — they poison the
         # whole settings_json column and make logo uploads return HTTP 500.
-        settings = _prune_oversized_data_urls_deep(settings)
+        settings = _prune_huge_strings(_prune_oversized_data_urls_deep(settings))
         if isinstance(settings.get("site_appearance"), dict):
             settings["site_appearance"]["logo_url"] = updated.get("logo_url", "")
             settings["site_appearance"]["hero_image_url"] = updated.get("hero_image_url", "")
+            # Re-apply size toggles after deep prune (they are never huge).
+            for size_key in ("logo_height_px", "logo_max_width_px", "logo_show_name"):
+                if size_key in updated:
+                    settings["site_appearance"][size_key] = updated[size_key]
         tenant.settings_json = _safe_settings_json(settings)
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except Exception:
+            # Nuclear retry: keep only site_appearance + tiny branding bag.
+            await self._session.rollback()
+            tenant = await self._get_tenant(tenant_id)
+            slim = {
+                "site_appearance": {
+                    k: updated.get(k)
+                    for k in (
+                        "logo_url",
+                        "hero_image_url",
+                        "logo_height_px",
+                        "logo_max_width_px",
+                        "logo_show_name",
+                        "footer_brand_name",
+                        "rent_office_name",
+                        "hero_image_focal",
+                    )
+                    if k in updated
+                },
+                "branding": {
+                    "logo_url": str(updated.get("logo_url") or ""),
+                },
+            }
+            # Preserve non-appearance keys that are small enough.
+            prev = _prune_huge_strings(_prune_oversized_data_urls_deep(_parse_settings(tenant.settings_json)))
+            for key, val in prev.items():
+                if key in ("site_appearance", "branding"):
+                    continue
+                raw = json.dumps(val, ensure_ascii=False, default=str)
+                if len(raw) <= _MAX_SETTINGS_STRING:
+                    slim[key] = val
+            appearance_full = _prune_oversized_media(
+                {**DEFAULT_SITE_APPEARANCE, **(prev.get("site_appearance") or {}), **updated}
+            )
+            appearance_full.pop("display_name", None)
+            appearance_full.pop("storage_source", None)
+            appearance_full.pop("tenant_slug", None)
+            slim["site_appearance"] = appearance_full
+            tenant.settings_json = _safe_settings_json(slim)
+            await self._session.flush()
+            updated = appearance_full
         try:
             await self._audit.record(
                 tenant_id=tenant_id,
