@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import SettingsTabPanels from './SettingsTabPanels.jsx';
+import AdminMenuFade from './AdminMenuFade.jsx';
 import {
   DEFAULT_PLATFORM_TAB,
   DEFAULT_TENANT_SETTINGS_TAB,
@@ -112,7 +113,7 @@ export default function SettingsHub({
       : TAB_HINTS[tab] || 'Επιλέξτε ενότητα από τις κάρτες αριστερά';
 
   return (
-    <div className="settings-hub animate-in fade-in duration-300 w-full">
+    <div className="settings-hub w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
         {/* Secondary settings rail — fades out in design mode for more canvas */}
         <aside
@@ -284,7 +285,7 @@ export default function SettingsHub({
         </aside>
 
         {/* Panel content */}
-        <div className="min-w-0 flex-1 space-y-5 w-full">
+        <AdminMenuFade panelKey={tab || defaultTab} className="min-w-0 flex-1 space-y-5 w-full">
           {!designMode ? (
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -371,7 +372,7 @@ export default function SettingsHub({
             onOpenPayments={() => selectTab('payments')}
             contractPrefs={contractPrefs}
           />
-        </div>
+        </AdminMenuFade>
       </div>
     </div>
   );

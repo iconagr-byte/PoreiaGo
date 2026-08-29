@@ -9,6 +9,7 @@ import {
   saveBusesHubOrder,
 } from '../../lib/admin/busesHub.js';
 import { isFleetOpsSubTab } from '../../lib/admin/fleetOpsHub.js';
+import AdminMenuFade from './AdminMenuFade.jsx';
 
 const RAIL_ACTIVE = {
   emerald: 'border-emerald-300 bg-emerald-50 shadow-sm',
@@ -113,7 +114,7 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
   };
 
   return (
-    <div className="buses-hub animate-in fade-in duration-300 w-full">
+    <div className="buses-hub w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
         <aside className="w-full lg:w-80 xl:w-[22rem] shrink-0 lg:sticky lg:top-3 self-start">
           <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-4">
@@ -247,7 +248,7 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1 space-y-5 w-full">
+        <AdminMenuFade panelKey={railTab} className="min-w-0 flex-1 space-y-5 w-full">
           {!inFleetOps ? (
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -266,7 +267,7 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
           ) : null}
 
           {children}
-        </div>
+        </AdminMenuFade>
       </div>
     </div>
   );

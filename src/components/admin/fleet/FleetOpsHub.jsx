@@ -12,6 +12,7 @@ import FleetAvailabilityPanel from './FleetAvailabilityPanel.jsx';
 import FleetDocumentsPanel from './FleetDocumentsPanel.jsx';
 import FleetExpensesPanel from './FleetExpensesPanel.jsx';
 import FleetDigestPanel from './FleetDigestPanel.jsx';
+import AdminMenuFade from '../AdminMenuFade.jsx';
 
 const RAIL_ACTIVE = {
   violet: 'border-violet-300 bg-violet-50 shadow-sm',
@@ -128,16 +129,16 @@ export default function FleetOpsHub({
 
   if (embedded) {
     return (
-      <div className="fleet-ops-hub fleet-ops-hub--embedded animate-in fade-in duration-300 w-full space-y-5">
+      <div className="fleet-ops-hub fleet-ops-hub--embedded w-full space-y-5">
         {header}
         {subtabChips}
-        {body}
+        <AdminMenuFade panelKey={tab || DEFAULT_FLEET_OPS_TAB}>{body}</AdminMenuFade>
       </div>
     );
   }
 
   return (
-    <div className="fleet-ops-hub animate-in fade-in duration-300 w-full">
+    <div className="fleet-ops-hub w-full">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
         <aside className="w-full lg:w-[15.5rem] xl:w-64 shrink-0 lg:sticky lg:top-3 self-start">
           <div className="rounded-[24px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-2.5 sm:p-3 space-y-3">
@@ -218,10 +219,10 @@ export default function FleetOpsHub({
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1 space-y-5 w-full">
+        <AdminMenuFade panelKey={tab || DEFAULT_FLEET_OPS_TAB} className="min-w-0 flex-1 space-y-5 w-full">
           {header}
           {body}
-        </div>
+        </AdminMenuFade>
       </div>
     </div>
   );

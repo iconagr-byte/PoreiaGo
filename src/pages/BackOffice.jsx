@@ -76,6 +76,7 @@ import FleetOpsHubNav from '../components/admin/fleet/FleetOpsHubNav.jsx';
 import FleetOpsHub from '../components/admin/fleet/FleetOpsHub.jsx';
 import RentDeskHub from '../components/admin/fleet/RentDeskHub.jsx';
 import BusesHub from '../components/admin/BusesHub.jsx';
+import AdminMenuFade from '../components/admin/AdminMenuFade.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
 import OfficeSetupWizard, {
@@ -2232,11 +2233,19 @@ export default function BackOffice() {
                 : 'max-w-container-max mx-auto'
             }
           >
-            {activeTab === 'dashboard' && renderDashboard()}
-            {activeTab === 'customers' && (rentOnly || customerServiceScope === CUSTOMER_SERVICE_RENT) && renderCustomers()}
-            {LOYALTY_UI_ENABLED && activeTab === 'loyalty' && <LoyaltyRewardsPanel />}
+            {activeTab === 'dashboard' && (
+              <AdminMenuFade panelKey="dashboard">{renderDashboard()}</AdminMenuFade>
+            )}
+            {activeTab === 'customers' && (rentOnly || customerServiceScope === CUSTOMER_SERVICE_RENT) && (
+              <AdminMenuFade panelKey="customers-rent">{renderCustomers()}</AdminMenuFade>
+            )}
+            {LOYALTY_UI_ENABLED && activeTab === 'loyalty' && (
+              <AdminMenuFade panelKey="loyalty">
+                <LoyaltyRewardsPanel />
+              </AdminMenuFade>
+            )}
             {activeTab === 'settings' && (
-              <div className="pb-stack-lg w-full">
+              <AdminMenuFade panelKey="settings" className="pb-stack-lg w-full">
                 <ImpersonationBanner />
                 <SettingsHub
                   initialTab={settingsSubTab}
@@ -2248,15 +2257,15 @@ export default function BackOffice() {
                     focusRentModule: Boolean(location.state?.focusRentModule),
                   }}
                 />
-              </div>
+              </AdminMenuFade>
             )}
             {activeTab === 'fleet_live_map' && (
-              <div className="animate-in fade-in duration-300 -mt-1">
+              <AdminMenuFade panelKey="fleet-live-map" className="-mt-1">
                 <FleetLiveMapWebSocket />
-              </div>
+              </AdminMenuFade>
             )}
             {isBusesHubTab(activeTab) && (
-              <div className="pb-stack-lg w-full">
+              <AdminMenuFade panelKey="buses-hub" className="pb-stack-lg w-full">
                 <BusesHub
                   activeTab={sanitizeBusesHubTab(activeTab)}
                   onNavigate={(id) => {
@@ -2306,10 +2315,10 @@ export default function BackOffice() {
                   {activeTab === 'lost_found' && renderLostFound()}
                   {activeTab === 'bookings' && renderBookings()}
                 </BusesHub>
-              </div>
+              </AdminMenuFade>
             )}
             {activeTab === 'fleet_rental' && (
-              <div className="pb-stack-lg w-full">
+              <AdminMenuFade panelKey="rent-desk" className="pb-stack-lg w-full">
                 <RentDeskHub
                   activeTab={fleetRentalTab}
                   onTabChange={setFleetRentalTab}
@@ -2322,19 +2331,23 @@ export default function BackOffice() {
                     setActiveTab('customers');
                   }}
                 />
-              </div>
+              </AdminMenuFade>
             )}
             {activeTab === 'email' && (
-              <EmailHub
-                intent={emailIntent}
-                onIntentHandled={() => setEmailIntent(null)}
-              />
+              <AdminMenuFade panelKey="email">
+                <EmailHub
+                  intent={emailIntent}
+                  onIntentHandled={() => setEmailIntent(null)}
+                />
+              </AdminMenuFade>
             )}
             {activeTab === 'email_templates' && (
-              <EmailTemplatesPage
-                onUseTemplate={useEmailTemplate}
-                rentEnabled={rentMenuVisible}
-              />
+              <AdminMenuFade panelKey="email-templates">
+                <EmailTemplatesPage
+                  onUseTemplate={useEmailTemplate}
+                  rentEnabled={rentMenuVisible}
+                />
+              </AdminMenuFade>
             )}
           </div>
         </div>
