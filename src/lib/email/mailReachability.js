@@ -4,7 +4,7 @@
 export const APP_MAIL_EGRESS_IP = '169.58.199.186';
 
 export function isMailTimeoutMessage(msg) {
-  return /timeout|timed out|δεν ήταν δυνατή η σύνδεση|Errno 110|μη προσβάσιμος/i.test(
+  return /timeout|timed out|δεν ήταν δυνατή η σύνδεση|Errno 110|μη προσβάσιμος|μη απαντά|δεν ανοίγει σύνδεση|θύρα 993\/143|θύρα 587\/465/i.test(
     String(msg || ''),
   );
 }

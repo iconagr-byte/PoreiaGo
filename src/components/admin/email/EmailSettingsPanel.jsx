@@ -649,6 +649,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         <ul className="space-y-3">
           {accounts.map((a) => {
             const hasErr = Boolean(a.last_sync_error);
+            const syncTimeout = hasErr && isMailTimeoutMessage(a.last_sync_error);
             return (
               <li
                 key={a.id}
@@ -680,13 +681,21 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                         <span
                           className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
                             hasErr
-                              ? 'bg-rose-100 text-rose-700'
+                              ? syncTimeout
+                                ? 'bg-amber-100 text-amber-900'
+                                : 'bg-rose-100 text-rose-700'
                               : a.is_active === false
                                 ? 'bg-surface-container-high text-on-surface-variant'
                                 : 'bg-emerald-100 text-emerald-800'
                           }`}
                         >
-                          {hasErr ? 'Σφάλμα sync' : a.is_active === false ? 'Ανενεργό' : 'Ενεργό'}
+                          {hasErr
+                            ? syncTimeout
+                              ? 'Χρειάζεται whitelist'
+                              : 'Σφάλμα sync'
+                            : a.is_active === false
+                              ? 'Ανενεργό'
+                              : 'Ενεργό'}
                         </span>
                       </div>
                       <p className="mt-0.5 truncate text-body-sm text-on-surface-variant">
@@ -697,12 +706,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                         {a.imap_secure ? ' · SSL' : ''} · SMTP {a.smtp_host}:{a.smtp_port}
                         {a.smtp_secure ? ' · STARTTLS' : Number(a.smtp_port) === 465 ? ' · SSL' : ''}
                       </p>
-                      {hasErr && (
-                        <div className="mt-2 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2 text-label-sm text-rose-800">
-                          <p className="font-semibold">Sync: {syncErrorDisplay(a.last_sync_error)}</p>
-                          <p className="mt-0.5 opacity-90">{syncErrorHint(a.last_sync_error)}</p>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -730,6 +733,23 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                     </button>
                   </div>
                 </div>
+                {hasErr && syncTimeout && !(testingAccountId === a.id && testChecks.length > 0) ? (
+                  <div className="mt-3">
+                    <EmailConnectionResult
+                      ok={false}
+                      timeout
+                      mailHost={a.imap_host || a.smtp_host}
+                      imapPort={a.imap_port}
+                      smtpPort={a.smtp_port}
+                    />
+                  </div>
+                ) : null}
+                {hasErr && !syncTimeout ? (
+                  <div className="mt-3 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2 text-label-sm text-rose-800">
+                    <p className="font-semibold">Sync: {syncErrorDisplay(a.last_sync_error)}</p>
+                    <p className="mt-0.5 opacity-90">{syncErrorHint(a.last_sync_error)}</p>
+                  </div>
+                ) : null}
                 {testingAccountId === a.id && testChecks.length > 0 ? (
                   <div className="mt-3 border-t border-outline-variant/40 pt-3">
                     <EmailConnectionCheckList

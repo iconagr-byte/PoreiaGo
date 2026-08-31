@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { mailTimeoutGuide } from '../../../lib/email/mailReachability.js';
+import {
+  APP_MAIL_EGRESS_IP,
+  mailTimeoutGuide,
+} from '../../../lib/email/mailReachability.js';
 
 async function copyText(text, okMsg) {
   try {
@@ -76,7 +79,7 @@ export default function EmailConnectionResult({
         className="overflow-hidden rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50 via-white to-[#f5f5f7] shadow-sm"
         role="status"
       >
-        <div className="border-b border-amber-200/70 bg-amber-50/80 px-4 py-3">
+        <div className="space-y-3 border-b border-amber-200/70 bg-amber-50/80 px-4 py-3">
           <div className="flex items-start gap-3">
             <span
               className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white"
@@ -84,10 +87,42 @@ export default function EmailConnectionResult({
             >
               !
             </span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[15px] font-bold text-amber-950">{guide.title}</p>
               <p className="mt-0.5 text-[13px] leading-snug text-amber-950/75">{guide.summary}</p>
+              <p className="mt-2 text-[13px] leading-snug text-amber-950/90">
+                Χρειάζεται whitelist από τον πάροχο hosting για το IP{' '}
+                <button
+                  type="button"
+                  onClick={() => copyText(APP_MAIL_EGRESS_IP, 'IP αντιγράφηκε')}
+                  className="inline-flex items-center rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[13px] font-bold text-[#0071e3] ring-1 ring-amber-300/80 hover:bg-white"
+                >
+                  {APP_MAIL_EGRESS_IP}
+                </button>
+              </p>
             </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pl-11">
+            <button
+              type="button"
+              onClick={async () => {
+                const okCopy = await copyText(guide.request, 'Αίτημα whitelist αντιγράφηκε');
+                if (okCopy) {
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 2000);
+                }
+              }}
+              className="inline-flex items-center justify-center rounded-xl bg-[#0071e3] px-3.5 py-2 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#0077ed]"
+            >
+              {copied ? 'Αντιγράφηκε ✓' : 'Αντιγραφή αιτήματος για Intechs'}
+            </button>
+            <button
+              type="button"
+              onClick={() => copyText(APP_MAIL_EGRESS_IP, 'IP αντιγράφηκε')}
+              className="inline-flex items-center justify-center rounded-xl border border-black/[0.1] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+            >
+              Μόνο IP
+            </button>
           </div>
         </div>
 
@@ -119,28 +154,6 @@ export default function EmailConnectionResult({
               Αίτημα για hosting
             </p>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#1d1d1f]">{guide.request}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  const okCopy = await copyText(guide.request, 'Αίτημα whitelist αντιγράφηκε');
-                  if (okCopy) {
-                    setCopied(true);
-                    window.setTimeout(() => setCopied(false), 2000);
-                  }
-                }}
-                className="inline-flex items-center justify-center rounded-xl bg-[#0071e3] px-3.5 py-2 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#0077ed]"
-              >
-                {copied ? 'Αντιγράφηκε ✓' : 'Αντιγραφή αιτήματος'}
-              </button>
-              <button
-                type="button"
-                onClick={() => copyText(guide.facts[0].copy, 'IP αντιγράφηκε')}
-                className="inline-flex items-center justify-center rounded-xl border border-black/[0.1] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
-              >
-                Μόνο IP
-              </button>
-            </div>
           </div>
         </div>
       </div>
