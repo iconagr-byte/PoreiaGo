@@ -1,0 +1,50 @@
+name: Diagnose mail reachability (Contabo)
+
+# TCP probe from VPS (+ API container) to customer IMAP/SMTP.
+# Secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY (same as Deploy VPS).
+
+on:
+  workflow_dispatch:
+    inputs:
+      mail_host:
+        description: "Mail host to probe"
+        required: false
+        default: "mail.achilliotravel.com"
+        type: string
+      imap_port:
+        description: "IMAP port"
+        required: false
+        default: "993"
+        type: string
+      smtp_port:
+        description: "SMTP port"
+        required: false
+        default: "465"
+        type: string
+
+concurrency:
+  group: diagnose-mail-reachability
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe IMAP/SMTP from Contabo
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 3m
+          script: |
+            set -euo pipefail
+            cd /opt/poreiago
+            git fetch origin main || true
+            git checkout main || true
+            git pull --ff-only origin main || true
+            export MAIL_HOST='${{ inputs.mail_host }}'
+            export IMAP_PORT='${{ inputs.imap_port }}'
+            export SMTP_PORT='${{ inputs.smtp_port }}'
+            bash deploy/scripts/diagnose-mail-reachability.sh
