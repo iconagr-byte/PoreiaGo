@@ -208,6 +208,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         <main className="rent-home rent-home--guest-land">
           <RentGuestHero
             brandLabel={branding.brandLabel}
+            heroKicker={branding.heroKicker}
             title={branding.title}
             titleAccent={branding.titleAccent}
             copy={branding.copy}
@@ -605,7 +606,7 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
           {!isMobile ? (
             <section id="rent-home" className="rent-inline-section" aria-label="Αρχική">
               <section className="rent-hero rent-hero--inline" aria-label="Ενοικίαση">
-                <p className="rent-hero-brand">{branding.brandLabel}</p>
+                <p className="rent-hero-brand">{branding.heroKicker || branding.brandLabel}</p>
                 <h1 className="rent-hero-title">{branding.title}</h1>
                 <p className="rent-hero-copy">{branding.copy}</p>
                 <button type="button" className="rent-hero-cta" onClick={() => scrollToSection('rent-book')}>
