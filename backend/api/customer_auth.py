@@ -228,42 +228,22 @@ async def google_auth_config():
 @router.post("/google")
 async def verify_google_token(request: Request, body: GoogleTokenRequest):
     """Verify Google ID token, upsert account, return JWT."""
-    client_id = _google_client_id()
-    if not client_id:
-        raise HTTPException(
-            status_code=503,
-            detail="Google OAuth not configured (set GOOGLE_CLIENT_ID)",
-        )
+    from app.services.google_oauth import verify_google_id_token
 
-    async with httpx.AsyncClient() as http:
-        response = await http.get(
-            "https://oauth2.googleapis.com/tokeninfo",
-            params={"id_token": body.id_token},
-            timeout=10.0,
-        )
-
-    if response.status_code != 200:
+    try:
+        data = await verify_google_id_token(body.id_token)
+    except HTTPException as exc:
         record_login_from_request(
             request,
             actor_type="customer",
             identity="google",
             success=False,
             method="google",
-            detail="Invalid Google token",
+            detail=str(exc.detail),
         )
-        raise HTTPException(status_code=401, detail="Invalid Google token")
-
-    data = response.json()
-    if data.get("aud") != client_id:
-        raise HTTPException(status_code=401, detail="Google token audience mismatch")
-
-    email_verified = str(data.get("email_verified", "")).lower()
-    if email_verified not in ("true", "1"):
-        raise HTTPException(status_code=401, detail="Google email not verified")
+        raise
 
     email = str(data.get("email", "")).strip().lower()
-    if not email:
-        raise HTTPException(status_code=401, detail="Google account has no email")
 
     if email in STAFF_EMAILS:
         raise HTTPException(status_code=403, detail="Use Admin Login for staff accounts")

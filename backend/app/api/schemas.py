@@ -15,6 +15,12 @@ class LoginRequest(BaseModel):
     mfa_code: str | None = None
 
 
+class GoogleAdminLoginRequest(BaseModel):
+    id_token: str = Field(min_length=10)
+    tenant_id: UUID | None = None
+    tenant_slug: str | None = Field(default=None, max_length=64)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

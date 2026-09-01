@@ -6,7 +6,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas import LoginRequest, MfaEnrollResponse, MfaVerifyRequest, RefreshTokenRequest, TokenResponse
+from app.api.schemas import (
+    GoogleAdminLoginRequest,
+    LoginRequest,
+    MfaEnrollResponse,
+    MfaVerifyRequest,
+    RefreshTokenRequest,
+    TokenResponse,
+)
 from app.core.auth_deps import get_current_user_id, get_tenant_db
 from app.core.database import AsyncSessionLocal
 from app.core.config import get_settings
@@ -232,6 +239,97 @@ async def login(request: Request, body: LoginRequest):
             method="password",
             tenant_id=str(tenant.id),
             detail=tenant.slug,
+        )
+        return _token_response(
+            access_token=token,
+            refresh_token=refresh,
+            tenant_id=tenant.id,
+            tenant_slug=tenant.slug,
+            roles=role_values,
+        )
+
+
+@router.post("/google", response_model=TokenResponse)
+async def google_login(request: Request, body: GoogleAdminLoginRequest):
+    """Admin Back Office — Google Sign-In for existing office users."""
+    from app.services.google_oauth import verify_google_id_token
+    from travel_platform.settings.login_audit_store import record_login_from_request
+
+    try:
+        claims = await verify_google_id_token(body.id_token)
+    except HTTPException as exc:
+        record_login_from_request(
+            request,
+            actor_type="admin",
+            identity="google",
+            success=False,
+            method="google",
+            detail=str(exc.detail),
+        )
+        raise
+
+    email = str(claims.get("email", "")).strip().lower()
+    forced_tenant_id = body.tenant_id
+    try:
+        from uuid import UUID as _UUID
+
+        from middleware.domain_tenant import _is_platform_host
+        from travel_platform.settings.office_host_guard import (
+            host_looks_like_achillio_travel,
+            login_host_forced_tenant_id,
+            resolve_poreiago_platform_tenant_id,
+        )
+
+        host = _browser_office_host(request)
+        platform = _is_platform_host(host)
+        slug_in = (body.tenant_slug or "").strip().lower()
+        if host_looks_like_achillio_travel(host) and forced_tenant_id is None:
+            forced = await login_host_forced_tenant_id(host, is_platform_host=False)
+            if forced is not None:
+                forced_tenant_id = forced
+        elif forced_tenant_id is None and not slug_in:
+            forced = await login_host_forced_tenant_id(host, is_platform_host=platform)
+            if forced is not None:
+                forced_tenant_id = forced
+            elif platform:
+                platform_tid = await resolve_poreiago_platform_tenant_id()
+                if platform_tid:
+                    forced_tenant_id = _UUID(str(platform_tid))
+    except Exception:
+        pass
+
+    async with AsyncSessionLocal() as db:
+        try:
+            token, refresh, user, tenant = await AuthService(db).login_with_google(
+                email=email,
+                tenant_id=forced_tenant_id,
+                tenant_slug=body.tenant_slug,
+                google_name=claims.get("name"),
+            )
+            await db.commit()
+        except ValueError as exc:
+            await db.rollback()
+            record_login_from_request(
+                request,
+                actor_type="admin",
+                identity=email,
+                success=False,
+                method="google",
+                detail=str(exc),
+            )
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+
+        role_values = [r for r in (user.roles or []) if r in {e.value for e in UserRole}]
+        record_login_from_request(
+            request,
+            actor_type="admin",
+            identity=getattr(user, "email", None) or email,
+            success=True,
+            actor_id=str(user.id),
+            actor_name=getattr(user, "full_name", None) or claims.get("name"),
+            method="google",
+            tenant_id=str(tenant.id),
+            detail=f"{tenant.slug} · google",
         )
         return _token_response(
             access_token=token,
