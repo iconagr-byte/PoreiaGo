@@ -333,6 +333,15 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         except Exception:
             pass
 
+        # My Wallet SQLite — so the passenger sees the ticket when they log in
+        # with the same email (no manual booking-code claim required).
+        try:
+            from app.services.customer_wallet_booking_sync import mirror_single_booking_to_wallet
+
+            await mirror_single_booking_to_wallet(booking, tenant_id=str(tenant_id))
+        except Exception:
+            pass
+
         return booking
 
 

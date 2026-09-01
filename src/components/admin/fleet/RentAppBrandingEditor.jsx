@@ -247,7 +247,7 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
           <div className="rent-brand-phone" aria-hidden={!preview.brandLabel}>
             <div className="rent-brand-phone-notch" />
             <div className="rent-brand-phone-hero">
-              <p className="rent-brand-phone-name">{preview.brandLabel}</p>
+              <p className="rent-brand-phone-name">{preview.heroKicker || preview.brandLabel}</p>
               <h4 className="rent-brand-phone-title">{preview.title}</h4>
               <p className="rent-brand-phone-copy">{preview.copy}</p>
               <div className="rent-brand-phone-cta">
