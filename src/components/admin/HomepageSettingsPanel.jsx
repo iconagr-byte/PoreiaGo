@@ -94,7 +94,7 @@ const HOME_SECTIONS = [
   { id: 'hero', label: 'Hero', icon: 'panorama', accent: 'bg-indigo-500' },
   { id: 'slider', label: 'Slider', icon: 'slideshow', accent: 'bg-cyan-600' },
   { id: 'trips', label: 'Καρτέλες εκδρομών', icon: 'view_carousel', accent: 'bg-emerald-500' },
-  { id: 'branding', label: 'Λογότυπο & εικόνες', icon: 'image', accent: 'bg-amber-500' },
+  { id: 'branding', label: 'Μάρκα & λογότυπο', icon: 'image', accent: 'bg-amber-500' },
   { id: 'footer', label: 'Footer', icon: 'vertical_align_bottom', accent: 'bg-rose-500' },
 ];
 
@@ -161,6 +161,45 @@ function LogoBlock({
   };
 
   return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-black/[0.06] bg-white overflow-hidden">
+        <div className="px-5 py-4 border-b border-black/[0.04] bg-slate-50/80">
+          <h5 className="font-bold text-slate-900">Επωνυμία γραφείου</h5>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Εμφανίζεται στο header και στο footer της αρχικής — αντί για το γενικό «Γραφείο»
+          </p>
+        </div>
+        <div className="p-5 space-y-3">
+          <label className="block">
+            <span className="sr-only">Επωνυμία γραφείου</span>
+            <input
+              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[15px] font-semibold text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+              placeholder="π.χ. Achillio Travel"
+              value={form.footer_brand_name || ''}
+              onChange={(e) => setForm((p) => ({ ...p, footer_brand_name: e.target.value }))}
+              maxLength={80}
+              autoComplete="organization"
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3">
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0ea5e9] to-[#0f766e] text-sm font-bold text-white shadow-sm"
+              aria-hidden
+            >
+              {(brandName || 'Γ').charAt(0).toUpperCase()}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+                {brandName || 'Γραφείο'}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {brandName ? 'Προεπισκόπηση header' : 'Συμπληρώστε επωνυμία για να φύγει το «Γραφείο»'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
     <div className="rounded-2xl border border-black/[0.06] bg-white overflow-hidden">
       <div className="px-5 py-4 border-b border-black/[0.04] bg-slate-50/80">
         <h5 className="font-bold text-slate-900">Λογότυπο</h5>
@@ -435,7 +474,7 @@ function LogoBlock({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-900">Όνομα δίπλα στο logo</p>
               <p className="text-xs text-slate-500 mt-0.5 truncate">
-                {brandName || 'Ορίστε επωνυμία στο Footer'}
+                {brandName || 'Ορίστε επωνυμία παραπάνω'}
               </p>
             </div>
             <span
@@ -453,6 +492,7 @@ function LogoBlock({
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 }
@@ -1215,6 +1255,23 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
 
         {designPage === 'home' && section === 'overview' && (
           <>
+            {!String(form.footer_brand_name || '').trim() ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-amber-950">Η αρχική δείχνει ακόμα «Γραφείο»</p>
+                  <p className="mt-0.5 text-xs text-amber-900/80">
+                    Ορίστε επωνυμία και λογότυπο για να φαίνεται το brand σας στο header.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => selectSection('branding')}
+                  className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                >
+                  Μάρκα & λογότυπο
+                </button>
+              </div>
+            ) : null}
             <PanelCard
               title="Τρέχουσα διάταξη"
               description="Σύνοψη των ενεργών προτύπων. Αλλάξτε τα από τα μενού στα αριστερά."
@@ -1623,6 +1680,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               // Migrate legacy data: URLs (or stuck optimistic previews) via file upload,
               // then save sizing. Never PUT huge data URLs into Postgres.
               const patch = {
+                footer_brand_name: String(form.footer_brand_name || '').trim(),
                 logo_height_px: clampLogoHeight(form.logo_height_px),
                 logo_max_width_px: clampLogoMaxWidth(form.logo_max_width_px),
                 logo_radius_px: clampLogoRadius(form.logo_radius_px),
@@ -1660,6 +1718,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 } catch (firstErr) {
                   // Sizing-only retry — logo file may already be on disk/Postgres.
                   const sizeOnly = {
+                    footer_brand_name: patch.footer_brand_name,
                     logo_height_px: patch.logo_height_px,
                     logo_max_width_px: patch.logo_max_width_px,
                     logo_radius_px: patch.logo_radius_px,
@@ -1675,7 +1734,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   });
                 }
                 setForm((p) => ({ ...p, ...result.data, ...patch, logo_url: logo || p.logo_url }));
-                toast.success('Οι ρυθμίσεις λογοτύπου αποθηκεύτηκαν', { id: 'homepage-save-ok' });
+                toast.success('Η επωνυμία και το λογότυπο αποθηκεύτηκαν', { id: 'homepage-save-ok' });
               } catch (err) {
                 if (err.message === 'AUTH_EXPIRED') {
                   toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά', { id: 'homepage-save-err' });
@@ -1690,9 +1749,9 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             }}
           >
             <PanelCard
-              title="Λογότυπο & εικόνες"
-              description="Μέγεθος, στρογγύλεμα, φόντο και hero φωτογραφία."
-              action={<SaveButton saving={saving} label="Αποθήκευση λογοτύπου" />}
+              title="Μάρκα & λογότυπο"
+              description="Επωνυμία γραφείου, λογότυπο και hero φωτογραφία — όλα από εδώ."
+              action={<SaveButton saving={saving} label="Αποθήκευση μάρκας" />}
             >
               <div className="space-y-6">
                 <LogoBlock
@@ -1755,13 +1814,16 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               />
 
               <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-                Το <strong>λογότυπο</strong> στο footer έρχεται από την ενότητα «Λογότυπο & εικόνες».
-                Συμπληρώστε επωνυμία / copyright παρακάτω — όχι AeroStride / PoreiaGo.
+                Το <strong>λογότυπο</strong> και η <strong>επωνυμία</strong> στο header έρχονται από
+                «Μάρκα & λογότυπο». Εδώ ρυθμίζετε μόνο footer κείμενα και σύνδεσμους.
               </div>
 
               <div className="mt-8 pt-8 border-t border-black/[0.06] grid md:grid-cols-2 gap-4">
                 <label className="block text-sm md:col-span-2">
-                  <span className="font-bold text-gray-700">Επωνυμία γραφείου (footer)</span>
+                  <span className="font-bold text-gray-700">Επωνυμία γραφείου</span>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Ίδιο πεδίο με «Μάρκα & λογότυπο» — εμφανίζεται και στο header.
+                  </p>
                   <input
                     className="mt-1 w-full rounded-xl border px-3 py-2"
                     placeholder="π.χ. Achillio Travel"
