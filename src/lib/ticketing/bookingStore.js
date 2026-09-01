@@ -21,6 +21,7 @@ import {
 } from '../../services/paymentNotificationApi.js';
 import {
   fetchAllBookingsFromServer,
+  fetchMyBookingsFromServer,
   syncMyBookingsToServer,
   upsertBookingOnServer,
 } from '../../services/customerBookingsApi.js';
@@ -117,7 +118,7 @@ export async function loadAllBookingsAsync() {
   return loadBookings();
 }
 
-/** My Wallet — sync κρατήσεων πελάτη με server. */
+/** My Wallet — sync κρατήσεων πελάτη με server (+ SaaS office walk-ins by email). */
 export async function loadBookingsForCustomer(email) {
   const key = String(email || '').trim().toLowerCase();
   const localForUser = loadBookings().filter(
@@ -134,7 +135,15 @@ export async function loadBookingsForCustomer(email) {
     return loadBookings().filter((b) => String(b.email || '').toLowerCase() === key);
   } catch (err) {
     console.warn('[bookings] customer sync failed', err);
-    return localForUser;
+    try {
+      // GET also pulls Postgres bookings for this email+office.
+      const remote = await fetchMyBookingsFromServer();
+      mergeBookingsIntoStore(remote);
+      return loadBookings().filter((b) => String(b.email || '').toLowerCase() === key);
+    } catch (err2) {
+      console.warn('[bookings] customer fetch failed', err2);
+      return localForUser;
+    }
   }
 }
 
