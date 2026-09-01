@@ -14,7 +14,7 @@ vi.mock('../lib/platform/tenantHost.js', () => ({
 
 import { canAccessPlatformOperatorUi, isImpersonating } from '../lib/saasJwt.js';
 import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
-import { shouldShowRentMenu } from './officeModulesApi.js';
+import { shouldShowRentMenu, shouldShowRentStorefront } from './officeModulesApi.js';
 
 describe('shouldShowRentMenu', () => {
   beforeEach(() => {
@@ -125,5 +125,34 @@ describe('shouldShowRentMenu', () => {
         tenant_slug: 'sunny-buses',
       }),
     ).toBe(false);
+  });
+});
+
+describe('shouldShowRentStorefront', () => {
+  beforeEach(() => {
+    isPlatformMarketingHost.mockReturnValue(false);
+  });
+
+  it('shows Rent on PoreiaGo marketing host', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(shouldShowRentStorefront({ rent_enabled: false })).toBe(true);
+  });
+
+  it('hides Rent on tenant storefront without rent_enabled', () => {
+    expect(
+      shouldShowRentStorefront({
+        rent_enabled: false,
+        office_kind: 'customer',
+      }),
+    ).toBe(false);
+  });
+
+  it('shows Rent on tenant storefront when rent_enabled', () => {
+    expect(
+      shouldShowRentStorefront({
+        rent_enabled: true,
+        office_kind: 'customer',
+      }),
+    ).toBe(true);
   });
 });
