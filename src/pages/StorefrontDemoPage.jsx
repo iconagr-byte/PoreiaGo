@@ -37,6 +37,7 @@ import FleetShowcaseSection from '../components/FleetShowcaseSection.jsx';
 import StorefrontHeader from '../components/storefront/StorefrontHeader.jsx';
 import StorefrontHero from '../components/storefront/StorefrontHero.jsx';
 import StorefrontFooter from '../components/storefront/StorefrontFooter.jsx';
+import NewsletterOfferBanner from '../components/storefront/NewsletterOfferBanner.jsx';
 import StorefrontRentSection from '../components/storefront/StorefrontRentSection.jsx';
 import TripsSection from '../components/storefront/TripsSection.jsx';
 
@@ -553,6 +554,12 @@ export default function StorefrontDemoPage() {
         )}
 
       </main>
+
+      <NewsletterOfferBanner
+        variant={rentOnly ? 'rent' : 'trips'}
+        privacyUrl={siteAppearance.footer_privacy_url || '#'}
+        privacyLabel={siteAppearance.footer_privacy_label || 'Πολιτική Απορρήτου'}
+      />
 
       <StorefrontFooter
         siteAppearance={siteAppearance}

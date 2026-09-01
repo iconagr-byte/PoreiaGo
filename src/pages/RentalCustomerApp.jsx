@@ -32,6 +32,7 @@ import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.
 import RentalWalletPanel from '../components/rental/RentalWalletPanel.jsx';
 import RentWalletCheckInBand from '../components/rental/RentWalletCheckInBand.jsx';
 import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.jsx';
+import NewsletterOfferBanner from '../components/storefront/NewsletterOfferBanner.jsx';
 import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
@@ -350,6 +351,12 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   .getElementById('rent-guest-search')
                   ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }}
+            />
+
+            <NewsletterOfferBanner
+              variant="rent"
+              privacyUrl={siteAppearance?.footer_privacy_url || '#'}
+              privacyLabel={siteAppearance?.footer_privacy_label || 'Πολιτική Απορρήτου'}
             />
 
             {isPlatformMarketingHost() ? <RentProductSection /> : null}
