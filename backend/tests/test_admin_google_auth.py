@@ -49,7 +49,7 @@ def test_admin_google_rejects_unknown_user(client, monkeypatch):
                 service.login_with_google = AsyncMock(
                     side_effect=ValueError("Δεν βρέθηκε λογαριασμός"),
                 )
-                res = client.post("/api/v1/auth/google", json={"id_token": "ok-token"})
+                res = client.post("/api/v1/auth/google", json={"id_token": "valid-token-xyz"})
 
     assert res.status_code == 401
 
@@ -90,7 +90,7 @@ def test_admin_google_returns_token(client, monkeypatch):
                 service.login_with_google = AsyncMock(
                     return_value=("access-token", "refresh-token", fake_user, fake_tenant),
                 )
-                res = client.post("/api/v1/auth/google", json={"id_token": "ok-token"})
+                res = client.post("/api/v1/auth/google", json={"id_token": "valid-token-xyz"})
 
     assert res.status_code == 200
     data = res.json()
