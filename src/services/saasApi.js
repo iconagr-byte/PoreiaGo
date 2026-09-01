@@ -217,6 +217,39 @@ export async function saasLogin({ email, password, tenantSlug, tenantId, mfaCode
   return { ...data, roles };
 }
 
+/** POST /api/v1/auth/google — admin Back Office Google Sign-In. */
+export async function saasGoogleLogin({ idToken, tenantSlug, tenantId, email }) {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/v1/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id_token: idToken,
+        tenant_slug: tenantSlug || undefined,
+        tenant_id: tenantId || undefined,
+      }),
+    });
+  } catch (err) {
+    throw networkLoginError(err);
+  }
+  if (!res.ok) await parseError(res);
+  const data = await res.json();
+  const resolvedTenantId =
+    data.tenant_id || decodeJwtPayload(data.access_token)?.tenant_id || DEV_TENANT;
+  setSaasSession({
+    accessToken: data.access_token,
+    tenantId: resolvedTenantId,
+    email: email || getSaasUserEmail() || undefined,
+  });
+  if (Array.isArray(data.roles) && data.roles.length) {
+    storeSaasRoles(data.roles);
+  } else {
+    storeSaasRolesFromToken(data.access_token);
+  }
+  return data;
+}
+
 /** POST /api/v1/auth/dev-login — local dev fallback when Postgres/seed unavailable. */
 export async function saasDevLogin({ email, password, tenantSlug }) {
   let res;
