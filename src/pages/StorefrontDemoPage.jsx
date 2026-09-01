@@ -30,6 +30,7 @@ import {
   DEFAULT_OFFICE_MODULES,
   fetchOfficeModules,
   isRentOnlyModules,
+  shouldShowRentStorefront,
 } from '../services/officeModulesApi.js';
 import { fetchPublicRentalCatalog } from '../services/customerRentalApi.js';
 import { withDemoRentFleet } from '../lib/rental/demoRentFleet.js';
@@ -87,7 +88,7 @@ export default function StorefrontDemoPage() {
   const [rentalLoading, setRentalLoading] = useState(false);
 
   const tripsEnabled = modules.trips_enabled !== false;
-  const rentEnabled = Boolean(modules.rent_enabled);
+  const rentEnabled = shouldShowRentStorefront(modules);
   const rentOnly = isRentOnlyModules(modules);
 
   const pickerTrips = useMemo(

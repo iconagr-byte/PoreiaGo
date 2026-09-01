@@ -5320,3 +5320,53 @@
   letter-spacing: 0.04em;
   box-shadow: 0 8px 22px rgba(10, 122, 108, 0.32);
 }
+
+.rent-gate-shell {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  font-family: var(--wallet-font, system-ui, sans-serif);
+}
+
+.rent-gate-card {
+  max-width: 28rem;
+  width: 100%;
+  text-align: center;
+  background: #fff;
+  border-radius: 24px;
+  padding: 2rem 1.5rem;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+}
+
+.rent-gate-icon {
+  font-size: 2.5rem;
+  color: #6e6e73;
+  margin-bottom: 0.75rem;
+}
+
+.rent-gate-card h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.35rem;
+}
+
+.rent-gate-card p,
+.rent-gate-copy {
+  margin: 0;
+  color: #6e6e73;
+  line-height: 1.5;
+}
+
+.rent-gate-cta {
+  display: inline-flex;
+  margin-top: 1.25rem;
+  padding: 0.75rem 1.1rem;
+  border-radius: 999px;
+  background: #0a7a6c;
+  color: #fff;
+  font-weight: 650;
+  text-decoration: none;
+}

@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from api.customer_auth import get_current_customer
 from travel_platform.rental import rental_store as store
 from travel_platform.settings.drivers_store import DEMO_TENANT_ID
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/customer/rentals", tags=["Customer Rentals"])
 
@@ -63,6 +68,53 @@ async def _tenant_id(request: Request) -> str:
         status_code=404,
         detail="Δεν βρέθηκε γραφείο ενοικίασης για αυτό το domain.",
     )
+
+
+async def _require_rent_module(request: Request) -> str:
+    """Resolve tenant and block Rent APIs when the office has no active Rent contract."""
+    tid = await _tenant_id(request)
+
+    import os
+
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    if tid == DEMO_TENANT_ID and env in ("development", "dev", "local"):
+        return tid
+
+    try:
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import (
+            is_poreiago_platform_office,
+            modules_for_tenant,
+        )
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            row = await session.execute(select(Tenant).where(Tenant.id == UUID(str(tid))))
+            tenant = row.scalar_one_or_none()
+            if not tenant:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Οι ενοικιάσεις δεν είναι ενεργές για αυτό το γραφείο.",
+                )
+            if is_poreiago_platform_office(tenant):
+                return tid
+            mods = modules_for_tenant(tenant)
+            if not mods.get("rent_enabled"):
+                raise HTTPException(
+                    status_code=404,
+                    detail="Οι ενοικιάσεις δεν είναι ενεργές για αυτό το γραφείο.",
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("rent module guard failed for tenant_id=%s", tid)
+        raise HTTPException(
+            status_code=404,
+            detail="Οι ενοικιάσεις δεν είναι ενεργές για αυτό το γραφείο.",
+        ) from None
+
+    return tid
 
 class CustomerBookingBody(BaseModel):
     vehicle_id: str
@@ -154,7 +206,7 @@ async def rental_catalog(
     category: str | None = None,
     _: dict = Depends(get_current_customer),
 ):
-    vehicles = store.public_catalog(await _tenant_id(request), category=category)
+    vehicles = store.public_catalog(await _require_rent_module(request), category=category)
     return {"vehicles": vehicles, "count": len(vehicles)}
 
 
@@ -168,7 +220,7 @@ async def rental_public_lookup(request: Request, body: GuestRentalLookupBody):
     if not reference or len(reference) < 4:
         raise HTTPException(status_code=400, detail="Απαιτείται κωδικός αναφοράς (π.χ. RB-…)")
     row = store.lookup_booking_for_guest(
-        await _tenant_id(request),
+        await _require_rent_module(request),
         email=email,
         reference=reference,
     )
@@ -186,7 +238,7 @@ async def rental_public_catalog(
 
     Booking/availability still requires customer auth.
     """
-    vehicles = store.public_catalog(await _tenant_id(request), category=category)
+    vehicles = store.public_catalog(await _require_rent_module(request), category=category)
     public = []
     for v in vehicles:
         public.append(
@@ -209,7 +261,7 @@ async def rental_public_catalog(
 @router.get("/public/extras")
 async def rental_public_extras(request: Request):
     """Office-bookable extras catalog (tenant from Host)."""
-    _ = await _tenant_id(request)
+    _ = await _require_rent_module(request)
     items = [
         {
             "id": key,
@@ -234,7 +286,7 @@ async def _availability_payload(
 ) -> dict:
     try:
         rows = store.check_availability(
-            await _tenant_id(request),
+            await _require_rent_module(request),
             start_time=start_time,
             end_time=end_time,
             category=category,
@@ -302,7 +354,7 @@ async def my_rental_bookings(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
-    rows = store.list_bookings_for_email(await _tenant_id(request), account["email"])
+    rows = store.list_bookings_for_email(await _require_rent_module(request), account["email"])
     return {"bookings": [_public_booking(b) for b in rows], "total": len(rows)}
 
 
@@ -337,7 +389,7 @@ async def book_rental(
         "total_cost": body.total_cost,
     }
     try:
-        row = store.create_booking(await _tenant_id(request), payload)
+        row = store.create_booking(await _require_rent_module(request), payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -369,7 +421,7 @@ async def cancel_my_rental(
 ):
     try:
         row = store.cancel_booking_for_customer(
-            await _tenant_id(request),
+            await _require_rent_module(request),
             booking_id,
             email=account["email"],
         )

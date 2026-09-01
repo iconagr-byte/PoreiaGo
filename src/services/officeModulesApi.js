@@ -99,6 +99,18 @@ function isPoreiagoPlatformModules(modules) {
  * - Office with rent_enabled → yes
  * - PoreiaGo platform office (incl. seed slug achillio) → yes
  */
+/**
+ * Public storefront /rent — only when the office has Rent enabled.
+ * PoreiaGo marketing host (poreiago.com) always keeps Rent as product demo.
+ */
+export function shouldShowRentStorefront(modules, opts = {}) {
+  const hostname =
+    opts.hostname ||
+    (typeof window !== 'undefined' ? window.location.hostname : '');
+  if (isPlatformMarketingHost(hostname)) return true;
+  return Boolean(modules?.rent_enabled);
+}
+
 export function shouldShowRentMenu(modules, opts = {}) {
   // Impersonating a tenant office → match that office (Achillio stays Rent-off).
   if (isImpersonating()) {

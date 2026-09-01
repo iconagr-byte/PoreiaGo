@@ -48,6 +48,31 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import BrandingBoot from './components/BrandingBoot.jsx';
 import MaintenanceGate from './components/MaintenanceGate.jsx';
+import RentStorefrontGate from './components/rental/RentStorefrontGate.jsx';
+
+function RentalCustomerAppGated() {
+  return (
+    <RentStorefrontGate>
+      <RentalCustomerApp />
+    </RentStorefrontGate>
+  );
+}
+
+function RentBookingWizardGated() {
+  return (
+    <RentStorefrontGate>
+      <RentBookingWizardPage />
+    </RentStorefrontGate>
+  );
+}
+
+function RentBookingLookupGated() {
+  return (
+    <RentStorefrontGate>
+      <RentBookingLookupPage />
+    </RentStorefrontGate>
+  );
+}
 
 function RentalPwaBoot() {
   useEffect(() => {
@@ -90,16 +115,16 @@ function App() {
             {/* Rent: green URLs — /rent/login + /rent/wallet + /rent/my-booking (not bus). */}
             <Route path="/rent/login" element={<LoginPage rentEntrance />} />
             <Route path="/rent/register" element={<RegisterPage />} />
-            <Route path="/rent/my-booking" element={<RentBookingLookupPage />} />
+            <Route path="/rent/my-booking" element={<RentBookingLookupGated />} />
             {/* Legacy marketing URL — same content lives on /rent now. */}
             <Route path="/rent/services" element={<Navigate to="/rent" replace />} />
             <Route path="/rent/servises" element={<Navigate to="/rent" replace />} />
-            <Route path="/rent/book/services" element={<RentBookingWizardPage />} />
-            <Route path="/rent/book/details" element={<RentBookingWizardPage />} />
-            <Route path="/rent/book/payment" element={<RentBookingWizardPage />} />
-            <Route path="/rent/wallet" element={<RentalCustomerApp />} />
-            <Route path="/rent" element={<RentalCustomerApp />} />
-            <Route path="/rent/*" element={<RentalCustomerApp />} />
+            <Route path="/rent/book/services" element={<RentBookingWizardGated />} />
+            <Route path="/rent/book/details" element={<RentBookingWizardGated />} />
+            <Route path="/rent/book/payment" element={<RentBookingWizardGated />} />
+            <Route path="/rent/wallet" element={<RentalCustomerAppGated />} />
+            <Route path="/rent" element={<RentalCustomerAppGated />} />
+            <Route path="/rent/*" element={<RentalCustomerAppGated />} />
             {/* Contactless rental contract signature (token from SMS/email). */}
             <Route path="/sign/:token" element={<RentalRemoteSignPage />} />
             <Route path="/" element={<HomePage />} />
