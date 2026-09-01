@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 
-import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 
