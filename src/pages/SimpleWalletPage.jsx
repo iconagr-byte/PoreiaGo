@@ -37,7 +37,8 @@ import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
-import { useRentMobile } from '../lib/rental/rentDevice.js';
+import { useWalletSurface } from '../lib/rental/rentDevice.js';
+import WalletDesktopAsides from '../components/wallet/WalletDesktopAsides.jsx';
 import '../styles/wallet-pass.css';
 
 const TABS = [
@@ -133,7 +134,11 @@ function WalletAuthGate() {
 function WalletAuthenticatedApp() {
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = useRentMobile();
+  const surface = useWalletSurface();
+  const isPhone = surface === 'phone';
+  /** Side “how it works” columns — desktop only (tablet uses wider framed shell). */
+  const showDeskAsides = surface === 'desktop';
+  const wideChrome = surface === 'desktop' || surface === 'tablet';
   const [activeTab, setActiveTab] = useState('home');
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
@@ -304,15 +309,104 @@ function WalletAuthenticatedApp() {
       new Date(`${b.date}T23:59:59`) >= new Date(),
   );
 
+  const homeColumn = (
+    <>
+      {showWelcome && featured ? (
+        <div className="wallet-welcome" role="status">
+          <span className="material-symbols-outlined" aria-hidden>
+            check_circle
+          </span>
+          <div>
+            <p className="wallet-welcome-title">Το εισιτήριό σας είναι έτοιμο</p>
+            <p className="wallet-welcome-copy">Δείξτε το QR στον οδηγό κατά την επιβίβαση.</p>
+          </div>
+          <button
+            type="button"
+            className="wallet-welcome-dismiss"
+            onClick={() => {
+              setShowWelcome(false);
+              clearWalletFocusBooking();
+            }}
+            aria-label="Κλείσιμο"
+          >
+            <span className="material-symbols-outlined" aria-hidden>
+              close
+            </span>
+          </button>
+        </div>
+      ) : null}
+
+      {(networkOffline || usingOfflinePass) && displayBooking ? (
+        <div className="wallet-offline-banner" role="status">
+          <span className="material-symbols-outlined" aria-hidden>
+            wifi_off
+          </span>
+          <p>Χωρίς σύνδεση — εμφανίζεται το τελευταίο αποθηκευμένο εισιτήριο.</p>
+        </div>
+      ) : null}
+
+      {loadingBookings && !displayBooking ? (
+        <div className="wallet-pass-empty">
+          <div className="wallet-pass-empty-inner">
+            <p className="wallet-pass-empty-copy">Φόρτωση εισιτηρίου…</p>
+          </div>
+        </div>
+      ) : (
+        <WalletBoardingPass
+          booking={displayBooking}
+          coverImage={displayCover}
+          brandLabel={displayBrand}
+          passengerName={displayPassenger}
+          onOpenDetails={openTicket}
+          onBrowseTrips={() => navigate('/')}
+          onQrChange={handleQrChange}
+          offline={usingOfflinePass}
+        />
+      )}
+
+      {featured ? <WalletInstallPrompt /> : null}
+
+      {otherUpcoming.length > 0 || bookings.length > 1 ? (
+        <div className="wallet-home-more">
+          {otherUpcoming.slice(0, 2).map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              className="wallet-home-more-btn"
+              onClick={() => openTicket(b)}
+            >
+              <span className="truncate pr-2">{b.tripTitle}</span>
+              <span>
+                {b.date}
+                {b.seat ? ` · ${b.seat}` : ''}
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className="wallet-home-more-btn"
+            onClick={() => setActiveTab('bookings')}
+          >
+            <span>Όλες οι κρατήσεις</span>
+            <span>{bookings.length}</span>
+          </button>
+        </div>
+      ) : null}
+    </>
+  );
+
   return (
-    <div className={`wallet-phone-stage${isMobile ? '' : ' wallet-phone-stage--desktop'}`}>
+    <div
+      className={`wallet-phone-stage wallet-phone-stage--${surface}`}
+      data-wallet-surface={surface}
+    >
       <div className="wallet-app">
         <header className="wallet-topbar">
           <button type="button" className="wallet-topbar-btn" onClick={() => navigate('/')}>
             <span className="material-symbols-outlined text-[20px]" aria-hidden>
               arrow_back
             </span>
-            Αρχική
+            {isPhone ? 'Αρχική' : 'Αρχική σελίδα'}
           </button>
           <div className="wallet-topbar-brand">
             <OfficeBrandMark className="h-8" variant="light" fallbackLabel="My Wallet" asLink={false} />
@@ -334,93 +428,19 @@ function WalletAuthenticatedApp() {
 
         <main className="wallet-main">
         {activeTab === 'home' && !isTicketView ? (
-          <>
-            {showWelcome && featured ? (
-              <div className="wallet-welcome" role="status">
-                <span className="material-symbols-outlined" aria-hidden>
-                  check_circle
-                </span>
-                <div>
-                  <p className="wallet-welcome-title">Το εισιτήριό σας είναι έτοιμο</p>
-                  <p className="wallet-welcome-copy">Δείξτε το QR στον οδηγό κατά την επιβίβαση.</p>
-                </div>
-                <button
-                  type="button"
-                  className="wallet-welcome-dismiss"
-                  onClick={() => {
-                    setShowWelcome(false);
-                    clearWalletFocusBooking();
-                  }}
-                  aria-label="Κλείσιμο"
-                >
-                  <span className="material-symbols-outlined" aria-hidden>
-                    close
-                  </span>
-                </button>
-              </div>
-            ) : null}
-
-            {(networkOffline || usingOfflinePass) && displayBooking ? (
-              <div className="wallet-offline-banner" role="status">
-                <span className="material-symbols-outlined" aria-hidden>
-                  wifi_off
-                </span>
-                <p>Χωρίς σύνδεση — εμφανίζεται το τελευταίο αποθηκευμένο εισιτήριο.</p>
-              </div>
-            ) : null}
-
-            {loadingBookings && !displayBooking ? (
-              <div className="wallet-pass-empty">
-                <div className="wallet-pass-empty-inner">
-                  <p className="wallet-pass-empty-copy">Φόρτωση εισιτηρίου…</p>
-                </div>
-              </div>
-            ) : (
-              <WalletBoardingPass
-                booking={displayBooking}
-                coverImage={displayCover}
-                brandLabel={displayBrand}
-                passengerName={displayPassenger}
-                onOpenDetails={openTicket}
-                onBrowseTrips={() => navigate('/')}
-                onQrChange={handleQrChange}
-                offline={usingOfflinePass}
-              />
-            )}
-
-            {featured ? <WalletInstallPrompt /> : null}
-
-            {otherUpcoming.length > 0 || bookings.length > 1 ? (
-              <div className="wallet-home-more">
-                {otherUpcoming.slice(0, 2).map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    className="wallet-home-more-btn"
-                    onClick={() => openTicket(b)}
-                  >
-                    <span className="truncate pr-2">{b.tripTitle}</span>
-                    <span>
-                      {b.date}
-                      {b.seat ? ` · ${b.seat}` : ''}
-                    </span>
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="wallet-home-more-btn"
-                  onClick={() => setActiveTab('bookings')}
-                >
-                  <span>Όλες οι κρατήσεις</span>
-                  <span>{bookings.length}</span>
-                </button>
-              </div>
-            ) : null}
-          </>
+          showDeskAsides ? (
+            <div className="wallet-home-desk">
+              <WalletDesktopAsides side="left" hasTicket={Boolean(displayBooking)} />
+              <div className="wallet-home-desk-center">{homeColumn}</div>
+              <WalletDesktopAsides side="right" hasTicket={Boolean(displayBooking)} />
+            </div>
+          ) : (
+            homeColumn
+          )
         ) : null}
 
         {activeTab === 'bookings' && (
-          <div className="wallet-stack">
+          <div className={`wallet-stack${wideChrome ? ' wallet-stack--desk' : ''}`}>
             <div className="wallet-panel">
               <h2>Οι κρατήσεις μου</h2>
               <p className="wallet-panel-lead">
@@ -488,7 +508,7 @@ function WalletAuthenticatedApp() {
         )}
 
         {activeTab === 'rentals' && (
-          <div className="wallet-stack">
+          <div className={`wallet-stack${wideChrome ? ' wallet-stack--desk' : ''}`}>
             <section className="wallet-panel">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>
@@ -513,7 +533,7 @@ function WalletAuthenticatedApp() {
         {activeTab === 'lost_found' && <LostFoundPanel bookings={bookings} />}
 
         {activeTab === 'account' && (
-          <div className="wallet-stack">
+          <div className={`wallet-stack${wideChrome ? ' wallet-stack--desk' : ''}`}>
             <section className="wallet-panel">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>
@@ -554,22 +574,24 @@ function WalletAuthenticatedApp() {
         )}
 
         {isTicketView && (
-          <WalletTicketDetail
-            booking={selectedBooking}
-            coverImage={tripImageFor(selectedBooking)}
-            brandLabel={brandLabel}
-            passengerName={profile.name}
-            onBookingUpdated={handleBookingUpdated}
-            onBack={() => {
-              setActiveTab('home');
-              setSelectedBookingId(null);
-            }}
-          />
+          <div className={wideChrome ? 'wallet-stack--desk' : undefined}>
+            <WalletTicketDetail
+              booking={selectedBooking}
+              coverImage={tripImageFor(selectedBooking)}
+              brandLabel={brandLabel}
+              passengerName={profile.name}
+              onBookingUpdated={handleBookingUpdated}
+              onBack={() => {
+                setActiveTab('home');
+                setSelectedBookingId(null);
+              }}
+            />
+          </div>
         )}
         </main>
 
         {!isTicketView ? (
-          <nav className="wallet-nav" aria-label="My Wallet">
+          <nav className="wallet-nav" aria-label="My Wallet" data-surface={surface}>
             {TABS.map((tab) => (
               <button
                 key={tab.id}
