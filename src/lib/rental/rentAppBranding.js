@@ -3,6 +3,8 @@
  * Stored on site_appearance; empty fields fall back to office legal name / defaults.
  */
 
+import { isPlatformPlaceholderLogo } from '../branding/officeBrand.js';
+
 export const DEFAULT_RENT_APP_BRANDING = {
   rent_office_name: '',
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
@@ -14,9 +16,16 @@ export const DEFAULT_RENT_APP_BRANDING = {
   rent_cta_label: 'Βρες όχημα',
 };
 
+/** Names that look like empty admin placeholders — never show alone on /rent. */
+const GENERIC_OFFICE_LABEL_RE = /^(γραφείο|office|το γραφείο|agency)$/i;
+
 /** Legacy guest copy removed from /rent hero — treat as empty if still stored. */
 const OBSOLETE_RENT_GUEST_HERO_COPY =
   'Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.';
+
+export function isGenericRentOfficeLabel(name) {
+  return !String(name || '').trim() || GENERIC_OFFICE_LABEL_RE.test(String(name).trim());
+}
 
 /**
  * @param {object} appearance
@@ -24,11 +33,19 @@ const OBSOLETE_RENT_GUEST_HERO_COPY =
  */
 export function resolveRentAppBranding(appearance = {}, opts = {}) {
   const guest = Boolean(opts.guest);
-  const office =
-    String(appearance.rent_office_name || '').trim() ||
-    String(appearance.footer_brand_name || '').trim() ||
-    String(appearance.display_name || '').trim() ||
-    'Ενοικίαση';
+  const candidates = [
+    appearance.rent_office_name,
+    appearance.footer_brand_name,
+    appearance.display_name,
+  ]
+    .map((v) => String(v || '').trim())
+    .filter((v) => v && !isGenericRentOfficeLabel(v));
+
+  const office = candidates[0] || 'Ενοικιάσεις';
+  const hasRealOfficeName = candidates.length > 0;
+
+  const rawLogo = appearance.logo_url || '';
+  const logoUrl = isPlatformPlaceholderLogo(rawLogo) ? '' : String(rawLogo).trim();
 
   const title = guest
     ? String(appearance.rent_guest_hero_title || '').trim() ||
@@ -54,6 +71,10 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
   return {
     officeName: office,
     brandLabel: office,
+    logoUrl,
+    showName: appearance.logo_show_name !== false,
+    /** Secondary chip under the name — only when a real office brand exists. */
+    brandSubtitle: hasRealOfficeName ? 'Ενοικιάσεις' : '',
     title,
     titleAccent,
     copy,

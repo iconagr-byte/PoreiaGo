@@ -37,6 +37,7 @@ import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx'
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
+import RentBrandMark from '../components/rental/RentBrandMark.jsx';
 import { RentProductSection } from '../components/marketing/PlatformLandingSections.jsx';
 import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
@@ -153,8 +154,10 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           resolveRentAppBranding(
             {
               ...(data || {}),
-              footer_brand_name: data?.footer_brand_name || brand.displayName || brand.name,
-              display_name: brand.displayName || brand.name,
+              footer_brand_name: data?.footer_brand_name || brand.displayName || '',
+              display_name: brand.displayName || '',
+              logo_url: data?.logo_url || brand.logoUrl || '',
+              logo_show_name: brand.showName,
             },
             { guest: true },
           ),
@@ -196,11 +199,17 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           <button
             type="button"
             className="rent-topbar-brand"
+            aria-label={branding.brandLabel}
             onClick={() => {
               /* no-op */
             }}
           >
-            {branding.brandLabel}
+            <RentBrandMark
+              label={branding.brandLabel}
+              logoUrl={branding.logoUrl}
+              showName={branding.showName}
+              subtitle={branding.brandSubtitle}
+            />
           </button>
           <RentGuestTopActions onAccount={onRequireLogin} />
         </header>
@@ -208,6 +217,8 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         <main className="rent-home rent-home--guest-land">
           <RentGuestHero
             brandLabel={branding.brandLabel}
+            logoUrl={branding.logoUrl}
+            brandSubtitle={branding.brandSubtitle}
             title={branding.title}
             titleAccent={branding.titleAccent}
             copy={branding.copy}
@@ -484,8 +495,10 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
         setBranding(
           resolveRentAppBranding({
             ...(data || {}),
-            footer_brand_name: data?.footer_brand_name || brand.displayName || brand.name,
-            display_name: brand.displayName || brand.name,
+            footer_brand_name: data?.footer_brand_name || brand.displayName || '',
+            display_name: brand.displayName || '',
+            logo_url: data?.logo_url || brand.logoUrl || '',
+            logo_show_name: brand.showName,
           }),
         );
       })
@@ -589,9 +602,15 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
           <button
             type="button"
             className="rent-topbar-brand"
+            aria-label={branding.brandLabel}
             onClick={() => scrollToSection(isMobile ? 'rent-wallet' : 'rent-home')}
           >
-            {branding.brandLabel}
+            <RentBrandMark
+              label={branding.brandLabel}
+              logoUrl={branding.logoUrl}
+              showName={branding.showName}
+              subtitle={branding.brandSubtitle}
+            />
           </button>
           <button type="button" className="rent-btn rent-btn-wallet" onClick={openWallet}>
             <span className="material-symbols-outlined" aria-hidden>
@@ -605,7 +624,14 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
           {!isMobile ? (
             <section id="rent-home" className="rent-inline-section" aria-label="Αρχική">
               <section className="rent-hero rent-hero--inline" aria-label="Ενοικίαση">
-                <p className="rent-hero-brand">{branding.brandLabel}</p>
+                <div className="rent-hero-brand">
+                  <RentBrandMark
+                    label={branding.brandLabel}
+                    logoUrl={branding.logoUrl}
+                    showName={branding.showName}
+                    subtitle={branding.brandSubtitle}
+                  />
+                </div>
                 <h1 className="rent-hero-title">{branding.title}</h1>
                 <p className="rent-hero-copy">{branding.copy}</p>
                 <button type="button" className="rent-hero-cta" onClick={() => scrollToSection('rent-book')}>

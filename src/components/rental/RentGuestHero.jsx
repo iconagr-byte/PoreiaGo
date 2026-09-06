@@ -7,6 +7,7 @@ import {
 import { buildRentLocationOptions } from '../../lib/rental/rentBookingSearch.js';
 import { readPageSlider } from '../../lib/homepage/pageSlider.js';
 import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
+import RentBrandMark from './RentBrandMark.jsx';
 
 /**
  * Full-bleed photo hero for guest /rent — mirrors platform bus landing form.
@@ -14,6 +15,8 @@ import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
  */
 export default function RentGuestHero({
   brandLabel = 'Ενοικίαση',
+  logoUrl = '',
+  brandSubtitle = 'Ενοικιάσεις',
   title,
   titleAccent,
   copy,
@@ -80,7 +83,14 @@ export default function RentGuestHero({
       </div>
 
       <div className="rent-hero-landing-inner">
-        <p className="rent-hero-brand rent-hero-brand--landing">{brandLabel}</p>
+        <div className="rent-hero-brand rent-hero-brand--landing">
+          <RentBrandMark
+            label={brandLabel}
+            logoUrl={logoUrl}
+            subtitle={brandSubtitle}
+            variant="onDark"
+          />
+        </div>
 
         <h1 className="rent-hero-landing-title">
           {headline}{' '}
