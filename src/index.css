@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+/* Fast fade when switching admin hub menus / panels */
+@keyframes admin-menu-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.admin-menu-fade {
+  animation: admin-menu-fade-in 140ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-menu-fade {
+    animation: none;
+  }
+}
+
 /* Admin sidebar — τμήματα μενού */
 .admin-sidebar-nav {
   background: transparent;
@@ -22,13 +42,17 @@
   margin-top: 0.125rem;
 }
 
+.admin-nav-section-label-rent {
+  color: color-mix(in srgb, #0f766e 70%, var(--color-on-surface-variant));
+}
+
 .admin-nav-section-label {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--color-on-surface-variant) 72%, transparent);
-  padding: 0 0.5rem 0.5rem;
+  padding: 0 0.5rem 0.35rem;
   margin: 0;
 }
 
@@ -36,65 +60,561 @@
   color: color-mix(in srgb, #4f46e5 75%, var(--color-on-surface-variant));
 }
 
-.admin-nav-section-toggle {
-  width: 100%;
-  min-height: 2.625rem;
+.admin-nav-section-label-settings {
+  color: color-mix(in srgb, var(--color-primary) 55%, var(--color-on-surface-variant));
+}
+
+/* —— Service mode switch (Όλα / Λεωφορεία / Ενοικιάσεις) —— */
+.admin-nav-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid color-mix(in srgb, #94a3b8 22%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.admin-nav-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 2.65rem;
+  padding: 0.3rem 0.15rem;
+  border: 1px solid transparent;
+  border-radius: 0.7rem;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.admin-nav-mode-btn .material-symbols-outlined {
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.admin-nav-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.85);
+  color: #334155;
+}
+
+.admin-nav-mode-btn.is-active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.admin-nav-mode-btn--all.is-active {
+  color: #4338ca;
+  border-color: color-mix(in srgb, #6366f1 28%, transparent);
+}
+
+.admin-nav-mode-btn--buses.is-active {
+  color: #0369a1;
+  border-color: color-mix(in srgb, #0ea5e9 30%, transparent);
+}
+
+.admin-nav-mode-btn--rent.is-active {
+  color: #0f766e;
+  border-color: color-mix(in srgb, #14b8a6 35%, transparent);
+  background: linear-gradient(180deg, #f0fdfa 0%, #fff 100%);
+}
+
+.admin-nav-mode-label {
+  line-height: 1.1;
+}
+
+/* —— Zones —— */
+.admin-nav-zone {
+  border-radius: 0.95rem;
+  padding: 0.45rem 0.3rem 0.35rem;
+}
+
+.admin-nav-zone--shared {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(139, 92, 246, 0.18), transparent 48%),
+    radial-gradient(circle at 92% 12%, rgba(14, 165, 233, 0.14), transparent 44%),
+    radial-gradient(circle at 70% 100%, rgba(251, 191, 36, 0.12), transparent 40%),
+    linear-gradient(165deg, #eef2ff 0%, #f5f3ff 45%, #ecfdf5 100%);
+  border: 1px solid color-mix(in srgb, #a78bfa 36%, transparent);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.1);
+  padding: 0.55rem 0.4rem 0.45rem;
+}
+
+.admin-nav-zone--shared-cards {
+  padding-bottom: 0.55rem;
+}
+
+.admin-nav-zone--buses {
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.9) 0%, rgba(255, 255, 255, 0.35) 100%);
+  border: 1px solid color-mix(in srgb, #0ea5e9 16%, transparent);
+}
+
+.admin-nav-zone--rent-hint {
+  background: linear-gradient(135deg, rgba(240, 253, 250, 0.95), rgba(255, 255, 255, 0.7));
+  border: 1px dashed color-mix(in srgb, #14b8a6 35%, transparent);
+  padding: 0.75rem 0.85rem;
+}
+
+.admin-nav-rent-hint-text {
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.admin-nav-zone-head {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  padding: 0 0.75rem;
-  margin-bottom: 0.375rem;
-  border: 1px solid transparent;
-  border-radius: 0.625rem;
-  background: transparent;
-  color: var(--color-on-surface-variant);
-  font-size: 0.875rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  gap: 0.5rem;
+  padding: 0.15rem 0.4rem 0.45rem;
 }
 
-.admin-nav-section-toggle:hover {
-  background: var(--color-surface-container-low);
-  color: var(--color-primary);
-}
-
-.admin-nav-section-toggle-active {
-  background: var(--color-surface-container-low);
-  color: var(--color-primary);
-  border-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
-}
-
-.admin-nav-section-toggle-icon {
-  width: 1.375rem;
-  height: 1.375rem;
+.admin-nav-zone-icon {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 0.55rem;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.admin-nav-section-toggle-icon .material-symbols-outlined {
+.admin-nav-zone-icon .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.admin-nav-zone-head--shared .admin-nav-zone-icon {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.admin-nav-zone-head--shared .admin-nav-zone-title {
+  color: #4f46e5;
+}
+
+.admin-nav-zone-head--shared .admin-nav-zone-sub {
+  color: #7c3aed;
+}
+
+.admin-nav-zone-head--buses .admin-nav-zone-icon {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.admin-nav-zone-title {
+  margin: 0;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.admin-nav-zone-head--buses .admin-nav-zone-title {
+  color: #0369a1;
+}
+
+.admin-nav-zone-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #94a3b8;
+  line-height: 1.2;
+}
+
+/* Dual bus+car badge on shared items (legacy / flat list) */
+.admin-nav-dual-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  margin-left: 0.15rem;
+}
+
+.admin-nav-dual-badge-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0f2fe;
+  color: #0284c7;
+  border: 1px solid color-mix(in srgb, #0ea5e9 25%, transparent);
+}
+
+.admin-nav-dual-badge-icon--car {
+  background: #ccfbf1;
+  color: #0f766e;
+  border-color: color-mix(in srgb, #14b8a6 30%, transparent);
+  margin-left: -0.2rem;
+}
+
+.admin-nav-dual-badge-icon .material-symbols-outlined {
+  font-size: 0.7rem;
+  line-height: 1;
+  font-variation-settings: 'FILL' 1;
+}
+
+/* Compact “Κοινό” chip on card-style shared rows */
+.admin-nav-shared-chip {
+  flex-shrink: 0;
+  margin-left: 0.25rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6d28d9;
+  background: linear-gradient(135deg, #ede9fe, #fce7f3);
+  border: 1px solid color-mix(in srgb, #a855f7 35%, transparent);
+  line-height: 1.2;
+}
+
+.admin-nav-btn--mini-card .admin-nav-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-nav-btn--mini-card .admin-nav-mini-chevron {
+  margin-left: 0.1rem;
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn-active .admin-nav-shared-chip,
+.admin-nav-btn--mini-card:hover .admin-nav-shared-chip {
+  background: linear-gradient(135deg, #ddd6fe, #fbcfe8);
+  color: #5b21b6;
+  border-color: color-mix(in srgb, #9333ea 40%, transparent);
+}
+
+.admin-nav-btn--shared {
+  padding-right: 0.4rem;
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn--shared {
+  padding-right: 0.4rem;
+}
+
+/* Shared rows use per-item accents (indigo/emerald/…) — keep light tinted hover */
+.admin-nav-btn--mini-card.admin-nav-btn--shared:hover,
+.admin-nav-btn--mini-card.admin-nav-btn--shared.admin-nav-btn-active {
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.admin-nav-btn--mini-card .admin-nav-icon--circle {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-nav-btn--mini-card[data-accent='indigo'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #c7d2fe, #a5b4fc);
+  color: #3730a3;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='emerald'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #a7f3d0, #6ee7b7);
+  color: #065f46;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='violet'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #ddd6fe, #c4b5fd);
+  color: #5b21b6;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='sky'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #bae6fd, #7dd3fc);
+  color: #075985;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='cyan'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #a5f3fc, #67e8f9);
+  color: #155e75;
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='rose'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #fecdd3, #fda4af);
+  color: #9f1239;
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='amber'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #fde68a, #fcd34d);
+  color: #92400e;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+.admin-nav-btn--mini-card[data-accent='blue'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #bfdbfe, #93c5fd);
+  color: #1e40af;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='teal'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #99f6e4, #5eead4);
+  color: #115e59;
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.28);
+}
+.admin-nav-btn--mini-card[data-accent='orange'] .admin-nav-icon--circle {
+  background: linear-gradient(145deg, #fed7aa, #fdba74);
+  color: #9a3412;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.28);
+}
+
+/* Soft resting tint so Κοινά cards aren’t flat white */
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='indigo'] {
+  background: linear-gradient(135deg, #f8faff, #fff);
+  border-color: color-mix(in srgb, #818cf8 22%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='emerald'] {
+  background: linear-gradient(135deg, #f6fffb, #fff);
+  border-color: color-mix(in srgb, #34d399 22%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='amber'] {
+  background: linear-gradient(135deg, #fffdf5, #fff);
+  border-color: color-mix(in srgb, #fbbf24 26%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='sky'] {
+  background: linear-gradient(135deg, #f5fbff, #fff);
+  border-color: color-mix(in srgb, #38bdf8 22%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn--shared[data-accent='violet'] {
+  background: linear-gradient(135deg, #faf8ff, #fff);
+  border-color: color-mix(in srgb, #a78bfa 24%, transparent);
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='indigo'],
+.admin-nav-btn--mini-card[data-accent='indigo']:hover {
+  background: linear-gradient(135deg, #eef2ff, #fff);
+  border-color: color-mix(in srgb, #6366f1 35%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='emerald'],
+.admin-nav-btn--mini-card[data-accent='emerald']:hover {
+  background: linear-gradient(135deg, #ecfdf5, #fff);
+  border-color: color-mix(in srgb, #10b981 35%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='amber'],
+.admin-nav-btn--mini-card[data-accent='amber']:hover {
+  background: linear-gradient(135deg, #fffbeb, #fff);
+  border-color: color-mix(in srgb, #f59e0b 40%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='sky'],
+.admin-nav-btn--mini-card[data-accent='sky']:hover {
+  background: linear-gradient(135deg, #f0f9ff, #fff);
+  border-color: color-mix(in srgb, #0ea5e9 35%, transparent);
+}
+.admin-nav-btn--mini-card.admin-nav-btn-active[data-accent='violet'],
+.admin-nav-btn--mini-card[data-accent='violet']:hover {
+  background: linear-gradient(135deg, #f5f3ff, #fff);
+  border-color: color-mix(in srgb, #8b5cf6 35%, transparent);
+}
+
+/* Pinned service cards (Rent / Fleet ops) */
+.admin-nav-service-card {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: left;
+  padding: 0.55rem 0.5rem 0.55rem 0.55rem;
+  border-radius: 0.95rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease;
+}
+
+.admin-nav-service-card:active {
+  transform: scale(0.985);
+}
+
+.admin-nav-service-card-glow {
+  position: absolute;
+  inset: auto -20% -40% auto;
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(18px);
+  opacity: 0.35;
+}
+
+.admin-nav-service-card--rent {
+  background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 70%);
+  border-color: color-mix(in srgb, #14b8a6 22%, transparent);
+  box-shadow: 0 2px 10px rgba(13, 148, 136, 0.06);
+}
+
+.admin-nav-service-card--rent .admin-nav-service-card-glow {
+  background: #2dd4bf;
+}
+
+.admin-nav-service-card--rent.is-active,
+.admin-nav-service-card--rent:hover {
+  border-color: color-mix(in srgb, #0f766e 40%, transparent);
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.12);
+}
+
+.admin-nav-service-card--buses {
+  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 70%);
+  border-color: color-mix(in srgb, #0ea5e9 20%, transparent);
+  box-shadow: 0 2px 10px rgba(14, 165, 233, 0.05);
+}
+
+.admin-nav-service-card--buses.is-active,
+.admin-nav-service-card--buses:hover {
+  border-color: color-mix(in srgb, #0369a1 38%, transparent);
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.12);
+}
+
+.admin-nav-service-card--settings {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 70%);
+  border-color: color-mix(in srgb, #64748b 20%, transparent);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+}
+
+.admin-nav-service-card--settings.is-active,
+.admin-nav-service-card--settings:hover {
+  border-color: color-mix(in srgb, #334155 36%, transparent);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
+}
+
+.admin-nav-service-card-icon {
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-nav-service-card-icon .material-symbols-outlined {
   font-size: 1.25rem;
 }
 
-.admin-nav-section-toggle-label {
+.admin-nav-service-card--rent .admin-nav-service-card-icon {
+  background: linear-gradient(160deg, #14b8a6, #0f766e);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(15, 118, 110, 0.28);
+}
+
+.admin-nav-service-card--buses .admin-nav-service-card-icon {
+  background: linear-gradient(160deg, #38bdf8, #0284c7);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.22);
+}
+
+.admin-nav-service-card--settings .admin-nav-service-card-icon {
+  background: linear-gradient(160deg, #64748b, #334155);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(51, 65, 85, 0.22);
+}
+
+.admin-nav-service-card-copy {
   flex: 1;
-  text-align: left;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
 }
 
-.admin-nav-chevron {
+.admin-nav-service-card-kicker {
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.admin-nav-service-card--rent .admin-nav-service-card-kicker {
+  color: #0f766e;
+}
+
+.admin-nav-service-card--buses .admin-nav-service-card-kicker {
+  color: #0369a1;
+}
+
+.admin-nav-service-card--settings .admin-nav-service-card-kicker {
+  color: #475569;
+}
+
+.admin-nav-service-card-title {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.admin-nav-service-card--single .admin-nav-service-card-copy {
+  justify-content: center;
+}
+
+.admin-nav-service-card--single .admin-nav-service-card-title {
+  font-size: 0.78rem;
+  letter-spacing: -0.01em;
+}
+
+.admin-nav-service-card-sub {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+.admin-nav-service-card-chevron {
   font-size: 1.125rem;
-  transition: transform 0.2s ease;
-  color: color-mix(in srgb, var(--color-outline) 90%, transparent);
+  color: #94a3b8;
+  flex-shrink: 0;
 }
 
-.admin-nav-chevron-open {
-  transform: rotate(180deg);
+.admin-nav-service-card--rent .admin-nav-service-card-chevron {
+  color: #2dd4bf;
+}
+
+.admin-nav-service-card--buses .admin-nav-service-card-chevron {
+  color: #7dd3fc;
+}
+
+.admin-nav-service-card--settings .admin-nav-service-card-chevron {
+  color: #94a3b8;
+}
+
+.admin-nav-scroll {
+  scrollbar-gutter: stable;
+}
+
+.admin-nav-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-nav-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-outline) 35%, transparent);
+  border-radius: 999px;
 }
 
 .admin-nav-row-nested {
-  padding-left: 0.375rem;
+  padding-left: 0.25rem;
 }
 
 .admin-nav-hint {
@@ -103,7 +623,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--color-on-surface-variant) 70%, transparent);
-  padding: 0 0.5rem 0.625rem;
+  padding: 0.25rem 0.5rem 0.75rem;
   margin: 0;
 }
 
@@ -125,7 +645,7 @@
   display: flex;
   align-items: center;
   gap: 0.125rem;
-  min-height: 2.625rem;
+  min-height: 2.25rem;
   border-radius: 0.625rem;
   transition: opacity 0.15s ease;
 }
@@ -138,8 +658,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.625rem;
-  height: 2.25rem;
+  width: 1.375rem;
+  height: 2rem;
   flex-shrink: 0;
   color: color-mix(in srgb, var(--color-outline) 85%, transparent);
   cursor: grab;
@@ -165,18 +685,18 @@
 .admin-nav-btn {
   flex: 1;
   min-width: 0;
-  min-height: 2.625rem;
+  min-height: 2.25rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0 0.75rem 0 0.5rem;
+  gap: 0.5rem;
+  padding: 0.2rem 0.55rem 0.2rem 0.35rem;
   border: 1px solid transparent;
   border-radius: 0.625rem;
   background: transparent;
   color: var(--color-on-surface-variant);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
   text-align: left;
   cursor: pointer;
   transition:
@@ -189,6 +709,67 @@
 .admin-nav-btn:hover {
   background: var(--color-surface-container-low);
   color: var(--color-primary);
+}
+
+/* Λεωφορεία zone — mini-cards */
+.admin-nav-list--mini-cards {
+  gap: 0.4rem;
+}
+
+.admin-nav-row--mini-card {
+  min-height: 2.85rem;
+  align-items: stretch;
+}
+
+.admin-nav-row--mini-card .admin-nav-grip {
+  height: auto;
+  min-height: 2.85rem;
+  align-self: center;
+}
+
+.admin-nav-btn--mini-card {
+  min-height: 2.85rem;
+  padding: 0.45rem 0.5rem 0.45rem 0.4rem;
+  border-radius: 0.85rem;
+  border-color: color-mix(in srgb, var(--color-outline) 20%, transparent);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  gap: 0.55rem;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.admin-nav-btn--mini-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  background: #fff;
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn-active {
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
+}
+
+.admin-nav-icon--circle {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, currentColor 14%, #fff);
+}
+
+.admin-nav-icon--circle .material-symbols-outlined {
+  font-size: 1.1rem;
+}
+
+.admin-nav-mini-chevron {
+  font-size: 1.125rem;
+  color: #cbd5e1;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.admin-nav-btn--mini-card.admin-nav-btn-active .admin-nav-mini-chevron,
+.admin-nav-btn--mini-card:hover .admin-nav-mini-chevron {
+  color: currentColor;
+  opacity: 0.5;
 }
 
 .admin-nav-icon {
@@ -208,9 +789,9 @@
 .admin-nav-label {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-nav-btn-active {
@@ -272,6 +853,18 @@
   color: #0f766e;
   border-color: color-mix(in srgb, #14b8a6 18%, transparent);
 }
+.admin-nav-btn[data-accent='orange']:hover,
+.admin-nav-btn-active[data-accent='orange'] {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: color-mix(in srgb, #f97316 18%, transparent);
+}
+.admin-nav-btn[data-accent='slate']:hover,
+.admin-nav-btn-active[data-accent='slate'] {
+  background: #f8fafc;
+  color: #334155;
+  border-color: color-mix(in srgb, #64748b 18%, transparent);
+}
 
 .admin-nav-btn[data-accent='indigo'] .admin-nav-icon { color: #6366f1; }
 .admin-nav-btn[data-accent='emerald'] .admin-nav-icon { color: #10b981; }
@@ -282,6 +875,8 @@
 .admin-nav-btn[data-accent='amber'] .admin-nav-icon { color: #f59e0b; }
 .admin-nav-btn[data-accent='blue'] .admin-nav-icon { color: #3b82f6; }
 .admin-nav-btn[data-accent='teal'] .admin-nav-icon { color: #14b8a6; }
+.admin-nav-btn[data-accent='orange'] .admin-nav-icon { color: #f97316; }
+.admin-nav-btn[data-accent='slate'] .admin-nav-icon { color: #64748b; }
 
 .admin-nav-btn-platform {
   background: color-mix(in srgb, #4f46e5 8%, white) !important;
@@ -299,6 +894,31 @@
 
 .admin-nav-drop-end-active {
   min-height: 0.5rem;
+}
+
+.admin-nav-section-drop-target {
+  outline: 1.5px dashed color-mix(in srgb, var(--color-primary) 45%, transparent);
+  outline-offset: 2px;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--color-primary) 4%, transparent);
+}
+
+.admin-nav-empty-drop {
+  min-height: 2.25rem;
+  margin: 0 0.25rem;
+  border-radius: 0.75rem;
+  border: 1px dashed color-mix(in srgb, var(--color-outline) 35%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.admin-nav-empty-hint {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-on-surface-variant) 70%, transparent);
 }
 
 @theme {

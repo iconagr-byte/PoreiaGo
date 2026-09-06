@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     stripe_price_starter_yearly: str = Field(default="", alias="STRIPE_PRICE_STARTER_YEARLY")
     stripe_price_professional_yearly: str = Field(default="", alias="STRIPE_PRICE_PROFESSIONAL_YEARLY")
     stripe_price_enterprise_yearly: str = Field(default="", alias="STRIPE_PRICE_ENTERPRISE_YEARLY")
+    stripe_price_rent: str = Field(default="", alias="STRIPE_PRICE_RENT")
+    stripe_price_rent_yearly: str = Field(default="", alias="STRIPE_PRICE_RENT_YEARLY")
+    stripe_price_rent_addon: str = Field(default="", alias="STRIPE_PRICE_RENT_ADDON")
     billing_success_url: str = Field(
         default="http://localhost:5173/admin?billing=success",
         alias="BILLING_SUCCESS_URL",
@@ -75,6 +78,11 @@ class Settings(BaseSettings):
     billing_signup_cancel_url: str = Field(
         default="http://localhost:5173/grafeia/signup?billing=cancel",
         alias="BILLING_SIGNUP_CANCEL_URL",
+    )
+    billing_demo_mode: bool = Field(
+        default=True,
+        alias="BILLING_DEMO_MODE",
+        description="Allow office signup / trial without real Stripe charge (demo payment). Set false for live Stripe only.",
     )
 
     usage_metering_enabled: bool = Field(default=True, alias="USAGE_METERING_ENABLED")

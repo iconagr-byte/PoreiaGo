@@ -42,7 +42,10 @@ export default function ImageDropField({
         }
         onChange?.(url);
       } catch (err) {
-        setError(err.message || 'Αποτυχία ανεβάσματος');
+        const raw = String(err?.message || 'Αποτυχία ανεβάσματος');
+        setError(/invalid token|unauthorized|401/i.test(raw)
+          ? 'Η συνεδρία έληξε ή το ανέβασμα απέτυχε — δοκιμάστε ξανά ή αποθηκεύστε μετά την επιλογή.'
+          : raw);
       } finally {
         setUploading(false);
       }

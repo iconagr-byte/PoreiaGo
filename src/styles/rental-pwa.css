@@ -1,0 +1,5372 @@
+/* Apple-inspired customer rental PWA (/rent) — phone form factor */
+
+.rent-phone-stage {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(70% 55% at 50% 0%, rgba(70, 120, 140, 0.2), transparent 55%),
+    #05080a;
+}
+
+.rent-app {
+  --rent-ink: #1d1d1f;
+  --rent-secondary: #6e6e73;
+  --rent-fill: #f5f5f7;
+  --rent-card: rgba(255, 255, 255, 0.82);
+  --rent-stroke: rgba(0, 0, 0, 0.08);
+  --rent-deep: #0b3d4a;
+  --rent-teal: #0a7a6c;
+  --rent-blue: #0071e3;
+  --rent-mist: #d7ebe7;
+  --rent-sand: #f2f4f7;
+  --rent-foam: #fbfbfd;
+  --rent-accent: #ff9f0a;
+  --wallet-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --wallet-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui,
+    sans-serif;
+  --wallet-ink: var(--rent-ink);
+  --wallet-muted: var(--rent-secondary);
+  --wallet-accent: var(--rent-teal);
+  --wallet-accent-deep: var(--rent-deep);
+  --wallet-accent-soft: rgba(10, 122, 108, 0.12);
+  --wallet-mint: var(--rent-teal);
+  --wallet-mint-soft: rgba(10, 122, 108, 0.12);
+  --wallet-sunset: var(--rent-accent);
+  --wallet-sunset-soft: rgba(255, 159, 10, 0.16);
+  --wallet-paper: #ffffff;
+  --wallet-sand: #eef5f3;
+  --wallet-danger: #ff3b30;
+  position: relative;
+  width: min(390px, 100%);
+  height: min(844px, calc(100dvh - 2.5rem));
+  max-height: 844px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 2.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 0 0 10px #0a0a0c,
+    0 0 0 12px rgba(255, 255, 255, 0.08),
+    0 30px 80px rgba(0, 0, 0, 0.55);
+  background:
+    radial-gradient(900px 380px at 10% -8%, rgba(10, 122, 108, 0.1), transparent 55%),
+    radial-gradient(700px 320px at 95% 0%, rgba(0, 113, 227, 0.07), transparent 50%),
+    linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+  color: var(--rent-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: -0.015em;
+  container-type: inline-size;
+  container-name: rent-app;
+}
+
+.rent-app::before {
+  content: '';
+  position: absolute;
+  top: 0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 7.25rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: #050507;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.rent-app * {
+  box-sizing: border-box;
+}
+
+/* Full-bleed hero — brand first */
+.rent-hero {
+  position: relative;
+  min-height: 62%;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 2.4rem 1.2rem 1.35rem;
+  overflow: hidden;
+  color: #f5f5f7;
+  background:
+    radial-gradient(90% 70% at 88% 8%, rgba(255, 159, 10, 0.22), transparent 52%),
+    radial-gradient(110% 85% at 8% 100%, rgba(10, 122, 108, 0.45), transparent 52%),
+    linear-gradient(165deg, #102a32 0%, #0b4a4a 46%, #071c22 100%);
+  animation: rent-hero-in 700ms ease-out both;
+}
+
+.rent-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 35%),
+    radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.08), transparent 40%);
+  pointer-events: none;
+}
+
+/* Platform-style photo hero (guest /rent) */
+.rent-hero--landing {
+  justify-content: center;
+  min-height: min(62dvh, 560px);
+  padding: 5.5rem 1.25rem 3.25rem;
+  background: #020617;
+}
+
+.rent-hero--landing::before {
+  display: none;
+}
+
+.rent-hero-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.rent-hero-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.rent-hero-media .rent-hero-slider,
+.rent-hero-media .site-hero-slider {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.rent-hero-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.rent-hero-shade--x {
+  background: linear-gradient(
+    90deg,
+    rgba(2, 6, 23, 0.94) 0%,
+    rgba(2, 6, 23, 0.78) 42%,
+    rgba(2, 6, 23, 0.35) 100%
+  );
+}
+
+.rent-hero-shade--y {
+  background: linear-gradient(
+    180deg,
+    rgba(2, 6, 23, 0.55) 0%,
+    rgba(2, 6, 23, 0.28) 40%,
+    rgba(2, 6, 23, 0.88) 100%
+  );
+}
+
+.rent-hero-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 50% at 15% 20%, rgba(56, 189, 248, 0.14), transparent 58%);
+  pointer-events: none;
+}
+
+.rent-hero-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.14;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.rent-hero-landing-inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 40rem;
+  display: grid;
+  gap: 0;
+}
+
+.rent-hero-brand {
+  position: relative;
+  margin: 0 0 0.75rem;
+  font-size: clamp(2.2rem, 11cqi, 2.85rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  max-width: 11ch;
+  animation: rent-rise 780ms 60ms ease-out both;
+}
+
+.rent-hero-brand--landing {
+  max-width: none;
+  font-size: clamp(2.4rem, 8vw, 3.4rem);
+  margin-bottom: 1rem;
+  text-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.rent-hero-title {
+  position: relative;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  max-width: 22ch;
+  animation: rent-rise 780ms 140ms ease-out both;
+}
+
+.rent-hero-landing-title {
+  position: relative;
+  margin: 0 0 1rem;
+  font-size: clamp(1.65rem, 4.8vw, 2.65rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  color: #fff;
+  max-width: 18ch;
+  animation: rent-rise 780ms 120ms ease-out both;
+}
+
+.rent-hero-accent {
+  display: inline;
+  background: linear-gradient(90deg, #7dd3fc, #a5f3fc 45%, #a5b4fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.rent-hero-copy {
+  position: relative;
+  margin: 0.5rem 0 1.15rem;
+  max-width: 28ch;
+  color: rgba(245, 245, 247, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  animation: rent-rise 780ms 200ms ease-out both;
+}
+
+.rent-hero-landing-copy {
+  position: relative;
+  margin: 0 0 1.35rem;
+  max-width: 38ch;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(0.95rem, 2.2vw, 1.12rem);
+  line-height: 1.5;
+  animation: rent-rise 780ms 180ms ease-out both;
+}
+
+.rent-hero-actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  animation: rent-rise 780ms 240ms ease-out both;
+}
+
+.rent-hero-cta {
+  position: relative;
+  appearance: none;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 3.15rem;
+  padding: 0.9rem 1.15rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #3a3a3c;
+  font-weight: 500;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  animation: rent-rise 780ms 260ms ease-out both;
+  transition: transform 0.15s ease;
+  text-align: left;
+}
+
+.rent-hero-cta .material-symbols-outlined {
+  font-size: 1.3rem;
+  opacity: 0.55;
+  color: #1c1c1e;
+}
+
+.rent-hero-cta:active {
+  transform: scale(0.98);
+}
+
+.rent-hero-actions .rent-hero-cta {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: min(100%, 11rem);
+  justify-content: center;
+  font-weight: 700;
+  animation: none;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.rent-hero-cta--primary {
+  background: #fff;
+  color: #0f172a;
+}
+
+.rent-hero-cta--primary .material-symbols-outlined {
+  opacity: 0.85;
+  color: #0f172a;
+}
+
+.rent-hero-cta--teal {
+  background: rgba(20, 184, 166, 0.16);
+  border: 1px solid rgba(94, 234, 212, 0.45);
+  color: #ecfdf5;
+  box-shadow: none;
+}
+
+.rent-hero-cta--teal .material-symbols-outlined {
+  opacity: 0.95;
+  color: #99f6e4;
+}
+
+.rent-hero-pickups {
+  position: relative;
+  margin: 0.15rem 0 0.85rem;
+  max-width: 36rem;
+  animation: rent-rise 780ms 260ms ease-out both;
+}
+
+.rent-hero-pickups-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.rent-hero-pickups-label .material-symbols-outlined {
+  font-size: 0.95rem;
+  color: #99f6e4;
+}
+
+.rent-hero-pickup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.rent-hero-pickup-chip {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(15, 23, 42, 0.35);
+  color: #f8fafc;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.rent-hero-pickup-chip:hover {
+  background: rgba(20, 184, 166, 0.28);
+  border-color: rgba(94, 234, 212, 0.55);
+}
+
+.rent-hero-pickup-chip:active {
+  transform: scale(0.98);
+}
+
+.rent-hero-tagline {
+  position: relative;
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: -0.01em;
+  animation: rent-rise 780ms 280ms ease-out both;
+}
+
+.rent-hero-stats {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: 1.75rem;
+  max-width: 36rem;
+  animation: rent-rise 780ms 320ms ease-out both;
+}
+
+.rent-hero-stat {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 0.85rem 0.9rem;
+}
+
+.rent-hero-stat--accent {
+  background: rgba(20, 184, 166, 0.16);
+  border-color: rgba(94, 234, 212, 0.32);
+}
+
+.rent-hero-stat strong {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.rent-hero-stat span {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.rent-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 2.15rem 1.1rem 0.75rem;
+  flex-shrink: 0;
+  z-index: 5;
+  background: rgba(251, 251, 253, 0.92);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border-bottom: 1px solid var(--rent-stroke);
+}
+
+.rent-topbar-brand {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.12rem;
+  letter-spacing: -0.03em;
+  color: var(--rent-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.rent-topbar--guest {
+  gap: 0.65rem;
+}
+
+.rent-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.rent-top-chip-wrap {
+  position: relative;
+}
+
+.rent-top-chip {
+  appearance: none;
+  border: 1px solid rgba(10, 122, 108, 0.16);
+  background: rgba(10, 122, 108, 0.08);
+  color: var(--rent-deep);
+  border-radius: 999px;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.7rem 0.35rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.rent-top-chip:hover,
+.rent-top-chip.is-open {
+  background: rgba(10, 122, 108, 0.14);
+  border-color: rgba(10, 122, 108, 0.28);
+}
+
+.rent-top-chip--wallet {
+  margin-left: 0.15rem;
+  padding: 0.35rem 0.85rem 0.35rem 0.65rem;
+  border-color: transparent;
+  background: linear-gradient(145deg, #0b3d4a 0%, #0a7a6c 100%);
+  color: #f4fffb;
+  box-shadow: 0 6px 18px rgba(11, 61, 74, 0.28);
+  text-decoration: none;
+}
+
+.rent-top-chip--wallet:hover,
+.rent-top-chip--wallet.is-open {
+  background: linear-gradient(145deg, #0a3540 0%, #098f7e 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(11, 61, 74, 0.34);
+  transform: translateY(-1px);
+}
+
+.rent-top-chip--wallet .material-symbols-outlined {
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-top-chip-wallet-label {
+  white-space: nowrap;
+}
+
+.rent-top-chip .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.rent-top-chip-caret {
+  font-size: 1rem !important;
+  opacity: 0.55;
+}
+
+.rent-top-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  min-width: 12.5rem;
+  padding: 0.35rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+  z-index: 40;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.rent-top-menu-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  padding: 0.65rem 0.7rem;
+  border-radius: 12px;
+  color: var(--rent-ink);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rent-top-menu-item:hover {
+  background: rgba(10, 122, 108, 0.08);
+  color: var(--rent-deep);
+}
+
+.rent-top-menu-item .material-symbols-outlined {
+  font-size: 1.1rem;
+  color: var(--rent-teal);
+}
+
+.rent-top-icon-btn {
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--rent-ink);
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.rent-top-icon-btn:hover,
+.rent-top-icon-btn.is-open {
+  background: #fff;
+  border-color: rgba(10, 122, 108, 0.28);
+  color: var(--rent-deep);
+}
+
+.rent-top-icon-btn .material-symbols-outlined {
+  font-size: 1.2rem;
+}
+
+.rent-top-menu--account {
+  min-width: 9.5rem;
+}
+
+.rent-top-menu--account .rent-top-menu-item {
+  font-weight: 700;
+}
+
+.rent-top-lang {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.12rem;
+  padding: 0.18rem;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.12);
+}
+
+.rent-top-lang button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-secondary);
+  min-width: 2.1rem;
+  min-height: 1.85rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.rent-top-lang button.is-active {
+  background: #fff;
+  color: var(--rent-deep);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 720px) {
+  .rent-top-chip-label {
+    display: none;
+  }
+
+  .rent-top-chip {
+    padding: 0.35rem 0.45rem;
+  }
+
+  .rent-top-chip--wallet {
+    padding: 0.35rem 0.65rem 0.35rem 0.5rem;
+  }
+
+  .rent-top-chip-wallet-label {
+    font-size: 0.72rem;
+  }
+
+  .rent-top-chip-caret {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .rent-top-chip-wallet-label {
+    display: none;
+  }
+
+  .rent-top-chip--wallet {
+    padding: 0.35rem 0.45rem;
+  }
+}
+
+.rent-main,
+.rent-home {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem 1rem 5.6rem;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.rent-home {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 5.6rem;
+}
+
+.rent-home .rent-home-stack {
+  padding: 1.15rem 1rem 1.5rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-panel {
+  background: var(--rent-card);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  border-radius: 24px;
+  padding: 1.15rem 1.15rem 1.25rem;
+  border: 1px solid var(--rent-stroke);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 14px 36px rgba(15, 23, 42, 0.06);
+  animation: rent-rise 420ms ease-out both;
+}
+
+.rent-panel h2 {
+  margin: 0 0 0.3rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--rent-ink);
+}
+
+.rent-panel-lead {
+  margin: 0 0 1rem;
+  color: var(--rent-secondary);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.rent-btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  min-height: 2.85rem;
+  padding: 0.7rem 1.15rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.rent-btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.rent-btn-primary {
+  background: linear-gradient(180deg, #1aa392 0%, #0b3d4a 100%);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(11, 61, 74, 0.24);
+}
+
+.rent-btn-ghost {
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--rent-ink);
+  border: 1px solid var(--rent-stroke);
+}
+
+.rent-btn-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--rent-deep, #0b3d4a);
+  color: #fff;
+  border: 0;
+  box-shadow: 0 8px 20px rgba(11, 61, 74, 0.22);
+}
+
+.rent-btn-wallet .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.rent-btn-danger {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+}
+
+.rent-btn-block {
+  width: 100%;
+}
+
+.rent-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rent-nav {
+  position: absolute;
+  left: 0.65rem;
+  right: 0.65rem;
+  bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.15rem;
+  padding: 0.35rem;
+  border-radius: 22px;
+  background: rgba(236, 236, 238, 0.94);
+  border: 1px solid var(--rent-stroke);
+  backdrop-filter: blur(22px) saturate(1.45);
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 16px 40px rgba(15, 23, 42, 0.12);
+}
+
+.rent-nav button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  padding: 0.42rem 0.15rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.rent-nav button .material-symbols-outlined {
+  font-size: 1.3rem;
+}
+
+.rent-nav button.is-active {
+  color: var(--rent-deep);
+  background: rgba(10, 122, 108, 0.12);
+}
+
+.rent-nav button.is-active .material-symbols-outlined {
+  font-variation-settings: 'FILL' 1;
+}
+
+/* Single-page Rent: no bottom tabs — sections stacked in main */
+.rent-app--inline .rent-nav {
+  display: none;
+}
+
+.rent-main--inline {
+  padding: 1rem 1rem max(1.5rem, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rent-inline-section {
+  scroll-margin-top: 4.5rem;
+}
+
+.rent-hero--inline {
+  border-radius: 24px;
+  min-height: auto;
+  margin: 0;
+}
+
+.rent-phone-stage--inline.rent-phone-stage--desktop .rent-main--inline {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  max-width: 1280px;
+  margin-inline: auto;
+  width: 100%;
+}
+
+.rent-phone-stage--inline.rent-phone-stage--desktop .rent-hero--inline {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+/* Install card */
+.rent-install {
+  margin: 0.75rem 0 0;
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--rent-stroke);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  align-items: center;
+  justify-content: space-between;
+  animation: rent-rise 500ms 100ms ease-out both;
+}
+
+.rent-install--compact {
+  margin: 1rem 0 0;
+  padding: 0.85rem 0.9rem;
+  box-shadow: none;
+}
+
+.rent-gate-card .rent-install {
+  background: rgba(245, 245, 247, 0.95);
+}
+
+.rent-guest-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--rent-secondary);
+}
+
+.rent-hero-cta {
+  text-decoration: none;
+}
+
+.rent-app--guest {
+  position: relative;
+}
+
+.rent-app--guest .rent-nav {
+  display: none;
+}
+
+.rent-app--guest .rent-home {
+  padding-bottom: 2rem;
+}
+
+.rent-install-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+  color: var(--rent-ink);
+}
+
+.rent-install-text {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--rent-secondary);
+  max-width: 34ch;
+  line-height: 1.4;
+}
+
+.rent-install-icon {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #1aa392, #0b3d4a);
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 8px 18px rgba(11, 61, 74, 0.25);
+}
+
+.rent-install-icon .material-symbols-outlined {
+  font-size: 1.35rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-home-stack {
+  display: grid;
+  gap: 0.85rem;
+  padding-top: 0.25rem;
+}
+
+.rent-home-fleet {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-home-fleet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rent-home-fleet-tools {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rent-home-fleet-tools input {
+  border: 1px solid var(--rent-stroke);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.rent-home-fleet-cats {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+}
+
+.rent-home-fleet-cats button {
+  appearance: none;
+  border: 1px solid var(--rent-stroke);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--rent-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.28rem 0.52rem;
+  cursor: pointer;
+}
+
+.rent-home-fleet-cats button.is-active {
+  border-color: rgba(10, 122, 108, 0.4);
+  color: var(--rent-deep);
+  background: rgba(10, 122, 108, 0.12);
+}
+
+.rent-home-fleet-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--rent-ink);
+}
+
+.rent-home-fleet-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-teal);
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.rent-home-fleet-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 72%;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.rent-home-fleet-strip::-webkit-scrollbar {
+  display: none;
+}
+
+/* —— Platform-form landing bands (guest /rent body) —— */
+.rent-home-stack--landing {
+  padding: 0;
+  gap: 0;
+  background: #f5f5f7;
+}
+
+.rent-land {
+  display: grid;
+  gap: 0;
+}
+
+.rent-land-band {
+  position: relative;
+  padding: 2.75rem 1.15rem;
+}
+
+.rent-land-band--mist {
+  background: #f5f5f7;
+}
+
+.rent-land-band--dark {
+  background: #0f172a;
+  color: #fff;
+}
+
+.rent-land-band--teal {
+  background: linear-gradient(180deg, #062a30 0%, #0b3d4a 48%, #020617 100%);
+  color: #fff;
+  overflow: hidden;
+}
+
+.rent-land-band--teal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 20%, rgba(45, 212, 191, 0.22), transparent),
+    radial-gradient(ellipse 50% 40% at 90% 80%, rgba(56, 189, 248, 0.12), transparent);
+}
+
+.rent-land-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.rent-land-head {
+  margin-bottom: 1.35rem;
+}
+
+.rent-land-head--center {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.rent-land-eyebrow {
+  margin: 0 0 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6e6e73;
+}
+
+.rent-land-title {
+  margin: 0;
+  font-size: clamp(1.55rem, 4vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  color: #1d1d1f;
+}
+
+.rent-land-title--light {
+  color: #fff;
+}
+
+.rent-land-muted {
+  color: #6e6e73;
+}
+
+.rent-land-sub {
+  margin: 0.55rem 0 0;
+  max-width: 40ch;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: #6e6e73;
+}
+
+.rent-land-sub--light {
+  color: rgba(255, 255, 255, 0.6);
+  margin-inline: auto;
+}
+
+.rent-land-sub--teal {
+  color: rgba(240, 253, 250, 0.72);
+  max-width: 36ch;
+}
+
+.rent-land-tools {
+  margin-top: 0.25rem;
+  margin-bottom: 0.35rem;
+}
+
+.rent-fleet-rail--land {
+  margin-top: 1.25rem;
+  grid-auto-columns: minmax(70%, 250px);
+}
+
+.rent-fleet-rail--land .rent-fleet-tile {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 22px;
+  padding: 0.55rem 0.55rem 0.85rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+}
+
+.rent-fleet-rail--land .rent-fleet-tile-media {
+  border-radius: 16px;
+}
+
+.rent-fleet-rail--land .rent-fleet-tile-body {
+  padding: 0.15rem 0.35rem 0;
+}
+
+/* —— Vehicle pick cards (Hertz structure, rent teal) —— */
+.rent-land-band--pick {
+  background:
+    radial-gradient(90% 60% at 10% 0%, rgba(10, 122, 108, 0.08), transparent 55%),
+    linear-gradient(180deg, #eef5f3 0%, #f5f5f7 100%);
+}
+
+.rent-pick-head {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.15rem;
+}
+
+.rent-pick-head-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 3.4vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--rent-ink);
+  line-height: 1.2;
+}
+
+.rent-pick-head-where {
+  display: inline;
+  font-weight: 600;
+  color: var(--rent-secondary);
+}
+
+.rent-pick-loc {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--rent-deep);
+  font-size: 0.88em;
+  font-weight: 700;
+}
+
+.rent-pick-head-sub {
+  margin: 0.45rem 0 0;
+  font-size: 0.88rem;
+  color: var(--rent-secondary);
+}
+
+.rent-pick-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.rent-pick-filter {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.rent-pick-filter > span {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--rent-secondary);
+}
+
+.rent-pick-filter select,
+.rent-pick-filter input {
+  appearance: none;
+  min-height: 2.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.55rem 0.8rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--rent-ink);
+  outline: none;
+}
+
+.rent-pick-filter select:focus,
+.rent-pick-filter input:focus {
+  border-color: rgba(10, 122, 108, 0.45);
+  box-shadow: 0 0 0 3px rgba(10, 122, 108, 0.12);
+}
+
+.rent-pick-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.9rem;
+}
+
+.rent-pick {
+  position: relative;
+  display: grid;
+  gap: 1.05rem;
+  padding: 1.35rem 1.2rem 1.2rem;
+  border-radius: 24px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.055);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease;
+}
+
+.rent-pick:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+}
+
+.rent-pick-fav {
+  appearance: none;
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(238, 245, 243, 0.95);
+  color: var(--rent-deep);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.rent-pick-fav .material-symbols-outlined {
+  font-size: 1.05rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-pick-top {
+  display: grid;
+  gap: 0.45rem;
+  padding-right: 1.75rem;
+}
+
+.rent-pick-title {
+  margin: 0;
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--rent-ink);
+  line-height: 1.25;
+}
+
+.rent-pick-title em {
+  display: block;
+  margin-top: 0.1rem;
+  font-style: normal;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--rent-secondary);
+}
+
+.rent-pick-group {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--rent-secondary);
+}
+
+.rent-pick-group .material-symbols-outlined {
+  font-size: 0.95rem;
+  color: var(--rent-teal);
+}
+
+.rent-pick-specs {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem 0.75rem;
+}
+
+.rent-pick-specs li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #4a4a4f;
+}
+
+.rent-pick-specs .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: var(--rent-teal);
+}
+
+.rent-pick-media {
+  aspect-ratio: 16 / 9.5;
+  border-radius: 18px;
+  background:
+    radial-gradient(70% 80% at 50% 80%, rgba(10, 122, 108, 0.08), transparent 70%),
+    #f4f7f6;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  position: relative;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.rent-pick-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  transform: scale(1.02);
+  transition: transform 0.35s ease;
+}
+
+.rent-pick:hover .rent-pick-media img {
+  transform: scale(1.06);
+}
+
+.rent-pick-media .material-symbols-outlined {
+  font-size: 2.4rem;
+  color: rgba(60, 60, 67, 0.3);
+}
+
+.rent-pick-media-hint {
+  position: absolute;
+  left: 0.65rem;
+  bottom: 0.55rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.rent-pick:hover .rent-pick-media-hint,
+.rent-pick-media:focus-visible .rent-pick-media-hint {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (hover: none) {
+  .rent-pick-media-hint {
+    opacity: 0.92;
+    transform: none;
+  }
+}
+
+.rent-pick-foot {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-pick-price {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--rent-deep);
+  text-align: center;
+}
+
+.rent-pick-cta {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  min-height: 3.15rem;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #0c8a7a 0%, var(--rent-deep) 100%);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
+}
+
+.rent-pick-cta:hover {
+  filter: brightness(1.05);
+}
+
+.rent-pick-cta:active {
+  transform: scale(0.985);
+  opacity: 0.92;
+}
+
+.rent-land-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.rent-land-cards--2 {
+  grid-template-columns: 1fr;
+}
+
+.rent-land-card {
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 22px;
+  padding: 1.35rem 1.25rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.rent-land-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+.rent-land-card-icon {
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.35rem;
+  background: rgba(10, 122, 108, 0.12);
+  color: var(--rent-teal);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.rent-land-card-icon .material-symbols-outlined {
+  font-size: 1.45rem;
+  font-weight: 300;
+}
+
+.rent-land-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+}
+
+.rent-land-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #6e6e73;
+}
+
+.rent-land-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.rent-land-steps li {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rent-land-step-num {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: rgba(255, 255, 255, 0.2);
+  line-height: 1;
+}
+
+.rent-land-steps h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.rent-land-steps p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+  max-width: 28ch;
+}
+
+.rent-land-center {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.rent-land-btn {
+  appearance: none;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 3.1rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.rent-land-btn:active {
+  transform: scale(0.98);
+}
+
+.rent-land-btn .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.rent-land-btn--sky {
+  background: #0ea5e9;
+  color: #fff;
+}
+
+.rent-land-btn--white {
+  background: #fff;
+  color: #042f2e;
+}
+
+.rent-land-btn--ghost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+}
+
+.rent-land-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  background: rgba(45, 212, 191, 0.12);
+  color: #99f6e4;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rent-land-chip .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.rent-land-checks {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-land-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: rgba(240, 253, 250, 0.92);
+  line-height: 1.35;
+}
+
+.rent-land-checks .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: #5eead4;
+  margin-top: 0.05rem;
+}
+
+.rent-land-actions {
+  margin-top: 1.5rem;
+}
+
+.rent-land-teal-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.rent-land-aside {
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 1.35rem 1.25rem;
+}
+
+.rent-land-aside-kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #99f6e4;
+}
+
+.rent-land-aside h3 {
+  margin: 0.45rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.rent-land-aside p {
+  margin: 0.45rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* —— Hertz-like booking search bar (rent theme) —— */
+.rent-search-wrap {
+  position: relative;
+  z-index: 6;
+  padding: 0;
+}
+
+/* Booking strip — full-bleed teal like Hertz yellow bar */
+.rent-search-wrap--top {
+  margin: 0;
+  background: linear-gradient(180deg, #0b3d4a 0%, #0a7a6c 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.85rem 1rem 1rem;
+}
+
+/* Sit below the hero (not under the header) — lower in the first viewport */
+.rent-search-wrap--below-hero {
+  position: relative;
+  z-index: 7;
+  margin-top: -2.75rem;
+  padding-top: 1.35rem;
+  padding-bottom: 1.25rem;
+  border-radius: 1.15rem 1.15rem 0 0;
+  box-shadow: 0 -12px 36px rgba(2, 6, 23, 0.18);
+}
+
+.rent-search {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.rent-search-panel {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  color: #fff;
+}
+
+.rent-search-wrap--top .rent-search-panel {
+  background: transparent;
+}
+
+.rent-search-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rent-search-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rent-search-switch {
+  width: 2.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.18s ease;
+}
+
+.rent-search-switch::after {
+  content: '';
+  position: absolute;
+  top: 0.16rem;
+  left: 0.16rem;
+  width: 1.02rem;
+  height: 1.02rem;
+  border-radius: 999px;
+  background: #fff;
+  transition: transform 0.18s ease;
+}
+
+.rent-search-toggle input:checked + .rent-search-switch {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.rent-search-toggle input:checked + .rent-search-switch::after {
+  transform: translateX(1rem);
+  background: var(--rent-deep);
+}
+
+.rent-search-row {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-search-field {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: center;
+  background: #fff;
+  color: var(--rent-ink);
+  border-radius: 14px;
+  padding: 0.65rem 0.8rem;
+  min-height: 4.1rem;
+}
+
+.rent-search-field--place {
+  grid-template-columns: auto 1fr auto;
+}
+
+.rent-search-field-icon {
+  font-size: 1.35rem;
+  color: var(--rent-teal);
+}
+
+.rent-search-field-body {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.rent-search-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--rent-secondary);
+}
+
+.rent-search-field select,
+.rent-search-field input[type='date'],
+.rent-search-field input[type='time'] {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--rent-ink);
+  outline: none;
+}
+
+.rent-search-datetime {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 0.35rem;
+}
+
+.rent-search-submit {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  min-height: 4.1rem;
+  padding: 0.85rem 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: #fff;
+  color: #0b3d4a;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.rent-search-submit .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: #0a7a6c;
+}
+
+.rent-search-submit:hover {
+  background: #f5f5f7;
+}
+
+.rent-search-submit:active {
+  transform: scale(0.985);
+}
+
+.rent-search-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin-top: 0.85rem;
+}
+
+.rent-search-promo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rent-search-promo input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #fff;
+}
+
+.rent-search-promo-input {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--rent-ink);
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.rent-search-error {
+  margin: 0.65rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffe8a3;
+}
+
+/* —— Apple-clean guest landing (legacy helpers) —— */
+.rent-apple-block {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 22px;
+  padding: 1.35rem 1.25rem 1.4rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
+  animation: rent-rise 480ms ease-out both;
+}
+
+.rent-apple-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rent-secondary);
+}
+
+.rent-apple-title {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  color: var(--rent-ink);
+}
+
+.rent-apple-lead {
+  margin: 0.4rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--rent-secondary);
+  max-width: 36ch;
+}
+
+.rent-apple-tools {
+  margin-top: 1.05rem;
+}
+
+.rent-apple-tools input {
+  border: 0;
+  border-radius: 14px;
+  background: rgba(120, 120, 128, 0.12);
+  padding: 0.72rem 0.9rem;
+  font-size: 0.9rem;
+  color: var(--rent-ink);
+}
+
+.rent-apple-tools input::placeholder {
+  color: rgba(60, 60, 67, 0.45);
+}
+
+.rent-apple-cats {
+  margin-top: 0.55rem;
+  gap: 0.4rem;
+}
+
+.rent-apple-cats button {
+  border: 0;
+  background: rgba(120, 120, 128, 0.1);
+  color: var(--rent-ink);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 0.42rem 0.78rem;
+}
+
+.rent-apple-cats button.is-active {
+  background: var(--rent-ink);
+  color: #fff;
+  border-color: transparent;
+}
+
+.rent-fleet-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(72%, 260px);
+  gap: 0.85rem;
+  overflow-x: auto;
+  margin-top: 1.1rem;
+  padding: 0.15rem 0.1rem 0.35rem;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.rent-fleet-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.rent-fleet-tile {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  display: grid;
+  gap: 0.7rem;
+  cursor: pointer;
+  scroll-snap-align: start;
+  position: relative;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rent-fleet-tile:hover {
+  transform: translateY(-3px);
+}
+
+.rent-fleet-tile:active {
+  transform: scale(0.985);
+}
+
+.rent-fleet-tile-media {
+  aspect-ratio: 4 / 3;
+  border-radius: 18px;
+  background: #e8eef0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.rent-fleet-tile-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rent-fleet-tile-media .material-symbols-outlined {
+  font-size: 2.2rem;
+  color: rgba(60, 60, 67, 0.35);
+}
+
+.rent-fleet-tile-fav {
+  position: absolute;
+  right: 0.7rem;
+  top: 0.7rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  color: #1c1c1e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.rent-fleet-tile-fav .material-symbols-outlined {
+  font-size: 1.05rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-fleet-tile-body {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0 0.1rem;
+}
+
+.rent-fleet-tile-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--rent-ink);
+  line-height: 1.2;
+}
+
+.rent-fleet-tile-meta {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--rent-secondary);
+  letter-spacing: -0.01em;
+}
+
+.rent-fleet-tile-price {
+  margin-top: 0.2rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--rent-ink);
+}
+
+.rent-guest-extras {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-apple-trust {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 0.75rem;
+}
+
+.rent-apple-trust li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--rent-ink);
+}
+
+.rent-apple-trust .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: var(--rent-teal);
+  opacity: 0.9;
+}
+
+.rent-apple-steps {
+  list-style: none;
+  margin: 1.15rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.rent-apple-steps li {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.85rem 0;
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.rent-apple-steps li:last-child {
+  padding-bottom: 0;
+}
+
+.rent-apple-step-i {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--rent-ink);
+  background: rgba(120, 120, 128, 0.12);
+}
+
+.rent-apple-steps strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--rent-ink);
+}
+
+.rent-apple-steps p {
+  margin: 0.2rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--rent-secondary);
+}
+
+.rent-apple-rows {
+  list-style: none;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.rent-apple-rows li {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.85rem 0;
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.rent-apple-rows li:last-child {
+  padding-bottom: 0;
+}
+
+.rent-apple-rows .material-symbols-outlined {
+  font-size: 1.25rem;
+  color: var(--rent-teal);
+  margin-top: 0.05rem;
+}
+
+.rent-apple-rows strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--rent-ink);
+}
+
+.rent-apple-rows p {
+  margin: 0.2rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--rent-secondary);
+}
+
+.rent-apple-checklist {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-apple-checklist li {
+  position: relative;
+  padding-left: 1.15rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--rent-ink);
+  line-height: 1.35;
+}
+
+.rent-apple-checklist li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.45rem;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--rent-teal);
+}
+
+.rent-apple-cta {
+  appearance: none;
+  border: 0;
+  margin-top: 1.25rem;
+  width: 100%;
+  min-height: 3.1rem;
+  border-radius: 999px;
+  background: var(--rent-ink);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.rent-apple-cta:active {
+  transform: scale(0.985);
+  opacity: 0.92;
+}
+
+/* Legacy card shell (kept for any remaining uses) */
+.rent-home-fleet-card {
+  appearance: none;
+  border: 1px solid var(--rent-stroke);
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 18px;
+  padding: 0.5rem;
+  text-align: left;
+  display: grid;
+  gap: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+  scroll-snap-align: start;
+  position: relative;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.rent-home-fleet-fav {
+  position: absolute;
+  right: 0.72rem;
+  top: 0.72rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.rent-home-fleet-fav .material-symbols-outlined {
+  font-size: 1.02rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-home-fleet-media {
+  height: 6.6rem;
+  border-radius: 13px;
+  background: #eef5f3;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.rent-home-fleet-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rent-home-fleet-media .material-symbols-outlined {
+  font-size: 2rem;
+  color: var(--rent-teal);
+}
+
+.rent-home-fleet-body {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.rent-home-fleet-body strong {
+  font-size: 0.86rem;
+  color: var(--rent-ink);
+  letter-spacing: -0.02em;
+}
+
+.rent-home-fleet-body span {
+  font-size: 0.72rem;
+  color: var(--rent-secondary);
+}
+
+.rent-home-fleet-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--rent-secondary);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--rent-stroke);
+  border-radius: 14px;
+  padding: 0.65rem 0.75rem;
+}
+
+.rent-quick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.rent-quick button {
+  appearance: none;
+  border: 1px solid var(--rent-stroke);
+  background: rgba(255, 255, 255, 0.86);
+  border-radius: 18px;
+  padding: 0.95rem 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+  transition: transform 0.15s ease;
+}
+
+.rent-quick button:active {
+  transform: scale(0.985);
+}
+
+.rent-quick-label {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--rent-ink);
+}
+
+.rent-quick-meta {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--rent-secondary);
+}
+
+.rent-quick .material-symbols-outlined {
+  color: var(--rent-teal);
+  font-size: 1.4rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-segment {
+  display: inline-flex;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.12);
+  gap: 0.15rem;
+  margin-bottom: 0.9rem;
+}
+
+.rent-segment button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-secondary);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rent-segment button.is-active {
+  background: #fff;
+  color: var(--rent-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Customer calendar board */
+.rent-cal-month {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.rent-cal-month h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-transform: capitalize;
+}
+
+.rent-cal-nav {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.rent-cal-nav button {
+  appearance: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--rent-stroke);
+  background: #fff;
+  color: var(--rent-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.rent-cal-weekdays,
+.rent-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+}
+
+.rent-cal-weekdays {
+  margin-bottom: 0.35rem;
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--rent-secondary);
+  text-transform: uppercase;
+}
+
+.rent-cal-cell {
+  appearance: none;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  min-height: 3.1rem;
+  padding: 0.3rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rent-cal-cell.is-empty {
+  background: transparent;
+  cursor: default;
+}
+
+.rent-cal-cell.is-today {
+  border-color: rgba(255, 159, 10, 0.45);
+  background: rgba(255, 159, 10, 0.1);
+}
+
+.rent-cal-cell.is-selected {
+  border-color: rgba(10, 122, 108, 0.45);
+  background: rgba(10, 122, 108, 0.12);
+  box-shadow: 0 0 0 2px rgba(10, 122, 108, 0.12);
+}
+
+.rent-cal-day {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--rent-ink);
+}
+
+.rent-cal-dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--rent-teal);
+  margin-top: 0.25rem;
+}
+
+.rent-cal-side {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-cal-card {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--rent-stroke);
+  background: #fff;
+  border-radius: 16px;
+  padding: 0.8rem 0.9rem;
+  cursor: pointer;
+}
+
+.rent-cal-card.is-selected {
+  border-color: rgba(10, 122, 108, 0.35);
+  background: rgba(10, 122, 108, 0.06);
+}
+
+.rent-cal-card strong {
+  display: block;
+  font-size: 0.88rem;
+  letter-spacing: -0.02em;
+}
+
+.rent-cal-card span {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--rent-secondary);
+}
+
+.rent-cal-map {
+  margin-top: 0.9rem;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--rent-stroke);
+  height: 14rem;
+  background: #eef1f4;
+}
+
+.rent-cal-map .leaflet-container {
+  height: 100%;
+  width: 100%;
+  font-family: inherit;
+}
+
+.rent-gate {
+  position: relative;
+  width: min(390px, 100%);
+  height: min(844px, calc(100dvh - 2.5rem));
+  max-height: 844px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2.4rem 1.15rem 1.5rem;
+  text-align: center;
+  border-radius: 2.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 0 0 10px #0a0a0c,
+    0 0 0 12px rgba(255, 255, 255, 0.08),
+    0 30px 80px rgba(0, 0, 0, 0.55);
+  background:
+    radial-gradient(80% 60% at 50% 0%, rgba(10, 122, 108, 0.28), transparent 60%),
+    #0b3d4a !important;
+  color: #f5f5f7 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+}
+
+.rent-gate::before {
+  content: '';
+  position: absolute;
+  top: 0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 7.25rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: #050507;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.rent-gate-card {
+  width: min(100%, 22.5rem);
+  border-radius: 28px;
+  padding: 1.5rem 1.25rem 1.35rem;
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 24px 48px rgba(0, 0, 0, 0.28);
+  text-align: left;
+}
+
+.rent-gate-card h1 {
+  margin: 0;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  color: #1d1d1f !important;
+}
+
+.rent-gate-card p {
+  margin: 0.55rem 0 0;
+  color: #6e6e73 !important;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  max-width: none;
+}
+
+.rent-gate-actions {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1.25rem;
+}
+
+.rent-gate-actions a,
+.rent-gate-actions button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.95rem;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-decoration: none !important;
+  cursor: pointer;
+  border: 0;
+}
+
+.rent-gate-btn-primary {
+  background: #0b3d4a !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(11, 61, 74, 0.28);
+}
+
+.rent-gate-btn-secondary {
+  background: rgba(120, 120, 128, 0.12) !important;
+  color: #1d1d1f !important;
+}
+
+.rent-gate-btn-ghost {
+  background: transparent !important;
+  color: #0b3d4a !important;
+  border: 1px solid rgba(11, 61, 74, 0.2) !important;
+}
+
+.rent-preview-banner {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  background: #fff3cd;
+  color: #6b4f00;
+  border-bottom: 1px solid rgba(180, 140, 20, 0.25);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.rent-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.rent-catalog .wallet-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-catalog .wallet-btn-primary {
+  background: linear-gradient(180deg, #1aa392 0%, #0b3d4a 100%);
+  box-shadow: 0 8px 18px rgba(11, 61, 74, 0.22);
+}
+
+.rent-catalog .wallet-input:focus,
+.rent-catalog .wallet-select:focus,
+.rent-catalog .wallet-textarea:focus {
+  border-color: rgba(10, 122, 108, 0.55);
+}
+
+.rent-catalog .wallet-booking-card {
+  background: #fff;
+}
+
+.rent-booking-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.rent-booking-steps span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.42rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.12);
+  color: var(--rent-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.rent-booking-steps span.is-active {
+  background: rgba(10, 122, 108, 0.16);
+  color: var(--rent-deep);
+}
+
+.rent-booking-steps span.is-done {
+  background: rgba(16, 185, 129, 0.14);
+  color: #0f766e;
+}
+
+.rent-extras {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rent-extras label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.rent-cancel-policy {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--rent-secondary);
+}
+
+.rent-results-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.55rem 0 0.75rem;
+}
+
+.rent-results-tools label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--rent-secondary);
+}
+
+.rent-results-tools select,
+.rent-results-tools input[type='range'] {
+  width: 100%;
+}
+
+.rent-check-inline {
+  display: flex !important;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+}
+
+.rent-vehicle-trust {
+  margin: 0.15rem 0 0;
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.rent-vehicle-more {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-blue);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  justify-self: start;
+}
+
+.rent-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 100;
+  display: grid;
+  place-items: end center;
+  padding: 0.75rem;
+}
+
+.rent-sheet {
+  width: min(420px, 100%);
+  max-height: 84vh;
+  overflow: auto;
+  border-radius: 22px;
+  background: #fff;
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rent-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rent-sheet-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.rent-sheet-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.rent-sheet-gallery img {
+  width: 100%;
+  height: 7.4rem;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.rent-sheet-body {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rent-sheet-body p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--rent-secondary);
+}
+
+.rent-sheet--detail {
+  width: min(520px, 100%);
+  max-height: 90vh;
+}
+
+.rent-sheet-head-copy {
+  min-width: 0;
+}
+
+.rent-sheet-similar {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: #8e8e93;
+}
+
+.rent-sheet-gallery.is-single {
+  grid-template-columns: 1fr;
+}
+
+.rent-sheet-gallery.is-single img {
+  max-height: 220px;
+  object-fit: contain;
+  background: #f4f7f6;
+}
+
+.rent-sheet-group {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-sheet-price {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #1d1d1f;
+}
+
+.rent-sheet-headline {
+  font-weight: 700;
+  color: #1d1d1f;
+}
+
+.rent-sheet-facts {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.rent-sheet-facts li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #3c3c43;
+  background: #f4f7f6;
+  border-radius: 12px;
+  padding: 0.45rem 0.55rem;
+}
+
+.rent-sheet-facts .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-sheet-tags {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.rent-sheet-tags li {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--rent-teal, #0a7a6c);
+  background: rgba(10, 122, 108, 0.1);
+  border-radius: 999px;
+  padding: 0.28rem 0.55rem;
+}
+
+.rent-sheet-terms {
+  margin-top: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.rent-sheet-terms p {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.rent-sheet-cta {
+  margin-top: 0.35rem;
+  width: 100%;
+}
+
+.rent-postbook-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rent-picked-vehicle {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.55rem;
+  margin-bottom: 0.85rem;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 122, 108, 0.22);
+  background: rgba(10, 122, 108, 0.07);
+}
+
+.rent-picked-vehicle-media {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(10, 122, 108, 0.16);
+  display: grid;
+  place-items: center;
+}
+
+.rent-picked-vehicle-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rent-picked-vehicle-media .material-symbols-outlined {
+  color: var(--rent-teal);
+  font-size: 1.35rem;
+}
+
+.rent-picked-vehicle-body {
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.rent-picked-vehicle-label {
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: var(--rent-teal);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rent-picked-vehicle-body strong {
+  font-size: 0.83rem;
+  color: var(--rent-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rent-picked-vehicle-body span {
+  font-size: 0.7rem;
+  color: var(--rent-secondary);
+}
+
+.rent-catalog .wallet-vehicle-thumb {
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 0.85rem;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--wallet-sand);
+  border: 1px solid rgba(7, 40, 48, 0.08);
+}
+
+.rent-vehicle-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-vehicle-card {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 22px;
+  background: #fff;
+  border: 1px solid var(--rent-stroke);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.rent-vehicle-card.is-selected {
+  border-color: rgba(10, 122, 108, 0.55);
+  box-shadow:
+    0 0 0 2px rgba(10, 122, 108, 0.18),
+    0 14px 32px rgba(11, 61, 74, 0.12);
+}
+
+.rent-vehicle-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rent-vehicle-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 9.5rem;
+  background: #eef5f3;
+}
+
+.rent-vehicle-gallery img {
+  width: 100%;
+  height: 5.1rem;
+  object-fit: cover;
+  display: block;
+  background: #e8f0ee;
+}
+
+.rent-vehicle-gallery img:first-child:last-child {
+  grid-column: 1 / -1;
+  height: 10.5rem;
+}
+
+.rent-vehicle-placeholder {
+  min-height: 9.5rem;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(80% 70% at 80% 20%, rgba(255, 159, 10, 0.18), transparent 55%),
+    linear-gradient(165deg, #102a32 0%, #0b4a4a 50%, #071c22 100%);
+  color: rgba(245, 245, 247, 0.85);
+}
+
+.rent-vehicle-placeholder .material-symbols-outlined {
+  font-size: 2.4rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-vehicle-body {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0 0.15rem 0.15rem;
+}
+
+.rent-vehicle-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rent-vehicle-title-row h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--rent-ink);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.rent-vehicle-cat {
+  display: inline-flex;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(10, 122, 108, 0.12);
+  color: var(--rent-deep);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rent-vehicle-price {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--rent-deep);
+  white-space: nowrap;
+}
+
+.rent-vehicle-meta {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--rent-secondary);
+}
+
+.rent-vehicle-desc {
+  margin: 0.15rem 0 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--rent-ink);
+}
+
+.rent-vehicle-desc.is-muted {
+  color: var(--rent-secondary);
+  font-style: italic;
+}
+
+.rent-catalog h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.03em;
+  color: var(--rent-ink);
+}
+
+.rent-account-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.rent-account-row:last-of-type {
+  border-bottom: 0;
+}
+
+.rent-account-row dt {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--rent-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rent-account-row dd {
+  margin: 0.2rem 0 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+@keyframes rent-hero-in {
+  from {
+    opacity: 0.65;
+    filter: saturate(0.85);
+  }
+  to {
+    opacity: 1;
+    filter: saturate(1);
+  }
+}
+
+@keyframes rent-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Rent Wallet — separate from bus My Wallet */
+.rent-panel--wallet {
+  padding: 0.85rem 0.85rem 1rem;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.rent-panel--wallet > h2,
+.rent-panel--wallet > .rent-panel-lead {
+  padding: 0 0.25rem;
+}
+
+/* Online Check-In band — left promo | My Wallet | 3 steps */
+.rent-inline-section--wallet {
+  scroll-margin-top: 4.5rem;
+}
+
+.rent-wallet-checkin {
+  display: grid;
+  gap: 1.35rem;
+  padding: 1.35rem 1.1rem 1.5rem;
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.2)),
+    #e8ecef;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  animation: rent-rise 480ms ease-out both;
+}
+
+.rent-wallet-checkin-center {
+  min-width: 0;
+  order: 1;
+}
+
+.rent-wallet-checkin-aside--left {
+  order: 2;
+}
+
+.rent-wallet-checkin-aside--right {
+  order: 3;
+}
+
+.rent-wallet-checkin-aside {
+  min-width: 0;
+}
+
+.rent-wallet-checkin-kicker {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+.rent-wallet-checkin-title {
+  margin: 0.55rem 0 0;
+  font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+  color: #1f2937;
+}
+
+.rent-wallet-checkin-lead {
+  margin: 0.85rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #4b5563;
+  max-width: 28rem;
+}
+
+.rent-wallet-checkin-steps {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-wallet-checkin-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.rent-wallet-checkin-chevron {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #111827;
+}
+
+@media (min-width: 901px) {
+  .rent-wallet-checkin {
+    grid-template-columns: minmax(200px, 1fr) minmax(300px, 440px) minmax(200px, 1fr);
+    align-items: center;
+    gap: 1.75rem 2rem;
+    padding: 2rem 1.75rem;
+  }
+
+  .rent-wallet-checkin-center,
+  .rent-wallet-checkin-aside--left,
+  .rent-wallet-checkin-aside--right {
+    order: unset;
+  }
+
+  .rent-wallet-checkin-aside--left {
+    padding-right: 0.25rem;
+  }
+
+  .rent-wallet-checkin-aside--right {
+    padding-left: 0.25rem;
+  }
+
+  .rent-wallet-checkin-title {
+    font-size: clamp(1.25rem, 1.8vw, 1.65rem);
+  }
+}
+
+@media (min-width: 1100px) {
+  .rent-wallet-checkin {
+    gap: 2rem 2.75rem;
+    padding: 2.25rem 2rem;
+  }
+}
+
+.rent-wallet {
+  display: grid;
+  gap: 1rem;
+}
+
+.rent-wallet-hero {
+  background:
+    radial-gradient(90% 70% at 88% 8%, rgba(255, 159, 10, 0.22), transparent 52%),
+    radial-gradient(110% 85% at 8% 100%, rgba(10, 122, 108, 0.5), transparent 52%),
+    linear-gradient(165deg, #102a32 0%, #0b4a4a 46%, #071c22 100%) !important;
+}
+
+.rent-wallet-pass .wallet-pass-status.is-ok {
+  background: rgba(10, 122, 108, 0.14);
+  color: #0b3d4a;
+}
+
+.rent-wallet-pass .wallet-pass-status.is-warn {
+  background: rgba(255, 159, 10, 0.16);
+  color: #9a6700;
+}
+
+.rent-wallet-pass .wallet-pass-status.is-muted {
+  background: rgba(120, 120, 128, 0.14);
+  color: #6e6e73;
+}
+
+.rent-wallet-route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--rent-secondary);
+}
+
+.rent-wallet-route .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: var(--rent-teal);
+}
+
+.rent-wallet-mode {
+  margin-left: auto;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(10, 122, 108, 0.1);
+  color: var(--rent-deep);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.rent-wallet-more {
+  margin-top: 0.25rem;
+}
+
+.rent-wallet-more-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--rent-ink);
+}
+
+.rent-wallet-card-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+.rent-wallet-card-btn .material-symbols-outlined {
+  color: var(--rent-secondary);
+  flex-shrink: 0;
+}
+
+.rent-wallet-empty .wallet-pass-empty-icon {
+  color: var(--rent-teal);
+}
+
+/* Teal Apple auth (login/register) — Rent app, distinct from blue My Wallet */
+.rent-auth-stage {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(70% 55% at 50% 0%, rgba(10, 122, 108, 0.28), transparent 55%),
+    #05080a;
+}
+
+.rent-auth-shell {
+  position: relative;
+  width: min(390px, 100%);
+  min-height: min(100dvh - 2.5rem, 844px);
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  border-radius: 2.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 0 0 10px #0a0a0c,
+    0 0 0 12px rgba(255, 255, 255, 0.08),
+    0 30px 80px rgba(0, 0, 0, 0.55);
+  background: linear-gradient(165deg, #102a32 0%, #0b4a4a 46%, #071c22 100%);
+  color: #f5f5f7;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+}
+
+.rent-auth-shell::before {
+  content: '';
+  position: absolute;
+  top: 0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 7.25rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: #050507;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.rent-auth-scroll {
+  flex: 1 0 auto;
+  min-height: 0;
+  overflow: visible;
+  padding: 2.5rem 1.15rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.rent-auth-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.rent-auth-card {
+  width: 100%;
+  border-radius: 28px;
+  padding: 1.5rem 1.25rem 1.35rem;
+  background: #ffffff;
+  color: #1d1d1f;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
+}
+
+.rent-auth-card .rent-auth-icon {
+  display: block;
+  margin: 0 auto 0.65rem;
+  font-size: 2.2rem;
+  color: #0a7a6c;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-auth-card h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  color: #1d1d1f;
+}
+
+.rent-auth-card .rent-auth-lead {
+  margin: 0.55rem 0 0;
+  text-align: center;
+  color: #6e6e73;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.rent-auth-card .rent-auth-hint {
+  margin: 0.35rem 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #6e6e73;
+}
+
+.rent-auth-card label {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1d1d1f;
+}
+
+.rent-auth-card input[type='email'],
+.rent-auth-card input[type='password'],
+.rent-auth-card input[type='text'] {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: #f2f4f7;
+  padding: 0.95rem 1.1rem;
+  font: inherit;
+  color: #1d1d1f;
+}
+
+.rent-auth-card .relative input[type='email'],
+.rent-auth-card .relative input[type='password'],
+.rent-auth-card .relative input[type='text'] {
+  padding-left: 2.75rem;
+}
+
+.rent-auth-card input:focus {
+  outline: 2px solid rgba(10, 122, 108, 0.35);
+  outline-offset: 1px;
+}
+
+.rent-auth-submit {
+  width: 100%;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  min-height: 3.1rem;
+  margin-top: 0.35rem;
+  background: linear-gradient(180deg, #1aa392 0%, #0b3d4a 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(11, 61, 74, 0.32);
+}
+
+.rent-auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rent-auth-link {
+  color: #0a7a6c;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.rent-auth-link:hover {
+  text-decoration: underline;
+}
+
+.rent-auth-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  color: rgba(245, 245, 247, 0.78);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.rent-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  color: #aeaeb2;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rent-auth-divider::before,
+.rent-auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* Desktop (JS: !isMobile): fill the whole viewport — no phone chrome */
+.rent-phone-stage--desktop,
+.rent-auth-stage--desktop {
+  padding: 0;
+  align-items: stretch;
+  background: #f5f5f7;
+}
+
+.rent-auth-stage--desktop {
+  background:
+    radial-gradient(70% 55% at 50% 0%, rgba(10, 122, 108, 0.18), transparent 55%),
+    linear-gradient(180deg, #0b3d4a 0%, #062a30 40%, #05080a 100%);
+}
+
+.rent-phone-stage--desktop .rent-app,
+.rent-auth-stage--desktop .rent-auth-shell,
+.rent-auth-stage--desktop .rent-gate {
+  width: 100%;
+  min-height: 100dvh;
+  height: auto;
+  max-height: none;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.rent-phone-stage--desktop .rent-app::before,
+.rent-auth-stage--desktop .rent-auth-shell::before,
+.rent-auth-stage--desktop .rent-gate::before {
+  display: none;
+}
+
+.rent-phone-stage--desktop .rent-topbar,
+.rent-phone-stage--desktop .rent-main,
+.rent-phone-stage--desktop .rent-home-stack {
+  width: 100%;
+  max-width: 1120px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.rent-phone-stage--desktop .rent-topbar {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.rent-phone-stage--desktop .rent-main {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.rent-phone-stage--desktop .rent-home {
+  max-width: none;
+}
+
+.rent-phone-stage--desktop .rent-hero {
+  min-height: min(52dvh, 560px);
+  padding-left: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+  padding-right: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+}
+
+.rent-phone-stage--desktop .rent-hero--landing {
+  min-height: min(58dvh, 560px);
+  padding-top: 4.5rem;
+  padding-bottom: 4.25rem;
+  padding-left: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+  padding-right: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+}
+
+.rent-phone-stage--desktop .rent-hero-landing-inner {
+  max-width: 42rem;
+}
+
+.rent-phone-stage--desktop .rent-hero-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 48rem;
+  margin-top: 2.5rem;
+  gap: 0.85rem;
+}
+
+/* Guest: white header → hero → teal search (lower booking strip) */
+.rent-phone-stage--desktop .rent-app--guest .rent-topbar {
+  position: relative;
+  z-index: 8;
+  width: 100%;
+  max-width: none;
+  padding: 0.85rem max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--rent-ink);
+}
+
+.rent-phone-stage--desktop .rent-app--guest .rent-topbar-brand {
+  color: var(--rent-ink);
+}
+
+.rent-phone-stage--desktop .rent-app--guest .rent-btn-ghost {
+  background: rgba(10, 122, 108, 0.1);
+  color: var(--rent-deep);
+  border: 1px solid rgba(10, 122, 108, 0.18);
+}
+
+.rent-phone-stage--desktop .rent-home-fleet-strip {
+  grid-auto-columns: minmax(220px, 260px);
+}
+
+.rent-phone-stage--desktop .rent-fleet-rail {
+  grid-auto-columns: minmax(240px, 280px);
+  gap: 1.1rem;
+}
+
+.rent-phone-stage--desktop .rent-guest-extras,
+.rent-phone-stage--desktop .rent-apple-fleet {
+  max-width: 1120px;
+  margin-inline: auto;
+  width: 100%;
+}
+
+.rent-phone-stage--desktop .rent-apple-trust {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.rent-phone-stage--desktop .rent-apple-rows {
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1.5rem;
+}
+
+.rent-phone-stage--desktop .rent-apple-rows li {
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.rent-phone-stage--desktop .rent-home-stack {
+  gap: 1rem;
+}
+
+.rent-phone-stage--desktop .rent-home-stack--landing {
+  gap: 0;
+}
+
+.rent-phone-stage--desktop .rent-land-band {
+  padding: 4.5rem 1.5rem;
+}
+
+.rent-phone-stage--desktop .rent-land-cards {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.rent-phone-stage--desktop .rent-land-cards--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rent-phone-stage--desktop .rent-land-steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+}
+
+.rent-phone-stage--desktop .rent-land-teal-grid {
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.rent-phone-stage--desktop .rent-fleet-rail--land {
+  grid-auto-columns: minmax(240px, 270px);
+}
+
+.rent-phone-stage--desktop .rent-pick-head {
+  grid-template-columns: 1.4fr auto;
+  align-items: end;
+  gap: 1.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.rent-phone-stage--desktop .rent-pick-filters {
+  grid-template-columns: 9.5rem 11rem;
+  justify-content: end;
+}
+
+.rent-phone-stage--desktop .rent-pick-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2.35rem 2rem;
+}
+
+.rent-phone-stage--desktop .rent-pick-grid--home {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2.25rem 1.95rem;
+}
+
+.rent-phone-stage--desktop .rent-pick {
+  padding: 1.45rem 1.3rem 1.25rem;
+}
+
+.rent-phone-stage--desktop .rent-pick-title {
+  font-size: 1.28rem;
+}
+
+.rent-phone-stage--desktop .rent-search-wrap--top {
+  margin-top: 0;
+  padding: 1rem max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem)) 1.15rem;
+}
+
+.rent-phone-stage--desktop .rent-search-wrap--below-hero {
+  margin-top: -3.5rem;
+  padding-top: 1.55rem;
+  padding-bottom: 1.45rem;
+  border-radius: 1.35rem 1.35rem 0 0;
+}
+
+.rent-phone-stage--desktop .rent-search-row {
+  grid-template-columns: minmax(220px, 1.4fr) minmax(160px, 1fr) minmax(160px, 1fr) auto;
+  align-items: stretch;
+}
+
+.rent-phone-stage--desktop .rent-search-row--split {
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) auto;
+}
+
+.rent-phone-stage--desktop .rent-search-submit {
+  min-width: 11.5rem;
+  align-self: stretch;
+}
+
+.rent-phone-stage--desktop .rent-nav {
+  left: max(0.65rem, calc((100% - 1120px) / 2));
+  right: max(0.65rem, calc((100% - 1120px) / 2));
+  width: auto;
+  max-width: none;
+}
+
+.rent-auth-stage--desktop .rent-auth-scroll {
+  padding: clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 1.75rem);
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px) minmax(0, 1fr);
+  gap: clamp(1.25rem, 2.5vw, 2.25rem);
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+/* iPad / tablet portrait: full-bleed, left copy + form */
+@media (min-width: 701px) and (max-width: 1100px) {
+  .rent-auth-stage--desktop .rent-auth-scroll {
+    grid-template-columns: minmax(220px, 1fr) minmax(320px, 440px);
+    max-width: 920px;
+    gap: 1.5rem 1.75rem;
+    padding: 1.5rem 1.25rem;
+  }
+
+  .rent-auth-stage--desktop .rent-auth-aside--right {
+    display: none;
+  }
+
+  .rent-auth-aside-title {
+    font-size: clamp(1.45rem, 3.2vw, 2rem);
+  }
+
+  .rent-auth-aside-lead {
+    font-size: 0.92rem;
+  }
+}
+
+/* Landscape tablets: keep three columns when wide enough */
+@media (min-width: 901px) and (max-width: 1100px) and (orientation: landscape) {
+  .rent-auth-stage--desktop .rent-auth-scroll {
+    grid-template-columns: minmax(180px, 1fr) minmax(300px, 400px) minmax(180px, 1fr);
+    max-width: 1100px;
+  }
+
+  .rent-auth-stage--desktop .rent-auth-aside--right {
+    display: flex;
+  }
+}
+
+.rent-auth-stage--desktop .rent-auth-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.rent-auth-stage--desktop .rent-auth-card {
+  width: 100%;
+}
+
+.rent-auth-aside {
+  display: none;
+}
+
+.rent-auth-stage--desktop .rent-auth-aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #f5f5f7;
+  padding: 0.35rem 0.15rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+}
+
+.rent-auth-aside-kicker {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(110, 231, 183, 0.92);
+}
+
+.rent-auth-aside-title {
+  margin: 0.7rem 0 0;
+  font-size: clamp(1.7rem, 2.6vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+  color: #ffffff;
+}
+
+.rent-auth-aside-title--sm {
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  font-weight: 650;
+}
+
+.rent-auth-aside-lead {
+  margin: 1rem 0 0;
+  max-width: 22rem;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  font-weight: 400;
+  color: rgba(245, 245, 247, 0.72);
+}
+
+.rent-auth-aside-list {
+  list-style: none;
+  margin: 1.45rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.rent-auth-aside-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.rent-auth-aside-list .material-symbols-outlined {
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #6ee7b7;
+  font-size: 1.2rem;
+  backdrop-filter: blur(8px);
+}
+
+.rent-auth-aside-list strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.rent-auth-aside-list span {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: rgba(245, 245, 247, 0.62);
+}
+
+.rent-auth-aside-steps {
+  list-style: none;
+  margin: 1.35rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-auth-aside-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.rent-auth-aside-step {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #062a30;
+  background: linear-gradient(180deg, #a7f3d0 0%, #6ee7b7 100%);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.22);
+}
+
+.rent-auth-aside-steps strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.rent-auth-aside-steps span {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: rgba(245, 245, 247, 0.62);
+}
+
+.rent-auth-aside-note {
+  margin: 1.4rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.rent-auth-aside-note strong {
+  color: #a7f3d0;
+  font-weight: 650;
+}
+
+.rent-auth-link--on-dark {
+  color: #6ee7b7;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rent-auth-link--on-dark:hover {
+  color: #d1fae5;
+}
+
+.rent-auth-stage--desktop .rent-auth-card {
+  width: min(440px, 100%);
+}
+
+/* Real phones: full-bleed, no device chrome */
+@media (max-width: 480px) {
+  .rent-phone-stage,
+  .rent-auth-stage {
+    padding: 0;
+    align-items: stretch;
+    background: #05080a;
+  }
+
+  .rent-app,
+  .rent-gate,
+  .rent-auth-shell {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .rent-app::before,
+  .rent-gate::before,
+  .rent-auth-shell::before {
+    display: none;
+  }
+
+  .rent-hero {
+    min-height: min(58dvh, 520px);
+    padding-top: max(1.35rem, env(safe-area-inset-top, 0px));
+  }
+
+  .rent-topbar {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  }
+
+  .rent-nav {
+    bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* —— Booking wizard: services / coverage step —— */
+.rent-wiz-stage {
+  min-height: 100dvh;
+  background:
+    radial-gradient(80% 50% at 0% 0%, rgba(10, 122, 108, 0.1), transparent 55%),
+    linear-gradient(180deg, #eef5f3 0%, #f5f5f7 100%);
+  color: var(--rent-ink, #1d1d1f);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+}
+
+.rent-wiz-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1rem 1rem 2.5rem;
+}
+
+.rent-wiz-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.rent-wiz-brand {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--rent-deep, #0b3d4a);
+  text-decoration: none;
+  font-size: 1.05rem;
+}
+
+.rent-wiz-back {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--rent-teal, #0a7a6c);
+  text-decoration: none;
+}
+
+.rent-wiz-head {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.rent-wiz-eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-head h1 {
+  margin: 0;
+  font-size: clamp(1.55rem, 3.5vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.rent-wiz-steps {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  position: relative;
+}
+
+.rent-wiz-steps::before {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 0.72rem;
+  height: 2px;
+  background: rgba(60, 60, 67, 0.16);
+  z-index: 0;
+}
+
+.rent-wiz-step {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.rent-wiz-step-dot {
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  background: #d1d1d6;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.rent-wiz-step.is-done .rent-wiz-step-dot {
+  background: linear-gradient(180deg, #0c8a7a 0%, #0b3d4a 100%);
+}
+
+.rent-wiz-step.is-done .rent-wiz-step-dot .material-symbols-outlined {
+  font-size: 0.95rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-wiz-step.is-active .rent-wiz-step-dot {
+  background: #fff;
+  border: 3px solid var(--rent-teal, #0a7a6c);
+  box-shadow: 0 0 0 3px rgba(10, 122, 108, 0.15);
+}
+
+.rent-wiz-step-pulse {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-step-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--rent-secondary, #6e6e73);
+  line-height: 1.25;
+  max-width: 12ch;
+}
+
+.rent-wiz-step.is-active .rent-wiz-step-label,
+.rent-wiz-step.is-done .rent-wiz-step-label {
+  color: var(--rent-ink, #1d1d1f);
+  font-weight: 700;
+}
+
+.rent-wiz-trip {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.75rem;
+}
+
+.rent-wiz-trip-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.rent-wiz-trip-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: start;
+  padding: 0.95rem 1rem;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+}
+
+.rent-wiz-trip-card .material-symbols-outlined {
+  color: var(--rent-teal, #0a7a6c);
+  font-size: 1.35rem;
+  margin-top: 0.1rem;
+}
+
+.rent-wiz-trip-card p {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-trip-card strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.rent-wiz-edit {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rent-deep, #0b3d4a);
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  justify-self: end;
+}
+
+.rent-wiz-layout {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.rent-wiz-main h2,
+.rent-wiz-side-top h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.rent-wiz-lead {
+  margin: 0.4rem 0 1.1rem;
+  font-size: 0.92rem;
+  color: var(--rent-secondary, #6e6e73);
+  max-width: 48ch;
+}
+
+.rent-wiz-coverages {
+  display: grid;
+  gap: 1rem;
+}
+
+.rent-wiz-included {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.75rem;
+}
+
+.rent-wiz-included li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #0f766e;
+  background: rgba(13, 148, 136, 0.08);
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+}
+
+.rent-wiz-included .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.rent-wiz-cover {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.9rem;
+  padding: 1.15rem 1.1rem;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rent-wiz-cover.is-on {
+  border-color: rgba(10, 122, 108, 0.45);
+  box-shadow: 0 10px 28px rgba(10, 122, 108, 0.1);
+}
+
+.rent-wiz-cover-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: rgba(10, 122, 108, 0.12);
+  color: var(--rent-deep, #0b3d4a);
+  display: grid;
+  place-items: center;
+}
+
+.rent-wiz-cover-body h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.rent-wiz-cover-body > p {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-cover-flags {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.rent-wiz-cover-flags li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rent-wiz-cover-flags .is-yes {
+  color: #0a7a6c;
+}
+
+.rent-wiz-cover-flags .is-no {
+  color: #c41e3a;
+}
+
+.rent-wiz-cover-flags .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.rent-wiz-cover-foot {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.rent-wiz-cover-foot strong {
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.rent-wiz-cover-foot span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-cover-btn {
+  appearance: none;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--rent-deep, #0b3d4a);
+  background: #fff;
+  color: var(--rent-deep, #0b3d4a);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rent-wiz-cover.is-on .rent-wiz-cover-btn {
+  background: linear-gradient(180deg, #0c8a7a 0%, #0b3d4a 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+.rent-wiz-side-card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 20px;
+  padding: 1.15rem 1.1rem 1.25rem;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+  display: grid;
+  gap: 1.1rem;
+}
+
+.rent-wiz-side-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  margin: -1.15rem -1.1rem 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--rent-deep, #0b3d4a);
+  color: #fff;
+}
+
+.rent-wiz-side-top h2 {
+  color: #fff;
+  font-size: 1rem;
+}
+
+.rent-wiz-side-top button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+
+.rent-wiz-vehicle {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rent-wiz-vehicle h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.rent-wiz-vehicle h3 em {
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-vehicle > div > p {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-vehicle img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  background: #f4f7f6;
+  border-radius: 14px;
+}
+
+.rent-wiz-vehicle-specs {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.rent-wiz-vehicle-specs li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rent-wiz-vehicle-specs .material-symbols-outlined {
+  font-size: 1rem;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-includes h4,
+.rent-wiz-selected h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rent-wiz-includes ul,
+.rent-wiz-selected ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.rent-wiz-includes li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.rent-wiz-includes .material-symbols-outlined {
+  font-size: 1.05rem;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-selected p,
+.rent-wiz-selected li {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-selected li {
+  font-weight: 700;
+  color: var(--rent-ink, #1d1d1f);
+}
+
+.rent-wiz-total {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.rent-wiz-total span {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rent-wiz-total small {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-total strong {
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
+  color: var(--rent-deep, #0b3d4a);
+}
+
+.rent-wiz-total-was {
+  display: inline !important;
+  margin-right: 0.35rem;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  color: #8e8e93 !important;
+  text-decoration: line-through;
+}
+
+.rent-wiz-next {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  min-height: 3.15rem;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #0c8a7a 0%, #0b3d4a 100%);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.rent-wiz-next:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.rent-wiz-note {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-empty {
+  padding: 2rem 1.25rem;
+  text-align: center;
+  background: #fff;
+  border-radius: 18px;
+}
+
+.rent-wiz-cta-link {
+  display: inline-flex;
+  margin-top: 0.75rem;
+  font-weight: 700;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-stage--desktop .rent-wiz-shell {
+  padding: 1.5rem 1.5rem 3.5rem;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-steps {
+  max-width: 720px;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-step-label {
+  font-size: 0.78rem;
+  max-width: 16ch;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-trip-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-layout {
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-side {
+  position: sticky;
+  top: 1.25rem;
+}
+
+.rent-wiz-stage--desktop .rent-wiz-coverages {
+  gap: 1.25rem;
+}
+
+/* —— Details step: Hertz-like forms + upsell, PoreiaGo teal —— */
+.rent-wiz-upsell {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.15rem 1.25rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(10, 122, 108, 0.12), rgba(11, 61, 74, 0.06));
+  border: 1px solid rgba(10, 122, 108, 0.22);
+  margin-bottom: 1.25rem;
+}
+
+.rent-wiz-upsell-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-upsell h2 {
+  margin: 0;
+  font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  color: var(--rent-deep, #0b3d4a);
+}
+
+.rent-wiz-upsell h2 strong {
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-upsell p {
+  margin: 0.45rem 0 0;
+  font-size: 0.88rem;
+  color: var(--rent-secondary, #6e6e73);
+  line-height: 1.45;
+}
+
+.rent-wiz-upsell-btn {
+  appearance: none;
+  margin-top: 0.85rem;
+  border: 0;
+  min-height: 2.65rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #0c8a7a 0%, #0b3d4a 100%);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.rent-wiz-upsell-visual {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #0b3d4a, #0a7a6c);
+  color: #e8fff8;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.rent-wiz-upsell-visual .material-symbols-outlined {
+  font-size: 2rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rent-wiz-form-card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 20px;
+  padding: 1.25rem 1.2rem 1.35rem;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+  margin-bottom: 1.1rem;
+}
+
+.rent-wiz-form-card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--rent-deep, #0b3d4a);
+}
+
+.rent-wiz-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .rent-wiz-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rent-wiz-span-2 {
+    grid-column: 1 / -1;
+  }
+}
+
+.rent-wiz-form-grid label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--rent-secondary, #6e6e73);
+}
+
+.rent-wiz-form-grid label span {
+  letter-spacing: 0.01em;
+}
+
+.rent-wiz-form-grid input,
+.rent-wiz-form-grid select {
+  appearance: none;
+  width: 100%;
+  min-height: 2.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(60, 60, 67, 0.18);
+  background: #fbfcfc;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--rent-ink, #1d1d1f);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rent-wiz-form-grid input:focus,
+.rent-wiz-form-grid select:focus {
+  border-color: rgba(10, 122, 108, 0.55);
+  box-shadow: 0 0 0 3px rgba(10, 122, 108, 0.14);
+  background: #fff;
+}
+
+.rent-wiz-form-grid label.has-error input {
+  border-color: #e5484d;
+}
+
+.rent-wiz-form-grid em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #e5484d;
+}
+
+.rent-wiz-checks {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rent-wiz-checks label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--rent-ink, #1d1d1f);
+  cursor: pointer;
+}
+
+.rent-wiz-checks input {
+  margin-top: 0.2rem;
+  accent-color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-wiz-next--mobile {
+  display: none;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .rent-wiz-upsell {
+    grid-template-columns: 1fr;
+  }
+
+  .rent-wiz-upsell-visual {
+    display: none;
+  }
+
+  .rent-wiz-next--mobile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 720px) {
+  .rent-wiz-step-label {
+    max-width: 8ch;
+    font-size: 0.62rem;
+  }
+}
+
+/* —— Payment step —— */
+.rent-pay-plans {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rent-pay-plan {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  text-align: left;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1.5px solid rgba(10, 122, 108, 0.16);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.rent-pay-plan .material-symbols-outlined {
+  color: var(--rent-teal, #0a7a6c);
+  font-size: 1.4rem;
+  margin-top: 0.1rem;
+}
+
+.rent-pay-plan.is-active {
+  border-color: var(--rent-teal, #0a7a6c);
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.08), rgba(10, 122, 108, 0.02));
+  box-shadow: 0 0 0 1px rgba(10, 122, 108, 0.2);
+}
+
+.rent-pay-plan-copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.rent-pay-plan-copy strong {
+  font-size: 0.95rem;
+  color: var(--rent-ink, #1d1d1f);
+}
+
+.rent-pay-plan-copy em {
+  font-style: normal;
+  font-size: 0.8rem;
+  color: #6e6e73;
+}
+
+.rent-pay-plan-copy small {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-pay-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.rent-pay-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.95rem;
+  border-radius: 999px;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #3a3a3c;
+  cursor: pointer;
+}
+
+.rent-pay-method .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+.rent-pay-method.is-active {
+  background: linear-gradient(180deg, #1aa896 0%, #0a7a6c 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(10, 122, 108, 0.28);
+}
+
+.rent-pay-card-fields {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border-radius: 1rem;
+  background: rgba(10, 122, 108, 0.04);
+  border: 1px solid rgba(10, 122, 108, 0.12);
+}
+
+.rent-pay-card-fields label,
+.rent-pay-bank-select {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+}
+
+.rent-pay-card-fields label span,
+.rent-pay-bank-select span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6e6e73;
+}
+
+.rent-pay-card-fields input,
+.rent-pay-bank-select select {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.65rem 0.8rem;
+  font-size: 0.92rem;
+  background: #fff;
+}
+
+.rent-pay-card-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.rent-pay-secure,
+.rent-pay-soft,
+.rent-pay-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #6e6e73;
+}
+
+.rent-pay-hint {
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 196, 70, 0.15);
+  border: 1px solid rgba(200, 140, 20, 0.25);
+  color: #7a4e00;
+}
+
+.rent-pay-bank {
+  margin-top: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: rgba(10, 122, 108, 0.06);
+  border: 1px solid rgba(10, 122, 108, 0.18);
+}
+
+.rent-pay-bank-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 800;
+  color: #0a5c52;
+  margin-bottom: 0.65rem;
+}
+
+.rent-pay-bank dl {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.65rem 0 0;
+}
+
+.rent-pay-bank dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.rent-pay-bank dt {
+  color: #5a7a74;
+}
+
+.rent-pay-bank dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  color: #123;
+}
+
+.rent-pay-iban,
+.rent-pay-ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.rent-pay-bank-note {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(10, 122, 108, 0.15);
+  font-size: 0.75rem;
+  color: #3d5c56;
+  line-height: 1.45;
+}
+
+.rent-pay-due {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.rent-pay-due-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6e6e73;
+  margin: 0 0 0.2rem;
+}
+
+.rent-pay-due-amount {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--rent-teal, #0a7a6c);
+  margin: 0;
+}
+
+.rent-pay-due-promo {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+.rent-pay-promo-card h2 {
+  margin-bottom: 0.75rem;
+}
+
+.rent-pay-promo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 650;
+  cursor: pointer;
+  color: var(--rent-ink, #1d1d1f);
+}
+
+.rent-pay-promo-toggle input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-pay-promo-row {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.rent-pay-promo-input {
+  width: 100%;
+  border: 1px solid rgba(60, 60, 67, 0.18);
+  border-radius: 12px;
+  background: #f5f5f7;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rent-ink, #1d1d1f);
+}
+
+.rent-pay-promo-input:focus {
+  outline: none;
+  border-color: rgba(10, 122, 108, 0.45);
+  box-shadow: 0 0 0 3px rgba(10, 122, 108, 0.12);
+}
+
+.rent-pay-promo-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #6e6e73;
+}
+
+.rent-pay-promo-hint.is-ok {
+  color: #0a7a6c;
+  font-weight: 650;
+}
+
+.rent-pay-promo-hint.is-bad {
+  color: #c9342c;
+  font-weight: 650;
+}
+
+.rent-pay-promo-saving {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(10, 122, 108, 0.08);
+  color: #0a7a6c;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.rent-pay-due-balance {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--rent-ink, #1d1d1f);
+  margin: 0;
+}
+
+.rent-wiz-next--pay {
+  background: linear-gradient(180deg, #1aa896 0%, #0a7a6c 100%);
+  border: none;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  box-shadow: 0 8px 22px rgba(10, 122, 108, 0.32);
+}
+
+.rent-gate-shell {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  font-family: var(--wallet-font, system-ui, sans-serif);
+}
+
+.rent-gate-card {
+  max-width: 28rem;
+  width: 100%;
+  text-align: center;
+  background: #fff;
+  border-radius: 24px;
+  padding: 2rem 1.5rem;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+}
+
+.rent-gate-icon {
+  font-size: 2.5rem;
+  color: #6e6e73;
+  margin-bottom: 0.75rem;
+}
+
+.rent-gate-card h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.35rem;
+}
+
+.rent-gate-card p,
+.rent-gate-copy {
+  margin: 0;
+  color: #6e6e73;
+  line-height: 1.5;
+}
+
+.rent-gate-cta {
+  display: inline-flex;
+  margin-top: 1.25rem;
+  padding: 0.75rem 1.1rem;
+  border-radius: 999px;
+  background: #0a7a6c;
+  color: #fff;
+  font-weight: 650;
+  text-decoration: none;
+}

@@ -3,39 +3,108 @@ import { adminBearerHeaders, adminFetch } from './adminApi.js';
 import { getSaasToken, saasFetch } from './saasApi.js';
 import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
 import { HOMEPAGE_LAYOUT_DEFAULTS } from '../lib/homepage/homepageTemplates.js';
+import { scrubSiteAppearancePlaceholders } from '../lib/branding/officeBrand.js';
+import {
+  scrubAchillioBrandForPlatformHost,
+} from '../lib/branding/platformStorefrontGuard.js';
+import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'aerostride_site_appearance_v1';
+// v3: tenant-scoped cache — never reuse Achillio Travel brand across offices.
+const STORAGE_KEY_BASE = 'aerostride_site_appearance_v3';
+
+function appearanceStorageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
+
+function finalizeAppearance(data = {}) {
+  const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
+  // Scrubs Achillio Travel only on PoreiaGo marketing host or platform seed slug.
+  return scrubAchillioBrandForPlatformHost(merged);
+}
 
 export const DEFAULT_SITE_APPEARANCE = {
   logo_url: '',
-  hero_image_url: '/images/hero-bus-achillio.png',
+  logo_height_px: 40,
+  logo_max_width_px: 180,
+  logo_radius_px: 0,
+  logo_padding_px: 0,
+  logo_bg_mode: 'none',
+  logo_shadow: false,
+  logo_show_name: true,
+  hero_image_url: '',
+  hero_image_focal: 'center',
   hero_badge: 'Premium Ταξιδιωτική Εμπειρία',
   hero_title: 'Η Ελλάδα, όπως δεν την έχεις ξαναδεί:',
   hero_title_accent: 'Άνεση, ασφάλεια & θέση εξασφαλισμένη.',
   hero_subtitle:
     'Διάλεξτε από τις προγραμματισμένες εκδρομές μας — χωρίς αναζήτηση προορισμού, μόνο ταξίδια που οργανώνουμε εμείς.',
   hero_search_label: 'Πρόγραμμα εκδρομών',
-  footer_brand_name: 'PoreiaGo',
-  footer_copyright: '© PoreiaGo. Redefining the journey.',
-  footer_privacy_label: 'Privacy Policy',
+  footer_brand_name: '',
+  footer_copyright: '',
+  footer_privacy_label: 'Πολιτική Απορρήτου',
   footer_privacy_url: '#',
-  footer_terms_label: 'Terms of Service',
+  footer_terms_label: 'Όροι Χρήσης',
   footer_terms_url: '#',
   footer_contact_email: '',
   footer_contact_phone: '',
   footer_address: '',
+  rent_office_name: '',
+  rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
+  rent_hero_copy:
+    'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
+  rent_guest_hero_title: 'Δες τον στόλο πριν κλείσεις',
+  rent_guest_hero_copy: '',
+  rent_cta_label: 'Βρες όχημα',
+  rent_pickup_locations: [],
+  rent_coverage_options: [],
+  rent_included_defaults: [],
+  rent_upsell_coverage_id: '',
+  /** Bus trip extras catalog (after seat selection). */
+  trip_extra_options: [],
+  rent_notify_email_enabled: true,
+  rent_notify_sms_enabled: true,
+  rent_notify_email_label: 'Θέλω προσφορές στο email',
+  rent_notify_sms_label: 'Θέλω ενημερώσεις SMS για την κράτηση',
+  rent_notify_email_default: false,
+  rent_notify_sms_default: false,
+  rent_notify_sms_template_confirmed:
+    'Κράτηση {ref} επιβεβαιώθηκε. Παραλαβή: {pickup} · {start}. {office}',
+  rent_notify_sms_template_status: 'Κράτηση {ref}: νέα κατάσταση {status}. {office}',
+  rent_notify_email_subject: 'Κράτηση {ref} — επιβεβαίωση',
+  rent_notify_email_body:
+    'Γεια σου {name},<br/><br/>Η κράτησή σου <strong>{ref}</strong> επιβεβαιώθηκε.<br/>Παραλαβή: {pickup}<br/>Έναρξη: {start}<br/><br/>Ευχαριστούμε,<br/>{office}',
+  home_slider_enabled: false,
+  home_slider_autoplay: true,
+  home_slider_interval_sec: 5,
+  home_slider_options: {},
+  home_slider_slides: [],
+  rent_slider_enabled: false,
+  rent_slider_autoplay: true,
+  rent_slider_interval_sec: 5,
+  rent_slider_options: {},
+  rent_slider_slides: [],
   ...HOMEPAGE_LAYOUT_DEFAULTS,
   updated_at: null,
 };
 
 async function parseError(res) {
   const err = await res.json().catch(() => ({}));
-  throw new Error(err.detail || res.statusText || 'Request failed');
+  let detail = err.detail || res.statusText || 'Request failed';
+  if (Array.isArray(detail)) {
+    detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
+  } else if (typeof detail === 'object' && detail) {
+    detail = detail.message || JSON.stringify(detail);
+  }
+  const raw = String(detail || '').trim();
+  if (/internal server error/i.test(raw) || res.status >= 500) {
+    throw new Error('Σφάλμα server — δοκιμάστε μικρότερο JPG/PNG ή κάντε επανασύνδεση');
+  }
+  throw new Error(raw || 'Request failed');
 }
 
 function cacheLocally(data) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(appearanceStorageKey(), JSON.stringify(finalizeAppearance(data)));
   } catch {
     /* quota */
   }
@@ -43,8 +112,8 @@ function cacheLocally(data) {
 
 function loadCached() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...DEFAULT_SITE_APPEARANCE, ...JSON.parse(raw) } : null;
+    const raw = localStorage.getItem(appearanceStorageKey());
+    return raw ? finalizeAppearance(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
@@ -53,7 +122,10 @@ function loadCached() {
 export { loadCached as loadCachedSiteAppearance };
 
 function mergeAppearance(patch = {}) {
-  return { ...DEFAULT_SITE_APPEARANCE, ...loadCached(), ...patch };
+  return finalizeAppearance({
+    ...loadCached(),
+    ...patch,
+  });
 }
 
 /** Resolve logo/hero URLs (API assets, static public paths, data URLs). */
@@ -68,18 +140,20 @@ export function resolveSiteAssetUrl(url) {
   return url;
 }
 
-export async function fetchSiteAppearance() {
+export async function fetchSiteAppearance(host = typeof window !== 'undefined' ? window.location.hostname : '') {
   try {
-    const res = await fetch(`${API_BASE}/api/site/appearance`);
+    const qs = host ? `?host=${encodeURIComponent(host)}` : '';
+    const res = await fetch(`${API_BASE}/api/site/appearance${qs}`);
     if (res.ok) {
       const data = await res.json();
-      cacheLocally(data);
-      return { ...DEFAULT_SITE_APPEARANCE, ...data };
+      const merged = finalizeAppearance(data);
+      cacheLocally(merged);
+      return merged;
     }
   } catch {
     /* offline */
   }
-  return loadCached() || { ...DEFAULT_SITE_APPEARANCE };
+  return loadCached() || finalizeAppearance({});
 }
 
 /** Admin panel — SaaS Postgres when JWT present, else file store. */
@@ -87,11 +161,24 @@ export async function fetchAdminSiteAppearance() {
   if (getSaasToken()) {
     try {
       const data = await saasFetch('/api/v1/branding/site-appearance');
-      const merged = { ...DEFAULT_SITE_APPEARANCE, ...data };
+      const merged = finalizeAppearance(data);
+      // Keep a just-uploaded office-assets logo if the GET came back empty
+      // (persist race) or scrub wiped it before tenant_slug was present.
+      const cached = loadCached();
+      if (
+        !merged.logo_url &&
+        cached?.logo_url &&
+        (String(cached.logo_url).startsWith('/api/site/office-assets/') ||
+          String(cached.logo_url).startsWith('/api/site/assets/'))
+      ) {
+        merged.logo_url = cached.logo_url;
+      }
       cacheLocally(merged);
       return merged;
     } catch {
-      /* fall through to file store */
+      // Do NOT fall through to host-based fetchSiteAppearance — that would
+      // cache PoreiaGo marketing appearance under this office's tenant key.
+      return loadCached() || finalizeAppearance({});
     }
   }
   return fetchSiteAppearance();
@@ -107,16 +194,21 @@ export async function updateSiteAppearance(patch) {
         method: 'PUT',
         body: JSON.stringify(patch),
       });
-      const merged = { ...DEFAULT_SITE_APPEARANCE, ...data };
+      // Keep client patch on top — older API schemas may omit layout keys;
+      // never let host scrubbers wipe a logo/hero the office just uploaded.
+      const merged = finalizeAppearance({ ...data, ...patch });
+      if (Object.prototype.hasOwnProperty.call(patch, 'logo_url') && patch.logo_url) {
+        merged.logo_url = patch.logo_url;
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'hero_image_url') && patch.hero_image_url) {
+        merged.hero_image_url = patch.hero_image_url;
+      }
       cacheLocally(merged);
       return { data: merged, source: data.storage_source === 'postgres' ? 'postgres' : 'server', offline: false };
     } catch (saasErr) {
-      try {
-        const legacy = await updateSiteAppearanceLegacy(patch);
-        return legacy;
-      } catch {
-        throw saasErr;
-      }
+      // Fail closed — never fall through to shared /api/admin/platform/site-appearance
+      // (that file is PoreiaGo marketing; Achillio must not overwrite it).
+      throw saasErr;
     }
   }
 
@@ -158,6 +250,35 @@ async function updateSiteAppearanceLegacy(patch) {
 }
 
 export async function uploadSiteAsset(kind, file) {
+  // SaaS / office tenants: multipart upload to tenant-scoped disk + short URL
+  // in Postgres. Data URLs in settings_json caused 500s on large logos.
+  if (getSaasToken()) {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await adminFetch(
+      `/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
+      { method: 'POST', body: form, retries: 3 },
+    );
+    if (isAuthFailureStatus(res.status)) {
+      handleAuthFailure();
+      throw new Error('AUTH_EXPIRED');
+    }
+    if (!res.ok) await parseError(res);
+    const data = await res.json();
+    if (data.appearance || data.url) {
+      const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
+      const merged = finalizeAppearance({
+        ...(data.appearance || {}),
+        [key]: data.url || data.appearance?.[key] || '',
+      });
+      // Always pin the uploaded URL after finalize (marketing-host scrub must not win).
+      if (data.url) merged[key] = data.url;
+      cacheLocally(merged);
+      return { ...data, appearance: merged };
+    }
+    return data;
+  }
+
   const form = new FormData();
   form.append('file', file);
   const res = await fetch(
@@ -175,6 +296,25 @@ export async function uploadSiteAsset(kind, file) {
 }
 
 export async function clearSiteAsset(kind) {
+  if (getSaasToken()) {
+    const res = await adminFetch(
+      `/api/v1/branding/site-appearance/upload/${encodeURIComponent(kind)}`,
+      { method: 'DELETE', retries: 3 },
+    );
+    if (isAuthFailureStatus(res.status)) {
+      handleAuthFailure();
+      throw new Error('AUTH_EXPIRED');
+    }
+    if (!res.ok) await parseError(res);
+    const data = await res.json();
+    if (data.appearance) {
+      const merged = finalizeAppearance(data.appearance);
+      cacheLocally(merged);
+      return { ok: true, appearance: merged };
+    }
+    return { ok: true, appearance: data.appearance };
+  }
+
   const res = await adminFetch(
     `/api/admin/platform/site-appearance/upload/${encodeURIComponent(kind)}`,
     { method: 'DELETE' },

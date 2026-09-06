@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import imaplib
 import logging
 import smtplib
@@ -12,17 +13,69 @@ from email.mime.text import MIMEText
 from typing import Any
 
 from .attachment_utils import normalize_attachments
+from .imap_utf8 import connect_imap, format_imap_connect_error, is_timeout_error
 from .settings_store import get_settings
 
 logger = logging.getLogger(__name__)
 
 
+SMTP_TIMEOUT_HINT_EL = (
+    "SMTP σύνδεση: timeout — δεν ήταν δυνατή η σύνδεση στον mail server "
+    "(θύρα 587/465). Ελέγξτε host και ότι ο πάροχος επιτρέπει εξωτερική αποστολή."
+)
+
+
+def normalize_mail_password(password: str | None, *, host: str = "", email: str = "") -> str:
+    """Strip spaces from Google/Yahoo/Outlook app passwords (shown as 'xxxx xxxx xxxx xxxx')."""
+    raw = str(password or "")
+    if not raw:
+        return ""
+    blob = f"{host} {email}".lower()
+    app_pwd_provider = any(
+        x in blob
+        for x in (
+            "gmail.com",
+            "googlemail.com",
+            "imap.gmail.com",
+            "smtp.gmail.com",
+            "yahoo.",
+            "ymail.com",
+            "imap.mail.yahoo.com",
+            "smtp.mail.yahoo.com",
+            "outlook.",
+            "hotmail.",
+            "live.com",
+            "office365.com",
+        )
+    )
+    if app_pwd_provider or (len(raw.replace(" ", "")) == 16 and " " in raw):
+        return "".join(raw.split())
+    return raw.strip()
+
+
+def _format_smtp_error(exc: BaseException) -> str:
+    from .imap_utf8 import GMAIL_APP_PASSWORD_HINT_EL, is_gmail_app_password_error
+
+    if is_timeout_error(exc):
+        return SMTP_TIMEOUT_HINT_EL
+    if is_gmail_app_password_error(exc):
+        return GMAIL_APP_PASSWORD_HINT_EL
+    raw = str(exc).strip()
+    if raw.startswith("b'") and raw.endswith("'"):
+        raw = raw[2:-1]
+    return f"SMTP σύνδεση: {raw}"
+
+
 def settings_to_imap_config(account: dict) -> dict[str, Any]:
+    host = (account.get("imap_host") or "").strip()
+    email = (account.get("email_address") or account.get("mail_username") or "").strip()
     return {
-        "host": (account.get("imap_host") or "").strip(),
+        "host": host,
         "port": int(account.get("imap_port") or 993),
         "user": (account.get("mail_username") or account.get("email_address") or "").strip(),
-        "password": account.get("mail_password") or "",
+        "password": normalize_mail_password(
+            account.get("mail_password"), host=host, email=email
+        ),
         "use_ssl": bool(account.get("imap_secure", True)),
         "store_email": (account.get("email_address") or "").strip().lower(),
         "imap_mailbox": account.get("imap_mailbox") or "INBOX",
@@ -32,23 +85,38 @@ def settings_to_imap_config(account: dict) -> dict[str, Any]:
 
 
 def settings_to_smtp_config(account: dict) -> dict[str, Any]:
+    port = int(account.get("smtp_port") or 587)
+    # Port 465 = implicit SSL (SMTPS). STARTTLS checkbox applies to 587/25.
+    use_ssl = port == 465 or bool(account.get("smtp_ssl"))
+    use_tls = (not use_ssl) and bool(account.get("smtp_secure", True))
+    host = (account.get("smtp_host") or "").strip()
+    email = (account.get("email_address") or account.get("mail_username") or "").strip()
     return {
-        "host": (account.get("smtp_host") or "").strip(),
-        "port": int(account.get("smtp_port") or 587),
+        "host": host,
+        "port": port,
         "user": (account.get("mail_username") or account.get("email_address") or "").strip(),
-        "password": account.get("mail_password") or "",
-        "use_tls": bool(account.get("smtp_secure", True)),
+        "password": normalize_mail_password(
+            account.get("mail_password"), host=host, email=email
+        ),
+        "use_ssl": use_ssl,
+        "use_tls": use_tls,
         "from_addr": (account.get("email_address") or "").strip(),
     }
 
 
-def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
-    if cfg["use_ssl"]:
-        client = imaplib.IMAP4_SSL(cfg["host"], cfg["port"])
+def _open_smtp(cfg: dict):
+    """Return connected SMTP / SMTP_SSL client (caller must quit/close)."""
+    if cfg.get("use_ssl"):
+        smtp = smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=20)
     else:
-        client = imaplib.IMAP4(cfg["host"], cfg["port"])
-    client.login(cfg["user"], cfg["password"])
-    return client
+        smtp = smtplib.SMTP(cfg["host"], cfg["port"], timeout=20)
+        if cfg.get("use_tls"):
+            smtp.starttls()
+    return smtp
+
+
+def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
+    return connect_imap(cfg)
 
 
 def test_imap_connection(account: dict) -> dict:
@@ -61,7 +129,7 @@ def test_imap_connection(account: dict) -> dict:
         client.logout()
         return {"ok": True, "message": "IMAP σύνδεση επιτυχής"}
     except Exception as exc:
-        return {"ok": False, "error": str(exc)}
+        return {"ok": False, "error": format_imap_connect_error(exc)}
 
 
 def test_smtp_connection(account: dict) -> dict:
@@ -69,14 +137,12 @@ def test_smtp_connection(account: dict) -> dict:
     if not cfg["host"] or not cfg["user"]:
         return {"ok": False, "error": "Συμπληρώστε SMTP host και username"}
     try:
-        with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as smtp:
-            if cfg["use_tls"]:
-                smtp.starttls()
+        with _open_smtp(cfg) as smtp:
             if cfg["password"]:
                 smtp.login(cfg["user"], cfg["password"])
         return {"ok": True, "message": "SMTP σύνδεση επιτυχής"}
     except Exception as exc:
-        return {"ok": False, "error": str(exc)}
+        return {"ok": False, "error": _format_smtp_error(exc)}
 
 
 def test_account_connection(account: dict) -> dict:
@@ -174,7 +240,7 @@ def _build_message(
     return msg
 
 
-def send_email_smtp(
+def _send_email_smtp_sync(
     account: dict,
     *,
     to: str,
@@ -210,11 +276,36 @@ def send_email_smtp(
     if not recipients:
         raise ValueError("Δεν βρέθηκε έγκυρος παραλήπτης")
 
-    with smtplib.SMTP(cfg["host"], cfg["port"], timeout=20) as smtp:
-        if cfg["use_tls"]:
-            smtp.starttls()
+    with _open_smtp(cfg) as smtp:
         if cfg["user"] and cfg["password"]:
             smtp.login(cfg["user"], cfg["password"])
         smtp.sendmail(from_addr, recipients, msg.as_string())
 
     return f"email-smtp-{to}"
+
+
+async def send_email_smtp(
+    account: dict,
+    *,
+    to: str,
+    subject: str,
+    body_html: str,
+    cc: str = "",
+    bcc: str = "",
+    priority: str = "normal",
+    request_read_receipt: bool = False,
+    attachments: list[dict] | None = None,
+) -> str:
+    """Async SMTP send — sync smtplib runs in a worker thread (awaitable)."""
+    return await asyncio.to_thread(
+        _send_email_smtp_sync,
+        account,
+        to=to,
+        subject=subject,
+        body_html=body_html,
+        cc=cc,
+        bcc=bcc,
+        priority=priority,
+        request_read_receipt=request_read_receipt,
+        attachments=attachments,
+    )

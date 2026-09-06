@@ -1,0 +1,39 @@
+{
+  "name": "My Wallet — Εισιτήριο",
+  "short_name": "My Wallet",
+  "description": "Το εισιτήριό σας και το QR επιβίβασης — PoreiaGo",
+  "lang": "el",
+  "dir": "ltr",
+  "start_url": "/wallet",
+  "scope": "/wallet",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e8eef5",
+  "theme_color": "#0f4c81",
+  "icons": [
+    {
+      "src": "/icons/wallet-pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/wallet-pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/wallet-pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/wallet-pwa.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

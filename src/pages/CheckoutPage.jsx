@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { loginAsCustomer, getCustomerEmail } from '../lib/auth.js';
+import { getCustomerEmail, getCustomerToken, isCustomer } from '../lib/auth.js';
+import {
+  saveWalletClaim,
+  walletClaimAuthPath,
+  walletClaimNavState,
+  walletHomeNavState,
+} from '../lib/wallet/walletClaim.js';
 import { createBookingFromCheckout } from '../lib/ticketing/bookingStore.js';
 import {
   clearPendingCheckout,
   loadPendingCheckout,
 } from '../lib/ticketing/pendingCheckout.js';
-import { loadTrips } from '../lib/trips/tripStore.js';
+import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { trackAbandonedCheckout } from '../lib/revenue/abandonedCart.js';
@@ -30,11 +36,13 @@ import { maskIban } from '../lib/payments/ibanValidation.js';
 import { fetchCheckoutSettings, DEFAULT_CHECKOUT_SETTINGS } from '../services/checkoutSettingsApi.js';
 import { validateCheckoutEmail } from '../services/emailSpamApi.js';
 import { completeAbandonedCart, getStoredResumeToken } from '../services/abandonedApi.js';
+import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
 
 export default function CheckoutPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const [processing, setProcessing] = useState(false);
+  const [demoDone, setDemoDone] = useState(null);
   const [paymentPlan, setPaymentPlan] = useState(PAYMENT_PLAN_FULL);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [checkoutSettings, setCheckoutSettings] = useState({ ...DEFAULT_CHECKOUT_SETTINGS });
@@ -48,11 +56,16 @@ export default function CheckoutPage() {
     expiry: '',
     cvv: '',
   });
+  const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
 
   const trip = useMemo(() => {
     const id = Number(tripId);
-    return loadTrips().find((t) => t.id === id) || null;
-  }, [tripId]);
+    if (!id) return null;
+    const found = loadTrips().find((t) => t.id === id) || null;
+    if (found) return found;
+    if (isDemo) return loadPlatformDemoTrips().find((t) => t.id === id) || null;
+    return null;
+  }, [tripId, isDemo]);
 
   const pending = useMemo(() => loadPendingCheckout(), [tripId]);
   const checkoutTotal = Number(pending?.total) || 0;
@@ -124,14 +137,15 @@ export default function CheckoutPage() {
   }, [depositEnabled, paymentPlan]);
 
   useEffect(() => {
+    if (demoDone) return;
     if (!trip || !pending || pending.tripId !== trip.id) {
       if (trip) navigate(`/select-seat/${trip.id}`, { replace: true });
       else navigate('/', { replace: true });
     }
-  }, [trip, pending, navigate]);
+  }, [trip, pending, navigate, demoDone]);
 
   useEffect(() => {
-    if (!trip || !pending) return;
+    if (isDemo || !trip || !pending) return;
     trackAbandonedCheckout({
       tripId: trip.id,
       tripTitle: trip.title,
@@ -141,7 +155,45 @@ export default function CheckoutPage() {
       passengerEmail: form.email,
       passengerPhone: form.phone,
     });
-  }, [trip, pending, chargeNow, form.name, form.email, form.phone]);
+  }, [trip, pending, chargeNow, form.name, form.email, form.phone, isDemo]);
+
+  if (demoDone) {
+    return (
+      <div className="relative min-h-screen bg-surface py-6 px-4 md:py-10">
+        <MinimalPageBackground />
+        <div className="relative z-10 max-w-lg mx-auto">
+          <div className="bg-surface-container-lowest/95 backdrop-blur-sm rounded-2xl border border-black/[0.05] p-6 md:p-8 shadow-sm text-center">
+            <span className="material-symbols-outlined text-4xl text-emerald-600 mb-3">check_circle</span>
+            <p className="text-sm font-semibold text-emerald-700 mb-1">Demo πληρωμή προσομοιώθηκε</p>
+            <h1 className="text-2xl font-bold text-on-surface tracking-tight mb-2">
+              {demoDone.reference}
+            </h1>
+            <p className="text-sm text-on-surface-variant leading-relaxed mb-2">
+              {trip?.title || 'Εκδρομή'} · θέσεις {demoDone.seats || '—'}
+            </p>
+            <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+              €{Number(demoDone.amountPaid || 0).toFixed(2)} — προεπισκόπηση πλατφόρμας, χωρίς χρέωση
+              και χωρίς My Wallet.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                to={`/select-seat/${trip?.id || 1}`}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-surface-container px-5 py-3 text-sm font-bold text-on-surface hover:bg-surface-container-low"
+              >
+                Ξανά επιλογή θέσης
+              </Link>
+              <Link
+                to="/#platform-trips"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-primary text-on-primary px-5 py-3 text-sm font-bold hover:opacity-90"
+              >
+                Πίσω στις εκδρομές
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!trip || !pending || pending.tripId !== trip.id) {
     return (
@@ -153,6 +205,12 @@ export default function CheckoutPage() {
   }
 
   const seatCount = pending.seats?.split(',').filter(Boolean).length || 1;
+  const extrasLines = Array.isArray(pending.extras) ? pending.extras : [];
+  const extrasTotal = Number(pending.extrasTotal) || 0;
+  const seatSubtotal =
+    Number(pending.seatSubtotal) ||
+    Math.max(0, checkoutTotal - extrasTotal) ||
+    checkoutTotal;
   const subtotal = checkoutTotal;
   const serviceFee = 0;
   const total = checkoutTotal;
@@ -206,6 +264,21 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (!validate()) return;
 
+    if (isDemo) {
+      setProcessing(true);
+      await new Promise((r) => setTimeout(r, 900));
+      const ref = `DEMO-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+      clearPendingCheckout();
+      setDemoDone({
+        reference: ref,
+        seats: pending.seats,
+        amountPaid: chargeNow,
+      });
+      toast.success('Demo κράτηση — πληρωμή προσομοιώθηκε.');
+      setProcessing(false);
+      return;
+    }
+
     try {
       await validateCheckoutEmail(form.email);
     } catch (err) {
@@ -238,34 +311,50 @@ export default function CheckoutPage() {
         },
         paymentMethod,
         bankAccountId: selectedBankAccount?.id || null,
-      });
-      loginAsCustomer(form.email, {
-        name: form.name,
-        phone: form.phone,
-        provider: 'checkout',
+        extras: Array.isArray(pending.extras) ? pending.extras : [],
+        extrasTotal: Number(pending.extrasTotal) || 0,
+        seatSubtotal: Number(pending.seatSubtotal) || null,
       });
       clearPendingCheckout();
       const resumeToken = getStoredResumeToken();
       if (resumeToken) await completeAbandonedCart(resumeToken);
       sessionStorage.setItem('lastBookingId', booking.id);
-      if (booking.syncedToSaas) {
+
+      const hasWalletSession = Boolean(isCustomer() && getCustomerToken());
+      if (hasWalletSession) {
         toast.success(
           isBankTransfer
-            ? 'Η κράτηση καταχωρήθηκε — ολοκληρώστε την τραπεζική κατάθεση'
+            ? 'Η κράτηση καταχωρήθηκε — εμφανίζεται στο My Wallet'
             : isDepositPlan
-              ? 'Προκαταβολή OK — η κράτηση επιβεβαιώθηκε'
-              : 'Πληρωμή OK — κράτηση & τιμολόγιο myDATA σε επεξεργασία',
+              ? 'Προκαταβολή OK — η κράτηση είναι στο My Wallet'
+              : 'Πληρωμή OK — ανοίγει το My Wallet με το εισιτήριό σας',
         );
-      } else {
-        toast.success(
-          isBankTransfer
-            ? 'Η κράτηση καταχωρήθηκε — ολοκληρώστε την τραπεζική κατάθεση'
-            : isDepositPlan
-              ? 'Η προκαταβολή ολοκληρώθηκε — κράτηση επιβεβαιωμένη!'
-              : 'Η πληρωμή ολοκληρώθηκε!',
-        );
+        navigate('/wallet', {
+          state: walletHomeNavState({
+            highlightBooking: booking.id,
+            fromClaim: true,
+          }),
+        });
+        return;
       }
-      navigate('/wallet', { state: { highlightBooking: booking.id } });
+
+      const claim = saveWalletClaim({
+        email: form.email,
+        name: form.name,
+        phone: form.phone,
+        bookingId: booking.id,
+        reference: booking.pnr || booking.id,
+        source: 'checkout',
+      });
+      toast.success(
+        isBankTransfer
+          ? 'Κράτηση OK — δημιουργήστε My Wallet για το εισιτήριο'
+          : 'Πληρωμή OK — δημιουργήστε My Wallet για να δείτε το εισιτήριο',
+      );
+      navigate(walletClaimAuthPath({ preferLogin: false }), {
+        replace: true,
+        state: walletClaimNavState(claim),
+      });
     } catch {
       toast.error('Αποτυχία πληρωμής. Δοκιμάστε ξανά.');
     } finally {
@@ -279,18 +368,36 @@ export default function CheckoutPage() {
       <div className="relative z-10 max-w-5xl mx-auto">
         <button
           type="button"
-          onClick={() => navigate(`/select-seat/${trip.id}`)}
+          onClick={() => navigate(`/book/extras/${trip.id}`)}
           className="mb-4 flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-bold text-sm"
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-          Επιλογή θέσεων
+          Υπηρεσίες
         </button>
 
         <div className="mb-6">
-          <p className="text-primary text-xs font-bold uppercase tracking-wide mb-1">Checkout</p>
+          {isDemo ? (
+            <div className="mb-4 rounded-2xl border border-sky-200/80 bg-sky-50 px-4 py-3 text-sm text-sky-950 flex gap-2.5 items-start">
+              <span className="material-symbols-outlined text-[20px] text-sky-600 shrink-0 mt-0.5">
+                science
+              </span>
+              <div>
+                <p className="font-semibold">Demo checkout</p>
+                <p className="text-sky-900/80 text-xs mt-0.5 leading-relaxed">
+                  Συμπληρώστε τα στοιχεία και πατήστε πληρωμή — δεν γίνεται χρέωση ούτε δημιουργία
+                  My Wallet.
+                </p>
+              </div>
+            </div>
+          ) : null}
+          <p className="text-primary text-xs font-bold uppercase tracking-wide mb-1">
+            {isDemo ? 'Demo checkout' : 'Checkout'}
+          </p>
           <h1 className="text-2xl md:text-3xl font-bold text-on-surface">Ολοκλήρωση & πληρωμή</h1>
           <p className="text-sm text-on-surface-variant mt-1">
-            Ασφαλής πληρωμή · κράτηση άμεσα στο My Wallet
+            {isDemo
+              ? 'Προεπισκόπηση διαδικασίας κράτησης θέσης'
+              : 'Ασφαλής πληρωμή · μετά δημιουργείτε My Wallet για το εισιτήριο'}
           </p>
         </div>
 
@@ -537,7 +644,7 @@ export default function CheckoutPage() {
                         {bankReferencePreview}
                       </dd>
                       <p className="text-[11px] text-sky-700/80 mt-1">
-                        Το ακριβές reference θα εμφανιστεί στο My Wallet μετά την κράτηση.
+                        Το ακριβές reference θα εμφανιστεί αφού δημιουργήσετε My Wallet.
                       </p>
                     </div>
                   </dl>
@@ -608,6 +715,26 @@ export default function CheckoutPage() {
                     ))}
                   </div>
                 )}
+                {extrasLines.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-on-surface-variant">
+                      <dt>Εισιτήρια</dt>
+                      <dd>€{seatSubtotal.toFixed(2)}</dd>
+                    </div>
+                    {extrasLines.map((line) => (
+                      <div
+                        key={line.id || line.formKey || line.title}
+                        className="flex justify-between text-xs text-on-surface-variant pl-1"
+                      >
+                        <span>
+                          {line.title}
+                          {line.qty > 1 ? ` × ${line.qty}` : ''}
+                        </span>
+                        <span>€{Number(line.lineTotalEur || 0).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <dt className="text-on-surface-variant">Υποσύνολο</dt>
                   <dd>€{subtotal.toFixed(2)}</dd>
@@ -658,6 +785,11 @@ export default function CheckoutPage() {
                     <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
                     Επεξεργασία…
                   </>
+                ) : isDemo ? (
+                  <>
+                    Ολοκλήρωση demo €{chargeNow.toFixed(2)}
+                    <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+                  </>
                 ) : isBankTransfer ? (
                   <>
                     {isDepositPlan
@@ -679,10 +811,16 @@ export default function CheckoutPage() {
               </button>
 
               <p className="text-[10px] text-center text-on-surface-variant mt-3">
-                Με την πληρωμή αποδέχεστε τους{' '}
-                <Link to="/" className="text-primary hover:underline">
-                  όρους χρήσης
-                </Link>
+                {isDemo
+                  ? 'Demo — χωρίς πραγματική χρέωση ή κράτηση.'
+                  : (
+                    <>
+                      Με την πληρωμή αποδέχεστε τους{' '}
+                      <Link to="/" className="text-primary hover:underline">
+                        όρους χρήσης
+                      </Link>
+                    </>
+                  )}
               </p>
             </div>
           </div>

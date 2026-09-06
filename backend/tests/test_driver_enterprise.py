@@ -60,10 +60,83 @@ class SosServiceTests(unittest.IsolatedAsyncioTestCase):
         os.environ.setdefault("AUTH_JWT_SECRET", "dev-jwt-secret-change-in-prod-32bytes!!")
         from travel_platform.driver.sos_service import publish_driver_sos
 
-        with patch(
-            "travel_platform.driver.sos_service.publish_fleet_alert",
-            new_callable=AsyncMock,
-            return_value=True,
+        with (
+            patch(
+                "travel_platform.driver.sos_service.publish_fleet_alert",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.driver.sos_service._send_sos_admin_push",
+                new_callable=AsyncMock,
+                return_value={"attempted": 1, "sent": 1, "title": "SOS οδηγού"},
+            ),
+        ):
+            result = await publish_driver_sos(
+                tenant_id="00000000-0000-0000-0000-000000000001",
+                trip_id=7,
+                driver_id="drv-1",
+                lat=37.98,
+                lng=23.73,
+                driver_name="Νίκος",
+                bus_plate="ΑΒΓ1234",
+            )
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["alert_id"])
+        self.assertEqual(result["push"]["sent"], 1)
+
+    async def test_publish_sos_without_trip(self) -> None:
+        """SOS must reach the office even before shift start / without trip binding."""
+        from travel_platform.driver.sos_service import publish_driver_sos
+        from travel_platform.telemetry.alerts import TelemetryAlertBus
+
+        with (
+            patch(
+                "travel_platform.driver.sos_service.publish_fleet_alert",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.driver.sos_service._send_sos_admin_push",
+                new_callable=AsyncMock,
+                return_value={"attempted": 1, "sent": 1, "title": "SOS οδηγού"},
+            ),
+        ):
+            result = await publish_driver_sos(
+                tenant_id="00000000-0000-0000-0000-000000000001",
+                trip_id=None,
+                driver_id="drv-1",
+                lat=37.98,
+                lng=23.73,
+            )
+        self.assertTrue(result["ok"])
+        recent = TelemetryAlertBus.list_recent(
+            "00000000-0000-0000-0000-000000000001",
+            limit=5,
+        )
+        self.assertTrue(any(a.get("alert_type") == "SOS" for a in recent))
+
+    async def test_publish_sos_does_not_force_offline_or_remove_vehicles(self) -> None:
+        """Regression: SOS must never cut the driver live connection / map pin."""
+        from travel_platform.driver.sos_service import publish_driver_sos
+
+        with (
+            patch(
+                "travel_platform.driver.sos_service.publish_fleet_alert",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.driver.sos_service._send_sos_admin_push",
+                new_callable=AsyncMock,
+                return_value={"attempted": 0, "sent": 0},
+            ),
+            patch(
+                "travel_platform.telemetry.driver_shift_tracker.force_driver_offline",
+            ) as offline,
+            patch(
+                "travel_platform.telemetry.processor.get_live_fleet",
+            ) as live,
         ):
             result = await publish_driver_sos(
                 tenant_id="00000000-0000-0000-0000-000000000001",
@@ -73,7 +146,8 @@ class SosServiceTests(unittest.IsolatedAsyncioTestCase):
                 lng=23.73,
             )
         self.assertTrue(result["ok"])
-        self.assertTrue(result["alert_id"])
+        offline.assert_not_called()
+        live.assert_not_called()
 
 
 if __name__ == "__main__":

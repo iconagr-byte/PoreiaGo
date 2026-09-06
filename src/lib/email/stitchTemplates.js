@@ -15,6 +15,14 @@ import {
   STITCH_GREECE_PLACES_CATEGORY,
   STITCH_GREECE_PLACE_TEMPLATES,
 } from './stitchTemplatesGreecePlaces.js';
+import {
+  STITCH_NEWSLETTER_CATEGORY,
+  STITCH_NEWSLETTER_TEMPLATES,
+} from './stitchTemplatesNewsletter.js';
+import {
+  STITCH_RENT_CATEGORY,
+  STITCH_RENT_TEMPLATES,
+} from './stitchTemplatesRent.js';
 
 const THUMB = {
   santoriniPkg: '/email-templates/gr_1.png',
@@ -85,6 +93,8 @@ export const STITCH_TEMPLATE_CATEGORIES = [
   { id: 'promotions', label: 'Προσφορές & Flash', icon: 'local_offer' },
   { id: 'destinations', label: 'Προορισμοί', icon: 'travel_explore' },
   { id: 'packages', label: 'Πακέτα ταξιδιού', icon: 'card_travel' },
+  STITCH_NEWSLETTER_CATEGORY,
+  STITCH_RENT_CATEGORY,
   STITCH_EUROPE_CITIES_CATEGORY,
   STITCH_GREECE_PLACES_CATEGORY,
   ...STITCH_GR_EXTRA_CATEGORIES,
@@ -293,6 +303,8 @@ const STITCH_MARKETING_TEMPLATES = [
 
 export const STITCH_CAMPAIGN_TEMPLATES = [
   ...STITCH_MARKETING_TEMPLATES,
+  ...STITCH_NEWSLETTER_TEMPLATES,
+  ...STITCH_RENT_TEMPLATES,
   ...STITCH_GR_TEMPLATES,
   ...STITCH_EXTRA_TEMPLATES,
   ...STITCH_MORE_TEMPLATES,

@@ -40,6 +40,7 @@ export default function DriversManagementPanel() {
   const navigate = useNavigate();
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('');
   const [query, setQuery] = useState('');
 
@@ -55,16 +56,58 @@ export default function DriversManagementPanel() {
     });
   }, [drivers, query]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ quiet } = {}) => {
     setLoading(true);
-    const rows = await fetchFleetDrivers(filter || undefined);
-    setDrivers(rows);
-    setLoading(false);
+    setLoadError('');
+    try {
+      const rows = await fetchFleetDrivers(filter || undefined);
+      setDrivers(Array.isArray(rows) ? rows : []);
+      setLoadError('');
+    } catch (err) {
+      // Keep last good rows when a deploy bounce hits — empty wipe hides Achilleas.
+      const msg = err.message || 'Αποτυχία φόρτωσης οδηγών';
+      setLoadError(msg);
+      if (!quiet) toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
   }, [filter]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    let retryTimer;
+    const attempt = async (isRetry) => {
+      if (!isRetry) {
+        setLoading(true);
+        setLoadError('');
+      }
+      try {
+        const rows = await fetchFleetDrivers(filter || undefined);
+        if (cancelled) return;
+        setDrivers(Array.isArray(rows) ? rows : []);
+        setLoadError('');
+        setLoading(false);
+      } catch (err) {
+        if (cancelled) return;
+        if (!isRetry) {
+          // Quiet first failure — often mid-deploy. Retry before showing error.
+          retryTimer = window.setTimeout(() => {
+            void attempt(true);
+          }, 1200);
+          return;
+        }
+        const msg = err.message || 'Αποτυχία φόρτωσης οδηγών';
+        setLoadError(msg);
+        toast.error(msg);
+        setLoading(false);
+      }
+    };
+    void attempt(false);
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [filter]);
 
   const onDelete = async (d) => {
     if (!window.confirm(`Διαγραφή οδηγού ${d.name};`)) return;
@@ -88,7 +131,8 @@ export default function DriversManagementPanel() {
             Λογαριασμοί οδηγών
           </h3>
           <p className="mt-1 text-[14px] text-zinc-500 tracking-tight max-w-lg">
-            Email και κωδικός για είσοδο στο /driver.
+            Email και κωδικός για είσοδο στο /driver. Ο Αχιλλέας ανήκει στο PoreiaGo —
+            αν η λίστα είναι άδεια, κάντε ανανέωση μετά το deploy.
           </p>
         </div>
         <button
@@ -146,6 +190,23 @@ export default function DriversManagementPanel() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : loadError ? (
+          <div className="px-6 py-14 text-center">
+            <div className="w-14 h-14 rounded-[16px] bg-amber-50 flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-amber-500 text-[28px]">wifi_off</span>
+            </div>
+            <p className="text-[16px] font-semibold text-zinc-800 tracking-tight">
+              Δεν φορτώθηκε η λίστα οδηγών
+            </p>
+            <p className="text-[14px] text-zinc-500 mt-1 max-w-md mx-auto">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => load()}
+              className="mt-5 inline-flex items-center gap-2 h-11 px-5 rounded-[12px] bg-zinc-900 text-white text-[14px] font-semibold"
+            >
+              Δοκιμή ξανά
+            </button>
           </div>
         ) : visible.length === 0 ? (
           <div className="px-6 py-14 text-center">

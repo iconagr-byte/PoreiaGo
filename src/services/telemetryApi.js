@@ -2,7 +2,9 @@ import { API_BASE } from '../config/api.js';
 import { adminAuthHeaders } from './adminApi.js';
 import { driverSessionHeaders } from '../lib/driver/driverSession.js';
 
-const DEVICE_KEY = import.meta.env.VITE_TELEMETRY_DEVICE_KEY || 'dev-gps-key';
+const DEVICE_KEY =
+  import.meta.env.VITE_TELEMETRY_DEVICE_KEY ||
+  (import.meta.env.PROD ? '' : 'dev-gps-key');
 
 export async function postTelemetryUpdate(payload) {
   const res = await fetch(`${API_BASE}/telemetry/update`, {
@@ -21,15 +23,20 @@ export async function postTelemetryUpdate(payload) {
 }
 
 export async function fetchLiveFleet(authHeaders = adminAuthHeaders()) {
-  try {
-    const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
-      headers: authHeaders,
-    });
-    if (res.ok) return res.json();
-    // Do not fall back to mock when authenticated — empty list is honest.
-    if (authHeaders?.Authorization) return [];
-  } catch {
-    if (authHeaders?.Authorization) return [];
+  const res = await fetch(`${API_BASE}/api/v1/telemetry/fleet/live`, {
+    headers: authHeaders,
+  });
+  if (res.ok) {
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  }
+  // Authenticated failures must not fall back to mock fleet (hides real LIVE drivers).
+  if (authHeaders?.Authorization) {
+    const body = await res.json().catch(() => ({}));
+    const detail = body.detail || `Αποτυχία live στόλου (${res.status})`;
+    const err = new Error(typeof detail === 'string' ? detail : `Αποτυχία live στόλου (${res.status})`);
+    err.status = res.status;
+    throw err;
   }
   return getMockFleet();
 }
@@ -176,10 +183,13 @@ export const DEFAULT_TELEMETRY_SETTINGS = {
   fuel_price_eur_per_liter: 1.85,
   gforce_spike_threshold_g: 0.45,
   prefer_tracker_events: true,
-  eta_refresh_seconds: 300,
-  eta_ws_push_seconds: 30,
+  eta_refresh_seconds: 5,
+  eta_ws_push_seconds: 5,
   driver_stale_seconds: 90,
   google_maps_configured: false,
+  fleet_digest_enabled: true,
+  fleet_digest_email_enabled: true,
+  fleet_digest_sms_enabled: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'aerostride_telemetry_settings';
@@ -224,6 +234,18 @@ export async function updateTelemetrySettings(patch, authHeaders = adminAuthHead
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
     return merged;
   }
+}
+
+export async function sendFleetDigest({ days = 1 } = {}, authHeaders = adminAuthHeaders()) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/fleet-digest/send?days=${encodeURIComponent(days)}`,
+    { method: 'POST', headers: authHeaders },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία αποστολής digest');
+  }
+  return data;
 }
 
 export async function fetchTelemetryAlerts({ limit = 50 } = {}, authHeaders = adminAuthHeaders()) {

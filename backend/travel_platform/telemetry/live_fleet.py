@@ -88,6 +88,13 @@ class LiveFleetService:
             merged["bus_plate"] = plate
         if raw.get("heading_deg") is not None:
             merged["heading_deg"] = raw.get("heading_deg")
+        trip_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
+        if trip_title:
+            merged["trip_title"] = str(trip_title).strip()
+        elif update.trip_id is not None and not merged.get("trip_title"):
+            from travel_platform.telemetry.trip_title_resolve import resolve_trip_title_sync
+
+            merged["trip_title"] = resolve_trip_title_sync(update.trip_id)
 
         self._vehicles[vid] = merged
         # Keep code index in sync
@@ -110,6 +117,27 @@ class LiveFleetService:
                 return candidate
         return None
 
+    def _meta_to_state(self, meta: dict[str, Any], *, stale_seconds: int, now: datetime) -> LiveVehicleState | None:
+        if meta.get("lat") is None or meta.get("lng") is None:
+            return None
+        from travel_platform.telemetry.live_fleet_redis import parse_updated_at
+
+        updated = parse_updated_at(meta.get("updated_at"))
+        if updated and (now - updated).total_seconds() > stale_seconds:
+            return None
+        return LiveVehicleState(
+            vehicle_id=str(meta.get("vehicle_id") or ""),
+            vehicle_code=meta.get("vehicle_code", ""),
+            trip_id=meta.get("trip_id"),
+            lat=float(meta["lat"]),
+            lng=float(meta["lng"]),
+            speed_kmh=float(meta.get("speed_kmh") or 0),
+            engine_on=bool(meta.get("engine_on", False)),
+            fuel_level_pct=meta.get("fuel_level_pct"),
+            idle_seconds_trip=int(meta.get("idle_seconds_trip") or 0),
+            updated_at=updated or now,
+        )
+
     def list_active(self, tenant_id: UUID) -> list[LiveVehicleState]:
         from travel_platform.telemetry.settings_store import get_telemetry_settings
 
@@ -120,36 +148,250 @@ class LiveFleetService:
         for meta in self._vehicles.values():
             if meta.get("tenant_id") != tid:
                 continue
-            if "lat" not in meta or "lng" not in meta:
-                continue
-            updated = meta.get("updated_at")
-            if isinstance(updated, str):
-                updated = datetime.fromisoformat(updated.replace("Z", "+00:00"))
-            if updated and updated.tzinfo is None:
-                updated = updated.replace(tzinfo=timezone.utc)
-            if updated and (now - updated).total_seconds() > stale_seconds:
-                continue
-            out.append(
-                LiveVehicleState(
-                    vehicle_id=str(meta.get("vehicle_id") or ""),
-                    vehicle_code=meta.get("vehicle_code", ""),
-                    trip_id=meta.get("trip_id"),
-                    lat=meta["lat"],
-                    lng=meta["lng"],
-                    speed_kmh=meta.get("speed_kmh", 0),
-                    engine_on=meta.get("engine_on", False),
-                    fuel_level_pct=meta.get("fuel_level_pct"),
-                    idle_seconds_trip=meta.get("idle_seconds_trip", 0),
-                    updated_at=updated or datetime.now(timezone.utc),
-                )
-            )
+            state = self._meta_to_state(meta, stale_seconds=stale_seconds, now=now)
+            if state:
+                out.append(state)
         return out
 
+    async def list_active_async(self, tenant_id: UUID) -> list[LiveVehicleState]:
+        """Memory + Redis (needed when WS is down and HTTP poll hits another worker)."""
+        from travel_platform.telemetry.live_fleet_redis import load_live_vehicles
+        from travel_platform.telemetry.settings_store import get_telemetry_settings
+
+        tid = str(tenant_id)
+        stale_seconds = get_telemetry_settings(tid).driver_stale_seconds
+        now = datetime.now(timezone.utc)
+        by_id: dict[str, LiveVehicleState] = {}
+
+        for state in self.list_active(tenant_id):
+            if state.vehicle_id:
+                by_id[state.vehicle_id] = state
+
+        for meta in await load_live_vehicles(tid):
+            # Hydrate local cache so subsequent meta lookups work.
+            vid = str(meta.get("vehicle_id") or "")
+            if vid:
+                self._vehicles[vid] = {**self._vehicles.get(vid, {}), **meta}
+                code = meta.get("vehicle_code")
+                if code:
+                    self._code_index[f"{tid}:{code}"] = vid
+            state = self._meta_to_state(meta, stale_seconds=stale_seconds, now=now)
+            if not state or not state.vehicle_id:
+                continue
+            prev = by_id.get(state.vehicle_id)
+            if not prev or state.updated_at >= prev.updated_at:
+                by_id[state.vehicle_id] = state
+        return list(by_id.values())
+
+    def _merge_admin_fleets(
+        self,
+        primary: list[LiveVehicleState],
+        *extras: list[LiveVehicleState],
+    ) -> list[LiveVehicleState]:
+        seen_ids = {v.vehicle_id for v in primary if v.vehicle_id}
+        seen_codes = {v.vehicle_code for v in primary if v.vehicle_code}
+        merged = list(primary)
+        for group in extras:
+            for v in group or []:
+                if v.vehicle_id and v.vehicle_id in seen_ids:
+                    continue
+                if v.vehicle_code and v.vehicle_code in seen_codes:
+                    continue
+                merged.append(v)
+                if v.vehicle_id:
+                    seen_ids.add(v.vehicle_id)
+                if v.vehicle_code:
+                    seen_codes.add(v.vehicle_code)
+        return merged
+
+    def _legacy_merge_allowed(self) -> bool:
+        import os
+
+        return os.getenv("ALLOW_CROSS_TENANT_FLEET_MERGE", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+
+    def list_active_for_admin(self, tenant_id: UUID) -> list[LiveVehicleState]:
+        """
+        Active vehicles for the admin map.
+
+        Cross-tenant demo/platform merge is OFF by default (tenant isolation).
+        When ALLOW_CROSS_TENANT_FLEET_MERGE=1, only the platform/Achillio office
+        (and DEMO JWT) may merge DEMO↔platform GPS — never PoreiaGo / other
+        SaaS offices (that was the dual-office pin bleed).
+        """
+        import os
+
+        primary = self.list_active(tenant_id)
+        if not self._legacy_merge_allowed():
+            return primary
+
+        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
+        demo = str(DEFAULT_TENANT)
+        tid = str(tenant_id)
+        platform_raw = (
+            os.getenv("SAAS_DEFAULT_TENANT_ID")
+            or os.getenv("DEFAULT_TENANT_ID")
+            or ""
+        ).strip()
+
+        # PoreiaGo / customer offices must never inherit Achillio or DEMO pins.
+        if tid != demo and (not platform_raw or tid != platform_raw):
+            return primary
+
+        extras: list[list[LiveVehicleState]] = []
+        if tid == platform_raw and tid != demo:
+            extras.append(self.list_active(UUID(demo)))
+        elif tid == demo and platform_raw and platform_raw != demo:
+            extras.append(self.list_active(UUID(platform_raw)))
+
+        return self._merge_admin_fleets(primary, *extras)
+
+    async def list_active_for_admin_async(self, tenant_id: UUID) -> list[LiveVehicleState]:
+        primary = await self.list_active_async(tenant_id)
+        if not self._legacy_merge_allowed():
+            return primary
+
+        from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
+        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
+        demo = str(DEFAULT_TENANT)
+        tid = str(tenant_id)
+        platform = ""
+        try:
+            platform = str(await resolve_platform_tenant_id() or "").strip()
+        except Exception:
+            pass
+
+        # PoreiaGo / customer offices must never inherit Achillio or DEMO pins.
+        if tid != demo and (not platform or tid != platform):
+            return primary
+
+        extras: list[list[LiveVehicleState]] = []
+        seen = {tid}
+        if tid == platform and demo not in seen:
+            extras.append(await self.list_active_async(UUID(demo)))
+            seen.add(demo)
+        elif tid == demo and platform and platform not in seen:
+            extras.append(await self.list_active_async(UUID(platform)))
+            seen.add(platform)
+
+        return self._merge_admin_fleets(primary, *extras)
+
     def vehicle_meta(self, tenant_id: UUID, vehicle_id: str) -> dict:
+        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
         meta = self._vehicles.get(vehicle_id, {})
-        if meta.get("tenant_id") != str(tenant_id):
-            return {}
-        return meta
+        meta_tid = str(meta.get("tenant_id") or "")
+        want = str(tenant_id)
+        if meta_tid == want:
+            return meta
+        # Only when legacy merge is on: allow DEMO ↔ same vehicle enrichment.
+        # Never return a pin belonging to an unrelated SaaS office.
+        if self._legacy_merge_allowed():
+            if meta_tid == DEFAULT_TENANT and want != DEFAULT_TENANT:
+                return meta
+            if want == DEFAULT_TENANT and meta_tid and meta_tid != DEFAULT_TENANT:
+                return meta
+        return {}
+
+    async def vehicle_meta_async(self, tenant_id: UUID, vehicle_id: str) -> dict:
+        local = self.vehicle_meta(tenant_id, vehicle_id)
+        if local.get("lat") is not None:
+            return local
+        from travel_platform.operations.master_qr_bridge import resolve_platform_tenant_id
+        from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+        from travel_platform.telemetry.live_fleet_redis import load_live_vehicle
+
+        candidates = [str(tenant_id)]
+        if self._legacy_merge_allowed():
+            if str(tenant_id) != DEFAULT_TENANT:
+                candidates.append(DEFAULT_TENANT)
+            else:
+                try:
+                    platform = str(await resolve_platform_tenant_id())
+                    if platform and platform not in candidates:
+                        candidates.append(platform)
+                except Exception:
+                    pass
+
+        remote: dict = {}
+        for tid in candidates:
+            remote = await load_live_vehicle(tid, vehicle_id)
+            if remote.get("lat") is not None:
+                break
+        if remote:
+            self._vehicles[vehicle_id] = {**self._vehicles.get(vehicle_id, {}), **remote}
+        return remote or local
+
+    async def remove_driver_vehicles(
+        self,
+        tenant_id: str,
+        driver_id: str,
+        *,
+        extra_tenant_ids: list[str] | None = None,
+    ) -> list[str]:
+        """
+        Drop live vehicles for a driver (end shift).
+
+        Clears memory + Redis for the primary tenant and any extras (demo /
+        obsolete seed slug). GPS briefly landed on the wrong Achillio tenant;
+        end-shift must wipe every mirror or the admin map keeps showing the pin.
+        """
+        from travel_platform.telemetry.live_fleet_redis import (
+            delete_live_vehicle,
+            load_live_vehicles,
+        )
+
+        did = str(driver_id or "").strip()
+        if not did:
+            return []
+
+        tenants: set[str] = set()
+        for raw in [tenant_id, *(extra_tenant_ids or [])]:
+            tid = str(raw or "").strip()
+            if tid:
+                tenants.add(tid)
+        if not tenants:
+            return []
+
+        removed: list[str] = []
+        seen: set[tuple[str, str]] = set()
+
+        async def _drop(tid: str, vid: str, meta: dict[str, Any] | None = None) -> None:
+            key = (tid, vid)
+            if not vid or key in seen:
+                return
+            seen.add(key)
+            code = (meta or {}).get("vehicle_code") or self._vehicles.get(vid, {}).get("vehicle_code")
+            self._vehicles.pop(vid, None)
+            if code:
+                self._code_index.pop(f"{tid}:{code}", None)
+            await delete_live_vehicle(tid, vid)
+            removed.append(vid)
+
+        for tid in tenants:
+            for vid, meta in list(self._vehicles.items()):
+                if str(meta.get("tenant_id") or "") != tid:
+                    continue
+                if str(meta.get("driver_id") or "") != did:
+                    continue
+                await _drop(tid, vid, meta)
+
+            try:
+                remote_rows = await load_live_vehicles(tid)
+            except Exception:
+                remote_rows = []
+            for meta in remote_rows:
+                if str(meta.get("driver_id") or "") != did:
+                    continue
+                vid = str(meta.get("vehicle_id") or "")
+                await _drop(tid, vid, meta)
+
+        return removed
 
     def heatmap_grid(self, tenant_id: UUID, cell_size: float = 0.01) -> list[dict]:
         """Aggregate frequent stopping points for heatmap layer."""

@@ -7,6 +7,8 @@ import { getSaasToken, saasAuthHeaders } from './saasApi.js';
 export { getSaasToken };
 
 export function adminAuthHeaders(extra = {}) {
+  // Tenant scope comes from JWT only — never send a client Host override
+  // (spoofable). Achillio recovery uses proxied Host + Achillio JWT.
   return { ...saasAuthHeaders(), ...extra };
 }
 
@@ -18,9 +20,55 @@ export function adminBearerHeaders(extra = {}) {
   return headers;
 }
 
+function isNetworkError(err) {
+  const raw = String(err?.message || err || '').trim();
+  return (
+    err?.name === 'TypeError' ||
+    /failed to fetch|networkerror|load failed|network request failed/i.test(raw)
+  );
+}
+
+function networkAdminError() {
+  return new Error(
+    'Δεν υπάρχει σύνδεση με τον server (πιθανό deploy). Περιμένετε λίγο και πατήστε Δοκιμή ξανά.',
+  );
+}
+
+/**
+ * fetch() with short retries — deploy bounces often surface as "Failed to fetch"
+ * or 502/503 while Traefik/nginx reattach api-blue.
+ */
 export async function adminFetch(path, options = {}) {
-  return fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { ...adminAuthHeaders(), ...(options.headers || {}) },
-  });
+  const attempts = Math.max(1, Number(options.retries) || 3);
+  const { retries, ...fetchOpts } = options;
+  void retries;
+  const isFormData =
+    typeof FormData !== 'undefined' && fetchOpts.body instanceof FormData;
+  // FormData must not send Content-Type: application/json (breaks multipart + auth proxies).
+  const baseHeaders = isFormData ? adminBearerHeaders() : adminAuthHeaders();
+  let lastErr;
+
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...fetchOpts,
+        headers: { ...baseHeaders, ...(fetchOpts.headers || {}) },
+      });
+      if ([502, 503, 504, 404].includes(res.status) && i < attempts - 1) {
+        // 404 here is usually Traefik mid-deploy ("404 page not found"), not a
+        // real missing drivers route — retry like other bounce codes.
+        await new Promise((r) => setTimeout(r, 450 * (i + 1)));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (!isNetworkError(err) || i === attempts - 1) {
+        throw isNetworkError(err) ? networkAdminError() : err;
+      }
+      await new Promise((r) => setTimeout(r, 450 * (i + 1)));
+    }
+  }
+
+  throw isNetworkError(lastErr) ? networkAdminError() : lastErr;
 }

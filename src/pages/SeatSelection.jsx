@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { loadTrips } from '../lib/trips/tripStore.js';
+import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import { generateSeatMap } from '../lib/seats/generateSeatMap.js';
+import {
+  findSeatConflicts,
+  normalizeSeatCode,
+  seatsTakenForTrip,
+} from '../lib/seats/occupiedSeats.js';
 import { savePendingCheckout } from '../lib/ticketing/pendingCheckout.js';
+import { loadBookings } from '../lib/ticketing/bookingStore.js';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { useTripPricing } from '../hooks/useTripPricing.js';
@@ -16,11 +22,13 @@ import {
   sumSelectedSeatPrices,
 } from '../lib/seats/seatPricing.js';
 import { fetchPublicSeatPricing } from '../services/seatPricingApi.js';
+import { fetchOccupiedSeats, getSaasTenantId } from '../services/saasApi.js';
 import {
   getSeatMapCheckoutButtonClass,
   getSeatMapHeaderClasses,
   resolveTripSeatMapTheme,
 } from '../lib/seats/seatMapThemes.js';
+import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
 
 export default function SeatSelection() {
   const { tripId } = useParams();
@@ -28,11 +36,19 @@ export default function SeatSelection() {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [fleetCheck, setFleetCheck] = useState({ loading: true, available: true, reason: null, warning: null });
   const [seatPricingConfig, setSeatPricingConfig] = useState(null);
+  const [occupiedSeats, setOccupiedSeats] = useState([]);
+  const [occupancyLoading, setOccupancyLoading] = useState(true);
+  const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
 
   const trip = useMemo(() => {
     const id = Number(tripId);
     if (!id) return null;
-    return loadTrips().find((t) => t.id === id) || null;
+    const found = loadTrips().find((t) => t.id === id) || null;
+    if (found) return found;
+    if (isPlatformSeatBookingDemo()) {
+      return loadPlatformDemoTrips().find((t) => t.id === id) || null;
+    }
+    return null;
   }, [tripId]);
 
   const { pricePerSeat, quote } = useTripPricing(trip);
@@ -46,6 +62,49 @@ export default function SeatSelection() {
 
   useEffect(() => {
     if (!trip) return;
+    if (isDemo) {
+      setOccupiedSeats([]);
+      setOccupancyLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setOccupancyLoading(true);
+
+    const localTaken = [...seatsTakenForTrip(trip, loadBookings())];
+
+    (async () => {
+      let remote = [];
+      try {
+        const data = await fetchOccupiedSeats(trip.id, getSaasTenantId());
+        remote = Array.isArray(data?.seats) ? data.seats : [];
+      } catch {
+        /* offline / no tenant — fall back to local bookings */
+      }
+      if (cancelled) return;
+      const merged = new Set(
+        [...localTaken, ...remote].map(normalizeSeatCode).filter(Boolean),
+      );
+      setOccupiedSeats([...merged]);
+      setOccupancyLoading(false);
+      setSelectedSeats((prev) =>
+        prev.filter((id) => {
+          const number = String(id).includes('-') ? String(id).split('-').pop() : id;
+          return !merged.has(normalizeSeatCode(number));
+        }),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trip, isDemo]);
+
+  useEffect(() => {
+    if (!trip) return;
+    if (isDemo) {
+      setFleetCheck({ loading: false, available: true, reason: null, warning: null });
+      return;
+    }
     let cancelled = false;
     setFleetCheck((s) => ({ ...s, loading: true }));
     checkTripAvailable(trip).then((result) => {
@@ -64,14 +123,14 @@ export default function SeatSelection() {
     return () => {
       cancelled = true;
     };
-  }, [trip]);
+  }, [trip, isDemo]);
 
   const { layout, seats, availableCount } = useMemo(() => {
     if (!trip) return { layout: null, seats: [], availableCount: 0 };
-    const map = generateSeatMap(trip);
+    const map = generateSeatMap(trip, { occupiedSeats });
     const priced = enrichSeatsWithPricing(map.seats, seatPricingConfig, tripBasePrice);
     return { ...map, seats: priced, availableCount: map.availableCount };
-  }, [trip, seatPricingConfig, tripBasePrice]);
+  }, [trip, seatPricingConfig, tripBasePrice, occupiedSeats]);
 
   const seatTheme = useMemo(() => resolveTripSeatMapTheme(trip), [trip]);
   const headerChrome = useMemo(() => getSeatMapHeaderClasses(seatTheme), [seatTheme]);
@@ -109,6 +168,46 @@ export default function SeatSelection() {
   const fromPrice =
     availablePrices.length > 0 ? Math.min(...availablePrices) : tripBasePrice;
 
+  const continueToExtras = () => {
+    const labels = selectedSeatRows.map((s) => s.number);
+    const conflicts = findSeatConflicts(labels, occupiedSeats);
+    if (conflicts.length) {
+      toast.error(`Οι θέσεις είναι κατειλημμένες: ${conflicts.join(', ')}`);
+      setSelectedSeats((prev) =>
+        prev.filter((id) => {
+          const number = String(id).includes('-') ? String(id).split('-').pop() : id;
+          return !conflicts.includes(normalizeSeatCode(number));
+        }),
+      );
+      return;
+    }
+    savePendingCheckout({
+      tripId: trip.id,
+      seats: selectedLabels,
+      seatSubtotal: total,
+      total,
+      pricePerSeat: selectedSeatRows.length ? total / selectedSeatRows.length : tripBasePrice,
+      seatBreakdown: selectedSeatRows.map((s) => ({
+        number: s.number,
+        priceEur: s.priceEur,
+        tier: s.tier,
+      })),
+      extras: [],
+      extrasTotal: 0,
+      extrasSelection: {},
+      demo: isDemo,
+    });
+    if (!isDemo) {
+      trackAbandonedCheckout({
+        tripId: trip.id,
+        tripTitle: trip.title,
+        seats: selectedLabels,
+        amountEur: total,
+      });
+    }
+    navigate(`/book/extras/${trip.id}`);
+  };
+
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-[#f8f6f1] via-surface to-[#eef1f5] py-6 px-4 md:py-8">
       <MinimalPageBackground />
@@ -121,6 +220,21 @@ export default function SeatSelection() {
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
           Πίσω
         </button>
+
+        {isDemo ? (
+          <div className="mb-4 rounded-2xl border border-sky-200/80 bg-sky-50 px-4 py-3 text-sm text-sky-950 flex gap-2.5 items-start">
+            <span className="material-symbols-outlined text-[20px] text-sky-600 shrink-0 mt-0.5">
+              science
+            </span>
+            <div>
+              <p className="font-semibold">Demo κράτηση θέσης</p>
+              <p className="text-sky-900/80 text-xs mt-0.5 leading-relaxed">
+                Προεπισκόπηση πλατφόρμας — επιλέξτε θέσεις και ολοκληρώστε το checkout χωρίς
+                πραγματική πληρωμή ή εισιτήριο.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <div
           className={`rounded-[1.75rem] border p-5 md:p-6 mb-5 text-white overflow-hidden relative ${headerChrome.wrapper}`}
@@ -230,30 +344,16 @@ export default function SeatSelection() {
               </div>
               <button
                 type="button"
-                disabled={selectedSeats.length === 0 || !fleetCheck.available || fleetCheck.loading}
-                onClick={() => {
-                  savePendingCheckout({
-                    tripId: trip.id,
-                    seats: selectedLabels,
-                    total,
-                    pricePerSeat: selectedSeatRows.length ? total / selectedSeatRows.length : tripBasePrice,
-                    seatBreakdown: selectedSeatRows.map((s) => ({
-                      number: s.number,
-                      priceEur: s.priceEur,
-                      tier: s.tier,
-                    })),
-                  });
-                  trackAbandonedCheckout({
-                    tripId: trip.id,
-                    tripTitle: trip.title,
-                    seats: selectedLabels,
-                    amountEur: total,
-                  });
-                  navigate(`/checkout/${trip.id}`);
-                }}
+                disabled={
+                  selectedSeats.length === 0 ||
+                  !fleetCheck.available ||
+                  fleetCheck.loading ||
+                  occupancyLoading
+                }
+                onClick={continueToExtras}
                 className={`w-full py-3.5 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all ${getSeatMapCheckoutButtonClass(selectedSeats.length > 0, seatTheme)}`}
               >
-                Ολοκλήρωση
+                {isDemo ? 'Συνέχεια (Demo)' : 'Πρόσθεσε υπηρεσίες'}
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
             </div>

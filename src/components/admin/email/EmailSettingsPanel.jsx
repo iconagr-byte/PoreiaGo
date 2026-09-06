@@ -9,9 +9,24 @@ import {
   updateEmailSettings,
 } from '../../../services/emailSettingsApi.js';
 import {
+  downloadEmailSettingsEnvTemplate,
   downloadEmailSettingsTemplate,
-  parseEmailSettingsFile,
+  parseEmailSettingsBytes,
 } from '../../../lib/email/emailSettingsImport.js';
+import {
+  isMailTimeoutMessage,
+  MAIL_TIMEOUT_TOAST_EL,
+  mailTimeoutHintEl,
+} from '../../../lib/email/mailReachability.js';
+import {
+  buildEmailChecksFromResult,
+  buildPendingEmailChecks,
+} from '../../../lib/email/emailConnectionChecks.js';
+import { PROVIDERS, detectProvider } from '../../../lib/email/emailProviderPresets.js';
+import EmailConnectWizard from './EmailConnectWizard.jsx';
+import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
+import EmailConnectionResult from './EmailConnectionResult.jsx';
+
 const EMPTY = {
   label: '',
   email_address: '',
@@ -22,20 +37,71 @@ const EMPTY = {
   imap_folder_sent: 'Sent',
   imap_folder_spam: 'Spam',
   smtp_host: '',
-  smtp_port: 587,
-  smtp_secure: true,
+  smtp_port: 465,
+  smtp_secure: false,
   mail_username: '',
   mail_password: '',
   is_active: true,
 };
 
-export default function EmailSettingsPanel({ onAccountChange }) {
+const fieldClass =
+  'mt-1.5 w-full rounded-xl border border-outline-variant/80 bg-surface px-3.5 py-2.5 text-body-md text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15';
+const labelClass = 'block text-label-sm font-semibold text-on-surface-variant';
+const sectionClass =
+  'rounded-2xl border border-outline-variant/70 bg-surface-container-low/40 p-4 sm:p-5 space-y-4';
+
+function Field({ id, label, hint, children }) {
+  return (
+    <div>
+      <label htmlFor={id} className={labelClass}>
+        {label}
+      </label>
+      {children}
+      {hint ? <p className="mt-1 text-label-sm text-on-surface-variant/80">{hint}</p> : null}
+    </div>
+  );
+}
+
+function syncErrorDisplay(error) {
+  const msg = String(error || '');
+  if (/poreiago|intechs|34\.141\.98\.145|169\.58\.199\.186|imap\.gmail\.com|whitelist|app password|forward/i.test(msg)) {
+    return 'IMAP σύνδεση: timeout — δεν ήταν δυνατή η σύνδεση στον mail server (θύρα 993/143). Ελέγξτε host, ότι ο λογαριασμός IMAP είναι ενεργός, και ότι ο πάροχος email επιτρέπει εξωτερικές συνδέσεις.';
+  }
+  return msg;
+}
+
+function syncErrorHint(error) {
+  const msg = String(error || '');
+  if (/application-specific password|app password|185833/i.test(msg)) {
+    return 'Gmail: δημιουργήστε App Password (Google Account → Ασφάλεια → Κωδικοί εφαρμογών) και χρησιμοποιήστε αυτόν, όχι τον κανονικό κωδικό.';
+  }
+  if (/AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(msg)) {
+    return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login).';
+  }
+  if (/timed out|timeout|Errno 110|δεν ήταν δυνατή η σύνδεση|poreiago|intechs|34\.141/i.test(msg)) {
+    return 'Δεν ανοίγει σύνδεση στον mail server. Ελέγξτε host/port και ότι το IMAP επιτρέπεται από τον πάροχο email.';
+  }
+  if (/ascii codec|ordinal not in range|encoding/i.test(msg)) {
+    return 'Πρόβλημα encoding — δοκιμάστε ξανά μετά από αποθήκευση κωδικού.';
+  }
+  if (/CERTIFICATE|SSL|hostname/i.test(msg)) {
+    return 'Πρόβλημα πιστοποιητικού SSL στον mail server — επικοινωνήστε με τον πάροχο hosting.';
+  }
+  return 'Ελέγξτε host / κωδικό και πατήστε Συγχρονισμός IMAP στο Mailbox.';
+}
+
+export default function EmailSettingsPanel({ onAccountChange, openConnectWizard = false }) {
   const [accounts, setAccounts] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ ...EMPTY });
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testChecks, setTestChecks] = useState([]);
+  const [testingAccountId, setTestingAccountId] = useState(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [showWizard, setShowWizard] = useState(Boolean(openConnectWizard));
   const fileInputRef = useRef(null);
 
   const load = async () => {
@@ -54,63 +120,291 @@ export default function EmailSettingsPanel({ onAccountChange }) {
     load();
   }, []);
 
+  useEffect(() => {
+    if (openConnectWizard) setShowWizard(true);
+  }, [openConnectWizard]);
+
   const set = (key) => (e) => {
     const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setForm((f) => ({ ...f, [key]: v }));
+    setForm((f) => {
+      const next = { ...f, [key]: v };
+      // Keep username in sync when empty and email changes.
+      if (key === 'email_address' && !(f.mail_username || '').trim()) {
+        next.mail_username = v;
+      }
+      // Mirror IMAP host → SMTP host when SMTP still empty or matched previous IMAP host.
+      if (key === 'imap_host' && (!(f.smtp_host || '').trim() || f.smtp_host === f.imap_host)) {
+        next.smtp_host = v;
+      }
+      // Auto-fill Gmail / Yahoo / Outlook / cPanel hosts when the address domain is known
+      // and hosts are still empty or were previously auto-filled for another provider.
+      if (key === 'email_address') {
+        const prov = detectProvider(v);
+        const known = ['gmail', 'yahoo', 'outlook', 'achillio'].includes(prov.id);
+        const hostEmpty = !(f.imap_host || '').trim();
+        const wasProviderHost = [
+          'imap.gmail.com',
+          'imap.mail.yahoo.com',
+          'outlook.office365.com',
+          'mail.achilliotravel.com',
+        ].includes(String(f.imap_host || '').toLowerCase());
+        if (known && (hostEmpty || wasProviderHost || String(f.imap_host || '').startsWith('mail.'))) {
+          next.imap_host = prov.imap_host;
+          next.imap_port = prov.imap_port;
+          next.imap_secure = prov.imap_secure;
+          next.smtp_host = prov.smtp_host;
+          next.smtp_port = prov.smtp_port;
+          next.smtp_secure = prov.smtp_secure;
+          if (!(next.mail_username || '').trim()) next.mail_username = String(v || '').trim();
+        }
+      }
+      return next;
+    });
+    setTestResult(null);
   };
 
+  const applyImapPreset = (preset) => {
+    if (preset === '993') {
+      setForm((f) => ({ ...f, imap_port: 993, imap_secure: true }));
+    } else if (preset === '143') {
+      setForm((f) => ({ ...f, imap_port: 143, imap_secure: false }));
+    }
+    setTestResult(null);
+  };
+
+  const applySmtpPreset = (preset) => {
+    if (preset === '587') {
+      setForm((f) => ({ ...f, smtp_port: 587, smtp_secure: true }));
+    } else if (preset === '465') {
+      setForm((f) => ({ ...f, smtp_port: 465, smtp_secure: false }));
+    }
+    setTestResult(null);
+  };
+
+  const applyProviderPreset = (providerId) => {
+    const prov =
+      providerId === 'auto'
+        ? detectProvider(form.email_address)
+        : PROVIDERS[providerId] || PROVIDERS.custom;
+    const email = (form.email_address || '').trim().toLowerCase();
+    const domain = email.includes('@') ? email.split('@')[1] : '';
+    const resolved =
+      providerId === 'auto'
+        ? prov
+        : providerId === 'custom' && domain
+          ? {
+              ...PROVIDERS.custom,
+              imap_host: `mail.${domain}`,
+              smtp_host: `mail.${domain}`,
+            }
+          : providerId === 'achillio'
+            ? detectProvider('info@achilliotravel.com')
+            : prov;
+
+    setForm((f) => ({
+      ...f,
+      imap_host: resolved.imap_host || f.imap_host,
+      imap_port: resolved.imap_port ?? 993,
+      imap_secure: Boolean(resolved.imap_secure),
+      smtp_host: resolved.smtp_host || f.smtp_host,
+      smtp_port: resolved.smtp_port ?? 465,
+      smtp_secure: Boolean(resolved.smtp_secure),
+      mail_username: (f.mail_username || '').trim() || email || f.mail_username,
+      label: (f.label || '').trim() || resolved.label || f.label,
+    }));
+    setTestResult({
+      ok: true,
+      message: `Προεπιλογές: ${resolved.label || providerId}`,
+      hint: (resolved.help || []).join(' · '),
+    });
+    toast.success(`${resolved.label || 'Προεπιλογές'} φορτώθηκαν`, { id: 'email-provider-preset' });
+  };
+
+  const activeProviderId = (() => {
+    const host = String(form.imap_host || '').toLowerCase();
+    if (host === 'imap.gmail.com') return 'gmail';
+    if (host === 'imap.mail.yahoo.com') return 'yahoo';
+    if (host === 'outlook.office365.com') return 'outlook';
+    if (host === 'mail.achilliotravel.com') return 'achillio';
+    if (host.startsWith('mail.')) return 'custom';
+    return '';
+  })();
+
   const startNew = () => {
+    setShowWizard(false);
     setEditingId('new');
     setForm({ ...EMPTY });
+    setTestResult(null);
+    setTestChecks([]);
+    setTestingAccountId(null);
+    setPasswordVisible(false);
   };
 
   const startEdit = (acc) => {
+    setShowWizard(false);
     setEditingId(acc.id);
     setForm({
       ...EMPTY,
-      label: acc.label,
-      email_address: acc.email_address,
-      imap_host: acc.imap_host,
-      imap_port: acc.imap_port,
-      imap_secure: acc.imap_secure,
-      imap_mailbox: acc.imap_mailbox,
-      imap_folder_sent: acc.imap_folder_sent,
-      imap_folder_spam: acc.imap_folder_spam,
-      smtp_host: acc.smtp_host,
-      smtp_port: acc.smtp_port,
-      smtp_secure: acc.smtp_secure,
-      mail_username: acc.mail_username,
+      label: acc.label || '',
+      email_address: acc.email_address || '',
+      imap_host: acc.imap_host || '',
+      imap_port: acc.imap_port || 993,
+      imap_secure: Boolean(acc.imap_secure),
+      imap_mailbox: acc.imap_mailbox || 'INBOX',
+      imap_folder_sent: acc.imap_folder_sent || 'Sent',
+      imap_folder_spam: acc.imap_folder_spam || 'Spam',
+      smtp_host: acc.smtp_host || '',
+      smtp_port: acc.smtp_port || 587,
+      smtp_secure: Boolean(acc.smtp_secure),
+      mail_username: acc.mail_username || acc.email_address || '',
       mail_password: '',
-      is_active: acc.is_active,
+      is_active: acc.is_active !== false,
+    });
+    setTestResult(null);
+    setTestChecks([]);
+    setTestingAccountId(null);
+    setPasswordVisible(false);
+    requestAnimationFrame(() => {
+      document.getElementById('email-settings-editor')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
     });
   };
 
   const runTest = async () => {
     setTesting(true);
+    setTestResult(null);
+    const account = {
+      ...form,
+      imap_port: Number(form.imap_port),
+      smtp_port: Number(form.smtp_port),
+      mail_username: form.mail_username || form.email_address,
+      mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
+    };
+    setTestingAccountId(editingId || 'editor');
+    setTestChecks(
+      buildPendingEmailChecks(account).map((c, i) =>
+        i === 0
+          ? { ...c, status: 'running', detail: 'Ξεκινά έλεγχος IMAP & SMTP…' }
+          : { ...c, status: 'pending', detail: 'Αναμονή…' },
+      ),
+    );
     try {
-      const r = await testEmailConnection({
-        ...form,
-        imap_port: Number(form.imap_port),
-        smtp_port: Number(form.smtp_port),
-        mail_username: form.mail_username || form.email_address,
-      });
-      if (r.ok) toast.success('IMAP & SMTP: επιτυχής σύνδεση');
-      else toast.error(r.imap?.error || r.smtp?.error || 'Αποτυχία σύνδεσης');
+      const r = await testEmailConnection(account);
+      const built = buildEmailChecksFromResult(account, r);
+      setTestChecks(built.checks);
+      if (r.ok) {
+        const msg = 'IMAP & SMTP: επιτυχής σύνδεση';
+        setTestResult({ ok: true, message: msg });
+        toast.success(msg, { id: 'email-conn-test' });
+      } else {
+        const imapFail = r.imap && !r.imap.ok;
+        const smtpFail = r.smtp && !r.smtp.ok;
+        const timeout =
+          (imapFail && isMailTimeoutMessage(r.imap?.error)) ||
+          (smtpFail && isMailTimeoutMessage(r.smtp?.error));
+        if (timeout) {
+          const mailHost = form.imap_host || form.smtp_host;
+          const imapPort = Number(form.imap_port) || 993;
+          const smtpPort = Number(form.smtp_port) || 465;
+          setTestResult({
+            ok: false,
+            message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
+            hint: mailTimeoutHintEl({ mailHost, imapPort, smtpPort }),
+            timeout: true,
+            mailHost,
+            imapPort,
+            smtpPort,
+          });
+          toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
+        } else {
+          const parts = [];
+          if (imapFail) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
+          if (smtpFail) parts.push(`SMTP: ${r.smtp.error || 'αποτυχία'}`);
+          const msg = parts.join(' · ') || 'Αποτυχία σύνδεσης';
+          setTestResult({
+            ok: false,
+            message: msg,
+            hint: syncErrorHint(msg),
+          });
+          toast.error(msg, { id: 'email-conn-test' });
+        }
+      }
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.message, { id: 'email-conn-test' });
+      setTestResult({ ok: false, message: err.message, hint: syncErrorHint(err.message) });
+      setTestChecks((prev) =>
+        prev.map((c) =>
+          c.status === 'running' || c.status === 'pending'
+            ? { ...c, status: 'fail', detail: err.message }
+            : c,
+        ),
+      );
     } finally {
       setTesting(false);
     }
   };
 
   const runTestSaved = async (id) => {
+    const acc = accounts.find((a) => a.id === id);
+    if (!acc) {
+      toast.error('Ο λογαριασμός δεν βρέθηκε');
+      return;
+    }
     setTesting(true);
+    setTestingAccountId(id);
+    setTestResult(null);
+    setTestChecks(
+      buildPendingEmailChecks(acc).map((c, i) =>
+        i === 0
+          ? { ...c, status: 'running', detail: 'Ξεκινά έλεγχος IMAP & SMTP για αυτό το γραφείο…' }
+          : { ...c, status: 'pending', detail: 'Αναμονή…' },
+      ),
+    );
     try {
       const r = await testSavedEmailConnection(id);
-      if (r.ok) toast.success('Σύνδεση OK');
-      else toast.error(r.imap?.error || r.smtp?.error || 'Αποτυχία');
+      const built = buildEmailChecksFromResult(acc, r);
+      setTestChecks(built.checks);
+      if (r.ok) {
+        setTestResult({ ok: true, message: 'IMAP & SMTP: επιτυχής σύνδεση' });
+        toast.success('Σύνδεση OK — δείτε τα βήματα παρακάτω', { id: 'email-conn-test' });
+      } else {
+        const timeout = built.imapHostFail || built.smtpHostFail;
+        if (timeout) {
+          const mailHost = acc.imap_host || acc.smtp_host;
+          const imapPort = Number(acc.imap_port) || 993;
+          const smtpPort = Number(acc.smtp_port) || 465;
+          setTestResult({
+            ok: false,
+            message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
+            hint: mailTimeoutHintEl({ mailHost, imapPort, smtpPort }),
+            timeout: true,
+            mailHost,
+            imapPort,
+            smtpPort,
+          });
+          toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
+        } else {
+          const msg = r.imap?.error || r.smtp?.error || 'Αποτυχία';
+          setTestResult({
+            ok: false,
+            message: msg,
+            hint: syncErrorHint(msg),
+          });
+          toast.error(msg, { id: 'email-conn-test' });
+        }
+      }
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.message, { id: 'email-conn-test' });
+      setTestResult({ ok: false, message: err.message, hint: syncErrorHint(err.message) });
+      setTestChecks((prev) =>
+        prev.map((c) =>
+          c.status === 'running' || c.status === 'pending'
+            ? { ...c, status: 'fail', detail: err.message }
+            : c,
+        ),
+      );
     } finally {
       setTesting(false);
     }
@@ -128,6 +422,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
         imap_port: Number(form.imap_port),
         smtp_port: Number(form.smtp_port),
         mail_username: form.mail_username || form.email_address,
+        // Gmail/Yahoo App Passwords are shown with spaces — strip before save/test.
+        mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
       };
       if (editingId === 'new') {
         if (!form.mail_password) {
@@ -146,6 +442,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
         toast.success('Ενημερώθηκε');
       }
       setEditingId(null);
+      setTestResult(null);
+      setPasswordVisible(false);
       load();
     } catch (err) {
       toast.error(err.message);
@@ -172,6 +470,16 @@ export default function EmailSettingsPanel({ onAccountChange }) {
       ...account,
       mail_password: account.mail_password || '',
     });
+    setTestResult(null);
+    setTestChecks([]);
+    setTestingAccountId(null);
+    setPasswordVisible(false);
+    requestAnimationFrame(() => {
+      document.getElementById('email-settings-editor')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
   };
 
   const handleImportFile = async (event) => {
@@ -181,26 +489,53 @@ export default function EmailSettingsPanel({ onAccountChange }) {
 
     setImporting(true);
     try {
-      const text = await file.text();
-      const { accounts, errors } = parseEmailSettingsFile(text, file.name);
+      const buf = await file.arrayBuffer();
+      const { accounts: imported, errors } = parseEmailSettingsBytes(buf, file.name);
 
-      if (errors.length) {
-        errors.forEach((msg) => toast.error(msg, { duration: 5000 }));
-      }
-      if (!accounts.length) {
-        if (!errors.length) toast.error('Δεν βρέθηκαν έγκυροι λογαριασμοί στο αρχείο');
+      if (!imported.length) {
+        if (errors.length) errors.forEach((msg) => toast.error(msg, { duration: 6000 }));
+        else toast.error('Δεν βρέθηκαν έγκυροι λογαριασμοί στο αρχείο');
         return;
       }
 
-      if (accounts.length === 1) {
-        applyImportedAccount(accounts[0]);
-        toast.success('Οι ρυθμίσεις φορτώθηκαν — ελέγξτε και πατήστε Αποθήκευση');
+      const softErrors = errors.filter(Boolean);
+
+      if (imported.length === 1) {
+        const account = imported[0];
+        if (account.mail_password && account.mail_password !== 'YOUR_PASSWORD_HERE') {
+          try {
+            const created = await createEmailSettings({
+              ...account,
+              imap_port: Number(account.imap_port) || 993,
+              smtp_port: Number(account.smtp_port) || 587,
+              mail_username: account.mail_username || account.email_address,
+            });
+            toast.success('Ο λογαριασμός εισήχθη και αποθηκεύτηκε');
+            onAccountChange?.(created.id);
+            localStorage.setItem('email_active_account', created.id);
+            setEditingId(null);
+            load();
+            return;
+          } catch (err) {
+            toast.error(err.message || 'Αποτυχία αποθήκευσης — ελέγξτε τη φόρμα');
+            applyImportedAccount(account);
+            return;
+          }
+        }
+        applyImportedAccount(account);
+        softErrors.forEach((msg) => toast.error(msg, { duration: 6000 }));
+        toast.success(
+          account.mail_password
+            ? 'Φορτώθηκε — αλλάξτε τον κωδικό-πρότυπο και πατήστε Αποθήκευση'
+            : 'Φορτώθηκε η φόρμα — συμπληρώστε κωδικό και πατήστε Αποθήκευση',
+        );
         return;
       }
 
+      softErrors.forEach((msg) => toast.error(msg, { duration: 5000 }));
       let created = 0;
-      for (const account of accounts) {
-        if (!account.mail_password) continue;
+      for (const account of imported) {
+        if (!account.mail_password || account.mail_password === 'YOUR_PASSWORD_HERE') continue;
         await createEmailSettings(account);
         created += 1;
       }
@@ -208,7 +543,8 @@ export default function EmailSettingsPanel({ onAccountChange }) {
         toast.success(`Εισήχθησαν ${created} λογαριασμοί`);
         load();
       } else {
-        toast.error('Κανένας λογαριασμός δεν αποθηκεύτηκε — λείπουν κωδικοί');
+        applyImportedAccount(imported[0]);
+        toast.error('Κανένας λογαριασμός δεν αποθηκεύτηκε αυτόματα — συμπληρώστε κωδικό και Αποθήκευση');
       }
     } catch (err) {
       toast.error(err.message || 'Αποτυχία εισαγωγής');
@@ -217,118 +553,602 @@ export default function EmailSettingsPanel({ onAccountChange }) {
     }
   };
 
+  const isNew = editingId === 'new';
+  const requiredOk = Boolean(
+    (form.email_address || '').trim() &&
+      (form.imap_host || '').trim() &&
+      (form.smtp_host || '').trim(),
+  );
+  const canTest = requiredOk && !testing && !saving;
+  const canSave = requiredOk && !saving && (isNew ? Boolean((form.mail_password || '').trim()) : true);
+  const smtpPreset =
+    Number(form.smtp_port) === 465 && !form.smtp_secure
+      ? '465'
+      : Number(form.smtp_port) === 587 && form.smtp_secure
+        ? '587'
+        : 'custom';
+  const imapPreset =
+    Number(form.imap_port) === 143 && !form.imap_secure
+      ? '143'
+      : Number(form.imap_port) === 993 && form.imap_secure
+        ? '993'
+        : 'custom';
+
   return (
     <div className="space-y-6 max-w-3xl">
-      <div className="flex justify-between items-center">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h2 className="font-headline-md text-headline-md text-on-surface">Ρυθμίσεις Email</h2>
-          <p className="text-body-sm text-on-surface-variant mt-1">
-            Συνδέστε τον δικό σας λογαριασμό (π.χ. info@mydomain.gr) — IMAP/SMTP, όχι .env.
-            Εισαγωγή από <strong>JSON</strong> ή <strong>.env</strong> αρχείο.
+          <p className="mt-1 max-w-xl text-body-sm text-on-surface-variant">
+            Συνδέστε προσωπικό ή εταιρικό mailbox (IMAP/SMTP) μετά την αγορά συμβολαίου.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,.env,.txt,application/json,text/plain"
+            accept=".mobileconfig,.vbs,.json,.env,.txt,application/json,text/plain,.env.prod,.env.local,.env.example,application/x-apple-aspen-config,text/vbscript,*/*"
             className="hidden"
             onChange={handleImportFile}
           />
           <button
             type="button"
+            onClick={() => {
+              setShowWizard(true);
+              setEditingId(null);
+            }}
+            className="rounded-xl bg-primary px-4 py-2 text-label-md font-semibold text-on-primary shadow-sm hover:opacity-95"
+          >
+            + Σύνδεση email
+          </button>
+          <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
-            className="px-4 py-2 rounded-lg border border-outline-variant text-label-md font-bold"
+            className="rounded-xl border border-outline-variant bg-surface px-3.5 py-2 text-label-md font-semibold text-on-surface hover:bg-surface-container-low disabled:opacity-60"
           >
-            {importing ? 'Εισαγωγή…' : 'Εισαγωγή από αρχείο'}
+            {importing ? 'Εισαγωγή…' : 'Εισαγωγή αρχείου'}
           </button>
           <button
             type="button"
             onClick={downloadEmailSettingsTemplate}
-            className="px-4 py-2 rounded-lg border border-outline-variant text-label-md"
+            className="rounded-xl border border-outline-variant bg-surface px-3.5 py-2 text-label-md text-on-surface-variant hover:bg-surface-container-low"
           >
-            Πρότυπο JSON
+            JSON
+          </button>
+          <button
+            type="button"
+            onClick={downloadEmailSettingsEnvTemplate}
+            className="rounded-xl border border-outline-variant bg-surface px-3.5 py-2 text-label-md text-on-surface-variant hover:bg-surface-container-low"
+          >
+            .env
           </button>
           <button
             type="button"
             onClick={startNew}
-            className="px-4 py-2 rounded-lg bg-primary text-on-primary text-label-md"
+            className="rounded-xl border border-outline-variant bg-surface px-3.5 py-2 text-label-md font-semibold text-on-surface hover:bg-surface-container-low"
           >
-            + Νέος λογαριασμός
+            Χειροκίνητα
           </button>
         </div>
       </div>
 
+      {(showWizard || accounts.length === 0) && !editingId && (
+        <EmailConnectWizard
+          onCancel={accounts.length ? () => setShowWizard(false) : undefined}
+          onConnected={(created) => {
+            setShowWizard(false);
+            onAccountChange?.(created.id);
+            localStorage.setItem('email_active_account', created.id);
+            load();
+          }}
+        />
+      )}
+
       {accounts.length > 0 && (
-        <ul className="space-y-2">
-          {accounts.map((a) => (
-            <li
-              key={a.id}
-              className="flex flex-wrap items-center justify-between gap-2 p-4 rounded-xl border border-outline-variant bg-surface"
-            >
-              <div>
-                <p className="font-semibold text-on-surface">{a.label || a.email_address}</p>
-                <p className="text-body-sm text-on-surface-variant">{a.email_address}</p>
-                {a.last_sync_error && (
-                  <p className="text-label-sm text-error mt-1">Sync: {a.last_sync_error}</p>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => runTestSaved(a.id)} className="text-label-sm text-primary font-bold">
-                  Έλεγχος
-                </button>
-                <button type="button" onClick={() => startEdit(a)} className="text-label-sm font-bold">
-                  Επεξεργασία
-                </button>
-                <button type="button" onClick={() => remove(a.id)} className="text-label-sm text-error font-bold">
-                  Διαγραφή
-                </button>
-              </div>
-            </li>
-          ))}
+        <ul className="space-y-3">
+          {accounts.map((a) => {
+            const hasErr = Boolean(a.last_sync_error);
+            const syncTimeout = hasErr && isMailTimeoutMessage(a.last_sync_error);
+            return (
+              <li
+                key={a.id}
+                className="rounded-2xl border border-outline-variant/80 bg-surface p-4 shadow-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex items-start gap-3">
+                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path
+                          d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                        />
+                        <path
+                          d="m5.5 7.5 6.5 5 6.5-5"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-semibold text-on-surface">
+                          {a.label || a.email_address}
+                        </p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+                            hasErr
+                              ? syncTimeout
+                                ? 'bg-amber-100 text-amber-900'
+                                : 'bg-rose-100 text-rose-700'
+                              : a.is_active === false
+                                ? 'bg-surface-container-high text-on-surface-variant'
+                                : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {hasErr
+                            ? syncTimeout
+                              ? 'Χρειάζεται whitelist'
+                              : 'Σφάλμα sync'
+                            : a.is_active === false
+                              ? 'Ανενεργό'
+                              : 'Ενεργό'}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-body-sm text-on-surface-variant">
+                        {a.email_address}
+                      </p>
+                      <p className="mt-1 text-label-sm text-on-surface-variant/80">
+                        IMAP {a.imap_host}:{a.imap_port}
+                        {a.imap_secure ? ' · SSL' : ''} · SMTP {a.smtp_host}:{a.smtp_port}
+                        {a.smtp_secure ? ' · STARTTLS' : Number(a.smtp_port) === 465 ? ' · SSL' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => runTestSaved(a.id)}
+                      disabled={testing}
+                      className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-1.5 text-label-sm font-bold text-primary hover:bg-primary/10 disabled:opacity-60"
+                    >
+                      {testing && testingAccountId === a.id ? 'Έλεγχος…' : 'Έλεγχος'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(a)}
+                      className="rounded-xl border border-outline-variant px-3 py-1.5 text-label-sm font-bold text-on-surface hover:bg-surface-container-low"
+                    >
+                      Επεξεργασία
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => remove(a.id)}
+                      className="rounded-xl border border-rose-200 px-3 py-1.5 text-label-sm font-bold text-rose-700 hover:bg-rose-50"
+                    >
+                      Διαγραφή
+                    </button>
+                  </div>
+                </div>
+                {hasErr && syncTimeout && !(testingAccountId === a.id && testChecks.length > 0) ? (
+                  <div className="mt-3">
+                    <EmailConnectionResult
+                      ok={false}
+                      timeout
+                      mailHost={a.imap_host || a.smtp_host}
+                      imapPort={a.imap_port}
+                      smtpPort={a.smtp_port}
+                    />
+                  </div>
+                ) : null}
+                {hasErr && !syncTimeout ? (
+                  <div className="mt-3 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2 text-label-sm text-rose-800">
+                    <p className="font-semibold">Sync: {syncErrorDisplay(a.last_sync_error)}</p>
+                    <p className="mt-0.5 opacity-90">{syncErrorHint(a.last_sync_error)}</p>
+                  </div>
+                ) : null}
+                {testingAccountId === a.id && testChecks.length > 0 ? (
+                  <div className="mt-3 border-t border-outline-variant/40 pt-3">
+                    <EmailConnectionCheckList
+                      checks={testChecks}
+                      testing={testing && testingAccountId === a.id}
+                      title={
+                        testing && testingAccountId === a.id
+                          ? 'Έλεγχος σε εξέλιξη — τι ελέγχεται'
+                          : 'Αποτέλεσμα ελέγχου σύνδεσης'
+                      }
+                    />
+                    {testResult && !testing ? (
+                      <div className="mt-2">
+                        <EmailConnectionResult
+                          ok={testResult.ok}
+                          message={testResult.message}
+                          hint={testResult.hint}
+                          timeout={testResult.timeout}
+                          mailHost={testResult.mailHost || a.imap_host || a.smtp_host}
+                          imapPort={testResult.imapPort || a.imap_port}
+                          smtpPort={testResult.smtpPort || a.smtp_port}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
 
       {editingId && (
-        <div className="rounded-2xl border border-outline-variant p-6 space-y-4 bg-surface-container-lowest">
-          <h3 className="font-title-md text-title-md">
-            {editingId === 'new' ? 'Νέος λογαριασμός' : 'Επεξεργασία'}
-          </h3>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" placeholder="Ετικέτα (π.χ. Πωλήσεις)" value={form.label} onChange={set('label')} />
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" placeholder="Email *" value={form.email_address} onChange={set('email_address')} />
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" placeholder="IMAP Host *" value={form.imap_host} onChange={set('imap_host')} />
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" type="number" placeholder="IMAP Port" value={form.imap_port} onChange={set('imap_port')} />
-            <label className="flex items-center gap-2 text-body-sm">
-              <input type="checkbox" checked={form.imap_secure} onChange={set('imap_secure')} /> IMAP SSL/TLS
-            </label>
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" placeholder="SMTP Host *" value={form.smtp_host} onChange={set('smtp_host')} />
-            <input className="px-3 py-2 rounded-lg border border-outline-variant" type="number" placeholder="SMTP Port" value={form.smtp_port} onChange={set('smtp_port')} />
-            <label className="flex items-center gap-2 text-body-sm">
-              <input type="checkbox" checked={form.smtp_secure} onChange={set('smtp_secure')} /> SMTP STARTTLS
-            </label>
-            <input className="px-3 py-2 rounded-lg border border-outline-variant sm:col-span-2" placeholder="Username" value={form.mail_username} onChange={set('mail_username')} />
-            <input
-              className="px-3 py-2 rounded-lg border border-outline-variant sm:col-span-2"
-              type="password"
-              placeholder={editingId === 'new' ? 'Κωδικός *' : 'Κωδικός (κενό = χωρίς αλλαγή)'}
-              value={form.mail_password}
-              onChange={set('mail_password')}
-            />
+        <div
+          id="email-settings-editor"
+          className="space-y-5 rounded-2xl border border-outline-variant/80 bg-surface p-5 shadow-sm sm:p-6"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-2 border-b border-outline-variant/50 pb-4">
+            <div>
+              <h3 className="font-title-md text-title-md text-on-surface">
+                {isNew ? 'Νέος λογαριασμός' : 'Επεξεργασία λογαριασμού'}
+              </h3>
+              <p className="mt-0.5 text-body-sm text-on-surface-variant">
+                Επιλέξτε πάροχο για έτοιμα IMAP/SMTP ή συμπληρώστε χειροκίνητα.
+              </p>
+            </div>
           </div>
-          <p className="text-label-sm text-on-surface-variant">
-            Φάκελοι IMAP: INBOX / {form.imap_folder_sent} / {form.imap_folder_spam}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={runTest} disabled={testing} className="px-4 py-2 rounded-lg border border-primary text-primary font-bold">
-              {testing ? 'Έλεγχος…' : 'Έλεγχος Σύνδεσης'}
-            </button>
-            <button type="button" onClick={save} disabled={saving} className="px-4 py-2 rounded-lg bg-primary text-on-primary">
-              Αποθήκευση
-            </button>
-            <button type="button" onClick={() => setEditingId(null)} className="px-4 py-2 rounded-lg border">
+
+          <section className={sectionClass}>
+            <h4 className="text-label-md font-bold uppercase tracking-wide text-on-surface-variant">
+              Έτοιμα settings
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'gmail', label: 'Gmail / Google' },
+                { id: 'yahoo', label: 'Yahoo Mail' },
+                { id: 'outlook', label: 'Outlook / Microsoft' },
+                { id: 'custom', label: 'Εταιρικό mail.domain' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => applyProviderPreset(p.id)}
+                  className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
+                    activeProviderId === p.id
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => applyProviderPreset('auto')}
+                className="rounded-xl border border-dashed border-outline-variant bg-surface px-3 py-2 text-label-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
+              >
+                Από το email…
+              </button>
+            </div>
+            {activeProviderId === 'gmail' || activeProviderId === 'yahoo' ? (
+              <p className="text-label-sm text-on-surface-variant">
+                Χρειάζεται <strong>App Password</strong> (όχι τον κανονικό κωδικό λογαριασμού). Username =
+                το πλήρες email (π.χ. name@gmail.com).
+              </p>
+            ) : null}
+          </section>
+
+          <section className={sectionClass}>
+            <h4 className="text-label-md font-bold uppercase tracking-wide text-on-surface-variant">
+              Ταυτότητα
+            </h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="email-label" label="Ετικέτα">
+                <input
+                  id="email-label"
+                  className={fieldClass}
+                  placeholder="π.χ. Πωλήσεις"
+                  value={form.label}
+                  onChange={set('label')}
+                />
+              </Field>
+              <Field id="email-address" label="Διεύθυνση email *">
+                <input
+                  id="email-address"
+                  className={fieldClass}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="info@example.com"
+                  value={form.email_address}
+                  onChange={set('email_address')}
+                />
+              </Field>
+            </div>
+          </section>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <section className={sectionClass}>
+              <h4 className="text-label-md font-bold uppercase tracking-wide text-on-surface-variant">
+                IMAP · λήψη
+              </h4>
+              <Field id="imap-host" label="IMAP host *" hint="Συνήθως mail.το-domain.gr">
+                <input
+                  id="imap-host"
+                  className={fieldClass}
+                  placeholder="mail.example.com"
+                  value={form.imap_host}
+                  onChange={set('imap_host')}
+                />
+              </Field>
+              <div>
+                <p className={labelClass}>Προεπιλογή ασφαλείας</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyImapPreset('993')}
+                    className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
+                      imapPreset === '993'
+                        ? 'bg-primary text-on-primary'
+                        : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    993 · SSL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyImapPreset('143')}
+                    className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
+                      imapPreset === '143'
+                        ? 'bg-primary text-on-primary'
+                        : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    143 · STARTTLS
+                  </button>
+                </div>
+                <p className="mt-1.5 text-label-sm text-on-surface-variant/80">
+                  Αν το 993 κάνει timeout από firewall, δοκιμάστε 143 · STARTTLS.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field id="imap-port" label="Port">
+                  <input
+                    id="imap-port"
+                    className={fieldClass}
+                    type="number"
+                    value={form.imap_port}
+                    onChange={(e) => {
+                      const port = Number(e.target.value);
+                      setForm((f) => ({
+                        ...f,
+                        imap_port: e.target.value,
+                        imap_secure: port === 993 ? true : port === 143 ? false : f.imap_secure,
+                      }));
+                      setTestResult(null);
+                    }}
+                  />
+                </Field>
+                <div className="flex items-end pb-1">
+                  <label className="flex items-center gap-2 rounded-xl border border-outline-variant/80 bg-surface px-3 py-2.5 text-body-sm text-on-surface">
+                    <input
+                      type="checkbox"
+                      className="accent-primary"
+                      checked={form.imap_secure}
+                      onChange={set('imap_secure')}
+                    />
+                    SSL / TLS
+                  </label>
+                </div>
+              </div>
+              <Field id="imap-mailbox" label="Φάκελος εισερχομένων">
+                <input
+                  id="imap-mailbox"
+                  className={fieldClass}
+                  value={form.imap_mailbox}
+                  onChange={set('imap_mailbox')}
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field id="imap-sent" label="Απεσταλμένα">
+                  <input
+                    id="imap-sent"
+                    className={fieldClass}
+                    value={form.imap_folder_sent}
+                    onChange={set('imap_folder_sent')}
+                  />
+                </Field>
+                <Field id="imap-spam" label="Spam">
+                  <input
+                    id="imap-spam"
+                    className={fieldClass}
+                    value={form.imap_folder_spam}
+                    onChange={set('imap_folder_spam')}
+                  />
+                </Field>
+              </div>
+            </section>
+
+            <section className={sectionClass}>
+              <h4 className="text-label-md font-bold uppercase tracking-wide text-on-surface-variant">
+                SMTP · αποστολή
+              </h4>
+              <Field id="smtp-host" label="SMTP host *">
+                <input
+                  id="smtp-host"
+                  className={fieldClass}
+                  placeholder="mail.example.com"
+                  value={form.smtp_host}
+                  onChange={set('smtp_host')}
+                />
+              </Field>
+              <div>
+                <p className={labelClass}>Προεπιλογή ασφαλείας</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applySmtpPreset('465')}
+                    className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
+                      smtpPreset === '465'
+                        ? 'bg-primary text-on-primary'
+                        : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    465 · SSL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applySmtpPreset('587')}
+                    className={`rounded-xl px-3 py-2 text-label-sm font-bold transition ${
+                      smtpPreset === '587'
+                        ? 'bg-primary text-on-primary'
+                        : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    587 · STARTTLS
+                  </button>
+                </div>
+                <p className="mt-1.5 text-label-sm text-on-surface-variant/80">
+                  Για cPanel Secure SSL/TLS προτείνεται 465 · SSL. Εναλλακτικά 587 · STARTTLS.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field id="smtp-port" label="Port">
+                  <input
+                    id="smtp-port"
+                    className={fieldClass}
+                    type="number"
+                    value={form.smtp_port}
+                    onChange={(e) => {
+                      const port = Number(e.target.value);
+                      setForm((f) => ({
+                        ...f,
+                        smtp_port: e.target.value,
+                        // Auto-align encryption when switching common ports.
+                        smtp_secure: port === 465 ? false : port === 587 ? true : f.smtp_secure,
+                      }));
+                      setTestResult(null);
+                    }}
+                  />
+                </Field>
+                <div className="flex items-end pb-1">
+                  <label
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-body-sm ${
+                      Number(form.smtp_port) === 465
+                        ? 'cursor-not-allowed border-outline-variant/50 bg-surface-container-low text-on-surface-variant opacity-70'
+                        : 'border-outline-variant/80 bg-surface text-on-surface'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-primary"
+                      checked={form.smtp_secure}
+                      disabled={Number(form.smtp_port) === 465}
+                      onChange={set('smtp_secure')}
+                    />
+                    STARTTLS
+                  </label>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section className={sectionClass}>
+            <h4 className="text-label-md font-bold uppercase tracking-wide text-on-surface-variant">
+              Στοιχεία σύνδεσης
+            </h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="mail-user" label="Username" hint="Συνήθως το πλήρες email">
+                <input
+                  id="mail-user"
+                  className={fieldClass}
+                  autoComplete="username"
+                  placeholder={form.email_address || 'info@example.com'}
+                  value={form.mail_username}
+                  onChange={set('mail_username')}
+                />
+              </Field>
+              <Field
+                id="mail-pass"
+                label={isNew ? 'Κωδικός mailbox *' : 'Κωδικός mailbox'}
+                hint={isNew ? null : 'Αφήστε κενό για να μην αλλάξει'}
+              >
+                <div className="relative">
+                  <input
+                    id="mail-pass"
+                    className={`${fieldClass} pr-24`}
+                    type={passwordVisible ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder={isNew ? 'Κωδικός *' : '••••••••'}
+                    value={form.mail_password}
+                    onChange={set('mail_password')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPasswordVisible((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border border-outline-variant bg-surface px-2.5 py-1 text-label-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
+                  >
+                    {passwordVisible ? 'Απόκρυψη' : 'Εμφάνιση'}
+                  </button>
+                </div>
+              </Field>
+            </div>
+          </section>
+
+          {(testChecks.length > 0 &&
+            (testingAccountId === editingId || testingAccountId === 'editor')) ||
+          testResult ? (
+            <div className="space-y-2">
+              {testChecks.length > 0 &&
+              (testingAccountId === editingId || testingAccountId === 'editor') ? (
+                <EmailConnectionCheckList
+                  checks={testChecks}
+                  testing={testing}
+                  title={
+                    testing ? 'Έλεγχος σε εξέλιξη — τι ελέγχεται' : 'Αποτέλεσμα ελέγχου σύνδεσης'
+                  }
+                />
+              ) : null}
+              {testResult ? (
+                <EmailConnectionResult
+                  ok={testResult.ok}
+                  message={testResult.message}
+                  hint={testResult.hint}
+                  timeout={testResult.timeout}
+                  mailHost={testResult.mailHost || form.imap_host || form.smtp_host}
+                  imapPort={testResult.imapPort || form.imap_port}
+                  smtpPort={testResult.smtpPort || form.smtp_port}
+                />
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-outline-variant/50 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setEditingId(null);
+                setTestResult(null);
+                setPasswordVisible(false);
+              }}
+              className="rounded-xl border border-outline-variant px-4 py-2.5 text-label-md font-semibold text-on-surface hover:bg-surface-container-low"
+            >
               Ακύρωση
+            </button>
+            <button
+              type="button"
+              onClick={runTest}
+              disabled={!canTest}
+              className="rounded-xl border border-primary/40 bg-primary/5 px-4 py-2.5 text-label-md font-bold text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {testing ? 'Έλεγχος…' : 'Έλεγχος σύνδεσης'}
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={!canSave}
+              className="rounded-xl bg-primary px-5 py-2.5 text-label-md font-bold text-on-primary shadow-sm hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? 'Αποθήκευση…' : 'Αποθήκευση'}
             </button>
           </div>
         </div>

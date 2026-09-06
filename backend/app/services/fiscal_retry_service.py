@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -16,6 +17,43 @@ from app.services.payment_dispatch import dispatch_fiscal_receipt
 class FiscalRetryService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def abandon_invoice(
+        self,
+        *,
+        tenant_id: UUID,
+        invoice_id: UUID,
+        reason: str = "Abandoned by admin",
+    ) -> FiscalInvoice:
+        """Close a non-issued fiscal invoice so it no longer blocks pipeline health."""
+        await apply_tenant_rls(self._session, tenant_id)
+        result = await self._session.execute(
+            select(FiscalInvoice).where(
+                FiscalInvoice.id == invoice_id,
+                FiscalInvoice.tenant_id == tenant_id,
+            ),
+        )
+        invoice = result.scalar_one_or_none()
+        if not invoice:
+            raise ValueError("Fiscal invoice not found")
+        if invoice.status == FiscalInvoiceStatus.ISSUED or invoice.aade_mark:
+            raise ValueError("Cannot abandon an issued fiscal invoice")
+        if invoice.status not in (
+            FiscalInvoiceStatus.FAILED,
+            FiscalInvoiceStatus.PENDING,
+            FiscalInvoiceStatus.QUEUED,
+        ):
+            raise ValueError(f"Cannot abandon fiscal invoice in status {invoice.status.value}")
+
+        meta = dict(invoice.metadata_json or {})
+        meta["abandoned"] = True
+        meta["abandoned_at"] = datetime.now(timezone.utc).isoformat()
+        meta["abandoned_reason"] = reason
+        invoice.metadata_json = meta
+        invoice.status = FiscalInvoiceStatus.FAILED
+        invoice.error_message = reason[:500]
+        await self._session.flush()
+        return invoice
 
     async def retry_invoice(
         self,

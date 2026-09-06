@@ -1,19 +1,16 @@
 import { API_BASE } from '../config/api.js';
+import {
+  ensurePushSubscription,
+  ensureServiceWorkerRegistration,
+  getPushSubscriptionForScript,
+  getRegistrationByScript,
+} from '../lib/push/webPushHelpers.js';
 import { saasAuthHeaders } from './saasApi.js';
+
+const ADMIN_SW = '/sw.js';
 
 function getAdminEmail() {
   return localStorage.getItem('saas_user_email') || '';
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = window.atob(base64);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) {
-    output[i] = raw.charCodeAt(i);
-  }
-  return output;
 }
 
 export function isAdminPushSupported() {
@@ -39,10 +36,19 @@ export async function fetchAdminPushStatus() {
   return data;
 }
 
-async function registerServiceWorker() {
-  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-  await navigator.serviceWorker.ready;
-  return registration;
+/** True only if THIS browser has an active PushManager subscription on /sw.js. */
+export async function isThisBrowserAdminPushSubscribed() {
+  if (!isAdminPushSupported()) return false;
+  try {
+    const subscription = await getPushSubscriptionForScript(ADMIN_SW);
+    return Boolean(subscription?.endpoint);
+  } catch {
+    return false;
+  }
+}
+
+async function registerAdminServiceWorker() {
+  return ensureServiceWorkerRegistration(ADMIN_SW, { scope: '/' });
 }
 
 export async function subscribeAdminFleetPush() {
@@ -64,14 +70,8 @@ export async function subscribeAdminFleetPush() {
     throw new Error('Δεν δόθηκε άδεια ειδοποιήσεων');
   }
 
-  const registration = await registerServiceWorker();
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(config.public_key),
-    });
-  }
+  const registration = await registerAdminServiceWorker();
+  const subscription = await ensurePushSubscription(registration, config.public_key);
 
   const json = subscription.toJSON();
   const res = await fetch(`${API_BASE}/api/admin/push/subscribe`, {
@@ -89,10 +89,23 @@ export async function subscribeAdminFleetPush() {
   return data;
 }
 
+/** Immediate test push to this admin's registered devices. */
+export async function sendAdminPushTest() {
+  const res = await fetch(`${API_BASE}/api/admin/push/test`, {
+    method: 'POST',
+    headers: saasAuthHeaders(),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || 'Αποτυχία δοκιμής push');
+  return data;
+}
+
 export async function unsubscribeAdminFleetPush() {
   const email = getAdminEmail();
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
+  const registration =
+    (await getRegistrationByScript(ADMIN_SW)) ||
+    (await navigator.serviceWorker.getRegistration('/'));
+  const subscription = registration ? await registration.pushManager.getSubscription() : null;
   if (!subscription) return { ok: true };
 
   const res = await fetch(`${API_BASE}/api/admin/push/subscribe`, {

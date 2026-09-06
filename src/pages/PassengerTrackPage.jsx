@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import { fetchTripTrack } from '../services/passengerTrackApi.js';
 import { useLiveEta } from '../hooks/useLiveEta.js';
+import { LIVE_REFRESH_MS, LIVE_REFRESH_SEC } from '../lib/liveRefresh.js';
 
 const DEMO_TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -39,7 +40,7 @@ export default function PassengerTrackPage() {
   const { displayText, eta, loading: etaLoading } = useLiveEta(numericTripId, {
     tenantId,
     enabled: Number.isFinite(numericTripId),
-    syncIntervalSec: 30,
+    syncIntervalSec: LIVE_REFRESH_SEC,
   });
 
   const refresh = useCallback(async () => {
@@ -57,7 +58,7 @@ export default function PassengerTrackPage() {
 
   useEffect(() => {
     refresh();
-    const id = setInterval(refresh, 30_000);
+    const id = setInterval(refresh, LIVE_REFRESH_MS);
     return () => clearInterval(id);
   }, [refresh]);
 

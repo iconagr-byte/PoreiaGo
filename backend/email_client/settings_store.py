@@ -8,6 +8,7 @@ from typing import Any
 
 from ticketing.db import get_db
 
+from .imap_utf8 import sanitize_stored_imap_error
 from .secrets_vault import decrypt_password, encrypt_password
 
 EMAIL_SETTINGS_SCHEMA = """
@@ -42,6 +43,10 @@ def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def _sanitize_last_sync_error(message: str | None) -> str | None:
+    return sanitize_stored_imap_error(message)
+
+
 def _new_id() -> str:
     return f"EMS-{uuid.uuid4().hex[:12]}"
 
@@ -65,13 +70,18 @@ def _row_settings(row, *, include_password: bool = False) -> dict:
         "mail_username": row["mail_username"],
         "is_active": bool(row["is_active"]),
         "last_sync_at": row["last_sync_at"],
-        "last_sync_error": row["last_sync_error"],
+        "last_sync_error": _sanitize_last_sync_error(row["last_sync_error"]),
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
         "has_password": bool(row["mail_password_enc"]),
+        "password_decrypt_failed": False,
     }
     if include_password:
-        out["mail_password"] = decrypt_password(row["mail_password_enc"])
+        try:
+            out["mail_password"] = decrypt_password(row["mail_password_enc"])
+        except ValueError:
+            out["mail_password"] = ""
+            out["password_decrypt_failed"] = True
     return out
 
 
@@ -81,16 +91,60 @@ async def init_email_settings_tables() -> None:
     await _migrate_messages_account_fk(db)
     await _migrate_auto_responder_fk(db)
     await _migrate_campaigns_account_fk(db)
+    await _scrub_branded_sync_errors(db)
+    await _pin_cpanel_ssl_ports(db)
     await db.commit()
+
+
+async def _scrub_branded_sync_errors(db) -> None:
+    """Replace stored PoreiaGo/Intechs/IP timeout copy with neutral hint."""
+    cur = await db.execute(
+        """
+        SELECT id, last_sync_error FROM email_settings
+        WHERE last_sync_error IS NOT NULL AND last_sync_error != ''
+        """
+    )
+    rows = await cur.fetchall()
+    for row in rows:
+        raw = row["last_sync_error"] if hasattr(row, "keys") else row[1]
+        sid = row["id"] if hasattr(row, "keys") else row[0]
+        cleaned = sanitize_stored_imap_error(raw)
+        if cleaned != raw:
+            await db.execute(
+                "UPDATE email_settings SET last_sync_error=? WHERE id=?",
+                (cleaned, sid),
+            )
+
+
+async def _pin_cpanel_ssl_ports(db) -> None:
+    """Align Achillio mailbox rows to cPanel Secure SSL/TLS (IMAP 993 · SMTP 465)."""
+    await db.execute(
+        """
+        UPDATE email_settings
+        SET
+          imap_host = 'mail.achilliotravel.com',
+          smtp_host = 'mail.achilliotravel.com',
+          imap_port = 993,
+          imap_secure = 1,
+          smtp_port = 465,
+          smtp_secure = 0,
+          updated_at = datetime('now')
+        WHERE lower(email_address) LIKE '%@achilliotravel.com'
+        """
+    )
 
 
 async def _migrate_messages_account_fk(db) -> None:
     cur = await db.execute("PRAGMA table_info(email_messages)")
     cols = {r[1] for r in await cur.fetchall()}
+    if not cols:
+        return
     if "email_settings_id" not in cols:
         await db.execute(
             "ALTER TABLE email_messages ADD COLUMN email_settings_id TEXT"
         )
+    # Per-account uniqueness — drop legacy global unique on message_id alone.
+    await db.execute("DROP INDEX IF EXISTS idx_email_msg_id")
     await db.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_email_msg_account
@@ -121,15 +175,53 @@ async def list_settings(
     *,
     owner_key: str = "default",
     active_only: bool = False,
+    include_legacy_default: bool = False,
 ) -> list[dict]:
     db = get_db()
-    q = "SELECT * FROM email_settings WHERE owner_key = ?"
-    params: list = [owner_key]
+    if include_legacy_default and owner_key != "default":
+        q = "SELECT * FROM email_settings WHERE owner_key IN (?, ?)"
+        params: list = [owner_key, "default"]
+    else:
+        q = "SELECT * FROM email_settings WHERE owner_key = ?"
+        params = [owner_key]
     if active_only:
         q += " AND is_active = 1"
     q += " ORDER BY created_at ASC"
     cur = await db.execute(q, params)
+    rows = [_row_settings(r) for r in await cur.fetchall()]
+    # SEAL: never auto-claim owner_key=default into the logged-in office.
+    # First office to open Email settings used to steal IMAP/SMTP from another
+    # tenant. Legacy rows stay readable only via explicit claim_legacy_owner().
+    if include_legacy_default and owner_key != "default":
+        rows = [r for r in rows if r.get("owner_key") == owner_key]
+    return rows
+
+
+async def list_all_active_settings() -> list[dict]:
+    """All active accounts (any office) — for background IMAP sync worker."""
+    db = get_db()
+    cur = await db.execute(
+        "SELECT * FROM email_settings WHERE is_active = 1 ORDER BY created_at ASC"
+    )
     return [_row_settings(r) for r in await cur.fetchall()]
+
+
+async def claim_legacy_owner(settings_id: str, owner_key: str) -> dict | None:
+    """Move owner_key=default → tenant:* for the logged-in office."""
+    row = await get_settings(settings_id)
+    if not row:
+        return None
+    if row.get("owner_key") == owner_key:
+        return row
+    if row.get("owner_key") != "default":
+        return None
+    db = get_db()
+    await db.execute(
+        "UPDATE email_settings SET owner_key = ?, updated_at = ? WHERE id = ?",
+        (owner_key, _now(), settings_id),
+    )
+    await db.commit()
+    return await get_settings(settings_id)
 
 
 async def get_settings(settings_id: str, *, with_password: bool = False) -> dict | None:
@@ -307,6 +399,6 @@ async def record_sync_result(
         SET last_sync_at=?, last_sync_error=?, updated_at=?
         WHERE id=?
         """,
-        (_now(), error, _now(), settings_id),
+        (_now(), sanitize_stored_imap_error(error), _now(), settings_id),
     )
     await db.commit()

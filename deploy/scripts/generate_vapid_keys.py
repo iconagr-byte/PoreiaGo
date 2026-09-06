@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Generate Web Push VAPID keys into deploy/ (never print private key to stdout)."""
+"""Generate Web Push VAPID keys into deploy/ (never print private key to stdout).
+
+Uses cryptography only (no py_vapid dependency) so VPS bootstrap is reliable.
+"""
 
 from __future__ import annotations
 
@@ -7,8 +10,9 @@ import base64
 import sys
 from pathlib import Path
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from py_vapid import Vapid01
 
 DEPLOY_DIR = Path(__file__).resolve().parents[1]
 PUBLIC_FILE = DEPLOY_DIR / ".vapid_public.key"
@@ -40,11 +44,14 @@ def main() -> int:
         print(f"VAPID keys already exist in {DEPLOY_DIR}")
         return 0
 
-    vapid = Vapid01()
-    vapid.generate_keys()
-    pub_raw = vapid.public_key.public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    pub_raw = private_key.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
     public_key = base64.urlsafe_b64encode(pub_raw).decode("ascii").rstrip("=")
-    private_pem = vapid.private_pem().decode("ascii")
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("ascii")
 
     PUBLIC_FILE.write_text(public_key + "\n", encoding="utf-8")
     PRIVATE_FILE.write_text(private_pem, encoding="utf-8")
@@ -54,8 +61,10 @@ def main() -> int:
         pass
 
     if ENV_FILE.exists():
+        # Inline PEM so the API container works even when /app/data was not synced yet.
         _set_env_kv("WEB_PUSH_VAPID_PUBLIC_KEY", public_key)
-        _set_env_kv("WEB_PUSH_VAPID_PRIVATE_KEY_FILE", "/run/secrets/vapid_private.pem")
+        _set_env_kv("WEB_PUSH_VAPID_PRIVATE_KEY", private_pem.replace("\n", "\\n"))
+        _set_env_kv("WEB_PUSH_VAPID_PRIVATE_KEY_FILE", "/app/data/vapid_private.pem")
         _set_env_kv("WEB_PUSH_VAPID_SUBJECT", SUBJECT)
 
     print(f"Created {PUBLIC_FILE.name} and {PRIVATE_FILE.name}")

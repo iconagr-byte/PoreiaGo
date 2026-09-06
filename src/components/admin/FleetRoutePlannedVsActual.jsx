@@ -59,7 +59,7 @@ export default function FleetRoutePlannedVsActual() {
       } else if (result.error === 'missing_actual') {
         setError('Δεν βρέθηκαν GPS σημεία — ο οδηγός πρέπει να ήταν online κατά τη βάρδια.');
       } else if (result.error) {
-        setError('Η βάση δεδομένων δεν είναι διαθέσιμη ή λείπει το migration trip_coordinates.');
+        setError('Το ιστορικό GPS δεν είναι ακόμα διαθέσιμο — δοκιμάστε ξανά σε λίγο.');
       }
     } catch (err) {
       setError(err.message || 'Αποτυχία σύγκρισης');

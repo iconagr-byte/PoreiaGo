@@ -41,6 +41,18 @@ DEFAULT_FISCAL_SETTINGS: dict[str, Any] = {
         "retail_item_code": "",
         "wholesale_item_code": "",
     },
+    "softone": {
+        "api_url": "https://einvoice.s1ecos.gr",
+        "issuer_name": "",
+        "branch_code": 0,
+        "item_code": "",
+    },
+    "impact": {
+        "api_url": "https://einvoiceapi.impact.gr",
+        "issuer_name": "",
+        "branch_code": 0,
+        "item_code": "",
+    },
 }
 
 def _parse_settings(raw: str | None) -> dict[str, Any]:
@@ -92,6 +104,14 @@ def fiscal_settings_public_view(fiscal: dict[str, Any]) -> dict[str, Any]:
         "epsilon": _mask_provider_block(
             merged.get("epsilon"),
             secret_keys=("jwt", "subscription_key"),
+        ),
+        "softone": _mask_provider_block(
+            merged.get("softone"),
+            secret_keys=("api_key",),
+        ),
+        "impact": _mask_provider_block(
+            merged.get("impact"),
+            secret_keys=("api_key",),
         ),
     }
 
@@ -160,6 +180,18 @@ class TenantFiscalSettingsService:
                 {"jwt": "jwt_enc", "subscription_key": "subscription_key_enc"},
             )
             merged["epsilon"] = block
+
+        for provider_key in ("softone", "impact"):
+            provider_patch = patch.get(provider_key)
+            if not isinstance(provider_patch, dict):
+                continue
+            block = dict(merged.get(provider_key) or {})
+            block.update({k: v for k, v in provider_patch.items() if k != "api_key"})
+            block = _encrypt_secret_fields(
+                {**block, **({"api_key": provider_patch["api_key"]} if "api_key" in provider_patch else {})},
+                {"api_key": "api_key_enc"},
+            )
+            merged[provider_key] = block
 
         settings["fiscal"] = merged
         tenant.settings_json = json.dumps(settings, ensure_ascii=False)

@@ -9,6 +9,20 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      name: 'pwa-service-worker-allowed',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const url = req.url?.split('?')[0] || ''
+          if (url === '/rental-pwa/sw.js') {
+            res.setHeader('Service-Worker-Allowed', '/rent')
+          } else if (url === '/wallet-pwa/sw.js') {
+            res.setHeader('Service-Worker-Allowed', '/wallet')
+          }
+          next()
+        })
+      },
+    },
   ],
   server: {
     // Μόνο API endpoints — ΟΧΙ /admin/login ή /admin (React routes)
@@ -22,6 +36,8 @@ export default defineConfig({
       '/api/v1/telemetry': { target: API_TARGET, changeOrigin: true },
       '/api/admin/telemetry': { target: API_TARGET, changeOrigin: true },
       '/api/admin/platform': { target: API_TARGET, changeOrigin: true },
+      '/api/admin/push': { target: API_TARGET, changeOrigin: true },
+      '/api/admin/platform/fleet-rental': { target: API_TARGET, changeOrigin: true },
       '/api/passenger': { target: API_TARGET, changeOrigin: true },
       '/api/tickets': { target: API_TARGET, changeOrigin: true },
       '/api/abandoned': { target: API_TARGET, changeOrigin: true },
@@ -31,6 +47,7 @@ export default defineConfig({
       '/api/auth': { target: API_TARGET, changeOrigin: true },
       '/api/push': { target: API_TARGET, changeOrigin: true },
       '/api/customer': { target: API_TARGET, changeOrigin: true },
+      '/api/lost-items': { target: API_TARGET, changeOrigin: true },
       '/api/bookings': { target: API_TARGET, changeOrigin: true },
       '/api/campaigns': { target: API_TARGET, changeOrigin: true },
       '/api/email': { target: API_TARGET, changeOrigin: true },

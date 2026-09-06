@@ -1,10 +1,12 @@
 import { useState } from 'react';
 
 const CHECKLIST = [
-  'Redis + Celery worker + Celery beat τρέχουν',
-  'Provider ρυθμισμένος (Φορολογία) — Native AADE / Prosvasis / Epsilon',
+  'Redis + Celery worker + Celery beat τρέχουν (/health → celery)',
+  'Provider ρυθμισμένος (Φορολογία) — Prosvasis / Epsilon / Native AADE',
+  'FISCAL_ENCRYPTION_KEY στο VPS για Prosvasis/Epsilon',
   'STRIPE_CHECKOUT_WEBHOOK_SECRET για κάρτα',
   'SMTP για email με MARK',
+  'Οδηγός: docs/FISCAL-PROVIDER-SETUP.md',
 ];
 
 const RECON_ROWS = [

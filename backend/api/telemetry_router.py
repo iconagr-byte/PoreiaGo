@@ -38,7 +38,21 @@ ingest_router = APIRouter(prefix="/telemetry", tags=["telemetry-ingest"])
 
 
 def verify_device_key(x_device_key: str | None = Header(default=None, alias="X-Device-Key")) -> str:
-    allowed = os.getenv("TELEMETRY_DEVICE_KEYS", "dev-gps-key").split(",")
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    raw = (os.getenv("TELEMETRY_DEVICE_KEYS") or "").strip()
+    if not raw:
+        if env in ("production", "prod"):
+            raise HTTPException(status_code=401, detail="Telemetry device keys not configured")
+        allowed = ["dev-gps-key"]
+    else:
+        allowed = [k.strip() for k in raw.split(",") if k.strip()]
+    if env in ("production", "prod") and any(
+        k.lower() in {"dev-gps-key", "change-me"} for k in allowed
+    ):
+        # Never accept known weak keys even if misconfigured in prod env.
+        allowed = [k for k in allowed if k.lower() not in {"dev-gps-key", "change-me"}]
+        if not allowed:
+            raise HTTPException(status_code=401, detail="Telemetry device keys not configured")
     if not x_device_key or x_device_key.strip() not in allowed:
         raise HTTPException(status_code=401, detail="Invalid device key")
     return x_device_key.strip()
@@ -82,28 +96,79 @@ admin_router = APIRouter(prefix="/telemetry", tags=["telemetry-admin"])
 async def fleet_live(
     tenant_id: Annotated[UUID, Depends(get_tenant_id)],
 ):
-    live: LiveFleetService = get_live_fleet()
+    """Latest GPS pins for the admin map.
+
+    Per-row failures are skipped. A total list failure returns 503 (not empty [])
+    so the admin client keeps the last-known pin instead of wiping the map.
+    """
+    import logging
+
+    from travel_platform.telemetry.live_fleet_media import enrich_live_vehicle_media
+    from travel_platform.telemetry.live_fleet_trail_redis import (
+        load_trails_for_tenant,
+        trail_points_for_api,
+    )
+    from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
+
+    log = logging.getLogger(__name__)
+    try:
+        live: LiveFleetService = get_live_fleet()
+        vehicles = await live.list_active_for_admin_async(tenant_id)
+    except Exception as exc:
+        log.exception("fleet_live list_active failed tenant=%s", tenant_id)
+        raise HTTPException(status_code=503, detail="Live fleet temporarily unavailable") from exc
+
     rows = []
-    for v in live.list_active(tenant_id):
-        meta = live._vehicles.get(v.vehicle_id, {})
-        rows.append(
-            LiveVehicleResponse(
-                vehicle_id=v.vehicle_id,
-                vehicle_code=v.vehicle_code,
-                trip_id=v.trip_id,
-                lat=v.lat,
-                lng=v.lng,
-                speed_kmh=v.speed_kmh,
-                engine_on=v.engine_on,
-                fuel_level_pct=v.fuel_level_pct,
-                idle_seconds_trip=v.idle_seconds_trip,
-                updated_at=v.updated_at,
-                driver_name=meta.get("driver_name"),
-                bus_plate=meta.get("bus_plate", v.vehicle_code),
-                heading_deg=meta.get("heading_deg"),
+    trails_by_vehicle: dict = {}
+    try:
+        vids = [str(v.vehicle_id) for v in vehicles if getattr(v, "vehicle_id", None)]
+        trails_by_vehicle = await load_trails_for_tenant(str(tenant_id), vids)
+    except Exception:
+        log.debug("fleet_live trail load skipped", exc_info=True)
+
+    from travel_platform.telemetry.office_fleet_filter import office_allows_live_driver
+
+    for v in vehicles:
+        try:
+            meta = await live.vehicle_meta_async(tenant_id, v.vehicle_id)
+            if not meta:
+                meta = live._vehicles.get(v.vehicle_id, {})
+            if not office_allows_live_driver(str(tenant_id), meta.get("driver_id"), meta):
+                continue
+            media = enrich_live_vehicle_media(
                 driver_id=meta.get("driver_id"),
-            ),
-        )
+                bus_plate=meta.get("bus_plate", v.vehicle_code),
+                vehicle_code=v.vehicle_code,
+            )
+            trip_title = await resolve_trip_title(v.trip_id, preferred=meta.get("trip_title"))
+            raw_trail = trails_by_vehicle.get(str(v.vehicle_id)) or []
+            # Always include current pin so a brand-new shift still draws a path start.
+            if not raw_trail:
+                raw_trail = [{"lat": v.lat, "lng": v.lng, "t": None, "s": v.speed_kmh, "h": meta.get("heading_deg")}]
+            rows.append(
+                LiveVehicleResponse(
+                    vehicle_id=v.vehicle_id,
+                    vehicle_code=v.vehicle_code,
+                    trip_id=v.trip_id,
+                    lat=v.lat,
+                    lng=v.lng,
+                    speed_kmh=v.speed_kmh,
+                    engine_on=v.engine_on,
+                    fuel_level_pct=v.fuel_level_pct,
+                    idle_seconds_trip=v.idle_seconds_trip,
+                    updated_at=v.updated_at,
+                    driver_name=meta.get("driver_name"),
+                    bus_plate=media.get("bus_plate") or meta.get("bus_plate", v.vehicle_code),
+                    heading_deg=meta.get("heading_deg"),
+                    driver_id=meta.get("driver_id"),
+                    photo_url=media.get("photo_url"),
+                    vehicle_image_url=media.get("vehicle_image_url"),
+                    trip_title=trip_title or None,
+                    trail=trail_points_for_api(raw_trail),
+                ),
+            )
+        except Exception:
+            log.exception("fleet_live row enrich failed vehicle=%s", getattr(v, "vehicle_id", None))
     return rows
 
 

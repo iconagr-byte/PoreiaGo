@@ -1,16 +1,15 @@
 import { API_BASE } from '../config/api.js';
+import {
+  ensurePushSubscription,
+  ensureServiceWorkerRegistration,
+  getPushSubscriptionForScript,
+  getRegistrationByScript,
+} from '../lib/push/webPushHelpers.js';
 import { driverSessionHeaders } from '../lib/driver/driverSession.js';
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = window.atob(base64);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) {
-    output[i] = raw.charCodeAt(i);
-  }
-  return output;
-}
+const DRIVER_SW = '/driver-sw.js';
+/** Narrow scope so driver SW never controls /admin or storefront pages. */
+export const DRIVER_SW_SCOPE = '/driver/';
 
 export function isDriverPushSupported() {
   return (
@@ -37,10 +36,22 @@ export async function fetchDriverPushStatus() {
   return data;
 }
 
-async function registerDriverServiceWorker() {
-  const registration = await navigator.serviceWorker.register('/driver-sw.js');
-  await navigator.serviceWorker.ready;
-  return registration;
+/** True only if THIS browser has a Push subscription on the driver SW. */
+export async function isThisBrowserDriverPushSubscribed() {
+  if (!isDriverPushSupported()) return false;
+  try {
+    const subscription = await getPushSubscriptionForScript(DRIVER_SW);
+    return Boolean(subscription?.endpoint);
+  } catch {
+    return false;
+  }
+}
+
+export async function registerDriverServiceWorker() {
+  return ensureServiceWorkerRegistration(DRIVER_SW, {
+    scope: DRIVER_SW_SCOPE,
+    updateViaCache: 'none',
+  });
 }
 
 export async function subscribeDriverPush() {
@@ -59,13 +70,7 @@ export async function subscribeDriverPush() {
   }
 
   const registration = await registerDriverServiceWorker();
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(config.public_key),
-    });
-  }
+  const subscription = await ensurePushSubscription(registration, config.public_key);
 
   const json = subscription.toJSON();
   const res = await fetch(`${API_BASE}/api/driver/push/subscribe`, {
@@ -83,8 +88,10 @@ export async function subscribeDriverPush() {
 }
 
 export async function unsubscribeDriverPush() {
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
+  const registration =
+    (await getRegistrationByScript(DRIVER_SW)) ||
+    (await navigator.serviceWorker.getRegistration(DRIVER_SW_SCOPE));
+  const subscription = registration ? await registration.pushManager.getSubscription() : null;
   if (!subscription) return { ok: true };
 
   const res = await fetch(`${API_BASE}/api/driver/push/subscribe`, {

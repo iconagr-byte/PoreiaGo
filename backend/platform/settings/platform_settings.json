@@ -14,7 +14,7 @@
   "smtp_from_email": "noreply@poreiago.app",
   "sms_sender_id": "POREIA",
   "maintenance_mode": false,
-  "checkout_base_url": "http://localhost:5173",
+  "checkout_base_url": "https://www.poreiago.com",
   "checkout_deposit_enabled": true,
   "checkout_deposit_percent": 30,
   "checkout_bank_transfer_enabled": true,

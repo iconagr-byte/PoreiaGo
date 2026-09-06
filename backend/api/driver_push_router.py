@@ -11,7 +11,11 @@ from travel_platform.notifications.push_subscription_store import (
     list_subscriptions_for_driver,
     upsert_subscription,
 )
-from travel_platform.notifications.web_push_service import get_public_vapid_key, web_push_configured
+from travel_platform.notifications.web_push_service import (
+    ensure_web_push_keys,
+    get_public_vapid_key,
+    web_push_configured,
+)
 
 router = APIRouter(prefix="/api/driver/push", tags=["Driver Push"])
 
@@ -34,6 +38,7 @@ def _driver_email(session: dict) -> str:
 
 @router.get("/config")
 async def driver_push_config():
+    ensure_web_push_keys()
     return {
         "enabled": web_push_configured(),
         "public_key": get_public_vapid_key(),
@@ -42,6 +47,7 @@ async def driver_push_config():
 
 @router.get("/status")
 async def driver_push_status(session: dict = Depends(require_driver_session)):
+    ensure_web_push_keys()
     tenant_id = str(session.get("tenant_id") or "")
     driver_id = str(session.get("sub") or session.get("driver_id") or "")
     subs = list_subscriptions_for_driver(tenant_id, driver_id)
@@ -58,6 +64,7 @@ async def driver_push_subscribe(
     session: dict = Depends(require_driver_session),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ):
+    ensure_web_push_keys()
     if not web_push_configured():
         raise HTTPException(status_code=503, detail="Web Push δεν είναι ρυθμισμένο (VAPID)")
     tenant_id = str(session.get("tenant_id") or "")

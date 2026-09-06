@@ -22,10 +22,27 @@ class StripeReadinessTests(unittest.TestCase):
             settings.stripe_price_starter_yearly = ""
             settings.stripe_price_professional_yearly = ""
             settings.stripe_price_enterprise = ""
+            settings.billing_demo_mode = False
             gs.return_value = settings
             data = stripe_readiness()
         self.assertFalse(data["checkout_ready"])
+        self.assertTrue(data["demo_mode"])
         self.assertIn("STRIPE_SECRET_KEY", data["missing_env"])
+
+    def test_demo_mode_flag_with_stripe_ready(self):
+        with patch("app.services.billing_service.get_settings") as gs:
+            settings = MagicMock()
+            settings.stripe_secret_key = "sk_test_x"
+            settings.stripe_price_starter = "price_a"
+            settings.stripe_price_professional = "price_b"
+            settings.stripe_price_starter_yearly = "price_c"
+            settings.stripe_price_professional_yearly = "price_d"
+            settings.stripe_price_enterprise = ""
+            settings.billing_demo_mode = True
+            gs.return_value = settings
+            data = stripe_readiness()
+        self.assertTrue(data["checkout_ready"])
+        self.assertTrue(data["demo_mode"])
 
 
 class LocalTrialTests(unittest.IsolatedAsyncioTestCase):
@@ -47,7 +64,7 @@ class LocalTrialTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        with patch("app.services.billing_service.stripe_readiness", return_value={"checkout_ready": False}), patch(
+        with patch("app.services.billing_service.stripe_readiness", return_value={"checkout_ready": False, "demo_mode": True}), patch(
             "app.services.billing_service._plan_base_cents",
             return_value=29900,
         ):

@@ -6,10 +6,11 @@ const ISSUER = 'aerostride-ticketing';
 const WINDOW_SECONDS = 30;
 
 function getJwtSecret() {
-  return (
-    import.meta.env.VITE_TICKET_JWT_SECRET ||
-    'change-me-in-production-min-32-characters-long'
-  );
+  const fromEnv = import.meta.env.VITE_TICKET_JWT_SECRET;
+  if (fromEnv) return fromEnv;
+  // Never ship a default ticket secret in production builds.
+  if (import.meta.env.PROD) return '';
+  return 'change-me-in-production-min-32-characters-long';
 }
 
 function base64UrlDecode(str) {

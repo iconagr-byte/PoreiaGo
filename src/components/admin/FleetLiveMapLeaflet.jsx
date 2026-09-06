@@ -1,88 +1,185 @@
-import { useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { useEffect, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import '../../styles/fleet-live-map.css';
 import { useAnimatedFleetVehicles } from '../../hooks/useAnimatedFleetVehicles.js';
+import { useFleetVehicleTrails } from '../../hooks/useFleetVehicleTrails.js';
 import FleetHeatmapLayer from './FleetHeatmapLayer.jsx';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import {
   formatBoardingLabel,
   formatPassengerNames,
   formatSensorSummary,
+  formatUpdatedAgo,
+  resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
+import { formatFleetBusPillLabel } from '../../lib/admin/fleetBusPillLabel.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
 import FleetMapFlyTo from './FleetMapFlyTo.jsx';
+import FleetLiveTrailsLeaflet from './FleetLiveTrailsLeaflet.jsx';
+import GreecePlacesLeafletLayer from './GreecePlacesLeafletLayer.jsx';
+import { APPLE_LEAFLET_TILES } from '../../lib/maps/appleMapTheme.js';
 
-const busIcon = (heading) =>
-  L.divIcon({
+function escapeAttr(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/** Avoid recreating L.divIcon every animation frame (reloads the photo). */
+const BUS_ICON_CACHE = new Map();
+const BUS_ICON_CACHE_MAX = 80;
+
+const busIcon = (vehicle) => {
+  const headingRaw = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
+  const heading = Math.round(headingRaw / 15) * 15;
+  const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
+  const label = formatFleetBusPillLabel(vehicle);
+  const key = `${vehicle?.id || ''}|${img}|${heading}|${label}`;
+  const cached = BUS_ICON_CACHE.get(key);
+  if (cached) return cached;
+
+  const icon = L.divIcon({
     className: 'fleet-bus-marker-ws',
-    html: `<div style="transform:rotate(${heading ?? 0}deg);background:#0040df;color:#fff;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #facc15;font-size:18px">🚌</div>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
+    html: `<div class="fleet-apple-bus-pin">
+      <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${escapeAttr(label)}</div>
+      <div class="fleet-apple-bus-pin__ring">
+        <div class="fleet-apple-bus-pin__avatar"><img src="${escapeAttr(img)}" alt="" decoding="async" loading="eager" /></div>
+        <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
+      </div>
+    </div>`,
+    iconSize: [52, 72],
+    iconAnchor: [26, 40],
   });
+  BUS_ICON_CACHE.set(key, icon);
+  if (BUS_ICON_CACHE.size > BUS_ICON_CACHE_MAX) {
+    const first = BUS_ICON_CACHE.keys().next().value;
+    BUS_ICON_CACHE.delete(first);
+  }
+  return icon;
+};
 
-function LeafletAnimatedMarkers({ vehicles }) {
+function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
   const display = useAnimatedFleetVehicles(vehicles);
 
   return display.map((v) => (
-    <Marker key={v.id} position={[v.lat, v.lng]} icon={busIcon(v.heading)}>
-      <Tooltip direction="top" offset={[0, -18]} opacity={0.95} permanent={false}>
-        <strong>{v.driver_name}</strong>
-        <br />
-        {v.bus_plate} · {Math.round(v.speed)} km/h
-        {formatBoardingLabel(v) ? (
-          <>
-            <br />
-            Επιβάτες: {formatBoardingLabel(v)}
-          </>
-        ) : null}
-      </Tooltip>
+    <Marker
+      key={v.id}
+      position={[v.lat, v.lng]}
+      icon={busIcon(v)}
+      eventHandlers={{
+        dblclick: (e) => {
+          e.originalEvent?.preventDefault?.();
+          e.originalEvent?.stopPropagation?.();
+          onVehicleHistory?.(v);
+        },
+      }}
+    >
       <Popup>
-        <strong>{v.driver_name}</strong>
-        <br />
-        Πινακίδα: {v.bus_plate}
-        <br />
-        Ταχύτητα: {Math.round(v.speed)} km/h
-        <br />
-        Δρομολόγιο #{v.trip_id ?? '—'}
-        {formatBoardingLabel(v) ? (
-          <>
-            <br />
-            Επιβιβασμένοι: {formatBoardingLabel(v)}
-          </>
-        ) : null}
-        {formatPassengerNames(v) ? (
-          <>
-            <br />
-            <span className="text-xs">{formatPassengerNames(v)}</span>
-          </>
-        ) : null}
-        {formatSensorSummary(v) ? (
-          <>
-            <br />
-            <span className="text-xs text-gray-500">{formatSensorSummary(v)}</span>
-          </>
-        ) : null}
-        <div className="mt-2">
-          <FleetDriverPlaybackButton vehicle={v} />
+        <div className="fleet-apple-popup">
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+            <img
+              src={resolveSiteAssetUrl(resolveFleetMarkerImage(v))}
+              alt=""
+              decoding="async"
+              style={{ width: 48, height: 48, borderRadius: 14, objectFit: 'cover' }}
+            />
+            <div>
+              <div className="fleet-apple-popup__title">{v.driver_name}</div>
+              <div className="fleet-apple-popup__meta">
+                {v.bus_plate}
+                {v.trip_title || v.trip_id ? ` · ${v.trip_title || `Εκδρομή #${v.trip_id}`}` : ''}
+              </div>
+            </div>
+          </div>
+          Ταχύτητα: {Math.round(v.speed)} km/h
+          <br />
+          Δρομολόγιο #{v.trip_id ?? '—'}
+          <br />
+          Ενημέρωση: {formatUpdatedAgo(v.timestamp) || '—'}
+          {formatBoardingLabel(v) ? (
+            <>
+              <br />
+              Επιβιβασμένοι: {formatBoardingLabel(v)}
+            </>
+          ) : null}
+          {formatPassengerNames(v) ? (
+            <>
+              <br />
+              <span className="text-xs">{formatPassengerNames(v)}</span>
+            </>
+          ) : null}
+          {formatSensorSummary(v) ? (
+            <>
+              <br />
+              <span className="text-xs text-gray-500">{formatSensorSummary(v)}</span>
+            </>
+          ) : null}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <FleetDriverPlaybackButton vehicle={v} />
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
+              onClick={() => onVehicleHistory?.(v)}
+            >
+              Ιστορικό
+            </button>
+          </div>
+          <p style={{ marginTop: 8, fontSize: 11, color: '#94a3b8' }}>Διπλό κλικ στο pin για ιστορικό</p>
         </div>
       </Popup>
     </Marker>
   ));
 }
 
-function FitBounds({ vehicles }) {
+/** Fit only when the vehicle *set* changes or when parent requests recenter — never on GPS ticks. */
+function FitBounds({ vehicles, fitNonce = 0 }) {
   const map = useMap();
+  const fittedIdsRef = useRef('');
+  const userMovedRef = useRef(false);
+  const lastNonceRef = useRef(fitNonce);
+
+  useEffect(() => {
+    const markMoved = () => {
+      userMovedRef.current = true;
+    };
+    map.on('dragstart', markMoved);
+    map.on('zoomstart', markMoved);
+    return () => {
+      map.off('dragstart', markMoved);
+      map.off('zoomstart', markMoved);
+    };
+  }, [map]);
+
   useEffect(() => {
     if (!vehicles?.length) return;
+    const ids = vehicles
+      .map((v) => v.id || v.vehicle_id || `${v.lat},${v.lng}`)
+      .sort()
+      .join('|');
+    const force = fitNonce !== lastNonceRef.current;
+    if (force) {
+      userMovedRef.current = false;
+      lastNonceRef.current = fitNonce;
+    } else if (userMovedRef.current) {
+      return;
+    } else if (ids === fittedIdsRef.current) {
+      return;
+    }
+    fittedIdsRef.current = ids;
     const bounds = L.latLngBounds(vehicles.map((v) => [v.lat, v.lng]));
-    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 12 });
-  }, [vehicles, map]);
+    map.fitBounds(bounds, { padding: [64, 64], maxZoom: 13, animate: true });
+  }, [vehicles, map, fitNonce]);
+
   return null;
 }
 
-/** Leaflet fallback — χωρίς Mapbox token. */
+/** Leaflet fallback — Apple-like soft basemap + ελληνικές ετικέτες. */
 export default function FleetLiveMapLeaflet({
   vehicles,
   center,
@@ -93,26 +190,47 @@ export default function FleetLiveMapLeaflet({
   sosAlerts = [],
   showGeofence = false,
   showSosPins = true,
+  showPlaces = true,
+  showTrails = true,
   focusSosAlert = null,
+  fitNonce = 0,
+  onVehicleHistory,
 }) {
   const fitPoints = useMemo(() => {
-    const pts = vehicles.map((v) => [v.lat, v.lng]);
-    sosAlerts.forEach((a) => pts.push([a.lat, a.lng]));
+    const pts = vehicles.map((v) => ({ ...v, id: v.id || v.vehicle_id }));
+    sosAlerts.forEach((a, i) => pts.push({ id: `sos-${a.id || i}`, lat: a.lat, lng: a.lng }));
     return pts;
   }, [vehicles, sosAlerts]);
 
+  const trails = useFleetVehicleTrails(vehicles, {
+    enabled: showTrails,
+    maxPoints: 3000,
+    minMoveM: 3,
+  });
+
   return (
-    <MapContainer center={center} zoom={7} className="h-full w-full" scrollWheelZoom>
+    <MapContainer
+      center={center}
+      zoom={6.4}
+      className="h-full w-full"
+      scrollWheelZoom
+      zoomControl={false}
+    >
       <TileLayer
-        attribution="© OpenStreetMap · © CARTO"
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        attribution={APPLE_LEAFLET_TILES.attribution}
+        url={APPLE_LEAFLET_TILES.url}
+        subdomains={APPLE_LEAFLET_TILES.subdomains}
+        maxZoom={APPLE_LEAFLET_TILES.maxZoom}
       />
-      <FitBounds vehicles={fitPoints.length ? fitPoints.map(([lat, lng]) => ({ lat, lng })) : vehicles} />
+      <ZoomControl position="bottomright" />
+      <GreecePlacesLeafletLayer visible={showPlaces} />
+      <FitBounds vehicles={fitPoints} fitNonce={fitNonce} />
       {focusSosAlert ? <FleetMapFlyTo alert={focusSosAlert} /> : null}
       <FleetGeofenceLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
+      <FleetLiveTrailsLeaflet trails={trails} visible={showTrails} />
       <FleetSosPins alerts={sosAlerts} visible={showSosPins} />
       <FleetHeatmapLayer points={heatmap} visible={showHeat} />
-      <LeafletAnimatedMarkers vehicles={vehicles} />
+      <LeafletAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
     </MapContainer>
   );
 }

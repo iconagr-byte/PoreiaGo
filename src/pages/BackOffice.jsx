@@ -1,29 +1,35 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { mockFleet } from '../data/mockData';
 import { fetchAllLostItems, updateLostItemStatus } from '../services/lostItemsApi.js';
-import { loadAllCustomers, getCustomerByEmail } from '../lib/customers/customerStore.js';
+import {
+  loadCustomersByService,
+  getCustomerByEmail,
+  syncCustomersFromBookings,
+  syncCustomersFromRentalBookings,
+  CUSTOMER_SERVICE_BUSES,
+  CUSTOMER_SERVICE_RENT,
+} from '../lib/customers/customerStore.js';
+import { fetchRentalBookings, fetchRentalSummary } from '../services/fleetRentalApi.js';
 import { loadBookings, cancelBooking } from '../lib/ticketing/bookingStore.js';
 import { patchAdminBooking } from '../services/adminBookingsApi.js';
 import { loadMergedBookings } from '../lib/ticketing/bookingMerge.js';
-import { adminScanTicket, ensureDriverSession } from '../services/ticketingApi.js';
-import { SCAN_RESULT } from '../lib/ticketing/constants.js';
+import { ensureDriverSession } from '../services/ticketingApi.js';
 import BookingDetailPanel from '../components/booking/BookingDetailPanel.jsx';
 import RecordCashPaymentModal from '../components/admin/RecordCashPaymentModal.jsx';
 import FiscalMarkCell from '../components/admin/FiscalMarkCell.jsx';
 import toast, { Toaster } from 'react-hot-toast';
-import BusQrScanner from '../components/BusQrScanner.jsx';
-import LiveFleetMap from '../components/admin/LiveFleetMap.jsx';
 import FleetLiveMapWebSocket from '../components/admin/FleetLiveMapWebSocket.jsx';
-import FleetRouteHistory from '../components/admin/FleetRouteHistory.jsx';
-import FleetKpisDashboard from '../components/admin/FleetKpisDashboard.jsx';
-import ActiveDriversList from '../components/admin/ActiveDriversList.jsx';
+import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
+import AdminNotificationBell from '../components/admin/AdminNotificationBell.jsx';
+import AdminAccountMenu from '../components/admin/AdminAccountMenu.jsx';
+import OfficeWalletShareCard from '../components/admin/OfficeWalletShareCard.jsx';
 import { FleetTelemetryProvider } from '../context/FleetTelemetryContext.jsx';
-import TelemetryAlertsPanel from '../components/admin/TelemetryAlertsPanel.jsx';
 import ImpersonationBanner from '../components/admin/ImpersonationBanner.jsx';
 import SettingsHub from '../components/admin/SettingsHub.jsx';
-import CustomerBookingCard from '../components/admin/CustomerBookingCard.jsx';
-import { isPaid, isConfirmed, canRecordCashPayment } from '../lib/bookingDisplay.js';
+import AddCustomerModal from '../components/admin/AddCustomerModal.jsx';
+import CustomersCrmPanel from '../components/admin/CustomersCrmPanel.jsx';
+import AdminMobileNavDrawer from '../components/admin/AdminMobileNavDrawer.jsx';
+import { canRecordCashPayment } from '../lib/bookingDisplay.js';
 import { recordCashPayment } from '../lib/ticketing/bookingStore.js';
 import { DEFAULT_PAYMENT_SECURITY } from '../lib/payments/paymentSecurity.js';
 import { deleteTrip as removeTripFromStore, loadTrips, getTripById } from '../lib/trips/tripStore.js';
@@ -48,18 +54,54 @@ import {
 } from '../services/platformApi.js';
 import { clearSaasSession, getSaasToken } from '../services/saasApi.js';
 import { DEFAULT_TENANT_SETTINGS_TAB, DEFAULT_PLATFORM_TAB, sanitizeSettingsSubTab } from '../lib/admin/settingsTabs.js';
+import { DEFAULT_RENT_DESK_TAB, sanitizeRentDeskTab } from '../lib/admin/rentDeskNav.js';
+import {
+  DEFAULT_FLEET_OPS_TAB,
+  isFleetOpsSubTab,
+  sanitizeFleetOpsSubTab,
+} from '../lib/admin/fleetOpsHub.js';
+import {
+  DEFAULT_BUSES_HUB_TAB,
+  isBusesHubTab,
+  sanitizeBusesHubTab,
+} from '../lib/admin/busesHub.js';
+import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
+import OfficeLogoChangeModal from '../components/admin/OfficeLogoChangeModal.jsx';
+import AddFleetVehicleModal from '../components/admin/AddFleetVehicleModal.jsx';
+import FleetVehiclesBoard from '../components/admin/FleetVehiclesBoard.jsx';
 import { isSaasSuperAdmin, isSaasTokenExpired } from '../lib/saasJwt.js';
 import { exportTripManifestPdf } from '../lib/manifest/exportManifestPdf.js';
 import FleetAlertsPanel from '../components/admin/FleetAlertsPanel.jsx';
+import FleetOpsHubNav from '../components/admin/fleet/FleetOpsHubNav.jsx';
+import FleetOpsHub from '../components/admin/fleet/FleetOpsHub.jsx';
+import RentDeskHub from '../components/admin/fleet/RentDeskHub.jsx';
+import BusesHub from '../components/admin/BusesHub.jsx';
+import AdminMenuFade from '../components/admin/AdminMenuFade.jsx';
 import EmailHub from '../components/admin/email/EmailHub.jsx';
 import EmailTemplatesPage from '../components/admin/email/EmailTemplatesPage.jsx';
+import OfficeSetupWizard, {
+  isOfficeSetupComplete,
+} from '../components/admin/OfficeSetupWizard.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
 import DriversHub from '../components/admin/DriversHub.jsx';
+import BusSetupTools from '../components/admin/BusSetupTools.jsx';
+import LoyaltyRewardsPanel from '../components/admin/LoyaltyRewardsPanel.jsx';
+import { LOYALTY_UI_ENABLED } from '../lib/admin/loyaltyUi.js';
 import SortableSidebarNav from '../components/admin/SortableSidebarNav.jsx';
 import DashboardKpiCard from '../components/admin/DashboardKpiCard.jsx';
 import TemplateSearch from '../components/admin/TemplateSearch.jsx';
 import { avatarColorClass } from '../lib/admin/avatarColors.js';
 import { computeDashboardKpis } from '../lib/admin/dashboardKpis.js';
+import {
+  defaultAdminTabForOfficeMode,
+  isAdminTabAllowedForOfficeMode,
+} from '../lib/admin/sidebarNav.js';
+import {
+  DEFAULT_OFFICE_MODULES,
+  fetchAdminOfficeModules,
+  officeModeFromModules,
+  shouldShowRentMenu,
+} from '../services/officeModulesApi.js';
 
 function bookingStatusBadgeClass(status) {
   const s = String(status || '').toLowerCase();
@@ -86,9 +128,30 @@ export default function BackOffice() {
     return fromQuery || location.state?.activeTab || 'dashboard';
   });
   const [settingsSubTab, setSettingsSubTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('sub') || params.get('settingsSubTab');
     const fromState = location.state?.settingsSubTab || location.state?.platformTab;
-    if (fromState) return sanitizeSettingsSubTab(fromState, isSaasSuperAdmin());
+    if (fromQuery || fromState) {
+      return sanitizeSettingsSubTab(fromQuery || fromState, isSaasSuperAdmin());
+    }
     return isSaasSuperAdmin() ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
+  });
+  const [fleetRentalTab, setFleetRentalTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('rentTab') || params.get('fleetRentalTab');
+    const fromState = location.state?.fleetRentalTab;
+    return sanitizeRentDeskTab(fromQuery || fromState || DEFAULT_RENT_DESK_TAB);
+  });
+  const [fleetOpsSubTab, setFleetOpsSubTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('fleetOpsTab') || params.get('opsTab');
+    const fromState = location.state?.fleetOpsSubTab;
+    const tabHint = params.get('tab') || location.state?.activeTab;
+    if (isFleetOpsSubTab(fromQuery || fromState)) {
+      return sanitizeFleetOpsSubTab(fromQuery || fromState);
+    }
+    if (isFleetOpsSubTab(tabHint)) return sanitizeFleetOpsSubTab(tabHint);
+    return DEFAULT_FLEET_OPS_TAB;
   });
   const [trips, setTrips] = useState(() => loadTrips());
   const [routesMarket, setRoutesMarket] = useState(MARKET_DOMESTIC);
@@ -96,12 +159,122 @@ export default function BackOffice() {
   const [lostItemsLoading, setLostItemsLoading] = useState(false);
   const [bookings, setBookings] = useState(() => loadBookings());
   const [bookingsLoading, setBookingsLoading] = useState(false);
-  const [scanFlash, setScanFlash] = useState(null);
+  const [chatFocusDriverId, setChatFocusDriverId] = useState(() => {
+    const fromQuery = new URLSearchParams(window.location.search).get('driverId');
+    return fromQuery || location.state?.driverId || null;
+  });
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerServiceScope, setCustomerServiceScope] = useState(CUSTOMER_SERVICE_BUSES);
+  const [customers, setCustomers] = useState(() =>
+    loadCustomersByService(CUSTOMER_SERVICE_BUSES),
+  );
+  const [rentalBookings, setRentalBookings] = useState([]);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [logoModalOpen, setLogoModalOpen] = useState(false);
+  const [brandRefreshKey, setBrandRefreshKey] = useState(0);
+  const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
+  const [rentSummary, setRentSummary] = useState(null);
+  const [showOfficeSetup, setShowOfficeSetup] = useState(
+    () => Boolean(location.state?.officeSetup) || !isOfficeSetupComplete(),
+  );
+  const officeMode = officeModeFromModules(officeModules);
+  const rentMenuVisible = shouldShowRentMenu(officeModules);
+  const rentOnly = officeMode === 'rent_only';
+  useEffect(() => {
+    if (rentOnly) setCustomerServiceScope(CUSTOMER_SERVICE_RENT);
+  }, [rentOnly]);
+
+  const refreshCustomersForScope = (scope = customerServiceScope) => {
+    setCustomers(loadCustomersByService(scope));
+  };
 
   useEffect(() => {
-    const tab = new URLSearchParams(location.search).get('tab');
-    if (tab) setActiveTab(tab);
+    let cancelled = false;
+    const refresh = () => {
+      fetchAdminOfficeModules().then((mods) => {
+        if (!cancelled) setOfficeModules(mods);
+      });
+    };
+    refresh();
+    window.addEventListener('saas-session-changed', refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('saas-session-changed', refresh);
+    };
+  }, [location.key]);
+
+  useEffect(() => {
+    if (!rentOnly) return;
+    if (!isAdminTabAllowedForOfficeMode(activeTab, officeMode)) {
+      setActiveTab(defaultAdminTabForOfficeMode(officeMode));
+    }
+  }, [rentOnly, officeMode, activeTab]);
+
+  useEffect(() => {
+    if (rentMenuVisible) return;
+    if (activeTab === 'fleet_rental') {
+      toast.error('Το Rent δεν είναι ενεργό για αυτό το γραφείο');
+      setActiveTab('dashboard');
+    }
+  }, [rentMenuVisible, activeTab]);
+
+  useEffect(() => {
+    if (LOYALTY_UI_ENABLED) return;
+    if (activeTab === 'loyalty') setActiveTab('dashboard');
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!rentOnly || activeTab !== 'dashboard') return undefined;
+    let cancelled = false;
+    fetchRentalSummary()
+      .then((data) => {
+        if (!cancelled) setRentSummary(data || null);
+      })
+      .catch(() => {
+        if (!cancelled) setRentSummary(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rentOnly, activeTab, location.key]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab) {
+      if (isFleetOpsSubTab(tab)) {
+        setFleetOpsSubTab(sanitizeFleetOpsSubTab(tab));
+        setActiveTab('fleet_ops');
+      } else {
+        setActiveTab(tab);
+      }
+    }
+    const driverId = params.get('driverId');
+    if (driverId) setChatFocusDriverId(driverId);
+    const sub = params.get('sub') || params.get('settingsSubTab');
+    if (sub) {
+      setActiveTab('settings');
+      setSettingsSubTab(sanitizeSettingsSubTab(sub, isSaasSuperAdmin()));
+    }
+    const rentTab = params.get('rentTab') || params.get('fleetRentalTab');
+    if (rentTab) {
+      setActiveTab('fleet_rental');
+      setFleetRentalTab(sanitizeRentDeskTab(rentTab));
+    }
+    const opsTab = params.get('fleetOpsTab') || params.get('opsTab');
+    if (opsTab) {
+      setFleetOpsSubTab(sanitizeFleetOpsSubTab(opsTab));
+      setActiveTab('fleet_ops');
+    }
   }, [location.search]);
+
+  // Legacy deep links (?tab=driver_chat) → parent hub + sub-tab.
+  useEffect(() => {
+    if (!isFleetOpsSubTab(activeTab)) return;
+    setFleetOpsSubTab(sanitizeFleetOpsSubTab(activeTab));
+    setActiveTab('fleet_ops');
+  }, [activeTab]);
 
   useEffect(() => {
     const role = localStorage.getItem('userRole');
@@ -119,13 +292,31 @@ export default function BackOffice() {
     ensureDriverSession();
   }, [navigate]);
 
+  // Legacy debug tab removed — send any leftover state to the live map.
+  useEffect(() => {
+    if (activeTab === 'live_tracking') {
+      setActiveTab('fleet_live_map');
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (isSaasSuperAdmin()) return;
+    setSettingsSubTab((prev) => sanitizeSettingsSubTab(prev, false));
+  }, []);
+
   useEffect(() => {
     if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
+      const tab = location.state.activeTab;
+      if (tab === 'customers') {
+        const scope = rentOnly ? CUSTOMER_SERVICE_RENT : CUSTOMER_SERVICE_BUSES;
+        setCustomerServiceScope(scope);
+        setCustomers(loadCustomersByService(scope));
+        setSelectedCustomer(null);
+      }
+      setActiveTab(tab);
     }
-    if (location.state?.settingsSubTab === 'drivers' || location.state?.platformTab === 'drivers') {
-      setActiveTab('drivers');
-      return;
+    if (location.state?.driverId) {
+      setChatFocusDriverId(location.state.driverId);
     }
     if (location.state?.settingsSubTab || location.state?.platformTab) {
       setSettingsSubTab(
@@ -135,11 +326,18 @@ export default function BackOffice() {
         ),
       );
     }
+    if (location.state?.fleetRentalTab) {
+      setFleetRentalTab(sanitizeRentDeskTab(location.state.fleetRentalTab));
+    }
     if (location.state?.activeTab === 'email') {
       setEmailIntent({
         hubTab: location.state.emailHubTab || 'mailbox',
+        ...(location.state?.connectEmail ? { connectEmail: true } : {}),
         ...(location.state?.emailCompose ? { compose: location.state.emailCompose } : {}),
       });
+    }
+    if (location.state?.officeSetup) {
+      setShowOfficeSetup(true);
     }
     if (
       location.state?.routesMarket === MARKET_DOMESTIC ||
@@ -166,6 +364,49 @@ export default function BackOffice() {
     };
   }, [activeTab, location.key]);
 
+  // Πελατολόγιο: hydrate buses vs rent CRM separately (never mix lists).
+  useEffect(() => {
+    if (activeTab !== 'customers' && activeTab !== 'fleet_rental') return;
+    let cancelled = false;
+    const scope =
+      activeTab === 'fleet_rental' || rentOnly
+        ? CUSTOMER_SERVICE_RENT
+        : customerServiceScope;
+    loadMergedBookings()
+      .then((merged) => {
+        if (cancelled) return;
+        setBookings(merged);
+        syncCustomersFromBookings(merged);
+        if (scope === CUSTOMER_SERVICE_BUSES) {
+          setCustomers(loadCustomersByService(CUSTOMER_SERVICE_BUSES));
+        }
+      })
+      .catch(() => {
+        if (!cancelled && scope === CUSTOMER_SERVICE_BUSES) {
+          setCustomers(loadCustomersByService(CUSTOMER_SERVICE_BUSES));
+        }
+      });
+    fetchRentalBookings()
+      .then((rows) => {
+        if (cancelled) return;
+        setRentalBookings(rows);
+        syncCustomersFromRentalBookings(rows);
+        if (scope === CUSTOMER_SERVICE_RENT) {
+          setCustomers(loadCustomersByService(CUSTOMER_SERVICE_RENT));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRentalBookings([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, location.key, customerServiceScope, rentOnly]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [activeTab]);
+
   useEffect(() => {
     if (activeTab !== 'lost_found') return;
     let cancelled = false;
@@ -188,12 +429,11 @@ export default function BackOffice() {
     };
   }, [activeTab, location.key]);
 
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [cashPaymentBooking, setCashPaymentBooking] = useState(null);
   const [cashPaymentSaving, setCashPaymentSaving] = useState(false);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [expandedTripBookings, setExpandedTripBookings] = useState(null);
+  const [bookingTripQuery, setBookingTripQuery] = useState('');
   const [fleetVehicles, setFleetVehicles] = useState([]);
   const [fleetCards, setFleetCards] = useState(null);
   const [fleetAlerts, setFleetAlerts] = useState([]);
@@ -256,8 +496,10 @@ export default function BackOffice() {
 
   const openCustomerProfile = (booking) => {
     if (!booking) return;
-    const fromMock = getCustomerByEmail(booking.email) ||
-      loadAllCustomers().find(
+    const scope = CUSTOMER_SERVICE_BUSES;
+    const fromMock =
+      getCustomerByEmail(booking.email, scope) ||
+      loadCustomersByService(scope).find(
         (c) =>
           c.id === booking.customerId ||
           (booking.customerName && c.name === booking.customerName),
@@ -269,10 +511,41 @@ export default function BackOffice() {
       points: 0,
       tier: 'Silver',
       joinDate: '—',
+      serviceScope: scope,
     };
     setSelectedBooking(null);
+    setCustomerServiceScope(scope);
+    setCustomers(loadCustomersByService(scope));
     setSelectedCustomer(customer);
     setActiveTab('customers');
+  };
+
+  /** Sidebar / header: land on the matching service CRM list. */
+  const goToCustomersHome = () => {
+    const scope = rentOnly ? CUSTOMER_SERVICE_RENT : CUSTOMER_SERVICE_BUSES;
+    setCustomerServiceScope(scope);
+    setCustomers(loadCustomersByService(scope));
+    setSelectedCustomer(null);
+    setActiveTab('customers');
+  };
+
+  /** Buses hub «Κρατήσεις» — always the bookings list home (not a stuck ticket). */
+  const goToBookingsHome = () => {
+    setSelectedBooking(null);
+    setActiveTab('bookings');
+  };
+
+  const handleAdminTabChange = (tab) => {
+    if (tab === 'customers') {
+      const scope = rentOnly ? CUSTOMER_SERVICE_RENT : CUSTOMER_SERVICE_BUSES;
+      setCustomerServiceScope(scope);
+      setCustomers(loadCustomersByService(scope));
+      setSelectedCustomer(null);
+    }
+    if (tab === 'bookings') {
+      setSelectedBooking(null);
+    }
+    setActiveTab(tab);
   };
 
   const openBookingTicket = (booking) => {
@@ -303,6 +576,7 @@ export default function BackOffice() {
   };
 
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [addVehicleOpen, setAddVehicleOpen] = useState(false);
   const [serviceForm, setServiceForm] = useState({
     vehicle_id: '',
     mileage: '',
@@ -366,15 +640,19 @@ export default function BackOffice() {
         setFleetCards(cards);
         setFleetAlerts(alerts);
         if (vehicles.length) {
-          const firstId = selectedFleetVehicleId || vehicles[0].id;
-          setSelectedFleetVehicleId(firstId);
-          setServiceForm((prev) => ({ ...prev, vehicle_id: firstId }));
+          setSelectedFleetVehicleId((prev) => prev || vehicles[0].id);
+          setServiceForm((prev) => ({
+            ...prev,
+            vehicle_id: prev.vehicle_id || vehicles[0].id,
+          }));
         }
       })
       .catch(() => {
-        /* fallback to local mock data */
+        /* offline — keep current list */
       });
-  }, [activeTab, selectedFleetVehicleId]);
+    // Only reload when entering the fleet tab — not when selection changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'dashboard' || fleetVehicles.length) return;
@@ -419,7 +697,87 @@ export default function BackOffice() {
     [bookings, trips, fleetVehicles],
   );
 
-  const renderDashboard = () => (
+  const renderDashboard = () => {
+    if (rentOnly) {
+      return (
+        <div className="space-y-stack-lg pb-stack-lg">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-700 mb-2">Rent</p>
+            <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
+              Dashboard ενοικιάσεων
+            </h2>
+            <p className="text-sm text-on-surface-variant mt-1">
+              Στόλος, κρατήσεις και check-in — χωρίς εκδρομές λεωφορείου.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+            <DashboardKpiCard
+              label="Οχήματα"
+              value={rentSummary?.vehicles_total ?? '—'}
+              icon="directions_car"
+              tone="emerald"
+            />
+            <DashboardKpiCard
+              label="Διαθέσιμα"
+              value={rentSummary?.available ?? '—'}
+              icon="check_circle"
+              tone="emerald"
+            />
+            <DashboardKpiCard
+              label="Σε ενοικίαση"
+              value={rentSummary?.rented ?? '—'}
+              icon="key"
+              tone="sky"
+            />
+            <DashboardKpiCard
+              label="Ενεργές κρατήσεις"
+              value={rentSummary?.active_bookings ?? '—'}
+              icon="event"
+              tone="violet"
+            />
+          </div>
+
+          <div className="bg-white rounded-[24px] border border-teal-100/80 shadow-level-2 p-6 md:p-8">
+            <h3 className="font-headline-md text-lg font-bold text-on-surface mb-2">Γρήγορες ενέργειες</h3>
+            <p className="text-sm text-on-surface-variant mb-5">
+              Άνοιξε το desk Ενοικιάσεις για στόλο, ημερολόγιο και check-in/out.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setFleetRentalTab('clients');
+                  setActiveTab('fleet_rental');
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-teal-700 text-white text-sm font-bold hover:bg-teal-800"
+              >
+                <span className="material-symbols-outlined text-[18px]">car_rental</span>
+                Desk ενοικιάσεων
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('fleet_live_map')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-slate-800 hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">map</span>
+                Ζωντανός χάρτης
+              </button>
+              <button
+                type="button"
+                onClick={goToCustomersHome}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-black/[0.08] bg-white text-sm font-bold text-slate-800 hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">group</span>
+                Πελάτες
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="space-y-stack-lg pb-stack-lg">
       <div>
         <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
@@ -454,6 +812,105 @@ export default function BackOffice() {
         />
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-5 items-stretch">
+        <OfficeWalletShareCard />
+        <DriverChatDashboardWidget
+          onOpenInbox={() => {
+            setFleetOpsSubTab('driver_chat');
+            setActiveTab('fleet_ops');
+          }}
+          onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+        />
+      </div>
+
+      <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-violet-100/60 flex flex-col min-w-0 overflow-hidden">
+        <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-headline-md text-lg sm:text-xl text-on-surface font-bold tracking-tight">
+              Στόλος γραφείου
+            </h3>
+            <p className="text-sm text-on-surface-variant mt-0.5">
+              {fleetVehicles.length
+                ? `${fleetVehicles.length} οχήματα από τις ρυθμίσεις στόλου`
+                : 'Χωρίς οχήματα — πρόσθεσε από Διαχείριση Στόλου'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('fleet')}
+            className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+          >
+            Διαχείριση
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </button>
+        </div>
+        {fleetVehicles.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <span className="material-symbols-outlined text-4xl text-slate-300">directions_bus</span>
+            <p className="font-bold text-gray-900 mt-2">Δεν υπάρχουν οχήματα στον στόλο</p>
+            <p className="text-sm text-on-surface-variant mt-1">
+              Δεν εμφανίζονται demo οχήματα. Πρόσθεσε λεωφορείο ή van για να ξεκινήσεις.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('fleet');
+                setAddVehicleOpen(true);
+              }}
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold"
+            >
+              <span className="material-symbols-outlined text-[16px]">add</span>
+              Νέο όχημα
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead>
+                <tr className="bg-surface-container-low/60">
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Όχημα
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Πινακίδα
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Κατάσταση
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Χλμ.
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/[0.04]">
+                {fleetVehicles.slice(0, 8).map((v) => (
+                  <tr
+                    key={v.id}
+                    className="hover:bg-primary/[0.03] cursor-pointer"
+                    onClick={() => setActiveTab('fleet')}
+                  >
+                    <td className="px-4 py-3 font-semibold text-sm text-on-surface">
+                      {v.make} {v.model}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-sm">{v.plate_number || '—'}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {v.service_status === 'Urgent'
+                        ? 'Σε Service'
+                        : v.service_status === 'Warning'
+                          ? 'Προειδοποίηση'
+                          : 'Ενεργό'}
+                    </td>
+                    <td className="px-4 py-3 text-sm tabular-nums">
+                      {Number(v.current_odometer || 0).toLocaleString('el-GR')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-[24px] shadow-level-2 card-inner-border border border-sky-100/60 flex flex-col min-w-0 overflow-hidden">
           <div className="px-4 sm:px-5 py-4 border-b border-black/[0.05] flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -467,7 +924,7 @@ export default function BackOffice() {
             </div>
             <button
               type="button"
-              onClick={() => setActiveTab('bookings')}
+              onClick={goToBookingsHome}
               className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
             >
               Όλες
@@ -585,6 +1042,7 @@ export default function BackOffice() {
         </div>
     </div>
   );
+  };
 
   const renderRoutes = () => {
     const filteredTrips = trips.filter((t) => getTripMarket(t) === routesMarket);
@@ -682,6 +1140,16 @@ export default function BackOffice() {
                         </div>
                       )}
                       <span className="truncate">{trip.title}</span>
+                      {trip.status === 'draft' && (
+                        <span className="ml-2 shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                          Draft
+                        </span>
+                      )}
+                      {trip.featured && (
+                        <span className="ml-1 shrink-0 material-symbols-outlined text-[16px] text-amber-500">
+                          star
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface">
@@ -696,8 +1164,19 @@ export default function BackOffice() {
                     {trip.vehiclePlate && (
                       <span className="block text-xs font-mono text-gray-500">{trip.vehiclePlate}</span>
                     )}
+                    {Array.isArray(trip.additionalFleet) && trip.additionalFleet.length > 0 ? (
+                      <span className="block text-[11px] font-semibold text-teal-700 mt-0.5">
+                        +{trip.additionalFleet.length} επιπλέον λεωφορεί
+                        {trip.additionalFleet.length === 1 ? 'ο' : 'α'}
+                      </span>
+                    ) : null}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface">{trip.vehicleType}</td>
+                  <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface">
+                    {trip.vehicleType}
+                    {Array.isArray(trip.additionalFleet) && trip.additionalFleet.length > 0
+                      ? ` · ${1 + trip.additionalFleet.length} οχήματα`
+                      : ''}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <span className={`px-3 py-1 bg-surface-container text-on-surface rounded-full font-label-sm ${trip.availableSeats === 0 ? 'bg-error text-white' : ''}`}>
                       {trip.availableSeats}
@@ -731,207 +1210,56 @@ export default function BackOffice() {
     );
   };
 
-  const renderCustomers = () => {
-    if (selectedCustomer) {
-      const customer =
-        loadAllCustomers().find((c) => c.id === selectedCustomer.id) || selectedCustomer;
-      const customerName = customer.name || 'Άγνωστος πελάτης';
-      const customerBookings = bookings.filter(
-        (b) =>
-          b.customerId === customer.id ||
-          b.customerName === customer.name ||
-          b.email === customer.email,
-      );
-      const totalSpent = customerBookings.reduce((sum, b) => sum + (b.price || 0), 0);
-      const paidTotal = customerBookings.filter(isPaid).reduce((sum, b) => sum + (b.price || 0), 0);
-      const confirmedCount = customerBookings.filter(isConfirmed).length;
-      const pendingCount = customerBookings.length - confirmedCount;
+  const renderCustomers = () => (
+    <CustomersCrmPanel
+      customers={customers}
+      selectedCustomer={selectedCustomer}
+      setSelectedCustomer={setSelectedCustomer}
+      bookings={bookings}
+      rentalBookings={rentalBookings}
+      serviceScope={customerServiceScope}
+      onAddCustomer={() => setAddCustomerOpen(true)}
+      onCustomersChange={() => refreshCustomersForScope(customerServiceScope)}
+      onBookingsChange={() => {
+        setBookingsLoading(true);
+        loadMergedBookings()
+          .then(setBookings)
+          .catch(() => setBookings(loadBookings()))
+          .finally(() => setBookingsLoading(false));
+        refreshCustomersForScope(customerServiceScope);
+      }}
+      openBookingTicket={openBookingTicket}
+    />
+  );
 
-      return (
-        <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in zoom-in-95 duration-300">
-          <div className="flex items-center gap-4 mb-2">
-            <button
-              type="button"
-              onClick={() => setSelectedCustomer(null)}
-              className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-            >
-              <span className="material-symbols-outlined text-gray-600">arrow_back</span>
-            </button>
-            <span className="font-bold text-gray-500">Πίσω στον κατάλογο πελατών</span>
-          </div>
-
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-xl font-bold">
-                {customerName.substring(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <h2 className="font-headline-lg font-bold text-on-surface">{customerName}</h2>
-                <p className="text-on-surface-variant">{customer.email}</p>
-                <p className="text-sm text-gray-400 font-mono mt-1">{customer.id}</p>
-              </div>
-            </div>
-            <span
-              className={`px-4 py-2 rounded-full text-sm font-bold ${
-                customer.tier === 'Platinum'
-                  ? 'bg-slate-800 text-slate-200'
-                  : customer.tier === 'Gold'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              {customer.tier || 'Silver'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white p-5 rounded-3xl border border-black/[0.05] shadow-sm">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">AeroMiles</div>
-              <div className="text-2xl font-bold text-amber-600">{customer.points ?? 0}</div>
-            </div>
-            <div className="bg-white p-5 rounded-3xl border border-black/[0.05] shadow-sm">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Επιβεβαιωμένες</div>
-              <div className="text-2xl font-bold text-emerald-600">
-                {confirmedCount}
-                <span className="text-sm text-gray-400 font-normal"> / {customerBookings.length}</span>
-              </div>
-            </div>
-            <div className="bg-white p-5 rounded-3xl border border-black/[0.05] shadow-sm">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Εισπράχθηκαν</div>
-              <div className="text-2xl font-bold text-primary">€{paidTotal.toFixed(2)}</div>
-            </div>
-            <div className="bg-white p-5 rounded-3xl border border-black/[0.05] shadow-sm">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Σύνολο τιμολογίων</div>
-              <div className="text-2xl font-bold text-gray-900">€{totalSpent.toFixed(2)}</div>
-              {pendingCount > 0 && (
-                <p className="text-xs text-amber-600 mt-1 font-bold">{pendingCount} εκκρεμείς</p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg flex items-center gap-2 px-1">
-              <span className="material-symbols-outlined text-primary">receipt_long</span>
-              Ιστορικό κρατήσεων & οικονομικά
-            </h3>
-            {customerBookings.length === 0 ? (
-              <p className="p-8 text-center text-gray-500 bg-white rounded-3xl border">
-                Δεν υπάρχουν καταγεγραμμένες κρατήσεις.
-              </p>
-            ) : (
-              customerBookings.map((b) => (
-                <CustomerBookingCard
-                  key={b.id}
-                  booking={b}
-                  onOpenDetail={openBookingTicket}
-                  onViewTicket={openBookingTicket}
-                />
-              ))
-            )}
-          </div>
-
-          <p className="text-xs text-gray-400 text-center">
-            Εγγραφή: {customer.joinDate}
-          </p>
-        </div>
-      );
-    }
-
-    return (
-    <div className="space-y-stack-lg pb-stack-lg relative">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-            Πελατολόγιο & Επιβραβεύσεις
-          </h2>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-            Διαχείριση πελατών, πόντων επιβράβευσης και ιστορικού κρατήσεων.
-          </p>
-          <p className="text-xs text-on-surface-variant mt-2">Κλικ σε γραμμή για προφίλ πελάτη.</p>
-        </div>
-      </div>
-
-      <div className="bg-surface-container-lowest rounded-[32px] shadow-level-2 card-inner-border flex flex-col">
-        <div className="flex-1 overflow-x-auto p-2">
-          <table className="min-w-full divide-y divide-surface-container-high">
-            <thead>
-              <tr>
-                <th className="px-6 py-3 bg-surface-container-lowest text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Πελάτης</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-center text-xs font-medium text-on-surface-variant uppercase tracking-wider">Tier</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">AeroMiles</th>
-                <th className="px-6 py-3 bg-surface-container-lowest text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">Ημ/νια Εγγραφής</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-container-high">
-              {loadAllCustomers().map(customer => (
-                <tr key={customer.id} onClick={() => setSelectedCustomer(customer)} className="hover:bg-surface-container-lowest transition-colors cursor-pointer group">
-                  <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface font-bold flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
-                      {customer.name.substring(0, 2).toUpperCase()}
-                    </div>
-                    {customer.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-body-md text-on-surface-variant">
-                    {customer.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      customer.tier === 'Platinum' ? 'bg-slate-800 text-slate-200' :
-                      customer.tier === 'Gold' ? 'bg-amber-100 text-amber-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {customer.tier}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right font-body-md text-amber-600 font-bold flex items-center justify-end gap-2">
-                    {customer.points >= 1500 && (
-                      <span className="material-symbols-outlined text-[16px] text-amber-500 animate-bounce">redeem</span>
-                    )}
-                    {customer.points}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right font-body-md text-on-surface-variant text-sm">
-                    {customer.joinDate}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    );
-  };
-
-  const renderDrivers = () => <DriversHub />;
+  const renderDrivers = () => <DriversHub showPageHeader={false} />;
+  const renderBusSetup = () => <BusSetupTools />;
 
   const renderFleet = () => {
-    const rows = fleetVehicles.length
-      ? fleetVehicles.map((v) => ({
-          id: v.id,
-          name: `${v.make} ${v.model}`,
-          licensePlate: v.plate_number,
-          type: v.model,
-          seats: '-',
-          status:
-            v.service_status === 'Urgent'
-              ? 'Σε Service'
-              : v.service_status === 'Warning'
-                ? 'Προειδοποίηση'
-                : 'Ενεργό',
-          kilometers: v.current_odometer || 0,
-          lastService: v.last_service_date || '-',
-          nextServiceKm: v.next_service_threshold || v.current_odometer,
-          financials: {
-            revenue: 0,
-            expenses:
-              Number(v.fuel_cost_total || 0) +
-              Number(v.insurance_cost_total || 0),
-          },
-          service_status: v.service_status,
-          km_to_service: v.km_to_service,
-        }))
-      : mockFleet;
+    const rows = fleetVehicles.map((v) => ({
+      id: v.id,
+      name: `${v.make} ${v.model}`,
+      licensePlate: v.plate_number,
+      type: v.category || v.model,
+      seats: v.seat_count ?? '-',
+      status:
+        v.service_status === 'Urgent'
+          ? 'Σε Service'
+          : v.service_status === 'Warning'
+            ? 'Προειδοποίηση'
+            : 'Ενεργό',
+      kilometers: v.current_odometer || 0,
+      lastService: v.last_service_date || '-',
+      nextServiceKm: v.next_service_threshold || v.current_odometer,
+      financials: {
+        revenue: 0,
+        expenses:
+          Number(v.fuel_cost_total || 0) +
+          Number(v.insurance_cost_total || 0),
+      },
+      service_status: v.service_status,
+      km_to_service: v.km_to_service,
+    }));
     const totalFleet = rows.length;
     const activeFleet = rows.filter((f) => f.status === 'Ενεργό').length;
     const totalRevenue = rows.reduce((sum, f) => sum + Number(f.financials?.revenue || 0), 0);
@@ -947,8 +1275,28 @@ export default function BackOffice() {
             <p className="font-body-md text-body-md text-on-surface-variant mt-1">
               Παρακολούθηση οχημάτων, κατάσταση συντήρησης και οικονομικά στοιχεία.
             </p>
+            <div className="mt-5">
+              <FleetOpsHubNav
+                activeTab="fleet"
+                onNavigate={(id) => {
+                  if (id === 'fleet') {
+                    setActiveTab('fleet');
+                    return;
+                  }
+                  setFleetOpsSubTab(sanitizeFleetOpsSubTab(id));
+                  setActiveTab('fleet_ops');
+                }}
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setAddVehicleOpen(true)}
+              className="px-6 py-2 bg-gray-900 text-white font-label-md text-label-md rounded-full hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-md"
+            >
+              <span className="material-symbols-outlined text-sm">add</span> Νέο όχημα
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -1053,132 +1401,22 @@ export default function BackOffice() {
           }}
         />
 
-        <p className="text-xs text-on-surface-variant">
-          Κλικ σε γραμμή για πάνελ ανάλυσης · διπλό κλικ για πλήρες προφίλ οχήματος.
-        </p>
-
-        {/* Detailed Table (Hybrid Bottom) */}
-        <div
-          id="fleet-vehicle-table"
-          className="bg-white rounded-[32px] shadow-sm border border-black/[0.05] flex flex-col overflow-hidden"
-        >
-          <div className="flex-1 overflow-x-auto p-2">
-            <table className="min-w-full divide-y divide-gray-100">
-              <thead>
-                <tr>
-                  <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Όχημα</th>
-                  <th className="px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Κατάσταση</th>
-                  <th className="px-6 py-4 bg-white text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Χιλιόμετρα</th>
-                  <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Service</th>
-                  <th className="px-6 py-4 bg-white text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Οικονομικά (Έσοδα/Έξοδα)</th>
-                  <th className="px-4 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-16"> </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {rows.map(bus => {
-                  const kmUntilService = Number(bus.nextServiceKm || 0) - Number(bus.kilometers || 0);
-                  const needsServiceSoon = kmUntilService < 5000 || bus.service_status === 'Warning' || bus.service_status === 'Urgent';
-                  
-                  return (
-                    <tr
-                      key={bus.id}
-                      onClick={() => setSelectedFleetVehicleId(bus.id)}
-                      onDoubleClick={() => navigate(`/admin/fleet/${bus.id}`)}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer group"
-                      title="Κλικ για ανάλυση / διπλό κλικ για προφίλ"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl bg-surface-container-low text-primary flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                            <span className="material-symbols-outlined text-[24px]">directions_bus</span>
-                          </div>
-                          <div>
-                            <div className="font-bold text-gray-900">{bus.name} <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full ml-2">{bus.type} • {bus.seats} Θέσεις</span></div>
-                            <div className="text-sm font-mono text-gray-500 mt-0.5">{bus.licensePlate} • ID: {bus.id}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
-                          bus.status === 'Ενεργό' ? 'bg-green-50 text-green-700 border border-green-200' :
-                          'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                          {bus.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="font-bold text-gray-900">{Number(bus.kilometers || 0).toLocaleString()} km</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-left">
-                        <div className="text-sm text-gray-900">Τελευταίο: {bus.lastService}</div>
-                        <div className={`text-xs mt-1 flex items-center gap-1 ${needsServiceSoon && bus.status === 'Ενεργό' ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                          {needsServiceSoon && bus.status === 'Ενεργό' && <span className="material-symbols-outlined text-[14px]">warning</span>}
-                          Επόμενο σε {kmUntilService.toLocaleString()} km
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="font-bold text-emerald-600 mb-1">+€{bus.financials.revenue.toLocaleString()}</div>
-                        <div className="font-bold text-rose-500 text-xs">-€{bus.financials.expenses.toLocaleString()}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-center">
-                        <button
-                          type="button"
-                          disabled={deletingFleetId === bus.id}
-                          onClick={(e) => handleDeleteFleetVehicle(e, bus.id, bus.name)}
-                          className="p-2 rounded-full text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity disabled:opacity-40"
-                          title="Διαγραφή οχήματος"
-                          aria-label={`Διαγραφή ${bus.name}`}
-                        >
-                          <span className="material-symbols-outlined text-[20px]">delete</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {selectedFleetVehicleId && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl border border-black/[0.05] p-5">
-              <div className="text-xs text-gray-500 font-bold uppercase mb-1">Αναφορά κόστους (6 μήνες)</div>
-              <div className="text-2xl font-bold text-primary mb-3">€{Number(fleetCostReport?.total || 0).toLocaleString('el-GR')}</div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">Συντήρηση</span><span className="font-semibold">€{Number(fleetCostReport?.maintenance_total || 0).toLocaleString('el-GR')}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Καύσιμα</span><span className="font-semibold">€{Number(fleetCostReport?.fuel_total || 0).toLocaleString('el-GR')}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Ασφάλιση</span><span className="font-semibold">€{Number(fleetCostReport?.insurance_total || 0).toLocaleString('el-GR')}</span></div>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-black/[0.05] p-5">
-              <div className="text-xs text-gray-500 font-bold uppercase mb-1">Απόσβεση</div>
-              <div className="text-2xl font-bold text-emerald-600 mb-1">€{Number(fleetDepreciation?.estimated_book_value || 0).toLocaleString('el-GR')}</div>
-              <div className="text-sm text-gray-500">Εκτιμώμενη λογιστική αξία</div>
-              <div className="mt-3 text-sm text-gray-700">
-                Ηλικία: <span className="font-semibold">{fleetDepreciation?.age_years ?? '-'} έτη</span>
-              </div>
-              <div className="text-sm text-gray-700">
-                Συντελεστής χιλιομέτρων: <span className="font-semibold">{fleetDepreciation?.mileage_factor ?? '-'}</span>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-black/[0.05] p-5">
-              <div className="text-xs text-gray-500 font-bold uppercase mb-2">Τελευταία service</div>
-              <div className="space-y-2 max-h-40 overflow-auto">
-                {fleetVehicleEvents.slice(0, 4).map((e) => (
-                  <div key={e.id} className="rounded-xl bg-slate-50 p-2.5">
-                    <div className="text-sm font-semibold text-gray-900">{e.service_type} · €{Number(e.cost || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">{e.event_date} · {e.shop_or_mechanic || '—'}</div>
-                  </div>
-                ))}
-                {fleetVehicleEvents.length === 0 && (
-                  <p className="text-sm text-gray-500">Δεν υπάρχουν καταγεγραμμένα service events.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <FleetVehiclesBoard
+          vehicles={fleetVehicles}
+          selectedId={selectedFleetVehicleId}
+          onSelect={setSelectedFleetVehicleId}
+          onDelete={handleDeleteFleetVehicle}
+          deletingId={deletingFleetId}
+          costReport={fleetCostReport}
+          depreciation={fleetDepreciation}
+          events={fleetVehicleEvents}
+          onVehicleUpdated={(updated) => {
+            if (!updated?.id) return;
+            setFleetVehicles((prev) =>
+              prev.map((v) => (v.id === updated.id ? { ...v, ...updated } : v)),
+            );
+          }}
+        />
 
         {serviceModalOpen && (
           <div className="fixed inset-0 z-[210] bg-black/40 flex items-center justify-center p-4">
@@ -1261,6 +1499,24 @@ export default function BackOffice() {
             </form>
           </div>
         )}
+
+        <AddFleetVehicleModal
+          open={addVehicleOpen}
+          onClose={() => setAddVehicleOpen(false)}
+          onCreated={async (vehicle) => {
+            if (vehicle?.id) {
+              setFleetVehicles((prev) =>
+                prev.some((v) => v.id === vehicle.id) ? prev : [vehicle, ...prev],
+              );
+              setSelectedFleetVehicleId(vehicle.id);
+            }
+            try {
+              await reloadFleetData(vehicle?.id);
+            } catch {
+              /* optimistic row already shown */
+            }
+          }}
+        />
       </div>
     );
   };
@@ -1430,21 +1686,102 @@ export default function BackOffice() {
       );
     }
 
-    // Group bookings by tripTitle using the state bookings
-    const groupedBookings = bookings.reduce((acc, booking) => {
-      const key = `${booking.tripTitle} - ${booking.date}`;
-      if (!acc[key]) acc[key] = { tripTitle: booking.tripTitle, date: booking.date, bookings: [] };
-      acc[key].bookings.push(booking);
-      return acc;
-    }, {});
+    // All office trips appear (even with 0 bookings / drafts). Orphan booking titles stay listed too.
+    const officeTrips = Array.isArray(trips) ? trips : [];
+    const groupsByKey = {};
+
+    const ensureGroup = (key, tripTitle, trip = null) => {
+      if (!groupsByKey[key]) {
+        groupsByKey[key] = {
+          key,
+          tripTitle,
+          tripId: trip?.id ?? null,
+          draft: trip?.status === 'draft',
+          bookings: [],
+          dates: new Set(),
+        };
+      } else if (trip?.id && !groupsByKey[key].tripId) {
+        groupsByKey[key].tripId = trip.id;
+        groupsByKey[key].draft = trip.status === 'draft';
+      }
+      return groupsByKey[key];
+    };
+
+    for (const trip of officeTrips) {
+      const title = String(trip.title || 'Εκδρομή').trim() || 'Εκδρομή';
+      ensureGroup(`trip:${trip.id}`, title, trip);
+    }
+
+    for (const booking of bookings) {
+      const trip =
+        (booking.tripId && officeTrips.find((t) => String(t.id) === String(booking.tripId))) ||
+        officeTrips.find(
+          (t) =>
+            String(t.title || '').trim() === String(booking.tripTitle || '').trim() &&
+            String(booking.tripTitle || '').trim(),
+        ) ||
+        null;
+      const tripTitle = trip
+        ? String(trip.title || 'Εκδρομή').trim() || 'Εκδρομή'
+        : String(booking.tripTitle || 'Εκδρομή').trim() || 'Εκδρομή';
+      const key = trip ? `trip:${trip.id}` : `title:${tripTitle}`;
+      const group = ensureGroup(key, tripTitle, trip);
+      group.bookings.push(booking);
+      if (booking.date) group.dates.add(String(booking.date));
+      else if (trip?.departureTime) {
+        const d = String(trip.departureTime).slice(0, 10);
+        if (d) group.dates.add(d);
+      }
+    }
+
+    // Departure date hint for empty trips (no bookings yet).
+    for (const group of Object.values(groupsByKey)) {
+      if (group.dates.size === 0 && group.tripId) {
+        const trip = officeTrips.find((t) => t.id === group.tripId);
+        const d = trip?.departureTime ? String(trip.departureTime).slice(0, 10) : '';
+        if (d) group.dates.add(d);
+      }
+    }
+
+    const sortedGroups = Object.values(groupsByKey)
+      .map((group) => {
+        const dates = [...group.dates].sort();
+        const sortedBookings = [...group.bookings].sort((a, b) => {
+          const da = String(a.date || '');
+          const db = String(b.date || '');
+          if (da !== db) return da.localeCompare(db);
+          return String(a.customerName || a.email || '').localeCompare(
+            String(b.customerName || b.email || ''),
+            'el',
+          );
+        });
+        return { ...group, dates, bookings: sortedBookings };
+      })
+      .sort((a, b) => {
+        // Trips with bookings first, then by title.
+        if (a.bookings.length !== b.bookings.length) {
+          return b.bookings.length - a.bookings.length;
+        }
+        return a.tripTitle.localeCompare(b.tripTitle, 'el');
+      });
+
+    const q = String(bookingTripQuery || '').trim().toLowerCase();
+    const visibleGroups = q
+      ? sortedGroups.filter(
+          (g) =>
+            g.tripTitle.toLowerCase().includes(q) ||
+            String(g.tripId || '').includes(q) ||
+            g.dates.some((d) => d.includes(q)),
+        )
+      : sortedGroups;
 
     return (
       <div className="space-y-stack-lg pb-stack-lg relative animate-in fade-in zoom-in-95 duration-300">
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-6">
           <div>
             <h2 className="font-headline-lg text-headline-lg font-bold tracking-tight text-on-surface mb-2">Διαχείριση Κρατήσεων ανά Ταξίδι</h2>
             <p className="font-body-md text-on-surface-variant max-w-2xl text-lg">
-              Επιλέξτε μια εκδρομή για manifest & κρατήσεις.
+              Όλες οι εκδρομές του γραφείου — με ή χωρίς κρατήσεις. Manifest & θέσεις ανά ταξίδι.
               {bookingsLoading && ' Συγχρονισμός SaaS…'}
             </p>
           </div>
@@ -1452,23 +1789,56 @@ export default function BackOffice() {
             type="button"
             onClick={() => {
               setBookingsLoading(true);
+              setTrips(loadTrips());
               loadMergedBookings()
                 .then(setBookings)
                 .finally(() => setBookingsLoading(false));
             }}
-            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-bold hover:bg-gray-50 flex items-center gap-2"
+            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-bold hover:bg-gray-50 flex items-center gap-2 shrink-0"
           >
             <span className="material-symbols-outlined text-[18px]">sync</span>
             Ανανέωση
           </button>
         </div>
 
+        <div className="relative mb-4">
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
+            search
+          </span>
+          <input
+            type="search"
+            value={bookingTripQuery}
+            onChange={(e) => setBookingTripQuery(e.target.value)}
+            placeholder="Αναζήτηση εκδρομής (π.χ. Σωτηρα)…"
+            className="w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40"
+          />
+        </div>
+
+        {!visibleGroups.length ? (
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
+            <span className="material-symbols-outlined text-4xl text-slate-300">directions_bus</span>
+            <p className="mt-3 text-sm font-bold text-slate-800">
+              {q ? 'Καμία εκδρομή με αυτό το φίλτρο' : 'Δεν υπάρχουν εκδρομές'}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {q
+                ? 'Καθαρίστε την αναζήτηση ή ελέγξτε τον τίτλο στην καρτέλα Εκδρομές.'
+                : 'Δημιουργήστε μια εκδρομή από Εκδρομές για να εμφανιστεί εδώ.'}
+            </p>
+          </div>
+        ) : null}
+
         <div className="space-y-6">
-          {Object.entries(groupedBookings).map(([key, group]) => {
+          {visibleGroups.map((group) => {
+            const key = group.key;
             const isExpanded = expandedTripBookings === key;
-            const confirmedCount = group.bookings.filter(b => b.status === 'Επιβεβαιωμένη' || b.status === 'Ολοκληρώθηκε').length;
-            const pendingCount = group.bookings.length - confirmedCount;
             const totalRevenue = group.bookings.reduce((sum, b) => sum + (b.price || 0), 0);
+            const dateLabel =
+              group.dates.length === 0
+                ? 'Χωρίς ημερομηνία'
+                : group.dates.length === 1
+                  ? `Αναχώρηση: ${group.dates[0]}`
+                  : `${group.dates.length} αναχωρήσεις · ${group.dates[0]} → ${group.dates[group.dates.length - 1]}`;
 
             return (
               <div key={key} className="bg-white rounded-3xl shadow-sm border border-black/[0.05] overflow-hidden transition-all">
@@ -1477,16 +1847,23 @@ export default function BackOffice() {
                   className={`p-6 cursor-pointer hover:bg-gray-50 flex items-center justify-between transition-colors ${isExpanded ? 'border-b border-gray-100 bg-gray-50/50' : ''}`}
                   onClick={() => setExpandedTripBookings(isExpanded ? null : key)}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-[24px]">directions_bus</span>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-lg">{group.tripTitle}</h3>
-                      <p className="text-sm text-gray-500 font-medium">Αναχώρηση: {group.date}</p>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-gray-900 text-lg truncate flex items-center gap-2">
+                        {group.tripTitle}
+                        {group.draft ? (
+                          <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                            Πρόχειρο
+                          </span>
+                        ) : null}
+                      </h3>
+                      <p className="text-sm text-gray-500 font-medium">{dateLabel}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-8">
+                  <div className="flex items-center gap-8 shrink-0">
                     <div className="hidden md:flex gap-6 text-sm">
                       <div className="text-center">
                         <span className="block text-gray-500 font-bold uppercase tracking-wider text-[10px] mb-1">Κρατήσεις</span>
@@ -1507,17 +1884,34 @@ export default function BackOffice() {
                 {isExpanded && (
                   <div className="animate-in fade-in slide-in-from-top-4 duration-300">
                     <div className="bg-white">
-                      <div className="px-6 py-4 bg-gray-50/50 flex justify-between items-center border-b border-gray-100">
+                      <div className="px-6 py-4 bg-gray-50/50 flex justify-between items-center border-b border-gray-100 gap-3 flex-wrap">
                         <span className="text-sm font-bold text-gray-600">Λίστα Επιβατών (Manifest)</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">
+                            Σύρετε οριζόντια για MARK · Μετρητά · Check-in
+                          </span>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             try {
+                              const trip =
+                                (group.tripId && getTripById(group.tripId)) ||
+                                trips.find((t) => t.title === group.tripTitle) ||
+                                getTripById(group.bookings[0]?.tripId);
                               exportTripManifestPdf({
                                 tripTitle: group.tripTitle,
-                                date: group.date,
-                                bookings: group.bookings,
+                                date:
+                                  group.dates.length === 1
+                                    ? group.dates[0]
+                                    : group.dates.join(', '),
+                                bookings: group.bookings.map((b) => ({
+                                  ...b,
+                                  flightSeat: b.flightSeat || b.flight_seat,
+                                  currency: trip?.currency || b.currency || 'EUR',
+                                })),
+                                flights: trip?.flights || [],
+                                currency: trip?.currency || 'EUR',
                               });
                               toast.success('Άνοιγμα εκτύπωσης manifest…');
                             } catch (err) {
@@ -1529,24 +1923,39 @@ export default function BackOffice() {
                           <span className="material-symbols-outlined text-[18px]">download</span>
                           Εξαγωγή PDF
                         </button>
+                        </div>
                       </div>
-                      <table className="min-w-full divide-y divide-gray-100">
+                      {!group.bookings.length ? (
+                        <div className="px-6 py-10 text-center">
+                          <p className="text-sm font-bold text-slate-700">Δεν υπάρχουν κρατήσεις ακόμη</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Η εκδρομή είναι διαθέσιμη για επιλογή — οι θέσεις θα εμφανιστούν μόλις γίνουν κρατήσεις.
+                          </p>
+                        </div>
+                      ) : (
+                      <div className="overflow-x-auto overscroll-x-contain">
+                        <table className="min-w-[64rem] w-full divide-y divide-gray-100">
                         <thead>
                           <tr>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Όνομα Πελάτη</th>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Θέση</th>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Boarding Pass</th>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Τιμή</th>
-                            <th className="px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">MARK / Πάροχος</th>
-                            <th className="px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Ενέργειες</th>
-                            <th className="px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Check-in</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                              Αναχώρηση
+                            </th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[12rem]">
+                              Όνομα Πελάτη
+                            </th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Θέση</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Boarding Pass</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Τιμή</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">MARK / Πάροχος</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Ενέργειες</th>
+                            <th className="px-4 sm:px-6 py-4 bg-white text-center text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Check-in</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {group.bookings.map(booking => {
                             const customerData =
-                              getCustomerByEmail(booking.email) ||
-                              loadAllCustomers().find((c) => c.id === booking.customerId);
+                              getCustomerByEmail(booking.email, CUSTOMER_SERVICE_BUSES) ||
+                              loadCustomersByService(CUSTOMER_SERVICE_BUSES).find((c) => c.id === booking.customerId);
                             const balanceDue =
                               Number(booking.balanceDue) ||
                               Math.max(0, Number(booking.price || 0) - Number(booking.amountPaid || 0));
@@ -1557,7 +1966,10 @@ export default function BackOffice() {
                                 className={`hover:bg-gray-50 transition-colors cursor-pointer group ${booking.checkedIn ? 'bg-green-50/30' : ''}`}
                                 onDoubleClick={() => setSelectedBooking(booking)}
                               >
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                  <div className="font-bold text-gray-900 text-sm">{booking.date || '—'}</div>
+                                </td>
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   <div className="font-bold text-gray-900 text-base flex items-center gap-2">
                                     <button
                                       type="button"
@@ -1591,10 +2003,10 @@ export default function BackOffice() {
                                     Προβολή εισιτηρίου
                                   </button>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   <div className="font-bold text-primary">{booking.seat}</div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   {booking.boardingPassIssued ? (
                                     <span className="inline-flex items-center gap-1 text-xs font-bold text-gray-600">
                                       <span className="material-symbols-outlined text-[16px] text-green-500">qr_code</span> Εκδόθηκε
@@ -1603,7 +2015,7 @@ export default function BackOffice() {
                                     <span className="text-xs text-gray-400 font-medium">Όχι Ακόμα</span>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   <div className="font-bold text-gray-900">€{Number(booking.price || 0).toFixed(2)}</div>
                                   {balanceDue > 0 && (
                                     <div className="text-xs font-bold text-amber-700 mt-1">
@@ -1611,10 +2023,10 @@ export default function BackOffice() {
                                     </div>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   <FiscalMarkCell booking={booking} />
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
                                   {showCash ? (
                                     <button
                                       type="button"
@@ -1632,7 +2044,7 @@ export default function BackOffice() {
                                     <span className="text-xs text-gray-400 font-medium">—</span>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
                                   {booking.checkedIn ? (
                                     <button 
                                       onClick={(e) => handleCheckIn(e, booking.id)}
@@ -1653,7 +2065,9 @@ export default function BackOffice() {
                             );
                           })}
                         </tbody>
-                      </table>
+                        </table>
+                      </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1667,52 +2081,128 @@ export default function BackOffice() {
 
   return (
     <FleetTelemetryProvider>
+      {showOfficeSetup && (
+        <OfficeSetupWizard
+          rentEnabled={rentMenuVisible}
+          forceOpen={Boolean(location.state?.officeSetup)}
+          onFinished={() => setShowOfficeSetup(false)}
+          onDismiss={() => setShowOfficeSetup(false)}
+        />
+      )}
     <div className="bg-surface text-on-surface h-screen flex overflow-hidden relative">
-      <aside className="w-64 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0 relative z-20">
-        <div className="p-6">
-          <h1 className="font-headline-md text-headline-md font-bold text-on-surface tracking-tight cursor-pointer" onClick={() => navigate('/')}>
-            PoreiaGo
-          </h1>
+      <aside className="w-[17.5rem] xl:w-80 bg-surface-container-lowest border-r border-black/[0.05] hidden md:flex flex-col flex-shrink-0 relative z-20">
+        <div className="shrink-0 px-5 pt-7 pb-6 mb-1 border-b border-black/[0.05]">
+          <button
+            type="button"
+            className="group block text-left w-full rounded-xl hover:bg-slate-50/80 p-2.5 -m-1 transition-colors"
+            onClick={() => setLogoModalOpen(true)}
+            aria-label="Αλλαγή λογοτύπου εταιρείας"
+            title="Αλλαγή λογοτύπου"
+          >
+            <span className="flex items-center gap-3 min-h-[3.5rem]">
+              <OfficeBrandMark
+                className="min-h-14"
+                variant="light"
+                asLink={false}
+                fallbackLabel="Γραφείο"
+                refreshKey={brandRefreshKey}
+                preferAdmin
+                minHeightPx={56}
+              />
+              <span className="material-symbols-outlined text-[20px] text-slate-300 group-hover:text-primary transition-colors shrink-0">
+                edit
+              </span>
+            </span>
+          </button>
         </div>
         <SortableSidebarNav
           activeTab={activeTab}
           settingsSubTab={settingsSubTab}
-          onTabChange={setActiveTab}
+          fleetOpsSubTab={fleetOpsSubTab}
+          fleetRentalTab={fleetRentalTab}
+          onTabChange={handleAdminTabChange}
           onSettingsSubTabChange={setSettingsSubTab}
+          onFleetOpsSubTabChange={setFleetOpsSubTab}
+          onFleetRentalTabChange={setFleetRentalTab}
           onEmailClick={goToEmailMailbox}
           onNavigate={(path) => navigate(path)}
+          officeMode={officeMode}
+          rentEnabled={rentMenuVisible}
         />
       </aside>
 
+      <AdminMobileNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        activeTab={activeTab}
+        settingsSubTab={settingsSubTab}
+        fleetOpsSubTab={fleetOpsSubTab}
+        fleetRentalTab={fleetRentalTab}
+        onTabChange={handleAdminTabChange}
+        onSettingsSubTabChange={setSettingsSubTab}
+        onFleetOpsSubTabChange={setFleetOpsSubTab}
+        onFleetRentalTabChange={setFleetRentalTab}
+        onEmailClick={goToEmailMailbox}
+        onNavigate={(path) => navigate(path)}
+        officeMode={officeMode}
+        rentEnabled={rentMenuVisible}
+        brandRefreshKey={brandRefreshKey}
+        onEditLogo={() => {
+          setMobileNavOpen(false);
+          setLogoModalOpen(true);
+        }}
+      />
+
+      <AddCustomerModal
+        open={addCustomerOpen}
+        serviceScope={customerServiceScope}
+        onClose={() => setAddCustomerOpen(false)}
+        onCreated={(row) => {
+          refreshCustomersForScope(customerServiceScope);
+          setSelectedCustomer(row);
+        }}
+      />
+
       <main className="flex-1 flex flex-col relative h-full overflow-hidden">
-        <header className="h-20 glass-overlay border-b border-black/[0.05] flex items-center justify-between px-margin-desktop shrink-0 z-10 sticky top-0">
-          <div className="flex items-center gap-4 w-96">
-            <TemplateSearch onUseTemplate={useEmailTemplate} />
-          </div>
-          <div className="flex items-center gap-6">
+        <header className="h-20 glass-overlay border-b border-black/[0.05] flex items-center justify-between px-4 sm:px-margin-desktop shrink-0 z-10 sticky top-0 gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <button
               type="button"
-              onClick={() => {
-                ensureDriverSession();
-                setIsScannerOpen(true);
-              }}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold hover:bg-gray-800"
+              className="md:hidden w-11 h-11 rounded-full bg-white border border-black/[0.08] shadow-sm flex items-center justify-center shrink-0"
+              aria-label="Άνοιγμα μενού"
+              onClick={() => setMobileNavOpen(true)}
             >
-              <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
-              Scan QR
+              <span className="material-symbols-outlined">menu</span>
             </button>
-            <button className="relative p-2 text-on-surface-variant hover:text-primary transition-colors">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
-            </button>
-            <div className="flex items-center gap-3 pl-4 border-l border-black/[0.05]">
-              <div className="hidden sm:block">
-                <p className="font-label-md text-label-md text-on-surface cursor-pointer hover:text-primary" onClick={() => {
-                  localStorage.removeItem('userRole');
-                  clearSaasSession();
-                  navigate('/admin/login');
-                }}>Admin User (Logout)</p>
-              </div>
+            <div className="flex items-center gap-4 w-full max-w-sm min-w-0">
+              <TemplateSearch onUseTemplate={useEmailTemplate} />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+            <AdminNotificationBell
+              onNavigate={(tab, extra = {}) => {
+                if (extra.driverId) setChatFocusDriverId(extra.driverId);
+                if (!tab) return;
+                if (isFleetOpsSubTab(tab)) {
+                  setFleetOpsSubTab(sanitizeFleetOpsSubTab(tab));
+                  setActiveTab('fleet_ops');
+                  return;
+                }
+                setActiveTab(tab);
+              }}
+            />
+            <div className="pl-2 sm:pl-3 border-l border-black/[0.06]">
+              <AdminAccountMenu
+                onOpenSettings={() => {
+                  setActiveTab('settings');
+                  setSettingsSubTab(
+                    sanitizeSettingsSubTab(
+                      settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB,
+                      isSaasSuperAdmin(),
+                    ),
+                  );
+                }}
+              />
             </div>
           </div>
         </header>
@@ -1723,163 +2213,145 @@ export default function BackOffice() {
               ? 'flex-1 overflow-auto p-3 md:p-4'
               : activeTab === 'dashboard'
                 ? 'flex-1 overflow-auto p-4 md:p-5 lg:p-6'
+                : activeTab === 'fleet_live_map'
+                  ? 'flex-1 overflow-auto p-2 sm:p-3 md:p-4'
+                : isBusesHubTab(activeTab) || activeTab === 'fleet_rental' || activeTab === 'settings'
+                  ? 'flex-1 overflow-auto p-3 sm:p-4 md:pl-2 md:pr-5 md:py-5'
                 : 'flex-1 overflow-auto p-margin-mobile md:p-margin-desktop'
           }
         >
           <div
             className={
-              activeTab === 'email' || activeTab === 'email_templates' || activeTab === 'dashboard'
+              activeTab === 'email' ||
+              activeTab === 'email_templates' ||
+              activeTab === 'dashboard' ||
+              activeTab === 'fleet_live_map' ||
+              isBusesHubTab(activeTab) ||
+              activeTab === 'fleet_rental' ||
+              activeTab === 'settings'
                 ? 'w-full min-w-0'
                 : 'max-w-container-max mx-auto'
             }
           >
-            {activeTab === 'dashboard' && renderDashboard()}
-            {activeTab === 'routes' && renderRoutes()}
-            {activeTab === 'customers' && renderCustomers()}
-            {activeTab === 'fleet' && renderFleet()}
-            {activeTab === 'drivers' && renderDrivers()}
+            {activeTab === 'dashboard' && (
+              <AdminMenuFade panelKey="dashboard">{renderDashboard()}</AdminMenuFade>
+            )}
+            {activeTab === 'customers' && (rentOnly || customerServiceScope === CUSTOMER_SERVICE_RENT) && (
+              <AdminMenuFade panelKey="customers-rent">{renderCustomers()}</AdminMenuFade>
+            )}
+            {LOYALTY_UI_ENABLED && activeTab === 'loyalty' && (
+              <AdminMenuFade panelKey="loyalty">
+                <LoyaltyRewardsPanel />
+              </AdminMenuFade>
+            )}
             {activeTab === 'settings' && (
-              <div className="pb-stack-lg max-w-7xl">
+              <AdminMenuFade panelKey="settings" className="pb-stack-lg w-full">
                 <ImpersonationBanner />
                 <SettingsHub
                   initialTab={settingsSubTab}
                   onSubTabChange={setSettingsSubTab}
+                  officeMode={officeMode}
                   contractPrefs={{
                     plan: location.state?.plan,
                     interval: location.state?.interval,
+                    focusRentModule: Boolean(location.state?.focusRentModule),
                   }}
                 />
-              </div>
-            )}
-            {activeTab === 'live_tracking' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300 space-y-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSettingsSubTab(
-                      isSaasSuperAdmin() ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB,
-                    );
-                    setActiveTab('settings');
-                  }}
-                  className="w-full flex items-center justify-between gap-4 p-4 rounded-2xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
-                >
-                  <span className="flex items-center gap-2 font-bold text-primary">
-                    <span className="material-symbols-outlined">settings</span>
-                    Control Panel — πλατφόρμα, πληρωμές, οδηγοί
-                  </span>
-                  <span className="material-symbols-outlined text-primary">arrow_forward</span>
-                </button>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  <TelemetryAlertsPanel />
-                  <div className="bg-white rounded-[28px] border border-black/[0.05] p-6 shadow-sm">
-                    <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary">info</span>
-                      Γρήγορη δοκιμή
-                    </h3>
-                    <p className="text-sm text-gray-500 mb-4">
-                      Στείλτε GPS εκτός διαδρόμου ή{' '}
-                      <code className="text-xs bg-gray-100 px-1 rounded">tracker_event_id: 101</code> για live
-                      ειδοποίηση εδώ και στο wallet ETA.
-                    </p>
-                    <pre className="text-[11px] bg-gray-900 text-gray-100 p-4 rounded-xl overflow-x-auto">
-{`curl -X POST http://localhost:8000/telemetry/update \\
-  -H "X-Device-Key: dev-gps-key" \\
-  -H "Content-Type: application/json" \\
-  -d '{"tenant_id":"00000000-0000-0000-0000-000000000001",
-       "vehicle_code":"XAH-4021","trip_id":1,
-       "latitude":38.5,"longitude":23.5,
-       "speed_kmh":60,"engine_status":"on"}'`}
-                    </pre>
-                  </div>
-                </div>
-                <LiveFleetMap pollMs={5000} />
-              </div>
+              </AdminMenuFade>
             )}
             {activeTab === 'fleet_live_map' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300 space-y-6">
+              <AdminMenuFade panelKey="fleet-live-map" className="-mt-1">
                 <FleetLiveMapWebSocket />
-              </div>
+              </AdminMenuFade>
             )}
-            {activeTab === 'fleet_kpis' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300">
-                <FleetKpisDashboard />
-              </div>
+            {isBusesHubTab(activeTab) && (
+              <AdminMenuFade panelKey="buses-hub" className="pb-stack-lg w-full">
+                <BusesHub
+                  activeTab={sanitizeBusesHubTab(activeTab)}
+                  onNavigate={(id) => {
+                    const next = sanitizeBusesHubTab(id || DEFAULT_BUSES_HUB_TAB);
+                    if (next === 'fleet_ops') {
+                      setFleetOpsSubTab(
+                        sanitizeFleetOpsSubTab(fleetOpsSubTab || DEFAULT_FLEET_OPS_TAB),
+                      );
+                      setActiveTab('fleet_ops');
+                      return;
+                    }
+                    // Always land on CRM list home (not a stuck customer detail).
+                    if (next === 'customers') {
+                      handleAdminTabChange('customers');
+                      return;
+                    }
+                    // Always land on bookings list home (not a stuck ticket detail).
+                    if (next === 'bookings') {
+                      goToBookingsHome();
+                      return;
+                    }
+                    setActiveTab(next);
+                  }}
+                >
+                  {activeTab === 'customers' &&
+                    customerServiceScope === CUSTOMER_SERVICE_BUSES &&
+                    !rentOnly &&
+                    renderCustomers()}
+                  {activeTab === 'routes' && renderRoutes()}
+                  {activeTab === 'fleet' && renderFleet()}
+                  {(activeTab === 'fleet_ops' || isFleetOpsSubTab(activeTab)) && (
+                    <FleetOpsHub
+                      embedded
+                      initialTab={fleetOpsSubTab}
+                      onSubTabChange={setFleetOpsSubTab}
+                      chatFocusDriverId={chatFocusDriverId}
+                      onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+                      onOpenFleet={() => setActiveTab('fleet')}
+                      onOpenPayments={() => {
+                        setSettingsSubTab('payments');
+                        setActiveTab('settings');
+                      }}
+                    />
+                  )}
+                  {activeTab === 'drivers' && renderDrivers()}
+                  {activeTab === 'bus_setup' && renderBusSetup()}
+                  {activeTab === 'lost_found' && renderLostFound()}
+                  {activeTab === 'bookings' && renderBookings()}
+                </BusesHub>
+              </AdminMenuFade>
             )}
-            {activeTab === 'fleet_active_drivers' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300">
-                <ActiveDriversList />
-              </div>
+            {activeTab === 'fleet_rental' && (
+              <AdminMenuFade panelKey="rent-desk" className="pb-stack-lg w-full">
+                <RentDeskHub
+                  activeTab={fleetRentalTab}
+                  onTabChange={setFleetRentalTab}
+                  initialTab={fleetRentalTab}
+                  onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+                  onOpenCustomer={(person) => {
+                    setCustomerServiceScope(CUSTOMER_SERVICE_RENT);
+                    setCustomers(loadCustomersByService(CUSTOMER_SERVICE_RENT));
+                    setSelectedCustomer({ ...person, serviceScope: CUSTOMER_SERVICE_RENT });
+                    setActiveTab('customers');
+                  }}
+                />
+              </AdminMenuFade>
             )}
-            {activeTab === 'fleet_route_playback' && (
-              <div className="pb-stack-lg animate-in fade-in duration-300">
-                <FleetRouteHistory />
-              </div>
-            )}
-            {activeTab === 'lost_found' && renderLostFound()}
             {activeTab === 'email' && (
-              <EmailHub
-                intent={emailIntent}
-                onIntentHandled={() => setEmailIntent(null)}
-              />
+              <AdminMenuFade panelKey="email">
+                <EmailHub
+                  intent={emailIntent}
+                  onIntentHandled={() => setEmailIntent(null)}
+                />
+              </AdminMenuFade>
             )}
             {activeTab === 'email_templates' && (
-              <EmailTemplatesPage onUseTemplate={useEmailTemplate} />
+              <AdminMenuFade panelKey="email-templates">
+                <EmailTemplatesPage
+                  onUseTemplate={useEmailTemplate}
+                  rentEnabled={rentMenuVisible}
+                />
+              </AdminMenuFade>
             )}
-            {activeTab === 'bookings' && renderBookings()}
           </div>
         </div>
       </main>
-
-      {/* Mobile Scanner Modal */}
-      {isScannerOpen && (
-        <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center">
-          <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent z-10">
-            <h3 className="text-white font-bold text-xl flex items-center gap-2">
-              <span className="material-symbols-outlined">qr_code_scanner</span> Scanner Λεωφορείου
-            </h3>
-            <button 
-              onClick={() => setIsScannerOpen(false)}
-              className="w-12 h-12 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
-          </div>
-          
-          <div className="w-full max-w-md min-h-[360px] relative overflow-hidden rounded-[32px] border-4 border-white/20 shadow-2xl bg-black">
-            <BusQrScanner
-              onScan={async (raw) => {
-                const response = await adminScanTicket({ qr: raw, tripId: 1 });
-                setScanFlash(response.result);
-                if (response.result === SCAN_RESULT.SUCCESS) {
-                  setBookings(loadBookings());
-                  toast.success(
-                    `✅ ${response.passengerName} — Θέση ${response.seat}`,
-                    { duration: 4000 },
-                  );
-                  setIsScannerOpen(false);
-                } else {
-                  toast.error(response.message || 'Άκυρο εισιτήριο');
-                }
-              }}
-            />
-            {scanFlash && (
-              <div
-                className={`absolute inset-0 pointer-events-none flex items-center justify-center text-4xl font-bold ${
-                  scanFlash === SCAN_RESULT.SUCCESS ? 'bg-green-500/30' : 'bg-red-500/30'
-                }`}
-              >
-                {scanFlash === SCAN_RESULT.SUCCESS ? '✓' : '✗'}
-              </div>
-            )}
-            
-            <div className="absolute inset-0 pointer-events-none border-2 border-primary/50 m-12 rounded-3xl"></div>
-          </div>
-          
-          <div className="absolute bottom-10 left-0 right-0 text-center px-6">
-            <p className="text-white/80 font-medium">Κεντράρετε το QR Code του πελάτη μέσα στο πλαίσιο.</p>
-          </div>
-        </div>
-      )}
 
       <RecordCashPaymentModal
         booking={cashPaymentBooking}
@@ -1888,6 +2360,12 @@ export default function BackOffice() {
         onClose={() => setCashPaymentBooking(null)}
         onConfirm={handleQuickCashPayment}
         confirming={cashPaymentSaving}
+      />
+
+      <OfficeLogoChangeModal
+        open={logoModalOpen}
+        onClose={() => setLogoModalOpen(false)}
+        onSaved={() => setBrandRefreshKey((k) => k + 1)}
       />
 
       {/* React Hot Toast */}

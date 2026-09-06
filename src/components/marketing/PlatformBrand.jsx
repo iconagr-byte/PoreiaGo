@@ -28,7 +28,7 @@ export default function PlatformBrand({ className = '', variant = 'dark', asLink
             isDark ? 'text-white/50' : 'text-slate-500'
           }`}
         >
-          Travel Agency SaaS
+          SaaS για ταξιδιωτικά γραφεία
         </span>
       </span>
     </span>

@@ -1,0 +1,1107 @@
+/* Apple-inspired chrome for admin Ενοικιάσεις */
+
+.rental-apple-shell {
+  --rapple-ink: #1d1d1f;
+  --rapple-secondary: #6e6e73;
+  --rapple-fill: #f5f5f7;
+  --rapple-card: rgba(255, 255, 255, 0.78);
+  --rapple-stroke: rgba(0, 0, 0, 0.08);
+  --rapple-accent: #0a7a6c;
+  --rapple-accent-soft: rgba(10, 122, 108, 0.12);
+  --rapple-blue: #0071e3;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI',
+    system-ui, sans-serif;
+  color: var(--rapple-ink);
+  margin: -0.15rem -0.1rem 0;
+  padding: 0.55rem 0.35rem 1rem;
+  border-radius: 24px;
+  background:
+    radial-gradient(1100px 420px at 8% -12%, rgba(10, 122, 108, 0.1), transparent 55%),
+    radial-gradient(900px 380px at 92% 0%, rgba(0, 113, 227, 0.07), transparent 52%),
+    linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+}
+
+.rental-apple-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  border: 1px solid var(--rapple-stroke);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(245, 245, 247, 0.88) 100%);
+  backdrop-filter: blur(22px) saturate(1.45);
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 18px 44px rgba(15, 23, 42, 0.07);
+  padding: 1.15rem 1.25rem 1.2rem;
+}
+
+.rental-apple-hero::before {
+  content: '';
+  position: absolute;
+  right: -3rem;
+  top: -4rem;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 999px;
+  background: rgba(10, 122, 108, 0.12);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.rental-apple-hero::after {
+  content: '';
+  position: absolute;
+  left: 28%;
+  bottom: -5rem;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 999px;
+  background: rgba(0, 113, 227, 0.08);
+  filter: blur(36px);
+  pointer-events: none;
+}
+
+.rental-apple-hero-inner {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rental-apple-icon {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 1.05rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(160deg, #1aa392 0%, #0b3d4a 100%);
+  box-shadow: 0 10px 24px rgba(11, 61, 74, 0.28);
+  flex-shrink: 0;
+}
+
+.rental-apple-icon .material-symbols-outlined {
+  font-size: 1.65rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rental-apple-title {
+  margin: 0;
+  font-size: clamp(1.55rem, 2.6vw, 1.95rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--rapple-ink);
+}
+
+.rental-apple-subtitle {
+  margin: 0.35rem 0 0;
+  max-width: 36rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--rapple-secondary);
+  letter-spacing: -0.01em;
+}
+
+.rental-apple-refresh {
+  appearance: none;
+  border: 1px solid var(--rapple-stroke);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  color: var(--rapple-ink);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.rental-apple-refresh:hover {
+  background: #fff;
+}
+
+.rental-apple-refresh:active {
+  transform: scale(0.98);
+}
+
+.rental-apple-refresh .material-symbols-outlined {
+  font-size: 1.1rem;
+}
+
+/* Vertical left nav + content (desktop); horizontal scroll on small screens */
+.rental-apple-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.rental-apple-body.is-sidebar-driven {
+  display: block;
+}
+
+.rental-apple-nav-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.rental-apple-nav {
+  display: flex;
+  flex-direction: row;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.4rem;
+  border-radius: 22px;
+  border: 1px solid var(--rapple-stroke);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 10px 28px rgba(15, 23, 42, 0.05);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.rental-apple-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.rental-apple-nav-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--rapple-secondary);
+  border-radius: 16px;
+  padding: 0.55rem 0.85rem;
+  min-height: 2.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.rental-apple-nav-btn .material-symbols-outlined {
+  font-size: 1.2rem;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.rental-apple-nav-label {
+  min-width: 0;
+}
+
+.rental-apple-nav-btn:hover {
+  color: var(--rapple-ink);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.rental-apple-nav-btn.is-active {
+  color: #fff;
+  background: linear-gradient(180deg, #1b8f80 0%, #0b3d4a 100%);
+  box-shadow:
+    0 8px 18px rgba(11, 61, 74, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.rental-apple-nav-btn.is-active .material-symbols-outlined {
+  opacity: 1;
+  font-variation-settings: 'FILL' 1;
+}
+
+.rental-apple-nav-btn:active {
+  transform: scale(0.985);
+}
+
+.rental-apple-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+@media (min-width: 900px) {
+  .rental-apple-body {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .rental-apple-nav-wrap {
+    width: 12.75rem;
+    position: sticky;
+    top: 5.5rem;
+    align-self: flex-start;
+  }
+
+  .rental-apple-nav {
+    flex-direction: column;
+    overflow-x: visible;
+    overflow-y: auto;
+    max-height: calc(100vh - 8rem);
+    padding: 0.45rem;
+    gap: 0.28rem;
+  }
+
+  .rental-apple-nav-btn {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.65rem 0.8rem;
+    min-height: 2.75rem;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.25;
+  }
+
+  .rental-apple-main {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .rental-apple-hero {
+    padding: 1rem;
+    border-radius: 22px;
+  }
+
+  .rental-apple-nav-btn {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.78rem;
+  }
+}
+
+/* Soften nested white cards inside the shell */
+.rental-apple-shell .bg-white.rounded-2xl,
+.rental-apple-shell .rounded-2xl.bg-white {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  backdrop-filter: blur(16px) saturate(1.25);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  border-radius: 22px !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 14px 36px rgba(15, 23, 42, 0.06);
+}
+
+.rental-apple-shell input,
+.rental-apple-shell select,
+.rental-apple-shell textarea {
+  border-radius: 14px !important;
+}
+
+.rental-apple-shell .rounded-full {
+  letter-spacing: -0.01em;
+}
+
+/* ── Συμβόλαια Rent editor ── */
+.rent-plan-editor-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1.5rem;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #6e6e73;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.rent-plan-editor-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem;
+  border-radius: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background:
+    radial-gradient(80% 120% at 100% 0%, rgba(10, 122, 108, 0.14), transparent 55%),
+    linear-gradient(145deg, #fff 0%, #f3faf8 100%);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.05);
+}
+
+.rent-plan-editor-kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0a7a6c;
+}
+
+.rent-plan-editor-hero-title {
+  margin: 0.2rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #1d1d1f;
+}
+
+.rent-plan-editor-hero-copy {
+  margin: 0.4rem 0 0;
+  max-width: 40rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #6e6e73;
+}
+
+.rent-plan-editor-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rent-plan-dirty {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #c9860a;
+  background: rgba(255, 159, 10, 0.14);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+}
+
+.rent-plan-primary-btn,
+.rent-plan-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.rent-plan-primary-btn {
+  background: #0a7a6c;
+  color: #fff;
+}
+
+.rent-plan-primary-btn:hover:not(:disabled) {
+  background: #08665b;
+}
+
+.rent-plan-primary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rent-plan-secondary-btn {
+  background: rgba(255, 255, 255, 0.9);
+  color: #1d1d1f;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.rent-plan-secondary-btn:hover {
+  background: #fff;
+}
+
+.rent-plan-section-bar {
+  padding: 1rem 1.15rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.rent-plan-editor-card {
+  border-radius: 26px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.rent-plan-editor-card--teal {
+  border-color: rgba(10, 122, 108, 0.18);
+}
+
+.rent-plan-editor-card--slate {
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+.rent-plan-editor-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 1.1rem 1.2rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background: linear-gradient(180deg, rgba(245, 245, 247, 0.7), transparent);
+}
+
+.rent-plan-editor-card--teal .rent-plan-editor-card-head {
+  background: linear-gradient(180deg, rgba(10, 122, 108, 0.08), transparent);
+}
+
+.rent-plan-editor-title {
+  margin: 0.15rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.rent-plan-editor-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: #6e6e73;
+}
+
+.rent-plan-editor-grid {
+  display: grid;
+  gap: 1.15rem;
+  padding: 1.15rem 1.2rem 1.35rem;
+}
+
+@media (min-width: 1100px) {
+  .rent-plan-editor-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+    align-items: start;
+  }
+}
+
+.rent-plan-field {
+  display: block;
+}
+
+.rent-plan-field-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6e6e73;
+}
+
+.rent-plan-field-hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #aeaeb2;
+}
+
+.rent-plan-input {
+  margin-top: 0.4rem;
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #f5f5f7;
+  border-radius: 14px !important;
+  padding: 0.72rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.rent-plan-input:focus {
+  outline: 2px solid rgba(10, 122, 108, 0.35);
+  outline-offset: 1px;
+  background: #fff;
+}
+
+.rent-plan-input--lg {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.rent-plan-price-wrap {
+  position: relative;
+  margin-top: 0.4rem;
+}
+
+.rent-plan-price-wrap > span {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 800;
+  color: #6e6e73;
+}
+
+.rent-plan-price-wrap .rent-plan-input {
+  margin-top: 0;
+  padding-left: 1.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rent-plan-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rent-plan-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rent-plan-toggle-track {
+  width: 2.5rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  background: #d2d2d7;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.rent-plan-toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 0.18rem;
+  left: 0.18rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.rent-plan-toggle.is-on .rent-plan-toggle-track {
+  background: #0a7a6c;
+}
+
+.rent-plan-toggle.is-on .rent-plan-toggle-track::after {
+  transform: translateX(1.05rem);
+}
+
+.rent-plan-toggle-text {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1d1d1f;
+}
+
+.rent-plan-features-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.rent-plan-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(10, 122, 108, 0.25);
+  background: rgba(10, 122, 108, 0.08);
+  color: #0a7a6c;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rent-plan-feature-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.rent-plan-feature-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.rent-plan-feature-handle {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #6e6e73;
+  background: #f5f5f7;
+}
+
+.rent-plan-feature-row .rent-plan-input {
+  margin-top: 0;
+}
+
+.rent-plan-feature-actions {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+
+.rent-plan-icon-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  border: 0;
+  background: #f5f5f7;
+  color: #6e6e73;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.rent-plan-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.rent-plan-icon-btn.is-danger:hover {
+  background: rgba(255, 59, 48, 0.12);
+  color: #ff3b30;
+}
+
+.rent-plan-preview {
+  border-radius: 22px;
+  padding: 1.15rem 1.1rem 1.2rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(160deg, #f0faf7 0%, #fff 55%);
+}
+
+.rent-plan-preview--slate {
+  background: linear-gradient(160deg, #f4f5f7 0%, #fff 55%);
+}
+
+.rent-plan-preview.is-hidden {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+}
+
+.rent-plan-preview-hidden {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #c9860a;
+}
+
+.rent-plan-preview-badge {
+  display: inline-flex;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  background: #0a7a6c;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rent-plan-preview--slate .rent-plan-preview-badge {
+  background: #1d1d1f;
+}
+
+.rent-plan-preview-title {
+  margin: 0.7rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.rent-plan-preview-tagline {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  color: #6e6e73;
+  line-height: 1.4;
+}
+
+.rent-plan-preview-price {
+  margin: 0.85rem 0 0;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rent-plan-preview-price span {
+  margin-left: 0.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+.rent-plan-preview-features {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.rent-plan-preview-features li {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+  font-size: 0.8rem;
+  color: #3a3a3c;
+  line-height: 1.35;
+}
+
+.rent-plan-preview-features .material-symbols-outlined {
+  font-size: 1rem;
+  color: #0a7a6c;
+  margin-top: 0.05rem;
+}
+
+.rent-plan-preview--slate .rent-plan-preview-features .material-symbols-outlined {
+  color: #1d1d1f;
+}
+
+.rent-plan-preview-cta {
+  margin-top: 1rem;
+  text-align: center;
+  padding: 0.7rem 0.9rem;
+  border-radius: 999px;
+  background: #0a7a6c;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rent-plan-preview--slate .rent-plan-preview-cta {
+  background: #1d1d1f;
+}
+
+.rent-plan-sticky-save {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
+}
+
+/* Rent app branding onboarding */
+.rent-brand-editor {
+  color: #1d1d1f;
+}
+
+.rent-brand-editor--loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-weight: 700;
+  color: #6e6e73;
+}
+
+.rent-brand-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.35rem;
+  border-radius: 24px;
+  background:
+    radial-gradient(700px 240px at 0% 0%, rgba(10, 122, 108, 0.16), transparent 55%),
+    linear-gradient(135deg, #0b3d4a 0%, #0a7a6c 55%, #0f766e 100%);
+  color: #fff;
+}
+
+.rent-brand-kicker {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.rent-brand-title {
+  margin: 0.35rem 0 0.4rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.rent-brand-lead {
+  margin: 0;
+  max-width: 36rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  opacity: 0.88;
+}
+
+.rent-brand-hero-art {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.rent-brand-hero-art .material-symbols-outlined {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 1.35rem;
+}
+
+.rent-brand-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 960px) {
+  .rent-brand-grid {
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: start;
+  }
+}
+
+.rent-brand-fields {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 22px;
+  padding: 1.1rem;
+}
+
+.rent-brand-field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.rent-brand-field-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #1d1d1f;
+}
+
+.rent-brand-field-hint {
+  font-size: 0.72rem;
+  color: #6e6e73;
+}
+
+.rent-brand-input {
+  width: 100%;
+  margin-top: 0.2rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  background: #fbfbfd;
+}
+
+.rent-brand-input:focus {
+  outline: 2px solid rgba(10, 122, 108, 0.35);
+  border-color: #0a7a6c;
+  background: #fff;
+}
+
+.rent-brand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.rent-brand-primary-btn,
+.rent-brand-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.rent-brand-primary-btn {
+  border: 0;
+  background: #0a7a6c;
+  color: #fff;
+}
+
+.rent-brand-primary-btn:disabled {
+  opacity: 0.45;
+}
+
+.rent-brand-secondary-btn {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  color: #1d1d1f;
+}
+
+.rent-brand-preview-col {
+  position: sticky;
+  top: 1rem;
+}
+
+.rent-brand-preview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.rent-brand-preview-toggle {
+  display: inline-flex;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: #ececef;
+  gap: 0.15rem;
+}
+
+.rent-brand-preview-toggle button {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #6e6e73;
+  cursor: pointer;
+}
+
+.rent-brand-preview-toggle button.is-active {
+  background: #fff;
+  color: #0b3d4a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.rent-brand-phone {
+  border-radius: 28px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #111;
+  padding: 0.55rem;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.rent-brand-phone-notch {
+  width: 34%;
+  height: 0.35rem;
+  margin: 0.25rem auto 0.55rem;
+  border-radius: 999px;
+  background: #2a2a2c;
+}
+
+.rent-brand-phone-hero {
+  border-radius: 22px;
+  min-height: 280px;
+  padding: 1.35rem 1.15rem 1.25rem;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(45, 212, 191, 0.28), transparent),
+    linear-gradient(160deg, #062a30 0%, #0b3d4a 45%, #0a7a6c 100%);
+  color: #fff;
+}
+
+.rent-brand-phone-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  opacity: 0.92;
+}
+
+.rent-brand-phone-title {
+  margin: 0.65rem 0 0.45rem;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.rent-brand-phone-copy {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  opacity: 0.78;
+}
+
+.rent-brand-phone-cta {
+  margin-top: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b3d4a;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rent-brand-phone-cta .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+
+/* Printable rental agreement */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .rental-agreement-sheet,
+  .rental-agreement-sheet * {
+    visibility: visible !important;
+  }
+
+  .rental-agreement-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .rental-agreement-print {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+}
+

@@ -23,6 +23,15 @@ export async function fetchFiscalStats(days = 30) {
   return res.json();
 }
 
+export async function abandonFiscalInvoice(invoiceId, reason = '') {
+  const q = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+  const res = await adminFetch(`/api/admin/platform/fiscal-invoices/${invoiceId}/abandon${q}`, {
+    method: 'POST',
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function downloadFiscalInvoicesCsv({ days = 90, status = '' } = {}) {
   const q = new URLSearchParams({ days: String(days) });
   if (status) q.set('status', status);

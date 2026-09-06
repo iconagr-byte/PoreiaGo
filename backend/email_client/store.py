@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS email_messages (
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_email_msg_id ON email_messages(message_id);
 CREATE INDEX IF NOT EXISTS idx_email_folder_date ON email_messages(folder, message_date DESC);
 CREATE INDEX IF NOT EXISTS idx_email_sender ON email_messages(sender);
 
@@ -77,11 +76,11 @@ def _row_message(row) -> dict:
         "subject": row["subject"],
         "sender": row["sender"],
         "recipient": row["recipient"],
-        "body_html": row["body_html"],
+        "body_html": row["body_html"] or "",
         "body_text": row["body_text"],
         "folder": row["folder"],
         "is_read": bool(row["is_read"]),
-        "date": row["message_date"],
+        "date": row["message_date"] or "",
         "imap_uid": row["imap_uid"],
         "in_reply_to": row["in_reply_to"],
         "created_at": row["created_at"],
@@ -110,7 +109,11 @@ async def init_email_client_tables() -> None:
     await _migrate_campaign_metrics(db)
     await db.commit()
     await init_email_settings_tables()
-    await sync_subscribers_from_accounts()
+    try:
+        await sync_subscribers_from_accounts()
+    except Exception:
+        logger = __import__("logging").getLogger("poreiago.email")
+        logger.exception("email subscriber sync skipped")
 
 
 async def _migrate_campaign_metrics(db) -> None:
@@ -161,11 +164,25 @@ async def upsert_message(data: dict) -> dict | None:
         return None
     sid = data.get("email_settings_id")
     db = get_db()
+    existing = None
     if sid:
         cur = await db.execute(
             "SELECT id FROM email_messages WHERE message_id = ? AND email_settings_id = ?",
             (mid, sid),
         )
+        existing = await cur.fetchone()
+        if not existing:
+            # Claim legacy rows that were synced before per-account scoping.
+            cur = await db.execute(
+                """
+                SELECT id FROM email_messages
+                WHERE message_id = ?
+                  AND (email_settings_id IS NULL OR email_settings_id = '')
+                LIMIT 1
+                """,
+                (mid,),
+            )
+            existing = await cur.fetchone()
     else:
         cur = await db.execute(
             """
@@ -174,7 +191,7 @@ async def upsert_message(data: dict) -> dict | None:
             """,
             (mid,),
         )
-    existing = await cur.fetchone()
+        existing = await cur.fetchone()
     now = _now()
     if existing:
         eid = existing["id"]
@@ -404,6 +421,62 @@ async def set_subscription(email: str, is_subscribed: bool) -> dict | None:
     )
     await db.commit()
     return await get_subscriber_by_email(email)
+
+
+async def ensure_subscriber(
+    *,
+    email: str,
+    name: str = "",
+    customer_id: str | None = None,
+    is_subscribed: bool = True,
+) -> dict | None:
+    """Create or update a marketing subscriber (used by rent opt-in)."""
+    key = (email or "").strip().lower()
+    if not key or "@" not in key:
+        return None
+    existing = await get_subscriber_by_email(key)
+    now = _now()
+    db = get_db()
+    if existing:
+        await db.execute(
+            """
+            UPDATE email_subscribers
+            SET name=COALESCE(NULLIF(?, ''), name),
+                customer_id=COALESCE(?, customer_id),
+                is_subscribed=?,
+                unsubscribed_at=?,
+                updated_at=?
+            WHERE email=?
+            """,
+            (
+                (name or "").strip(),
+                customer_id,
+                1 if is_subscribed else 0,
+                None if is_subscribed else now,
+                now,
+                key,
+            ),
+        )
+        await db.commit()
+        return await get_subscriber_by_email(key)
+
+    await db.execute(
+        """
+        INSERT INTO email_subscribers (id, email, customer_id, name, is_subscribed, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            _new_id("SUB"),
+            key,
+            customer_id,
+            (name or "").strip(),
+            1 if is_subscribed else 0,
+            now,
+            now,
+        ),
+    )
+    await db.commit()
+    return await get_subscriber_by_email(key)
 
 
 async def unsubscribe_by_token(token: str) -> bool:

@@ -6,6 +6,7 @@ import {
   saasCreateGuestBooking,
   syncTicketForBoarding,
 } from '../../services/saasApi.js';
+import { findSeatConflicts, seatsTakenForTrip } from '../seats/occupiedSeats.js';
 import { dispatchPartnerEvent } from '../../services/growthApi.js';
 import { API_BASE } from '../../config/api.js';
 import { getCustomerToken } from '../auth.js';
@@ -24,6 +25,7 @@ import {
   upsertBookingOnServer,
 } from '../../services/customerBookingsApi.js';
 import { CHECK_IN } from './constants.js';
+import { localIdFromReference } from './bookingIds.js';
 import {
   buildPaymentMethodLabel,
   buildPaymentStatusLabel,
@@ -34,8 +36,17 @@ import {
   roundMoney,
 } from '../payments/depositPayment.js';
 import { PAYMENT_METHOD_BANK } from '../payments/bankTransfer.js';
+import {
+  isAuthenticatedOfficeSession,
+  officeStorageKey,
+} from '../admin/officeTenantStore.js';
+import { stripDemoBookings } from '../admin/demoCatalog.js';
 
-const STORAGE_KEY = 'aerostride_bookings_v1';
+const STORAGE_KEY_BASE = 'aerostride_bookings_v1';
+
+function storageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
 
 /**
  * @typedef {typeof mockBookings[0] & {
@@ -141,13 +152,33 @@ async function pushBookingToServer(booking) {
 
 export function loadBookings() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        if (isAuthenticatedOfficeSession()) {
+          const clean = stripDemoBookings(parsed);
+          if (clean.length !== parsed.length) {
+            try {
+              saveBookings(clean);
+            } catch {
+              /* ignore */
+            }
+          }
+          return clean;
+        }
+        return parsed;
+      }
     }
   } catch {
-    /* use seed */
+    /* fall through */
   }
+
+  // Authenticated office: never inject platform demo bookings.
+  if (isAuthenticatedOfficeSession()) {
+    return [];
+  }
+
   const seeded = seedTripIds(mockBookings);
   saveBookings(seeded);
   return seeded;
@@ -155,7 +186,7 @@ export function loadBookings() {
 
 /** @param {BookingRecord[]} bookings */
 export function saveBookings(bookings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+  localStorage.setItem(storageKey(), JSON.stringify(bookings));
 }
 
 /** @param {string} bookingId */
@@ -226,6 +257,11 @@ function buildLocalBooking({
   balanceDue,
   depositPercent,
   saasMeta,
+  extras = [],
+  extrasTotal = 0,
+  seatSubtotal = null,
+  bookingSource = 'Website (B2C)',
+  agentName = 'Online Auto',
 }) {
   const email = passenger.email.trim().toLowerCase();
   const customer = ensureCustomerForPassenger(passenger);
@@ -239,8 +275,21 @@ function buildLocalBooking({
   const taxes = Math.round(total * 0.24 * 100) / 100;
   const basePrice = Math.round((total - taxes) * 100) / 100;
   const now = new Date();
-  const paymentLabel = buildPaymentStatusLabel(paymentPlan, paymentMethod, pct);
+  let paymentLabel = buildPaymentStatusLabel(paymentPlan, paymentMethod, pct);
+  // Unpaid office / bus cash reservations must not look PAID.
+  if (paidNow <= 0 && remaining > 0) {
+    if (paymentMethod === 'cash_on_bus') paymentLabel = 'PENDING (Μετρητά στο λεωφορείο)';
+    else if (paymentMethod === 'cash_office') paymentLabel = 'PENDING (Μετρητά — γκισέ)';
+  }
   const paymentMethodLabel = buildPaymentMethodLabel(paymentPlan, paymentMethod, pct);
+  const extrasList = Array.isArray(extras) ? extras : [];
+  const extrasSum = roundMoney(extrasTotal || extrasList.reduce((s, x) => s + (Number(x.lineTotalEur) || 0), 0));
+  const seatsTotal = roundMoney(
+    seatSubtotal != null ? seatSubtotal : Math.max(0, total - extrasSum),
+  );
+  const extrasNote = extrasList.length
+    ? `Extras: ${extrasList.map((x) => x.title).join(', ')} (€${extrasSum.toFixed(2)}).`
+    : '';
 
   const dep = trip.departureTime ? new Date(trip.departureTime) : now;
   const ref = saasMeta?.referenceCode || randomPnr();
@@ -250,7 +299,11 @@ function buildLocalBooking({
       : '';
 
   return {
-    id: saasMeta?.saasBookingId ? `B-${saasMeta.referenceCode}` : `B-${Date.now()}`,
+    id: saasMeta?.referenceCode
+      ? localIdFromReference(saasMeta.referenceCode)
+      : saasMeta?.saasBookingId
+        ? `B-${String(saasMeta.saasBookingId).slice(0, 8)}`
+        : `B-${Date.now()}`,
     saasBookingId: saasMeta?.saasBookingId || null,
     customerId: customer.id,
     customerName: passenger.name.trim(),
@@ -261,6 +314,9 @@ function buildLocalBooking({
     seats: seatList,
     seat: seatList.join(', '),
     price: total,
+    seatSubtotal: seatsTotal,
+    extras: extrasList,
+    extrasTotal: extrasSum,
     amountPaid: paidNow,
     balanceDue: remaining,
     paymentPlan,
@@ -276,7 +332,7 @@ function buildLocalBooking({
     paymentStatus: paymentLabel,
     paymentMethod: paymentMethodLabel,
     paymentDate: now.toISOString().replace('T', ' ').slice(0, 19),
-    notes: [saasMeta?.syncedToSaas ? 'Συγχρονισμένο με SaaS API' : '', depositNote]
+    notes: [saasMeta?.syncedToSaas ? 'Συγχρονισμένο με SaaS API' : '', depositNote, extrasNote]
       .filter(Boolean)
       .join(' '),
     boardingPassIssued: true,
@@ -288,8 +344,8 @@ function buildLocalBooking({
     invoiceNumber: `INV-${now.getFullYear()}-${String(Date.now()).slice(-6)}`,
     basePrice,
     taxes,
-    bookingSource: 'Website (B2C)',
-    agentName: 'Online Auto',
+    bookingSource: bookingSource || 'Website (B2C)',
+    agentName: agentName || 'Online Auto',
     syncedToSaas: Boolean(saasMeta?.syncedToSaas),
   };
 }
@@ -334,8 +390,17 @@ export async function createBookingFromCheckout({
   passenger,
   paymentMethod,
   bankAccountId = null,
+  extras = [],
+  extrasTotal = 0,
+  seatSubtotal = null,
+  bookingSource,
+  agentName,
 }) {
   const seatList = seats.split(',').map((s) => s.trim()).filter(Boolean);
+  const localConflicts = findSeatConflicts(seatList, seatsTakenForTrip(trip, loadBookings()));
+  if (localConflicts.length) {
+    throw new Error(`Οι θέσεις είναι ήδη κατειλημμένες: ${localConflicts.join(', ')}`);
+  }
   const pct = normalizeDepositPercent(depositPercent);
   const split = computeDepositSplit(total, pct);
   const paidNow = roundMoney(
@@ -346,6 +411,9 @@ export async function createBookingFromCheckout({
   );
   const paymentMethodMeta = buildPaymentMethodLabel(paymentPlan, paymentMethod, pct);
   const tenantId = getSaasTenantId();
+  const extrasList = Array.isArray(extras) ? extras : [];
+  const extrasSum = roundMoney(extrasTotal || 0);
+  const seatsTotal = roundMoney(seatSubtotal != null ? seatSubtotal : total);
 
   if (tenantId) {
     try {
@@ -357,13 +425,16 @@ export async function createBookingFromCheckout({
         amountEur: paidNow,
         externalTripId: trip.id,
         tripTitle: trip.title,
-        paymentMethod: paymentMethodMeta,
+        paymentMethod: paymentMethod || paymentMethodMeta,
         phone: passenger.phone.trim(),
         seats: seatList,
         paymentPlan,
         totalEur: total,
         balanceDue: remaining,
         depositPercent: pct,
+        source: bookingSource || 'Website (B2C)',
+        agentName: agentName || 'Online Auto',
+        departureAt: trip.departureTime || null,
       });
       const booking = applyBankTransferPending(
         buildLocalBooking({
@@ -376,6 +447,11 @@ export async function createBookingFromCheckout({
           amountPaid: paidNow,
           balanceDue: remaining,
           depositPercent: pct,
+          extras: extrasList,
+          extrasTotal: extrasSum,
+          seatSubtotal: seatsTotal,
+          bookingSource,
+          agentName,
           saasMeta: {
             saasBookingId: api.id,
             referenceCode: api.reference_code,
@@ -417,6 +493,14 @@ export async function createBookingFromCheckout({
       notifyPaymentConfirmationSafe(saved, { paymentMethod, paymentPlan });
       return saved;
     } catch (err) {
+      // Seat conflict / validation — never invent a local double booking.
+      if (
+        err?.status === 409 ||
+        err?.code === 'seat_conflict' ||
+        /κατειλημ|seat.?conflict|θέσε/i.test(String(err?.message || ''))
+      ) {
+        throw err;
+      }
       console.warn('[checkout] SaaS booking failed, using localStorage', err);
     }
   }
@@ -433,6 +517,11 @@ export async function createBookingFromCheckout({
         amountPaid: paidNow,
         balanceDue: remaining,
         depositPercent: pct,
+        extras: extrasList,
+        extrasTotal: extrasSum,
+        seatSubtotal: seatsTotal,
+        bookingSource,
+        agentName,
         saasMeta: null,
       }),
       {
@@ -535,6 +624,19 @@ export async function recordCashPayment(bookingId, payload = {}) {
       ? { ...saved, lastCashAmount: payload.amount }
       : saved;
     mergeBookingsIntoStore([normalized]);
+    try {
+      const sync = await syncTicketForBoarding({
+        ...normalized,
+        paymentStatus: normalized.paymentStatus || 'PAID',
+      });
+      if (sync?.ticket_ref) {
+        updateBooking(normalized.id, { ticketRef: sync.ticket_ref, boardingPassIssued: true });
+        normalized.ticketRef = sync.ticket_ref;
+        normalized.boardingPassIssued = true;
+      }
+    } catch (syncErr) {
+      console.warn('[cash] ticket re-sync failed', syncErr);
+    }
     notifyPaymentConfirmationSafe(normalized, { event: PAYMENT_NOTIFY_EVENTS.CASH_PAYMENT });
     return normalized;
   } catch (err) {

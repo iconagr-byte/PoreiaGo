@@ -22,11 +22,13 @@ export default function MasterQrPanel({ compact = false }) {
   useEffect(() => {
     const all = loadTrips();
     setTrips(all);
-    if (all.length && !tripId) {
-      setTripId(String(all[0].id));
+    const initialId = all.length ? String(all[0].id) : '';
+    if (initialId) setTripId((prev) => prev || initialId);
+    // Background only — never block driver list / QR issue on full trip sync.
+    if (all.length) {
+      syncTripsToPostgres(all).catch(() => {});
     }
-    syncTripsToPostgres(all).catch(() => {});
-  }, [tripId]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +36,9 @@ export default function MasterQrPanel({ compact = false }) {
     fetchFleetDrivers('active')
       .then((rows) => {
         if (!cancelled) setDrivers(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setDrivers([]);
       })
       .finally(() => {
         if (!cancelled) setDriversLoading(false);
@@ -54,15 +59,14 @@ export default function MasterQrPanel({ compact = false }) {
       setLoading(true);
       try {
         const trip = getTripById(id) || trips.find((t) => Number(t.id) === id);
+        // Fire-and-forget sync of the selected trip; QR mint must not wait.
         if (trip) {
-          const sync = await syncTripsToPostgres([trip]);
-          if (!sync.postgres_available) {
-            toast('Postgres offline — τοπικό QR', { icon: 'ℹ️' });
-          }
+          syncTripsToPostgres([trip]).catch(() => {});
         }
         const result = await issueMasterQr({
           tripId: id,
           driverId: driverId.trim() || undefined,
+          preferAdmin: true,
         });
         setIssued(result);
         toast.success('Το Master QR εκδόθηκε');

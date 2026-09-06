@@ -15,98 +15,119 @@ export default function ThemeGallery({ activeThemeId, onPreview, onApply, applyi
   const active = getHomepageThemeById(activeThemeId);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
-            search
-          </span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Αναζήτηση θέματος…"
-            className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-black/[0.08] bg-white text-sm focus:ring-2 focus:ring-primary/30"
-          />
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="pdw-theme-search relative flex-1">
+            <span className="material-symbols-outlined">search</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Αναζήτηση θέματος…"
+            />
+          </div>
+          <p className="text-xs font-semibold text-[#6e6e73] tabular-nums shrink-0">
+            {themes.length}/{HOMEPAGE_THEMES.length}
+          </p>
         </div>
-        <p className="text-xs text-gray-500 font-medium">
-          {themes.length} από {HOMEPAGE_THEMES.length} θέματα
-        </p>
-      </div>
 
-      <div className="flex flex-wrap gap-2">
-        {THEME_CATEGORIES.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            onClick={() => setCategory(cat.id)}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
-              category === cat.id
-                ? 'bg-slate-900 text-white shadow-md'
-                : 'bg-white text-gray-600 border border-black/[0.08] hover:border-primary/30'
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
+        <div className="pdw-theme-chips">
+          {THEME_CATEGORIES.map((cat) => {
+            const on = category === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setCategory(cat.id)}
+                className={`pdw-theme-chip${on ? ' is-active' : ''}`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {active && (
-        <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 to-violet-500/5 p-4 flex flex-wrap items-center gap-4">
-          <div className="w-16 shrink-0">
+        <div className="pdw-theme-active">
+          <div className="pdw-theme-active__preview">
             <ThemeMiniPreview theme={active} selected />
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Ενεργό θέμα</p>
-            <p className="font-bold text-gray-900">{active.nameEl}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{active.description}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#86868b]">Ενεργό</p>
+            <p className="font-bold text-[#1d1d1f] truncate text-base">{active.nameEl}</p>
+            <p className="text-xs text-[#6e6e73] truncate mt-0.5">{active.mood || active.description}</p>
+          </div>
+          <div className="hidden sm:flex gap-1.5 shrink-0">
+            {[active.palette.primary, active.palette.secondary, active.palette.hero].map((c) => (
+              <span
+                key={c}
+                className="h-5 w-5 rounded-full border border-black/10 shadow-sm"
+                style={{ background: c }}
+              />
+            ))}
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="pdw-theme-grid">
         {themes.map((theme) => {
           const selected = theme.id === activeThemeId;
           return (
             <article
               key={theme.id}
-              className={`group rounded-2xl border bg-white p-3 transition-all hover:shadow-xl ${
-                selected ? 'border-primary ring-2 ring-primary/25 shadow-lg' : 'border-black/[0.06]'
-              }`}
+              className={`pdw-theme-card group${selected ? ' is-selected' : ''}`}
             >
-              <button
-                type="button"
-                className="w-full text-left"
-                onClick={() => onPreview(theme)}
-              >
+              <button type="button" className="w-full text-left" onClick={() => onPreview(theme)}>
                 <ThemeMiniPreview theme={theme} selected={selected} />
-                <div className="mt-3">
-                  <p className="font-bold text-sm text-gray-900 leading-tight">{theme.nameEl}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{theme.name}</p>
-                  <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{theme.description}</p>
+                <div className="mt-2.5 px-0.5">
+                  <p className="font-bold text-sm text-[#1d1d1f] leading-snug truncate">{theme.nameEl}</p>
+                  {theme.badge ? (
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#5e5ce6] mt-0.5">
+                      {theme.badge}
+                    </p>
+                  ) : null}
+                  <div className="mt-1.5 flex items-center gap-1">
+                    {[theme.palette.primary, theme.palette.secondary, theme.palette.hero].map((c, i) => (
+                      <span
+                        key={`${theme.id}-${i}`}
+                        className="h-2.5 w-2.5 rounded-full border border-black/10"
+                        style={{ background: c }}
+                      />
+                    ))}
+                  </div>
                 </div>
               </button>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => onPreview(theme)}
-                  className="flex-1 py-2 rounded-xl text-xs font-bold border border-black/[0.08] hover:bg-slate-50"
-                >
-                  Προεπισκόπηση
-                </button>
-                <button
-                  type="button"
-                  disabled={applying}
-                  onClick={() => onApply(theme)}
-                  className="flex-1 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:opacity-90 disabled:opacity-50"
-                >
-                  {selected ? 'Ενεργό' : 'Εφαρμογή'}
-                </button>
-              </div>
+
+              <button
+                type="button"
+                disabled={applying || selected}
+                onClick={() => onApply(theme)}
+                className={`pdw-theme-apply${selected ? ' is-active' : ''}`}
+              >
+                {selected ? 'Ενεργό' : applying ? '…' : 'Εφαρμογή'}
+              </button>
             </article>
           );
         })}
       </div>
+
+      {themes.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-[rgba(0,0,0,0.08)] py-12 text-center bg-white/60">
+          <p className="text-sm font-bold text-[#1d1d1f]">Κανένα αποτέλεσμα</p>
+          <button
+            type="button"
+            onClick={() => {
+              setCategory('all');
+              setQuery('');
+            }}
+            className="mt-2 text-xs font-bold text-[#0071e3] hover:underline"
+          >
+            Καθαρισμός φίλτρων
+          </button>
+        </div>
+      )}
     </div>
   );
 }

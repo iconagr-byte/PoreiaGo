@@ -54,8 +54,9 @@ export default function EmailComposeModal({
         body_html: form.body_html,
         preheader: form.preheader,
         includeSignature: form.includeSignature,
+        fromEmail,
       }),
-    [form.body_html, form.preheader, form.includeSignature],
+    [form.body_html, form.preheader, form.includeSignature, fromEmail],
   );
 
   const insertSnippet = (html) => {
@@ -242,7 +243,7 @@ export default function EmailComposeModal({
                 checked={form.includeSignature}
                 onChange={(e) => patch('includeSignature', e.target.checked)}
               />
-              Υπογραφή PoreiaGo
+              Υπογραφή email
             </label>
 
             <p className="emc-section-title mt-3">Γρήγορες εισαγωγές</p>

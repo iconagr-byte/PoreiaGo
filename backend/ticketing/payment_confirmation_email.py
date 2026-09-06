@@ -339,7 +339,7 @@ def detect_payment_event(booking: dict[str, Any], event: str | None = None) -> s
 def _ticket_payload(booking: dict[str, Any]) -> dict[str, Any]:
     enriched = enrich_booking_passenger_track(dict(booking))
     price = enriched.get("price") or enriched.get("amount")
-    return {
+    payload = {
         "email": enriched.get("email"),
         "customer_name": enriched.get("customerName") or "",
         "trip_title": enriched.get("tripTitle") or "",
@@ -354,6 +354,20 @@ def _ticket_payload(booking: dict[str, Any]) -> dict[str, Any]:
         "phone": enriched.get("phone"),
         "passenger_track_url": enriched.get("passengerTrackUrl"),
     }
+    # Prefer office storefront host for magic-link CTAs when known on the booking.
+    domain = (
+        enriched.get("customDomain")
+        or enriched.get("custom_domain")
+        or enriched.get("officeDomain")
+        or enriched.get("office_domain")
+        or ""
+    )
+    public_base = enriched.get("publicBaseUrl") or enriched.get("public_base_url") or ""
+    if public_base:
+        payload["public_base_url"] = public_base
+    elif domain:
+        payload["custom_domain"] = domain
+    return payload
 
 
 async def send_payment_confirmation_notifications(

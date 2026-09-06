@@ -2,13 +2,13 @@ import PlatformSettingsPanel from './PlatformSettingsPanel.jsx';
 import PaymentManagementPanel from './PaymentManagementPanel.jsx';
 import FiscalSettingsPanel from './FiscalSettingsPanel.jsx';
 import SeatPricingPanel from './SeatPricingPanel.jsx';
-import TelemetrySettingsPanel from './TelemetrySettingsPanel.jsx';
+import TripExtrasEditor from './TripExtrasEditor.jsx';
 import UsersManagementPanel from './UsersManagementPanel.jsx';
 import BrandingPanel from './BrandingPanel.jsx';
 import HomepageSettingsPanel from './HomepageSettingsPanel.jsx';
 import PartnerWebhooksPanel from './PartnerWebhooksPanel.jsx';
-import DriversHub from './DriversHub.jsx';
 import GdprCompliancePanel from './GdprCompliancePanel.jsx';
+import LoginAuditPanel from './LoginAuditPanel.jsx';
 import ContractsPanel from './ContractsPanel.jsx';
 import SuperAdminPanel from './SuperAdminPanel.jsx';
 import SaasConnectionPanel from './SaasConnectionPanel.jsx';
@@ -37,10 +37,29 @@ export default function SettingsTabPanels({
 
   if (tab === 'platform') {
     return (
-      <>
+      <div className="space-y-8">
         <PlatformSettingsPanel onOpenPayments={onOpenPayments} />
-        <SeatPricingPanel />
-      </>
+        <div id="seat-pricing" className="scroll-mt-28 space-y-3">
+          <div className="flex items-center gap-3 px-1">
+            <div className="h-px flex-1 bg-slate-200" />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Θέσεις & τιμές
+            </p>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+          <SeatPricingPanel />
+        </div>
+        <div id="trip-extras" className="scroll-mt-28 space-y-3">
+          <div className="flex items-center gap-3 px-1">
+            <div className="h-px flex-1 bg-slate-200" />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Υπηρεσίες εκδρομής
+            </p>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+          <TripExtrasEditor />
+        </div>
+      </div>
     );
   }
   if (tab === 'payments') return <PaymentManagementPanel />;
@@ -50,24 +69,23 @@ export default function SettingsTabPanels({
       <ContractsPanel
         initialPlan={contractPrefs?.plan}
         initialInterval={contractPrefs?.interval}
+        focusRentModule={Boolean(contractPrefs?.focusRentModule)}
       />
     );
   }
   if (tab === 'compliance') return <GdprCompliancePanel />;
+  if (tab === 'logins') return <LoginAuditPanel />;
   if (tab === 'homepage') return <HomepageSettingsPanel />;
+  // Domain της προσωπικής σελίδας γραφείου — όχι κάτω από platform Growth.
+  if (tab === 'domain') return <BrandingPanel />;
   if (tab === 'growth') {
     return (
       <div className="space-y-6">
-        <BrandingPanel />
         <PartnerWebhooksPanel />
       </div>
     );
   }
-  if (tab === 'drivers') {
-    return <DriversHub showPageHeader={false} />;
-  }
   if (tab === 'users') return <UsersManagementPanel />;
-  if (tab === 'telematics') return <TelemetrySettingsPanel />;
 
   return null;
 }

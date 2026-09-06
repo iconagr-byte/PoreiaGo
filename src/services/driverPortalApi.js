@@ -1,5 +1,6 @@
 import { API_BASE } from '../config/api.js';
 import {
+  clearDriverTripBinding,
   driverSessionHeaders,
   getActiveTripId,
   getDriverSession,
@@ -9,17 +10,12 @@ import { fetchBoardingManifest, adminScanTicket } from './ticketingApi.js';
 
 export { adminScanTicket, fetchBoardingManifest };
 
-const DEV_SCHEDULE = [
-  { time: '08:00', stop: 'Αθήνα — Λαρίσσης', status: 'completed' },
-  { time: '10:30', stop: 'Λαμία', status: 'current' },
-  { time: '13:00', stop: 'Μετέωρα', status: 'upcoming' },
-  { time: '18:00', stop: 'Επιστροφή', status: 'upcoming' },
-];
-
 function mapSessionPayload(data) {
+  const rawTrip = data?.trip_id;
+  const tripId = rawTrip != null && Number(rawTrip) > 0 ? Number(rawTrip) : null;
   return {
     accessToken: data.access_token,
-    tripId: data.trip_id,
+    tripId,
     tenantId: data.tenant_id,
     driverId: data.driver_id,
     expiresAt: data.expires_at,
@@ -29,6 +25,9 @@ function mapSessionPayload(data) {
     vehiclePlate: data.vehicle_plate || null,
     vehicleCode: data.vehicle_code || null,
     vehicleImageUrl: data.vehicle_image_url || null,
+    tripTitle: data.trip_title || null,
+    destination: data.destination || null,
+    meetingPoint: data.meeting_point || null,
   };
 }
 
@@ -40,11 +39,12 @@ function saveMappedSession(data) {
 
 const DEV_SESSION = {
   accessToken: 'dev-driver-session',
-  tripId: 1,
+  // No fake trip — matches production when office has not opened an excursion.
+  tripId: null,
   tenantId: '00000000-0000-0000-0000-000000000001',
   driverId: 'dev-driver',
   expiresAt: Math.floor(Date.now() / 1000) + 86400,
-  schedule: DEV_SCHEDULE,
+  schedule: [],
   driverName: 'Οδηγός Demo',
   photoUrl: null,
   vehiclePlate: 'XAH-4021',
@@ -63,7 +63,6 @@ export async function loginDriver(username, password) {
   } catch {
     if (import.meta.env.DEV) {
       saveDriverSession(DEV_SESSION);
-      await cacheManifestForOffline(1);
       return DEV_SESSION;
     }
     throw new Error('Δεν υπάρχει σύνδεση με τον server');
@@ -74,7 +73,7 @@ export async function loginDriver(username, password) {
     throw new Error(typeof detail === 'string' ? detail : 'Λάθος όνομα χρήστη ή κωδικός');
   }
   const session = saveMappedSession(data);
-  await cacheManifestForOffline(data.trip_id);
+  if (data.trip_id) await cacheManifestForOffline(data.trip_id);
   return session;
 }
 
@@ -89,7 +88,6 @@ export async function exchangeMasterQr(qrRaw) {
   } catch {
     if (import.meta.env.DEV) {
       saveDriverSession(DEV_SESSION);
-      await cacheManifestForOffline(1);
       return DEV_SESSION;
     }
     throw new Error('Δεν υπάρχει σύνδεση με τον server');
@@ -98,13 +96,12 @@ export async function exchangeMasterQr(qrRaw) {
   if (!res.ok) {
     if (import.meta.env.DEV && qrRaw.trim().length > 4) {
       saveDriverSession(DEV_SESSION);
-      await cacheManifestForOffline(1);
       return DEV_SESSION;
     }
     throw new Error(data.detail || 'Master QR invalid');
   }
   const session = saveMappedSession(data);
-  await cacheManifestForOffline(data.trip_id);
+  if (data.trip_id) await cacheManifestForOffline(data.trip_id);
   return session;
 }
 
@@ -150,8 +147,40 @@ export async function postDriverTelemetryLocation(payload) {
   return data;
 }
 
+/** Explicit start-of-shift — notifies admin office (alert + Web Push). */
+export async function startDriverShift() {
+  const res = await fetch(`${API_BASE}/api/driver/telemetry/shift/start`, {
+    method: 'POST',
+    headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    keepalive: true,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Αποτυχία έναρξης βάρδιας');
+  }
+  return data;
+}
+
+/** Explicit end-of-shift — notifies admin platform + clears live map pin. */
+export async function endDriverShift() {
+  const res = await fetch(`${API_BASE}/api/driver/telemetry/shift/end`, {
+    method: 'POST',
+    headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    // Survive tab close / navigation so office still gets the push.
+    keepalive: true,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Αποτυχία τερματισμού βάρδιας');
+  }
+  return data;
+}
+
 export async function fetchDriverManifest() {
   const tripId = getActiveTripId();
+  if (!tripId) return null;
   try {
     const res = await fetch(`${API_BASE}/api/driver/manifest`, {
       headers: driverSessionHeaders(),
@@ -159,18 +188,22 @@ export async function fetchDriverManifest() {
     if (res.ok) {
       const data = await res.json();
       await cacheManifestForOffline(tripId, data);
-      window.dispatchEvent(new CustomEvent('driver-manifest-updated', { detail: { tripId } }));
+      // Do not dispatch here — polling listeners would recurse. Mutating
+      // flows (e.g. Scanner check-in) dispatch `driver-manifest-updated`.
       return data;
     }
+    // No open excursion — clear binding so κάτοψη / Εκδρομή #1 cannot linger.
+    if (res.status === 403 || res.status === 404) {
+      clearDriverTripBinding();
+      return null;
+    }
   } catch {
-    /* offline */
+    /* offline — never fall back to demo bookings without a live open trip */
   }
-  return loadCachedManifest(tripId) ?? fetchBoardingManifest(tripId);
+  return null;
 }
 
 export async function fetchDriverSchedule() {
-  const session = getDriverSession();
-  if (session?.schedule?.length) return session.schedule;
   try {
     const res = await fetch(`${API_BASE}/api/driver/schedule`, {
       headers: driverSessionHeaders(),
@@ -182,10 +215,29 @@ export async function fetchDriverSchedule() {
   } catch {
     /* offline */
   }
+  const session = getDriverSession();
   return session?.schedule || [];
 }
 
+export async function fetchDriverTrip() {
+  try {
+    const res = await fetch(`${API_BASE}/api/driver/trip`, {
+      headers: driverSessionHeaders(),
+    });
+    if (res.ok) return res.json();
+    if (res.status === 403 || res.status === 404) {
+      clearDriverTripBinding();
+      return null;
+    }
+  } catch {
+    /* offline */
+  }
+  // Do not invent trip meta from a stale session tripId (demo #1).
+  return null;
+}
+
 export async function cacheManifestForOffline(tripId, manifest) {
+  if (!tripId) return;
   const key = `driver_manifest_${tripId}`;
   if (manifest) {
     localStorage.setItem(key, JSON.stringify({ manifest, cachedAt: Date.now() }));
@@ -200,6 +252,7 @@ export async function cacheManifestForOffline(tripId, manifest) {
 }
 
 export function loadCachedManifest(tripId) {
+  if (!tripId) return null;
   try {
     const raw = localStorage.getItem(`driver_manifest_${tripId}`);
     if (!raw) return null;
@@ -222,11 +275,20 @@ export async function driverCheckin({ qrRaw, ticketId, tripId } = {}) {
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok) return data;
+    if (res.ok) {
+      window.dispatchEvent(
+        new CustomEvent('driver-manifest-updated', { detail: { tripId: activeTrip } }),
+      );
+      return data;
+    }
     return { ...data, result: data.result || 'FAILURE', ok: false };
   } catch {
     if (import.meta.env.DEV && qrRaw) {
-      return adminScanTicket({ qr: qrRaw, tripId: activeTrip });
+      const data = await adminScanTicket({ qr: qrRaw, tripId: activeTrip });
+      window.dispatchEvent(
+        new CustomEvent('driver-manifest-updated', { detail: { tripId: activeTrip } }),
+      );
+      return data;
     }
     throw new Error('Δεν υπάρχει σύνδεση με τον server');
   }
@@ -289,17 +351,23 @@ export async function uploadDriverExpense({ amount, category, description, recei
   }
 }
 
+function sosErrorMessage(detail, fallback = 'Αποτυχία αποστολής SOS') {
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg);
+  return fallback;
+}
+
 export async function triggerSosAlert({ lat, lng, accuracy_m, photoFile, message }) {
   const session = getDriverSession();
+  // Never fake success — office must actually receive the alert.
   if (!session?.accessToken) {
-    console.warn('[SOS offline]', { lat, lng });
-    return { ok: true, message: 'SOS αποθηκεύτηκε τοπικά (offline)', alert_id: `local-${Date.now()}` };
+    throw new Error('Δεν είστε συνδεδεμένος — ξανασυνδεθείτε και ξαναστείλτε SOS');
   }
 
   if (photoFile) {
     const form = new FormData();
-    form.append('lat', String(lat));
-    form.append('lng', String(lng));
+    form.append('lat', String(lat ?? 0));
+    form.append('lng', String(lng ?? 0));
     if (accuracy_m != null) form.append('accuracy_m', String(accuracy_m));
     if (message) form.append('message', message);
     form.append('incident_type', 'sos');
@@ -310,46 +378,45 @@ export async function triggerSosAlert({ lat, lng, accuracy_m, photoFile, message
       body: form,
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'SOS failed');
+    if (!res.ok) throw new Error(sosErrorMessage(data.detail));
     return data;
   }
 
   const res = await fetch(`${API_BASE}/api/telemetry/sos`, {
     method: 'POST',
     headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lat, lng, accuracy_m, message, incident_type: 'sos' }),
+    body: JSON.stringify({
+      lat: lat ?? 0,
+      lng: lng ?? 0,
+      accuracy_m,
+      message,
+      incident_type: 'sos',
+    }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || 'SOS failed');
+  if (!res.ok) throw new Error(sosErrorMessage(data.detail));
   return data;
 }
 
 export async function reportDriverIssue(payload) {
   const session = getDriverSession();
   if (!session?.accessToken) {
-    console.info('[Driver Issue]', { ...payload, tripId: session?.tripId });
-    return { ok: true, ticketId: `INC-${Date.now()}` };
+    throw new Error('Δεν είστε συνδεδεμένος — ξανασυνδεθείτε για αναφορά');
   }
-  try {
-    const res = await fetch(`${API_BASE}/api/telemetry/sos`, {
-      method: 'POST',
-      headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        lat: payload.lat,
-        lng: payload.lng,
-        accuracy_m: payload.accuracy_m,
-        incident_type: payload.type || 'incident',
-        message: `Driver report: ${payload.type}`,
-      }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return { ok: true, ticketId: data.alert_id, alert_id: data.alert_id };
-    }
-  } catch {
-    /* fallback */
-  }
-  return { ok: true, ticketId: `INC-${Date.now()}` };
+  const res = await fetch(`${API_BASE}/api/telemetry/sos`, {
+    method: 'POST',
+    headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      lat: payload.lat ?? 0,
+      lng: payload.lng ?? 0,
+      accuracy_m: payload.accuracy_m,
+      incident_type: payload.type || 'incident',
+      message: `Driver report: ${payload.type}`,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(sosErrorMessage(data.detail, 'Αποτυχία αναφοράς'));
+  return { ok: true, ticketId: data.alert_id, alert_id: data.alert_id };
 }
 
 /** @deprecated use triggerSosAlert */
@@ -430,12 +497,50 @@ export async function submitSafetyChecklist(verificationId, items) {
 }
 
 export function getDaySummaryStats(manifest) {
-  const boarded = manifest?.boarded_passengers?.length ?? 0;
+  const boardedList = Array.isArray(manifest?.boarded_passengers)
+    ? manifest.boarded_passengers
+    : [];
+  const boarded = manifest?.boarded_count ?? boardedList.length;
   const session = getDriverSession();
   return {
     totalKm: session?.totalKm ?? 142,
     passengersBoarded: boarded,
-    dailyEarnings: session?.dailyEarnings ?? boarded * 12.5,
+    boardedPassengers: boardedList,
     tripId: session?.tripId,
   };
+}
+
+/** Driver ↔ office chat */
+export async function fetchDriverChatMessages({ after } = {}) {
+  const q = after ? `?after=${encodeURIComponent(after)}` : '';
+  const res = await fetch(`${API_BASE}/api/driver/chat/messages${q}`, {
+    headers: driverSessionHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Αποτυχία φόρτωσης chat');
+  }
+  return res.json();
+}
+
+export async function sendDriverChatMessage(body) {
+  const res = await fetch(`${API_BASE}/api/driver/chat/messages`, {
+    method: 'POST',
+    headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Αποτυχία αποστολής');
+  }
+  return res.json();
+}
+
+export async function markDriverChatRead() {
+  const res = await fetch(`${API_BASE}/api/driver/chat/read`, {
+    method: 'POST',
+    headers: driverSessionHeaders(),
+  });
+  if (!res.ok) return { ok: false };
+  return res.json();
 }

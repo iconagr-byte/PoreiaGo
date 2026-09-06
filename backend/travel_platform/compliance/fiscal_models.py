@@ -13,6 +13,8 @@ class FiscalProvider(str, Enum):
     NATIVE_AADE = "native_aade"
     PROSVASIS = "prosvasis"
     EPSILON = "epsilon"
+    SOFTONE = "softone"
+    IMPACT = "impact"
 
 
 class PlatformPaymentMethod(str, Enum):

@@ -3,14 +3,36 @@ import toast from 'react-hot-toast';
 import {
   DEFAULT_FISCAL_SETTINGS,
   FISCAL_PROVIDERS,
+  FISCAL_PROVIDER_GROUPS,
   fetchFiscalSettings,
   updateFiscalSettings,
 } from '../../services/fiscalSettingsApi.js';
 import FiscalPipelineHelp from './FiscalPipelineHelp.jsx';
+import FiscalProviderActivateWizard from './FiscalProviderActivateWizard.jsx';
+import { API_BASE } from '../../config/api.js';
 
 const INPUT_CLASS =
   'mt-1.5 w-full rounded-xl border border-gray-200/90 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-primary/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20';
 
+function readinessTone(ok) {
+  if (ok === true) return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+  if (ok === false) return 'bg-rose-50 text-rose-800 border-rose-200';
+  return 'bg-amber-50 text-amber-900 border-amber-200';
+}
+
+function ReadinessChip({ label, ok, detail }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${readinessTone(ok)}`}
+      title={detail || ''}
+    >
+      <span className="material-symbols-outlined text-[14px]">
+        {ok === true ? 'check_circle' : ok === false ? 'error' : 'pending'}
+      </span>
+      {label}
+    </span>
+  );
+}
 function SectionHeader({ icon, title, subtitle }) {
   return (
     <div className="mb-5">
@@ -116,38 +138,81 @@ export default function FiscalSettingsPanel() {
     prosvasis_bearer: '',
     epsilon_jwt: '',
     epsilon_subscription_key: '',
+    softone_api_key: '',
+    impact_api_key: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pipeline, setPipeline] = useState(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const activeProvider = FISCAL_PROVIDERS.find((p) => p.id === form.provider);
+
+  const loadPipeline = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/health`, { credentials: 'omit' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setPipeline(await res.json());
+    } catch {
+      setPipeline(null);
+    }
+  }, []);
+
+  const blankSecrets = () => ({
+    prosvasis_s1code: '',
+    prosvasis_bearer: '',
+    epsilon_jwt: '',
+    epsilon_subscription_key: '',
+    softone_api_key: '',
+    impact_api_key: '',
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setForm(await fetchFiscalSettings());
-      setSecrets({
-        prosvasis_s1code: '',
-        prosvasis_bearer: '',
-        epsilon_jwt: '',
-        epsilon_subscription_key: '',
-      });
+      setSecrets(blankSecrets());
+      await loadPipeline();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία φόρτωσης ρυθμίσεων φορολογίας');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadPipeline]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  const providerReady =
+    form.provider === 'native_aade'
+      ? Boolean(String(form.issuer_vat || '').trim())
+      : form.provider === 'prosvasis'
+        ? Boolean(
+            form.prosvasis?.app_id &&
+              form.prosvasis?.s1code_configured &&
+              form.prosvasis?.bearer_token_configured,
+          )
+        : form.provider === 'epsilon'
+          ? Boolean(form.epsilon?.jwt_configured)
+          : form.provider === 'softone'
+            ? Boolean(form.softone?.api_key_configured)
+            : form.provider === 'impact'
+              ? Boolean(form.impact?.api_key_configured)
+              : false;
+
+  const redisOk = pipeline?.redis?.status === 'ok';
+  const celeryOk = pipeline?.celery?.status === 'ok';
+  const fiscalHealth = pipeline?.fiscal?.health;
   const setProvider = (provider) => setForm((prev) => ({ ...prev, provider }));
   const setProsvasis = (patch) =>
     setForm((prev) => ({ ...prev, prosvasis: { ...prev.prosvasis, ...patch } }));
   const setEpsilon = (patch) =>
     setForm((prev) => ({ ...prev, epsilon: { ...prev.epsilon, ...patch } }));
+  const setSoftone = (patch) =>
+    setForm((prev) => ({ ...prev, softone: { ...prev.softone, ...patch } }));
+  const setImpact = (patch) =>
+    setForm((prev) => ({ ...prev, impact: { ...prev.impact, ...patch } }));
 
   const onSave = async (e) => {
     e.preventDefault();
@@ -187,14 +252,29 @@ export default function FiscalSettingsPanel() {
         }
       }
 
+      if (form.provider === 'softone') {
+        patch.softone = {
+          api_url: form.softone.api_url,
+          issuer_name: form.softone.issuer_name,
+          branch_code: form.softone.branch_code,
+          item_code: form.softone.item_code,
+        };
+        if (secrets.softone_api_key.trim()) patch.softone.api_key = secrets.softone_api_key.trim();
+      }
+
+      if (form.provider === 'impact') {
+        patch.impact = {
+          api_url: form.impact.api_url,
+          issuer_name: form.impact.issuer_name,
+          branch_code: form.impact.branch_code,
+          item_code: form.impact.item_code,
+        };
+        if (secrets.impact_api_key.trim()) patch.impact.api_key = secrets.impact_api_key.trim();
+      }
+
       const data = await updateFiscalSettings(patch);
       setForm(data);
-      setSecrets({
-        prosvasis_s1code: '',
-        prosvasis_bearer: '',
-        epsilon_jwt: '',
-        epsilon_subscription_key: '',
-      });
+      setSecrets(blankSecrets());
       toast.success('Οι ρυθμίσεις φορολογικής έκδοσης αποθηκεύτηκαν');
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αποθήκευσης');
@@ -231,27 +311,114 @@ export default function FiscalSettingsPanel() {
               {activeProvider.label}
             </span>
           ) : null}
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-teal-700 text-white text-xs font-bold shadow-lg shadow-teal-700/20 hover:bg-teal-800 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[16px]">rocket_launch</span>
+            Ενεργοποίηση παρόχου
+          </button>
           <FiscalPipelineHelp className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-violet-200/80 bg-white text-violet-800 text-xs font-bold hover:bg-violet-50 shadow-sm transition-colors" />
         </div>
       </div>
 
-      <form onSubmit={onSave} className="p-6 space-y-8">
-        <div>
-          <SectionHeader
-            icon="storefront"
-            title="Πάροχος φορολογικής έκδοσης"
-            subtitle="Επιλέξτε πώς εκδίδονται ΑΠΥ/τιμολόγια μετά την πληρωμή."
-          />
-          <div className="grid gap-4 sm:grid-cols-3">
-            {FISCAL_PROVIDERS.map((p) => (
-              <ProviderCard
-                key={p.id}
-                provider={p}
-                active={form.provider === p.id}
-                onSelect={() => setProvider(p.id)}
-              />
-            ))}
+      {!providerReady || (form.provider !== 'softone' && form.provider !== 'impact') ? (
+        <div className="mx-6 mt-6 rounded-2xl border border-teal-200/80 bg-gradient-to-br from-teal-50 via-white to-emerald-50/50 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-600 text-white shadow-md shadow-teal-600/25">
+            <span className="material-symbols-outlined text-[26px]">verified</span>
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-gray-900">Οδηγός ενεργοποίησης ΥΠΑΗΕΣ</p>
+            <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+              SoftOne ή Impact σε λίγα βήματα: επιλογή παρόχου → API key → έλεγχος σύνδεσης →
+              ενεργοποίηση για το γραφείο.
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-teal-700 text-white text-sm font-bold shrink-0 shadow-lg shadow-teal-700/20 hover:bg-teal-800"
+          >
+            Ξεκίνα wizard
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </button>
+        </div>
+      ) : null}
+
+      <form onSubmit={onSave} className="p-6 space-y-8">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-bold text-slate-900">Κατάσταση pipeline</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Redis / Celery από `/health` · κλειδιά παρόχου από τις ρυθμίσεις γραφείου
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadPipeline}
+              className="text-xs font-bold text-primary hover:underline"
+            >
+              Ανανέωση
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ReadinessChip label="Redis" ok={pipeline ? redisOk : null} detail={pipeline?.redis?.detail} />
+            <ReadinessChip
+              label="Celery worker"
+              ok={pipeline?.celery ? celeryOk : null}
+              detail={
+                pipeline?.celery?.detail ||
+                (pipeline?.celery?.workers || []).join(', ') ||
+                'Μετά το deploy θα εμφανίζεται εδώ'
+              }
+            />
+            <ReadinessChip
+              label={`Fiscal ${fiscalHealth || '—'}`}
+              ok={fiscalHealth === 'ok' ? true : fiscalHealth === 'degraded' ? false : null}
+              detail={
+                pipeline?.fiscal
+                  ? `issued=${pipeline.fiscal.issued} pending=${pipeline.fiscal.pending} stuck=${pipeline.fiscal.stuck_candidates}`
+                  : ''
+              }
+            />
+            <ReadinessChip
+              label="Κλειδιά παρόχου"
+              ok={providerReady}
+              detail={
+                providerReady
+                  ? 'Τα απαραίτητα secrets/πεδία φαίνονται συμπληρωμένα'
+                  : 'Συμπλήρωσε secrets παρόχου ή ΑΦΜ για native AADE'
+              }
+            />
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Οδηγός: <code className="text-[11px]">docs/FISCAL-PROVIDER-SETUP.md</code> · Πάροχοι
+            ΥΠΑΗΕΣ: SoftOne, Impact · Άλλα: myDATA απευθείας, Prosvasis/Epsilon ERP.
+          </p>
+        </div>
+
+        <div className="space-y-8">
+          {FISCAL_PROVIDER_GROUPS.map((group) => {
+            const items = FISCAL_PROVIDERS.filter((p) => p.group === group.id);
+            if (!items.length) return null;
+            return (
+              <div key={group.id}>
+                <SectionHeader icon="storefront" title={group.title} subtitle={group.subtitle} />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {items.map((p) => (
+                    <ProviderCard
+                      key={p.id}
+                      provider={p}
+                      active={form.provider === p.id}
+                      onSelect={() => setProvider(p.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="rounded-2xl border border-gray-100 bg-gray-50/40 p-5 sm:p-6">
@@ -372,6 +539,73 @@ export default function FiscalSettingsPanel() {
           </div>
         ) : null}
 
+        {form.provider === 'softone' || form.provider === 'impact' ? (
+          <div
+            className={`rounded-2xl border p-5 sm:p-6 space-y-4 ${
+              form.provider === 'softone'
+                ? 'border-teal-100 bg-teal-50/25'
+                : 'border-indigo-100 bg-indigo-50/25'
+            }`}
+          >
+            <SectionHeader
+              icon={form.provider === 'softone' ? 'apartment' : 'receipt_long'}
+              title={form.provider === 'softone' ? 'SoftOne eINVOICING' : 'Impact EINVOICING'}
+              subtitle="Login με ΑΦΜ + API key · αποστολή μέσω /Invoice/json (EliseCore)."
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="API URL"
+                value={form[form.provider].api_url}
+                onChange={(v) =>
+                  form.provider === 'softone' ? setSoftone({ api_url: v }) : setImpact({ api_url: v })
+                }
+                hint={
+                  form.provider === 'softone'
+                    ? 'Prod: https://einvoice.s1ecos.gr · Demo: https://einvoice-demo.s1ecos.gr'
+                    : 'Prod: https://einvoiceapi.impact.gr · UAT: https://einvoiceapiuat.impact.gr'
+                }
+              />
+              <SecretField
+                label="API Key"
+                configured={form[form.provider].api_key_configured}
+                value={secrets[`${form.provider}_api_key`]}
+                onChange={(v) =>
+                  setSecrets((s) => ({
+                    ...s,
+                    [`${form.provider}_api_key`]: v,
+                  }))
+                }
+                placeholder="API key από portal παρόχου"
+              />
+              <TextField
+                label="Επωνυμία εκδότη"
+                value={form[form.provider].issuer_name}
+                onChange={(v) =>
+                  form.provider === 'softone'
+                    ? setSoftone({ issuer_name: v })
+                    : setImpact({ issuer_name: v })
+                }
+              />
+              <NumberField
+                label="Υποκατάστημα (branch code)"
+                value={form[form.provider].branch_code}
+                onChange={(v) =>
+                  form.provider === 'softone'
+                    ? setSoftone({ branch_code: v })
+                    : setImpact({ branch_code: v })
+                }
+              />
+              <TextField
+                label="Κωδικός είδους / υπηρεσίας"
+                value={form[form.provider].item_code}
+                onChange={(v) =>
+                  form.provider === 'softone' ? setSoftone({ item_code: v }) : setImpact({ item_code: v })
+                }
+              />
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100">
           <p className="text-xs text-gray-400 max-w-md">
             Οι αλλαγές ισχύουν για νέες εκδόσεις μετά την αποθήκευση. Για ουρά & σφάλματα, δείτε Πληρωμές → Fiscal.
@@ -386,6 +620,16 @@ export default function FiscalSettingsPanel() {
           </button>
         </div>
       </form>
+
+      <FiscalProviderActivateWizard
+        open={wizardOpen}
+        initialSettings={form}
+        onCancel={() => setWizardOpen(false)}
+        onActivated={async () => {
+          setWizardOpen(false);
+          await load();
+        }}
+      />
     </section>
   );
 }

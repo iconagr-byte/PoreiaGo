@@ -1,0 +1,219 @@
+/* Printable boarding pass — screen + @media print */
+
+.ticket-print-shell {
+  min-height: 100dvh;
+  padding: 1.25rem 1rem 2.5rem;
+}
+
+.ticket-print-status {
+  max-width: 28rem;
+  margin: 4rem auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: center;
+  color: var(--wallet-muted, #64748b);
+  font-weight: 600;
+}
+
+.ticket-print-link {
+  color: var(--wallet-accent, #0f4c81);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.ticket-print-toolbar {
+  max-width: 26rem;
+  margin: 0 auto 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.ticket-print-toolbar-title {
+  margin: 0;
+  font-family: var(--wallet-display, Georgia, serif);
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--wallet-ink, #0f172a);
+}
+
+.ticket-print-toolbar-copy {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--wallet-muted, #64748b);
+}
+
+.ticket-print-toolbar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ticket-print-pass {
+  max-width: 26rem;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 1.35rem;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1);
+}
+
+.ticket-print-hero {
+  position: relative;
+  min-height: 10.5rem;
+  background: linear-gradient(145deg, #1e3a5f 0%, #0f4c81 55%, #16324f 100%);
+  background-size: cover;
+  background-position: center;
+}
+
+.ticket-print-hero-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 20, 35, 0.2) 0%, rgba(8, 20, 35, 0.78) 100%);
+}
+
+.ticket-print-hero-copy {
+  position: relative;
+  z-index: 1;
+  padding: 1.25rem 1.2rem 1.4rem;
+  color: #fff;
+}
+
+.ticket-print-brand {
+  margin: 0 0 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.ticket-print-title {
+  margin: 0;
+  font-family: var(--wallet-display, Georgia, serif);
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.ticket-print-when {
+  margin: 0.45rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ticket-print-body {
+  padding: 1.15rem 1.2rem 1.25rem;
+}
+
+.ticket-print-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1rem;
+}
+
+.ticket-print-kicker {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.2rem;
+}
+
+.ticket-print-value {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.ticket-print-seat {
+  font-size: 1.45rem;
+  color: #0f4c81;
+}
+
+.ticket-print-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ticket-print-perforation {
+  margin: 1.1rem 0;
+  border-top: 1.5px dashed rgba(15, 23, 42, 0.16);
+}
+
+.ticket-print-qr-block {
+  text-align: center;
+}
+
+.ticket-print-qr-frame {
+  display: inline-block;
+  padding: 0.65rem;
+  border: 1.5px dashed rgba(15, 23, 42, 0.14);
+  border-radius: 1rem;
+  background: #f8fafc;
+}
+
+.ticket-print-qr-img {
+  display: block;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.ticket-print-pnr-lg {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+}
+
+.ticket-print-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.ticket-print-footer {
+  margin: 1rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+@media print {
+  .no-print-ticket {
+    display: none !important;
+  }
+
+  .wallet-app.ticket-print-shell {
+    background: #fff !important;
+    padding: 0 !important;
+    min-height: auto;
+  }
+
+  .ticket-print-pass {
+    max-width: none;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    border: 0;
+    break-inside: avoid;
+  }
+
+  .ticket-print-hero {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @page {
+    margin: 12mm;
+    size: A4;
+  }
+}

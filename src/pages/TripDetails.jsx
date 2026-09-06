@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { loadTrips } from '../lib/trips/tripStore.js';
+import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import { isInternationalTrip, MARKET_LABELS } from '../lib/trips/tripMarket.js';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import TripPriceDisplay from '../components/TripPriceDisplay.jsx';
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
 
 // Custom Red Pin Marker (Google Maps Style)
 const redIcon = L.divIcon({
@@ -53,7 +54,11 @@ export default function TripDetails() {
   const [nextStopName, setNextStopName] = useState("");
 
   useEffect(() => {
-    const found = loadTrips().find(t => t.id === parseInt(id));
+    const tripId = parseInt(id, 10);
+    let found = loadTrips().find((t) => t.id === tripId);
+    if (!found && isPlatformSeatBookingDemo()) {
+      found = loadPlatformDemoTrips().find((t) => t.id === tripId);
+    }
     if (found) {
       setTrip(found);
     }
@@ -147,7 +152,7 @@ export default function TripDetails() {
                 </span>
               )}
               <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-xs uppercase tracking-widest font-bold w-max">
-                Premium Εμπειρια
+                {trip.badge || trip.durationLabel || 'Premium Εμπειρία'}
               </span>
               <span className="text-on-surface-variant font-label-md bg-surface-container-lowest px-3 py-1 rounded-full border border-black/[0.05] shadow-sm flex items-center gap-2">
                 <span className="material-symbols-outlined text-[16px] text-primary">calendar_month</span>
@@ -213,6 +218,34 @@ export default function TripDetails() {
                 </div>
               </div>
             </div>
+
+            {(trip.meetingPoint || trip.durationLabel || (Array.isArray(trip.highlights) && trip.highlights.length > 0)) && (
+              <div className="mt-8 pt-6 border-t border-black/[0.05] space-y-4">
+                {trip.durationLabel ? (
+                  <p className="text-sm text-on-surface-variant">
+                    <span className="font-bold text-on-surface">Διάρκεια:</span> {trip.durationLabel}
+                  </p>
+                ) : null}
+                {trip.meetingPoint ? (
+                  <p className="text-sm text-on-surface-variant">
+                    <span className="font-bold text-on-surface">Σημείο συνάντησης:</span> {trip.meetingPoint}
+                  </p>
+                ) : null}
+                {Array.isArray(trip.highlights) && trip.highlights.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {trip.highlights.map((h) => (
+                      <span
+                        key={h}
+                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                      >
+                        <span className="material-symbols-outlined text-[14px] text-emerald-600">check</span>
+                        {h}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
 
           <div className="bg-surface-container-lowest rounded-[32px] p-8 shadow-level-2 mb-8 flex-1">
@@ -238,17 +271,20 @@ export default function TripDetails() {
             <button 
               type="button"
               onClick={async () => {
-                const check = await checkTripAvailable(trip);
-                if (!check.available) {
-                  toast.error(check.reason || 'Το όχημα δεν είναι διαθέσιμο');
-                  return;
+                if (!isPlatformSeatBookingDemo()) {
+                  const check = await checkTripAvailable(trip);
+                  if (!check.available) {
+                    toast.error(check.reason || 'Το όχημα δεν είναι διαθέσιμο');
+                    return;
+                  }
+                  if (check.warning) toast(check.warning, { icon: '⚠️' });
                 }
-                if (check.warning) toast(check.warning, { icon: '⚠️' });
                 navigate(`/select-seat/${trip.id}`);
               }}
               className="w-full py-4 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-[24px] font-headline-sm font-bold shadow-xl hover:scale-[1.02] hover:shadow-gray-900/30 transition-all flex items-center justify-center gap-3"
             >
-              Επιλογή Θέσης <span className="material-symbols-outlined text-2xl">arrow_forward</span>
+              {isPlatformSeatBookingDemo() ? 'Δοκιμή επιλογής θέσης' : 'Επιλογή Θέσης'}{' '}
+              <span className="material-symbols-outlined text-2xl">arrow_forward</span>
             </button>
           </div>
         </div>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>EmailAccountDescription</key>
+      <string>Sales</string>
+      <key>EmailAddress</key>
+      <string>sales@example.com</string>
+      <key>IncomingMailServerHostName</key>
+      <string>mail.example.com</string>
+      <key>IncomingMailServerPortNumber</key>
+      <integer>993</integer>
+      <key>IncomingMailServerUseSSL</key>
+      <true/>
+      <key>IncomingMailServerUsername</key>
+      <string>sales@example.com</string>
+      <key>IncomingPassword</key>
+      <string>secret-pass</string>
+      <key>OutgoingMailServerHostName</key>
+      <string>mail.example.com</string>
+      <key>OutgoingMailServerPortNumber</key>
+      <integer>465</integer>
+      <key>OutgoingMailServerUseSSL</key>
+      <true/>
+      <key>OutgoingMailServerUsername</key>
+      <string>sales@example.com</string>
+      <key>PayloadType</key>
+      <string>com.apple.mail.managed</string>
+      <key>IncomingMailServerIMAPPathPrefix</key>
+      <string>INBOX</string>
+    </dict>
+  </array>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+</dict>
+</plist>

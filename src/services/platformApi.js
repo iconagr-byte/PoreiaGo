@@ -1,12 +1,22 @@
 import { API_BASE } from '../config/api.js';
 import { mockFleet } from '../data/mockData.js';
+import { fileToDriverPhotoDataUrl } from '../lib/drivers/driverPhoto.js';
+import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 import { adminBearerHeaders, adminFetch } from './adminApi.js';
-import { getSaasToken, issueSaasMasterQr, saasFetch } from './saasApi.js';
+import { getSaasToken, getSaasTenantId, issueSaasMasterQr, saasFetch } from './saasApi.js';
 import { normalizeCheckoutSettings } from './checkoutSettingsApi.js';
 import { normalizeBankTransferSettings } from '../lib/payments/bankTransfer.js';
 
-const PLATFORM_SETTINGS_KEY = 'aerostride_platform_settings';
-const MAINT_EVENTS_KEY = 'aerostride_maintenance_events_v1';
+const PLATFORM_SETTINGS_KEY_BASE = 'aerostride_platform_settings';
+const MAINT_EVENTS_KEY_BASE = 'aerostride_maintenance_events_v1';
+
+function platformSettingsKey() {
+  return officeStorageKey(PLATFORM_SETTINGS_KEY_BASE);
+}
+
+function maintEventsKey() {
+  return officeStorageKey(MAINT_EVENTS_KEY_BASE);
+}
 
 export const DEFAULT_PLATFORM_SETTINGS = {
   company_name: 'PoreiaGo Travel',
@@ -24,7 +34,7 @@ export const DEFAULT_PLATFORM_SETTINGS = {
   smtp_from_email: 'noreply@poreiago.app',
   sms_sender_id: 'AEROSTRIDE',
   maintenance_mode: false,
-  checkout_base_url: 'http://localhost:5173',
+  checkout_base_url: 'https://www.poreiago.com',
   checkout_deposit_enabled: true,
   checkout_deposit_percent: 30,
   checkout_bank_transfer_enabled: true,
@@ -86,17 +96,52 @@ export function normalizePlatformSettings(form) {
   out.support_email = String(out.support_email || '').trim() || DEFAULT_PLATFORM_SETTINGS.support_email;
   out.smtp_from_email = String(out.smtp_from_email || '').trim() || DEFAULT_PLATFORM_SETTINGS.smtp_from_email;
   out.sms_sender_id = String(out.sms_sender_id || '').trim() || DEFAULT_PLATFORM_SETTINGS.sms_sender_id;
+  const checkout = String(out.checkout_base_url || '').trim().replace(/\/$/, '');
+  out.checkout_base_url =
+    !checkout || /localhost|127\.0\.0\.1/i.test(checkout)
+      ? productionCheckoutFallback()
+      : checkout;
   return out;
 }
 
 function saveSettingsLocally(data) {
-  localStorage.setItem(PLATFORM_SETTINGS_KEY, JSON.stringify(data));
+  localStorage.setItem(platformSettingsKey(), JSON.stringify(data));
 }
 
-export async function fetchPlatformSettings() {
-  if (getSaasToken()) {
+/**
+ * @param {{ preferPublic?: boolean }} [options]
+ * preferPublic: skip SaaS JWT (marketing homepage). Stale office tokens on
+ * www.poreiago.com must not trip saasFetch → /admin/login.
+ */
+function productionCheckoutFallback() {
+  try {
+    const host = String(window.location?.hostname || '').toLowerCase();
+    if (!host || host === 'localhost' || host === '127.0.0.1') {
+      return DEFAULT_PLATFORM_SETTINGS.checkout_base_url;
+    }
+    if (/(^|\.)achilliotravel\.com$/.test(host)) {
+      return 'https://www.achilliotravel.com';
+    }
+    return window.location.origin.replace(/\/$/, '') || DEFAULT_PLATFORM_SETTINGS.checkout_base_url;
+  } catch {
+    return DEFAULT_PLATFORM_SETTINGS.checkout_base_url;
+  }
+}
+
+function healLocalCheckout(data) {
+  const next = { ...DEFAULT_PLATFORM_SETTINGS, ...(data || {}) };
+  const url = String(next.checkout_base_url || '');
+  if (!url || /localhost|127\.0\.0\.1/i.test(url)) {
+    next.checkout_base_url = productionCheckoutFallback();
+  }
+  return next;
+}
+
+export async function fetchPlatformSettings(options = {}) {
+  const preferPublic = Boolean(options.preferPublic);
+  if (!preferPublic && getSaasToken()) {
     try {
-      const data = await saasFetch('/api/v1/settings/platform');
+      const data = healLocalCheckout(await saasFetch('/api/v1/settings/platform'));
       saveSettingsLocally(data);
       return data;
     } catch {
@@ -106,7 +151,7 @@ export async function fetchPlatformSettings() {
   try {
     const res = await adminFetch('/api/admin/platform/settings');
     if (res.ok) {
-      const data = await res.json();
+      const data = healLocalCheckout(await res.json());
       saveSettingsLocally(data);
       return data;
     }
@@ -114,12 +159,12 @@ export async function fetchPlatformSettings() {
     /* offline */
   }
   try {
-    const cached = localStorage.getItem(PLATFORM_SETTINGS_KEY);
-    if (cached) return JSON.parse(cached);
+    const cached = localStorage.getItem(platformSettingsKey());
+    if (cached) return healLocalCheckout(JSON.parse(cached));
   } catch {
     /* ignore */
   }
-  return { ...DEFAULT_PLATFORM_SETTINGS };
+  return healLocalCheckout({ ...DEFAULT_PLATFORM_SETTINGS });
 }
 
 export async function updatePlatformSettings(patch) {
@@ -201,6 +246,23 @@ export async function fetchPlatformUsers() {
   return getMockUsers();
 }
 
+/** Login history (admin / customer / driver): χρόνος, IP, συσκευή. */
+export async function fetchLoginAudits({
+  limit = 100,
+  actorType,
+  success,
+  q,
+} = {}) {
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  if (actorType) params.set('actor_type', actorType);
+  if (success === true || success === false) params.set('success', String(success));
+  if (q) params.set('q', q);
+  const res = await adminFetch(`/api/admin/platform/login-audits?${params}`);
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
 export async function createPlatformUser(body) {
   const res = await adminFetch('/api/admin/platform/users', {
     method: 'POST',
@@ -269,38 +331,113 @@ export async function downloadBackupFile(backupId, filename) {
   URL.revokeObjectURL(url);
 }
 
+const _driversListCache = { key: '', at: 0, rows: null };
+const DRIVERS_LIST_TTL_MS = 20_000;
+
 export async function fetchFleetDrivers(status) {
+  // Cache key includes tenant so PoreiaGo / Achillio never share a list in-memory.
+  const tid = getSaasTenantId() || '';
+  const key = `${tid}|${status || ''}`;
+  const now = Date.now();
+  if (
+    _driversListCache.rows &&
+    _driversListCache.key === key &&
+    now - _driversListCache.at < DRIVERS_LIST_TTL_MS
+  ) {
+    return _driversListCache.rows;
+  }
+
+  const q = status ? `?status=${status}` : '';
   try {
-    const q = status ? `?status=${status}` : '';
-    const res = await adminFetch(`/api/admin/platform/drivers${q}`);
-    if (res.ok) return res.json();
-  } catch {
-    /* offline */
+    // Extra retries — drivers list is the first thing offices notice after deploy bounce.
+    const res = await adminFetch(`/api/admin/platform/drivers${q}`, { retries: 4 });
+    if (res.ok) {
+      const rows = await res.json();
+      _driversListCache.key = key;
+      _driversListCache.at = now;
+      _driversListCache.rows = rows;
+      return rows;
+    }
+    // Authenticated failures must not swap in demo mocks (hides real drivers e.g. Achilleas).
+    if (getSaasToken()) {
+      if ([404, 502, 503, 504].includes(res.status)) {
+        throw new Error(
+          'Ο server είναι προσωρινά εκτός (deploy). Περιμένετε λίγο και πατήστε Δοκιμή ξανά.',
+        );
+      }
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Αποτυχία φόρτωσης οδηγών (${res.status})`);
+    }
+  } catch (err) {
+    if (getSaasToken()) throw err;
   }
   return getMockDrivers();
+}
+
+/** Invalidate after create/update/delete so the next list fetch is fresh. */
+export function invalidateFleetDriversCache() {
+  _driversListCache.key = '';
+  _driversListCache.at = 0;
+  _driversListCache.rows = null;
+}
+
+/** Sync peek from the recent drivers list cache — used to paint driver profile instantly. */
+export function peekCachedFleetDriver(driverId) {
+  if (!driverId || !_driversListCache.rows) return null;
+  return _driversListCache.rows.find((d) => d?.id === driverId) || null;
 }
 
 export async function fetchFleetDriver(driverId) {
   try {
     const res = await adminFetch(`/api/admin/platform/drivers/${driverId}`);
-    if (res.ok) return res.json();
+    if (res.ok) {
+      const row = await res.json();
+      // Keep list cache in sync so revisits stay instant.
+      if (_driversListCache.rows && row?.id) {
+        const idx = _driversListCache.rows.findIndex((d) => d?.id === row.id);
+        if (idx >= 0) {
+          _driversListCache.rows = [
+            ..._driversListCache.rows.slice(0, idx),
+            { ..._driversListCache.rows[idx], ...row },
+            ..._driversListCache.rows.slice(idx + 1),
+          ];
+        }
+      }
+      return row;
+    }
     if (res.status === 404) return null;
-  } catch {
-    /* offline */
+    if (getSaasToken()) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Αποτυχία φόρτωσης οδηγού (${res.status})`);
+    }
+  } catch (err) {
+    if (getSaasToken()) throw err;
   }
   return getMockDrivers().find((d) => d.id === driverId) || null;
 }
 
 export async function createFleetDriver(body) {
-  const res = await adminFetch('/api/admin/platform/drivers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await adminFetch('/api/admin/platform/drivers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    const raw = String(err?.message || '');
+    if (/failed to fetch|networkerror|load failed/i.test(raw) || err?.name === 'TypeError') {
+      throw new Error(
+        'Δεν υπάρχει σύνδεση με τον server — δοκιμάστε ξανά ή συνδεθείτε στο γραφείο.',
+      );
+    }
+    throw err;
+  }
   if (res.status === 401 || res.status === 403) {
-    throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά');
+    throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά στο γραφείο');
   }
   if (!res.ok) await parseError(res);
+  invalidateFleetDriversCache();
   return res.json();
 }
 
@@ -314,6 +451,7 @@ export async function updateFleetDriver(driverId, body) {
     throw new Error('Η συνεδρία admin έληξε — συνδεθείτε ξανά');
   }
   if (!res.ok) await parseError(res);
+  invalidateFleetDriversCache();
   return res.json();
 }
 
@@ -322,19 +460,32 @@ export async function deleteFleetDriver(driverId) {
     method: 'DELETE',
   });
   if (!res.ok && res.status !== 204) await parseError(res);
+  invalidateFleetDriversCache();
 }
 
-/** Upload driver headshot — returns relative `/api/site/driver-photos/...` URL. */
+/** Upload driver headshot — returns relative URL or compressed data URL for photo_url. */
 export async function uploadDriverPhoto(file) {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch(`${API_BASE}/api/admin/platform/drivers/photo-upload`, {
-    method: 'POST',
-    headers: adminBearerHeaders(),
-    body: form,
-  });
-  if (!res.ok) await parseError(res);
-  return res.json();
+  // Prefer server upload when authenticated; fall back to local compress so
+  // offices are never blocked by "Invalid token" on the multipart endpoint.
+  if (getSaasToken()) {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await adminFetch('/api/admin/platform/drivers/photo-upload', {
+        method: 'POST',
+        body: form,
+      });
+      if (res.ok) {
+        return res.json();
+      }
+      // 401/403/5xx → data-URL path below (saved with create/update).
+    } catch {
+      /* network / deploy bounce — use data URL */
+    }
+  }
+
+  const url = await fileToDriverPhotoDataUrl(file);
+  return { ok: true, url, local: true };
 }
 
 export async function fetchFleetPlateAvailability(plate) {
@@ -380,7 +531,66 @@ export async function fetchFleetVehicles() {
   } catch {
     /* offline */
   }
-  return getMockVehicles();
+  // Never inject platform demo fleet for offices.
+  return [];
+}
+
+export async function createFleetVehicle(payload) {
+  const res = await adminFetch('/api/admin/platform/fleet/vehicles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    await parseError(res);
+  }
+  return res.json();
+}
+
+/** Upload fleet bus photo — returns `{ ok, url }` for public_image_url / gallery_urls. */
+export async function uploadFleetVehiclePhoto(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await adminFetch('/api/admin/platform/fleet/vehicles/photo-upload', {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    await parseError(res);
+  }
+  return res.json();
+}
+
+export async function fetchFleetVehicle(vehicleId) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}`,
+  );
+  if (res.status === 404) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία φόρτωσης οχήματος');
+  }
+  return data;
+}
+
+export async function updateFleetVehicle(vehicleId, payload) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data.detail === 'string'
+        ? data.detail
+        : data.message || 'Αποτυχία ενημέρωσης οχήματος',
+    );
+  }
+  return data;
 }
 
 export async function deleteFleetVehicle(vehicleId) {
@@ -395,6 +605,87 @@ export async function deleteFleetVehicle(vehicleId) {
   return data;
 }
 
+export async function fetchFleetAvailabilityBoard() {
+  const res = await adminFetch('/api/admin/platform/fleet/availability-board');
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchFleetCalendar(withinDays = 120) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/calendar?within_days=${encodeURIComponent(withinDays)}`,
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchFleetDocuments(vehicleId) {
+  const q = vehicleId ? `?vehicle_id=${encodeURIComponent(vehicleId)}` : '';
+  const res = await adminFetch(`/api/admin/platform/fleet/documents${q}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function uploadFleetDocument(vehicleId, file, { kind = 'registration', expiresAt } = {}) {
+  const params = new URLSearchParams({ kind });
+  if (expiresAt) params.set('expires_at', expiresAt);
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(
+    `${API_BASE}/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}/documents?${params}`,
+    { method: 'POST', headers: adminBearerHeaders(), body: form },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία ανεβάσματος εγγράφου');
+  }
+  return data;
+}
+
+export async function deleteFleetDocument(vehicleId, documentId) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/vehicles/${encodeURIComponent(vehicleId)}/documents/${encodeURIComponent(documentId)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || 'Αποτυχία διαγραφής εγγράφου');
+  }
+  return true;
+}
+
+export async function fetchFleetExpenses(vehicleId) {
+  const q = vehicleId ? `?vehicle_id=${encodeURIComponent(vehicleId)}` : '';
+  const res = await adminFetch(`/api/admin/platform/fleet/expenses${q}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function createFleetExpense(payload) {
+  const res = await adminFetch('/api/admin/platform/fleet/expenses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία καταχώρισης εξόδου');
+  }
+  return data;
+}
+
+export async function deleteFleetExpense(expenseId) {
+  const res = await adminFetch(
+    `/api/admin/platform/fleet/expenses/${encodeURIComponent(expenseId)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || 'Αποτυχία διαγραφής');
+  }
+  return true;
+}
+
 export async function fetchFleetDashboard() {
   try {
     const res = await adminFetch('/api/admin/platform/fleet/dashboard');
@@ -402,15 +693,12 @@ export async function fetchFleetDashboard() {
   } catch {
     /* offline */
   }
-  const vehicles = getMockVehicles();
-  const urgent = vehicles.filter((v) => v.service_status === 'Urgent');
-  const warning = vehicles.filter((v) => v.service_status === 'Warning');
   return {
-    urgent_count: urgent.length,
-    warning_count: warning.length,
-    alerts_count: urgent.length + warning.length,
-    monthly_cost_estimate: vehicles.reduce((sum, v) => sum + Number(v.insurance_cost_total || 0), 0) / 12,
-    needs_attention: [...urgent, ...warning].slice(0, 5),
+    urgent_count: 0,
+    warning_count: 0,
+    alerts_count: 0,
+    monthly_cost_estimate: 0,
+    needs_attention: [],
     alerts: [],
   };
 }
@@ -429,14 +717,19 @@ export async function fetchFleetAlerts(unresolvedOnly = true) {
   return [];
 }
 
-const RESOLVED_ALERTS_KEY = 'aerostride_fleet_resolved_alerts';
+const RESOLVED_ALERTS_KEY_BASE = 'aerostride_fleet_resolved_alerts';
+
+function resolvedAlertsKey() {
+  return officeStorageKey(RESOLVED_ALERTS_KEY_BASE);
+}
 
 function markAlertResolvedLocal(alertId) {
   try {
-    const raw = localStorage.getItem(RESOLVED_ALERTS_KEY);
+    const key = resolvedAlertsKey();
+    const raw = localStorage.getItem(key);
     const ids = raw ? JSON.parse(raw) : [];
     if (!ids.includes(alertId)) ids.push(alertId);
-    localStorage.setItem(RESOLVED_ALERTS_KEY, JSON.stringify(ids));
+    localStorage.setItem(key, JSON.stringify(ids));
   } catch {
     /* ignore */
   }
@@ -444,7 +737,7 @@ function markAlertResolvedLocal(alertId) {
 
 function filterUnresolvedLocal(alerts) {
   try {
-    const raw = localStorage.getItem(RESOLVED_ALERTS_KEY);
+    const raw = localStorage.getItem(resolvedAlertsKey());
     const resolved = raw ? new Set(JSON.parse(raw)) : new Set();
     return alerts.filter((a) => !resolved.has(a.id));
   } catch {
@@ -563,8 +856,10 @@ export async function fetchFleetCostReport(vehicleId, dateFrom, dateTo) {
   };
 }
 
-export async function issueMasterQr({ tripId, driverId } = {}) {
-  if (getSaasToken()) {
+export async function issueMasterQr({ tripId, driverId, preferAdmin = false } = {}) {
+  // Admin hybrid path issues immediately (Postgres or local). SaaS-only path
+  // often fails/retries when the trip is not synced yet — prefer admin for UI.
+  if (!preferAdmin && getSaasToken()) {
     try {
       return await issueSaasMasterQr({ tripId, driverId });
     } catch {
@@ -601,6 +896,53 @@ export async function notifyDriverShiftPush({ tripId, driverId, message, tripTit
     method: 'POST',
     body: JSON.stringify(body),
   });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Driver ↔ office chat (admin) */
+export async function fetchDriverChatThreads() {
+  const res = await adminFetch('/api/admin/platform/driver-chat/threads');
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+export async function fetchDriverChatUnread() {
+  const res = await adminFetch('/api/admin/platform/driver-chat/unread');
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+export async function fetchAdminDriverChatMessages(driverId, { after } = {}) {
+  const q = after ? `?after=${encodeURIComponent(after)}` : '';
+  const res = await adminFetch(
+    `/api/admin/platform/driver-chat/${encodeURIComponent(driverId)}/messages${q}`,
+  );
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+export async function sendAdminDriverChatMessage(driverId, body, { tripId, senderName } = {}) {
+  const payload = { body };
+  if (tripId != null) payload.trip_id = Number(tripId);
+  if (senderName) payload.sender_name = senderName;
+  const res = await adminFetch(
+    `/api/admin/platform/driver-chat/${encodeURIComponent(driverId)}/messages`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+export async function markAdminDriverChatRead(driverId) {
+  const res = await adminFetch(
+    `/api/admin/platform/driver-chat/${encodeURIComponent(driverId)}/read`,
+    { method: 'POST' },
+  );
   if (!res.ok) await parseError(res);
   return res.json();
 }
@@ -655,7 +997,7 @@ function getMockVehicles() {
 
 function readLocalMaintenanceEvents() {
   try {
-    const raw = localStorage.getItem(MAINT_EVENTS_KEY);
+    const raw = localStorage.getItem(maintEventsKey());
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -664,7 +1006,7 @@ function readLocalMaintenanceEvents() {
 }
 
 function saveLocalMaintenanceEvents(events) {
-  localStorage.setItem(MAINT_EVENTS_KEY, JSON.stringify(events));
+  localStorage.setItem(maintEventsKey(), JSON.stringify(events));
 }
 
 function getLocalMaintenanceEvents(vehicleId) {

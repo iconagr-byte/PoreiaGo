@@ -14,6 +14,7 @@ from travel_platform.compliance.fiscal_tenant_config import (
 )
 from travel_platform.compliance.native_aade_strategy import NativeAADEStrategy
 from travel_platform.compliance.prosvasis_strategy import ProsvasisStrategy
+from travel_platform.compliance.softone_impact_strategy import SoftOneImpactStrategy
 
 
 async def transmit_booking_fiscal(
@@ -38,6 +39,14 @@ async def transmit_booking_fiscal(
         if not config or not config.epsilon:
             raise FiscalAPIError("Tenant fiscal provider is Epsilon but config is missing")
         result = await EpsilonStrategy().transmit(data, config.epsilon)
+    elif provider == FiscalProvider.SOFTONE:
+        if not config or not config.softone:
+            raise FiscalAPIError("Tenant fiscal provider is SoftOne but config is missing")
+        result = await SoftOneImpactStrategy(provider=FiscalProvider.SOFTONE).transmit(data, config.softone)
+    elif provider == FiscalProvider.IMPACT:
+        if not config or not config.impact:
+            raise FiscalAPIError("Tenant fiscal provider is Impact but config is missing")
+        result = await SoftOneImpactStrategy(provider=FiscalProvider.IMPACT).transmit(data, config.impact)
     else:
         creds = native_credentials or {}
         result = await NativeAADEStrategy().transmit_unified(data, creds)

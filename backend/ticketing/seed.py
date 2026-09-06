@@ -77,4 +77,12 @@ async def seed_if_empty() -> None:
 
 
 def trip_capacity(trip_id: int) -> int:
+    try:
+        from travel_platform.operations.trip_ops_store import get_trip_ops
+
+        ops = get_trip_ops(trip_id) or {}
+        if ops.get("total_seats"):
+            return max(int(ops["total_seats"]), 1)
+    except Exception:
+        pass
     return TRIP_CAPACITY.get(trip_id, 45)

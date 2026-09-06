@@ -73,7 +73,13 @@ export default function IosPwaGpsGuidance({ compact = false }) {
         </div>
       </div>
 
-      {(expanded || compact || critical) && (
+      {compact && critical && !expanded ? (
+        <p className="px-4 pb-3 text-xs font-semibold opacity-90">
+          Μετά την έναρξη: Share → Προσθήκη στην Αρχική οθόνη για σταθερό GPS.
+        </p>
+      ) : null}
+
+      {(expanded || (!compact && critical)) && (
         <ol className="px-4 pb-4 space-y-3 list-none">
           {steps.map((step, index) => (
             <li key={step.id} className="flex gap-3 rounded-xl bg-white/70 border border-black/5 p-3">

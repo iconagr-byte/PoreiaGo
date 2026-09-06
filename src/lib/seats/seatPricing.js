@@ -202,6 +202,47 @@ export function formatSeatOverridesText(overrides = {}) {
     .join('\n');
 }
 
+/** UI rows for admin seat-override editor. */
+export function seatOverridesToRows(overrides = {}) {
+  return Object.entries(overrides || {})
+    .map(([seat, val], index) => {
+      const price = parseOverridePrice(val);
+      const amenities = parseOverrideAmenities(val) || [];
+      if (price == null && !amenities.length) return null;
+      return {
+        key: `${seat}-${index}`,
+        seat: String(seat || '').toUpperCase(),
+        price_eur: price == null ? '' : String(price),
+        amenities,
+      };
+    })
+    .filter(Boolean);
+}
+
+export function rowsToSeatOverrides(rows = []) {
+  const overrides = {};
+  (rows || []).forEach((row) => {
+    const seat = String(row?.seat || '')
+      .trim()
+      .toUpperCase();
+    if (!seat) return;
+    const entry = {};
+    const priceRaw = String(row?.price_eur ?? '').trim();
+    if (priceRaw !== '') {
+      const price = Number(priceRaw);
+      if (Number.isFinite(price)) entry.price_eur = roundMoney(price);
+    }
+    const amenities = Array.isArray(row?.amenities)
+      ? row.amenities.map((a) => String(a).trim()).filter(Boolean)
+      : [];
+    if (amenities.length) entry.amenities = amenities;
+    if (entry.price_eur != null || entry.amenities?.length) {
+      overrides[seat] = entry;
+    }
+  });
+  return overrides;
+}
+
 export function amenitiesToText(list) {
   return (list || []).join('\n');
 }

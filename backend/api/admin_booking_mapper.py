@@ -54,12 +54,35 @@ def normalize_reference(code: str) -> str:
 
 
 def local_id_from_reference(reference_code: str) -> str:
-    ref = (reference_code or "").strip().upper()
+    """Canonical ticketing/wallet id: BK-B95F8658 → B-B95F8658 (never B-BK-…)."""
+    ref = (reference_code or "").strip().upper().replace(" ", "")
+    # Peel accidental B- prefixes so B-BK-HEX and B-B-HEX collapse correctly.
+    while ref.startswith("B-") and not ref.startswith("BK-"):
+        ref = ref[2:]
     if ref.startswith("BK-"):
         return f"B-{ref[3:]}"
-    if ref.startswith("B-"):
-        return ref
-    return f"B-{ref}"
+    return f"B-{ref}" if ref else ""
+
+
+def booking_id_aliases(booking_id: str) -> list[str]:
+    """All id forms that may appear in wallet QR, checkout sync, or office sync."""
+    raw = (booking_id or "").strip()
+    if not raw:
+        return []
+    upper = raw.upper().replace(" ", "")
+    canon = local_id_from_reference(upper)
+    pnr = normalize_reference(upper)
+    candidates = [raw, upper, canon, pnr]
+    if pnr.startswith("BK-"):
+        candidates.append(f"B-{pnr}")  # legacy B-BK-HEX
+    out: list[str] = []
+    seen: set[str] = set()
+    for c in candidates:
+        if not c or c in seen:
+            continue
+        seen.add(c)
+        out.append(c)
+    return out
 
 
 def build_fiscal_admin_fields(
@@ -229,6 +252,26 @@ def booking_to_admin_dict(
     else:
         payment_status = meta.get("payment_status") or status.value.upper()
 
+    taxes = float(meta.get("taxes") if meta.get("taxes") is not None else round(total_eur * 0.24, 2))
+    base_price = float(
+        meta.get("base_price") if meta.get("base_price") is not None else round(total_eur - taxes, 2)
+    )
+
+    trip_date = created.strftime("%Y-%m-%d") if created else ""
+    trip_time = created.strftime("%H:%M") if created else ""
+    dep_raw = meta.get("departure_at")
+    if dep_raw:
+        try:
+            dep = datetime.fromisoformat(str(dep_raw).replace("Z", "+00:00"))
+            trip_date = dep.strftime("%Y-%m-%d")
+            trip_time = dep.strftime("%H:%M")
+        except ValueError:
+            pass
+
+    boarding = meta.get("boarding_pass_issued")
+    if boarding is None:
+        boarding = paid or status in (BookingStatus.CONFIRMED, BookingStatus.PAID, BookingStatus.BOARDED)
+
     result = {
         "id": local_id_from_reference(booking.reference_code),
         "saasBookingId": str(booking.id),
@@ -237,8 +280,8 @@ def booking_to_admin_dict(
         "customerId": str(booking.customer_user_id) if booking.customer_user_id else None,
         "tripTitle": meta.get("trip_title") or "—",
         "tripId": trip_id,
-        "date": created.strftime("%Y-%m-%d") if created else "",
-        "time": created.strftime("%H:%M") if created else "",
+        "date": trip_date,
+        "time": trip_time,
         "seats": seats,
         "seat": booking.seat_label or ", ".join(seats),
         "price": total_eur,
@@ -248,6 +291,8 @@ def booking_to_admin_dict(
         "paymentPlan": payment_plan,
         "depositPercent": deposit_percent if balance_due > 0 else None,
         "balanceDueMethod": meta.get("balance_due_method"),
+        "basePrice": base_price,
+        "taxes": taxes,
         "status": greek_status,
         "checkInStatus": check_in_status,
         "checkedIn": checked_in,
@@ -255,11 +300,20 @@ def booking_to_admin_dict(
         "email": booking.passenger_email or "",
         "paymentStatus": payment_status,
         "paymentMethod": meta.get("payment_method") or "Online",
+        "paymentDate": meta.get("payment_date")
+        or (created.strftime("%Y-%m-%d %H:%M:%S") if created and amount_paid > 0 else None),
+        "transactionId": meta.get("transaction_id") or f"TXN-{booking.id}",
+        "invoiceNumber": meta.get("invoice_number")
+        or f"INV-{(booking.reference_code or '').replace('BK-', '')}",
         "pnr": booking.reference_code,
-        "boardingPassIssued": paid,
+        "ticketRef": meta.get("ticket_ref") or booking.reference_code,
+        "boardingPassIssued": bool(boarding),
         "bookingSource": meta.get("source") or "Postgres",
+        "agentName": meta.get("agent_name") or "",
         "passenger_vat_id": booking.passenger_vat_id,
         "notes": booking.notes,
+        "tenant_id": str(booking.tenant_id) if getattr(booking, "tenant_id", None) else None,
+        "tenantId": str(booking.tenant_id) if getattr(booking, "tenant_id", None) else None,
     }
     result.update(build_fiscal_admin_fields(booking, fiscal_invoices))
     return result

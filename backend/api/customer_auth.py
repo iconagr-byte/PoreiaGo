@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import os
 
-import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from ticketing.email_dispatch import send_email
@@ -19,6 +18,12 @@ from ticketing.customer_accounts import (
     upsert_google_account,
 )
 from ticketing.customer_jwt import create_customer_token, decode_customer_token
+from ticketing.wallet_magic import (
+    MAGIC_TTL_MINUTES,
+    consume_wallet_magic_token,
+    create_wallet_magic_token,
+)
+from travel_platform.settings.login_audit_store import record_login_from_request
 
 router = APIRouter(prefix="/api/auth", tags=["Customer Auth"])
 
@@ -52,6 +57,18 @@ class ResetPasswordRequest(BaseModel):
 
 class GoogleTokenRequest(BaseModel):
     id_token: str = Field(min_length=10)
+
+
+class WalletMagicIssueRequest(BaseModel):
+    email: EmailStr
+    booking_id: str = Field(min_length=1, max_length=80)
+    name: str = Field(default="", max_length=120)
+    phone: str = Field(default="", max_length=40)
+    send_email: bool = True
+
+
+class WalletMagicConsumeRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
 
 
 def _google_client_id() -> str:
@@ -105,15 +122,32 @@ async def register_customer(body: RegisterRequest):
 
 
 @router.post("/login")
-async def login_customer(body: LoginRequest):
+async def login_customer(request: Request, body: LoginRequest):
     email = body.email.strip().lower()
     if email in STAFF_EMAILS:
         raise HTTPException(status_code=403, detail="Use Admin Login for staff accounts")
 
     account = await authenticate_account(email, body.password)
     if not account:
+        record_login_from_request(
+            request,
+            actor_type="customer",
+            identity=email,
+            success=False,
+            method="password",
+            detail="Λάθος email ή κωδικός",
+        )
         raise HTTPException(status_code=401, detail="Λάθος email ή κωδικός")
     token = create_customer_token(email)
+    record_login_from_request(
+        request,
+        actor_type="customer",
+        identity=email,
+        success=True,
+        actor_id=str(account.get("customer_id") or email),
+        actor_name=account.get("name"),
+        method="password",
+    )
     return _profile_response(account, token)
 
 
@@ -174,41 +208,117 @@ async def reset_password(body: ResetPasswordRequest):
     return _profile_response(account, token)
 
 
-@router.post("/google")
-async def verify_google_token(body: GoogleTokenRequest):
-    """Verify Google ID token, upsert account, return JWT."""
+@router.get("/google/config")
+async def google_auth_config():
+    """
+    Public GIS client id for My Wallet Sign-In.
+
+    The OAuth Web Client ID is not a secret — Google embeds it in the browser.
+    Frontend loads this at runtime so ops only need GOOGLE_CLIENT_ID in .env.prod
+    (no Vite rebuild required when rotating the id).
+    """
     client_id = _google_client_id()
-    if not client_id:
-        raise HTTPException(
-            status_code=503,
-            detail="Google OAuth not configured (set GOOGLE_CLIENT_ID)",
+    return {
+        "enabled": bool(client_id),
+        "client_id": client_id or None,
+    }
+
+
+@router.post("/google")
+async def verify_google_token(request: Request, body: GoogleTokenRequest):
+    """Verify Google ID token, upsert account, return JWT."""
+    from app.services.google_oauth import verify_google_id_token
+
+    try:
+        data = await verify_google_id_token(body.id_token)
+    except HTTPException as exc:
+        record_login_from_request(
+            request,
+            actor_type="customer",
+            identity="google",
+            success=False,
+            method="google",
+            detail=str(exc.detail),
         )
-
-    async with httpx.AsyncClient() as http:
-        response = await http.get(
-            "https://oauth2.googleapis.com/tokeninfo",
-            params={"id_token": body.id_token},
-            timeout=10.0,
-        )
-
-    if response.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid Google token")
-
-    data = response.json()
-    if data.get("aud") != client_id:
-        raise HTTPException(status_code=401, detail="Google token audience mismatch")
-
-    email_verified = str(data.get("email_verified", "")).lower()
-    if email_verified not in ("true", "1"):
-        raise HTTPException(status_code=401, detail="Google email not verified")
+        raise
 
     email = str(data.get("email", "")).strip().lower()
-    if not email:
-        raise HTTPException(status_code=401, detail="Google account has no email")
 
     if email in STAFF_EMAILS:
         raise HTTPException(status_code=403, detail="Use Admin Login for staff accounts")
 
     account = await upsert_google_account(email, data.get("name"), data.get("picture"))
     token = create_customer_token(email, extra={"provider": "google"})
+    record_login_from_request(
+        request,
+        actor_type="customer",
+        identity=email,
+        success=True,
+        actor_id=str(account.get("customer_id") or email),
+        actor_name=account.get("name") or data.get("name"),
+        method="google",
+    )
     return _profile_response(account, token)
+
+
+@router.post("/wallet-magic/issue")
+async def issue_wallet_magic(body: WalletMagicIssueRequest):
+    """
+    Issue a short-lived magic link for My Wallet (phase B).
+
+    Always returns ok when inputs look valid — avoids email enumeration.
+    The raw magic URL is NEVER returned to untrusted clients (account takeover).
+    Ticket confirmation emails mint tokens server-side in ticketing.ticket_email.
+    """
+    email = body.email.strip().lower()
+    booking_id = body.booking_id.strip()
+    if email in STAFF_EMAILS:
+        return {"ok": True, "sent": False, "expires_minutes": MAGIC_TTL_MINUTES}
+
+    sent = False
+    try:
+        token = await create_wallet_magic_token(
+            email=email,
+            booking_id=booking_id,
+            name=body.name,
+            phone=body.phone,
+        )
+        magic_url = f"{_public_base_url()}/wallet/magic?token={token}"
+        # Public API only delivers by email — never leak the token URL in JSON.
+        if body.send_email:
+            subject = "My Wallet — Άνοιγμα εισιτηρίου"
+            html = f"""<!DOCTYPE html><html lang="el"><body style="font-family:Arial,sans-serif;padding:24px;background:#f4f7fb;">
+              <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:20px;padding:28px;border:1px solid #e2e8f0;">
+                <p style="margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#64748b;font-weight:bold;">My Wallet</p>
+                <h2 style="margin:0 0 12px;color:#0f172a;">Άνοιγμα εισιτηρίου</h2>
+                <p style="margin:0 0 20px;color:#64748b;line-height:1.55;">Πατήστε για να ανοίξετε το My Wallet χωρίς κωδικό. Ο σύνδεσμος ισχύει για {MAGIC_TTL_MINUTES} λεπτά.</p>
+                <p><a href="{magic_url}" style="display:inline-block;padding:14px 28px;background:#0f172a;color:#fff;text-decoration:none;border-radius:999px;font-weight:bold;">Άνοιγμα My Wallet</a></p>
+                <p style="margin:20px 0 0;font-size:11px;color:#94a3b8;word-break:break-all;">{magic_url}</p>
+              </div>
+            </body></html>"""
+            await send_email(email, subject, html)
+            sent = True
+    except Exception:
+        sent = False
+
+    return {
+        "ok": True,
+        "sent": sent,
+        "expires_minutes": MAGIC_TTL_MINUTES,
+    }
+
+
+@router.post("/wallet-magic/consume")
+async def consume_wallet_magic(body: WalletMagicConsumeRequest):
+    """Exchange a magic-link token for a customer JWT + focused booking."""
+    try:
+        result = await consume_wallet_magic_token(body.token)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    account = result["account"]
+    access = create_customer_token(account["email"], extra={"provider": "magic"})
+    profile = _profile_response(account, access)
+    profile["provider"] = "magic"
+    profile["highlight_booking"] = result["booking_id"]
+    return profile

@@ -2,7 +2,11 @@ import { createDriverTelemetrySocket } from './driverTelemetryWs.js';
 import { postDriverTelemetryLocation } from '../../services/driverPortalApi.js';
 
 /**
- * Driver GPS transport — prefer WebSocket, fall back to HTTP POST when WS is blocked.
+ * Driver GPS transport — HTTP is authoritative for the office live map.
+ *
+ * The admin map polls GET /fleet/live every 5s. WebSockets behind Traefik/nginx
+ * often "open" as zombies and never deliver frames. Prefer HTTP on every GPS
+ * tick; keep WS as a best-effort bonus for low-latency egress only.
  */
 export function createDriverTelemetryTransport({
   onMessage,
@@ -11,104 +15,127 @@ export function createDriverTelemetryTransport({
   onError,
   onTransport,
 } = {}) {
-  let mode = 'connecting'; // connecting | ws | http
+  let mode = 'http'; // http | ws (ws = HTTP + optional WS bonus)
   let closed = false;
   let wsConn = null;
-  let fallbackTimer = null;
   let httpInFlight = false;
+  let pendingPayload = null;
+  let lastPayload = null;
   let lastHttpErrorAt = 0;
+  let lastAckAt = 0;
+  let opened = false;
 
-  const useHttp = (reason) => {
-    if (closed || mode === 'http') return;
-    mode = 'http';
-    try {
-      wsConn?.close();
-    } catch {
-      /* ignore */
+  const markAck = (msg) => {
+    if (msg?.type === 'ack' || msg?.ok === true) {
+      lastAckAt = Date.now();
     }
-    wsConn = null;
-    onTransport?.('http', reason);
-    onOpen?.({ transport: 'http' });
   };
 
+  const notifyOpen = (transport, reason) => {
+    if (opened && transport === 'http') return;
+    opened = true;
+    onTransport?.(transport, reason);
+    onOpen?.({ transport });
+  };
+
+  const postHttp = (payload) => {
+    if (closed || !payload) return false;
+    if (httpInFlight) {
+      pendingPayload = payload;
+      return true;
+    }
+    httpInFlight = true;
+    postDriverTelemetryLocation(payload)
+      .then((msg) => {
+        markAck(msg);
+        notifyOpen('http', 'http_ok');
+        onMessage?.(msg);
+      })
+      .catch((err) => {
+        const t = Date.now();
+        if (t - lastHttpErrorAt > 5000) {
+          lastHttpErrorAt = t;
+          onError?.(err instanceof Error ? err : new Error('http_telemetry_failed'));
+          onMessage?.({
+            type: 'error',
+            detail: err?.message || 'http_telemetry_failed',
+          });
+        }
+      })
+      .finally(() => {
+        httpInFlight = false;
+        if (pendingPayload && !closed) {
+          const next = pendingPayload;
+          pendingPayload = null;
+          postHttp(next);
+        }
+      });
+    return true;
+  };
+
+  // Best-effort WS — never required for the office pin.
   try {
     wsConn = createDriverTelemetrySocket({
       onOpen: () => {
         if (closed) return;
-        if (fallbackTimer) {
-          window.clearTimeout(fallbackTimer);
-          fallbackTimer = null;
-        }
         mode = 'ws';
-        onTransport?.('ws');
-        onOpen?.({ transport: 'ws' });
+        notifyOpen('ws', 'ws_open');
+        if (lastPayload) {
+          try {
+            wsConn?.send(lastPayload);
+          } catch {
+            /* ignore */
+          }
+        }
       },
       onClose: (ev) => {
         if (closed) return;
         if (mode === 'ws') {
+          mode = 'http';
           onClose?.(ev);
-          useHttp('ws_closed');
         }
       },
       onError: (ev) => {
         if (closed) return;
         onError?.(ev);
-        useHttp('ws_error');
+        mode = 'http';
       },
-      onMessage: (msg) => onMessage?.(msg),
+      onMessage: (msg) => {
+        markAck(msg);
+        onMessage?.(msg);
+      },
     });
-  } catch (err) {
-    useHttp(err?.message || 'ws_unavailable');
+  } catch {
+    wsConn = null;
+    mode = 'http';
   }
-
-  // If Upgrade never completes (proxy 404), switch to HTTP quickly.
-  fallbackTimer = window.setTimeout(() => {
-    if (!closed && mode === 'connecting') {
-      useHttp('ws_timeout');
-    }
-  }, 2500);
 
   return {
     get mode() {
       return mode;
     },
+    get lastAckAt() {
+      return lastAckAt;
+    },
     send(payload) {
       if (closed) return false;
+      lastPayload = payload;
+      // Authoritative path for /fleet/live
+      postHttp(payload);
+      // Optional low-latency fan-out
       if (mode === 'ws' && wsConn) {
-        return wsConn.send(payload);
+        try {
+          wsConn.send(payload);
+        } catch {
+          /* ignore */
+        }
       }
-      if (mode === 'http' || mode === 'connecting') {
-        if (httpInFlight) return false;
-        httpInFlight = true;
-        postDriverTelemetryLocation(payload)
-          .then((msg) => {
-            if (mode === 'connecting') {
-              mode = 'http';
-              onTransport?.('http', 'http_ok');
-              onOpen?.({ transport: 'http' });
-            }
-            onMessage?.(msg);
-          })
-          .catch(() => {
-            const now = Date.now();
-            if (now - lastHttpErrorAt > 8000) {
-              lastHttpErrorAt = now;
-              onError?.(new Error('http_telemetry_failed'));
-            }
-          })
-          .finally(() => {
-            httpInFlight = false;
-          });
-        return true;
-      }
-      return false;
+      return true;
     },
     close() {
       closed = true;
-      if (fallbackTimer) {
-        window.clearTimeout(fallbackTimer);
-        fallbackTimer = null;
-      }
+      pendingPayload = null;
+      lastPayload = null;
       try {
         wsConn?.close();
       } catch {

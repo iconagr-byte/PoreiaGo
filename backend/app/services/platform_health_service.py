@@ -8,7 +8,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,25 @@ def _redis_ping() -> tuple[bool, str | None]:
         return False, str(exc)
 
 
+def _celery_ping() -> dict[str, Any]:
+    """Best-effort Celery worker liveness via broker inspect."""
+    try:
+        from workers.celery_app import celery_app
+
+        insp = celery_app.control.inspect(timeout=1.5)
+        pings = insp.ping() if insp is not None else None
+        workers = sorted((pings or {}).keys())
+        if workers:
+            return {"status": "ok", "workers": workers, "detail": None}
+        return {
+            "status": "fail",
+            "workers": [],
+            "detail": "no workers answered ping (is celery worker up?)",
+        }
+    except Exception as exc:
+        return {"status": "unknown", "workers": [], "detail": str(exc)}
+
+
 async def check_redis() -> dict[str, Any]:
     try:
         ok, detail = await asyncio.to_thread(_redis_ping)
@@ -38,6 +57,13 @@ async def check_redis() -> dict[str, Any]:
         "broker": os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
         "detail": None if ok else detail,
     }
+
+
+async def check_celery() -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(_celery_ping)
+    except Exception as exc:
+        return {"status": "unknown", "workers": [], "detail": str(exc)}
 
 
 async def check_database(session: AsyncSession) -> dict[str, Any]:
@@ -54,12 +80,22 @@ async def fiscal_pipeline_snapshot(session: AsyncSession) -> dict[str, Any]:
     from app.services.fiscal_auto_retry_service import fiscal_auto_retry_settings
     from app.services.fiscal_stuck_recovery_service import fiscal_stuck_recovery_settings
 
+    # Admin-abandoned rows stay FAILED in DB but must not keep the platform degraded.
+    # JSONB NULL @> … is NULL in SQL — treat missing metadata as not abandoned.
+    not_abandoned = or_(
+        FiscalInvoice.metadata_json.is_(None),
+        ~FiscalInvoice.metadata_json.contains({"abandoned": True}),
+    )
+
     counts: dict[str, int] = {}
     for status in FiscalInvoiceStatus:
         result = await session.execute(
             select(func.count())
             .select_from(FiscalInvoice)
-            .where(FiscalInvoice.status == status),
+            .where(
+                FiscalInvoice.status == status,
+                not_abandoned,
+            ),
         )
         counts[status.value] = int(result.scalar() or 0)
 
@@ -75,6 +111,7 @@ async def fiscal_pipeline_snapshot(session: AsyncSession) -> dict[str, Any]:
                 (FiscalInvoiceStatus.PENDING, FiscalInvoiceStatus.QUEUED),
             ),
             FiscalInvoice.updated_at <= cutoff,
+            not_abandoned,
         ),
     )
     stuck_candidates = int(stuck_result.scalar() or 0)
@@ -115,10 +152,13 @@ def resolve_overall_status(
     db_status: str,
     redis_status: str,
     fiscal_health: str | None,
+    celery_status: str | None = None,
 ) -> str:
     if db_status != "ok":
         return "unhealthy"
     if redis_status != "ok":
+        return "degraded"
+    if celery_status == "fail":
         return "degraded"
     if fiscal_health == "degraded":
         return "degraded"
@@ -131,6 +171,7 @@ async def build_platform_health(
     include_fiscal: bool = True,
 ) -> dict[str, Any]:
     redis = await check_redis()
+    celery = await check_celery()
     db = {"status": "skip"}
     fiscal: dict[str, Any] | None = None
 
@@ -147,6 +188,7 @@ async def build_platform_health(
         db_status=str(db.get("status", "skip")),
         redis_status=str(redis.get("status", "fail")),
         fiscal_health=fiscal.get("health") if fiscal else None,
+        celery_status=str(celery.get("status") or ""),
     )
 
     payload: dict[str, Any] = {
@@ -154,6 +196,7 @@ async def build_platform_health(
         "service": "aerostride",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "redis": redis,
+        "celery": celery,
         "database": db,
     }
     if fiscal is not None:

@@ -1,0 +1,702 @@
+import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import {
+  createEmailSettings,
+  testEmailConnection,
+} from '../../../services/emailSettingsApi.js';
+import {
+  buildAccountFromWizard,
+  detectProvider,
+} from '../../../lib/email/emailProviderPresets.js';
+import {
+  isMailTimeoutMessage,
+  MAIL_TIMEOUT_TOAST_EL,
+  mailTimeoutHintEl,
+} from '../../../lib/email/mailReachability.js';
+import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
+import EmailConnectionResult from './EmailConnectionResult.jsx';
+
+const fieldClass =
+  'mt-1.5 w-full rounded-xl border border-outline-variant/80 bg-surface px-3.5 py-2.5 text-body-md text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15';
+
+const labelClass = 'text-label-sm font-semibold text-on-surface-variant';
+
+function serverFromProvider(prov) {
+  return {
+    imap_host: prov.imap_host || '',
+    imap_port: Number(prov.imap_port) || 993,
+    imap_secure: Boolean(prov.imap_secure),
+    smtp_host: prov.smtp_host || '',
+    smtp_port: Number(prov.smtp_port) || 465,
+    smtp_secure: Boolean(prov.smtp_secure),
+  };
+}
+
+/**
+ * Personal-email onboarding for offices after contract purchase.
+ * Detects Gmail / Outlook / Yahoo presets; other domains use mail.{domain}.
+ * Host/port are editable so cPanel Secure SSL (993/465) can be set exactly.
+ */
+export default function EmailConnectWizard({
+  onConnected,
+  onCancel,
+  compact = false,
+  initialEmail = '',
+}) {
+  const [step, setStep] = useState(1);
+  const [email, setEmail] = useState(() => String(initialEmail || '').trim());
+  const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState(null);
+  const [checks, setChecks] = useState([]);
+  const [server, setServer] = useState(() =>
+    serverFromProvider(detectProvider(String(initialEmail || '').trim())),
+  );
+
+  const detected = useMemo(() => detectProvider(email), [email]);
+  const isCustom = detected.id === 'custom';
+  const activeProvider = useMemo(
+    () => ({
+      ...detected,
+      ...server,
+      help: detected.help,
+      passwordLabel: detected.passwordLabel,
+      label: detected.label,
+      id: detected.id,
+    }),
+    [detected, server],
+  );
+
+  const canNextEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSave =
+    canNextEmail &&
+    Boolean(password.trim()) &&
+    Boolean(String(server.imap_host || '').trim()) &&
+    Boolean(String(server.smtp_host || '').trim());
+
+  const goToServerStep = () => {
+    setServer(serverFromProvider(detectProvider(email)));
+    setStep(2);
+  };
+
+  useEffect(() => {
+    const next = String(initialEmail || '').trim();
+    if (!next) return;
+    setEmail(next);
+    setServer(serverFromProvider(detectProvider(next)));
+  }, [initialEmail]);
+
+  const patchServer = (patch) => {
+    setServer((s) => {
+      const next = { ...s, ...(patch || {}) };
+      if (Object.prototype.hasOwnProperty.call(patch || {}, 'imap_port')) {
+        const imapPort = Number(next.imap_port);
+        if (imapPort === 993) next.imap_secure = true;
+        if (imapPort === 143) next.imap_secure = false;
+      }
+      if (Object.prototype.hasOwnProperty.call(patch || {}, 'smtp_port')) {
+        const smtpPort = Number(next.smtp_port);
+        if (smtpPort === 465) next.smtp_secure = false;
+        if (smtpPort === 587) next.smtp_secure = true;
+      }
+      if (Object.prototype.hasOwnProperty.call(patch || {}, 'imap_secure')) {
+        next.imap_secure = Boolean(patch.imap_secure);
+      }
+      if (Object.prototype.hasOwnProperty.call(patch || {}, 'smtp_secure')) {
+        next.smtp_secure = Boolean(patch.smtp_secure);
+      }
+      return next;
+    });
+  };
+
+  const draftAccount = () => {
+    const account = buildAccountFromWizard({
+      email: email.trim(),
+      // Google shows App Passwords with spaces — strip before IMAP/SMTP.
+      password: String(password || '').replace(/\s+/g, ''),
+      provider: activeProvider,
+      mode: 'direct',
+      label: email.trim(),
+    });
+    return account;
+  };
+
+  const buildPendingChecks = (account) => [
+    {
+      id: 'imap_host',
+      label: `IMAP host · ${account.imap_host}:${account.imap_port}`,
+      status: 'pending',
+      detail: '',
+    },
+    {
+      id: 'imap_auth',
+      label: `IMAP login · ${account.mail_username || account.email_address}`,
+      status: 'pending',
+      detail: '',
+    },
+    {
+      id: 'smtp_host',
+      label: `SMTP host · ${account.smtp_host}:${account.smtp_port}`,
+      status: 'pending',
+      detail: '',
+    },
+    {
+      id: 'smtp_auth',
+      label: `SMTP login · ${account.mail_username || account.email_address}`,
+      status: 'pending',
+      detail: '',
+    },
+  ];
+
+  const patchChecks = (updater) => {
+    setChecks((prev) => updater(prev.map((c) => ({ ...c }))));
+  };
+
+  const runTest = async () => {
+    if (!canSave) {
+      toast.error('Συμπληρώστε email και κωδικό');
+      return;
+    }
+    const account = draftAccount();
+    setBusy(true);
+    setTesting(true);
+    setTestMsg(null);
+    setChecks(buildPendingChecks(account));
+
+    // Progressive UI while the API runs both IMAP + SMTP.
+    patchChecks((rows) => {
+      rows[0].status = 'running';
+      rows[0].detail = 'Σύνδεση στον διακομιστή…';
+      return rows;
+    });
+
+    const tick = window.setTimeout(() => {
+      patchChecks((rows) => {
+        if (rows[0].status === 'running') {
+          rows[0].detail = 'Αναμονή απάντησης IMAP…';
+        }
+        if (rows[1].status === 'pending') {
+          rows[1].status = 'running';
+          rows[1].detail = 'Έλεγχος κωδικού…';
+        }
+        return rows;
+      });
+    }, 600);
+
+    try {
+      const r = await testEmailConnection({
+        ...account,
+        imap_port: Number(account.imap_port),
+        smtp_port: Number(account.smtp_port),
+      });
+
+      window.clearTimeout(tick);
+      const imapOk = Boolean(r.imap?.ok);
+      const smtpOk = Boolean(r.smtp?.ok);
+      const imapErr = r.imap?.error || (!imapOk ? 'Αποτυχία IMAP' : '');
+      const smtpErr = r.smtp?.error || (!smtpOk ? 'Αποτυχία SMTP' : '');
+      const isTimeout = (msg) =>
+        /timeout|timed out|δεν ήταν δυνατή η σύνδεση|Errno 110/i.test(String(msg || ''));
+      const imapHostFail = !imapOk && isTimeout(imapErr);
+      const smtpHostFail = !smtpOk && isTimeout(smtpErr);
+
+      setChecks([
+        {
+          id: 'imap_host',
+          label: `IMAP host · ${account.imap_host}:${account.imap_port}`,
+          status: imapOk ? 'ok' : 'fail',
+          detail: imapOk ? 'Σύνδεση OK' : imapErr,
+        },
+        {
+          id: 'imap_auth',
+          label: `IMAP login · ${account.mail_username || account.email_address}`,
+          status: imapOk ? 'ok' : imapHostFail ? 'skip' : 'fail',
+          detail: imapOk
+            ? 'Ταυτοποίηση OK'
+            : imapHostFail
+              ? 'Παραλείφθηκε — δεν ανοίγει πρώτα ο διακομιστής'
+              : imapErr,
+        },
+        {
+          id: 'smtp_host',
+          label: `SMTP host · ${account.smtp_host}:${account.smtp_port}`,
+          status: smtpOk ? 'ok' : 'fail',
+          detail: smtpOk ? 'Σύνδεση OK' : smtpErr,
+        },
+        {
+          id: 'smtp_auth',
+          label: `SMTP login · ${account.mail_username || account.email_address}`,
+          status: smtpOk ? 'ok' : smtpHostFail ? 'skip' : 'fail',
+          detail: smtpOk
+            ? 'Ταυτοποίηση OK'
+            : smtpHostFail
+              ? 'Παραλείφθηκε — δεν ανοίγει πρώτα ο διακομιστής'
+              : smtpErr,
+        },
+      ]);
+
+      if (r.ok) {
+        setTestMsg({ ok: true, text: 'IMAP & SMTP επιτυχία — μπορείτε να αποθηκεύσετε' });
+        toast.success('IMAP & SMTP OK', { id: 'email-conn-test' });
+      } else if (imapHostFail || smtpHostFail) {
+        const mailHost = account.imap_host || account.smtp_host;
+        const imapPort = Number(account.imap_port) || 993;
+        const smtpPort = Number(account.smtp_port) || 465;
+        setTestMsg({
+          ok: false,
+          timeout: true,
+          text: mailTimeoutHintEl({ mailHost, imapPort, smtpPort }),
+          mailHost,
+          imapPort,
+          smtpPort,
+        });
+        toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
+      } else {
+        const text = [imapOk ? null : `IMAP: ${imapErr}`, smtpOk ? null : `SMTP: ${smtpErr}`]
+          .filter(Boolean)
+          .join(' · ');
+        setTestMsg({ ok: false, text: text || 'Αποτυχία σύνδεσης' });
+        toast.error(text || 'Αποτυχία σύνδεσης', { id: 'email-conn-test' });
+      }
+    } catch (err) {
+      window.clearTimeout(tick);
+      const msg = err.message || 'Αποτυχία αιτήματος';
+      const isDeploy =
+        /deploy|προσωρινά εκτός|Δεν υπάρχει σύνδεση με τον server|Failed to fetch|network/i.test(
+          msg,
+        );
+      if (isDeploy) {
+        setChecks([
+          {
+            id: 'imap_host',
+            label: `IMAP host · ${account.imap_host}:${account.imap_port}`,
+            status: 'skip',
+            detail: 'Ο server αναβαθμίζεται — δοκιμάστε σε ~1 λεπτό',
+          },
+          {
+            id: 'imap_auth',
+            label: `IMAP login · ${account.mail_username || account.email_address}`,
+            status: 'skip',
+            detail: 'Αναμονή…',
+          },
+          {
+            id: 'smtp_host',
+            label: `SMTP host · ${account.smtp_host}:${account.smtp_port}`,
+            status: 'skip',
+            detail: 'Αναμονή…',
+          },
+          {
+            id: 'smtp_auth',
+            label: `SMTP login · ${account.mail_username || account.email_address}`,
+            status: 'skip',
+            detail: 'Αναμονή…',
+          },
+        ]);
+        setTestMsg({
+          ok: false,
+          text: 'Ο server είναι προσωρινά εκτός (deploy). Περιμένετε ~1 λεπτό και πατήστε ξανά «Έλεγχος σύνδεσης». Δεν είναι λάθος App Password.',
+        });
+        toast.error('Server σε deploy — δοκιμάστε σε λίγο', { id: 'email-conn-test' });
+      } else if (isMailTimeoutMessage(msg)) {
+        setChecks((prev) =>
+          prev.map((c) => ({
+            ...c,
+            status: 'fail',
+            detail: c.status === 'pending' ? 'Δεν ολοκληρώθηκε' : msg,
+          })),
+        );
+        setTestMsg({
+          ok: false,
+          timeout: true,
+          text: mailTimeoutHintEl({
+            mailHost: account.imap_host,
+            imapPort: Number(account.imap_port) || 993,
+            smtpPort: Number(account.smtp_port) || 465,
+          }),
+          mailHost: account.imap_host || account.smtp_host,
+          imapPort: Number(account.imap_port) || 993,
+          smtpPort: Number(account.smtp_port) || 465,
+        });
+        toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test' });
+      } else {
+        setChecks((prev) =>
+          prev.map((c) => ({
+            ...c,
+            status: 'fail',
+            detail: c.status === 'pending' ? 'Δεν ολοκληρώθηκε' : msg,
+          })),
+        );
+        setTestMsg({ ok: false, text: msg });
+        toast.error(msg, { id: 'email-conn-test' });
+      }
+    } finally {
+      setBusy(false);
+      setTesting(false);
+    }
+  };
+
+  const save = async () => {
+    if (!canSave) {
+      toast.error('Συμπληρώστε email και κωδικό');
+      return;
+    }
+    setBusy(true);
+    try {
+      const account = draftAccount();
+      const created = await createEmailSettings({
+        ...account,
+        imap_port: Number(account.imap_port),
+        smtp_port: Number(account.smtp_port),
+        mail_username: account.mail_username || account.email_address,
+      });
+      toast.success('Το προσωπικό email συνδέθηκε');
+      onConnected?.(created);
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία αποθήκευσης');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className={
+        compact
+          ? 'email-connect-compact space-y-4'
+          : 'rounded-2xl border border-outline-variant/80 bg-surface p-5 shadow-sm sm:p-6 space-y-5 max-w-2xl'
+      }
+    >
+      {!compact && (
+        <div className="border-b border-outline-variant/50 pb-4">
+          <p className="text-label-sm font-bold uppercase tracking-wide text-primary">
+            Αυτόματη σύνδεση
+          </p>
+          <h3 className="mt-1 font-title-md text-title-md text-on-surface">
+            Συνδέστε το προσωπικό σας email
+          </h3>
+          <p className="mt-1 text-body-sm text-on-surface-variant">
+            Καταχωρήστε το email του γραφείου και τον κωδικό mailbox για συγχρονισμό IMAP/SMTP.
+          </p>
+          <div className="mt-3 flex gap-2">
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className={`h-1.5 flex-1 rounded-full ${
+                  step >= n ? 'bg-primary' : 'bg-surface-container-high'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {compact && (
+        <div className="flex gap-2" aria-hidden>
+          {[1, 2, 3].map((n) => (
+            <div
+              key={n}
+              className={`h-1.5 flex-1 rounded-full ${
+                step >= n ? 'bg-primary' : 'bg-surface-container-high'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {step === 1 && (
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="wiz-email" className="text-label-sm font-semibold text-on-surface-variant">
+              Διεύθυνση email *
+            </label>
+            <input
+              id="wiz-email"
+              type="email"
+              autoComplete="email"
+              className={fieldClass}
+              placeholder="π.χ. name@gmail.com ή info@το-domain.gr"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 pt-3 sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pb-1">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-xl border border-outline-variant px-4 py-2.5 text-label-md font-semibold bg-white"
+              >
+                Αργότερα
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={!canNextEmail}
+              onClick={goToServerStep}
+              className="rounded-xl bg-primary px-5 py-2.5 text-label-md font-bold text-on-primary disabled:opacity-50 shadow-sm"
+            >
+              Συνέχεια
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-outline-variant/70 bg-surface-container-low/40 px-4 py-3">
+            <p className="text-label-sm font-bold text-on-surface">
+              {isCustom ? 'Διακομιστές mailbox (cPanel)' : activeProvider.label}
+            </p>
+            <p className="mt-1 text-body-sm text-on-surface-variant">
+              Προσυμπληρώθηκαν από το domain σας — μπορείτε να τα αλλάξετε όπως στο Mail Client
+              (π.χ. IMAP 993 · SMTP 465).
+            </p>
+            {!isCustom && (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-body-sm text-on-surface-variant">
+                {(activeProvider.help || []).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label htmlFor="wiz-imap-host" className={labelClass}>
+                IMAP host *
+              </label>
+              <input
+                id="wiz-imap-host"
+                className={fieldClass}
+                value={server.imap_host}
+                onChange={(e) => patchServer({ imap_host: e.target.value })}
+                placeholder="mail.example.com"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label htmlFor="wiz-imap-port" className={labelClass}>
+                IMAP port
+              </label>
+              <input
+                id="wiz-imap-port"
+                type="number"
+                className={fieldClass}
+                value={server.imap_port}
+                onChange={(e) => patchServer({ imap_port: e.target.value })}
+              />
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => patchServer({ imap_port: 993, imap_secure: true })}
+                  className={`rounded-lg px-2.5 py-1 text-label-sm font-bold ${
+                    Number(server.imap_port) === 993
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface'
+                  }`}
+                >
+                  993 SSL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => patchServer({ imap_port: 143, imap_secure: false })}
+                  className={`rounded-lg px-2.5 py-1 text-label-sm font-bold ${
+                    Number(server.imap_port) === 143
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface'
+                  }`}
+                >
+                  143 STARTTLS
+                </button>
+              </div>
+            </div>
+            <div className="flex items-end pb-1">
+              <label className="flex items-center gap-2 rounded-xl border border-outline-variant px-3 py-2.5 text-body-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(server.imap_secure)}
+                  onChange={(e) => patchServer({ imap_secure: e.target.checked })}
+                />
+                IMAP SSL
+              </label>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="wiz-smtp-host" className={labelClass}>
+                SMTP host *
+              </label>
+              <input
+                id="wiz-smtp-host"
+                className={fieldClass}
+                value={server.smtp_host}
+                onChange={(e) => patchServer({ smtp_host: e.target.value })}
+                placeholder="mail.example.com"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label htmlFor="wiz-smtp-port" className={labelClass}>
+                SMTP port
+              </label>
+              <input
+                id="wiz-smtp-port"
+                type="number"
+                className={fieldClass}
+                value={server.smtp_port}
+                onChange={(e) => patchServer({ smtp_port: e.target.value })}
+              />
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => patchServer({ smtp_port: 465, smtp_secure: false })}
+                  className={`rounded-lg px-2.5 py-1 text-label-sm font-bold ${
+                    Number(server.smtp_port) === 465
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface'
+                  }`}
+                >
+                  465 SSL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => patchServer({ smtp_port: 587, smtp_secure: true })}
+                  className={`rounded-lg px-2.5 py-1 text-label-sm font-bold ${
+                    Number(server.smtp_port) === 587
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface'
+                  }`}
+                >
+                  587 STARTTLS
+                </button>
+              </div>
+            </div>
+            <div className="flex items-end pb-1">
+              <label
+                className={`flex items-center gap-2 rounded-xl border border-outline-variant px-3 py-2.5 text-body-sm ${
+                  Number(server.smtp_port) === 465 ? 'opacity-60' : ''
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(server.smtp_secure)}
+                  disabled={Number(server.smtp_port) === 465}
+                  onChange={(e) => patchServer({ smtp_secure: e.target.checked })}
+                />
+                SMTP STARTTLS
+              </label>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setServer(serverFromProvider(detectProvider(email)))}
+            className="text-label-sm font-semibold text-primary"
+          >
+            Επαναφορά προεπιλογών domain
+          </button>
+
+          <div className="flex flex-wrap justify-between gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="rounded-xl border border-outline-variant px-4 py-2.5 text-label-md font-semibold"
+            >
+              Πίσω
+            </button>
+            <button
+              type="button"
+              disabled={!String(server.imap_host || '').trim() || !String(server.smtp_host || '').trim()}
+              onClick={() => setStep(3)}
+              className="rounded-xl bg-primary px-5 py-2.5 text-label-md font-bold text-on-primary disabled:opacity-50"
+            >
+              Συνέχεια
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="wiz-pass" className="text-label-sm font-semibold text-on-surface-variant">
+              {activeProvider.passwordLabel} *
+            </label>
+            <p className="mt-1 text-label-sm text-on-surface-variant/80">
+              IMAP {server.imap_host}:{server.imap_port}
+              {server.imap_secure ? ' SSL' : ''} · SMTP {server.smtp_host}:{server.smtp_port}
+              {Number(server.smtp_port) === 465 ? ' SSL' : server.smtp_secure ? ' STARTTLS' : ''}
+            </p>
+            <div className="relative">
+              <input
+                id="wiz-pass"
+                type={passwordVisible ? 'text' : 'password'}
+                autoComplete="new-password"
+                className={`${fieldClass} pr-24`}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setPasswordVisible((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border border-outline-variant bg-surface px-2.5 py-1 text-label-sm font-bold"
+              >
+                {passwordVisible ? 'Απόκρυψη' : 'Εμφάνιση'}
+              </button>
+            </div>
+          </div>
+
+          {(testing || checks.length > 0) && (
+            <EmailConnectionCheckList
+              checks={checks}
+              testing={testing}
+              title={testing ? 'Έλεγχος σε εξέλιξη' : 'Αποτέλεσμα ελέγχου'}
+            />
+          )}
+
+          {testMsg && (
+            <EmailConnectionResult
+              ok={testMsg.ok}
+              message={testMsg.timeout ? undefined : testMsg.text}
+              hint={undefined}
+              timeout={testMsg.timeout}
+              mailHost={testMsg.mailHost}
+              imapPort={testMsg.imapPort}
+              smtpPort={testMsg.smtpPort}
+            />
+          )}
+
+          <div className="flex flex-wrap justify-between gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="rounded-xl border border-outline-variant px-4 py-2.5 text-label-md font-semibold"
+            >
+              Πίσω
+            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!canSave || busy}
+                onClick={runTest}
+                className="rounded-xl border border-primary/40 bg-primary/5 px-4 py-2.5 text-label-md font-bold text-primary disabled:opacity-50"
+              >
+                {testing ? 'Έλεγχος…' : 'Έλεγχος σύνδεσης'}
+              </button>
+              <button
+                type="button"
+                disabled={!canSave || busy}
+                onClick={save}
+                className="rounded-xl bg-primary px-5 py-2.5 text-label-md font-bold text-on-primary disabled:opacity-50"
+              >
+                Αποθήκευση
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

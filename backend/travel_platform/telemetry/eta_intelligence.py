@@ -22,7 +22,7 @@ from travel_platform.telemetry.live_fleet import LiveFleetService
 
 logger = logging.getLogger(__name__)
 
-REFRESH_SECONDS = int(os.getenv("ETA_REFRESH_SECONDS", "300"))
+REFRESH_SECONDS = int(os.getenv("ETA_REFRESH_SECONDS", "5"))
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
 TRAFFIC_LABELS = {

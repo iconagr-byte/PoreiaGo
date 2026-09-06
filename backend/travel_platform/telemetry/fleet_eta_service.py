@@ -9,14 +9,17 @@ from travel_platform.telemetry.eta_intelligence import get_eta_service
 from travel_platform.telemetry.eta_resolve import resolve_eta_snapshot
 from travel_platform.telemetry.eta_serializers import format_eta_display, snapshot_to_payload
 from travel_platform.telemetry.processor import get_live_fleet
-from travel_platform.telemetry.settings_store import get_telemetry_settings
+from travel_platform.telemetry.settings_store import (
+    LOCKED_LIVE_REFRESH_SECONDS,
+    get_telemetry_settings,
+)
 
 
 async def fetch_fleet_etas(tenant_id: UUID) -> dict[str, Any]:
     """Επιστρέφει ETA ανά ενεργό δρομολόγιο στον στόλο."""
     live = get_live_fleet()
     settings = get_telemetry_settings(str(tenant_id))
-    vehicles = live.list_active(tenant_id)
+    vehicles = await live.list_active_for_admin_async(tenant_id)
     seen_trips: set[int] = set()
     items: list[dict[str, Any]] = []
 
@@ -30,10 +33,12 @@ async def fetch_fleet_etas(tenant_id: UUID) -> dict[str, Any]:
         if not snap:
             continue
 
-        meta = live.vehicle_meta(tenant_id, vehicle.vehicle_id)
+        meta = await live.vehicle_meta_async(tenant_id, vehicle.vehicle_id)
+        if not meta:
+            meta = live._vehicles.get(vehicle.vehicle_id, {}) or {}
         payload = snapshot_to_payload(
             snap,
-            sync_interval_sec=settings.eta_ws_push_seconds,
+            sync_interval_sec=LOCKED_LIVE_REFRESH_SECONDS,
         )
         items.append(
             {
@@ -53,8 +58,8 @@ async def fetch_fleet_etas(tenant_id: UUID) -> dict[str, Any]:
     return {
         "tenant_id": str(tenant_id),
         "item_count": len(items),
-        "refresh_seconds": settings.eta_refresh_seconds,
-        "push_seconds": settings.eta_ws_push_seconds,
+        "refresh_seconds": LOCKED_LIVE_REFRESH_SECONDS,
+        "push_seconds": LOCKED_LIVE_REFRESH_SECONDS,
         "google_maps_configured": settings.google_maps_configured,
         "items": items,
     }

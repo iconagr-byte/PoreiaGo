@@ -24,7 +24,7 @@ class PlatformSettingsResponse(BaseModel):
     smtp_from_email: str = "noreply@poreiago.app"
     sms_sender_id: str = "AEROSTRIDE"
     maintenance_mode: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = "https://www.poreiago.com"
     checkout_deposit_enabled: bool = True
     checkout_deposit_percent: int = 30
 
@@ -171,8 +171,10 @@ class VehicleProfileResponse(BaseModel):
     seat_count: int = 49
     amenities: list[str] = []
     public_image_url: str = ""
+    gallery_urls: list[str] = []
     public_summary: str = ""
     show_on_website: bool = True
+    documents: list[dict] = []
     service_status: str
     km_to_service: float
     days_to_legal_deadline: int | None = None
@@ -202,6 +204,7 @@ class VehicleCreate(BaseModel):
     seat_count: int = Field(49, ge=8, le=80)
     amenities: list[str] = Field(default_factory=list)
     public_image_url: str = ""
+    gallery_urls: list[str] = Field(default_factory=list)
     public_summary: str = ""
     show_on_website: bool = True
 
@@ -227,6 +230,7 @@ class VehicleUpdate(BaseModel):
     seat_count: int | None = Field(None, ge=8, le=80)
     amenities: list[str] | None = None
     public_image_url: str | None = None
+    gallery_urls: list[str] | None = None
     public_summary: str | None = None
     show_on_website: bool | None = None
 
@@ -282,6 +286,34 @@ class DispatchBlockedRequest(BaseModel):
     trip_title: str | None = None
 
 
+class FleetExpenseCreate(BaseModel):
+    vehicle_id: str
+    expense_date: date | None = None
+    category: str = Field("fuel", pattern="^(fuel|tolls|insurance|other)$")
+    amount: float = Field(..., ge=0)
+    liters: float | None = Field(None, ge=0)
+    odometer: float | None = Field(None, ge=0)
+    note: str = ""
+
+
+class FleetExpenseResponse(BaseModel):
+    id: str
+    vehicle_id: str
+    tenant_id: str
+    expense_date: date
+    category: str
+    amount: float
+    liters: float | None = None
+    odometer: float | None = None
+    note: str = ""
+    created_at: datetime
+
+
+class FleetDocumentMeta(BaseModel):
+    kind: str = Field("registration", min_length=2)
+    expires_at: date | None = None
+
+
 class AbandonedCartUpsert(BaseModel):
     resume_token: str | None = None
     trip_id: int
@@ -307,6 +339,7 @@ class AbandonedCartResponse(BaseModel):
     updated_at: str
     recovery_sent_at: str | None = None
     completed_at: str | None = None
+    tenant_id: str = ""
 
 
 class AbandonedScanRequest(BaseModel):
@@ -329,8 +362,10 @@ class BrandingAdminResponse(BaseModel):
     css_injection_url: str = ""
     css_injection_inline: str = ""
     verified_domain: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = "https://www.poreiago.com"
     updated_at: str | None = None
+    # Present when Host maps to a Postgres tenant — used by guest booking lookup / wallet.
+    tenant_id: str | None = None
 
 
 class BrandingAdminUpdate(BaseModel):
@@ -403,16 +438,42 @@ class DriverShiftPushResponse(BaseModel):
 
 
 class TripSyncItem(BaseModel):
+    model_config = {"extra": "allow"}
+
     id: int = Field(..., gt=0)
     title: str = ""
     price: float = Field(default=0, ge=0)
     available_seats: int | None = None
     total_seats: int | None = None
+    destination: str = ""
+    meeting_point: str | None = None
+    meetingPoint: str | None = None
+    departure_time: str | None = None
+    departureTime: str | None = None
+    arrival_time: str | None = None
+    arrivalTime: str | None = None
+    stops: list[dict] = Field(default_factory=list)
+    segments: list[dict] = Field(default_factory=list)
+    status: str | None = None
+    featured: bool | None = None
+    description: str | None = None
+    image: str | None = None
+    hook: str | None = None
+    durationLabel: str | None = None
+    badge: str | None = None
+    highlights: list | None = None
+    market: str | None = None
+    vehicleType: str | None = None
+    currency: str | None = None
+    childPrice: float | None = None
+    availableSeats: int | None = None
+    totalSeats: int | None = None
 
 
 class TripsSyncRequest(BaseModel):
     tenant_id: str | None = None
     trips: list[TripSyncItem] = Field(default_factory=list)
+    replace_catalog: bool = False
 
 
 class TripsSyncResponse(BaseModel):

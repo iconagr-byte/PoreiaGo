@@ -72,7 +72,11 @@ async def sync_trips(
     from travel_platform.operations.trips_sync import sync_trips_to_postgres
 
     payload = [t.model_dump() for t in body.trips]
-    result = await sync_trips_to_postgres(payload, tenant_id=str(tenant_id))
+    result = await sync_trips_to_postgres(
+        payload,
+        tenant_id=str(tenant_id),
+        replace_catalog=bool(body.replace_catalog),
+    )
     return TripsSyncResponse(**result)
 
 

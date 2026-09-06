@@ -1,8 +1,15 @@
 /**
  * Module 4 — SOS button with long-press, GPS capture, optional incident photo.
+ *
+ * SOS must never start a shift. It notifies the office only.
+ * Prefer last known shift coords; avoid competing high-accuracy GPS requests.
  */
 import { useCallback, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+import {
+  requestDriverGpsKeepalive,
+  resolveCoordsForSos,
+} from '../../../lib/driver/driverGeolocation.js';
 import { reportDriverIssue, triggerSosAlert } from '../../../services/driverPortalApi.js';
 
 const LONG_PRESS_MS = 1200;
@@ -13,73 +20,88 @@ const ISSUE_TYPES = [
   { id: 'delay', label: 'Καθυστέρηση', icon: 'schedule' },
 ];
 
-function getCurrentPosition() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('GPS μη διαθέσιμο'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        resolve({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy_m: pos.coords.accuracy,
-        }),
-      (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 },
-    );
-  });
-}
-
 export default function SOSButton() {
   const [sosSent, setSosSent] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
   const [holding, setHolding] = useState(false);
+  const [sending, setSending] = useState(false);
   const timerRef = useRef(null);
   const firedRef = useRef(false);
 
   const sendSos = useCallback(async () => {
-    if (firedRef.current) return;
+    if (firedRef.current || sending) return;
     firedRef.current = true;
+    setSending(true);
     try {
-      const coords = await getCurrentPosition();
-      const res = await triggerSosAlert({ ...coords, photoFile });
+      const coords = await resolveCoordsForSos();
+      const res = await triggerSosAlert({
+        lat: coords.lat,
+        lng: coords.lng,
+        accuracy_m: coords.accuracy_m,
+        photoFile,
+      });
       setSosSent(true);
-      toast.success(res.message || 'SOS εστάλη');
+      toast.success(res.message || 'SOS εστάλη στο γραφείο', {
+        id: 'driver-sos-sent',
+        duration: 4000,
+      });
+      // Refresh pin only if a shift is already live — never starts GPS/shift.
+      requestDriverGpsKeepalive();
     } catch (err) {
       firedRef.current = false;
-      toast.error(err.message || 'Αποτυχία αποστολής SOS');
+      toast.error(err.message || 'Αποτυχία αποστολής SOS', { id: 'driver-sos-err' });
+    } finally {
+      setSending(false);
+      setHolding(false);
     }
-  }, [photoFile]);
+  }, [photoFile, sending]);
 
-  const onPressStart = () => {
+  const onPressStart = (e) => {
+    if (sending || sosSent) return;
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    e.preventDefault?.();
     firedRef.current = false;
     setHolding(true);
     timerRef.current = window.setTimeout(() => {
       setHolding(false);
-      sendSos();
+      void sendSos();
     }, LONG_PRESS_MS);
   };
 
-  const onPressEnd = () => {
+  const onPressEnd = (e) => {
     setHolding(false);
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
     if (timerRef.current) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (!firedRef.current) {
-      toast('Κρατήστε πατημένο για SOS', { icon: '⚠️' });
+    if (!firedRef.current && !sending) {
+      toast('Κρατήστε πατημένο για SOS', { icon: '⚠️', id: 'driver-sos-hold' });
     }
   };
 
   const report = async (type) => {
     try {
-      const coords = await getCurrentPosition();
-      const res = await reportDriverIssue({ type, ...coords, photoFile });
+      const coords = await resolveCoordsForSos();
+      const res = await reportDriverIssue({
+        type,
+        lat: coords.lat,
+        lng: coords.lng,
+        accuracy_m: coords.accuracy_m,
+        photoFile,
+      });
       toast.success(`Αναφορά #${res.ticketId || res.alert_id}`);
       setShowIssues(false);
+      requestDriverGpsKeepalive();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία αναφοράς');
     }
@@ -87,24 +109,28 @@ export default function SOSButton() {
 
   return (
     <div className="driver-stack relative">
+      <p className="text-xs text-[var(--driver-muted)] text-center -mt-1 mb-1 leading-relaxed">
+        Ειδοποιεί το γραφείο αμέσως. Δεν ξεκινά και δεν σταματά τη βάρδια / GPS.
+      </p>
       <button
         type="button"
         onPointerDown={onPressStart}
         onPointerUp={onPressEnd}
-        onPointerLeave={onPressEnd}
+        onPointerCancel={onPressEnd}
         onContextMenu={(e) => e.preventDefault()}
+        disabled={sending}
         className={`driver-touch driver-btn-danger driver-sos w-full rounded-2xl min-h-[80px] text-2xl font-black select-none touch-manipulation ${
           holding ? 'scale-95 ring-4 ring-red-300' : ''
         }`}
         aria-label="SOS — κρατήστε πατημένο"
       >
         <span className="material-symbols-outlined align-middle mr-2 text-4xl">emergency</span>
-        {holding ? 'ΑΠΟΣΤΟΛΗ…' : 'SOS — ΚΡΑΤΗΣΤΕ'}
+        {sending ? 'ΑΠΟΣΤΟΛΗ…' : holding ? 'ΑΠΟΣΤΟΛΗ…' : 'SOS — ΚΡΑΤΗΣΤΕ'}
       </button>
 
       {sosSent && (
         <p className="text-center text-red-400 text-sm font-bold">
-          Σήμα εστάλη — περιμένετε επικοινωνία από το κεντρικό
+          Σήμα εστάλη στο γραφείο. Η βάρδια δεν επηρεάζεται.
         </p>
       )}
 

@@ -4,6 +4,7 @@
 import { API_BASE } from '../config/api.js';
 import { clearSaasRoles, decodeJwtPayload, getSaasRoles, storeSaasRoles, storeSaasRolesFromToken } from '../lib/saasJwt.js';
 import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
+import { localIdFromReference } from '../lib/ticketing/bookingIds.js';
 
 const TOKEN_KEY = 'saas_access_token';
 const TENANT_KEY = 'saas_tenant_id';
@@ -20,14 +21,42 @@ function notifySaasSessionChanged() {
 }
 
 async function parseError(res) {
-  const err = await res.json().catch(() => ({}));
+  if ([502, 503, 504].includes(res.status)) {
+    const e = new Error(
+      'Ο server είναι προσωρινά εκτός (deploy/αναβάθμιση). Περιμένετε ~1 λεπτό και δοκιμάστε ξανά.',
+    );
+    e.status = res.status;
+    throw e;
+  }
+  const raw = await res.text().catch(() => '');
+  let err = {};
+  try {
+    err = raw ? JSON.parse(raw) : {};
+  } catch {
+    if (/bad gateway|gateway time-out|503|502|504/i.test(raw)) {
+      const e = new Error(
+        'Ο server είναι προσωρινά εκτός (deploy/αναβάθμιση). Περιμένετε ~1 λεπτό και δοκιμάστε ξανά.',
+      );
+      e.status = res.status;
+      throw e;
+    }
+  }
   let detail = err.detail ?? res.statusText ?? 'Request failed';
+  let code = null;
+  let seats = null;
   if (Array.isArray(detail)) {
     detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
-  } else if (typeof detail === 'object') {
-    detail = JSON.stringify(detail);
+  } else if (typeof detail === 'object' && detail) {
+    code = detail.code || null;
+    seats = detail.seats || null;
+    detail = detail.message || JSON.stringify(detail);
   }
-  throw new Error(String(detail));
+  const msg = String(detail || '').trim();
+  const e = new Error(msg || `Αποτυχία αίτησης (${res.status})`);
+  e.status = res.status;
+  if (code) e.code = code;
+  if (seats) e.seats = seats;
+  throw e;
 }
 
 export function getSaasToken() {
@@ -38,13 +67,24 @@ export function getSaasTenantId() {
   return localStorage.getItem(TENANT_KEY) || DEV_TENANT;
 }
 
+export function getSaasUserEmail() {
+  return String(localStorage.getItem(EMAIL_KEY) || '').trim();
+}
+
 export function setSaasSession({ accessToken, tenantId, email }) {
+  const previousTenantId = localStorage.getItem(TENANT_KEY) || '';
   if (accessToken) {
     localStorage.setItem(TOKEN_KEY, accessToken);
     storeSaasRolesFromToken(accessToken);
   }
   if (tenantId) localStorage.setItem(TENANT_KEY, tenantId);
   if (email) localStorage.setItem(EMAIL_KEY, email);
+  if (tenantId && previousTenantId !== tenantId) {
+    // Dynamic import avoids circular dependency with officeTenantStore.
+    import('../lib/admin/officeTenantStore.js')
+      .then((m) => m.resetOfficeLocalCachesForTenant(previousTenantId, tenantId))
+      .catch(() => {});
+  }
   notifySaasSessionChanged();
 }
 
@@ -128,19 +168,37 @@ export async function saasFetch(path, options = {}) {
   return res.json();
 }
 
+function networkLoginError(err) {
+  const raw = String(err?.message || err || '').trim();
+  if (
+    err?.name === 'TypeError' ||
+    /failed to fetch|networkerror|load failed|network request failed/i.test(raw)
+  ) {
+    return new Error(
+      'Δεν υπάρχει σύνδεση με τον server (πιθανό deploy). Περιμένετε ~1 λεπτό και δοκιμάστε ξανά.',
+    );
+  }
+  return err instanceof Error ? err : new Error(raw || 'Αποτυχία σύνδεσης');
+}
+
 /** POST /api/v1/auth/login — email + password; tenant resolved by backend. */
 export async function saasLogin({ email, password, tenantSlug, tenantId, mfaCode }) {
-  const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password,
-      tenant_slug: tenantSlug || undefined,
-      tenant_id: tenantId || undefined,
-      mfa_code: mfaCode || undefined,
-    }),
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        tenant_slug: tenantSlug || undefined,
+        tenant_id: tenantId || undefined,
+        mfa_code: mfaCode || undefined,
+      }),
+    });
+  } catch (err) {
+    throw networkLoginError(err);
+  }
   if (!res.ok) await parseError(res);
   const data = await res.json();
   const resolvedTenantId =
@@ -159,17 +217,55 @@ export async function saasLogin({ email, password, tenantSlug, tenantId, mfaCode
   return { ...data, roles };
 }
 
+/** POST /api/v1/auth/google — admin Back Office Google Sign-In. */
+export async function saasGoogleLogin({ idToken, tenantSlug, tenantId, email }) {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/v1/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id_token: idToken,
+        tenant_slug: tenantSlug || undefined,
+        tenant_id: tenantId || undefined,
+      }),
+    });
+  } catch (err) {
+    throw networkLoginError(err);
+  }
+  if (!res.ok) await parseError(res);
+  const data = await res.json();
+  const resolvedTenantId =
+    data.tenant_id || decodeJwtPayload(data.access_token)?.tenant_id || DEV_TENANT;
+  setSaasSession({
+    accessToken: data.access_token,
+    tenantId: resolvedTenantId,
+    email: email || getSaasUserEmail() || undefined,
+  });
+  if (Array.isArray(data.roles) && data.roles.length) {
+    storeSaasRoles(data.roles);
+  } else {
+    storeSaasRolesFromToken(data.access_token);
+  }
+  return data;
+}
+
 /** POST /api/v1/auth/dev-login — local dev fallback when Postgres/seed unavailable. */
 export async function saasDevLogin({ email, password, tenantSlug }) {
-  const res = await fetch(`${API_BASE}/api/v1/auth/dev-login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password,
-      tenant_slug: tenantSlug || undefined,
-    }),
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/v1/auth/dev-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        tenant_slug: tenantSlug || undefined,
+      }),
+    });
+  } catch (err) {
+    throw networkLoginError(err);
+  }
   if (!res.ok) await parseError(res);
   const data = await res.json();
   const resolvedTenantId =
@@ -218,18 +314,17 @@ export async function fetchSaasBookings() {
 /** B2C checkout — no JWT; uses VITE_SAAS_TENANT_ID or stored tenant. */
 /** POST /api/v1/bookings/lookup — email + reference required. */
 export async function saasLookupGuestBooking({ tenantId, email, referenceCode }) {
-  const tid = tenantId || getSaasTenantId();
-  if (!tid) {
-    throw new Error('Δεν έχει οριστεί tenant (VITE_SAAS_TENANT_ID)');
-  }
+  const tid = tenantId || getSaasTenantId() || undefined;
+  const body = {
+    passenger_email: email.trim().toLowerCase(),
+    reference_code: referenceCode.trim(),
+  };
+  // Backend can resolve tenant from Host on custom domains when omitted.
+  if (tid) body.tenant_id = tid;
   const res = await fetch(`${API_BASE}/api/v1/bookings/lookup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tenant_id: tid,
-      passenger_email: email.trim().toLowerCase(),
-      reference_code: referenceCode.trim(),
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) await parseError(res);
   return res.json();
@@ -258,8 +353,23 @@ export async function saasCreateGuestBooking(payload) {
       total_eur: payload.totalEur ?? null,
       balance_due: payload.balanceDue ?? null,
       deposit_percent: payload.depositPercent ?? null,
+      source: payload.source ?? null,
+      agent_name: payload.agentName ?? null,
+      departure_at: payload.departureAt ?? null,
     }),
   });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Public B2C — occupied seat codes for a trip (no passenger PII). */
+export async function fetchOccupiedSeats(externalTripId, tenantId) {
+  const tid = tenantId || getSaasTenantId();
+  const params = new URLSearchParams({
+    external_trip_id: String(externalTripId),
+  });
+  if (tid) params.set('tenant_id', tid);
+  const res = await fetch(`${API_BASE}/api/v1/bookings/occupied-seats?${params}`);
   if (!res.ok) await parseError(res);
   return res.json();
 }
@@ -277,11 +387,12 @@ export async function syncTicketForBoarding(booking) {
   const dep = booking.date
     ? `${booking.date}T${booking.time || '08:00'}:00`
     : new Date().toISOString();
+  const canonicalId = localIdFromReference(booking.pnr || booking.id) || booking.id;
   const res = await fetch(`${API_BASE}/api/tickets/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      id: booking.id,
+      id: canonicalId,
       trip_id: trip,
       customer_name: booking.customerName,
       seat_number: booking.seat || booking.seats?.join(', ') || '—',

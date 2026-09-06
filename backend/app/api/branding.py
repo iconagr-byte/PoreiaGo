@@ -6,7 +6,7 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas import (
@@ -24,11 +24,17 @@ from app.services.tenant_branding_service import (
     is_db_unavailable,
     update_file_branding_settings,
 )
-from app.services.tenant_site_appearance_service import TenantSiteAppearanceService
+from app.services.tenant_office_asset_service import clear_office_asset, save_office_asset
+from app.services.tenant_site_appearance_service import (
+    DEFAULT_SITE_APPEARANCE,
+    TenantSiteAppearanceService,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/branding", tags=["Tenant Branding"])
+
+_ASSET_KINDS = frozenset({"logo", "hero"})
 
 
 def _dev_fallback_enabled() -> bool:
@@ -107,6 +113,13 @@ async def update_branding_settings(
     return TenantBrandingSettingsResponse(**data)
 
 
+def _appearance_response_payload(data: dict) -> TenantSiteAppearanceResponse:
+    """Build response model — ignore unknown/extra keys from Postgres bags."""
+    fields = TenantSiteAppearanceResponse.model_fields
+    clean = {k: data[k] for k in fields if k in data}
+    return TenantSiteAppearanceResponse(**clean)
+
+
 @router.get("/site-appearance", response_model=TenantSiteAppearanceResponse)
 async def get_site_appearance(
     db: Annotated[AsyncSession, Depends(get_platform_db)],
@@ -117,7 +130,14 @@ async def get_site_appearance(
         data = await TenantSiteAppearanceService(db).get_appearance(tenant_id)
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return TenantSiteAppearanceResponse(**data)
+    except Exception as exc:
+        logger.exception("Site appearance GET failed")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load appearance") from exc
+    try:
+        return _appearance_response_payload(data)
+    except Exception as exc:
+        logger.exception("Site appearance response validation failed")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid appearance data") from exc
 
 
 @router.put("/site-appearance", response_model=TenantSiteAppearanceResponse)
@@ -130,12 +150,187 @@ async def update_site_appearance(
 ):
     actor_email = request.headers.get("X-Actor-Email")
     patch = body.model_dump(exclude_unset=True)
+    # Never persist multi-hundred-KB data URLs in Postgres settings_json —
+    # they blow up the row and cause 500s. Clients must use the upload endpoint.
+    for key in ("logo_url", "hero_image_url"):
+        val = patch.get(key)
+        if isinstance(val, str) and val.startswith("data:") and len(val) > 8_000:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Χρησιμοποιήστε Ανέβασμα αρχείου για λογότυπο/hero (όχι data URL)",
+            )
+    svc = TenantSiteAppearanceService(db)
     try:
-        data = await TenantSiteAppearanceService(db).update_appearance(
+        data = await svc.update_appearance(
             tenant_id,
             patch,
             actor_email=actor_email,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return TenantSiteAppearanceResponse(**data)
+    except Exception as exc:
+        logger.exception("Site appearance PUT failed for tenant %s — retrying after rollback", tenant_id)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        try:
+            data = await svc.update_appearance(
+                tenant_id,
+                patch,
+                actor_email=actor_email,
+            )
+        except Exception as retry_exc:
+            logger.exception("Site appearance PUT retry failed for tenant %s", tenant_id)
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Αποτυχία αποθήκευσης εμφάνισης",
+            ) from retry_exc
+    try:
+        return _appearance_response_payload(data)
+    except Exception as exc:
+        logger.exception("Site appearance response validation failed after update")
+        # Settings were written — return a permissive payload so the UI keeps the logo.
+        try:
+            return _appearance_response_payload({**DEFAULT_SITE_APPEARANCE, **(data or {}), **patch})
+        except Exception:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid appearance data",
+            ) from exc
+
+
+@router.post("/site-appearance/upload/{kind}")
+async def upload_site_appearance_asset(
+    kind: str,
+    db: Annotated[AsyncSession, Depends(get_platform_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
+    file: UploadFile = File(...),
+):
+    """Store logo/hero on disk and persist a short URL in tenant site_appearance."""
+    from travel_platform.media.image_optimize import looks_like_image, sniff_image_ext
+
+    kind_norm = str(kind or "").strip().lower()
+    if kind_norm not in _ASSET_KINDS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid asset kind")
+    content = await file.read()
+    ctype = str(file.content_type or "").strip().lower()
+    # Some browsers omit Content-Type on <input type=file> — sniff magic bytes.
+    if not looks_like_image(content, content_type=ctype, filename=file.filename):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Επιτρέπονται μόνο εικόνες (JPG, PNG, WebP)",
+        )
+    if sniff_image_ext(content) == ".heic" or "heic" in ctype or "heif" in ctype:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Τα HEIC δεν υποστηρίζονται — αποθηκεύστε ως JPG ή PNG",
+        )
+    try:
+        saved = save_office_asset(
+            tenant_id,
+            kind_norm,
+            content=content,
+            filename=file.filename,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Office asset optimize/save failed")
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Αποτυχία επεξεργασίας εικόνας",
+        ) from exc
+
+    key = "logo_url" if kind_norm == "logo" else "hero_image_url"
+    persist_warning = None
+    appearance: dict = {}
+    svc = TenantSiteAppearanceService(db)
+    patch = {key: saved["url"]}
+
+    async def _persist_url() -> dict:
+        # Prefer minimal writer — full update_appearance can choke on legacy bags.
+        if kind_norm == "logo":
+            return await svc.force_set_media_url(tenant_id, logo_url=saved["url"])
+        return await svc.force_set_media_url(tenant_id, hero_image_url=saved["url"])
+
+    try:
+        appearance = await _persist_url()
+    except Exception as exc:
+        logger.exception(
+            "Failed to persist office asset URL for tenant %s kind=%s url=%s",
+            tenant_id,
+            kind_norm,
+            saved.get("url"),
+        )
+        # Critical: a failed flush leaves the AsyncSession unusable. Without
+        # rollback, get_platform_db() commit → bare "Internal Server Error".
+        try:
+            await db.rollback()
+        except Exception:
+            logger.exception("Rollback after appearance persist failure")
+        try:
+            appearance = await svc.update_appearance(
+                tenant_id,
+                patch,
+                actor_email=None,
+            )
+            persist_warning = f"retried_update_after_{type(exc).__name__}"
+        except Exception as retry_exc:
+            logger.exception(
+                "Retry persist office asset URL failed for tenant %s kind=%s",
+                tenant_id,
+                kind_norm,
+            )
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            # File is already on disk — return URL so the UI can attach it.
+            persist_warning = f"{type(retry_exc).__name__}: {retry_exc}"
+            appearance = {key: saved["url"]}
+
+    if isinstance(appearance, dict):
+        for heavy in ("logo_url", "hero_image_url"):
+            val = str(appearance.get(heavy) or "")
+            if val.startswith("data:") and len(val) > 8000:
+                appearance[heavy] = saved["url"] if heavy == key else ""
+        if key not in appearance or not appearance.get(key):
+            appearance[key] = saved["url"]
+
+    payload = {
+        "ok": True,
+        "kind": kind_norm,
+        "url": saved["url"],
+        "bytes": saved["bytes"],
+        "content_type": saved["content_type"],
+        "appearance": appearance,
+    }
+    if persist_warning:
+        payload["persist_warning"] = persist_warning[:240]
+    return payload
+
+
+@router.delete("/site-appearance/upload/{kind}")
+async def clear_site_appearance_asset(
+    kind: str,
+    db: Annotated[AsyncSession, Depends(get_platform_db)],
+    tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
+    _: Annotated[None, Depends(require_roles(UserRole.TENANT_ADMIN, UserRole.SUPERADMIN))],
+):
+    kind_norm = str(kind or "").strip().lower()
+    if kind_norm not in _ASSET_KINDS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid asset kind")
+    try:
+        clear_office_asset(tenant_id, kind_norm)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    key = "logo_url" if kind_norm == "logo" else "hero_image_url"
+    value = "" if kind_norm == "logo" else DEFAULT_SITE_APPEARANCE.get("hero_image_url", "")
+    appearance = await TenantSiteAppearanceService(db).update_appearance(
+        tenant_id,
+        {key: value},
+    )
+    return {"ok": True, "appearance": appearance}

@@ -12,6 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit import AuditAction
 from app.models.tenant import Tenant
 from app.services.audit_service import AuditService
+from travel_platform.settings.checkout_base import (
+    PRODUCTION_PLATFORM_CHECKOUT,
+    heal_checkout_base_url,
+    is_localhost_checkout_url,
+    resolve_tenant_checkout_base,
+)
 
 DEFAULT_PLATFORM_SETTINGS: dict[str, Any] = {
     "company_name": "PoreiaGo Travel",
@@ -29,7 +35,7 @@ DEFAULT_PLATFORM_SETTINGS: dict[str, Any] = {
     "smtp_from_email": "noreply@poreiago.app",
     "sms_sender_id": "AEROSTRIDE",
     "maintenance_mode": False,
-    "checkout_base_url": "http://localhost:5173",
+    "checkout_base_url": PRODUCTION_PLATFORM_CHECKOUT,
     "checkout_deposit_enabled": True,
     "checkout_deposit_percent": 30,
     "checkout_bank_transfer_enabled": True,
@@ -55,6 +61,15 @@ def _parse_settings(raw: str | None) -> dict[str, Any]:
         return {}
 
 
+def _base_domain() -> str:
+    try:
+        from olympus.config import get_olympus_settings
+
+        return str(get_olympus_settings().base_domain or "poreiago.com")
+    except Exception:
+        return "poreiago.com"
+
+
 class TenantPlatformSettingsService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -64,7 +79,23 @@ class TenantPlatformSettingsService:
         tenant = await self._get_tenant(tenant_id)
         settings = _parse_settings(tenant.settings_json)
         platform = settings.get("platform")
-        merged = {**DEFAULT_PLATFORM_SETTINGS, **(platform if isinstance(platform, dict) else {})}
+        base = platform if isinstance(platform, dict) else {}
+        merged = {**DEFAULT_PLATFORM_SETTINGS, **base}
+        resolved = resolve_tenant_checkout_base(tenant, base_domain=_base_domain())
+        # Only the explicitly stored value counts — empty/missing → office origin
+        # (Achillio → achilliotravel.com, PoreiaGo → poreiago.com).
+        explicit = str(base.get("checkout_base_url") or "").strip()
+        if is_localhost_checkout_url(explicit):
+            merged["checkout_base_url"] = resolved
+            settings["platform"] = {
+                **DEFAULT_PLATFORM_SETTINGS,
+                **base,
+                "checkout_base_url": resolved,
+            }
+            tenant.settings_json = json.dumps(settings, ensure_ascii=False)
+            await self._session.flush()
+        else:
+            merged["checkout_base_url"] = heal_checkout_base_url(explicit, fallback=resolved)
         merged["storage_source"] = "postgres"
         merged["tenant_slug"] = tenant.slug
         return merged
@@ -82,7 +113,17 @@ class TenantPlatformSettingsService:
         base = current if isinstance(current, dict) else {}
         allowed = set(DEFAULT_PLATFORM_SETTINGS.keys())
         filtered = {k: v for k, v in patch.items() if k in allowed}
+        if "checkout_base_url" in filtered and is_localhost_checkout_url(
+            filtered.get("checkout_base_url")
+        ):
+            filtered["checkout_base_url"] = resolve_tenant_checkout_base(
+                tenant, base_domain=_base_domain()
+            )
         updated = {**DEFAULT_PLATFORM_SETTINGS, **base, **filtered}
+        if is_localhost_checkout_url(updated.get("checkout_base_url")):
+            updated["checkout_base_url"] = resolve_tenant_checkout_base(
+                tenant, base_domain=_base_domain()
+            )
         settings["platform"] = updated
         tenant.settings_json = json.dumps(settings, ensure_ascii=False)
         await self._session.flush()

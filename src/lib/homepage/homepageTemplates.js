@@ -103,7 +103,43 @@ export const TRIPS_LAYOUT_TEMPLATES = [
     label: '2 μεγάλες κάρτες',
     description: 'Δύο φαρδιές κάρτες ανά σειρά — έμφαση σε λιγότερες εκδρομές.',
     icon: 'view_column',
-    tags: ['Featured'],
+    tags: ['Featured', 'Premium'],
+  },
+  {
+    id: 'featured_plus_grid',
+    label: 'Featured + grid',
+    description: 'Η πρώτη εκδρομή σε μεγάλη κάρτα · οι υπόλοιπες σε πλέγμα δίπλα.',
+    icon: 'dashboard_customize',
+    tags: ['Premium', 'Featured'],
+  },
+  {
+    id: 'bento_showcase',
+    label: 'Bento showcase',
+    description: 'Ασύμμετρο premium πλέγμα — μία ηρωική κάρτα και δορυφόροι.',
+    icon: 'widgets',
+    tags: ['Premium', 'Creative'],
+  },
+  {
+    id: 'destination_bento',
+    label: 'Destination bento',
+    description:
+      'Gallery προορισμών 3+2 — πλήρης φωτογραφία, ημερομηνίες και τιμή θέσης λεωφορείου (όχι αεροπλάνο).',
+    icon: 'photo_library',
+    tags: ['Premium', 'Gallery', 'Λεωφορείο'],
+  },
+  {
+    id: 'grid_four',
+    label: 'Πλέγμα 4 στήλες',
+    description: 'Πυκνό gallery σε μεγάλες οθόνες — ιδανικό για πλούσιο κατάλογο.',
+    icon: 'apps',
+    tags: ['Catalog'],
+  },
+  {
+    id: 'editorial_stack',
+    label: 'Editorial stack',
+    description: 'Μεγάλες κάρτες σε στήλη στο κέντρο — περιοδικό look.',
+    icon: 'view_day',
+    tags: ['Premium', 'Editorial'],
   },
   {
     id: 'horizontal_scroll',
@@ -117,7 +153,7 @@ export const TRIPS_LAYOUT_TEMPLATES = [
     label: 'Εναλλασσόμενες σειρές',
     description: 'Εικόνα αριστερά/δεξιά εναλλάξ — storytelling layout.',
     icon: 'sync_alt',
-    tags: ['Storytelling'],
+    tags: ['Storytelling', 'Premium'],
   },
   {
     id: 'compact_list',
@@ -144,6 +180,34 @@ export const TRIP_CARD_TEMPLATES = [
     tags: ['Premium'],
   },
   {
+    id: 'soft_apple',
+    label: 'Soft Apple',
+    description: 'Ήσυχη κάρτα SF-style — απαλό γκρι, καθαρή τυπογραφία, χωρίς ένταση.',
+    icon: 'phone_iphone',
+    tags: ['Premium', 'Minimal'],
+  },
+  {
+    id: 'luxe_noir',
+    label: 'Luxe Noir',
+    description: 'Σκούρα premium κάρτα με χρυσές λεπτομέρειες — luxury coach vibe.',
+    icon: 'dark_mode',
+    tags: ['Premium', 'Luxury'],
+  },
+  {
+    id: 'spotlight',
+    label: 'Spotlight',
+    description: 'Μεγάλη φωτογραφία, τιμή σε badge και CTA — μεγιστοποιεί τη μετατροπή.',
+    icon: 'highlight',
+    tags: ['Premium', 'Conversion'],
+  },
+  {
+    id: 'ticket_stub',
+    label: 'Ticket Stub',
+    description: 'Κάρτα-εισιτήριο με διάτρηση — παιχνιδιάρικο και λειτουργικό.',
+    icon: 'confirmation_number',
+    tags: ['Premium', 'Playful'],
+  },
+  {
     id: 'compact_horizontal',
     label: 'Compact Horizontal',
     description: 'Οριζόντια διάταξη — εικόνα αριστερά, λεπτομέρειες δεξιά.',
@@ -151,11 +215,27 @@ export const TRIP_CARD_TEMPLATES = [
     tags: ['Συμπαγές'],
   },
   {
+    id: 'abroad_horizontal',
+    label: 'Abroad Horizontal',
+    description:
+      'Οριζόντια κάρτα εκδρομής εξωτερικού — προορισμός, ημερομηνίες και τιμή θέσης λεωφορείου (όχι αεροπλάνο).',
+    icon: 'public',
+    tags: ['Εξωτερικό', 'Horizontal', 'Λεωφορείο'],
+  },
+  {
     id: 'image_overlay',
     label: 'Image Overlay',
     description: 'Όλα πάνω στην εικόνα — cinematic look.',
     icon: 'layers',
-    tags: ['Cinematic'],
+    tags: ['Cinematic', 'Premium'],
+  },
+  {
+    id: 'destination_poster',
+    label: 'Destination Poster',
+    description:
+      'Full-bleed προορισμός: τίτλος + ημερομηνίες αριστερά, «Standard / VIP · €» δεξιά — για εκδρομές λεωφορείου.',
+    icon: 'wallpaper',
+    tags: ['Gallery', 'Λεωφορείο', 'Premium'],
   },
   {
     id: 'minimal_clean',
@@ -169,7 +249,7 @@ export const TRIP_CARD_TEMPLATES = [
     label: 'Magazine',
     description: 'Μεγάλοι τίτλοι, editorial spacing — ταξιδιωτικό περιοδικό.',
     icon: 'newspaper',
-    tags: ['Editorial'],
+    tags: ['Editorial', 'Premium'],
   },
   {
     id: 'bordered_sharp',
@@ -184,6 +264,84 @@ export const TRIP_CARD_TEMPLATES = [
     description: 'Glassmorphism με blur και ημιδιαφανές φόντο.',
     icon: 'blur_circular',
     tags: ['Glass'],
+  },
+];
+
+/** Rent homepage /rent fleet discovery — layout of vehicle cards. */
+export const RENT_FLEET_LAYOUT_TEMPLATES = [
+  {
+    id: 'rent_grid_three',
+    label: 'Πλέγμα 3 στήλες',
+    description: 'Κλασικό grid για στόλο ενοικίασης — ισορροπημένο σε desktop & mobile.',
+    icon: 'grid_view',
+    tags: ['Κλασικό'],
+  },
+  {
+    id: 'rent_grid_two',
+    label: '2 μεγάλες κάρτες',
+    description: 'Φαρδιές κάρτες — ιδανικό όταν έχετε λίγα premium οχήματα.',
+    icon: 'view_column',
+    tags: ['Premium', 'Featured'],
+  },
+  {
+    id: 'rent_featured',
+    label: 'Featured showroom',
+    description: 'Το πρώτο όχημα σε μεγάλη κάρτα · τα υπόλοιπα σε πλέγμα.',
+    icon: 'garage_home',
+    tags: ['Premium', 'Showroom'],
+  },
+  {
+    id: 'rent_scroll',
+    label: 'Οριζόντιο scroll',
+    description: 'Swipe καρουζέλ — γρήγορη περιήγηση στόλου στο κινητό.',
+    icon: 'swipe',
+    tags: ['Mobile'],
+  },
+  {
+    id: 'rent_list',
+    label: 'Λίστα σύγκρισης',
+    description: 'Συμπαγείς οριζόντιες σειρές — εύκολη σύγκριση τιμής & παροχών.',
+    icon: 'table_rows',
+    tags: ['Σύγκριση'],
+  },
+];
+
+/** Rent vehicle card visual style. */
+export const RENT_FLEET_CARD_TEMPLATES = [
+  {
+    id: 'rent_premium',
+    label: 'Premium Rent',
+    description: 'Μεγάλη φωτογραφία, κατηγορία, τιμή/ημέρα — καθαρό showroom.',
+    icon: 'directions_car',
+    tags: ['Premium'],
+  },
+  {
+    id: 'rent_soft',
+    label: 'Soft Showroom',
+    description: 'Απαλό Apple-style — ήσυχα χρώματα, λεπτά περιγράμματα.',
+    icon: 'phone_iphone',
+    tags: ['Premium', 'Minimal'],
+  },
+  {
+    id: 'rent_overlay',
+    label: 'Photo Overlay',
+    description: 'Όνομα & τιμή πάνω στη φωτογραφία — cinematic fleet look.',
+    icon: 'layers',
+    tags: ['Premium', 'Cinematic'],
+  },
+  {
+    id: 'rent_compact',
+    label: 'Compact Row',
+    description: 'Οριζόντια κάρτα — γρήγορη σάρωση πολλών οχημάτων.',
+    icon: 'view_agenda',
+    tags: ['Συμπαγές'],
+  },
+  {
+    id: 'rent_spec',
+    label: 'Spec Sheet',
+    description: 'Έμφαση σε θέσεις, κιβώτιο, καύσιμο και ημερήσια τιμή.',
+    icon: 'fact_check',
+    tags: ['Λειτουργικό'],
   },
 ];
 
@@ -244,6 +402,11 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   trips_layout_template: 'grid_three',
   trip_card_template: 'premium',
   footer_template: 'classic_columns',
+  rent_fleet_layout_template: 'rent_grid_three',
+  rent_fleet_card_template: 'rent_premium',
+  /** International section — stacked horizontal cards between Greece and fleet. */
+  intl_trips_layout_template: 'editorial_stack',
+  intl_trip_card_template: 'abroad_horizontal',
   trips_section_eyebrow: 'Ανακαλύψτε',
   trips_section_title: 'Εκδρομές στην Ελλάδα',
   trips_section_subtitle:
@@ -251,17 +414,61 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   intl_section_eyebrow: 'Διεθνή δρομολόγια',
   intl_section_title: 'Ταξίδια προς το Εξωτερικό',
   intl_section_subtitle:
-    'Αναχωρήσεις από Ελλάδα με Premium & Luxury coach — κράτηση θέσης online σε λίγα δευτερόλεπτα.',
+    'Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη.',
 };
 
 export function getTemplateById(list, id) {
   return list.find((t) => t.id === id) || list[0];
 }
 
-export function tripsGridClass(layoutId) {
+export function tripsGridClass(layoutId, tripCount = 0, cardTemplateId = '') {
+  const abroad = cardTemplateId === 'abroad_horizontal';
+
+  // One trip (typical new office) — keep the card narrow/centered, not full-bleed.
+  if (tripCount === 1) {
+    switch (layoutId) {
+      case 'compact_list':
+        return 'flex flex-col gap-3 max-w-sm sm:max-w-md mx-auto w-full';
+      case 'horizontal_scroll':
+        return 'flex justify-center gap-6';
+      case 'alternating_rows':
+      case 'editorial_stack':
+        return abroad
+          ? 'flex flex-col gap-8 max-w-3xl sm:max-w-4xl mx-auto w-full'
+          : 'flex flex-col gap-8 max-w-lg sm:max-w-xl mx-auto w-full';
+      default:
+        return 'grid grid-cols-1 max-w-[300px] sm:max-w-[340px] md:max-w-[380px] mx-auto gap-6 w-full';
+    }
+  }
+
+  // Two trips: avoid ultra-wide 50/50 stretch on large screens.
+  if (
+    tripCount === 2 &&
+    (layoutId === 'grid_two_large' ||
+      layoutId === 'grid_three' ||
+      layoutId === 'masonry_two' ||
+      layoutId === 'featured_plus_grid' ||
+      layoutId === 'grid_four')
+  ) {
+    return 'grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto w-full';
+  }
+
   switch (layoutId) {
     case 'grid_two_large':
       return 'grid grid-cols-1 lg:grid-cols-2 gap-10';
+    case 'featured_plus_grid':
+      return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 items-stretch';
+    case 'bento_showcase':
+      return 'grid grid-cols-1 md:grid-cols-6 gap-4 md:gap-5 items-stretch';
+    case 'destination_bento':
+      // 3 tall cards on top, 2 wider on bottom — airline-gallery look for coaches.
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-5 items-stretch';
+    case 'grid_four':
+      return 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6';
+    case 'editorial_stack':
+      return abroad
+        ? 'flex flex-col gap-6 md:gap-8 max-w-5xl mx-auto w-full'
+        : 'flex flex-col gap-5 md:gap-6 max-w-3xl mx-auto w-full';
     case 'horizontal_scroll':
       return 'flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-thin';
     case 'alternating_rows':
@@ -276,12 +483,63 @@ export function tripsGridClass(layoutId) {
   }
 }
 
-export function tripCardWrapperClass(layoutId) {
+export function tripCardWrapperClass(layoutId, tripCount = 0, index = 0, cardTemplateId = '') {
   if (layoutId === 'horizontal_scroll') {
-    return 'snap-start shrink-0 w-[min(88vw,340px)]';
+    const abroad = cardTemplateId === 'abroad_horizontal';
+    if (tripCount === 1) {
+      return abroad
+        ? 'w-full max-w-[420px] sm:max-w-[460px] h-full'
+        : 'w-full max-w-[320px] sm:max-w-[360px] h-full';
+    }
+    return abroad
+      ? 'snap-start shrink-0 w-[min(92vw,420px)] h-full'
+      : 'snap-start shrink-0 w-[min(88vw,300px)] h-full';
   }
   if (layoutId === 'masonry_two') {
     return 'break-inside-avoid mb-6';
+  }
+  if (layoutId === 'featured_plus_grid' && index === 0 && tripCount > 1) {
+    return 'h-full md:col-span-2';
+  }
+  if (layoutId === 'bento_showcase') {
+    if (index === 0) return 'h-full md:col-span-4 md:row-span-2 min-h-[280px]';
+    if (index === 1) return 'h-full md:col-span-2';
+    return 'h-full md:col-span-2';
+  }
+  if (layoutId === 'destination_bento') {
+    // Top row: indices 0–2 → 2 cols each. Bottom: 3–4 → 3 cols each (wider).
+    if (index <= 2) return 'h-full lg:col-span-2 min-h-[220px] sm:min-h-[260px] lg:min-h-[300px]';
+    return 'h-full sm:col-span-2 lg:col-span-3 min-h-[200px] sm:min-h-[240px] lg:min-h-[260px]';
+  }
+  // Equal-height cards in CSS grids (items stretch; children fill).
+  return 'h-full';
+}
+
+export function rentFleetGridClass(layoutId) {
+  switch (layoutId) {
+    case 'rent_grid_two':
+      return 'grid grid-cols-1 md:grid-cols-2 gap-6 list-none p-0 m-0';
+    case 'rent_featured':
+      return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0';
+    case 'rent_scroll':
+      return 'flex gap-5 overflow-x-auto pb-3 snap-x snap-mandatory list-none p-0 m-0';
+    case 'rent_list':
+      return 'flex flex-col gap-3 max-w-3xl list-none p-0 m-0';
+    case 'rent_grid_three':
+    default:
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0';
+  }
+}
+
+export function rentFleetCardWrapperClass(layoutId, index = 0) {
+  if (layoutId === 'rent_scroll') {
+    return 'snap-start shrink-0 w-[min(86vw,300px)]';
+  }
+  if (layoutId === 'rent_featured' && index === 0) {
+    return 'md:col-span-2';
+  }
+  if (layoutId === 'rent_list') {
+    return 'w-full';
   }
   return '';
 }

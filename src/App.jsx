@@ -1,14 +1,23 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { Toaster } from 'react-hot-toast';
-import FrontPage from './pages/FrontPage';
+import { captureRentalInstallPrompt, setupRentalPwa } from './lib/rental/registerRentalPwa.js';
+import { markPreferRentLookup } from './lib/rental/preferRentLookup.js';
+import HomePage from './pages/HomePage.jsx';
 import StorefrontDemoPage from './pages/StorefrontDemoPage';
 import BackOffice from './pages/BackOffice';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import SeatSelection from './pages/SeatSelection';
+import TripExtrasPage from './pages/TripExtrasPage';
 import TripDetails from './pages/TripDetails';
 import SimpleWalletPage from './pages/SimpleWalletPage.jsx';
+import WalletMagicPage from './pages/WalletMagicPage.jsx';
+import RentalCustomerApp from './pages/RentalCustomerApp.jsx';
+import RentBookingWizardPage from './pages/RentBookingWizardPage.jsx';
+import RentBookingLookupPage from './pages/RentBookingLookupPage.jsx';
+import RentalRemoteSignPage from './pages/RentalRemoteSignPage.jsx';
 import InBusPortal from './pages/InBusPortal';
 import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
@@ -18,7 +27,14 @@ import FleetVehicleDetail from './pages/FleetVehicleDetail';
 import TripEditorPage from './pages/admin/TripEditorPage';
 import DriverDetailPage from './pages/admin/DriverDetailPage';
 import DriverFormPage from './pages/admin/DriverFormPage.jsx';
+import RentalVehicleFormPage from './pages/admin/RentalVehicleFormPage.jsx';
 import PlatformAdminRedirect from './pages/admin/PlatformAdminRedirect';
+import TourLeaderLuggagePage from './pages/tour/TourLeaderLuggagePage.jsx';
+import SharedItineraryPage from './pages/tour/SharedItineraryPage.jsx';
+import PassengerSelfCheckinPage from './pages/tour/PassengerSelfCheckinPage.jsx';
+import PartnerItineraryPage from './pages/tour/PartnerItineraryPage.jsx';
+import PartnerLoginPage from './pages/partner/PartnerLoginPage.jsx';
+import PartnerPortalPage from './pages/partner/PartnerPortalPage.jsx';
 import AgencyPlansPage from './pages/AgencyPlansPage';
 import AgencySignupPage from './pages/AgencySignupPage';
 import AgencySignupSuccessPage from './pages/AgencySignupSuccessPage';
@@ -32,19 +48,86 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import BrandingBoot from './components/BrandingBoot.jsx';
 import MaintenanceGate from './components/MaintenanceGate.jsx';
+import RentStorefrontGate from './components/rental/RentStorefrontGate.jsx';
+
+function RentalCustomerAppGated() {
+  return (
+    <RentStorefrontGate>
+      <RentalCustomerApp />
+    </RentStorefrontGate>
+  );
+}
+
+function RentBookingWizardGated() {
+  return (
+    <RentStorefrontGate>
+      <RentBookingWizardPage />
+    </RentStorefrontGate>
+  );
+}
+
+function RentBookingLookupGated() {
+  return (
+    <RentStorefrontGate>
+      <RentBookingLookupPage />
+    </RentStorefrontGate>
+  );
+}
+
+function RentalPwaBoot() {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const path = window.location.pathname || '';
+    // Capture BIP as early as possible; register SW only on /rent so guests can install.
+    captureRentalInstallPrompt();
+    if (path === '/rent' || path.startsWith('/rent/')) {
+      markPreferRentLookup();
+      setupRentalPwa();
+    }
+  }, []);
+  return null;
+}
+
+/** Any visit under /rent marks the session so /my-booking never sticks as bus lookup. */
+function PreferRentSessionBoot() {
+  const location = useLocation();
+  useEffect(() => {
+    const path = location.pathname || '';
+    if (path === '/rent' || path.startsWith('/rent/')) markPreferRentLookup();
+  }, [location.pathname]);
+  return null;
+}
 
 function App() {
   return (
     <ErrorBoundary>
       <Router>
         <BrandingBoot />
+        <RentalPwaBoot />
+        <PreferRentSessionBoot />
         <MaintenanceGate>
           <Toaster position="top-center" />
           <Routes>
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
+            <Route path="/wallet/magic" element={<WalletMagicPage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
-            <Route path="/" element={<FrontPage />} />
+            {/* Rent: green URLs — /rent/login + /rent/wallet + /rent/my-booking (not bus). */}
+            <Route path="/rent/login" element={<LoginPage rentEntrance />} />
+            <Route path="/rent/register" element={<RegisterPage />} />
+            <Route path="/rent/my-booking" element={<RentBookingLookupGated />} />
+            {/* Legacy marketing URL — same content lives on /rent now. */}
+            <Route path="/rent/services" element={<Navigate to="/rent" replace />} />
+            <Route path="/rent/servises" element={<Navigate to="/rent" replace />} />
+            <Route path="/rent/book/services" element={<RentBookingWizardGated />} />
+            <Route path="/rent/book/details" element={<RentBookingWizardGated />} />
+            <Route path="/rent/book/payment" element={<RentBookingWizardGated />} />
+            <Route path="/rent/wallet" element={<RentalCustomerAppGated />} />
+            <Route path="/rent" element={<RentalCustomerAppGated />} />
+            <Route path="/rent/*" element={<RentalCustomerAppGated />} />
+            {/* Contactless rental contract signature (token from SMS/email). */}
+            <Route path="/sign/:token" element={<RentalRemoteSignPage />} />
+            <Route path="/" element={<HomePage />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />
             <Route path="/grafeia" element={<AgencyPlansPage />} />
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />
@@ -58,16 +141,31 @@ function App() {
             <Route path="/admin" element={<BackOffice />} />
             <Route path="/admin/platform" element={<PlatformAdminRedirect />} />
             <Route path="/admin/fleet/:vehicleId" element={<FleetVehicleDetail />} />
+            <Route path="/admin/fleet-rental/vehicles/new" element={<RentalVehicleFormPage />} />
+            <Route
+              path="/admin/fleet-rental/vehicles/:vehicleId/edit"
+              element={<RentalVehicleFormPage />}
+            />
             <Route path="/admin/trips/:tripId" element={<TripEditorPage />} />
+            <Route path="/tour-leader/:tripId" element={<TourLeaderLuggagePage />} />
+            <Route path="/itinerary/share" element={<SharedItineraryPage />} />
+            <Route path="/itinerary/:tripId" element={<SharedItineraryPage />} />
+            <Route path="/passenger-checkin" element={<PassengerSelfCheckinPage />} />
+            <Route path="/partner/itinerary" element={<PartnerItineraryPage />} />
+            <Route path="/partner/login" element={<PartnerLoginPage />} />
+            <Route path="/partner/portal" element={<PartnerPortalPage />} />
             <Route path="/admin/drivers/new" element={<DriverFormPage />} />
             <Route path="/admin/drivers/:driverId/edit" element={<DriverFormPage />} />
             <Route path="/admin/drivers/:driverId" element={<DriverDetailPage />} />
             <Route path="/driver/auth" element={<DriverAuthPage />} />
+            {/* Alias only — login UI lives in-place on /driver. */}
+            <Route path="/driver/login" element={<Navigate to="/driver" replace />} />
             <Route path="/driver/dashboard" element={<Navigate to="/driver" replace />} />
             <Route path="/driver" element={<DriverCommandCenter />} />
             <Route path="/driver/scan" element={<DriverScan />} />
             <Route path="/select-seat/:tripId" element={<SeatSelection />} />
             <Route path="/select-seat" element={<SeatSelection />} />
+            <Route path="/book/extras/:tripId" element={<TripExtrasPage />} />
             <Route path="/trip/:id" element={<TripDetails />} />
             <Route path="/checkout/:tripId" element={<CheckoutPage />} />
             <Route path="/checkout/resume/:token" element={<CheckoutResumePage />} />

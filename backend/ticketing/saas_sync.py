@@ -21,6 +21,7 @@ async def upsert_ticket_booking(
     saas_booking_id: str | None = None,
     email: str | None = None,
     special_requirements: dict | None = None,
+    commit: bool = True,
 ) -> dict:
     db = get_db()
     dep = departure_at or datetime.now(timezone.utc).isoformat()
@@ -30,11 +31,33 @@ async def upsert_ticket_booking(
     if saas_booking_id:
         spec["saas_booking_id"] = saas_booking_id
 
-    cur = await db.execute(
-        "SELECT id, ticket_ref FROM ticket_bookings WHERE id = ? OR saas_booking_id = ? LIMIT 1",
-        (local_id, saas_booking_id or ""),
-    )
-    existing = await cur.fetchone()
+    try:
+        from api.admin_booking_mapper import booking_id_aliases
+
+        aliases = booking_id_aliases(local_id)
+    except Exception:
+        aliases = [local_id] if local_id else []
+    if local_id and local_id not in aliases:
+        aliases.insert(0, local_id)
+
+    existing = None
+    if aliases:
+        placeholders = ", ".join("?" for _ in aliases)
+        cur = await db.execute(
+            f"""
+            SELECT id, ticket_ref FROM ticket_bookings
+            WHERE id IN ({placeholders})
+            LIMIT 1
+            """,
+            tuple(aliases),
+        )
+        existing = await cur.fetchone()
+    if not existing and saas_booking_id:
+        cur = await db.execute(
+            "SELECT id, ticket_ref FROM ticket_bookings WHERE saas_booking_id = ? LIMIT 1",
+            (saas_booking_id,),
+        )
+        existing = await cur.fetchone()
     ticket_ref = existing["ticket_ref"] if existing else str(uuid.uuid4())
 
     if existing:
@@ -82,7 +105,8 @@ async def upsert_ticket_booking(
                 saas_booking_id,
             ),
         )
-    await db.commit()
+    if commit:
+        await db.commit()
     cur2 = await db.execute("SELECT * FROM ticket_bookings WHERE id = ?", (booking_id,))
     row = await cur2.fetchone()
     return row_to_booking(row) if row else {}

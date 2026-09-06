@@ -1,44 +1,63 @@
 import { PLATFORM_NAME } from '../marketing/platformCopy.js';
+import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
+import { officeStorageKey } from '../admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'poreiago_branding_v2';
-const LEGACY_STORAGE_KEYS = ['aerostride_branding_v1', 'poreiago_branding_v1'];
+const STORAGE_KEY_BASE = 'poreiago_branding_v2';
+const LEGACY_STORAGE_KEYS = ['aerostride_branding_v1', 'poreiago_branding_v1', 'poreiago_branding_v2'];
 
-const LEGACY_NAME_RE = /achillio|aerostride|olympus/i;
+function brandingStorageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
 
-/** Platform marketing — tab title stays PoreiaGo, not tenant QA names. */
+/** Only obsolete platform QA leftovers — never real office names like «Achillio Travel». */
+const PLATFORM_PLACEHOLDER_NAME_RE = /^(aerostride|olympus|poreiago)(\s+(travel|platform))?$/i;
+
+/** @deprecated use isPlatformMarketingHost — kept for call sites */
 export function isPlatformMarketingContext() {
   if (typeof window === 'undefined') return true;
-  const host = window.location.hostname.toLowerCase();
-  const path = window.location.pathname;
-  if (host === 'localhost' || host === '127.0.0.1' || host === 'www.poreiago.com' || host === 'poreiago.com') {
-    return (
-      path === '/' ||
-      path.startsWith('/grafeia') ||
-      path === '/admin/login' ||
-      path === '/login' ||
-      path === '/register'
-    );
-  }
-  return false;
+  return isPlatformMarketingHost(window.location.hostname);
 }
 
 export function platformDocumentTitle() {
   return `${PLATFORM_NAME} — Travel Operations Platform`;
 }
 
-function sanitizeDisplayName(name) {
+/**
+ * Browser tab title for an office storefront.
+ * Never falls back to PoreiaGo on tenant hosts.
+ */
+export function tenantDocumentTitle(displayName, hostname = '') {
+  const name = String(displayName || '').trim();
+  if (name && !PLATFORM_PLACEHOLDER_NAME_RE.test(name)) {
+    return name.includes('—') ? name : name;
+  }
+  const host = String(hostname || (typeof window !== 'undefined' ? window.location.hostname : ''))
+    .toLowerCase()
+    .replace(/^www\./, '');
+  if (host && !isPlatformMarketingHost(host)) {
+    // achilliotravel.com → Achilliotravel (better than PoreiaGo)
+    const label = host.split('.')[0] || host;
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+  return platformDocumentTitle();
+}
+
+function sanitizeDisplayName(name, { allowTenantNames = true } = {}) {
   const trimmed = (name || '').trim();
-  if (!trimmed || LEGACY_NAME_RE.test(trimmed)) {
-    return PLATFORM_NAME;
+  if (!trimmed) return '';
+  if (PLATFORM_PLACEHOLDER_NAME_RE.test(trimmed)) {
+    return allowTenantNames ? '' : PLATFORM_NAME;
   }
   return trimmed;
 }
 
 export function sanitizeBranding(branding) {
   if (!branding) return null;
+  const onTenant =
+    typeof window !== 'undefined' && isTenantStorefrontHost(window.location.hostname);
   return {
     ...branding,
-    display_name: sanitizeDisplayName(branding.display_name),
+    display_name: sanitizeDisplayName(branding.display_name, { allowTenantNames: onTenant }),
   };
 }
 
@@ -46,12 +65,10 @@ export function purgeLegacyBrandingCache() {
   try {
     for (const key of LEGACY_STORAGE_KEYS) {
       const raw = localStorage.getItem(key);
-      if (!raw) {
-        continue;
-      }
+      if (!raw) continue;
       try {
         const parsed = JSON.parse(raw);
-        if (LEGACY_NAME_RE.test(parsed?.display_name || '')) {
+        if (PLATFORM_PLACEHOLDER_NAME_RE.test(String(parsed?.display_name || '').trim())) {
           localStorage.removeItem(key);
         }
       } catch {
@@ -66,13 +83,17 @@ export function purgeLegacyBrandingCache() {
 export function cacheBranding(branding) {
   const clean = sanitizeBranding(branding);
   if (!clean) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+  try {
+    localStorage.setItem(brandingStorageKey(), JSON.stringify(clean));
+  } catch {
+    /* quota */
+  }
   applyBrandingToDocument(clean);
 }
 
 export function loadCachedBranding() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(brandingStorageKey());
     return raw ? sanitizeBranding(JSON.parse(raw)) : null;
   } catch {
     return null;
@@ -89,10 +110,9 @@ export function applyBrandingToDocument(branding) {
     root.style.setProperty('--primary', clean.primary_color);
   }
 
-  if (!isPlatformMarketingContext()) {
-    document.title = clean.display_name.includes('—')
-      ? clean.display_name
-      : `${clean.display_name} — Travel Operations Platform`;
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (isTenantStorefrontHost(host) || !isPlatformMarketingHost(host)) {
+    document.title = tenantDocumentTitle(clean.display_name, host);
   } else {
     document.title = platformDocumentTitle();
   }

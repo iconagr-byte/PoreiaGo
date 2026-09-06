@@ -41,6 +41,13 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
         meta["heading_deg"] = raw.get("heading_deg")
     if raw.get("driver_id"):
         meta["driver_id"] = raw.get("driver_id")
+    preferred_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
+    if preferred_title:
+        meta["trip_title"] = str(preferred_title).strip()
+    elif update.trip_id is not None and not meta.get("trip_title"):
+        from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
+
+        meta["trip_title"] = await resolve_trip_title(update.trip_id)
     if meta:
         _live._vehicles[str(vehicle_id)] = {**_live._vehicles.get(str(vehicle_id), {}), **meta}
 
@@ -75,6 +82,21 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
 
     idle_sec = _idling.trip_idle_seconds(vehicle_id)
     _live.apply_update(vehicle_id, update, idle_seconds=idle_sec)
+
+    try:
+        from travel_platform.telemetry.live_fleet_redis import save_live_vehicle
+
+        meta = _live._vehicles.get(str(vehicle_id), {})
+        if meta:
+            ok = await save_live_vehicle(meta)
+            if not ok:
+                logger.warning(
+                    "live fleet Redis save returned false tenant=%s vehicle=%s",
+                    update.tenant_id,
+                    vehicle_id,
+                )
+    except Exception:
+        logger.warning("live fleet Redis save failed", exc_info=True)
 
     return NormalizedTelemetry(
         update=update,

@@ -8,14 +8,30 @@ import {
 
 assert.equal(sanitizeSettingsSubTab('tenants', false), 'platform');
 assert.equal(sanitizeSettingsSubTab('saas_infra', false), 'platform');
+assert.equal(sanitizeSettingsSubTab('integrations', false), 'platform');
 assert.equal(sanitizeSettingsSubTab('backup', false), 'platform');
+assert.equal(sanitizeSettingsSubTab('growth', false), 'platform');
 assert.equal(sanitizeSettingsSubTab('homepage', false), 'homepage');
-assert.equal(sanitizeSettingsSubTab('growth', false), 'growth');
+assert.equal(sanitizeSettingsSubTab('domain', false), 'domain');
 assert.equal(sanitizeSettingsSubTab('tenants', true), 'tenants');
+assert.equal(sanitizeSettingsSubTab('integrations', true), 'saas_infra');
+assert.equal(sanitizeSettingsSubTab('growth', true), 'growth');
 
 const tenantTabs = settingsTabsForRole(false);
 assert.ok(tenantTabs.some((t) => t.id === 'homepage'));
-assert.ok(!tenantTabs.some((t) => PLATFORM_ONLY_TAB_IDS.has(t.id) && t.id === 'tenants'));
+assert.ok(tenantTabs.some((t) => t.id === 'domain'));
+assert.ok(!tenantTabs.some((t) => t.id === 'drivers'));
+assert.ok(!tenantTabs.some((t) => t.id === 'telematics'));
+assert.equal(sanitizeSettingsSubTab('drivers', false), 'platform');
+assert.equal(sanitizeSettingsSubTab('telematics', false), 'platform');
+assert.ok(!tenantTabs.some((t) => PLATFORM_ONLY_TAB_IDS.has(t.id)));
+assert.ok(!tenantTabs.some((t) => t.id === 'growth'));
+assert.ok(!tenantTabs.some((t) => t.id === 'integrations'));
 assert.equal(tenantTabs.length, TENANT_SETTINGS_TABS.length);
+
+const platformTabs = settingsTabsForRole(true);
+assert.ok(platformTabs.some((t) => t.id === 'growth'));
+assert.ok(!platformTabs.some((t) => t.id === 'integrations'));
+assert.ok(platformTabs.some((t) => t.id === 'domain'));
 
 console.log('settingsTabs role gating: OK');

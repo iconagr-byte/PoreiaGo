@@ -74,7 +74,7 @@ export default function FleetRouteCompare() {
       if (result.error === 'missing_points') {
         setError('Λείπουν GPS σημεία σε ένα ή και τα δύο δρομολόγια.');
       } else if (result.error) {
-        setError('Η βάση δεδομένων δεν είναι διαθέσιμη ή λείπει το migration trip_coordinates.');
+        setError('Το ιστορικό GPS δεν είναι ακόμα διαθέσιμο — δοκιμάστε ξανά σε λίγο.');
       }
     } catch (err) {
       setError(err.message || 'Αποτυχία σύγκρισης');

@@ -1,26 +1,17 @@
 import { getLayoutForVehicle } from './busLayouts.js';
-
-function hashSeed(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i += 1) {
-    h = (h << 5) - h + str.charCodeAt(i);
-    h |= 0;
-  }
-  return Math.abs(h);
-}
-
-function isSeatBooked(tripId, seatId) {
-  const ratio = 0.22 + (hashSeed(`${tripId}-${seatId}`) % 18) / 100;
-  const threshold = ratio * 100;
-  return hashSeed(`booked-${tripId}-${seatId}`) % 100 < threshold;
-}
+import { normalizeSeatCode } from './occupiedSeats.js';
 
 /**
- * Σταθερή διάταξη θέσεων ανά εκδρομή + τύπο λεωφορείου (όχι τυχαία σε κάθε refresh).
+ * Build seat map for a trip from vehicle layout + real occupancy.
+ * @param {object} trip
+ * @param {{ occupiedSeats?: Iterable<string> }} [options]
  */
-export function generateSeatMap(trip) {
+export function generateSeatMap(trip, options = {}) {
   const layout = getLayoutForVehicle(trip?.vehicleType);
   const tripId = String(trip?.id ?? 'default');
+  const occupied = new Set(
+    [...(options.occupiedSeats || [])].map(normalizeSeatCode).filter(Boolean),
+  );
   const seats = [];
 
   for (let row = 1; row <= layout.rows; row += 1) {
@@ -28,7 +19,7 @@ export function generateSeatMap(trip) {
       const number = `${row}${col}`;
       const id = `${tripId}-${number}`;
       const isVip = layout.vipRows.includes(row);
-      const booked = isSeatBooked(tripId, id);
+      const booked = occupied.has(normalizeSeatCode(number));
       seats.push({
         id,
         row,

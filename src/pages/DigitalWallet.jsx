@@ -8,6 +8,7 @@ import TicketQrCode from '../components/TicketQrCode.jsx';
 import LiveEtaCountdown from '../components/passenger/LiveEtaCountdown.jsx';
 import { logoutCustomer } from '../lib/auth.js';
 import { ticketPrintPath } from '../lib/ticketing/printTicket.js';
+import { LOYALTY_UI_ENABLED } from '../lib/admin/loyaltyUi.js';
 
 export default function DigitalWallet({ demoMode = false }) {
   const navigate = useNavigate();
@@ -120,7 +121,7 @@ export default function DigitalWallet({ demoMode = false }) {
           </div>
         </div>
         <div className="flex items-center gap-6">
-          {customer && (
+          {LOYALTY_UI_ENABLED && customer && (
             <div className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-amber-100 to-amber-50 px-4 py-2 rounded-full border border-amber-200">
               <span className="material-symbols-outlined text-amber-500 text-[18px]">stars</span>
               <span className="font-label-md font-bold text-amber-800">{customer.points} AeroMiles</span>
@@ -319,6 +320,7 @@ export default function DigitalWallet({ demoMode = false }) {
               >
                 Οι Κρατήσεις μου
               </button>
+              {LOYALTY_UI_ENABLED ? (
               <button 
                 onClick={() => setActiveTab('rewards')}
                 className={`flex-1 min-w-[120px] py-3 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${activeTab === 'rewards' ? 'bg-amber-100 text-amber-700 shadow-sm' : 'text-amber-600/80 hover:text-amber-600'}`}
@@ -326,6 +328,7 @@ export default function DigitalWallet({ demoMode = false }) {
                 <span className="material-symbols-outlined text-[16px]">stars</span>
                 Επιβραβεύσεις
               </button>
+              ) : null}
               <button 
                 onClick={() => setActiveTab('lost_found')}
                 className={`flex-1 min-w-[140px] py-3 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${activeTab === 'lost_found' ? 'bg-rose-100 text-rose-700 shadow-sm' : 'text-rose-600/80 hover:text-rose-600'}`}
@@ -698,7 +701,7 @@ export default function DigitalWallet({ demoMode = false }) {
             )}
 
             {/* TAB: REWARDS & GAMIFICATION */}
-            {activeTab === 'rewards' && (
+            {LOYALTY_UI_ENABLED && activeTab === 'rewards' && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <section className="bg-white rounded-[32px] p-8 shadow-sm border border-black/[0.05] relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-8 opacity-10">

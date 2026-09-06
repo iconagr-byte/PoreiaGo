@@ -1,22 +1,28 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AUDIENCE_HOOKS,
   FEATURES,
+  FEATURES_BACKGROUND_IMAGE,
   HERO,
   HERO_BACKGROUND_IMAGE,
   PLATFORM_TAGLINE,
   STATS,
   STEPS,
 } from '../../lib/marketing/platformCopy.js';
+import { mergeRentPlanCatalog } from '../../lib/billing/planCatalog.js';
+import { fetchPublicRentPlanCatalog } from '../../services/rentPlanCatalogApi.js';
 import AgencyPlansHook from './AgencyPlansHook.jsx';
+import { FeatureVisual } from './FeatureVisuals.jsx';
 
 const FEATURE_ICON_STYLES = {
-  violet: 'bg-gradient-to-br from-[#ede8ff] to-[#f7f4ff] text-[#7d5ae8]',
-  sky: 'bg-gradient-to-br from-[#e3f0ff] to-[#f2f8ff] text-[#0077ed]',
-  emerald: 'bg-gradient-to-br from-[#dff7ec] to-[#f0fdf7] text-[#1f9d62]',
-  indigo: 'bg-gradient-to-br from-[#e8ecff] to-[#f4f6ff] text-[#4f5bd5]',
-  amber: 'bg-gradient-to-br from-[#fff4df] to-[#fffaf0] text-[#c9860a]',
-  rose: 'bg-gradient-to-br from-[#ffe8ef] to-[#fff5f8] text-[#e84a7a]',
+  violet: 'bg-[#f5f5f7] text-[#6e6e73]',
+  sky: 'bg-[#f5f5f7] text-[#6e6e73]',
+  emerald: 'bg-[#f5f5f7] text-[#6e6e73]',
+  teal: 'bg-[#f5f5f7] text-[#6e6e73]',
+  indigo: 'bg-[#f5f5f7] text-[#6e6e73]',
+  amber: 'bg-[#f5f5f7] text-[#6e6e73]',
+  rose: 'bg-[#f5f5f7] text-[#6e6e73]',
 };
 
 export function HeroSection() {
@@ -48,11 +54,6 @@ export function HeroSection() {
 
       <div className="relative z-10 w-full max-w-6xl mx-auto px-4 md:px-8 py-28 md:py-32">
         <div className="max-w-2xl">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-bold uppercase tracking-wider text-sky-200 mb-6">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            {HERO.badge}
-          </span>
-
           <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-bold text-white leading-[1.08] tracking-tight mb-6">
             {HERO.title}{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-cyan-200 to-indigo-300">
@@ -72,11 +73,26 @@ export function HeroSection() {
               Δείτε τα συμβόλαια
               <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
+            <a
+              href="#platform-trips"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-sky-300/45 bg-sky-500/15 text-sky-50 hover:bg-sky-400/25 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">map</span>
+              Εκδρομές
+            </a>
+            <a
+              href="#our-fleet"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-teal-300/50 bg-teal-500/15 text-teal-50 hover:bg-teal-400/25 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">directions_bus</span>
+              Στόλος λεωφορείων
+            </a>
             <Link
-              to="/admin/login"
+              to="/rent"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-base border border-white/25 text-white hover:bg-white/10 transition-colors"
             >
-              Σύνδεση γραφείου
+              <span className="material-symbols-outlined text-[20px]">car_rental</span>
+              Ενοικιάσεις
             </Link>
           </div>
 
@@ -87,7 +103,11 @@ export function HeroSection() {
           {STATS.map((s) => (
             <div
               key={s.label}
-              className="rounded-2xl bg-white/5 border border-white/10 px-4 py-4 backdrop-blur-sm"
+              className={`rounded-2xl border px-4 py-4 backdrop-blur-sm ${
+                s.value === 'Rent'
+                  ? 'bg-teal-500/15 border-teal-300/30'
+                  : 'bg-white/5 border-white/10'
+              }`}
             >
               <p className="text-xl md:text-2xl font-bold text-white">{s.value}</p>
               <p className="text-xs text-white/55 mt-1">{s.label}</p>
@@ -101,28 +121,30 @@ export function HeroSection() {
 
 export function PainPointsSection() {
   return (
-    <section className="relative py-20 md:py-28 overflow-hidden bg-gradient-to-b from-white via-indigo-50/40 to-slate-50 border-y border-slate-200/60">
+    <section className="relative py-20 md:py-28 overflow-hidden bg-[#f5f7fb] border-y border-slate-200/70 text-slate-900">
       <div
-        className="absolute inset-0 pointer-events-none opacity-60"
+        className="absolute inset-0 pointer-events-none"
         aria-hidden
         style={{
           backgroundImage:
-            'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.12), transparent), radial-gradient(ellipse 60% 40% at 100% 100%, rgba(139,92,246,0.08), transparent)',
+            'radial-gradient(ellipse 90% 55% at 50% -15%, rgba(99,102,241,0.10), transparent 58%), radial-gradient(ellipse 50% 35% at 0% 80%, rgba(14,165,233,0.06), transparent 55%), radial-gradient(ellipse 45% 30% at 100% 90%, rgba(99,102,241,0.05), transparent 50%)',
         }}
       />
       <div
-        className="absolute inset-0 opacity-[0.35] pointer-events-none"
+        className="absolute inset-0 opacity-40 pointer-events-none"
         aria-hidden
         style={{
           backgroundImage:
-            'linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
+            'linear-gradient(rgba(148,163,184,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.12) 1px, transparent 1px)',
+          backgroundSize: '44px 44px',
+          maskImage: 'linear-gradient(180deg, black 0%, transparent 92%)',
+          WebkitMaskImage: 'linear-gradient(180deg, black 0%, transparent 92%)',
         }}
       />
 
       <div className="relative max-w-6xl mx-auto px-4 md:px-8">
         <div className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100/80 border border-indigo-200/60 text-xs font-bold uppercase tracking-wider text-indigo-700 mb-5">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100/90 border border-indigo-200/70 text-xs font-bold uppercase tracking-wider text-indigo-700 mb-5">
             <span className="material-symbols-outlined text-[16px]">groups</span>
             Για ποιον είναι
           </span>
@@ -130,24 +152,18 @@ export function PainPointsSection() {
             Αναγνωρίζετε τον εαυτό σας;
           </h2>
           <p className="text-slate-600 mt-3 text-base md:text-lg leading-relaxed">
-            Πέντε καθημερινές προκλήσεις που λύνουμε με μία πλατφόρμα.
+            Έξι καθημερινές προκλήσεις που λύνουμε με μία πλατφόρμα.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-5 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 max-w-5xl mx-auto">
           {AUDIENCE_HOOKS.map((item, index) => {
             const iconStyle = FEATURE_ICON_STYLES[item.accent] || FEATURE_ICON_STYLES.indigo;
-            const gridClass =
-              index < 3
-                ? 'lg:col-span-2'
-                : index === 3
-                  ? 'lg:col-span-2 lg:col-start-2'
-                  : 'lg:col-span-2 lg:col-start-4';
 
             return (
               <article
                 key={item.text}
-                className={`group relative flex flex-col sm:flex-row lg:flex-col gap-4 p-6 md:p-7 rounded-[22px] bg-white/90 backdrop-blur-sm border border-white shadow-[0_4px_24px_rgba(15,23,42,0.05)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.12)] hover:border-indigo-200/80 hover:-translate-y-1 transition-all duration-300 ${gridClass}`}
+                className="group relative flex flex-col gap-4 p-6 md:p-7 rounded-[22px] bg-gradient-to-br from-indigo-50/90 via-white to-sky-50/70 border border-indigo-200/70 shadow-[0_8px_28px_rgba(79,91,213,0.08)] hover:shadow-[0_16px_40px_rgba(79,91,213,0.14)] hover:border-indigo-300 hover:-translate-y-1 transition-all duration-300"
               >
                 <div
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ${iconStyle}`}
@@ -166,7 +182,7 @@ export function PainPointsSection() {
                   </span>
                 </div>
                 <div
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-indigo-50 text-indigo-400 flex items-center justify-center text-xs font-black opacity-40 group-hover:opacity-100 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-all"
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-indigo-100/90 text-indigo-500 flex items-center justify-center text-xs font-black"
                   aria-hidden
                 >
                   {index + 1}
@@ -177,9 +193,9 @@ export function PainPointsSection() {
         </div>
 
         <div className="mt-12 md:mt-16 max-w-2xl mx-auto text-center">
-          <div className="inline-flex flex-col items-center gap-4 px-8 py-6 rounded-[24px] bg-gradient-to-br from-slate-900 to-indigo-950 text-white shadow-xl shadow-indigo-900/20">
-            <span className="material-symbols-outlined text-[28px] text-indigo-300">handshake</span>
-            <p className="text-sm md:text-base text-white/90 leading-relaxed font-medium">
+          <div className="inline-flex flex-col items-center gap-4 px-8 py-6 rounded-[24px] bg-gradient-to-br from-indigo-50 to-sky-50 border border-indigo-200/80 shadow-[0_8px_32px_rgba(99,102,241,0.08)] text-slate-800">
+            <span className="material-symbols-outlined text-[28px] text-indigo-500">handshake</span>
+            <p className="text-sm md:text-base text-slate-600 leading-relaxed font-medium">
               Αν απαντήσατε «ναι» σε οποιοδήποτε — η πλατφόρμα είναι φτιαγμένη για εσάς, όχι για ένα
               μεμονωμένο brand.
             </p>
@@ -194,70 +210,115 @@ export function FeaturesSection() {
   return (
     <section
       id="features"
-      className="py-24 md:py-32 bg-[#f5f5f7] antialiased font-[system-ui,-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif]"
+      className="relative isolate overflow-hidden py-24 md:py-32 antialiased"
+      style={{
+        fontFamily:
+          "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      }}
     >
-      <div className="max-w-[980px] mx-auto px-5 md:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-14 md:mb-20">
-          <p className="text-sm font-medium text-[#6e6e73] tracking-wide mb-3">Δυνατότητες</p>
-          <h2 className="text-[32px] md:text-[48px] font-semibold text-[#1d1d1f] tracking-[-0.02em] leading-[1.08]">
+      <div className="absolute inset-0 -z-10" aria-hidden>
+        <img
+          src={FEATURES_BACKGROUND_IMAGE}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-[center_45%] scale-105"
+        />
+        <div className="absolute inset-0 bg-slate-950/60" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-950/50 to-slate-950/80" />
+        <div
+          className="absolute inset-0 opacity-40"
+          style={{
+            backgroundImage:
+              'radial-gradient(ellipse 60% 40% at 50% 0%, rgba(56,189,248,0.18), transparent), radial-gradient(ellipse 40% 30% at 90% 80%, rgba(45,212,191,0.12), transparent)',
+          }}
+        />
+      </div>
+
+      <div className="relative max-w-6xl mx-auto px-5 md:px-8">
+        <div className="text-center max-w-3xl mx-auto mb-14 md:mb-16">
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-sky-200/90 tracking-wide mb-4">
+            <span className="w-8 h-px bg-sky-300/60" aria-hidden />
+            Δυνατότητες
+            <span className="w-8 h-px bg-sky-300/60" aria-hidden />
+          </p>
+          <h2 className="text-[32px] md:text-[46px] font-semibold text-white tracking-[-0.03em] leading-[1.08]">
             Ό,τι χρειάζεται ένα σύγχρονο γραφείο.
             <br className="hidden sm:block" />
-            <span className="text-[#6e6e73]"> Built-in.</span>
+            <span className="text-white/70">Όλα ενσωματωμένα.</span>
           </h2>
-          <p className="text-[17px] md:text-[19px] text-[#6e6e73] mt-5 leading-relaxed font-normal">
-            Έτοιμη υποδομή για περισσότερες εκδρομές με λιγότερο admin.
+          <p className="text-[17px] md:text-[19px] text-white/70 mt-5 leading-relaxed font-normal">
+            Έτοιμη υποδομή για περισσότερες εκδρομές με λιγότερη διαχείριση.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-          {FEATURES.map((f) => {
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 items-stretch">
+          {FEATURES.map((f, index) => {
             const iconStyle = FEATURE_ICON_STYLES[f.accent] || FEATURE_ICON_STYLES.indigo;
+            const wide = index === FEATURES.length - 1;
             return (
               <article
-                key={f.title}
-                className="group flex flex-col rounded-[22px] bg-white/90 backdrop-blur-xl p-7 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-[box-shadow,transform] duration-500 ease-out hover:-translate-y-0.5"
+                key={f.id || f.title}
+                className={`group h-full flex flex-col rounded-[20px] bg-white/95 overflow-hidden shadow-[0_8px_28px_rgba(0,0,0,0.16)] ring-1 ring-white/30 hover:shadow-[0_12px_36px_rgba(0,0,0,0.2)] transition-shadow duration-300 ease-out ${
+                  wide ? 'sm:col-span-2 lg:col-span-1' : ''
+                }`}
+                style={{
+                  animation: `featFadeUp 0.55s ease ${Math.min(index, 6) * 0.04}s both`,
+                }}
               >
-                <div
-                  className={`w-[52px] h-[52px] rounded-[14px] flex items-center justify-center mb-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] ${iconStyle}`}
-                >
-                  <span className="material-symbols-outlined text-[26px] font-light" aria-hidden>
-                    {f.icon}
-                  </span>
+                <FeatureVisual kind={f.visual} />
+                <div className="flex flex-col flex-1 p-5 md:p-6 pt-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div
+                      className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 ${iconStyle}`}
+                    >
+                      <span className="material-symbols-outlined text-[20px] font-light" aria-hidden>
+                        {f.icon}
+                      </span>
+                    </div>
+                    <h3 className="text-[17px] font-semibold text-[#1d1d1f] tracking-[-0.02em] leading-snug pt-1">
+                      {f.title}
+                    </h3>
+                  </div>
+                  <p className="text-[14px] text-[#6e6e73] leading-[1.5] flex-1">{f.body}</p>
+                  <p className="text-[12.5px] font-medium text-[#0071e3] mt-4 leading-snug inline-flex items-center gap-1">
+                    {f.hook}
+                    <span className="material-symbols-outlined text-[15px] opacity-60">arrow_forward</span>
+                  </p>
                 </div>
-
-                <h3 className="text-[19px] font-semibold text-[#1d1d1f] tracking-[-0.01em] leading-snug mb-2">
-                  {f.title}
-                </h3>
-                <p className="text-[15px] text-[#6e6e73] leading-[1.55] flex-1">{f.body}</p>
-                <p className="text-[13px] font-medium text-[#0071e3] mt-4 leading-snug group-hover:underline decoration-[#0071e3]/40 underline-offset-2">
-                  {f.hook}
-                </p>
               </article>
             );
           })}
         </div>
       </div>
+
+      <style>{`
+        @keyframes featFadeUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </section>
   );
 }
 
 export function HowItWorksSection() {
   return (
-    <section className="py-20 bg-slate-900 text-white">
+    <section className="py-20 md:py-24 bg-white text-slate-900 border-y border-slate-200/70">
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold">Πώς ξεκινάτε</h2>
-          <p className="text-white/60 mt-3">Τρία βήματα · χωρίς IT ομάδα</p>
+          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-[#1d1d1f]">
+            Πώς ξεκινάτε
+          </h2>
+          <p className="text-[#86868b] mt-3 text-[17px]">Τρία βήματα · χωρίς IT ομάδα</p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {STEPS.map((s, i) => (
             <div key={s.step} className="relative">
               {i < STEPS.length - 1 && (
-                <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-white/15" />
+                <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-slate-200" />
               )}
-              <span className="text-4xl font-black text-white/20">{s.step}</span>
-              <h3 className="text-xl font-bold mt-2 mb-2">{s.title}</h3>
-              <p className="text-sm text-white/65 leading-relaxed">{s.body}</p>
+              <span className="text-4xl font-black text-slate-200">{s.step}</span>
+              <h3 className="text-xl font-bold mt-2 mb-2 text-[#1d1d1f]">{s.title}</h3>
+              <p className="text-sm text-[#6e6e73] leading-relaxed">{s.body}</p>
             </div>
           ))}
         </div>
@@ -283,6 +344,109 @@ export function PricingTeaserSection() {
   );
 }
 
+export function RentProductSection() {
+  const [standalone, setStandalone] = useState(() => mergeRentPlanCatalog(null).standalone);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicRentPlanCatalog().then((data) => {
+      if (!cancelled) setStandalone(data.standalone);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (standalone.visible === false) return null;
+
+  return (
+    <section
+      id="rent"
+      className="relative py-20 md:py-28 overflow-hidden border-y border-teal-900/20 bg-gradient-to-b from-[#062a30] via-[#0b3d4a] to-slate-950"
+    >
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40"
+        aria-hidden
+        style={{
+          backgroundImage:
+            'radial-gradient(ellipse 70% 50% at 15% 20%, rgba(45,212,191,0.25), transparent), radial-gradient(ellipse 50% 40% at 90% 80%, rgba(56,189,248,0.12), transparent)',
+        }}
+      />
+      <div className="relative max-w-6xl mx-auto px-4 md:px-8">
+        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-14 items-center">
+          <div>
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-400/15 border border-teal-300/25 text-xs font-bold uppercase tracking-wider text-teal-200 mb-5">
+              <span className="material-symbols-outlined text-[16px]">car_rental</span>
+              Νέα υπηρεσία · Rent
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight">
+              Ενοικιάσεις οχημάτων με SOS, οδική βοήθεια και καθαρή ασφάλεια
+            </h2>
+            <p className="mt-4 text-base md:text-lg text-teal-50/75 leading-relaxed max-w-xl">
+              Ξεχωριστό συμβόλαιο μόνο για Rent, ή add-on πάνω στο πλάνο λεωφορείων. Δες στόλο και
+              υπηρεσίες στο <span className="text-white font-semibold">/rent</span> — χωρίς σύνδεση.
+            </p>
+            <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-teal-50/90">
+              {[
+                'SOS + live τοποθεσία',
+                'Οδική βοήθεια 24/7',
+                'CDW / SCDW πριν την υπογραφή',
+                'Share trip στην οικογένεια',
+                'Checklist πριν την αναχώρηση',
+                'Θυρίδα Ενοικιάσεων στον πίνακα',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="material-symbols-outlined text-teal-300 text-[18px] mt-0.5">
+                    check_circle
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a
+                href="#rent-guest-fleet"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white text-teal-950 font-bold hover:bg-teal-50"
+              >
+                Δες τον στόλο
+                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </a>
+              <Link
+                to="/rent"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
+              >
+                Άνοιγμα Rent
+              </Link>
+              <Link
+                to="/grafeia"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-white/25 text-white font-bold hover:bg-white/10"
+              >
+                Συμβόλαια Rent
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <article className="rounded-[24px] border border-white/15 bg-white/10 backdrop-blur-md p-6 text-white">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-teal-200">
+                {standalone.badge}
+              </p>
+              <h3 className="mt-2 text-xl font-bold">{standalone.name}</h3>
+              <p className="mt-1 text-sm text-white/65">
+                {standalone.tagline}
+              </p>
+              <p className="mt-4 text-2xl font-bold tabular-nums">
+                από €{standalone.monthlyEur}
+                <span className="text-sm font-semibold text-white/55">/μήνα</span>
+              </p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function FinalCtaSection() {
   return (
     <section className="py-20 px-4 md:px-8">
@@ -291,20 +455,20 @@ export function FinalCtaSection() {
           Έτοιμοι να ξεκινήσετε;
         </h2>
         <p className="text-white/80 mb-8 max-w-lg mx-auto">
-          Συνδεθείτε στο panel του γραφείου σας ή ζητήστε συμβόλαιο — η πλατφόρμα δουλεύει από την πρώτη μέρα.
+          Ζητήστε συμβόλαιο και ξεκινήστε — η πλατφόρμα δουλεύει από την πρώτη μέρα.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link
-            to="/admin/login"
+            to="/grafeia"
             className="px-8 py-3.5 bg-white text-indigo-900 rounded-full font-bold hover:opacity-95"
           >
-            Σύνδεση γραφείου
+            Επιλογή συμβολαίου
           </Link>
           <Link
-            to="/grafeia"
+            to="/rent"
             className="px-8 py-3.5 border border-white/40 rounded-full font-bold hover:bg-white/10"
           >
-            Επιλογή συμβολαίου
+            Δείτε τις ενοικιάσεις
           </Link>
         </div>
       </div>

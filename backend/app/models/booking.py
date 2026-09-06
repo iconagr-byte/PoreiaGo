@@ -57,7 +57,7 @@ class Booking(Base, TimestampMixin, TenantScopedMixin):
         nullable=False,
         index=True,
     )
-    seat_label: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    seat_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
     passenger_name: Mapped[str] = mapped_column(String(255), nullable=False)
     passenger_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     passenger_vat_id: Mapped[str | None] = mapped_column(String(32), nullable=True)

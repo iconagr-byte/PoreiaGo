@@ -1,59 +1,18 @@
 import { API_BASE } from '../config/api.js';
-import { mockFleet } from '../data/mockData.js';
-
-const AMENITY_DEFAULTS = {
-  'Luxury Coach': [
-    'Wi-Fi onboard',
-    'USB & 220V',
-    'Κλιματισμός',
-    'Ανακλινόμενα leather seats',
-    'WC onboard',
-    'Mini bar',
-  ],
-  'Premium Express': [
-    'Wi-Fi onboard',
-    'USB θύρες',
-    'Κλιματισμός',
-    'Ανακλινόμενα καθίσματα',
-    'Ψυγείο',
-  ],
-  Standard: [
-    'Κλιματισμός',
-    'USB θύρες',
-    'Θέρμανση',
-    'Μεγάλοι αποθηκευτικοί χώροι',
-  ],
-};
-
-function mockPublicFleet() {
-  return mockFleet
-    .filter((b) => b.status === 'Ενεργό')
-    .map((bus) => ({
-      id: bus.id,
-      name: bus.name,
-      make: bus.name.split(' ')[0] || 'Coach',
-      model: bus.type || 'Coach',
-      category: bus.type,
-      year: 2022,
-      seat_count: bus.seats,
-      amenities: AMENITY_DEFAULTS[bus.type] || AMENITY_DEFAULTS.Standard,
-      summary: `${bus.engineType} · ${bus.fuelConsumption}`,
-      image_url: '/images/hero-bus-achillio.png',
-      status_label: 'Διαθέσιμο',
-    }));
-}
 
 export async function fetchPublicFleet() {
   try {
-    const res = await fetch(`${API_BASE}/api/site/fleet`);
+    const host = typeof window !== 'undefined' ? window.location.host : '';
+    const qs = host ? `?host=${encodeURIComponent(host)}` : '';
+    const res = await fetch(`${API_BASE}/api/site/fleet${qs}`);
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length) return data;
+      return Array.isArray(data) ? data : [];
     }
   } catch {
-    /* offline */
+    /* offline / API down — show empty, never demo coaches */
   }
-  return mockPublicFleet();
+  return [];
 }
 
 export const AMENITY_ICONS = {

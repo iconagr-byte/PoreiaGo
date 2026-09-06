@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
-STORE_PATH = DATA_DIR / "tenant_branding.json"
+from app.core.data_paths import poreiago_data_dir, resolve_data_file
+from travel_platform.settings.checkout_base import (
+    PRODUCTION_PLATFORM_CHECKOUT,
+    heal_checkout_base_url,
+    is_localhost_checkout_url,
+)
+
+_LEGACY_DATA = Path(__file__).resolve().parents[2] / "data"
+DATA_DIR = poreiago_data_dir()
+STORE_PATH = resolve_data_file("tenant_branding.json", _LEGACY_DATA / "tenant_branding.json")
 
 DEFAULT_BRANDING = {
     "slug": "poreiago",
@@ -20,7 +29,7 @@ DEFAULT_BRANDING = {
     "css_injection_url": "",
     "css_injection_inline": "",
     "verified_domain": True,
-    "checkout_base_url": "http://localhost:5173",
+    "checkout_base_url": PRODUCTION_PLATFORM_CHECKOUT,
 }
 
 
@@ -34,7 +43,7 @@ class BrandingConfig:
     css_injection_url: str = ""
     css_injection_inline: str = ""
     verified_domain: bool = False
-    checkout_base_url: str = "http://localhost:5173"
+    checkout_base_url: str = PRODUCTION_PLATFORM_CHECKOUT
     updated_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,10 +64,51 @@ def _save_all(data: dict[str, dict[str, Any]]) -> None:
     STORE_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+_ACHILLIO_TRAVEL_SLUGS = frozenset(
+    {"admin-achillio-gr", "achillio-travel", "achilliotravel"}
+)
+_PLATFORM_KEYS = frozenset({"default", "poreiago", "achillio", "platform", "demo"})
+
+
+def _heal_platform_row(key: str, row: dict[str, Any]) -> dict[str, Any]:
+    """Never let shared platform keys advertise Achillio Travel domain/name."""
+    if key not in _PLATFORM_KEYS:
+        return row
+    merged = {**DEFAULT_BRANDING, **row}
+    domain = str(merged.get("custom_domain") or "").strip().lower().removeprefix("www.")
+    if domain == "achilliotravel.com" or domain.endswith(".achilliotravel.com"):
+        merged["custom_domain"] = ""
+        merged["verified_domain"] = True
+    checkout = str(merged.get("checkout_base_url") or "").strip().lower()
+    if "achilliotravel.com" in checkout or is_localhost_checkout_url(checkout):
+        merged["checkout_base_url"] = PRODUCTION_PLATFORM_CHECKOUT
+    else:
+        merged["checkout_base_url"] = heal_checkout_base_url(
+            merged.get("checkout_base_url"), fallback=PRODUCTION_PLATFORM_CHECKOUT
+        )
+    slug = str(merged.get("slug") or "").strip().lower()
+    if slug in _ACHILLIO_TRAVEL_SLUGS:
+        merged["slug"] = "poreiago"
+    name = str(merged.get("display_name") or "").strip()
+    if (not name) or ("achillio" in name.lower()):
+        merged["display_name"] = "PoreiaGo"
+    return merged
+
+
 def get_branding(tenant_key: str = "default") -> BrandingConfig:
     data = _load_all()
-    row = data.get(tenant_key) or data.get("default") or DEFAULT_BRANDING
-    return BrandingConfig(**{**DEFAULT_BRANDING, **row})
+    key = (tenant_key or "default").strip().lower() or "default"
+    row = data.get(key) or data.get("default") or DEFAULT_BRANDING
+    healed = _heal_platform_row(key if key in data else "default", dict(row))
+    merged = {**DEFAULT_BRANDING, **healed}
+    if key in _ACHILLIO_TRAVEL_SLUGS:
+        fallback = "https://www.achilliotravel.com"
+    else:
+        fallback = PRODUCTION_PLATFORM_CHECKOUT
+    merged["checkout_base_url"] = heal_checkout_base_url(
+        merged.get("checkout_base_url"), fallback=fallback
+    )
+    return BrandingConfig(**merged)
 
 
 def update_branding(tenant_key: str, patch: dict[str, Any]) -> BrandingConfig:
@@ -81,7 +131,10 @@ def resolve_by_host(host: str) -> BrandingConfig | None:
     if not h or h in ("localhost", "127.0.0.1"):
         return get_branding("default")
     for key, row in _load_all().items():
+        if key in ("default",):
+            continue
         domain = (row.get("custom_domain") or "").lower().removeprefix("www.")
         if domain and domain == h and row.get("verified_domain", False):
             return BrandingConfig(**{**DEFAULT_BRANDING, **row})
-    return get_branding("default")
+    # Unknown hosts: do NOT fall back to poisoned "default" (last office writer).
+    return None

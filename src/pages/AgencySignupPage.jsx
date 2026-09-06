@@ -3,12 +3,17 @@ import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import {
-  AGENCY_PLANS,
   BILLING_INTERVALS,
   displayPrice,
   getPlanById,
+  isBillablePlanId,
+  mergeAgencyPlanCatalog,
+  mergeRentPlanCatalog,
+  selectableAgencyPlans,
 } from '../lib/billing/planCatalog.js';
-import { createSignupCheckout } from '../services/billingApi.js';
+import { createSignupCheckout, fetchBillingConfig } from '../services/billingApi.js';
+import { fetchPublicAgencyPlanCatalog } from '../services/agencyPlanCatalogApi.js';
+import { fetchPublicRentPlanCatalog } from '../services/rentPlanCatalogApi.js';
 import { getPlatformBaseDomain } from '../lib/platform/domain.js';
 import PasswordField from '../components/PasswordField.jsx';
 
@@ -40,10 +45,51 @@ export default function AgencySignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+  const [billingConfig, setBillingConfig] = useState(null);
+  const [agencyCatalog, setAgencyCatalog] = useState(() => mergeAgencyPlanCatalog(null));
+  const [rentCatalog, setRentCatalog] = useState(() => mergeRentPlanCatalog(null));
 
-  const plan = useMemo(() => getPlanById(planId), [planId]);
+  const planOptions = useMemo(
+    () => selectableAgencyPlans(agencyCatalog, rentCatalog).filter((p) => isBillablePlanId(p.id)),
+    [agencyCatalog, rentCatalog],
+  );
+  const plan = useMemo(
+    () => getPlanById(planId, agencyCatalog, rentCatalog),
+    [planId, agencyCatalog, rentCatalog],
+  );
   const price = useMemo(() => displayPrice(plan, interval), [plan, interval]);
   const subdomainPreview = normalizeSubdomain(subdomain) || 'your-agency';
+  const demoMode = billingConfig?.demo_mode === true;
+  const trialDays = billingConfig?.trial_days || 14;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchBillingConfig()
+      .then((cfg) => {
+        if (!cancelled) setBillingConfig(cfg);
+      })
+      .catch(() => {
+        if (!cancelled) setBillingConfig({ demo_mode: true, trial_days: 14 });
+      });
+    Promise.all([
+      fetchPublicAgencyPlanCatalog().catch(() => mergeAgencyPlanCatalog(null)),
+      fetchPublicRentPlanCatalog().catch(() => mergeRentPlanCatalog(null)),
+    ]).then(([agency, rent]) => {
+      if (!cancelled) {
+        setAgencyCatalog(agency);
+        setRentCatalog(rent);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!planOptions.some((p) => p.id === planId) && planOptions[0]) {
+      setPlanId(planOptions[0].id);
+    }
+  }, [planOptions, planId]);
 
   useEffect(() => {
     if (searchParams.get('billing') === 'cancel') {
@@ -84,7 +130,7 @@ export default function AgencySignupPage() {
 
     setWorking(true);
     try {
-      const { checkout_url: url } = await createSignupCheckout({
+      const result = await createSignupCheckout({
         legalName: legalName.trim(),
         adminEmail: adminEmail.trim().toLowerCase(),
         subdomain,
@@ -92,8 +138,11 @@ export default function AgencySignupPage() {
         plan: planId,
         billingInterval: interval,
       });
-      if (url) {
-        window.location.href = url;
+      if (result?.checkout_url) {
+        if (result.demo) {
+          toast.success(`Demo γραφείο έτοιμο — δοκιμή ${trialDays} ημερών`);
+        }
+        window.location.href = result.checkout_url;
         return;
       }
       setError('Δεν επιστράφηκε checkout URL από τον server');
@@ -132,11 +181,20 @@ export default function AgencySignupPage() {
                 Νέο γραφείο
               </span>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-4">
-                Ξεκινήστε με Stripe Checkout
+                {demoMode
+                  ? `Demo πληρωμή — ${trialDays} ημέρες δωρεάν`
+                  : 'Ξεκινήστε με Stripe Checkout'}
               </h1>
               <p className="text-sm text-on-surface-variant mt-2 leading-relaxed">
-                Μετά την πληρωμή δημιουργείται αυτόματα ο tenant, ο admin λογαριασμός και η συνδρομή σας.
+                {demoMode
+                  ? 'Χωρίς πραγματική χρέωση: δημιουργείται αμέσως ο tenant, ο admin λογαριασμός και trial συνδρομή για δοκιμή.'
+                  : 'Μετά την πληρωμή δημιουργείται αυτόματα ο tenant, ο admin λογαριασμός και η συνδρομή σας.'}
               </p>
+              {demoMode ? (
+                <p className="mt-3 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2">
+                  Demo mode ενεργό — ιδανικό για δοκιμή νέου γραφείου.
+                </p>
+              ) : null}
             </div>
 
             <div className="rounded-[24px] border border-black/[0.06] bg-surface-container-low p-5 space-y-4">
@@ -158,7 +216,7 @@ export default function AgencySignupPage() {
                 ))}
               </div>
               <div className="grid gap-2">
-                {AGENCY_PLANS.filter((p) => !p.contactSales).map((p) => {
+                {planOptions.map((p) => {
                   const pPrice = displayPrice(p, interval);
                   const selected = planId === p.id;
                   return (
@@ -168,13 +226,22 @@ export default function AgencySignupPage() {
                       onClick={() => setPlanId(p.id)}
                       className={`w-full text-left rounded-2xl border px-4 py-3 transition-all ${
                         selected
-                          ? 'border-primary/40 bg-white ring-2 ring-primary/15'
+                          ? p.id === 'rent'
+                            ? 'border-teal-400/50 bg-white ring-2 ring-teal-500/20'
+                            : 'border-primary/40 bg-white ring-2 ring-primary/15'
                           : 'border-black/[0.06] bg-white/60 hover:bg-white'
                       }`}
                     >
                       <div className="flex justify-between gap-3 items-center">
                         <div>
-                          <p className="font-bold text-sm">{p.name}</p>
+                          <p className="font-bold text-sm">
+                            {p.name}
+                            {p.id === 'rent' ? (
+                              <span className="ml-2 text-[10px] font-bold uppercase text-teal-700">
+                                μόνο
+                              </span>
+                            ) : null}
+                          </p>
                           <p className="text-xs text-gray-500">{p.tagline}</p>
                         </div>
                         <p className="font-bold text-sm shrink-0">
@@ -300,18 +367,24 @@ export default function AgencySignupPage() {
                 {working ? (
                   <>
                     <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
-                    Μετάβαση στο Stripe…
+                    {demoMode ? 'Δημιουργία demo γραφείου…' : 'Μετάβαση στο Stripe…'}
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-[20px]">lock</span>
-                    Συνέχεια στην πληρωμή
+                    <span className="material-symbols-outlined text-[20px]">
+                      {demoMode ? 'science' : 'lock'}
+                    </span>
+                    {demoMode
+                      ? `Ενεργοποίηση demo (${trialDays} ημέρες)`
+                      : 'Συνέχεια στην πληρωμή'}
                   </>
                 )}
               </button>
 
               <p className="text-xs text-center text-gray-500">
-                Με την εγγραφή αποδέχεστε τους όρους SaaS · η χρέωση ξεκινά μετά την ολοκλήρωση του Checkout
+                {demoMode
+                  ? 'Demo πληρωμή — χωρίς χρέωση κάρτας. Μπορείτε αργότερα να ενεργοποιήσετε πραγματικό Stripe.'
+                  : 'Με την εγγραφή αποδέχεστε τους όρους SaaS · η χρέωση ξεκινά μετά την ολοκλήρωση του Checkout'}
               </p>
             </form>
           </section>

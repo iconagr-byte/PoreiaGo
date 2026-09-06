@@ -18,6 +18,18 @@ logger = logging.getLogger(__name__)
 DriverStatus = Literal["active", "inactive", "on_leave", "suspended"]
 
 DEFAULT_DRIVER_PASSWORD = "driver123"
+# Platform demo office — seed drivers belong only here.
+DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+
+# Built-in demo rows (Νίκος / Γιώργος / …). Real offices must not inherit these.
+SEED_DRIVER_IDS = frozenset(
+    {
+        "a1000000-0000-4000-8000-000000000001",
+        "a1000000-0000-4000-8000-000000000002",
+        "a1000000-0000-4000-8000-000000000003",
+        "a1000000-0000-4000-8000-000000000004",
+    }
+)
 
 # Prefer persistent volume in production (docker mount /app/data).
 _DATA_DIR = Path(os.getenv("POREIAGO_DATA_DIR") or Path(__file__).resolve().parents[2] / "data")
@@ -45,7 +57,17 @@ class FleetDriver:
     avg_rating: float | None = None
     password_hash: str | None = None
     photo_url: str | None = None
+    tenant_id: str = DEMO_TENANT_ID
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def _normalize_tenant_id(value: str | None) -> str:
+    tid = (value or "").strip()
+    return tid or DEMO_TENANT_ID
+
+
+def _driver_tenant_id(d: FleetDriver) -> str:
+    return _normalize_tenant_id(getattr(d, "tenant_id", None))
 
 
 def _parse_date(value) -> date | None:
@@ -92,6 +114,8 @@ def _driver_from_row(row: dict) -> FleetDriver:
         avg_rating=row.get("avg_rating"),
         password_hash=pwd_hash or hash_password(DEFAULT_DRIVER_PASSWORD),
         photo_url=(str(row["photo_url"]).strip() or None) if row.get("photo_url") else None,
+        # Legacy rows without tenant_id belong to the demo office only.
+        tenant_id=_normalize_tenant_id(row.get("tenant_id")),
         created_at=_parse_datetime(row.get("created_at")),
     )
 
@@ -117,48 +141,329 @@ def _driver_to_row(d: FleetDriver) -> dict:
         "avg_rating": d.avg_rating,
         "password_hash": d.password_hash,
         "photo_url": d.photo_url,
+        "tenant_id": _driver_tenant_id(d),
         "created_at": d.created_at.isoformat(),
     }
 
 
 def _seed() -> dict[str, FleetDriver]:
-    today = date.today()
-    # Stable IDs so restarts without a store file stay predictable in demos.
-    seeds = [
-        ("a1000000-0000-4000-8000-000000000001", "Νίκος Παπαδόπουλος", "XAH-4021", "XAH-4021", "AB123456", "+30 694 111 0001", "nikos.driver@aerostride.com", 145000, 312, 94),
-        ("a1000000-0000-4000-8000-000000000002", "Γιώργος Γεωργίου", "YZA-9901", "YZA-9901", "AB234567", "+30 694 222 0002", "giorgos.driver@aerostride.com", 280500, 428, 88),
-        ("a1000000-0000-4000-8000-000000000003", "Κώστας Κωνσταντίνου", "IMB-1055", "IMB-1055", "AB345678", "+30 694 333 0003", "kostas.driver@aerostride.com", 410200, 501, 91),
-        ("a1000000-0000-4000-8000-000000000004", "Ανδρέας Ανδρέου", "XAH-4022", "XAH-4022", "AB456789", "+30 694 444 0004", "andreas.driver@aerostride.com", 42000, 89, 97),
-    ]
-    drivers: dict[str, FleetDriver] = {}
-    pwd_hash = hash_password(DEFAULT_DRIVER_PASSWORD)
-    for did, name, vcode, plate, lic, phone, email, km, trips, safety in seeds:
-        drivers[did] = FleetDriver(
-            id=did,
-            name=name,
-            license_no=lic,
-            phone=phone,
-            email=email,
-            hiring_date=date(2022, 3, 15),
-            status="active" if vcode != "IMB-1055" else "on_leave",
-            vehicle_code=vcode,
-            license_plate=plate,
-            salary_per_km=0.45,
-            salary_per_trip=25.0,
-            current_balance=round(trips * 25.0 * 0.3, 2),
-            safety_score=safety,
-            trips_completed=trips,
-            total_km=float(km),
-            license_expires_at=date(today.year + 1, 6, 30),
-            avg_rating=4.2 + (safety % 5) * 0.1,
-            password_hash=pwd_hash,
-            photo_url=None,
+    """No built-in demo drivers — offices create real accounts only."""
+    return {}
+
+
+def purge_seed_demo_drivers() -> int:
+    """
+    Remove Νίκος/Γιώργος/… seed rows from the live store.
+
+    Returns how many rows were deleted. Safe to call on every process boot.
+    """
+    drivers = _ensure()
+    removed = 0
+    for did in list(SEED_DRIVER_IDS):
+        if did in drivers:
+            del drivers[did]
+            removed += 1
+    if removed:
+        try:
+            _persist()
+            logger.info("Purged %s seed demo driver(s) from %s", removed, STORE_PATH)
+        except Exception:
+            logger.exception("Failed to persist after purging seed demo drivers")
+    return removed
+
+
+def _prefer_driver_row(candidates: list[FleetDriver]) -> FleetDriver:
+    """Pick the surviving row when duplicates exist across offices."""
+    def sort_key(d: FleetDriver):
+        tid = _driver_tenant_id(d)
+        # Prefer real offices over DEMO; then oldest record.
+        return (
+            0 if tid != DEMO_TENANT_ID else 1,
+            d.created_at or datetime.now(timezone.utc),
+            d.id,
         )
-    return drivers
+
+    return sorted(candidates, key=sort_key)[0]
+
+
+def seal_cross_office_driver_uniqueness() -> dict:
+    """
+    Boot-time SEAL: drop DEMO duplicates only.
+
+    Never auto-delete a real-office driver when another real office also has
+    the same email/license — that needs a human decision. Global create-time
+    uniqueness still prevents new cross-office clones.
+    """
+    drivers = _ensure()
+    groups: dict[str, list[FleetDriver]] = {}
+
+    def add_key(kind: str, value: str | None, d: FleetDriver) -> None:
+        needle = _normalize_username(value)
+        if not needle:
+            return
+        groups.setdefault(f"{kind}:{needle}", []).append(d)
+
+    for d in list(drivers.values()):
+        if is_seed_driver(d):
+            continue
+        add_key("email", d.email, d)
+        add_key("license", d.license_no, d)
+        add_key("code", d.vehicle_code, d)
+        add_key("plate", d.license_plate, d)
+
+    delete_ids: set[str] = set()
+    skipped_real_conflicts = 0
+    for key, rows in groups.items():
+        by_id: dict[str, FleetDriver] = {r.id: r for r in rows}
+        uniq = list(by_id.values())
+        if len(uniq) < 2:
+            continue
+        winner = _prefer_driver_row(uniq)
+        for r in uniq:
+            if r.id == winner.id:
+                continue
+            # Only purge the DEMO side of a conflict — never wipe a real office row.
+            if _driver_tenant_id(r) != DEMO_TENANT_ID:
+                skipped_real_conflicts += 1
+                logger.error(
+                    "SEAL: real-office driver conflict key=%s keep=%s (%s) other=%s (%s) — not auto-deleted",
+                    key,
+                    winner.id,
+                    _driver_tenant_id(winner),
+                    r.id,
+                    _driver_tenant_id(r),
+                )
+                continue
+            delete_ids.add(r.id)
+            logger.warning(
+                "SEAL: removing DEMO duplicate %s (%s) kept=%s key=%s",
+                r.id,
+                r.email,
+                winner.id,
+                key,
+            )
+
+    removed = 0
+    for did in list(delete_ids):
+        if did in drivers:
+            del drivers[did]
+            removed += 1
+
+    if removed:
+        try:
+            _persist()
+            logger.info(
+                "SEAL: removed %s DEMO duplicate driver(s) from %s",
+                removed,
+                STORE_PATH,
+            )
+        except Exception:
+            logger.exception("SEAL: failed to persist after duplicate purge")
+
+    return {
+        "removed": removed,
+        "skipped_real_conflicts": skipped_real_conflicts,
+        "store": str(STORE_PATH),
+    }
 
 
 def _normalize_username(value: str | None) -> str:
     return (value or "").strip().lower()
+
+
+# Emails that must live on the PoreiaGo platform office (not Achillio Travel).
+_POREIAGO_HOME_EMAILS = frozenset(
+    {
+        "axilleas0@yahoo.gr",
+    }
+)
+# Back-compat alias — older call sites / tests.
+_ACHILLIO_HOME_EMAILS = _POREIAGO_HOME_EMAILS
+
+# Profiles used only when a home driver row is missing entirely (recreate).
+_POREIAGO_HOME_PROFILES: dict[str, dict] = {
+    "axilleas0@yahoo.gr": {
+        "name": "Αχιλλέας Χαραλαμπίδης",
+        "license_no": "AXILLEAS-HOME-LIC",
+        "phone": "+306900000001",
+        # Admin can reset from Οδηγοί → Επεξεργασία; default unlocks /driver login.
+        "password": DEFAULT_DRIVER_PASSWORD,
+    },
+}
+_ACHILLIO_HOME_PROFILES = _POREIAGO_HOME_PROFILES
+
+
+def find_drivers_by_email(email: str) -> list[FleetDriver]:
+    needle = _normalize_username(email)
+    if not needle:
+        return []
+    return [
+        d
+        for d in _ensure().values()
+        if not is_seed_driver(d) and _normalize_username(d.email) == needle
+    ]
+
+
+def rehome_driver_to_tenant(email: str, tenant_id: str, *, only_from_demo: bool = True) -> dict:
+    """
+    Move driver rows with this email onto ``tenant_id``.
+
+    Default SEAL: only DEMO orphans (never steal from a real office).
+    Known PoreiaGo home emails may pass ``only_from_demo=False`` so boot repair
+    can pull Achilleas back from Achillio Travel / DEMO onto PoreiaGo.
+    """
+    tid = _normalize_tenant_id(tenant_id)
+    if not tid or tid == DEMO_TENANT_ID:
+        return {"ok": False, "reason": "invalid_tenant", "moved": 0}
+    rows = find_drivers_by_email(email)
+    if not rows:
+        return {"ok": False, "reason": "not_found", "moved": 0, "email": email}
+    moved = 0
+    skipped_real = 0
+    for d in rows:
+        if _driver_tenant_id(d) == tid:
+            continue
+        prev = _driver_tenant_id(d)
+        if only_from_demo and prev != DEMO_TENANT_ID:
+            skipped_real += 1
+            logger.warning(
+                "REHOME skip real-office driver %s (%s) on %s — never steal across offices",
+                d.id,
+                d.email,
+                prev,
+            )
+            continue
+        d.tenant_id = tid
+        moved += 1
+        logger.warning(
+            "REHOME driver %s (%s) %s → %s",
+            d.id,
+            d.email,
+            prev,
+            tid,
+        )
+    if moved:
+        _persist()
+    return {
+        "ok": True,
+        "moved": moved,
+        "skipped_real": skipped_real,
+        "email": email,
+        "tenant_id": tid,
+        "ids": [d.id for d in rows if _driver_tenant_id(d) == tid],
+    }
+
+
+def ensure_home_driver_on_tenant(email: str, tenant_id: str) -> dict:
+    """
+    Make sure a known home driver exists on ``tenant_id``.
+
+    1) Force-rehome any existing row (even from another real office).
+    2) If missing entirely, recreate from ``_POREIAGO_HOME_PROFILES``.
+    """
+    email_n = _normalize_username(email)
+    tid = _normalize_tenant_id(tenant_id)
+    if not email_n or not tid or tid == DEMO_TENANT_ID:
+        return {"ok": False, "reason": "invalid_args", "email": email}
+
+    existing = find_drivers_by_email(email_n)
+    if existing:
+        report = rehome_driver_to_tenant(email_n, tid, only_from_demo=False)
+        on_home = [d for d in find_drivers_by_email(email_n) if _driver_tenant_id(d) == tid]
+        return {
+            "ok": True,
+            "action": "rehomed" if report.get("moved") else "already_home",
+            "email": email_n,
+            "tenant_id": tid,
+            "ids": [d.id for d in on_home],
+            "rehome": report,
+        }
+
+    profile = _POREIAGO_HOME_PROFILES.get(email_n)
+    if not profile:
+        return {"ok": False, "reason": "no_profile", "email": email_n}
+
+    # License may collide with a leftover row — uniquify once.
+    license_no = str(profile.get("license_no") or "HOME-LIC")
+    try:
+        created = create_driver(
+            {
+                "name": profile.get("name") or email_n,
+                "license_no": license_no,
+                "phone": profile.get("phone") or "",
+                "email": email_n,
+                "password": profile.get("password") or DEFAULT_DRIVER_PASSWORD,
+                "status": "active",
+                "tenant_id": tid,
+                "_allow_demo_tenant": False,
+            }
+        )
+    except ValueError as exc:
+        # Retry with a unique license if the fixed one is taken.
+        if "άδειας" in str(exc) or "license" in str(exc).lower():
+            created = create_driver(
+                {
+                    "name": profile.get("name") or email_n,
+                    "license_no": f"{license_no}-{uuid4().hex[:6].upper()}",
+                    "phone": profile.get("phone") or "",
+                    "email": email_n,
+                    "password": profile.get("password") or DEFAULT_DRIVER_PASSWORD,
+                    "status": "active",
+                    "tenant_id": tid,
+                }
+            )
+        else:
+            return {"ok": False, "reason": "create_failed", "detail": str(exc), "email": email_n}
+
+    logger.warning(
+        "ENSURE home driver created %s (%s) on tenant %s",
+        created.id,
+        created.email,
+        tid,
+    )
+    return {
+        "ok": True,
+        "action": "created",
+        "email": email_n,
+        "tenant_id": tid,
+        "ids": [created.id],
+        "password_reset_to_default": True,
+    }
+
+
+async def repair_poreiago_home_drivers() -> dict:
+    """
+    Boot repair: known home drivers (Achilleas) must live on PoreiaGo platform —
+    pull them off Achillio Travel / DEMO and recreate if missing.
+    """
+    try:
+        from travel_platform.settings.office_host_guard import (
+            resolve_poreiago_platform_tenant_id,
+        )
+    except Exception as exc:
+        return {"ok": False, "reason": f"imports:{exc}"}
+
+    try:
+        platform_tid = await resolve_poreiago_platform_tenant_id()
+    except Exception as exc:
+        return {"ok": False, "reason": f"db:{exc}"}
+
+    if not platform_tid or platform_tid == DEMO_TENANT_ID:
+        return {"ok": False, "reason": "poreiago_platform_tenant_missing"}
+
+    reports = []
+    for email in _POREIAGO_HOME_EMAILS:
+        reports.append(ensure_home_driver_on_tenant(email, platform_tid))
+    return {
+        "ok": True,
+        "poreiago_tenant_id": platform_tid,
+        "reports": reports,
+    }
+
+
+async def repair_achillio_home_drivers() -> dict:
+    """Deprecated alias — Achilleas home is PoreiaGo, not Achillio Travel."""
+    return await repair_poreiago_home_drivers()
 
 
 def _load_from_disk() -> tuple[dict[str, FleetDriver], float] | None:
@@ -231,6 +536,16 @@ def _ensure() -> dict[str, FleetDriver]:
         else:
             _drivers = _seed()
             _persist()
+        # Drop legacy seed demos that still sit on disk from older deploys.
+        stale = [did for did in SEED_DRIVER_IDS if did in _drivers]
+        if stale:
+            for did in stale:
+                del _drivers[did]
+            try:
+                _persist()
+                logger.info("Removed %s seed demo driver(s) on load", len(stale))
+            except Exception:
+                logger.exception("Failed to persist seed demo purge on load")
     return _drivers
 
 
@@ -240,8 +555,15 @@ def _assert_unique(
     license_no: str,
     vehicle_code: str | None,
     license_plate: str | None,
+    tenant_id: str | None = None,
     exclude_id: str | None = None,
 ) -> None:
+    """
+    SEAL: email / license / plate / vehicle code are globally unique across
+    ALL offices. Two γραφεία must never share the same driver identity.
+    ``tenant_id`` is accepted for call-site compatibility only.
+    """
+    del tenant_id  # uniqueness is global — never scoped per office
     email_n = _normalize_username(email)
     license_n = _normalize_username(license_no)
     code_n = _normalize_username(vehicle_code)
@@ -249,47 +571,158 @@ def _assert_unique(
     for d in _ensure().values():
         if exclude_id and d.id == exclude_id:
             continue
+        if is_seed_driver(d):
+            continue
         if email_n and d.email.lower() == email_n:
-            raise ValueError("Το email χρησιμοποιείται ήδη από άλλον οδηγό")
+            raise ValueError(
+                "Το email χρησιμοποιείται ήδη από οδηγό άλλου γραφείου — "
+                "κάθε οδηγός ανήκει σε ένα μόνο γραφείο"
+            )
         if license_n and d.license_no.lower() == license_n:
-            raise ValueError("Ο αριθμός άδειας χρησιμοποιείται ήδη")
+            raise ValueError(
+                "Ο αριθμός άδειας χρησιμοποιείται ήδη από οδηγό άλλου γραφείου"
+            )
         if code_n and d.vehicle_code and d.vehicle_code.lower() == code_n:
-            raise ValueError("Ο κωδικός οχήματος χρησιμοποιείται ήδη")
+            raise ValueError(
+                "Ο κωδικός οχήματος χρησιμοποιείται ήδη από οδηγό άλλου γραφείου"
+            )
         if plate_n and d.license_plate and d.license_plate.lower() == plate_n:
-            raise ValueError("Η πινακίδα χρησιμοποιείται ήδη")
+            raise ValueError(
+                "Η πινακίδα χρησιμοποιείται ήδη από οδηγό άλλου γραφείου"
+            )
 
 
-def list_drivers(status: str | None = None) -> list[FleetDriver]:
+def list_drivers(status: str | None = None, tenant_id: str | None = None) -> list[FleetDriver]:
     items = list(_ensure().values())
+    if tenant_id is not None:
+        tid = _normalize_tenant_id(tenant_id)
+        items = [d for d in items if _driver_tenant_id(d) == tid]
     if status:
         items = [d for d in items if d.status == status]
     return sorted(items, key=lambda d: d.name)
+
+
+def is_seed_driver(driver: FleetDriver | None) -> bool:
+    if not driver:
+        return False
+    return str(getattr(driver, "id", "") or "") in SEED_DRIVER_IDS
+
+
+def office_driver_id_set(
+    tenant_id: str,
+    *,
+    include_demo_legacy: bool = False,
+) -> set[str]:
+    """Driver ids the office may show on Οδηγοί / live map."""
+    rows = list_drivers_for_office(
+        tenant_id,
+        include_demo_legacy=include_demo_legacy,
+        claim_demo_legacy=False,
+    )
+    return {str(d.id) for d in rows if d and not is_seed_driver(d)}
+
+
+def list_drivers_for_office(
+    tenant_id: str,
+    status: str | None = None,
+    *,
+    include_demo_legacy: bool = False,
+    claim_demo_legacy: bool = False,
+) -> list[FleetDriver]:
+    """
+    List drivers for an admin office.
+
+    SEAL: only drivers whose ``tenant_id`` equals this office. DEMO legacy
+    include/claim is disabled permanently so one γραφείο can never pull or
+    steal another office's (or DEMO orphan) drivers.
+    """
+    del include_demo_legacy, claim_demo_legacy  # hard-disabled — never cross-claim
+    tid = _normalize_tenant_id(tenant_id)
+    matched = [d for d in _ensure().values() if _driver_tenant_id(d) == tid and not is_seed_driver(d)]
+    if status:
+        matched = [d for d in matched if d.status == status]
+    return sorted(matched, key=lambda d: d.name)
+
+
+def driver_visible_to_office(
+    driver: FleetDriver | None,
+    tenant_id: str,
+    *,
+    allow_demo_legacy: bool = False,
+) -> bool:
+    """True when the office may view/edit this driver — exact tenant match only."""
+    del allow_demo_legacy  # hard-disabled — no DEMO cross-office visibility
+    if not driver or is_seed_driver(driver):
+        return False
+    return _driver_tenant_id(driver) == _normalize_tenant_id(tenant_id)
 
 
 def get_driver(driver_id: str) -> FleetDriver | None:
     return _ensure().get(driver_id)
 
 
-def find_driver_by_username(username: str) -> FleetDriver | None:
-    """Match email, license number, or vehicle/driver code (case-insensitive)."""
+def _username_matches(driver: FleetDriver, needle: str) -> bool:
+    if driver.email.lower() == needle:
+        return True
+    if driver.license_no.lower() == needle:
+        return True
+    if driver.vehicle_code and driver.vehicle_code.lower() == needle:
+        return True
+    if driver.license_plate and driver.license_plate.lower() == needle:
+        return True
+    return False
+
+
+def find_driver_by_username(
+    username: str,
+    tenant_id: str | None = None,
+    *,
+    allow_demo_legacy: bool = False,
+) -> FleetDriver | None:
+    """
+    Match email, license number, or vehicle/driver code (case-insensitive).
+
+    When ``tenant_id`` is set, only that office's drivers match.
+    ``allow_demo_legacy`` may match a DEMO orphan (Achillio login recovery only).
+    """
     needle = _normalize_username(username)
     if not needle:
         return None
+    tid = _normalize_tenant_id(tenant_id) if tenant_id is not None else None
     for d in _ensure().values():
-        if d.email.lower() == needle:
+        if is_seed_driver(d):
+            continue
+        if not _username_matches(d, needle):
+            continue
+        if tid is None:
             return d
-        if d.license_no.lower() == needle:
+        dtid = _driver_tenant_id(d)
+        if dtid == tid:
             return d
-        if d.vehicle_code and d.vehicle_code.lower() == needle:
-            return d
-        if d.license_plate and d.license_plate.lower() == needle:
+        if (
+            allow_demo_legacy
+            and tid != DEMO_TENANT_ID
+            and dtid == DEMO_TENANT_ID
+        ):
             return d
     return None
 
 
-def authenticate_driver(username: str, password: str) -> FleetDriver | None:
-    driver = find_driver_by_username(username)
-    if not driver or driver.status not in ("active", "on_leave"):
+def authenticate_driver(
+    username: str,
+    password: str,
+    tenant_id: str | None = None,
+    *,
+    allow_demo_legacy: bool = False,
+) -> FleetDriver | None:
+    driver = find_driver_by_username(
+        username,
+        tenant_id=tenant_id,
+        allow_demo_legacy=allow_demo_legacy,
+    )
+    if not driver or is_seed_driver(driver):
+        return None
+    if driver.status not in ("active", "on_leave"):
         return None
     stored = driver.password_hash
     if not stored:
@@ -319,11 +752,24 @@ def create_driver(data: dict) -> FleetDriver:
     if isinstance(license_plate, str):
         license_plate = license_plate.strip() or None
 
+    tenant_id = _normalize_tenant_id(data.get("tenant_id"))
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    allow_demo = (
+        bool(data.get("_allow_demo_tenant"))
+        or os.getenv("ALLOW_DEMO_DRIVER_CREATE", "").lower() in ("1", "true", "yes")
+        or env in ("development", "dev", "local", "test")
+    )
+    # Production SEAL: never create drivers on the shared DEMO tenant.
+    if tenant_id == DEMO_TENANT_ID and not allow_demo:
+        raise ValueError(
+            "Απαιτείται έγκυρο γραφείο για νέο οδηγό — απαγορεύεται δημιουργία χωρίς tenant"
+        )
     _assert_unique(
         email=email,
         license_no=license_no,
         vehicle_code=vehicle_code,
         license_plate=license_plate,
+        tenant_id=tenant_id,
     )
 
     did = str(uuid4())
@@ -345,6 +791,7 @@ def create_driver(data: dict) -> FleetDriver:
         license_expires_at=_parse_date(data.get("license_expires_at")),
         password_hash=hash_password(str(pwd)),
         photo_url=(str(data["photo_url"]).strip() or None) if data.get("photo_url") else None,
+        tenant_id=tenant_id,
     )
     _ensure()[did] = driver
     _persist()
@@ -372,6 +819,7 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         license_no=next_license,
         vehicle_code=next_code,
         license_plate=next_plate,
+        tenant_id=_driver_tenant_id(d),
         exclude_id=driver_id,
     )
 
@@ -398,6 +846,14 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
         d.salary_per_km = float(patch["salary_per_km"])
     if patch.get("salary_per_trip") is not None:
         d.salary_per_trip = float(patch["salary_per_trip"])
+    # SEAL: tenant_id is immutable via normal updates — never move a driver
+    # between offices through PATCH. Internal repair uses force_tenant_id.
+    if patch.get("force_tenant_id"):
+        d.tenant_id = _normalize_tenant_id(patch["force_tenant_id"])
+    elif patch.get("tenant_id") and _normalize_tenant_id(patch["tenant_id"]) != _driver_tenant_id(d):
+        raise ValueError(
+            "Απαγορεύεται η μεταφορά οδηγού σε άλλο γραφείο — κάθε οδηγός ανήκει σε ένα μόνο γραφείο"
+        )
     if patch.get("password"):
         pwd = str(patch["password"])
         if len(pwd) < 4:
@@ -407,10 +863,26 @@ def update_driver(driver_id: str, patch: dict) -> FleetDriver:
     return d
 
 
-def delete_driver(driver_id: str) -> None:
-    if driver_id not in _ensure():
+def delete_driver(driver_id: str, *, tenant_id: str | None = None) -> None:
+    """
+    Delete a driver. When ``tenant_id`` is set (always from admin API), the row
+    must belong to that office — never delete across PoreiaGo ↔ Achillio.
+    """
+    drivers = _ensure()
+    d = drivers.get(driver_id)
+    if not d:
         raise KeyError("Driver not found")
-    del _ensure()[driver_id]
+    if tenant_id is not None:
+        want = _normalize_tenant_id(tenant_id)
+        if _driver_tenant_id(d) != want:
+            logger.warning(
+                "SEAL: blocked cross-office driver delete id=%s row_tenant=%s actor_tenant=%s",
+                driver_id,
+                _driver_tenant_id(d),
+                want,
+            )
+            raise KeyError("Driver not found")
+    del drivers[driver_id]
     _persist()
 
 

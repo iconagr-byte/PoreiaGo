@@ -34,6 +34,8 @@ replace_kv() {
 }
 
 echo "==> Ensuring domain vars in $ENV_FILE"
+replace_kv "ENVIRONMENT" "production"
+replace_kv "REQUIRE_PRODUCTION" "1"
 set_kv "API_HOST" "$API_HOST_DEFAULT"
 set_kv "APP_HOST" "$APP_HOST_DEFAULT"
 set_kv "ACME_EMAIL" "$ACME_EMAIL_DEFAULT"
@@ -45,6 +47,35 @@ set_kv "BILLING_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/admin?billing=success"
 set_kv "BILLING_CANCEL_URL" "https://${APP_HOST_DEFAULT}/admin?billing=cancel"
 set_kv "BILLING_SIGNUP_SUCCESS_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup/success?billing=success"
 set_kv "BILLING_SIGNUP_CANCEL_URL" "https://${APP_HOST_DEFAULT}/grafeia/signup?billing=cancel"
+# Prefer live billing; force false on every deploy (P1 production readiness).
+replace_kv "BILLING_DEMO_MODE" "false"
+set_kv "RENT_DEMO_FLEET" "false"
+set_kv "ADMIN_AUTH_DISABLED" "0"
+
+# Strong GPS ingest key — required for production boot guard
+if ! grep -q "^TELEMETRY_DEVICE_KEYS=.\+" "$ENV_FILE" 2>/dev/null; then
+  _tkey="$(openssl rand -hex 24)"
+  replace_kv "TELEMETRY_DEVICE_KEYS" "$_tkey"
+  echo "  + generated TELEMETRY_DEVICE_KEYS"
+elif grep -qE "^TELEMETRY_DEVICE_KEYS=(dev-gps-key)?$" "$ENV_FILE" 2>/dev/null || \
+     grep -q "^TELEMETRY_DEVICE_KEYS=dev-gps-key" "$ENV_FILE" 2>/dev/null; then
+  _tkey="$(openssl rand -hex 24)"
+  replace_kv "TELEMETRY_DEVICE_KEYS" "$_tkey"
+  echo "  ~ replaced weak TELEMETRY_DEVICE_KEYS"
+fi
+
+# Mailbox password encryption (Fernet material) — required by production_guard
+if ! grep -q "^EMAIL_ENCRYPTION_KEY=.\+" "$ENV_FILE" 2>/dev/null; then
+  _ekey="$(openssl rand -base64 32)"
+  replace_kv "EMAIL_ENCRYPTION_KEY" "$_ekey"
+  echo "  + generated EMAIL_ENCRYPTION_KEY"
+elif grep -q "aerostride-dev-email-key" "$ENV_FILE" 2>/dev/null; then
+  _ekey="$(openssl rand -base64 32)"
+  replace_kv "EMAIL_ENCRYPTION_KEY" "$_ekey"
+  echo "  ~ replaced weak EMAIL_ENCRYPTION_KEY"
+fi
+set_kv "METRICS_PUBLIC" "false"
+set_kv "METRICS_TOKEN" ""
 
 PLATFORM_DOMAIN="${PLATFORM_DOMAIN:-poreiago.com}"
 if grep -q "^APP_HOST=" "$ENV_FILE" 2>/dev/null; then
@@ -66,16 +97,43 @@ replace_kv "VITE_OLYMPUS_INGRESS_CNAME" "$INGRESS_CNAME"
 if ! [[ -f "$DEPLOY_DIR/.vapid_private.pem" ]]; then
   echo "==> Generating Web Push VAPID keys"
   REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
-  if ! python3 -c "import py_vapid" 2>/dev/null; then
-    pip3 install --user py-vapid cryptography >/dev/null 2>&1 || true
+  # Docker may have created a directory here if the compose bind-mount was missing a file.
+  if [[ -d "$DEPLOY_DIR/.vapid_private.pem" ]]; then
+    echo "  removing ghost directory deploy/.vapid_private.pem"
+    rm -rf "$DEPLOY_DIR/.vapid_private.pem"
+  fi
+  if ! python3 -c "from cryptography.hazmat.primitives.asymmetric import ec" 2>/dev/null; then
+    pip3 install --user cryptography >/dev/null 2>&1 || true
   fi
   python3 "$REPO_ROOT/deploy/scripts/generate_vapid_keys.py" || {
-    echo "WARN: VAPID generation failed — pip3 install py-vapid cryptography"
+    echo "WARN: host VAPID generation failed — API will auto-generate into /app/data on startup"
   }
 fi
 
 if [[ -f "$DEPLOY_DIR/.vapid_private.pem" ]]; then
-  set_kv "WEB_PUSH_VAPID_PRIVATE_KEY_FILE" "/run/secrets/vapid_private.pem"
+  set_kv "WEB_PUSH_VAPID_PRIVATE_KEY_FILE" "/app/data/vapid_private.pem"
+  # Escape newlines so docker env_file can load the PEM without a bind-mount.
+  # Use Python (not sed) — PEM base64 + \n sequences break sed replacements.
+  python3 - <<'PY' "$ENV_FILE" "$DEPLOY_DIR/.vapid_private.pem"
+import sys
+from pathlib import Path
+
+env_path = Path(sys.argv[1])
+pem = Path(sys.argv[2]).read_text(encoding="utf-8").strip().replace("\n", "\\n")
+key = "WEB_PUSH_VAPID_PRIVATE_KEY"
+lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+out, found = [], False
+for line in lines:
+    if line.startswith(key + "="):
+        out.append(f"{key}={pem}")
+        found = True
+    else:
+        out.append(line)
+if not found:
+    out.append(f"{key}={pem}")
+env_path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+print(f"  ~ set {key} (inline PEM)")
+PY
   if [[ -f "$DEPLOY_DIR/.vapid_public.key" ]]; then
     pub="$(tr -d '\n' < "$DEPLOY_DIR/.vapid_public.key")"
     replace_kv "WEB_PUSH_VAPID_PUBLIC_KEY" "$pub"
@@ -90,9 +148,14 @@ elif [[ -f "$DEPLOY_DIR/.vapid_public.key" ]]; then
   set_kv "WEB_PUSH_VAPID_PUBLIC_KEY" "$pub"
 fi
 
-if grep -q 'email: "\${ACME_EMAIL}"' "$DEPLOY_DIR/traefik/traefik.yml" 2>/dev/null; then
-  echo "==> Fixing Traefik ACME email"
-  sed -i.bak "s|email: \"\${ACME_EMAIL}\"|email: \"${ACME_EMAIL_DEFAULT}\"|" \
+# Traefik static YAML does not expand ${ACME_EMAIL:-...} — bake a real address.
+ACME_EMAIL_VALUE="$ACME_EMAIL_DEFAULT"
+if grep -q "^ACME_EMAIL=" "$ENV_FILE" 2>/dev/null; then
+  ACME_EMAIL_VALUE="$(grep "^ACME_EMAIL=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r')"
+fi
+if [[ -f "$DEPLOY_DIR/traefik/traefik.yml" ]]; then
+  echo "==> Baking ACME email into Traefik config ($ACME_EMAIL_VALUE)"
+  sed -i.bak -E "s|email: \".*\"|email: \"${ACME_EMAIL_VALUE}\"|" \
     "$DEPLOY_DIR/traefik/traefik.yml"
 fi
 
@@ -102,5 +165,45 @@ for f in olympus-on-demand-tls.yml tenants.example.yml; do
     echo "  disabled traefik/dynamic/$f"
   fi
 done
+
+# Keep custom-domains.yml active (tenant Host → frontend + Let's Encrypt).
+replace_kv "TRAEFIK_DYNAMIC_DIR" "/etc/traefik/dynamic"
+
+# Hybrid providers — empty placeholders (fill real keys on the VPS; see HYBRID-PROVIDERS.md)
+echo "==> Ensuring hybrid provider env keys (placeholders if missing)"
+set_kv "AVIATIONSTACK_API_KEY" ""
+set_kv "TWILIO_ACCOUNT_SID" ""
+set_kv "TWILIO_AUTH_TOKEN" ""
+set_kv "TWILIO_FROM_NUMBER" ""
+set_kv "TWILIO_WHATSAPP_FROM" ""
+
+# Fiscal — Fernet key for Prosvasis/Epsilon secrets in tenants.settings_json
+echo "==> Ensuring FISCAL_ENCRYPTION_KEY"
+if ! grep -q "^FISCAL_ENCRYPTION_KEY=.\+" "$ENV_FILE" 2>/dev/null; then
+  if python3 -c "from cryptography.fernet import Fernet" 2>/dev/null; then
+    _fkey="$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+  else
+    _fkey="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+  fi
+  replace_kv "FISCAL_ENCRYPTION_KEY" "$_fkey"
+  echo "  + generated FISCAL_ENCRYPTION_KEY"
+fi
+set_kv "AADE_MODE" "stub"
+set_kv "AADE_SECRETS_BACKEND" "env"
+
+# My Wallet Google Sign-In — see deploy/GOOGLE-SIGNIN.md
+echo "==> Ensuring Google Sign-In env keys"
+set_kv "GOOGLE_CLIENT_ID" ""
+set_kv "VITE_GOOGLE_CLIENT_ID" ""
+# Keep API + Vite keys in sync when only one side is filled.
+_g_api="$(grep "^GOOGLE_CLIENT_ID=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+_g_vite="$(grep "^VITE_GOOGLE_CLIENT_ID=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+if [[ -n "$_g_api" && -z "$_g_vite" ]]; then
+  replace_kv "VITE_GOOGLE_CLIENT_ID" "$_g_api"
+  echo "  ~ synced VITE_GOOGLE_CLIENT_ID from GOOGLE_CLIENT_ID"
+elif [[ -n "$_g_vite" && -z "$_g_api" ]]; then
+  replace_kv "GOOGLE_CLIENT_ID" "$_g_vite"
+  echo "  ~ synced GOOGLE_CLIENT_ID from VITE_GOOGLE_CLIENT_ID"
+fi
 
 echo "==> .env.prod ready"

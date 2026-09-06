@@ -5,12 +5,17 @@ import {
   normalizePaymentSettings,
   toLegacyCheckoutShape,
 } from '../lib/payments/paymentSettings.js';
+import { officeStorageKey } from '../lib/admin/officeTenantStore.js';
 
-const STORAGE_KEY = 'aerostride_payment_settings_v1';
+const STORAGE_KEY_BASE = 'aerostride_payment_settings_v1';
+
+function storageKey() {
+  return officeStorageKey(STORAGE_KEY_BASE);
+}
 
 function cache(data) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(storageKey(), JSON.stringify(data));
   } catch {
     /* quota */
   }
@@ -18,7 +23,7 @@ function cache(data) {
 
 function loadCached() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     return raw ? normalizePaymentSettings(JSON.parse(raw)) : null;
   } catch {
     return null;
@@ -27,7 +32,21 @@ function loadCached() {
 
 async function parseError(res) {
   const err = await res.json().catch(() => ({}));
-  throw new Error(err.detail || res.statusText || 'Request failed');
+  const detail = err.detail;
+  let message = res.statusText || 'Request failed';
+  if (typeof detail === 'string' && detail.trim()) {
+    message = detail;
+  } else if (Array.isArray(detail) && detail.length) {
+    message = detail
+      .map((d) => d?.msg || d?.message || JSON.stringify(d))
+      .filter(Boolean)
+      .join(' · ');
+  }
+  if (res.status === 404) {
+    message =
+      'Το API πληρωμών δεν είναι διαθέσιμο σε αυτό το περιβάλλον — δοκίμασε refresh ή επικοινώνησε με υποστήριξη';
+  }
+  throw new Error(message);
 }
 
 export async function fetchPublicPaymentSettings() {

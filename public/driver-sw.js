@@ -1,12 +1,14 @@
 /**
  * Driver Command Center — cache manifest, offline σελίδα, PWA assets.
  */
-const CACHE = 'aerostride-driver-v3';
+const CACHE = 'aerostride-driver-v8';
 const MANIFEST_PREFIX = '/driver-cache/manifest/';
 const OFFLINE_URL = '/driver-offline.html';
+const APP_SHELL = '/index.html';
 
 const PRECACHE_URLS = [
   OFFLINE_URL,
+  APP_SHELL,
   '/driver-telemetry-manifest.webmanifest',
   '/icons/driver-pwa.svg',
   '/icons/driver-pwa-192.png',
@@ -21,6 +23,12 @@ function offlineHtmlResponse() {
   });
 }
 
+async function clearAllNotifications() {
+  if (!self.registration?.getNotifications) return;
+  const list = await self.registration.getNotifications();
+  await Promise.all(list.map((n) => n.close()));
+}
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
@@ -30,15 +38,29 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key.startsWith('aerostride-driver-') && key !== CACHE).map((key) => caches.delete(key)),
-      ),
-    ).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key.startsWith('aerostride-driver-') && key !== CACHE)
+            .map((key) => caches.delete(key)),
+        ),
+      )
+      .then(() => clearAllNotifications())
+      .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
+  if (event.data?.type === 'CLEAR_NOTIFICATIONS') {
+    event.waitUntil(clearAllNotifications());
+    return;
+  }
   if (event.data?.type === 'CACHE_MANIFEST' && event.data.tripId) {
     const key = `${MANIFEST_PREFIX}${event.data.tripId}`;
     caches.open(CACHE).then((cache) => {
@@ -69,40 +91,69 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  const createdAt = Date.now();
+  const isChat = payload.data?.type === 'driver_office_chat';
   const options = {
     body: payload.body,
     tag: payload.tag || 'driver-pwa',
+    renotify: Boolean(isChat || payload.renotify),
+    requireInteraction: payload.requireInteraction === true || Boolean(isChat),
+    silent: false,
     data: {
-      url: payload.url || '/driver',
+      url: payload.url || (isChat ? '/driver?tab=chat' : '/driver'),
+      createdAt,
       ...(payload.data || {}),
     },
     icon: '/icons/driver-pwa-192.png',
     badge: '/icons/driver-pwa-192.png',
   };
 
-  event.waitUntil(self.registration.showNotification(payload.title || 'PoreiaGo Οδηγός', options));
+  event.waitUntil(
+    (async () => {
+      try {
+        const existing = await self.registration.getNotifications();
+        await Promise.all(
+          existing
+            .filter((n) => {
+              const tag = String(n.tag || '');
+              return tag.startsWith('driver-') || tag === 'driver-pwa';
+            })
+            .map((n) => n.close()),
+        );
+      } catch {
+        /* ignore */
+      }
+      await self.registration.showNotification(payload.title || 'PoreiaGo Οδηγός', options);
+    })(),
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification?.data || {};
   let target = data.url || data.auth_url || '/driver';
+  if (data.type === 'driver_office_chat') {
+    target = data.url || '/driver?tab=chat';
+  }
   if (target.startsWith('/')) {
     target = `${self.location.origin}${target}`;
   }
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const client of list) {
-        if ('focus' in client && client.url.includes('/driver')) {
-          client.navigate(target);
-          return client.focus();
+    clearAllNotifications().then(() =>
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+        for (const client of list) {
+          if ('focus' in client && client.url.includes('/driver')) {
+            client.postMessage({ type: 'DRIVER_NOTIFICATION_OPENED' });
+            if (client.navigate) client.navigate(target);
+            return client.focus();
+          }
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(target);
-      }
-      return undefined;
-    }),
+        if (clients.openWindow) {
+          return clients.openWindow(target);
+        }
+        return undefined;
+      }),
+    ),
   );
 });
 
@@ -113,7 +164,15 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate' && url.pathname.startsWith('/driver')) {
     event.respondWith(
       fetch(request)
-        .then((res) => res)
+        .then((res) => {
+          // Deep links must get the SPA shell — never pass through bare Traefik 404.
+          if (res && res.ok) return res;
+          return fetch(APP_SHELL).then((shell) =>
+            shell && shell.ok
+              ? shell
+              : caches.match(OFFLINE_URL).then((cached) => cached || offlineHtmlResponse()),
+          );
+        })
         .catch(() =>
           caches.match(OFFLINE_URL).then((cached) => cached || offlineHtmlResponse()),
         ),
@@ -123,11 +182,15 @@ self.addEventListener('fetch', (event) => {
 
   if (PRECACHE_URLS.includes(url.pathname)) {
     event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, clone));
-        return res;
-      })),
+      caches.match(request).then(
+        (cached) =>
+          cached ||
+          fetch(request).then((res) => {
+            const clone = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, clone));
+            return res;
+          }),
+      ),
     );
     return;
   }

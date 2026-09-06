@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
-from datetime import datetime, timezone
+from uuid import UUID
 
 from sqlalchemy import text
 
@@ -14,6 +15,19 @@ from travel_platform.telemetry.coordinate_buffer import drain_batch
 logger = logging.getLogger(__name__)
 
 FLUSH_INTERVAL_SEC = float(os.getenv("TELEMETRY_COORD_FLUSH_SEC", "15"))
+
+
+def _as_uuid_or_none(value: object) -> str | None:
+    """Driver/vehicle ids from Master QR / legacy JWTs are often not UUIDs."""
+    if value is None:
+        return None
+    text_value = str(value).strip()
+    if not text_value:
+        return None
+    try:
+        return str(UUID(text_value))
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 async def flush_coordinates_batch() -> int:
@@ -52,14 +66,14 @@ async def flush_coordinates_batch() -> int:
                     {
                         "tenant_id": row.tenant_id,
                         "trip_id": row.trip_id,
-                        "driver_id": row.driver_id,
-                        "vehicle_id": row.vehicle_id,
+                        "driver_id": _as_uuid_or_none(row.driver_id),
+                        "vehicle_id": _as_uuid_or_none(row.vehicle_id),
                         "recorded_at": row.recorded_at,
                         "speed_kmh": row.speed_kmh,
                         "heading_deg": row.heading_deg,
                         "lat": row.lat,
                         "lng": row.lng,
-                        "raw_payload": __import__("json").dumps(row.raw, default=str),
+                        "raw_payload": json.dumps(row.raw, default=str),
                     },
                 )
                 inserted += 1
