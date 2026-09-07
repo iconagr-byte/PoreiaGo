@@ -10,8 +10,10 @@ import {
 } from '../../../lib/email/emailProviderPresets.js';
 import {
   isMailTimeoutMessage,
+  isMailRemoteAuthRejectMessage,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
+  mailRemoteAuthHintEl,
 } from '../../../lib/email/mailReachability.js';
 import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
 import EmailConnectionResult from './EmailConnectionResult.jsx';
@@ -114,8 +116,7 @@ export default function EmailConnectWizard({
   const draftAccount = () => {
     const account = buildAccountFromWizard({
       email: email.trim(),
-      // Google shows App Passwords with spaces — strip before IMAP/SMTP.
-      password: String(password || '').replace(/\s+/g, ''),
+      password,
       provider: activeProvider,
       mode: 'direct',
       label: email.trim(),
@@ -253,6 +254,25 @@ export default function EmailConnectWizard({
           smtpPort,
         });
         toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
+      } else if (
+        isMailRemoteAuthRejectMessage(imapErr) ||
+        isMailRemoteAuthRejectMessage(smtpErr)
+      ) {
+        const mailHost = account.imap_host || account.smtp_host;
+        const imapPort = Number(account.imap_port) || 993;
+        const smtpPort = Number(account.smtp_port) || 465;
+        setTestMsg({
+          ok: false,
+          remoteAuth: true,
+          text: mailRemoteAuthHintEl({ mailHost, imapPort, smtpPort }),
+          mailHost,
+          imapPort,
+          smtpPort,
+        });
+        toast.error('Χρειάζεται whitelist IP για remote mail', {
+          id: 'email-conn-test',
+          duration: 5000,
+        });
       } else {
         const text = [imapOk ? null : `IMAP: ${imapErr}`, smtpOk ? null : `SMTP: ${smtpErr}`]
           .filter(Boolean)
@@ -659,9 +679,10 @@ export default function EmailConnectWizard({
           {testMsg && (
             <EmailConnectionResult
               ok={testMsg.ok}
-              message={testMsg.timeout ? undefined : testMsg.text}
+              message={testMsg.timeout || testMsg.remoteAuth ? undefined : testMsg.text}
               hint={undefined}
               timeout={testMsg.timeout}
+              remoteAuth={testMsg.remoteAuth}
               mailHost={testMsg.mailHost}
               imapPort={testMsg.imapPort}
               smtpPort={testMsg.smtpPort}

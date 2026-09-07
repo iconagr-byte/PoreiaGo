@@ -24,6 +24,28 @@ SMTP_TIMEOUT_HINT_EL = (
     "(θύρα 587/465). Ελέγξτε host και ότι ο πάροχος επιτρέπει εξωτερική αποστολή."
 )
 
+SMTP_REMOTE_AUTH_HINT_EL = (
+    "SMTP σύνδεση: Incorrect authentication data (535). "
+    "Αν το webmail ανοίγει με τον ίδιο κωδικό, ο πάροχος συχνά μπλοκάρει remote SMTP "
+    "από το IP της εφαρμογής — ζητήστε whitelist εξωτερικών IMAP/SMTP συνδέσεων."
+)
+
+MISSING_PASSWORD_HINT_EL = (
+    "Λείπει ο κωδικός mailbox — συμπληρώστε τον και πατήστε ξανά «Έλεγχος»."
+)
+
+DECRYPT_FAILED_HINT_EL = (
+    "Ο αποθηκευμένος κωδικός δεν αποκρυπτογραφείται — "
+    "αποθηκεύστε ξανά τον κωδικό mailbox στις Ρυθμίσεις Email."
+)
+
+
+def is_smtp_remote_auth_reject(exc: BaseException | str) -> bool:
+    msg = str(exc)
+    return "Incorrect authentication data" in msg or (
+        "535" in msg and "authentication" in msg.lower()
+    )
+
 
 def normalize_mail_password(password: str | None, *, host: str = "", email: str = "") -> str:
     """Strip spaces from Google/Yahoo/Outlook app passwords (shown as 'xxxx xxxx xxxx xxxx')."""
@@ -60,6 +82,8 @@ def _format_smtp_error(exc: BaseException) -> str:
         return SMTP_TIMEOUT_HINT_EL
     if is_gmail_app_password_error(exc):
         return GMAIL_APP_PASSWORD_HINT_EL
+    if is_smtp_remote_auth_reject(exc):
+        return SMTP_REMOTE_AUTH_HINT_EL
     raw = str(exc).strip()
     if raw.startswith("b'") and raw.endswith("'"):
         raw = raw[2:-1]
@@ -120,9 +144,13 @@ def _connect_imap(cfg: dict) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
 
 
 def test_imap_connection(account: dict) -> dict:
+    if account.get("password_decrypt_failed"):
+        return {"ok": False, "error": DECRYPT_FAILED_HINT_EL}
     cfg = settings_to_imap_config(account)
     if not cfg["host"] or not cfg["user"]:
         return {"ok": False, "error": "Συμπληρώστε IMAP host και username"}
+    if not (cfg.get("password") or "").strip():
+        return {"ok": False, "error": MISSING_PASSWORD_HINT_EL}
     try:
         client = _connect_imap(cfg)
         client.select(cfg.get("imap_mailbox", "INBOX"), readonly=True)
@@ -133,13 +161,16 @@ def test_imap_connection(account: dict) -> dict:
 
 
 def test_smtp_connection(account: dict) -> dict:
+    if account.get("password_decrypt_failed"):
+        return {"ok": False, "error": DECRYPT_FAILED_HINT_EL}
     cfg = settings_to_smtp_config(account)
     if not cfg["host"] or not cfg["user"]:
         return {"ok": False, "error": "Συμπληρώστε SMTP host και username"}
+    if not (cfg.get("password") or "").strip():
+        return {"ok": False, "error": MISSING_PASSWORD_HINT_EL}
     try:
         with _open_smtp(cfg) as smtp:
-            if cfg["password"]:
-                smtp.login(cfg["user"], cfg["password"])
+            smtp.login(cfg["user"], cfg["password"])
         return {"ok": True, "message": "SMTP σύνδεση επιτυχής"}
     except Exception as exc:
         return {"ok": False, "error": _format_smtp_error(exc)}

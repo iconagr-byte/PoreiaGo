@@ -2,6 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   APP_MAIL_EGRESS_IP,
+  mailRemoteAuthGuide,
   mailTimeoutGuide,
 } from '../../../lib/email/mailReachability.js';
 
@@ -42,12 +43,17 @@ export default function EmailConnectionResult({
   message = '',
   hint = '',
   timeout = false,
+  remoteAuth = false,
   mailHost,
   imapPort,
   smtpPort,
 } = {}) {
   const [copied, setCopied] = useState(false);
-  const guide = timeout ? mailTimeoutGuide({ mailHost, imapPort, smtpPort }) : null;
+  const guide = timeout
+    ? mailTimeoutGuide({ mailHost, imapPort, smtpPort })
+    : remoteAuth
+      ? mailRemoteAuthGuide({ mailHost, imapPort, smtpPort })
+      : null;
 
   if (ok) {
     return (
@@ -73,7 +79,7 @@ export default function EmailConnectionResult({
     );
   }
 
-  if (timeout && guide) {
+  if ((timeout || remoteAuth) && guide) {
     return (
       <div
         className="overflow-hidden rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50 via-white to-[#f5f5f7] shadow-sm"

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   APP_MAIL_EGRESS_IP,
   hostingWhitelistRequest,
+  isMailRemoteAuthRejectMessage,
+  mailRemoteAuthGuide,
   mailTimeoutGuide,
   mailTimeoutHintEl,
 } from './mailReachability.js';
@@ -25,5 +27,18 @@ describe('mailReachability', () => {
     expect(g.facts.map((f) => f.id)).toEqual(['ip', 'host', 'imap', 'smtp']);
     expect(g.steps).toHaveLength(3);
     expect(mailTimeoutHintEl({ mailHost: 'mail.achilliotravel.com' })).toContain(g.request);
+  });
+
+  it('detects Exim 535 remote-auth reject and builds whitelist guide', () => {
+    expect(
+      isMailRemoteAuthRejectMessage("SMTP σύνδεση: (535, b'Incorrect authentication data')"),
+    ).toBe(true);
+    const g = mailRemoteAuthGuide({
+      mailHost: 'mail.achilliotravel.com',
+      imapPort: 993,
+      smtpPort: 465,
+    });
+    expect(g.title).toMatch(/webmail/i);
+    expect(g.request).toContain('169.58.199.186');
   });
 });
