@@ -274,6 +274,13 @@ if [[ -n "$API_CID" ]]; then
   echo "  api-blue networks:"
   docker inspect "$API_CID" --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
 fi
+
+# Contabo must allow outbound IMAP/SMTP so office mailboxes can sync.
+if [[ -f "$ROOT_DIR/deploy/scripts/ensure-mail-egress.sh" ]]; then
+  echo "==> Ensure outbound mail ports (993/465/587)"
+  bash "$ROOT_DIR/deploy/scripts/ensure-mail-egress.sh" \
+    || echo "  WARN: mail egress probe failed — Contabo panel / hosting whitelist may still block"
+fi
 # Sync host VAPID keys into the durable api_data volume (env often pointed here without a copy).
 if [[ -n "$API_CID" && -f "$DEPLOY_DIR/.vapid_private.pem" && -f "$DEPLOY_DIR/.vapid_public.key" ]]; then
   echo "==> Syncing Web Push VAPID keys into api-blue:/app/data"
