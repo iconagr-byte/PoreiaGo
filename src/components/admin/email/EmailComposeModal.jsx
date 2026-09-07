@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Save, Send, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import '../../../styles/emailCompose.css';
@@ -135,7 +136,7 @@ export default function EmailComposeModal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="emc-overlay" role="dialog" aria-modal="true" aria-labelledby="emc-title">
       <div className="emc-shell">
         <header className="emc-header">
@@ -277,6 +278,7 @@ export default function EmailComposeModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

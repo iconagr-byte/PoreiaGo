@@ -1,15 +1,17 @@
 /* Modern email compose — light theme */
 
 .emc-overlay {
+  /* Above BackOffice aside (z-20) and sticky header (z-10). Fixed children
+     inside main still lose to sibling stacking — pair with portal to body. */
   position: fixed;
   inset: 0;
-  z-index: 55;
+  z-index: 220;
   display: flex;
   align-items: stretch;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.4);
+  background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(4px);
-  padding: 1rem;
+  padding: 0.75rem;
 }
 
 .emc-shell {
@@ -50,16 +52,19 @@
 
 .emc-body {
   display: grid;
-  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
   flex: 1;
   min-height: 0;
+  min-width: 0;
 }
 
 .emc-side {
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem 1.1rem;
   background: #fafbfc;
   border-right: 1px solid #e2e8f0;
+  min-width: 0;
 }
 
 .emc-center {
@@ -435,6 +440,30 @@
 @media (max-width: 1024px) {
   .emc-body {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: minmax(220px, 42vh) minmax(0, 1fr);
+  }
+
+  .emc-side {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .emc-shell {
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 640px) {
+  .emc-overlay {
+    padding: 0;
+  }
+
+  .emc-shell {
+    border-radius: 0;
+    max-width: none;
+  }
+
+  .emc-body {
+    grid-template-rows: minmax(200px, 38vh) minmax(0, 1fr);
   }
 }
