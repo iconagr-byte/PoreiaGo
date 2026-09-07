@@ -179,10 +179,15 @@ def test_smtp_connection(account: dict) -> dict:
 def test_account_connection(account: dict) -> dict:
     imap = test_imap_connection(account)
     smtp = test_smtp_connection(account)
+    remote_auth = is_smtp_remote_auth_reject(smtp.get("error") or "") or (
+        "Incorrect authentication data" in str(smtp.get("error") or "")
+    )
     return {
         "ok": imap.get("ok") and smtp.get("ok"),
         "imap": imap,
         "smtp": smtp,
+        # Frontend uses this even when IMAP surfaces a generic AUTH hint.
+        "remote_auth": bool(remote_auth and not imap.get("ok")),
     }
 
 

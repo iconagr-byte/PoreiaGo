@@ -3,6 +3,7 @@ import {
   APP_MAIL_EGRESS_IP,
   hostingWhitelistRequest,
   isMailRemoteAuthRejectMessage,
+  isMailRemoteAuthPair,
   mailRemoteAuthGuide,
   mailTimeoutGuide,
   mailTimeoutHintEl,
@@ -32,6 +33,12 @@ describe('mailReachability', () => {
   it('detects Exim 535 remote-auth reject and builds whitelist guide', () => {
     expect(
       isMailRemoteAuthRejectMessage("SMTP σύνδεση: (535, b'Incorrect authentication data')"),
+    ).toBe(true);
+    expect(
+      isMailRemoteAuthPair(
+        'IMAP σύνδεση: λάθος username ή κωδικός mailbox.',
+        'SMTP σύνδεση: Incorrect authentication data (535). Αν το webmail…',
+      ),
     ).toBe(true);
     const g = mailRemoteAuthGuide({
       mailHost: 'mail.achilliotravel.com',

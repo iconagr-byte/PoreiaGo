@@ -18,7 +18,23 @@ export function isMailRemoteAuthRejectMessage(msg) {
   return (
     /Incorrect authentication data/i.test(text) ||
     /\(535,\s*b?['"]Incorrect authentication/i.test(text) ||
-    /SMTP σύνδεση:.*\b535\b/i.test(text)
+    /SMTP σύνδεση:.*\b535\b/i.test(text) ||
+    /\b535\b/.test(text) ||
+    /μπλοκάρει remote SMTP/i.test(text) ||
+    /whitelist εξωτερικών IMAP\/SMTP/i.test(text)
+  );
+}
+
+/** IMAP AUTH failed + SMTP 535 → almost always hosting remote-auth restrict, not a typo. */
+export function isMailRemoteAuthPair(imapError, smtpError) {
+  const imap = String(imapError || '');
+  const smtp = String(smtpError || '');
+  const imapAuth =
+    /AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(imap);
+  return (
+    isMailRemoteAuthRejectMessage(smtp) ||
+    isMailRemoteAuthRejectMessage(imap) ||
+    (imapAuth && isMailRemoteAuthRejectMessage(smtp))
   );
 }
 
