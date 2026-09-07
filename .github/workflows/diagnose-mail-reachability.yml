@@ -47,4 +47,5 @@ jobs:
             export MAIL_HOST='${{ inputs.mail_host }}'
             export IMAP_PORT='${{ inputs.imap_port }}'
             export SMTP_PORT='${{ inputs.smtp_port }}'
+            bash deploy/scripts/ensure-mail-egress.sh || true
             bash deploy/scripts/diagnose-mail-reachability.sh

@@ -276,9 +276,9 @@ if [[ -n "$API_CID" ]]; then
 fi
 
 # Contabo must allow outbound IMAP/SMTP so office mailboxes can sync.
-if [[ -f "$ROOT_DIR/deploy/scripts/ensure-mail-egress.sh" ]]; then
+if [[ -f "$REPO_ROOT/deploy/scripts/ensure-mail-egress.sh" ]]; then
   echo "==> Ensure outbound mail ports (993/465/587)"
-  bash "$ROOT_DIR/deploy/scripts/ensure-mail-egress.sh" \
+  bash "$REPO_ROOT/deploy/scripts/ensure-mail-egress.sh" \
     || echo "  WARN: mail egress probe failed — Contabo panel / hosting whitelist may still block"
 fi
 # Sync host VAPID keys into the durable api_data volume (env often pointed here without a copy).
