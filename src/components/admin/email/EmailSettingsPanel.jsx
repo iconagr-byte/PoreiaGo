@@ -15,14 +15,20 @@ import {
 } from '../../../lib/email/emailSettingsImport.js';
 import {
   isMailTimeoutMessage,
+  isMailRemoteAuthRejectMessage,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
+  mailRemoteAuthHintEl,
 } from '../../../lib/email/mailReachability.js';
 import {
   buildEmailChecksFromResult,
   buildPendingEmailChecks,
 } from '../../../lib/email/emailConnectionChecks.js';
-import { PROVIDERS, detectProvider } from '../../../lib/email/emailProviderPresets.js';
+import {
+  PROVIDERS,
+  detectProvider,
+  normalizeMailPasswordForClient,
+} from '../../../lib/email/emailProviderPresets.js';
 import EmailConnectWizard from './EmailConnectWizard.jsx';
 import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
 import EmailConnectionResult from './EmailConnectionResult.jsx';
@@ -77,6 +83,9 @@ function syncErrorHint(error) {
   }
   if (/AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(msg)) {
     return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login).';
+  }
+  if (/Incorrect authentication data|\b535\b/i.test(msg)) {
+    return 'Αν το webmail ανοίγει με τον ίδιο κωδικό, ζητήστε whitelist του IP της εφαρμογής στον πάροχο hosting (remote IMAP/SMTP).';
   }
   if (/timed out|timeout|Errno 110|δεν ήταν δυνατή η σύνδεση|poreiago|intechs|34\.141/i.test(msg)) {
     return 'Δεν ανοίγει σύνδεση στον mail server. Ελέγξτε host/port και ότι το IMAP επιτρέπεται από τον πάροχο email.';
@@ -273,6 +282,19 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
   };
 
   const runTest = async () => {
+    const typedPassword = normalizeMailPasswordForClient(form.mail_password, {
+      host: form.imap_host || form.smtp_host,
+      email: form.email_address || form.mail_username,
+    });
+    // Editing a saved account with blank password field → test stored secret, not empty login.
+    if (!typedPassword && editingId && editingId !== 'new') {
+      await runTestSaved(editingId);
+      return;
+    }
+    if (!typedPassword) {
+      toast.error('Συμπληρώστε τον κωδικό mailbox για έλεγχο', { id: 'email-conn-test' });
+      return;
+    }
     setTesting(true);
     setTestResult(null);
     const account = {
@@ -280,7 +302,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
       imap_port: Number(form.imap_port),
       smtp_port: Number(form.smtp_port),
       mail_username: form.mail_username || form.email_address,
-      mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
+      mail_password: typedPassword,
     };
     setTestingAccountId(editingId || 'editor');
     setTestChecks(
@@ -304,10 +326,14 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         const timeout =
           (imapFail && isMailTimeoutMessage(r.imap?.error)) ||
           (smtpFail && isMailTimeoutMessage(r.smtp?.error));
+        const remoteAuth =
+          !timeout &&
+          ((smtpFail && isMailRemoteAuthRejectMessage(r.smtp?.error)) ||
+            (imapFail && isMailRemoteAuthRejectMessage(r.imap?.error)));
+        const mailHost = form.imap_host || form.smtp_host;
+        const imapPort = Number(form.imap_port) || 993;
+        const smtpPort = Number(form.smtp_port) || 465;
         if (timeout) {
-          const mailHost = form.imap_host || form.smtp_host;
-          const imapPort = Number(form.imap_port) || 993;
-          const smtpPort = Number(form.smtp_port) || 465;
           setTestResult({
             ok: false,
             message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
@@ -318,6 +344,21 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             smtpPort,
           });
           toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
+        } else if (remoteAuth) {
+          setTestResult({
+            ok: false,
+            message:
+              'Το hosting απέρριψε remote IMAP/SMTP (συχνά ακόμα και με σωστό κωδικό webmail).',
+            hint: mailRemoteAuthHintEl({ mailHost, imapPort, smtpPort }),
+            remoteAuth: true,
+            mailHost,
+            imapPort,
+            smtpPort,
+          });
+          toast.error('Χρειάζεται whitelist IP για remote mail', {
+            id: 'email-conn-test',
+            duration: 5000,
+          });
         } else {
           const parts = [];
           if (imapFail) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
@@ -371,10 +412,14 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         toast.success('Σύνδεση OK — δείτε τα βήματα παρακάτω', { id: 'email-conn-test' });
       } else {
         const timeout = built.imapHostFail || built.smtpHostFail;
+        const remoteAuth =
+          !timeout &&
+          (isMailRemoteAuthRejectMessage(r.imap?.error) ||
+            isMailRemoteAuthRejectMessage(r.smtp?.error));
+        const mailHost = acc.imap_host || acc.smtp_host;
+        const imapPort = Number(acc.imap_port) || 993;
+        const smtpPort = Number(acc.smtp_port) || 465;
         if (timeout) {
-          const mailHost = acc.imap_host || acc.smtp_host;
-          const imapPort = Number(acc.imap_port) || 993;
-          const smtpPort = Number(acc.smtp_port) || 465;
           setTestResult({
             ok: false,
             message: 'Ο mail server δεν απαντά από τον server της εφαρμογής (όχι λάθος κωδικός).',
@@ -385,6 +430,21 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             smtpPort,
           });
           toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
+        } else if (remoteAuth) {
+          setTestResult({
+            ok: false,
+            message:
+              'Το hosting απέρριψε remote IMAP/SMTP (συχνά ακόμα και με σωστό κωδικό webmail).',
+            hint: mailRemoteAuthHintEl({ mailHost, imapPort, smtpPort }),
+            remoteAuth: true,
+            mailHost,
+            imapPort,
+            smtpPort,
+          });
+          toast.error('Χρειάζεται whitelist IP για remote mail', {
+            id: 'email-conn-test',
+            duration: 5000,
+          });
         } else {
           const msg = r.imap?.error || r.smtp?.error || 'Αποτυχία';
           setTestResult({
@@ -422,8 +482,10 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         imap_port: Number(form.imap_port),
         smtp_port: Number(form.smtp_port),
         mail_username: form.mail_username || form.email_address,
-        // Gmail/Yahoo App Passwords are shown with spaces — strip before save/test.
-        mail_password: String(form.mail_password || '').replace(/\s+/g, ''),
+        mail_password: normalizeMailPasswordForClient(form.mail_password, {
+          host: form.imap_host || form.smtp_host,
+          email: form.email_address || form.mail_username,
+        }),
       };
       if (editingId === 'new') {
         if (!form.mail_password) {
@@ -768,6 +830,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                           message={testResult.message}
                           hint={testResult.hint}
                           timeout={testResult.timeout}
+                          remoteAuth={testResult.remoteAuth}
                           mailHost={testResult.mailHost || a.imap_host || a.smtp_host}
                           imapPort={testResult.imapPort || a.imap_port}
                           smtpPort={testResult.smtpPort || a.smtp_port}
@@ -1114,6 +1177,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                   message={testResult.message}
                   hint={testResult.hint}
                   timeout={testResult.timeout}
+                  remoteAuth={testResult.remoteAuth}
                   mailHost={testResult.mailHost || form.imap_host || form.smtp_host}
                   imapPort={testResult.imapPort || form.imap_port}
                   smtpPort={testResult.smtpPort || form.smtp_port}

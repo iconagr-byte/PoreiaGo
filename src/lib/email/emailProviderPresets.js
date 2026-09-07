@@ -106,6 +106,34 @@ export function detectProvider(email) {
   };
 }
 
+/**
+ * Match backend normalize_mail_password — strip spaces only for app-password providers
+ * (or 16-char spaced tokens). Keep normal cPanel passwords intact (trim only).
+ */
+export function normalizeMailPasswordForClient(password, { host = '', email = '' } = {}) {
+  const raw = String(password || '');
+  if (!raw) return '';
+  const blob = `${host} ${email}`.toLowerCase();
+  const appPwdProvider = [
+    'gmail.com',
+    'googlemail.com',
+    'imap.gmail.com',
+    'smtp.gmail.com',
+    'yahoo.',
+    'ymail.com',
+    'imap.mail.yahoo.com',
+    'smtp.mail.yahoo.com',
+    'outlook.',
+    'hotmail.',
+    'live.com',
+    'office365.com',
+  ].some((x) => blob.includes(x));
+  if (appPwdProvider || (raw.replace(/ /g, '').length === 16 && raw.includes(' '))) {
+    return raw.replace(/\s+/g, '');
+  }
+  return raw.trim();
+}
+
 export function buildAccountFromWizard({
   email,
   password,
@@ -118,13 +146,14 @@ export function buildAccountFromWizard({
     mode === 'gmail_bridge'
       ? PROVIDERS.gmail
       : provider || detectProvider(addr);
+  const host = prov.imap_host || (addr.includes('@') ? `mail.${addr.split('@')[1]}` : '');
 
   return {
     label: label || addr,
     email_address: mode === 'gmail_bridge' ? addr : addr,
     mail_username: mode === 'gmail_bridge' ? addr : addr,
-    mail_password: password || '',
-    imap_host: prov.imap_host || (addr.includes('@') ? `mail.${addr.split('@')[1]}` : ''),
+    mail_password: normalizeMailPasswordForClient(password, { host, email: addr }),
+    imap_host: host,
     imap_port: prov.imap_port,
     imap_secure: prov.imap_secure,
     imap_mailbox: 'INBOX',

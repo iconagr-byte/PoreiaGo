@@ -9,6 +9,19 @@ export function isMailTimeoutMessage(msg) {
   );
 }
 
+/**
+ * Exim/cPanel often returns 535 «Incorrect authentication data» when remote SMTP AUTH
+ * is restricted by IP — even when the mailbox password is correct and webmail works.
+ */
+export function isMailRemoteAuthRejectMessage(msg) {
+  const text = String(msg || '');
+  return (
+    /Incorrect authentication data/i.test(text) ||
+    /\(535,\s*b?['"]Incorrect authentication/i.test(text) ||
+    /SMTP σύνδεση:.*\b535\b/i.test(text)
+  );
+}
+
 /** Short toast — avoid dumping the full IMAP paragraph twice. */
 export const MAIL_TIMEOUT_TOAST_EL = 'Mail server μη προσβάσιμος — δείτε οδηγίες παρακάτω';
 
@@ -24,17 +37,12 @@ export function hostingWhitelistRequest({
   );
 }
 
-/** Structured guide for timeout / firewall UI (copyable request + fact chips). */
-export function mailTimeoutGuide({ mailHost, imapPort, smtpPort } = {}) {
+function mailReachabilityGuideBase({ mailHost, imapPort, smtpPort } = {}) {
   const host = String(mailHost || 'mail.achilliotravel.com').trim() || 'mail.achilliotravel.com';
   const imap = Number(imapPort) || 993;
   const smtp = Number(smtpPort) || 465;
   const request = hostingWhitelistRequest({ mailHost: host, imapPort: imap, smtpPort: smtp });
   return {
-    title: 'Ο mail server δεν απαντά',
-    summary:
-      'Δεν είναι λάθος κωδικός. Ο διακομιστής email μπλοκάρει τη σύνδεση από τον server της εφαρμογής.',
-    nextStep: 'Στείλτε στον πάροχο hosting (cPanel / Intechs) το παρακάτω αίτημα whitelist.',
     request,
     facts: [
       { id: 'ip', label: 'IP εφαρμογής', value: APP_MAIL_EGRESS_IP, copy: APP_MAIL_EGRESS_IP },
@@ -50,8 +58,37 @@ export function mailTimeoutGuide({ mailHost, imapPort, smtpPort } = {}) {
   };
 }
 
+/** Structured guide for timeout / firewall UI (copyable request + fact chips). */
+export function mailTimeoutGuide({ mailHost, imapPort, smtpPort } = {}) {
+  return {
+    title: 'Ο mail server δεν απαντά',
+    summary:
+      'Δεν είναι λάθος κωδικός. Ο διακομιστής email μπλοκάρει τη σύνδεση από τον server της εφαρμογής.',
+    nextStep: 'Στείλτε στον πάροχο hosting (cPanel / Intechs) το παρακάτω αίτημα whitelist.',
+    ...mailReachabilityGuideBase({ mailHost, imapPort, smtpPort }),
+  };
+}
+
+/**
+ * Guide when webmail works but IMAP/SMTP AUTH fails with Exim 535 from the app server.
+ */
+export function mailRemoteAuthGuide({ mailHost, imapPort, smtpPort } = {}) {
+  return {
+    title: 'Το webmail ανοίγει — η εφαρμογή όχι',
+    summary:
+      'Ο κωδικός mailbox είναι πιθανότατα σωστός. Το hosting συχνά επιτρέπει μόνο τοπικό webmail και απορρίπτει remote IMAP/SMTP από το IP της εφαρμογής (535 Incorrect authentication data).',
+    nextStep: 'Στείλτε στον πάροχο hosting (cPanel / Intechs) το παρακάτω αίτημα whitelist.',
+    ...mailReachabilityGuideBase({ mailHost, imapPort, smtpPort }),
+  };
+}
+
 /** Full hint text (summary + request) — used for clipboard / legacy callers. */
 export function mailTimeoutHintEl(opts = {}) {
   const g = mailTimeoutGuide(opts);
+  return `${g.summary} ${g.nextStep}\n\n${g.request}`;
+}
+
+export function mailRemoteAuthHintEl(opts = {}) {
+  const g = mailRemoteAuthGuide(opts);
   return `${g.summary} ${g.nextStep}\n\n${g.request}`;
 }

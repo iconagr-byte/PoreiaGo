@@ -2,6 +2,7 @@
 import {
   buildAccountFromWizard,
   detectProvider,
+  normalizeMailPasswordForClient,
 } from './emailProviderPresets.js';
 
 const gmail = detectProvider('me@gmail.com');
@@ -35,5 +36,14 @@ const bridged = buildAccountFromWizard({
 });
 console.assert(bridged.imap_host === 'imap.gmail.com', 'bridge uses gmail');
 console.assert(bridged.smtp_port === 587, 'bridge smtp 587');
+console.assert(bridged.mail_password === 'abcdefghijklmnop', 'gmail spaces stripped');
+
+console.assert(
+  normalizeMailPasswordForClient(' my pass ', {
+    host: 'mail.achilliotravel.com',
+    email: 'info@achilliotravel.com',
+  }) === 'my pass',
+  'cPanel password keeps spaces',
+);
 
 console.log('emailProviderPresets ok');
