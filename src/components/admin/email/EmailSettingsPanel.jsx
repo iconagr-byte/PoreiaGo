@@ -16,6 +16,7 @@ import {
 import {
   isMailTimeoutMessage,
   isMailRemoteAuthRejectMessage,
+  isMailRemoteAuthPair,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
   mailRemoteAuthHintEl,
@@ -328,8 +329,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           (smtpFail && isMailTimeoutMessage(r.smtp?.error));
         const remoteAuth =
           !timeout &&
-          ((smtpFail && isMailRemoteAuthRejectMessage(r.smtp?.error)) ||
-            (imapFail && isMailRemoteAuthRejectMessage(r.imap?.error)));
+          (Boolean(r.remote_auth) || isMailRemoteAuthPair(r.imap?.error, r.smtp?.error));
         const mailHost = form.imap_host || form.smtp_host;
         const imapPort = Number(form.imap_port) || 993;
         const smtpPort = Number(form.smtp_port) || 465;
@@ -414,8 +414,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         const timeout = built.imapHostFail || built.smtpHostFail;
         const remoteAuth =
           !timeout &&
-          (isMailRemoteAuthRejectMessage(r.imap?.error) ||
-            isMailRemoteAuthRejectMessage(r.smtp?.error));
+          (Boolean(r.remote_auth) || isMailRemoteAuthPair(r.imap?.error, r.smtp?.error));
         const mailHost = acc.imap_host || acc.smtp_host;
         const imapPort = Number(acc.imap_port) || 993;
         const smtpPort = Number(acc.smtp_port) || 465;
@@ -481,6 +480,9 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         ...form,
         imap_port: Number(form.imap_port),
         smtp_port: Number(form.smtp_port),
+        // Port 465 is always implicit SSL — never persist STARTTLS for it.
+        smtp_secure:
+          Number(form.smtp_port) === 465 ? false : Boolean(form.smtp_secure),
         mail_username: form.mail_username || form.email_address,
         mail_password: normalizeMailPasswordForClient(form.mail_password, {
           host: form.imap_host || form.smtp_host,
@@ -766,7 +768,11 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                       <p className="mt-1 text-label-sm text-on-surface-variant/80">
                         IMAP {a.imap_host}:{a.imap_port}
                         {a.imap_secure ? ' · SSL' : ''} · SMTP {a.smtp_host}:{a.smtp_port}
-                        {a.smtp_secure ? ' · STARTTLS' : Number(a.smtp_port) === 465 ? ' · SSL' : ''}
+                        {Number(a.smtp_port) === 465
+                          ? ' · SSL'
+                          : a.smtp_secure
+                            ? ' · STARTTLS'
+                            : ''}
                       </p>
                     </div>
                   </div>

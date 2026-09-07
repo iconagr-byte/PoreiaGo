@@ -11,6 +11,7 @@ import {
 import {
   isMailTimeoutMessage,
   isMailRemoteAuthRejectMessage,
+  isMailRemoteAuthPair,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
   mailRemoteAuthHintEl,
@@ -254,10 +255,7 @@ export default function EmailConnectWizard({
           smtpPort,
         });
         toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
-      } else if (
-        isMailRemoteAuthRejectMessage(imapErr) ||
-        isMailRemoteAuthRejectMessage(smtpErr)
-      ) {
+      } else if (Boolean(r.remote_auth) || isMailRemoteAuthPair(imapErr, smtpErr)) {
         const mailHost = account.imap_host || account.smtp_host;
         const imapPort = Number(account.imap_port) || 993;
         const smtpPort = Number(account.smtp_port) || 465;
