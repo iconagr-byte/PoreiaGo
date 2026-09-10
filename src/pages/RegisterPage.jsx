@@ -85,6 +85,10 @@ export default function RegisterPage() {
       setError('Οι κωδικοί δεν ταιριάζουν');
       return;
     }
+    if (!name || name.length < 2) {
+      setError('Συμπληρώστε το ονοματεπώνυμο του επιβάτη');
+      return;
+    }
     if (password.length < 6) {
       setError('Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες');
       return;
@@ -233,16 +237,24 @@ export default function RegisterPage() {
 
           <div className="space-y-2">
             <label className="block text-sm font-bold" htmlFor="name">
-              Ονοματεπώνυμο
+              Ονοματεπώνυμο <span className="text-red-500">*</span>
             </label>
             <input
               id="name"
               name="name"
               type="text"
+              required
+              minLength={2}
+              autoComplete="name"
               defaultValue={prefillName}
               className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
-              placeholder="Γιώργος Π."
+              placeholder="π.χ. Μαρία Παπαδοπούλου"
             />
+            {claim ? (
+              <p className="text-xs text-on-surface-variant">
+                Το όνομα του επιβάτη για το εισιτήριο στο My Wallet.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
