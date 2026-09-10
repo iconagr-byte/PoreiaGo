@@ -7,6 +7,7 @@ import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
 import WalletDeviceSave from './WalletDeviceSave.jsx';
 import { isPaid, statusStyle } from '../../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
+import { getBookingPassengers } from '../../lib/ticketing/bookingPassengers.js';
 
 function formatTripWhen(booking) {
   const date = booking?.date || '—';
@@ -55,6 +56,16 @@ export default function WalletBoardingPass({
   const pnr = booking.pnr || booking.id;
   const mark = bookingFiscalMark(booking);
   const seats = booking.seat || booking.seats || '—';
+  const party = getBookingPassengers(booking);
+  const companions = party.filter((p) => p.role === 'companion' && p.name);
+  const bookerDisplay =
+    passengerName ||
+    party.find((p) => p.role === 'booker')?.name ||
+    booking.customerName ||
+    booking.passengerName ||
+    booking.passenger_name ||
+    booking.name ||
+    '—';
 
   return (
     <section className="wallet-pass" aria-label="Εισιτήριο επιβίβασης">
@@ -74,17 +85,24 @@ export default function WalletBoardingPass({
         <div className="wallet-pass-card-top">
           <div className="min-w-0">
             <p className="wallet-pass-kicker">Επιβάτης</p>
-            <p className="wallet-pass-passenger truncate">
-              {passengerName ||
-                booking.customerName ||
-                booking.passengerName ||
-                booking.passenger_name ||
-                booking.name ||
-                '—'}
-            </p>
+            <p className="wallet-pass-passenger truncate">{bookerDisplay}</p>
           </div>
           <span className={`wallet-pass-status ${st.className}`}>{booking.status || (paid ? 'Πληρωμένο' : '—')}</span>
         </div>
+
+        {companions.length > 0 ? (
+          <ul className="wallet-pass-party" aria-label="Μέλη κράτησης">
+            {party.map((p) => (
+              <li key={`${p.seat}-${p.name}`}>
+                <span className="wallet-pass-party-seat">{p.seat || '—'}</span>
+                <span className="wallet-pass-party-name truncate">
+                  {p.name || '—'}
+                  {p.role === 'booker' ? ' · αγοραστής' : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         <div className="wallet-pass-meta">
           <div>

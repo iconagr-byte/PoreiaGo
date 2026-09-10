@@ -307,6 +307,9 @@ function buildLocalBooking({
     saasBookingId: saasMeta?.saasBookingId || null,
     customerId: customer.id,
     customerName: passenger.name.trim(),
+    ...(Array.isArray(passenger.passengers) && passenger.passengers.length
+      ? { passengers: passenger.passengers }
+      : {}),
     tripTitle: trip.title,
     tripId: trip.id,
     date: dep.toISOString().slice(0, 10),
@@ -428,6 +431,7 @@ export async function createBookingFromCheckout({
         paymentMethod: paymentMethod || paymentMethodMeta,
         phone: passenger.phone.trim(),
         seats: seatList,
+        passengers: Array.isArray(passenger.passengers) ? passenger.passengers : undefined,
         paymentPlan,
         totalEur: total,
         balanceDue: remaining,

@@ -10,6 +10,11 @@ import {
 } from '../lib/wallet/walletClaim.js';
 import { createBookingFromCheckout } from '../lib/ticketing/bookingStore.js';
 import {
+  buildBookingPassengers,
+  seatListFromBooking,
+  validateCompanionNames,
+} from '../lib/ticketing/bookingPassengers.js';
+import {
   clearPendingCheckout,
   loadPendingCheckout,
 } from '../lib/ticketing/pendingCheckout.js';
@@ -56,6 +61,7 @@ export default function CheckoutPage() {
     expiry: '',
     cvv: '',
   });
+  const [companionNames, setCompanionNames] = useState([]);
   const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
 
   const trip = useMemo(() => {
@@ -68,6 +74,16 @@ export default function CheckoutPage() {
   }, [tripId, isDemo]);
 
   const pending = useMemo(() => loadPendingCheckout(), [tripId]);
+  const seatCodes = useMemo(() => seatListFromBooking(pending?.seats || ''), [pending?.seats]);
+  const companionSeats = useMemo(() => seatCodes.slice(1), [seatCodes]);
+
+  useEffect(() => {
+    setCompanionNames((prev) => {
+      const next = companionSeats.map((_, i) => prev[i] || '');
+      if (next.length === prev.length && next.every((v, i) => v === prev[i])) return prev;
+      return next;
+    });
+  }, [companionSeats]);
   const checkoutTotal = Number(pending?.total) || 0;
   const depositPercent = checkoutSettings.checkout_deposit_percent;
   const depositEnabled = checkoutSettings.checkout_deposit_enabled;
@@ -234,6 +250,11 @@ export default function CheckoutPage() {
       toast.error('Συμπληρώστε το ονοματεπώνυμο');
       return false;
     }
+    const companionsError = validateCompanionNames(seatCodes, companionNames);
+    if (companionsError) {
+      toast.error(companionsError);
+      return false;
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       toast.error('Μη έγκυρο email');
       return false;
@@ -296,6 +317,11 @@ export default function CheckoutPage() {
     await new Promise((r) => setTimeout(r, 1200));
 
     try {
+      const passengers = buildBookingPassengers({
+        seats: seatCodes,
+        bookerName: form.name,
+        companionNames,
+      });
       const booking = await createBookingFromCheckout({
         trip,
         seats: pending.seats,
@@ -308,6 +334,7 @@ export default function CheckoutPage() {
           name: form.name,
           email: form.email,
           phone: form.phone,
+          passengers,
         },
         paymentMethod,
         bankAccountId: selectedBankAccount?.id || null,
@@ -410,7 +437,10 @@ export default function CheckoutPage() {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="block sm:col-span-2 text-sm">
-                  <span className="font-bold text-on-surface-variant text-xs uppercase">Ονοματεπώνυμο</span>
+                  <span className="font-bold text-on-surface-variant text-xs uppercase">
+                    Ονοματεπώνυμο αγοραστή
+                    {seatCodes[0] ? ` · θέση ${seatCodes[0]}` : ''}
+                  </span>
                   <input
                     required
                     value={form.name}
@@ -441,6 +471,43 @@ export default function CheckoutPage() {
                   />
                 </label>
               </div>
+
+              {companionSeats.length > 0 ? (
+                <div className="mt-5 pt-5 border-t border-black/[0.06]">
+                  <h3 className="font-bold text-on-surface mb-1 flex items-center gap-2 text-sm">
+                    <span className="material-symbols-outlined text-primary text-[20px]">group</span>
+                    Μέλη κράτησης
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mb-3">
+                    Καταχωρήστε το ονοματεπώνυμο για κάθε επιπλέον θέση.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {companionSeats.map((seat, index) => (
+                      <label key={seat} className="block text-sm">
+                        <span className="font-bold text-on-surface-variant text-xs uppercase">
+                          Επιβάτης · θέση {seat}
+                        </span>
+                        <input
+                          required
+                          minLength={2}
+                          value={companionNames[index] || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setCompanionNames((prev) => {
+                              const next = [...prev];
+                              next[index] = value;
+                              return next;
+                            });
+                          }}
+                          className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none"
+                          placeholder="Ονοματεπώνυμο συνεπιβάτη"
+                          autoComplete="off"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             {depositEnabled && (

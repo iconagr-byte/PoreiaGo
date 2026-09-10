@@ -20,6 +20,8 @@ function pickBookingFields(booking) {
     paymentStatus: booking.paymentStatus,
     price: booking.price,
     passengerName: booking.passengerName,
+    customerName: booking.customerName,
+    passengers: booking.passengers,
     name: booking.name,
     email: booking.email,
     fiscal_mark: booking.fiscal_mark,

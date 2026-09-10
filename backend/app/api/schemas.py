@@ -76,6 +76,8 @@ class GuestBookingCreate(BaseModel):
     payment_method: str | None = None
     phone: str | None = None
     seats: list[str] | None = None
+    # Optional party members: [{seat, name, role}] — one entry per seat.
+    passengers: list[dict] | None = None
     payment_plan: str | None = None
     total_eur: Decimal | None = None
     balance_due: Decimal | None = None

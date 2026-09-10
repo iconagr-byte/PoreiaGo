@@ -38,6 +38,21 @@ class GuestBookingCreateTests(unittest.TestCase):
     def test_local_id_from_bk(self):
         self.assertEqual(local_id_from_reference("BK-0995"), "B-0995")
 
+    def test_accepts_party_passengers(self):
+        body = GuestBookingCreate(
+            tenant_id=uuid4(),
+            passenger_name="Μαρία Παπαδοπούλου",
+            amount_eur=Decimal("64.60"),
+            total_eur=Decimal("64.60"),
+            seats=["5A", "5B"],
+            passengers=[
+                {"seat": "5A", "name": "Μαρία Παπαδοπούλου", "role": "booker"},
+                {"seat": "5B", "name": "Γιάννης Παπαδόπουλος", "role": "companion"},
+            ],
+        )
+        self.assertEqual(len(body.passengers), 2)
+        self.assertEqual(body.passengers[1]["role"], "companion")
+
 
 if __name__ == "__main__":
     unittest.main()
