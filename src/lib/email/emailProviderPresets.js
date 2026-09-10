@@ -107,8 +107,8 @@ export function detectProvider(email) {
 }
 
 /**
- * Match backend normalize_mail_password — strip spaces only for app-password providers
- * (or 16-char spaced tokens). Keep normal cPanel passwords intact (trim only).
+ * Match backend normalize_mail_password — strip spaces only for app-password
+ * providers. Never strip spaces for cPanel / custom hosts.
  */
 export function normalizeMailPasswordForClient(password, { host = '', email = '' } = {}) {
   const raw = String(password || '');
@@ -128,7 +128,7 @@ export function normalizeMailPasswordForClient(password, { host = '', email = ''
     'live.com',
     'office365.com',
   ].some((x) => blob.includes(x));
-  if (appPwdProvider || (raw.replace(/ /g, '').length === 16 && raw.includes(' '))) {
+  if (appPwdProvider) {
     return raw.replace(/\s+/g, '');
   }
   return raw.trim();

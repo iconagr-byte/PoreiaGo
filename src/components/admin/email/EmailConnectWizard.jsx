@@ -10,11 +10,8 @@ import {
 } from '../../../lib/email/emailProviderPresets.js';
 import {
   isMailTimeoutMessage,
-  isMailRemoteAuthRejectMessage,
-  isMailRemoteAuthPair,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
-  mailRemoteAuthHintEl,
 } from '../../../lib/email/mailReachability.js';
 import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
 import EmailConnectionResult from './EmailConnectionResult.jsx';
@@ -255,27 +252,21 @@ export default function EmailConnectWizard({
           smtpPort,
         });
         toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
-      } else if (Boolean(r.remote_auth) || isMailRemoteAuthPair(imapErr, smtpErr)) {
-        const mailHost = account.imap_host || account.smtp_host;
-        const imapPort = Number(account.imap_port) || 993;
-        const smtpPort = Number(account.smtp_port) || 465;
-        setTestMsg({
-          ok: false,
-          remoteAuth: true,
-          text: mailRemoteAuthHintEl({ mailHost, imapPort, smtpPort }),
-          mailHost,
-          imapPort,
-          smtpPort,
-        });
-        toast.error('Χρειάζεται whitelist IP για remote mail', {
-          id: 'email-conn-test',
-          duration: 5000,
-        });
       } else {
         const text = [imapOk ? null : `IMAP: ${imapErr}`, smtpOk ? null : `SMTP: ${smtpErr}`]
           .filter(Boolean)
           .join(' · ');
-        setTestMsg({ ok: false, text: text || 'Αποτυχία σύνδεσης' });
+        const dbg = r.auth_debug;
+        const debugLine = dbg
+          ? `\n\nΈλεγχος με username «${dbg.username}», μήκος κωδικού ${dbg.password_len}.`
+          : '';
+        setTestMsg({
+          ok: false,
+          text:
+            (text || 'Αποτυχία σύνδεσης') +
+            '\n\nΕφόσον το TCP ανοίγει, ο mail server απέρριψε username/κωδικό — ξαναβάλτε τον κωδικό webmail.' +
+            debugLine,
+        });
         toast.error(text || 'Αποτυχία σύνδεσης', { id: 'email-conn-test' });
       }
     } catch (err) {
