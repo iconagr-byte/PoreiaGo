@@ -461,10 +461,15 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       <div className="wallet-auth-shell">
         <div className="wallet-auth-scroll">
           {!isPhone ? (
-            <aside className="wallet-auth-aside" aria-label="Σχετικά με το My Wallet λεωφορείων">
+            <aside
+              className="wallet-auth-aside wallet-auth-aside--left"
+              aria-label="Σχετικά με το My Wallet λεωφορείων"
+            >
               <p className="wallet-auth-aside-kicker">My Wallet · Λεωφορεία</p>
               <h2 className="wallet-auth-aside-title">
-                Τα εισιτήριά σας,<br />πάντα στο κινητό
+                Τα εισιτήριά σας,
+                <br />
+                πάντα στο κινητό
               </h2>
               <p className="wallet-auth-aside-lead">
                 Κρατήσεις λεωφορείου, QR επιβίβασης και ιστορικό ταξιδιών σε ένα μέρος.
@@ -516,6 +521,39 @@ export default function LoginPage({ rentEntrance = false } = {}) {
               Επιστροφή στην Αρχική
             </Link>
           </div>
+          {!isPhone ? (
+            <aside className="wallet-auth-aside wallet-auth-aside--right" aria-label="Πώς λειτουργεί">
+              <p className="wallet-auth-aside-kicker">Πώς λειτουργεί</p>
+              <h2 className="wallet-auth-aside-title wallet-auth-aside-title--sm">
+                Από τη σύνδεση
+                <br />
+                στην επιβίβαση
+              </h2>
+              <ol className="wallet-auth-aside-steps">
+                <li>
+                  <span className="wallet-auth-aside-step">1</span>
+                  <div>
+                    <strong>Συνδεθείτε</strong>
+                    <span>Email ή Google — ασφαλή είσοδος.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="wallet-auth-aside-step">2</span>
+                  <div>
+                    <strong>Ανοίξτε το My Wallet</strong>
+                    <span>Εισιτήριο, θέση και QR σε μία οθόνη.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="wallet-auth-aside-step">3</span>
+                  <div>
+                    <strong>Επιβιβαστείτε με QR</strong>
+                    <span>Δείξτε το στον οδηγό — χωρίς χαρτί.</span>
+                  </div>
+                </li>
+              </ol>
+            </aside>
+          ) : null}
         </div>
       </div>
     </div>
