@@ -15,11 +15,8 @@ import {
 } from '../../../lib/email/emailSettingsImport.js';
 import {
   isMailTimeoutMessage,
-  isMailRemoteAuthRejectMessage,
-  isMailRemoteAuthPair,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
-  mailRemoteAuthHintEl,
 } from '../../../lib/email/mailReachability.js';
 import {
   buildEmailChecksFromResult,
@@ -83,10 +80,10 @@ function syncErrorHint(error) {
     return 'Gmail: δημιουργήστε App Password (Google Account → Ασφάλεια → Κωδικοί εφαρμογών) και χρησιμοποιήστε αυτόν, όχι τον κανονικό κωδικό.';
   }
   if (/AUTHENTICATIONFAILED|Authentication failed|λάθος username ή κωδικός/i.test(msg)) {
-    return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login).';
+    return 'Λάθος κωδικός ή username. Βεβαιωθείτε ότι ο κωδικός είναι του mailbox (όχι του admin login). Ξαναγράψτε τον κωδικό με «Εμφάνιση» ανοιχτό και πατήστε Αποθήκευση + Έλεγχος.';
   }
   if (/Incorrect authentication data|\b535\b/i.test(msg)) {
-    return 'Αν το webmail ανοίγει με τον ίδιο κωδικό, ζητήστε whitelist του IP της εφαρμογής στον πάροχο hosting (remote IMAP/SMTP).';
+    return 'Ο mail server απέρριψε τα credentials (535). Εφόσον το TCP ανοίγει, δεν είναι firewall — ξαναβάλτε τον κωδικό webmail και Αποθήκευση.';
   }
   if (/timed out|timeout|Errno 110|δεν ήταν δυνατή η σύνδεση|poreiago|intechs|34\.141/i.test(msg)) {
     return 'Δεν ανοίγει σύνδεση στον mail server. Ελέγξτε host/port και ότι το IMAP επιτρέπεται από τον πάροχο email.';
@@ -98,6 +95,28 @@ function syncErrorHint(error) {
     return 'Πρόβλημα πιστοποιητικού SSL στον mail server — επικοινωνήστε με τον πάροχο hosting.';
   }
   return 'Ελέγξτε host / κωδικό και πατήστε Συγχρονισμός IMAP στο Mailbox.';
+}
+
+function formatAuthDebugHint(debug) {
+  if (!debug || typeof debug !== 'object') return '';
+  const user = String(debug.username || '—');
+  const len = Number(debug.password_len) || 0;
+  const space = debug.password_has_space ? 'ναι' : 'όχι';
+  const sha = String(debug.password_sha10 || '—');
+  return (
+    `Έλεγχος με username «${user}», μήκος κωδικού ${len}, κενά μέσα στον κωδικό: ${space} ` +
+    `(sha10 ${sha}). Συγκρίνετε το μήκος με τον κωδικό webmail — αν διαφέρει, ο αποθηκευμένος κωδικός είναι λάθος.`
+  );
+}
+
+function authFailResult(r, fallbackMsg) {
+  const parts = [];
+  if (r?.imap && !r.imap.ok) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
+  if (r?.smtp && !r.smtp.ok) parts.push(`SMTP: ${r.smtp.error || 'αποτυχία'}`);
+  const msg = parts.join(' · ') || fallbackMsg || 'Αποτυχία σύνδεσης';
+  const debugHint = formatAuthDebugHint(r?.auth_debug);
+  const hint = [syncErrorHint(msg), debugHint].filter(Boolean).join('\n\n');
+  return { ok: false, message: msg, hint, authDebug: r?.auth_debug || null };
 }
 
 export default function EmailSettingsPanel({ onAccountChange, openConnectWizard = false }) {
@@ -327,9 +346,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         const timeout =
           (imapFail && isMailTimeoutMessage(r.imap?.error)) ||
           (smtpFail && isMailTimeoutMessage(r.smtp?.error));
-        const remoteAuth =
-          !timeout &&
-          (Boolean(r.remote_auth) || isMailRemoteAuthPair(r.imap?.error, r.smtp?.error));
         const mailHost = form.imap_host || form.smtp_host;
         const imapPort = Number(form.imap_port) || 993;
         const smtpPort = Number(form.smtp_port) || 465;
@@ -344,32 +360,10 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             smtpPort,
           });
           toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
-        } else if (remoteAuth) {
-          setTestResult({
-            ok: false,
-            message:
-              'Το hosting απέρριψε remote IMAP/SMTP (συχνά ακόμα και με σωστό κωδικό webmail).',
-            hint: mailRemoteAuthHintEl({ mailHost, imapPort, smtpPort }),
-            remoteAuth: true,
-            mailHost,
-            imapPort,
-            smtpPort,
-          });
-          toast.error('Χρειάζεται whitelist IP για remote mail', {
-            id: 'email-conn-test',
-            duration: 5000,
-          });
         } else {
-          const parts = [];
-          if (imapFail) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
-          if (smtpFail) parts.push(`SMTP: ${r.smtp.error || 'αποτυχία'}`);
-          const msg = parts.join(' · ') || 'Αποτυχία σύνδεσης';
-          setTestResult({
-            ok: false,
-            message: msg,
-            hint: syncErrorHint(msg),
-          });
-          toast.error(msg, { id: 'email-conn-test' });
+          const fail = authFailResult(r);
+          setTestResult(fail);
+          toast.error(fail.message, { id: 'email-conn-test' });
         }
       }
     } catch (err) {
@@ -412,9 +406,6 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         toast.success('Σύνδεση OK — δείτε τα βήματα παρακάτω', { id: 'email-conn-test' });
       } else {
         const timeout = built.imapHostFail || built.smtpHostFail;
-        const remoteAuth =
-          !timeout &&
-          (Boolean(r.remote_auth) || isMailRemoteAuthPair(r.imap?.error, r.smtp?.error));
         const mailHost = acc.imap_host || acc.smtp_host;
         const imapPort = Number(acc.imap_port) || 993;
         const smtpPort = Number(acc.smtp_port) || 465;
@@ -429,29 +420,10 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             smtpPort,
           });
           toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
-        } else if (remoteAuth) {
-          setTestResult({
-            ok: false,
-            message:
-              'Το hosting απέρριψε remote IMAP/SMTP (συχνά ακόμα και με σωστό κωδικό webmail).',
-            hint: mailRemoteAuthHintEl({ mailHost, imapPort, smtpPort }),
-            remoteAuth: true,
-            mailHost,
-            imapPort,
-            smtpPort,
-          });
-          toast.error('Χρειάζεται whitelist IP για remote mail', {
-            id: 'email-conn-test',
-            duration: 5000,
-          });
         } else {
-          const msg = r.imap?.error || r.smtp?.error || 'Αποτυχία';
-          setTestResult({
-            ok: false,
-            message: msg,
-            hint: syncErrorHint(msg),
-          });
-          toast.error(msg, { id: 'email-conn-test' });
+          const fail = authFailResult(r, 'Αποτυχία');
+          setTestResult(fail);
+          toast.error(fail.message, { id: 'email-conn-test' });
         }
       }
     } catch (err) {

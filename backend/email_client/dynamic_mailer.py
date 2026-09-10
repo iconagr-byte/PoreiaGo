@@ -24,10 +24,10 @@ SMTP_TIMEOUT_HINT_EL = (
     "(θύρα 587/465). Ελέγξτε host και ότι ο πάροχος επιτρέπει εξωτερική αποστολή."
 )
 
-SMTP_REMOTE_AUTH_HINT_EL = (
-    "SMTP σύνδεση: Incorrect authentication data (535). "
-    "Αν το webmail ανοίγει με τον ίδιο κωδικό, ο πάροχος συχνά μπλοκάρει remote SMTP "
-    "από το IP της εφαρμογής — ζητήστε whitelist εξωτερικών IMAP/SMTP συνδέσεων."
+SMTP_AUTH_FAIL_HINT_EL = (
+    "SMTP σύνδεση: Incorrect authentication data (535) — ο mail server απέρριψε "
+    "username/κωδικό. Εφόσον το TCP ανοίγει, δεν είναι firewall: ξαναβάλτε τον "
+    "κωδικό του mailbox (webmail), όχι τον κωδικό εισόδου στο γραφείο."
 )
 
 MISSING_PASSWORD_HINT_EL = (
@@ -40,15 +40,24 @@ DECRYPT_FAILED_HINT_EL = (
 )
 
 
-def is_smtp_remote_auth_reject(exc: BaseException | str) -> bool:
+def is_smtp_auth_reject(exc: BaseException | str) -> bool:
     msg = str(exc)
     return "Incorrect authentication data" in msg or (
         "535" in msg and "authentication" in msg.lower()
     )
 
 
+# Back-compat alias (older callers).
+is_smtp_remote_auth_reject = is_smtp_auth_reject
+
+
 def normalize_mail_password(password: str | None, *, host: str = "", email: str = "") -> str:
-    """Strip spaces from Google/Yahoo/Outlook app passwords (shown as 'xxxx xxxx xxxx xxxx')."""
+    """Normalize mailbox passwords without corrupting cPanel secrets.
+
+    Only Google/Yahoo/Outlook *App Passwords* are shown as spaced 16-char tokens
+    and may have spaces removed. Never apply that heuristic to custom/cPanel hosts
+    (e.g. mail.achilliotravel.com) — a real password with spaces would break AUTH.
+    """
     raw = str(password or "")
     if not raw:
         return ""
@@ -70,9 +79,28 @@ def normalize_mail_password(password: str | None, *, host: str = "", email: str 
             "office365.com",
         )
     )
-    if app_pwd_provider or (len(raw.replace(" ", "")) == 16 and " " in raw):
+    if app_pwd_provider:
         return "".join(raw.split())
+    # Trim only — keep internal spaces / special chars intact for cPanel.
     return raw.strip()
+
+
+def auth_debug_meta(account: dict) -> dict[str, Any]:
+    """Safe diagnostics for AUTH failures (never returns the password)."""
+    import hashlib
+
+    cfg = settings_to_imap_config(account)
+    pwd = cfg.get("password") or ""
+    digest = hashlib.sha256(pwd.encode("utf-8")).hexdigest()[:10] if pwd else ""
+    return {
+        "username": cfg.get("user") or "",
+        "password_len": len(pwd),
+        "password_has_space": (" " in pwd),
+        "password_sha10": digest,
+        "imap_host": cfg.get("host") or "",
+        "smtp_host": (account.get("smtp_host") or "").strip(),
+        "smtp_port": int(account.get("smtp_port") or 587),
+    }
 
 
 def _format_smtp_error(exc: BaseException) -> str:
@@ -82,8 +110,8 @@ def _format_smtp_error(exc: BaseException) -> str:
         return SMTP_TIMEOUT_HINT_EL
     if is_gmail_app_password_error(exc):
         return GMAIL_APP_PASSWORD_HINT_EL
-    if is_smtp_remote_auth_reject(exc):
-        return SMTP_REMOTE_AUTH_HINT_EL
+    if is_smtp_auth_reject(exc):
+        return SMTP_AUTH_FAIL_HINT_EL
     raw = str(exc).strip()
     if raw.startswith("b'") and raw.endswith("'"):
         raw = raw[2:-1]
@@ -179,15 +207,20 @@ def test_smtp_connection(account: dict) -> dict:
 def test_account_connection(account: dict) -> dict:
     imap = test_imap_connection(account)
     smtp = test_smtp_connection(account)
-    remote_auth = is_smtp_remote_auth_reject(smtp.get("error") or "") or (
-        "Incorrect authentication data" in str(smtp.get("error") or "")
+    debug = auth_debug_meta(account)
+    auth_rejected = (not imap.get("ok") and not smtp.get("ok")) and (
+        is_smtp_auth_reject(smtp.get("error") or "")
+        or "λάθος username ή κωδικός" in str(imap.get("error") or "")
+        or "AUTHENTICATIONFAILED" in str(imap.get("error") or "")
     )
     return {
         "ok": imap.get("ok") and smtp.get("ok"),
         "imap": imap,
         "smtp": smtp,
-        # Frontend uses this even when IMAP surfaces a generic AUTH hint.
-        "remote_auth": bool(remote_auth and not imap.get("ok")),
+        "auth_debug": debug,
+        # Legacy flag name — UI now treats this as credential reject (not firewall).
+        "remote_auth": False,
+        "credentials_rejected": bool(auth_rejected),
     }
 
 

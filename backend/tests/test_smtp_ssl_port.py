@@ -67,11 +67,26 @@ class SmtpConfigTests(unittest.TestCase):
             "my pass",
         )
 
-    def test_smtp_535_maps_to_remote_auth_hint(self):
-        from email_client.dynamic_mailer import SMTP_REMOTE_AUTH_HINT_EL, _format_smtp_error
+    def test_cpanel_sixteen_char_spaced_password_not_stripped(self):
+        """Do not treat cPanel passwords as Google app passwords."""
+        from email_client.dynamic_mailer import normalize_mail_password
+
+        raw = "abcd efgh ijkl mnop"  # 16 letters + spaces
+        self.assertEqual(
+            normalize_mail_password(
+                raw,
+                host="mail.achilliotravel.com",
+                email="info@achilliotravel.com",
+            ),
+            raw,
+        )
+
+    def test_smtp_535_maps_to_auth_fail_hint(self):
+        from email_client.dynamic_mailer import SMTP_AUTH_FAIL_HINT_EL, _format_smtp_error
 
         exc = Exception("(535, b'Incorrect authentication data')")
-        self.assertEqual(_format_smtp_error(exc), SMTP_REMOTE_AUTH_HINT_EL)
+        self.assertEqual(_format_smtp_error(exc), SMTP_AUTH_FAIL_HINT_EL)
+        self.assertIn("όχι firewall", _format_smtp_error(exc))
 
     def test_missing_password_rejected(self):
         from email_client.dynamic_mailer import MISSING_PASSWORD_HINT_EL, test_imap_connection
@@ -88,6 +103,24 @@ class SmtpConfigTests(unittest.TestCase):
         )
         self.assertFalse(r["ok"])
         self.assertEqual(r["error"], MISSING_PASSWORD_HINT_EL)
+
+    def test_auth_debug_never_leaks_password(self):
+        from email_client.dynamic_mailer import auth_debug_meta, test_account_connection
+
+        account = {
+            "imap_host": "mail.achilliotravel.com",
+            "imap_port": 993,
+            "smtp_host": "mail.achilliotravel.com",
+            "smtp_port": 465,
+            "email_address": "info@achilliotravel.com",
+            "mail_username": "info@achilliotravel.com",
+            "mail_password": "SecretPass99",
+            "imap_secure": True,
+        }
+        meta = auth_debug_meta(account)
+        self.assertEqual(meta["username"], "info@achilliotravel.com")
+        self.assertEqual(meta["password_len"], len("SecretPass99"))
+        self.assertNotIn("SecretPass99", str(meta))
 
 
 if __name__ == "__main__":
