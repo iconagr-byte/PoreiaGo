@@ -335,10 +335,7 @@ export async function saasCreateGuestBooking(payload) {
   if (!tenantId) {
     throw new Error('Δεν έχει οριστεί tenant (VITE_SAAS_TENANT_ID)');
   }
-  const res = await fetch(`${API_BASE}/api/v1/bookings/guest`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const body = {
       tenant_id: tenantId,
       passenger_name: payload.passengerName,
       passenger_email: payload.passengerEmail,
@@ -356,7 +353,14 @@ export async function saasCreateGuestBooking(payload) {
       source: payload.source ?? null,
       agent_name: payload.agentName ?? null,
       departure_at: payload.departureAt ?? null,
-    }),
+    };
+  if (Array.isArray(payload.passengers) && payload.passengers.length) {
+    body.passengers = payload.passengers;
+  }
+  const res = await fetch(`${API_BASE}/api/v1/bookings/guest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
   if (!res.ok) await parseError(res);
   return res.json();

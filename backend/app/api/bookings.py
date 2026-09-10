@@ -215,6 +215,8 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         "boarding_pass_issued": True,
         "ticket_ref": ref,
     }
+    if body.passengers:
+        metadata["passengers"] = body.passengers
     booking_status = BookingStatus.PAID
     payment_status = PaymentStatus.PAID
     if balance > 0:

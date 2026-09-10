@@ -13,6 +13,7 @@ import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
 import { fiscalReceiptPrintPath } from '../../lib/fiscal/fiscalReceiptPrint.js';
 import { sendTicketEmail } from '../../services/ticketingApi.js';
 import { ticketPrintPath } from '../../lib/ticketing/printTicket.js';
+import { getBookingPassengers } from '../../lib/ticketing/bookingPassengers.js';
 
 function tripImageFor(booking, coverImage) {
   return coverImage || '/images/hero-bus-achillio.png';
@@ -37,7 +38,14 @@ export default function WalletTicketDetail({
   const mark = bookingFiscalMark(booking);
   const price = Number(booking.price || 0);
   const seats = booking.seat || booking.seats || '—';
-  const name = passengerName || booking.passengerName || booking.customerName || booking.name || '—';
+  const party = getBookingPassengers(booking);
+  const name =
+    passengerName ||
+    party.find((p) => p.role === 'booker')?.name ||
+    booking.passengerName ||
+    booking.customerName ||
+    booking.name ||
+    '—';
   const cover = tripImageFor(booking, coverImage);
 
   useCustomerFiscalPoll(booking, {
@@ -113,6 +121,20 @@ export default function WalletTicketDetail({
               <p className="wallet-pass-meta-value">€{price.toFixed(2)}</p>
             </div>
           </div>
+
+          {party.length > 1 ? (
+            <div className="wallet-ticket-party">
+              <p className="wallet-pass-kicker">Μέλη κράτησης</p>
+              <ul>
+                {party.map((p) => (
+                  <li key={`${p.seat}-${p.name}`}>
+                    <strong>{p.seat || '—'}</strong>
+                    <span>{p.name || '—'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <div className="wallet-pass-perforation" aria-hidden>
             <span />
