@@ -75,7 +75,12 @@ export default function WalletBoardingPass({
           <div className="min-w-0">
             <p className="wallet-pass-kicker">Επιβάτης</p>
             <p className="wallet-pass-passenger truncate">
-              {passengerName || booking.passengerName || booking.name || '—'}
+              {passengerName ||
+                booking.customerName ||
+                booking.passengerName ||
+                booking.passenger_name ||
+                booking.name ||
+                '—'}
             </p>
           </div>
           <span className={`wallet-pass-status ${st.className}`}>{booking.status || (paid ? 'Πληρωμένο' : '—')}</span>
