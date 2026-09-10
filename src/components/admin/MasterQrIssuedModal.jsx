@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { QRCode } from 'react-qr-code';
 import { getMasterQrPngUrl } from '../../services/platformApi.js';
 
@@ -9,11 +10,13 @@ export default function MasterQrIssuedModal({ open, issued, driverId, tripTitle,
     ? new Date(issued.expires_at * 1000).toLocaleString('el-GR')
     : null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+  // Portal + z-[1200]: Leaflet panes/controls sit at 400–1000 and otherwise cover this modal.
+  return createPortal(
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/50">
       <div
         className="w-full max-w-lg rounded-[28px] bg-white shadow-2xl border border-black/[0.08] overflow-hidden"
         role="dialog"
+        aria-modal="true"
         aria-labelledby="master-qr-modal-title"
       >
         <div className="h-1 bg-gradient-to-r from-primary via-primary/70 to-indigo-400" />
@@ -82,6 +85,7 @@ export default function MasterQrIssuedModal({ open, issued, driverId, tripTitle,
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
