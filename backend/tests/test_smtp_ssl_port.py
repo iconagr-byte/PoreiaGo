@@ -86,7 +86,8 @@ class SmtpConfigTests(unittest.TestCase):
 
         exc = Exception("(535, b'Incorrect authentication data')")
         self.assertEqual(_format_smtp_error(exc), SMTP_AUTH_FAIL_HINT_EL)
-        self.assertIn("όχι firewall", _format_smtp_error(exc))
+        self.assertIn("δεν είναι firewall", _format_smtp_error(exc))
+        self.assertIn("webmail", _format_smtp_error(exc))
 
     def test_missing_password_rejected(self):
         from email_client.dynamic_mailer import MISSING_PASSWORD_HINT_EL, test_imap_connection
