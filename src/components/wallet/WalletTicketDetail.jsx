@@ -8,7 +8,14 @@ import TicketQrCode from '../TicketQrCode.jsx';
 import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
 import WalletDeviceSave from './WalletDeviceSave.jsx';
 import { useCustomerFiscalPoll } from '../../lib/fiscal/useCustomerFiscalPoll.js';
-import { isPaid, statusStyle, parsePaymentMethod, hasDepositBalance } from '../../lib/bookingDisplay.js';
+import {
+  isPaid,
+  statusStyle,
+  parsePaymentMethod,
+  hasDepositBalance,
+  isPendingBankTransfer,
+} from '../../lib/bookingDisplay.js';
+import { bookingBalanceDue } from '../../lib/payments/paymentSecurity.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
 import { fiscalReceiptPrintPath } from '../../lib/fiscal/fiscalReceiptPrint.js';
 import { sendTicketEmail } from '../../services/ticketingApi.js';
@@ -187,7 +194,7 @@ export default function WalletTicketDetail({
               <span className="material-symbols-outlined text-[18px] text-slate-500">
                 {pay.icon}
               </span>
-              {booking.paymentMethod || pay.label}
+              {pay.label}
             </dd>
           </div>
           {hasDepositBalance(booking) ? (
@@ -201,6 +208,15 @@ export default function WalletTicketDetail({
                 <dd className="text-amber-700">€{Number(booking.balanceDue || 0).toFixed(2)}</dd>
               </div>
             </>
+          ) : bookingBalanceDue(booking) > 0 ? (
+            <div>
+              <dt>
+                {isPendingBankTransfer(booking)
+                  ? 'Εκκρεμεί κατάθεση'
+                  : 'Πληρωτέο ποσό'}
+              </dt>
+              <dd className="text-amber-700">€{bookingBalanceDue(booking).toFixed(2)}</dd>
+            </div>
           ) : null}
         </dl>
         {mark ? (
