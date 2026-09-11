@@ -59,6 +59,20 @@ class EnsureBookingsSchemaTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(is_bookings_schema_drift_error(exc))
 
+    def test_detects_updated_at_drift(self):
+        exc = Exception(
+            "UndefinedColumnError: column bookings.updated_at does not exist "
+            'HINT: Perhaps you meant to reference the column "bookings.created_at".'
+        )
+        self.assertTrue(is_bookings_schema_drift_error(exc))
+
+    def test_heal_sql_includes_updated_at(self):
+        from app.services.ensure_bookings_schema import _HEAL_STATEMENTS
+
+        blob = "\n".join(_HEAL_STATEMENTS)
+        self.assertIn("updated_at", blob)
+        self.assertIn("created_at", blob)
+
     def test_ignores_unrelated_errors(self):
         self.assertFalse(is_bookings_schema_drift_error(RuntimeError("timeout")))
 
