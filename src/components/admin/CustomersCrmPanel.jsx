@@ -614,7 +614,7 @@ export default function CustomersCrmPanel({
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div className="space-y-1.5">
           <h2 className="text-[28px] sm:text-[34px] font-semibold tracking-tight text-zinc-900 leading-none">
-            {isRent ? 'Πελάτες ενοικιάσεων' : 'Πελάτες λεωφορείων'}
+            {isRent ? 'Πελάτες ενοικιάσεων' : 'Πελάτες'}
           </h2>
           <p className="text-[15px] text-zinc-500 tracking-tight max-w-lg leading-relaxed">
             {isRent
