@@ -811,10 +811,11 @@ export default function PaymentManagementPanel() {
 
   const onConfirmCash = async (payload) => {
     if (!cashBooking) return;
-    setCashConfirmingId(cashBooking.id);
+    const bookingId = cashBooking.id;
+    setCashConfirmingId(bookingId);
     try {
-      await recordCashPayment(cashBooking.id, payload);
-      toast.success('Η είσπραξη μετρητών καταχωρήθηκε');
+      const updated = await recordCashPayment(bookingId, payload);
+      toast.success('Η είσπραξη καταχωρήθηκε — ανοίγει το QR εισιτήριο');
       setCashBooking(null);
       await loadPending();
       try {
@@ -822,8 +823,13 @@ export default function PaymentManagementPanel() {
       } catch {
         /* ignore */
       }
+      window.location.assign(
+        `/ticket/print/${encodeURIComponent(updated?.id || bookingId)}?print=1`,
+      );
+      return updated;
     } catch (err) {
       toast.error(err.message || 'Αποτυχία καταχώρησης');
+      throw err;
     } finally {
       setCashConfirmingId(null);
     }
