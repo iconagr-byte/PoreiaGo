@@ -197,9 +197,6 @@ export default function WalletBoardingPass({
           <p className="wallet-pass-brand">{brandLabel}</p>
           <h1 className="wallet-pass-title">{booking.tripTitle || 'Εκδρομή'}</h1>
           <p className="wallet-pass-when">{formatTripWhen(booking)}</p>
-          {party.length > 1 ? (
-            <p className="wallet-pass-party-count">{party.length} ξεχωριστά εισιτήρια · 1 QR ανά επιβάτη</p>
-          ) : null}
         </div>
       </div>
 
