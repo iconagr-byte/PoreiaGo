@@ -11,7 +11,6 @@ import {
   uploadDriverPhoto,
 } from '../../services/platformApi.js';
 import ImageDropField from '../../components/admin/ImageDropField.jsx';
-import DriverLoginQrPanel from '../../components/admin/DriverLoginQrPanel.jsx';
 import PasswordField from '../../components/PasswordField.jsx';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
@@ -444,13 +443,22 @@ export default function DriverDetailPage() {
               </a>
             </div>
           </form>
-          <div className="px-6 pb-6">
-            <DriverLoginQrPanel
-              driverId={driver.id}
-              driverName={driver.name}
-              driverPhone={driver.phone || ''}
-              assignedTrips={assignedTrips}
-            />
+          <div className="mx-6 mb-6 rounded-2xl border border-amber-200/80 bg-amber-50/70 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-amber-950">Σύνδεση χωρίς κωδικό (Master QR)</p>
+              <p className="text-xs text-amber-900/75 mt-0.5 leading-relaxed">
+                Έκδοση QR / Viber και εγκατάσταση PWA γίνονται από το ειδικό μενού{' '}
+                <span className="font-semibold">Master QR &amp; PWA</span> — όχι από την καρτέλα οδηγού.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/admin', { state: { activeTab: 'bus_setup' } })}
+              className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">qr_code_2</span>
+              Master QR &amp; PWA
+            </button>
           </div>
         </section>
 
