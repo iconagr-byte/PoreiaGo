@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import apply_tenant_rls
@@ -230,6 +230,15 @@ class BookingPaymentService:
                 meta["bank_confirm_note"] = note
         booking.metadata_json = meta
 
+        # Never touch booking.fiscal_invoices here — async SQLAlchemy would
+        # raise MissingGreenlet / lazy-load IO and surface as HTTP 500.
+        count_result = await self._session.execute(
+            select(func.count())
+            .select_from(FiscalInvoice)
+            .where(FiscalInvoice.booking_id == booking.id),
+        )
+        capture_sequence = int(count_result.scalar_one() or 0) + 1
+
         fiscal_invoice = FiscalInvoice(
             tenant_id=tenant_id,
             booking_id=booking.id,
@@ -241,7 +250,7 @@ class BookingPaymentService:
             idempotency_key=idempotency_key,
             metadata_json={
                 "channel": channel,
-                "capture_sequence": len(booking.fiscal_invoices) + 1,
+                "capture_sequence": capture_sequence,
                 "actor_id": actor_id,
                 "note": note,
                 "receipt_number": receipt_number,

@@ -460,7 +460,27 @@ async def record_cash_payment_admin(
         await apply_tenant_rls(db, tenant_id)
         pg_booking = await _find_booking(db, tenant_id, booking_key)
         if not pg_booking:
-            raise HTTPException(status_code=404, detail="Booking not found in Postgres")
+            # Office / walk-in bookings may exist only in the ticket cache.
+            # Upsert into Postgres so cash capture + fiscal receipt can proceed.
+            from api.admin_booking_mapper import ensure_booking_from_admin_dict
+            import logging
+
+            log = logging.getLogger(__name__)
+            try:
+                pg_booking = ensure_booking_from_admin_dict(tenant_id, booking)
+                db.add(pg_booking)
+                await db.flush()
+                log.info(
+                    "Upserted cache booking into Postgres for cash capture key=%s ref=%s",
+                    booking_key,
+                    pg_booking.reference_code,
+                )
+            except Exception as exc:
+                await db.rollback()
+                raise HTTPException(
+                    status_code=404,
+                    detail="Η κράτηση δεν βρέθηκε στη βάση (Postgres). Ξαναάνοιξε την κράτηση από Κρατήσεις και δοκίμασε ξανά.",
+                ) from exc
 
         try:
             result = await BookingPaymentService(db).record_cash_payment(
@@ -473,6 +493,12 @@ async def record_cash_payment_admin(
                 note=body.note,
                 receipt_number=body.receipt_number,
             )
+            if result.status not in ("captured", "duplicate"):
+                await db.rollback()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Η καταχώρηση μετρητών δεν ολοκληρώθηκε ({result.status})",
+                )
             await db.commit()
             await db.refresh(pg_booking)
             result_status = result.status
@@ -495,9 +521,19 @@ async def record_cash_payment_admin(
                 "total_price": float(pg_booking.total_price),
                 "admin": booking_to_admin_dict(pg_booking, fiscal_invoices=fiscal_invoices),
             }
+        except HTTPException:
+            raise
         except Exception as exc:
             await db.rollback()
-            raise HTTPException(status_code=500, detail="Cash payment failed") from exc
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Cash payment failed booking_key=%s", booking_key
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Αποτυχία καταχώρησης μετρητών: {exc.__class__.__name__}",
+            ) from exc
 
     if fiscal_invoice_id and result_status == "captured":
         dispatch_fiscal_receipt(str(fiscal_invoice_id))
