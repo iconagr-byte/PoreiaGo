@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 CSS = Path(__file__).resolve().parents[2] / "src" / "styles" / "ticket-print.css"
 
@@ -19,7 +19,7 @@ class TicketPrintCssTests(unittest.TestCase):
 
     def test_screen_shell_not_clipped(self):
         text = CSS.read_text(encoding="utf-8")
-        # Screen override lives before the real @media print { block
+        # Real print block starts with `{` — ignore the phrase in the file header comment.
         screen = text.split("@media print {")[0]
         self.assertIn(".wallet-app.ticket-print-shell", screen)
         self.assertIn("overflow: visible", screen)
