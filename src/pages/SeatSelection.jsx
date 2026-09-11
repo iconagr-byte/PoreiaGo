@@ -351,9 +351,9 @@ export default function SeatSelection() {
                   occupancyLoading
                 }
                 onClick={continueToExtras}
-                className={`w-full py-3.5 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all ${getSeatMapCheckoutButtonClass(selectedSeats.length > 0, seatTheme)}`}
+                className={`w-full py-3.5 px-5 rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all ${getSeatMapCheckoutButtonClass(selectedSeats.length > 0, seatTheme)}`}
               >
-                {isDemo ? 'Συνέχεια (Demo)' : 'Πρόσθεσε υπηρεσίες'}
+                {isDemo ? 'Συνέχεια (Demo)' : 'Συνέχεια'}
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
             </div>
