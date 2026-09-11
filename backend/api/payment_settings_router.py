@@ -462,6 +462,10 @@ async def record_cash_payment_admin(
 
     async with AsyncSessionLocal() as db:
         try:
+            from app.services.ensure_bookings_schema import ensure_bookings_schema
+
+            # Heal Contabo drift before SELECT (missing customer_user_id etc.).
+            await ensure_bookings_schema(db)
             await apply_tenant_rls(db, tenant_id)
             pg_booking = await _find_booking(db, tenant_id, booking_key)
         except HTTPException:

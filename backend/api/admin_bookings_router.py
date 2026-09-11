@@ -56,6 +56,10 @@ async def _resolve_tenant_id(tenant_id: UUID | None) -> UUID:
 async def _find_booking(session, tenant_id: UUID, booking_key: str):
     from app.models.booking import Booking
     from api.admin_booking_mapper import booking_id_aliases, normalize_reference
+    from app.services.ensure_bookings_schema import (
+        ensure_bookings_schema,
+        is_bookings_schema_drift_error,
+    )
 
     key = booking_key.strip()
     filters = []
@@ -82,8 +86,25 @@ async def _find_booking(session, tenant_id: UUID, booking_key: str):
     if not unique_filters:
         return None
     stmt = select(Booking).where(Booking.tenant_id == tenant_id, or_(*unique_filters)).limit(1)
-    result = await session.execute(stmt)
-    return result.scalar_one_or_none()
+    try:
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+    except Exception as exc:
+        if not is_bookings_schema_drift_error(exc):
+            raise
+        await session.rollback()
+        healed = await ensure_bookings_schema(session, force=True)
+        if not healed:
+            raise
+        # DDL commit drops session GUCs (tenant RLS) — re-apply before retry.
+        try:
+            from app.core.auth_deps import apply_tenant_rls
+
+            await apply_tenant_rls(session, tenant_id)
+        except Exception:
+            pass
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
 
 
 async def _sync_sqlite_cache(admin_dict: dict[str, Any]) -> None:
