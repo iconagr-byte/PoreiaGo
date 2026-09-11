@@ -9,10 +9,14 @@ import {
   statusStyle,
   parsePaymentMethod,
   hasDepositBalance,
+  isPendingBankTransfer,
   canRecordCashPayment,
 } from '../../lib/bookingDisplay.js';
 import { recordCashPayment } from '../../lib/ticketing/bookingStore.js';
-import { DEFAULT_PAYMENT_SECURITY } from '../../lib/payments/paymentSecurity.js';
+import {
+  bookingBalanceDue,
+  DEFAULT_PAYMENT_SECURITY,
+} from '../../lib/payments/paymentSecurity.js';
 import { sendTicketEmail } from '../../services/ticketingApi.js';
 import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
 
@@ -296,7 +300,7 @@ export default function BookingDetailPanel({
                 <span className="font-bold text-gray-900">Σύνολο</span>
                 <span className="font-bold text-emerald-600">€{bookingPrice.toFixed(2)}</span>
               </div>
-              {hasDepositBalance(booking) && (
+              {hasDepositBalance(booking) ? (
                 <>
                   <div className="h-px bg-gray-200 my-3" />
                   <div className="flex justify-between items-center text-sm">
@@ -312,14 +316,33 @@ export default function BookingDetailPanel({
                     </span>
                   </div>
                 </>
-              )}
+              ) : bookingBalanceDue(booking) > 0 ? (
+                <>
+                  <div className="h-px bg-gray-200 my-3" />
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">
+                      {isPendingBankTransfer(booking)
+                        ? 'Εκκρεμεί τραπεζική κατάθεση'
+                        : 'Πληρωτέο ποσό'}
+                    </span>
+                    <span className="font-bold text-amber-700">
+                      €{bookingBalanceDue(booking).toFixed(2)}
+                    </span>
+                  </div>
+                  {isPendingBankTransfer(booking) ? (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Δεν είναι προκαταβολή — αναμένεται ολόκληρο το ποσό (κατάθεση ή μετρητά).
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div className="text-xs text-gray-400 uppercase font-bold mb-1">Τρόπος πληρωμής</div>
                 <div className="font-bold flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">{pay.icon}</span>
-                  {booking.paymentMethod || pay.label}
+                  {pay.label}
                 </div>
               </div>
               <div>
