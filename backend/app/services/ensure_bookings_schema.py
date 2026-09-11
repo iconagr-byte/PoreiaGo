@@ -78,6 +78,45 @@ _HEAL_STATEMENTS: tuple[str, ...] = (
     END $$
     """,
     "CREATE INDEX IF NOT EXISTS ix_bookings_payment_status ON bookings (payment_status)",
+    # Contabo legacy bookings tables often have extra NOT NULL columns the ORM
+    # never sets (e.g. name/code/customer_name). INSERT then fails and cash
+    # capture wrongly reports "booking not found". Soften those constraints.
+    """
+    DO $$
+    DECLARE
+      r RECORD;
+      keep TEXT[] := ARRAY[
+        'id', 'tenant_id', 'reference_code', 'status', 'payment_status',
+        'passenger_name', 'total_price', 'amount_paid', 'amount_eur',
+        'currency', 'created_at', 'updated_at'
+      ];
+    BEGIN
+      FOR r IN
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'bookings'
+          AND is_nullable = 'NO'
+          AND column_default IS NULL
+          AND NOT (column_name = ANY (keep))
+      LOOP
+        EXECUTE format(
+          'ALTER TABLE bookings ALTER COLUMN %I DROP NOT NULL',
+          r.column_name
+        );
+      END LOOP;
+    END $$
+    """,
+    """
+    UPDATE bookings
+    SET amount_eur = COALESCE(amount_eur, total_price, amount_paid, 0)
+    WHERE amount_eur IS NULL
+    """,
+    """
+    UPDATE bookings
+    SET passenger_name = COALESCE(NULLIF(passenger_name, ''), 'Επιβάτης')
+    WHERE passenger_name IS NULL OR passenger_name = ''
+    """,
     """
     CREATE TABLE IF NOT EXISTS fiscal_invoices (
         id UUID PRIMARY KEY,

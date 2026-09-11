@@ -73,6 +73,12 @@ class EnsureBookingsSchemaTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("updated_at", blob)
         self.assertIn("created_at", blob)
 
+    def test_heal_sql_softens_legacy_not_null(self):
+        from app.services.ensure_bookings_schema import _HEAL_STATEMENTS
+
+        blob = "\n".join(_HEAL_STATEMENTS)
+        self.assertIn("DROP NOT NULL", blob)
+
     def test_ignores_unrelated_errors(self):
         self.assertFalse(is_bookings_schema_drift_error(RuntimeError("timeout")))
 
