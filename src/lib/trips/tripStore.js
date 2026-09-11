@@ -34,7 +34,28 @@ export function loadTrips() {
 
   let base;
   try {
-    const raw = localStorage.getItem(storageKey());
+    const key = storageKey();
+    let raw = localStorage.getItem(key);
+    // Migrate unscoped legacy trips into the tenant key when scoped storage is empty.
+    if (
+      isAuthenticatedOfficeSession() &&
+      key !== STORAGE_KEY_BASE &&
+      (raw == null || raw === '' || raw === '[]')
+    ) {
+      const legacy = localStorage.getItem(STORAGE_KEY_BASE);
+      if (legacy && legacy !== '[]') {
+        try {
+          const parsedLegacy = JSON.parse(legacy);
+          if (Array.isArray(parsedLegacy) && parsedLegacy.length) {
+            localStorage.setItem(key, legacy);
+            localStorage.removeItem(STORAGE_KEY_BASE);
+            raw = legacy;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length) base = parsed.map(normalizeTrip);
@@ -108,7 +129,7 @@ export function deleteTrip(tripId) {
   saveTrips(trips);
   // Rebuild public catalog without the deleted trip.
   import('../../services/tripsSyncApi.js')
-    .then(({ syncTripsToPostgres }) => syncTripsToPostgres(trips, { replaceCatalog: true }))
+    .then(({ syncTripsToPostgres }) => syncTripsToPostgres(trips, { replaceCatalog: true, pruneMissing: true }))
     .catch(() => {});
 }
 
@@ -247,4 +268,71 @@ export function listPublishedTrips(trips = loadTrips()) {
 /** Curated demo trips for PoreiaGo marketing host (prospective buyers). */
 export function loadPlatformDemoTrips() {
   return mockTrips.map(normalizeTrip);
+}
+
+/** Map a server catalog / Postgres trip row into local tripStore shape. */
+export function catalogTripToLocal(row) {
+  if (!row || typeof row !== 'object') return null;
+  const id = Number(row.id);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const statusRaw = String(row.status || row.state || 'published').toLowerCase();
+  const status = statusRaw === 'draft' ? 'draft' : 'published';
+  return normalizeTrip({
+    id,
+    title: row.title || '',
+    destination: row.destination || '',
+    departureTime: row.departureTime || row.departure_time || '',
+    arrivalTime: row.arrivalTime || row.arrival_time || '',
+    price: row.price ?? row.base_price ?? 0,
+    childPrice: row.childPrice ?? row.child_price ?? null,
+    availableSeats: row.availableSeats ?? row.available_seats ?? 0,
+    totalSeats: row.totalSeats ?? row.total_seats ?? row.capacity ?? 30,
+    description: row.description || '',
+    image: row.image || row.image_url || '',
+    hook: row.hook || '',
+    durationLabel: row.durationLabel || row.duration_label || '',
+    badge: row.badge || '',
+    featured: Boolean(row.featured),
+    status,
+    meetingPoint: row.meetingPoint || row.meeting_point || '',
+    highlights: Array.isArray(row.highlights) ? row.highlights : [],
+    stops: Array.isArray(row.stops) ? row.stops : [],
+    market: row.market || null,
+    vehicleType: row.vehicleType || row.vehicle_type || '',
+    currency: row.currency || 'EUR',
+  });
+}
+
+/**
+ * Merge server catalog trips into localStorage without dropping richer local rows.
+ * Local wins on field conflicts; server fills missing ids (recovery after cache wipe).
+ * @returns {{ trips: object[], added: number, total: number }}
+ */
+export function mergeServerTripsIntoStore(serverTrips) {
+  const local = loadTrips();
+  const byId = new Map();
+  for (const t of local) {
+    if (t?.id != null) byId.set(Number(t.id), t);
+  }
+  let added = 0;
+  for (const raw of serverTrips || []) {
+    const mapped = catalogTripToLocal(raw);
+    if (!mapped) continue;
+    const id = Number(mapped.id);
+    if (!byId.has(id)) {
+      byId.set(id, mapped);
+      added += 1;
+    } else {
+      // Fill blank local fields from server without overwriting office edits.
+      const cur = byId.get(id);
+      const merged = { ...mapped, ...cur };
+      for (const [k, v] of Object.entries(mapped)) {
+        if (cur[k] == null || cur[k] === '') merged[k] = v;
+      }
+      byId.set(id, normalizeTrip(merged));
+    }
+  }
+  const trips = stripDemoTrips([...byId.values()].sort((a, b) => Number(a.id) - Number(b.id)));
+  saveTrips(trips);
+  return { trips, added, total: trips.length };
 }

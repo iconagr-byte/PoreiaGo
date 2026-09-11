@@ -74,6 +74,7 @@ from schemas.platform_admin import (
     TripSyncItem,
     TripsSyncRequest,
     TripsSyncResponse,
+    TripsListResponse,
     FleetCostReportResponse,
     FleetDepreciationResponse,
     MaintenanceEventCreate,
@@ -1335,6 +1336,16 @@ async def master_qr_png(
     )
 
 
+
+@router.get("/trips", response_model=TripsListResponse)
+async def list_trips_admin(request: Request):
+    from travel_platform.operations.trips_sync import list_office_trips
+
+    tenant_id = _request_tenant_id(request)
+    rows = await list_office_trips(tenant_id)
+    return TripsListResponse(trips=rows, tenant_id=tenant_id)
+
+
 @router.post("/trips/sync", response_model=TripsSyncResponse)
 async def sync_trips_admin(request: Request, body: TripsSyncRequest):
     from travel_platform.operations.trips_sync import sync_trips_to_postgres
@@ -1354,6 +1365,7 @@ async def sync_trips_admin(request: Request, body: TripsSyncRequest):
         payload,
         tenant_id=tenant_id,
         replace_catalog=bool(getattr(body, "replace_catalog", False)),
+        prune_missing=bool(getattr(body, "prune_missing", False)),
     )
     return TripsSyncResponse(**result)
 

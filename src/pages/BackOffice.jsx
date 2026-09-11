@@ -33,6 +33,7 @@ import { canRecordCashPayment } from '../lib/bookingDisplay.js';
 import { recordCashPayment } from '../lib/ticketing/bookingStore.js';
 import { DEFAULT_PAYMENT_SECURITY } from '../lib/payments/paymentSecurity.js';
 import { deleteTrip as removeTripFromStore, loadTrips, getTripById } from '../lib/trips/tripStore.js';
+import { hydrateTripsFromServer } from '../services/tripsSyncApi.js';
 import { ticketPrintPath } from '../lib/ticketing/printTicket.js';
 import {
   getTripMarket,
@@ -155,6 +156,20 @@ export default function BackOffice() {
     return DEFAULT_FLEET_OPS_TAB;
   });
   const [trips, setTrips] = useState(() => loadTrips());
+
+  // Recover trips from durable server catalog when localStorage was wiped/incomplete.
+  useEffect(() => {
+    let cancelled = false;
+    hydrateTripsFromServer()
+      .then((result) => {
+        if (!cancelled && result?.trips) setTrips(result.trips);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [routesMarket, setRoutesMarket] = useState(MARKET_DOMESTIC);
   const [lostItems, setLostItems] = useState([]);
   const [lostItemsLoading, setLostItemsLoading] = useState(false);

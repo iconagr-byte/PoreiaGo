@@ -53,10 +53,11 @@ async function parseAdminError(res) {
  * @param {object[]} trips
  * @returns {Promise<{ synced: number, skipped: number, postgres_available: boolean }>}
  */
-export async function syncTripsToPostgres(trips, { tenantId, replaceCatalog = false } = {}) {
+export async function syncTripsToPostgres(trips, { tenantId, replaceCatalog = false, pruneMissing = false } = {}) {
   const payload = {
     tenant_id: tenantId || getSaasTenantId() || undefined,
     replace_catalog: Boolean(replaceCatalog),
+    prune_missing: Boolean(pruneMissing),
     trips: (trips || []).map(tripToPayload),
   };
 
@@ -67,6 +68,7 @@ export async function syncTripsToPostgres(trips, { tenantId, replaceCatalog = fa
         body: JSON.stringify({
           trips: payload.trips,
           replace_catalog: payload.replace_catalog,
+          prune_missing: payload.prune_missing,
         }),
       });
     } catch (err) {
@@ -91,7 +93,40 @@ export function syncTripToPostgres(trip) {
 }
 
 /** Sync every trip from tripStore (admin panels) — replaces public catalog. */
+export async function fetchOfficeTripCatalog() {
+  if (getSaasToken()) {
+    try {
+      const data = await saasFetch('/api/v1/operations/trips');
+      if (Array.isArray(data?.trips)) return data.trips;
+      if (Array.isArray(data)) return data;
+    } catch (err) {
+      console.warn('[trips-sync] catalog fetch via SaaS failed', err);
+    }
+  }
+  const res = await adminFetch('/api/admin/platform/trips', { method: 'GET' });
+  if (!res.ok) await parseAdminError(res);
+  const data = await res.json();
+  if (Array.isArray(data?.trips)) return data.trips;
+  return Array.isArray(data) ? data : [];
+}
+
+/** Hydrate local trip list from durable server catalog (+ Postgres titles). */
+export async function hydrateTripsFromServer() {
+  const { mergeServerTripsIntoStore } = await import('../lib/trips/tripStore.js');
+  const rows = await fetchOfficeTripCatalog();
+  return mergeServerTripsIntoStore(rows);
+}
+
 export async function syncAllLocalTrips() {
-  const { loadTrips } = await import('../lib/trips/tripStore.js');
-  return syncTripsToPostgres(loadTrips(), { replaceCatalog: true });
+  const { loadTrips, mergeServerTripsIntoStore } = await import(
+    '../lib/trips/tripStore.js'
+  );
+  // Never replace the public catalog with a partial local list.
+  try {
+    const remote = await fetchOfficeTripCatalog();
+    if (remote.length) mergeServerTripsIntoStore(remote);
+  } catch (err) {
+    console.warn('[trips-sync] pre-sync hydrate failed', err);
+  }
+  return syncTripsToPostgres(loadTrips(), { replaceCatalog: true, pruneMissing: false });
 }

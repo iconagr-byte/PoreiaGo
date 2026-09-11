@@ -474,12 +474,18 @@ class TripsSyncRequest(BaseModel):
     tenant_id: str | None = None
     trips: list[TripSyncItem] = Field(default_factory=list)
     replace_catalog: bool = False
+    prune_missing: bool = False
 
 
 class TripsSyncResponse(BaseModel):
     synced: int
     skipped: int
     postgres_available: bool
+    tenant_id: str | None = None
+
+
+class TripsListResponse(BaseModel):
+    trips: list[dict] = Field(default_factory=list)
     tenant_id: str | None = None
 
 
