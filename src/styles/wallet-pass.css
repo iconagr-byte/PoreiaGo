@@ -226,6 +226,35 @@
   color: rgba(255, 255, 255, 0.88);
 }
 
+.wallet-pass-party-count {
+  margin: 0.65rem 0 0;
+  display: inline-flex;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.wallet-pass-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: -1.15rem;
+  position: relative;
+  z-index: 1;
+  padding: 0 0.15rem 0.25rem;
+}
+
+.wallet-pass-stack.is-multi .wallet-pass-card {
+  margin-top: 0;
+}
+
+.wallet-pass-stack:not(.is-multi) .wallet-pass-card {
+  margin-top: 0;
+}
+
 .wallet-pass-card {
   position: relative;
   margin-top: -1.15rem;

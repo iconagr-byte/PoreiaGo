@@ -37,6 +37,9 @@ async def verify_driver(authorization: str | None = Header(default=None)) -> str
 @router.post("/api/tickets/sync")
 async def sync_ticket_from_checkout(body: TicketSyncRequest):
     """Register checkout booking for rotating QR + driver scan."""
+    special = {}
+    if body.passengers:
+        special["passengers"] = body.passengers
     booking = await upsert_ticket_booking(
         local_id=body.id,
         trip_id=body.trip_id,
@@ -47,6 +50,7 @@ async def sync_ticket_from_checkout(body: TicketSyncRequest):
         departure_at=body.departure_at,
         saas_booking_id=body.saas_booking_id,
         email=body.email,
+        special_requirements=special or None,
     )
     return {"ok": True, "booking_id": booking.get("id"), "ticket_ref": booking.get("ticket_ref")}
 
@@ -75,18 +79,24 @@ async def cancel_ticket(booking_id: str):
 
 
 @router.get("/api/tickets/{booking_id}/qr", response_model=RotatingQrResponse)
-async def get_rotating_qr(booking_id: str):
-    """Issue short-lived JWT for rotating QR display."""
+async def get_rotating_qr(booking_id: str, seat: str | None = None):
+    """Issue short-lived JWT for rotating QR display (optional per-seat)."""
     booking = await get_booking_by_id(booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     if "CANCELLED" in booking["payment_status"].upper():
         raise HTTPException(status_code=410, detail="Booking cancelled")
     from ticketing.scan_service import is_paid
+    from ticketing.seat_boarding import booking_seat_codes, normalize_seat
 
     if not is_paid(booking["payment_status"]):
         raise HTTPException(status_code=402, detail="Booking not paid")
-    data = issue_rotating_jwt(booking["ticket_ref"], booking["trip_id"])
+    seat_code = normalize_seat(seat)
+    if seat_code:
+        seats = booking_seat_codes(booking)
+        if seats and seat_code not in seats:
+            raise HTTPException(status_code=400, detail=f"Seat {seat_code} not on booking")
+    data = issue_rotating_jwt(booking["ticket_ref"], booking["trip_id"], seat=seat_code or None)
     return RotatingQrResponse(**data)
 
 

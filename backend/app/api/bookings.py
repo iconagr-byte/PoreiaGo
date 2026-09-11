@@ -331,6 +331,11 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
                 phone=body.phone,
                 saas_booking_id=str(booking.id),
                 email=body.passenger_email,
+                special_requirements={
+                    "passengers": meta.get("passengers") or [],
+                }
+                if meta.get("passengers")
+                else None,
             )
         except Exception:
             pass

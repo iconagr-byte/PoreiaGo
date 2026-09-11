@@ -25,7 +25,7 @@ async def upsert_ticket_booking(
 ) -> dict:
     db = get_db()
     dep = departure_at or datetime.now(timezone.utc).isoformat()
-    spec = special_requirements or {}
+    spec = dict(special_requirements or {})
     if email:
         spec["email"] = email
     if saas_booking_id:
@@ -45,7 +45,7 @@ async def upsert_ticket_booking(
         placeholders = ", ".join("?" for _ in aliases)
         cur = await db.execute(
             f"""
-            SELECT id, ticket_ref FROM ticket_bookings
+            SELECT id, ticket_ref, special_requirements FROM ticket_bookings
             WHERE id IN ({placeholders})
             LIMIT 1
             """,
@@ -54,11 +54,23 @@ async def upsert_ticket_booking(
         existing = await cur.fetchone()
     if not existing and saas_booking_id:
         cur = await db.execute(
-            "SELECT id, ticket_ref FROM ticket_bookings WHERE saas_booking_id = ? LIMIT 1",
+            "SELECT id, ticket_ref, special_requirements FROM ticket_bookings WHERE saas_booking_id = ? LIMIT 1",
             (saas_booking_id,),
         )
         existing = await cur.fetchone()
     ticket_ref = existing["ticket_ref"] if existing else str(uuid.uuid4())
+
+    # Preserve boarded_seats / prior metadata when re-syncing.
+    if existing and existing["special_requirements"]:
+        try:
+            prev = json.loads(existing["special_requirements"])
+            if isinstance(prev, dict):
+                merged = {**prev, **spec}
+                if "boarded_seats" in prev:
+                    merged["boarded_seats"] = prev["boarded_seats"]
+                spec = merged
+        except Exception:
+            pass
 
     if existing:
         await db.execute(
