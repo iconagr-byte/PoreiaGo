@@ -304,6 +304,18 @@ async def lifespan(app: FastAPI):
         __import__("logging").getLogger("poreiago.startup").warning(
             "GPS schema ensure skipped: %s", gps_exc
         )
+    try:
+        # Contabo DBs often miss bookings.customer_user_id / payment columns when
+        # alembic upgrade aborts mid-chain — cash capture then 500s.
+        from app.core.database import AsyncSessionLocal as SaasSessionLocal
+        from app.services.ensure_bookings_schema import ensure_bookings_schema
+
+        async with SaasSessionLocal() as session:
+            await ensure_bookings_schema(session)
+    except Exception as bookings_exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Bookings schema ensure skipped: %s", bookings_exc
+        )
     if start_consumer and process_telemetry_payload:
         await start_consumer(process_telemetry_payload)
     try:
