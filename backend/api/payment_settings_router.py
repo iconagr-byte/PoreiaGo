@@ -225,11 +225,15 @@ async def _persist_confirmed_booking(
 
     merged = {**booking, **patch}
     email = merged.get("email") or "unknown@local.invalid"
-    saved = await upsert_booking(
-        merged,
-        customer_email=email,
-        tenant_id=str(await _tenant_id_for_admin_request(request)),
-    )
+    try:
+        saved = await upsert_booking(
+            merged,
+            customer_email=email,
+            tenant_id=str(await _tenant_id_for_admin_request(request)),
+        )
+    except Exception:
+        # Cache upsert must not fail a successful Postgres cash capture.
+        saved = merged
 
     try:
         from api.admin_booking_mapper import apply_patch_to_booking, booking_to_admin_dict
@@ -457,8 +461,21 @@ async def record_cash_payment_admin(
     pg_snapshot: dict[str, Any] = {}
 
     async with AsyncSessionLocal() as db:
-        await apply_tenant_rls(db, tenant_id)
-        pg_booking = await _find_booking(db, tenant_id, booking_key)
+        try:
+            await apply_tenant_rls(db, tenant_id)
+            pg_booking = await _find_booking(db, tenant_id, booking_key)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            await db.rollback()
+            import logging
+            logging.getLogger(__name__).exception(
+                "Cash payment DB prelude failed booking_key=%s", booking_key
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Αποτυχία καταχώρησης μετρητών: {exc.__class__.__name__}: {exc}",
+            ) from exc
         if not pg_booking:
             # Office / walk-in bookings may exist only in the ticket cache.
             # Upsert into Postgres so cash capture + fiscal receipt can proceed.
@@ -532,33 +549,51 @@ async def record_cash_payment_admin(
             )
             raise HTTPException(
                 status_code=500,
-                detail=f"Αποτυχία καταχώρησης μετρητών: {exc.__class__.__name__}",
+                detail=f"Αποτυχία καταχώρησης μετρητών: {exc.__class__.__name__}: {exc}",
             ) from exc
 
+    # Side-effects after a successful capture must never turn into HTTP 500 —
+    # the money is already recorded in Postgres.
     if fiscal_invoice_id and result_status == "captured":
-        dispatch_fiscal_receipt(str(fiscal_invoice_id))
+        try:
+            dispatch_fiscal_receipt(str(fiscal_invoice_id))
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Fiscal dispatch failed after cash capture booking_key=%s", booking_key
+            )
 
     balance = round(max(pg_snapshot["total_price"] - pg_snapshot["amount_paid"], 0.0), 2)
-    patch = build_cash_payment_patch(
-        pg_snapshot["admin"],
-        channel=channel,
-        amount_paid_now=float(body.amount),
-        new_amount_paid=pg_snapshot["amount_paid"],
-        new_balance=balance,
-        note=body.note,
-        receipt_number=body.receipt_number,
-    )
-    saved = await _persist_confirmed_booking(booking_key, pg_snapshot["admin"], patch, request)
+    try:
+        patch = build_cash_payment_patch(
+            pg_snapshot["admin"],
+            channel=channel,
+            amount_paid_now=float(body.amount),
+            new_amount_paid=pg_snapshot["amount_paid"],
+            new_balance=balance,
+            note=body.note,
+            receipt_number=body.receipt_number,
+        )
+        saved = await _persist_confirmed_booking(booking_key, pg_snapshot["admin"], patch, request)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "Post-cash persist failed booking_key=%s", booking_key
+        )
+        saved = {**pg_snapshot["admin"], "amountPaid": pg_snapshot["amount_paid"], "balanceDue": balance}
 
-    record_cash_audit(
-        booking_id=str(pg_snapshot["id"]),
-        amount_eur=float(body.amount),
-        channel=channel,
-        actor_id=str(actor_id) if actor_id else None,
-        reference=body.reference_code,
-        detail=body.note,
-        receipt_number=body.receipt_number,
-    )
+    try:
+        record_cash_audit(
+            booking_id=str(pg_snapshot["id"]),
+            amount_eur=float(body.amount),
+            channel=channel,
+            actor_id=str(actor_id) if actor_id else None,
+            reference=body.reference_code,
+            detail=body.note,
+            receipt_number=body.receipt_number,
+        )
+    except Exception:
+        pass
 
     try:
         await send_payment_confirmation_notifications(saved, event=EVENT_CASH_PAYMENT)
