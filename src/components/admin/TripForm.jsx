@@ -10,8 +10,8 @@ import LocationPicker from './LocationPicker.jsx';
 import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
 import HybridRoomingExtras from './hybrid/HybridRoomingExtras.jsx';
-import {
 import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
+import {
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
   MARKET_LABELS,
