@@ -52,3 +52,25 @@ class CashPaymentValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CashMoneyParsingTests(unittest.TestCase):
+    def test_greek_comma_amount_and_balance(self):
+        from travel_platform.payments.cash_payment_confirm import (
+            CashPaymentChannel,
+            validate_cash_payment_request,
+        )
+
+        booking = {
+            "id": "B-1",
+            "pnr": "BKHYDK37BA",
+            "price": "64,60",
+            "amountPaid": "0",
+            "balanceDue": "64,6",
+            "status": "Επιβεβαιωμένη",
+        }
+        channel = validate_cash_payment_request(
+            booking,
+            {"amount": "64,6", "channel": "driver_on_bus", "reference_code": "BKHYDK37BA"},
+        )
+        self.assertEqual(channel, CashPaymentChannel.DRIVER_ON_BUS)
