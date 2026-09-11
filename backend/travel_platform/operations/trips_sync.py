@@ -76,6 +76,7 @@ async def sync_trips_to_postgres(
     *,
     tenant_id: str | None = None,
     replace_catalog: bool = False,
+    prune_missing: bool = False,
 ) -> dict[str, Any]:
     if not trips:
         available = await saas_db_available()
@@ -116,8 +117,36 @@ async def sync_trips_to_postgres(
     try:
         if replace_catalog:
             from travel_platform.operations.tenant_trip_catalog_store import (
+                list_tenant_trips,
                 replace_tenant_catalog,
             )
+
+            # Guard: incomplete localStorage sync must not wipe durable catalog trips.
+            if not prune_missing:
+                existing = await asyncio.to_thread(
+                    list_tenant_trips, tid, published_only=False
+                )
+                incoming_ids = {
+                    int(r["id"])
+                    for r in catalog_rows
+                    if isinstance(r, dict) and r.get("id") is not None
+                }
+                preserved = 0
+                for row in existing or []:
+                    try:
+                        rid = int(row.get("id"))
+                    except (TypeError, ValueError):
+                        continue
+                    if rid not in incoming_ids:
+                        catalog_rows.append(row)
+                        preserved += 1
+                if preserved:
+                    logger.warning(
+                        "replace_catalog without prune_missing preserved %s server-only "
+                        "trips for tenant=%s (local list was incomplete)",
+                        preserved,
+                        tid,
+                    )
 
             catalog_saved = await asyncio.to_thread(replace_tenant_catalog, tid, catalog_rows)
         else:
@@ -211,3 +240,52 @@ async def sync_trips_to_postgres(
         "catalog_saved": catalog_saved,
         "tenant_id": tid,
     }
+
+
+
+async def list_office_trips(tenant_id: str | None) -> list[dict[str, Any]]:
+    """Full office trip list for admin hydrate (catalog + thin Postgres rows)."""
+    tid = (tenant_id or "").strip() or default_tenant_id()
+    from travel_platform.operations.tenant_trip_catalog_store import list_tenant_trips
+
+    catalog = await asyncio.to_thread(list_tenant_trips, tid, published_only=False)
+    by_id: dict[int, dict[str, Any]] = {}
+    for row in catalog or []:
+        try:
+            by_id[int(row["id"])] = dict(row)
+        except (TypeError, ValueError, KeyError):
+            continue
+
+    if await saas_db_available():
+        try:
+            from uuid import UUID
+
+            from database import AsyncSessionLocal
+            from middleware.tenant import apply_tenant_to_session
+            from sqlalchemy import text
+
+            async with AsyncSessionLocal() as session:
+                await apply_tenant_to_session(session, UUID(tid))
+                result = await session.execute(
+                    text(
+                        "SELECT id, title, total_seats, base_price "
+                        "FROM trips WHERE tenant_id = :tid ORDER BY id"
+                    ),
+                    {"tid": tid},
+                )
+                for id_, title, total_seats, base_price in result.fetchall():
+                    trip_id = int(id_)
+                    if trip_id in by_id:
+                        continue
+                    by_id[trip_id] = {
+                        "id": trip_id,
+                        "title": str(title or f"Trip #{trip_id}"),
+                        "price": float(base_price or 0),
+                        "totalSeats": int(total_seats or 0) or 30,
+                        "availableSeats": int(total_seats or 0) or 30,
+                        "status": "published",
+                    }
+        except Exception as exc:
+            logger.warning("list_office_trips postgres fallback failed: %s", exc)
+
+    return [by_id[k] for k in sorted(by_id.keys())]
