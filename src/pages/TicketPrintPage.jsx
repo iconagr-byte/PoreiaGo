@@ -201,8 +201,28 @@ export default function TicketPrintPage() {
 
   useEffect(() => {
     if (!autoPrint || !resolved) return undefined;
-    const t = window.setTimeout(() => window.print(), 450);
-    return () => window.clearTimeout(t);
+    let cancelled = false;
+    const run = async () => {
+      // Wait for QR <img> so print preview is not empty.
+      const imgs = Array.from(document.querySelectorAll('.ticket-print-qr-img'));
+      await Promise.all(
+        imgs.map(
+          (img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise((resolve) => {
+                  img.addEventListener('load', resolve, { once: true });
+                  img.addEventListener('error', resolve, { once: true });
+                }),
+        ),
+      );
+      if (!cancelled) window.print();
+    };
+    const t = window.setTimeout(run, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
   }, [autoPrint, resolved]);
 
   if (!bookingId || bookingId === 'demo') {
