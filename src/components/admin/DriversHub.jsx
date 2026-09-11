@@ -1,6 +1,5 @@
 /**
  * Drivers hub — accounts for the bus driver app.
- * Master QR / PWA install lives under Λεωφορεία → Master QR & PWA.
  */
 import DriversManagementPanel from './DriversManagementPanel.jsx';
 
@@ -18,9 +17,7 @@ export default function DriversHub({ showPageHeader = true }) {
             Οδηγοί
           </h2>
           <p className="text-[15px] text-zinc-500 tracking-tight max-w-xl leading-relaxed">
-            Λογαριασμοί εφαρμογής λεωφορείου. Chat και Master QR βρίσκονται στο μενού
-            Λεωφορεία (<span className="font-semibold text-zinc-700">Chat Οδηγών</span>,{' '}
-            <span className="font-semibold text-zinc-700">Master QR &amp; PWA</span>).
+            Λογαριασμοί εφαρμογής λεωφορείου — στοιχεία, κωδικοί και φωτογραφίες οδηγών.
           </p>
         </header>
       ) : null}
