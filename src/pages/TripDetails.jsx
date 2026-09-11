@@ -9,6 +9,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
+import { LEAFLET_BASEMAP } from '../lib/maps/appleMapTheme.js';
 
 // Custom Red Pin Marker (Google Maps Style)
 const redIcon = L.divIcon({
@@ -322,8 +323,10 @@ export default function TripDetails() {
             <MapContainer center={mapCenter} zoom={7} className="h-full w-full">
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              />
+                url={LEAFLET_BASEMAP.url}
+              subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
+            />
               {trip.stops?.map(stop => (
                 <Marker key={stop.id} position={[stop.lat, stop.lng]}>
                   <Popup>
