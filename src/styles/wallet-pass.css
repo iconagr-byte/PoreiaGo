@@ -226,17 +226,6 @@
   color: rgba(255, 255, 255, 0.88);
 }
 
-.wallet-pass-party-count {
-  margin: 0.65rem 0 0;
-  display: inline-flex;
-  padding: 0.28rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
 .wallet-pass-stack {
   display: flex;
   flex-direction: column;
