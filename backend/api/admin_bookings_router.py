@@ -54,6 +54,8 @@ async def _resolve_tenant_id(tenant_id: UUID | None) -> UUID:
 
 
 async def _find_booking(session, tenant_id: UUID, booking_key: str):
+    from sqlalchemy import String, cast
+
     from app.models.booking import Booking
     from api.admin_booking_mapper import booking_id_aliases, normalize_reference
     from app.services.ensure_bookings_schema import (
@@ -63,10 +65,16 @@ async def _find_booking(session, tenant_id: UUID, booking_key: str):
 
     key = booking_key.strip()
     filters = []
+    # Contabo often stores bookings.id as TEXT while the ORM maps UUID.
+    # Always compare via text cast so both UUID and TEXT PKs work.
     try:
-        filters.append(Booking.id == UUID(key))
+        as_uuid = str(UUID(key))
+        filters.append(cast(Booking.id, String) == as_uuid)
+        filters.append(cast(Booking.id, String) == as_uuid.upper())
+        filters.append(cast(Booking.id, String) == as_uuid.lower())
+        filters.append(cast(Booking.id, String) == key)
     except ValueError:
-        pass
+        filters.append(cast(Booking.id, String) == key)
     ref = normalize_reference(key)
     filters.append(Booking.reference_code == ref)
     filters.append(Booking.reference_code == key.upper())
@@ -90,11 +98,11 @@ async def _find_booking(session, tenant_id: UUID, booking_key: str):
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
     except Exception as exc:
-        if not is_bookings_schema_drift_error(exc):
+        if not is_bookings_schema_drift_error(exc) and not _is_booking_id_type_mismatch(exc):
             raise
         await session.rollback()
         healed = await ensure_bookings_schema(session, force=True)
-        if not healed:
+        if not healed and not _is_booking_id_type_mismatch(exc):
             raise
         # DDL commit drops session GUCs (tenant RLS) — re-apply before retry.
         try:
@@ -103,8 +111,26 @@ async def _find_booking(session, tenant_id: UUID, booking_key: str):
             await apply_tenant_rls(session, tenant_id)
         except Exception:
             pass
+        # Retry with text-only id match (no UUID bind) if type mismatch persists.
+        if _is_booking_id_type_mismatch(exc):
+            stmt = select(Booking).where(
+                Booking.tenant_id == tenant_id,
+                or_(
+                    cast(Booking.id, String) == key,
+                    Booking.reference_code == normalize_reference(key),
+                    Booking.reference_code == key.upper(),
+                ),
+            ).limit(1)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+
+def _is_booking_id_type_mismatch(exc: BaseException) -> bool:
+    """Contabo: bookings.id is TEXT but query binds UUID (text = uuid)."""
+    msg = f"{exc.__class__.__name__}: {exc}".lower()
+    return "text = uuid" in msg or (
+        "operator does not exist" in msg and "uuid" in msg and "text" in msg
+    )
 
 
 async def _sync_sqlite_cache(admin_dict: dict[str, Any]) -> None:

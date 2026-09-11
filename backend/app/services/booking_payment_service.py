@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import apply_tenant_rls
@@ -19,6 +19,11 @@ from app.services.fiscal_invoice_service import FiscalInvoiceService, resolve_in
 from travel_platform.payments.cash_payment_confirm import CHANNEL_LABELS, CashPaymentChannel
 
 logger = logging.getLogger(__name__)
+
+
+def _booking_id_eq(booking_id: UUID | str):
+    """Match bookings.id whether Contabo stores TEXT or UUID."""
+    return cast(Booking.id, String) == str(booking_id)
 
 
 @dataclass(frozen=True)
@@ -160,7 +165,7 @@ class BookingPaymentService:
 
         booking_result = await self._session.execute(
             select(Booking)
-            .where(Booking.id == booking_id, Booking.tenant_id == tenant_id)
+            .where(_booking_id_eq(booking_id), Booking.tenant_id == tenant_id)
             .with_for_update(),
         )
         booking = booking_result.scalar_one_or_none()
