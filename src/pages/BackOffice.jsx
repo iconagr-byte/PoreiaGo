@@ -562,14 +562,19 @@ export default function BackOffice() {
 
   const handleQuickCashPayment = async (payload) => {
     if (!cashPaymentBooking) return;
+    const bookingId = cashPaymentBooking.id;
     setCashPaymentSaving(true);
     try {
-      const updated = await recordCashPayment(cashPaymentBooking.id, payload);
+      const updated = await recordCashPayment(bookingId, payload);
       applyBookingUpdate(updated);
-      toast.success('Η είσπραξη μετρητών καταχωρήθηκε');
+      toast.success('Η είσπραξη καταχωρήθηκε — ανοίγει το QR εισιτήριο');
       setCashPaymentBooking(null);
+      // Button label is «Καταχώρηση & απόδειξη» — open boarding pass / QR.
+      navigate(ticketPrintPath(updated?.id || bookingId, { autoPrint: true }));
+      return updated;
     } catch (err) {
       toast.error(err.message || 'Αποτυχία καταχώρησης μετρητών');
+      throw err;
     } finally {
       setCashPaymentSaving(false);
     }

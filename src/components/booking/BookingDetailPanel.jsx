@@ -84,11 +84,16 @@ export default function BookingDetailPanel({
     setCashSaving(true);
     try {
       const updated = await recordCashPayment(booking.id, payload);
-      toast.success('Η είσπραξη μετρητών καταχωρήθηκε');
+      toast.success('Η είσπραξη καταχωρήθηκε — ανοίγει το QR εισιτήριο');
       setCashModalOpen(false);
       onBookingUpdated?.(updated);
+      window.location.assign(
+        `/ticket/print/${encodeURIComponent(updated?.id || booking.id)}?print=1`,
+      );
+      return updated;
     } catch (err) {
       toast.error(err.message || 'Αποτυχία καταχώρησης μετρητών');
+      throw err;
     } finally {
       setCashSaving(false);
     }

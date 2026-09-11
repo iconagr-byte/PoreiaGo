@@ -108,13 +108,23 @@ export function bookingBalanceDue(booking) {
   return Math.max(0, total - paid);
 }
 
+const CASH_CHANNELS = new Set([
+  'office_counter',
+  'driver_on_bus',
+  // legacy / alias spellings seen in older builds
+  'office_desk',
+  'driver_bus',
+]);
+
 export function validateCashPayment(booking, { amount, channel, reference }, security) {
   const sec = normalizePaymentSecurity(security);
   const errors = [];
   const balance = bookingBalanceDue(booking);
-  const amountNum = Number(amount);
+  const amountNum = Number(
+    typeof amount === 'string' ? amount.trim().replace(/\s/g, '').replace(',', '.') : amount,
+  );
 
-  if (!channel || !['office_counter', 'driver_on_bus'].includes(channel)) {
+  if (!channel || !CASH_CHANNELS.has(String(channel))) {
     errors.push('Επιλέξτε κανάλι είσπραξης (γκισέ ή οδηγός)');
   }
 
