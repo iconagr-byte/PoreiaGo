@@ -17,7 +17,6 @@ export const DND_NAV_ID = 'application/x-aerostride-nav-id';
 /** Hub subtabs only — never shown as top-level sidebar rows. */
 export const FLEET_OPS_ONLY_IDS = [
   'fleet_kpis',
-  'driver_chat',
   'fleet_route_playback',
   'fleet_calendar',
   'fleet_availability',
@@ -424,7 +423,7 @@ export const ADMIN_NAV_ITEMS = {
     filled: true,
     type: 'tab',
     tab: 'driver_chat',
-    navGroup: 'fleet_ops',
+    navGroup: 'main',
     accent: 'sky',
   },
   fleet_route_playback: {

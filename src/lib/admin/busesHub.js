@@ -4,7 +4,7 @@ import { isFleetOpsSubTab } from './fleetOpsHub.js';
 
 export const DEFAULT_BUSES_HUB_TAB = 'routes';
 
-export const BUSES_HUB_ORDER_KEY = 'poreiago_buses_hub_order_v1';
+export const BUSES_HUB_ORDER_KEY = 'poreiago_buses_hub_order_v2';
 
 export const BUSES_HUB_TABS = [
   {
@@ -41,6 +41,13 @@ export const BUSES_HUB_TABS = [
     description: 'Λογαριασμοί και βάρδιες',
     icon: 'badge',
     accent: 'indigo',
+  },
+  {
+    id: 'driver_chat',
+    label: 'Chat Οδηγών',
+    description: 'Μηνύματα γραφείου ↔ οδηγός',
+    icon: 'forum',
+    accent: 'sky',
   },
   {
     id: 'bus_setup',

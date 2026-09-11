@@ -5,7 +5,6 @@ import {
   sanitizeFleetOpsSubTab,
 } from '../../../lib/admin/fleetOpsHub.js';
 import FleetKpisDashboard from '../FleetKpisDashboard.jsx';
-import DriverChatInbox from '../DriverChatInbox.jsx';
 import FleetRouteHistory from '../FleetRouteHistory.jsx';
 import FleetCalendarPanel from './FleetCalendarPanel.jsx';
 import FleetAvailabilityPanel from './FleetAvailabilityPanel.jsx';
@@ -246,10 +245,6 @@ function FleetOpsHubPanel({
   switch (tab) {
     case 'fleet_kpis':
       return <FleetKpisDashboard />;
-    case 'driver_chat':
-      return (
-        <DriverChatInbox initialDriverId={chatFocusDriverId} onOpenLiveMap={onOpenLiveMap} />
-      );
     case 'fleet_route_playback':
       return <FleetRouteHistory />;
     case 'fleet_calendar':
