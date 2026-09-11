@@ -5,6 +5,16 @@
   padding: 1.25rem 1rem 2.5rem;
 }
 
+/* Ticket print reuses .wallet-app, which is a fixed phone frame (100dvh +
+   overflow:hidden). That clips long passes on screen and blanks Chrome print. */
+.wallet-app.ticket-print-shell {
+  width: min(430px, 100%);
+  height: auto;
+  min-height: 100dvh;
+  max-height: none;
+  overflow: visible;
+}
+
 .ticket-print-status {
   max-width: 28rem;
   margin: 4rem auto;
@@ -188,28 +198,82 @@
 }
 
 @media print {
+  /* Wallet shell uses height:100dvh + overflow:hidden — Chrome/Edge print
+     then paints a blank page. Unlock the page for print. */
+  html,
+  body,
+  #root {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
   .no-print-ticket {
     display: none !important;
   }
 
-  .wallet-app.ticket-print-shell {
+  /* Beat any global "body * { visibility:hidden }" print rules (e.g. rent admin). */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .wallet-app.ticket-print-shell,
+  .wallet-app.ticket-print-shell *,
+  .ticket-print-shell,
+  .ticket-print-shell *,
+  .ticket-print-stack,
+  .ticket-print-stack *,
+  .ticket-print-pass,
+  .ticket-print-pass * {
+    visibility: visible !important;
+  }
+
+  .wallet-app.ticket-print-shell,
+  .ticket-print-shell {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
     background: #fff !important;
     padding: 0 !important;
-    min-height: auto;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    display: block !important;
+  }
+
+  .ticket-print-stack {
+    display: block !important;
+    gap: 0 !important;
   }
 
   .ticket-print-pass {
-    max-width: none;
-    margin: 0;
-    border-radius: 0;
-    box-shadow: none;
-    border: 0;
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: 1px solid #d0d5dd !important;
+    overflow: visible !important;
     break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .ticket-print-hero {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .ticket-print-qr-img {
+    max-width: 200px !important;
+    height: auto !important;
   }
 
   @page {
