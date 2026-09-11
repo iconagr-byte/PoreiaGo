@@ -13,6 +13,7 @@ import {
   resolvePlaceSync,
 } from '../../lib/rental/geocodePlace.js';
 import toast from 'react-hot-toast';
+import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
 
 const WEEKDAYS = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
 
@@ -348,8 +349,10 @@ export default function RentalCustomerCalendar({ refreshKey = 0 }) {
         ) : (
           <MapContainer center={[38.5, 23.5]} zoom={6} scrollWheelZoom={false}>
             <TileLayer
-              attribution="&copy; OpenStreetMap &copy; CARTO"
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              attribution={LEAFLET_BASEMAP.attribution}
+              url={LEAFLET_BASEMAP.url}
+            subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
             />
             <FitPins pins={pins} focusId={selectedId} />
             {pins.map((pin) => (

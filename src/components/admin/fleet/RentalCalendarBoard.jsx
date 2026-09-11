@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
+import { LEAFLET_BASEMAP } from '../../../lib/maps/appleMapTheme.js';
   geocodePlaces,
   jitterLatLng,
   placesFromBookings,
@@ -635,8 +636,10 @@ export default function RentalCalendarBoard({
             scrollWheelZoom
           >
             <TileLayer
-              attribution="&copy; OpenStreetMap &copy; CARTO"
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              attribution={LEAFLET_BASEMAP.attribution}
+              url={LEAFLET_BASEMAP.url}
+            subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
             />
             <FitPins pins={mapPins} focusId={selectedBookingId ? `${selectedBookingId}-pickup` : null} />
             {routeLines.map((line) => (

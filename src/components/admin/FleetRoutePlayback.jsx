@@ -9,6 +9,7 @@ import {
   todayIsoDate,
 } from '../../lib/admin/fleetPlaybackNav.js';
 import { useFleetTelemetryEgress } from '../../context/FleetTelemetryContext.jsx';
+import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
 
 function FitRoute({ positions }) {
   const map = useMap();
@@ -495,9 +496,11 @@ export default function FleetRoutePlayback() {
           <div className="h-[min(68vh,560px)] rounded-[24px] overflow-hidden border border-black/[0.08] shadow-level-2">
             <MapContainer center={center} zoom={8} className="h-full w-full" scrollWheelZoom>
               <TileLayer
-                attribution="© OpenStreetMap · © CARTO"
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              />
+                attribution={LEAFLET_BASEMAP.attribution}
+                url={LEAFLET_BASEMAP.url}
+              subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
+            />
               <FitRoute positions={positions} />
               {positions.length > 1 ? (
                 <Polyline positions={positions} pathOptions={{ color: '#0040df', weight: 5, opacity: 0.85 }} />

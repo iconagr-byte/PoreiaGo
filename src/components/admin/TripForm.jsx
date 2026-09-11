@@ -11,6 +11,7 @@ import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
 import HybridRoomingExtras from './hybrid/HybridRoomingExtras.jsx';
 import {
+import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
   MARKET_DOMESTIC,
   MARKET_INTERNATIONAL,
   MARKET_LABELS,
@@ -1063,9 +1064,11 @@ export default function TripForm({
           <div className="h-[360px] rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
             <MapContainer center={[38.5, 23.0]} zoom={6} className="h-full w-full">
               <TileLayer
-                attribution="&copy; OpenStreetMap"
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              />
+                attribution={LEAFLET_BASEMAP.attribution}
+                url={LEAFLET_BASEMAP.url}
+              subdomains={LEAFLET_BASEMAP.subdomains}
+              maxZoom={LEAFLET_BASEMAP.maxZoom}
+            />
               <LocationPicker activeStopId={activeStopId} setFormData={setFormData} />
               {(formData.stops || []).map((stop) => (
                 <Marker key={stop.id} position={[stop.lat, stop.lng]} />
