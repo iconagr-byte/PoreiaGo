@@ -45,6 +45,20 @@ _HEAL_STATEMENTS: tuple[str, ...] = (
     ),
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS metadata_json JSONB",
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS notes TEXT",
+    # TimestampMixin — Contabo bootstrap tables often only have created_at.
+    (
+        "ALTER TABLE IF EXISTS bookings "
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+    ),
+    (
+        "ALTER TABLE IF EXISTS bookings "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+    ),
+    """
+    UPDATE bookings
+    SET updated_at = COALESCE(updated_at, created_at, now())
+    WHERE updated_at IS NULL
+    """,
     """
     UPDATE bookings
     SET total_price = COALESCE(total_price, amount_eur, amount_paid, 0)
@@ -112,7 +126,8 @@ async def ensure_bookings_schema(session: AsyncSession, *, force: bool = False) 
         await session.commit()
         _healed = True
         logger.info(
-            "Bookings schema healed (customer_user_id / payment columns / fiscal_invoices)"
+            "Bookings schema healed "
+            "(customer_user_id / payment / updated_at / fiscal_invoices)"
         )
         return True
     except Exception as exc:
@@ -128,6 +143,8 @@ def is_bookings_schema_drift_error(exc: BaseException) -> bool:
         if "bookings." in msg or "column bookings" in msg or "customer_user_id" in msg:
             return True
         if "payment_status" in msg or "amount_paid" in msg or "total_price" in msg:
+            return True
+        if "updated_at" in msg or "created_at" in msg:
             return True
     return False
 
