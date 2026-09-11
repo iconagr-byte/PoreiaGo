@@ -14,13 +14,6 @@ export const FLEET_OPS_HUB_TABS = [
     accent: 'violet',
   },
   {
-    id: 'driver_chat',
-    label: 'Chat Οδηγών',
-    description: 'Μηνύματα γραφείου ↔ οδηγός',
-    icon: 'forum',
-    accent: 'sky',
-  },
-  {
     id: 'fleet_route_playback',
     label: 'Ιστορικό Διαδρομής',
     description: 'Playback GPS διαδρομών',

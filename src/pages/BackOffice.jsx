@@ -84,6 +84,7 @@ import OfficeSetupWizard, {
 } from '../components/admin/OfficeSetupWizard.jsx';
 import { applyStitchTemplate } from '../lib/email/stitchTemplates.js';
 import DriversHub from '../components/admin/DriversHub.jsx';
+import DriverChatInbox from '../components/admin/DriverChatInbox.jsx';
 import BusSetupTools from '../components/admin/BusSetupTools.jsx';
 import LoyaltyRewardsPanel from '../components/admin/LoyaltyRewardsPanel.jsx';
 import { LOYALTY_UI_ENABLED } from '../lib/admin/loyaltyUi.js';
@@ -269,7 +270,7 @@ export default function BackOffice() {
     }
   }, [location.search]);
 
-  // Legacy deep links (?tab=driver_chat) → parent hub + sub-tab.
+  // Legacy deep links (?tab=fleet_kpis etc.) → fleet_ops hub + sub-tab.
   useEffect(() => {
     if (!isFleetOpsSubTab(activeTab)) return;
     setFleetOpsSubTab(sanitizeFleetOpsSubTab(activeTab));
@@ -820,10 +821,7 @@ export default function BackOffice() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-5 items-stretch">
         <OfficeWalletShareCard />
         <DriverChatDashboardWidget
-          onOpenInbox={() => {
-            setFleetOpsSubTab('driver_chat');
-            setActiveTab('fleet_ops');
-          }}
+          onOpenInbox={() => setActiveTab('driver_chat')}
           onOpenLiveMap={() => setActiveTab('fleet_live_map')}
         />
       </div>
@@ -1238,6 +1236,12 @@ export default function BackOffice() {
   );
 
   const renderDrivers = () => <DriversHub showPageHeader={false} />;
+  const renderDriverChat = () => (
+    <DriverChatInbox
+      initialDriverId={chatFocusDriverId}
+      onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+    />
+  );
   const renderBusSetup = () => <BusSetupTools />;
 
   const renderFleet = () => {
@@ -2316,6 +2320,7 @@ export default function BackOffice() {
                     />
                   )}
                   {activeTab === 'drivers' && renderDrivers()}
+                  {activeTab === 'driver_chat' && renderDriverChat()}
                   {activeTab === 'bus_setup' && renderBusSetup()}
                   {activeTab === 'lost_found' && renderLostFound()}
                   {activeTab === 'bookings' && renderBookings()}
