@@ -178,6 +178,31 @@ class RecordCashPaymentBody(BaseModel):
     idempotency_key: str | None = Field(default=None, max_length=128)
 
 
+def _cash_booking_lookup_keys(
+    booking_key: str,
+    booking: dict[str, Any],
+    body: RecordCashPaymentBody,
+) -> list[str]:
+    """URL id, form PNR, and cache aliases — office bookings often differ across these."""
+    keys: list[str] = []
+    for raw in (
+        booking_key,
+        body.reference_code,
+        booking.get("pnr"),
+        booking.get("reference_code"),
+        booking.get("referenceCode"),
+        booking.get("ticketRef"),
+        booking.get("ticket_ref"),
+        booking.get("id"),
+    ):
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if text and text not in keys:
+            keys.append(text)
+    return keys
+
+
 class PaymentAuditEntry(BaseModel):
     id: str
     at: str
@@ -467,7 +492,11 @@ async def record_cash_payment_admin(
             # Heal Contabo drift before SELECT (missing customer_user_id etc.).
             await ensure_bookings_schema(db)
             await apply_tenant_rls(db, tenant_id)
-            pg_booking = await _find_booking(db, tenant_id, booking_key)
+            pg_booking = None
+            for lookup_key in _cash_booking_lookup_keys(booking_key, booking, body):
+                pg_booking = await _find_booking(db, tenant_id, lookup_key)
+                if pg_booking:
+                    break
         except HTTPException:
             raise
         except Exception as exc:
@@ -486,6 +515,8 @@ async def record_cash_payment_admin(
             from api.admin_booking_mapper import ensure_booking_from_admin_dict
             import logging
 
+            from sqlalchemy.exc import IntegrityError
+
             log = logging.getLogger(__name__)
             try:
                 pg_booking = ensure_booking_from_admin_dict(tenant_id, booking)
@@ -496,11 +527,36 @@ async def record_cash_payment_admin(
                     booking_key,
                     pg_booking.reference_code,
                 )
+            except IntegrityError as exc:
+                # Race / already inserted under PNR — reload instead of fake 404.
+                await db.rollback()
+                await apply_tenant_rls(db, tenant_id)
+                for lookup_key in _cash_booking_lookup_keys(booking_key, booking, body):
+                    pg_booking = await _find_booking(db, tenant_id, lookup_key)
+                    if pg_booking:
+                        break
+                if not pg_booking:
+                    log.exception(
+                        "Cash upsert IntegrityError and reload miss key=%s", booking_key
+                    )
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Η κράτηση υπάρχει ήδη στη βάση αλλά δεν εντοπίστηκε με αυτό το "
+                            f"PNR/id. Δοκίμασε ξανά με PNR {body.reference_code or booking.get('pnr') or booking_key}."
+                        ),
+                    ) from exc
             except Exception as exc:
                 await db.rollback()
+                log.exception(
+                    "Cash upsert from cache failed booking_key=%s", booking_key
+                )
                 raise HTTPException(
-                    status_code=404,
-                    detail="Η κράτηση δεν βρέθηκε στη βάση (Postgres). Ξαναάνοιξε την κράτηση από Κρατήσεις και δοκίμασε ξανά.",
+                    status_code=500,
+                    detail=(
+                        "Αποτυχία αποθήκευσης κράτησης στη βάση (Postgres) πριν την "
+                        f"καταχώρηση μετρητών: {exc.__class__.__name__}: {exc}"
+                    ),
                 ) from exc
 
         try:
