@@ -406,6 +406,7 @@ export async function syncTicketForBoarding(booking) {
       departure_at: dep,
       saas_booking_id: booking.saasBookingId || null,
       email: booking.email,
+      passengers: Array.isArray(booking.passengers) ? booking.passengers : undefined,
     }),
   });
   if (!res.ok) await parseError(res);

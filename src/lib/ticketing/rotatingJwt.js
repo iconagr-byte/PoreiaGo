@@ -79,12 +79,14 @@ export async function verifyRotatingJwt(token) {
     return { ok: false, reason: 'PARSE_ERROR' };
   }
 
+  const seat = String(payload.seat || '').trim();
   return {
     ok: true,
     payload: {
       ref: String(payload.ref),
       tid: Number(payload.tid),
       step,
+      ...(seat ? { seat } : {}),
     },
   };
 }

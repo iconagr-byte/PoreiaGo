@@ -217,3 +217,16 @@
     size: A4;
   }
 }
+
+.ticket-print-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+@media print {
+  .ticket-print-stack .ticket-print-pass + .ticket-print-pass {
+    break-before: page;
+    page-break-before: always;
+  }
+}

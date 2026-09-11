@@ -40,8 +40,12 @@ export function useRotatingTicketQr(booking) {
         }
         let data = null;
         let lastDetail = 'QR fetch failed';
+        const seatParam = encodeURIComponent(String(booking.seat || '').trim());
+        const qs = seatParam ? `?seat=${seatParam}` : '';
         const responses = await Promise.all(
-          ids.map((id) => fetch(`${API_BASE}/api/tickets/${encodeURIComponent(id)}/qr`)),
+          ids.map((id) =>
+            fetch(`${API_BASE}/api/tickets/${encodeURIComponent(id)}/qr${qs}`),
+          ),
         );
         for (const res of responses) {
           if (res.ok) {
@@ -58,10 +62,13 @@ export function useRotatingTicketQr(booking) {
         }
       } catch {
         try {
-          const token = await issueSignedQrToken({
-            ...booking,
-            id: localIdFromReference(booking.pnr || booking.id) || booking.id,
-          });
+          const token = await issueSignedQrToken(
+            {
+              ...booking,
+              id: localIdFromReference(booking.pnr || booking.id) || booking.id,
+            },
+            { seat: booking.seat || '' },
+          );
           if (!cancelled) {
             setQrValue(token);
             setExpiresIn(30);
@@ -82,7 +89,7 @@ export function useRotatingTicketQr(booking) {
       cancelled = true;
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [booking?.id, booking?.paymentStatus]);
+  }, [booking?.id, booking?.seat, booking?.paymentStatus]);
 
   return { qrValue, expiresIn, loading, error };
 }

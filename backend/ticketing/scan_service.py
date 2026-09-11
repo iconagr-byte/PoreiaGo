@@ -6,6 +6,13 @@ from api.admin_booking_mapper import booking_id_aliases
 from .db import get_db, row_to_booking, transaction
 from .bt1_token import verify_bt1_token
 from .qr_rotating import verify_rotating_jwt
+from .seat_boarding import (
+    boarded_seats_from_spec,
+    booking_seat_codes,
+    dump_special_requirements,
+    normalize_seat,
+    passenger_name_for_seat,
+)
 
 
 def is_paid(payment_status: str) -> bool:
@@ -72,25 +79,41 @@ async def get_booking_by_id(booking_id: str) -> dict | None:
     return None
 
 
-def scan_response_success(booking: dict) -> dict:
+def scan_response_success(
+    booking: dict,
+    *,
+    boarded_seat: str | None = None,
+    passenger_name: str | None = None,
+) -> dict:
     spec = booking.get("special_requirements") or {}
-    seats = str(booking.get("seat_number") or "").strip()
-    seat_count = len([s for s in seats.replace(";", ",").split(",") if s.strip()]) or 1
+    if not isinstance(spec, dict):
+        spec = {}
+    seats = booking_seat_codes(booking)
+    seat_count = len(seats) or 1
     booking_ref = str(spec.get("pnr") or booking.get("ticket_ref") or booking["id"] or "").strip()
+    boarded = boarded_seats_from_spec(spec)
+    display_seat = boarded_seat or booking.get("seat_number")
     return {
         "result": "SUCCESS",
         "booking_id": booking["id"],
         "booking_ref": booking_ref,
-        "passenger_name": booking["customer_name"],
-        "seat_number": booking["seat_number"],
+        "passenger_name": passenger_name or booking["customer_name"],
+        "seat_number": display_seat,
         "seat_count": seat_count,
+        "boarded_seats": boarded,
+        "remaining_seats": [s for s in seats if s not in set(boarded)],
         "special_requirements": {
             "needs_assistance": bool(spec.get("needs_assistance")),
             "allergies": spec.get("allergies") or [],
             "notes": spec.get("notes") or "",
             "pnr": spec.get("pnr"),
+            "boarded_seats": boarded,
         },
-        "message": "Επιτυχής επιβίβαση",
+        "message": (
+            f"Επιτυχής επιβίβαση · θέση {boarded_seat}"
+            if boarded_seat
+            else "Επιτυχής επιβίβαση"
+        ),
     }
 
 
@@ -113,6 +136,7 @@ async def _board_booking(
     *,
     trip_id: int,
     scan_step: int | None = None,
+    seat: str | None = None,
 ) -> dict:
     if booking["trip_id"] != trip_id:
         return scan_response_failure(
@@ -135,6 +159,11 @@ async def _board_booking(
             booking,
         )
 
+    seat_code = normalize_seat(seat)
+    seats = booking_seat_codes(booking)
+    spec = dict(booking.get("special_requirements") or {})
+    boarded = boarded_seats_from_spec(spec)
+
     if booking["check_in_status"] == "BOARDED":
         return scan_response_failure(
             "ALREADY_SCANNED",
@@ -142,7 +171,7 @@ async def _board_booking(
             booking,
         )
 
-    if scan_step is not None and booking.get("last_scan_step") == scan_step:
+    if scan_step is not None and booking.get("last_scan_step") == scan_step and not seat_code:
         return scan_response_failure(
             "REPLAY_DETECTED",
             "Επανάληψη σάρωσης (replay).",
@@ -150,15 +179,73 @@ async def _board_booking(
         )
 
     now = datetime.now(timezone.utc).isoformat()
+
+    # Legacy QR without seat → board entire booking (group ticket).
+    if not seat_code:
+        if seats:
+            boarded = list(seats)
+        spec["boarded_seats"] = boarded
+        await db.execute(
+            """
+            UPDATE ticket_bookings
+            SET check_in_status = 'BOARDED',
+                last_scan_step = ?,
+                boarded_at = ?,
+                special_requirements = ?
+            WHERE id = ? AND check_in_status != 'BOARDED'
+            """,
+            (scan_step, now, dump_special_requirements(spec), booking["id"]),
+        )
+        cur2 = await db.execute(
+            "SELECT * FROM ticket_bookings WHERE id = ?",
+            (booking["id"],),
+        )
+        updated = await cur2.fetchone()
+        if not updated:
+            return scan_response_failure("NOT_FOUND", "Δεν βρέθηκε κράτηση.")
+        boarded_booking = row_to_booking(updated)
+        _notify_passenger_boarded(boarded_booking, trip_id, seat=None)
+        _sync_office_boarded(boarded_booking, trip_id)
+        return scan_response_success(boarded_booking)
+
+    # QR carried a seat but booking has no seat list → treat as that single seat.
+    if not seats and seat_code:
+        seats = [seat_code]
+
+    if seats and seat_code not in seats:
+        return scan_response_failure(
+            "SEAT_MISMATCH",
+            f"Η θέση {seat_code} δεν ανήκει σε αυτή την κράτηση.",
+            booking,
+        )
+
+    if seat_code in boarded:
+        return scan_response_failure(
+            "ALREADY_SCANNED",
+            f"Η θέση {seat_code} έχει ήδη επιβιβαστεί.",
+            booking,
+        )
+
+    boarded = [*boarded, seat_code]
+    spec["boarded_seats"] = boarded
+    all_done = bool(seats) and all(s in boarded for s in seats)
+    check_status = "BOARDED" if all_done else "NONE"
     await db.execute(
         """
         UPDATE ticket_bookings
-        SET check_in_status = 'BOARDED',
+        SET check_in_status = ?,
             last_scan_step = ?,
-            boarded_at = ?
-        WHERE id = ? AND check_in_status != 'BOARDED'
+            boarded_at = ?,
+            special_requirements = ?
+        WHERE id = ?
         """,
-        (scan_step, now, booking["id"]),
+        (
+            check_status,
+            scan_step,
+            now if all_done else booking.get("boarded_at"),
+            dump_special_requirements(spec),
+            booking["id"],
+        ),
     )
 
     cur2 = await db.execute(
@@ -168,13 +255,19 @@ async def _board_booking(
     updated = await cur2.fetchone()
     if not updated:
         return scan_response_failure("NOT_FOUND", "Δεν βρέθηκε κράτηση.")
-    boarded = row_to_booking(updated)
-    _notify_passenger_boarded(boarded, trip_id)
-    _sync_office_boarded(boarded, trip_id)
-    return scan_response_success(boarded)
+    boarded_booking = row_to_booking(updated)
+    pax = passenger_name_for_seat(boarded_booking, seat_code)
+    _notify_passenger_boarded(boarded_booking, trip_id, seat=seat_code)
+    if all_done:
+        _sync_office_boarded(boarded_booking, trip_id)
+    return scan_response_success(
+        boarded_booking,
+        boarded_seat=seat_code,
+        passenger_name=pax,
+    )
 
 
-def _notify_passenger_boarded(booking: dict, trip_id: int) -> None:
+def _notify_passenger_boarded(booking: dict, trip_id: int, seat: str | None = None) -> None:
     try:
         from travel_platform.growth.partner_store import dispatch_event
 
@@ -183,8 +276,12 @@ def _notify_passenger_boarded(booking: dict, trip_id: int) -> None:
             {
                 "booking_id": booking["id"],
                 "trip_id": trip_id,
-                "passenger_name": booking.get("customer_name"),
-                "seat_number": booking.get("seat_number"),
+                "passenger_name": (
+                    passenger_name_for_seat(booking, seat)
+                    if seat
+                    else booking.get("customer_name")
+                ),
+                "seat_number": seat or booking.get("seat_number"),
                 "phone": booking.get("phone"),
             },
         )
@@ -243,7 +340,9 @@ async def process_scan(qr_token: str, trip_id: int) -> dict:
             return scan_response_failure("NOT_FOUND", "Δεν βρέθηκε κράτηση.")
 
         booking = row_to_booking(row)
-        return await _board_booking(db, booking, trip_id=trip_id, scan_step=step)
+        return await _board_booking(
+            db, booking, trip_id=trip_id, scan_step=step, seat=payload.get("seat")
+        )
 
 
 async def _process_bt1_scan(token: str, trip_id: int) -> dict:
@@ -267,7 +366,13 @@ async def _process_bt1_scan(token: str, trip_id: int) -> dict:
         row = await cur.fetchone()
         if not row:
             return scan_response_failure("NOT_FOUND", "Δεν βρέθηκε κράτηση.")
-        return await _board_booking(db, row_to_booking(row), trip_id=trip_id, scan_step=None)
+        return await _board_booking(
+            db,
+            row_to_booking(row),
+            trip_id=trip_id,
+            scan_step=None,
+            seat=payload.get("seat"),
+        )
 
 
 def _msg(reason: str) -> str:
@@ -281,4 +386,5 @@ def _msg(reason: str) -> str:
         "CANCELLED": "Ακυρωμένη κράτηση.",
         "ALREADY_SCANNED": "Ήδη επιβιβασμένος.",
         "REPLAY_DETECTED": "Επανάληψη σάρωσης.",
+        "SEAT_MISMATCH": "Η θέση δεν ανήκει στην κράτηση.",
     }.get(reason, "Άκυρο εισιτήριο.")

@@ -1,5 +1,6 @@
 /**
- * Step 1 My Wallet home — one boarding pass as the hero composition.
+ * My Wallet home — boarding pass(es). Multi-seat bookings get one QR per traveler
+ * (airline-style), still under a single booker wallet account.
  */
 import { Link } from 'react-router-dom';
 import TicketQrCode from '../TicketQrCode.jsx';
@@ -13,6 +14,118 @@ function formatTripWhen(booking) {
   const date = booking?.date || '—';
   const time = booking?.time || '';
   return time ? `${date} · ${time}` : date;
+}
+
+function PassengerTicketCard({
+  booking,
+  passenger,
+  coverImage,
+  brandLabel,
+  paid,
+  status,
+  pnr,
+  mark,
+  offline,
+  onOpenDetails,
+  onQrChange,
+  showActions,
+}) {
+  const seatBooking = {
+    ...booking,
+    seat: passenger.seat || booking.seat,
+    seats: passenger.seat ? [passenger.seat] : booking.seats,
+    customerName: passenger.name || booking.customerName,
+    passengerName: passenger.name || booking.passengerName,
+  };
+
+  return (
+    <article className="wallet-pass-card wallet-pass-card-enter" aria-label={`Εισιτήριο ${passenger.name || passenger.seat}`}>
+      <div className="wallet-pass-card-top">
+        <div className="min-w-0">
+          <p className="wallet-pass-kicker">
+            {passenger.role === 'booker' ? 'Επιβάτης · αγοραστής' : 'Επιβάτης'}
+          </p>
+          <p className="wallet-pass-passenger truncate">{passenger.name || '—'}</p>
+        </div>
+        <span className={`wallet-pass-status ${status.className}`}>
+          {booking.status || (paid ? 'Πληρωμένο' : '—')}
+        </span>
+      </div>
+
+      <div className="wallet-pass-meta">
+        <div>
+          <p className="wallet-pass-kicker">Θέση</p>
+          <p className="wallet-pass-meta-value">{passenger.seat || '—'}</p>
+        </div>
+        <div>
+          <p className="wallet-pass-kicker">Κωδικός</p>
+          <p className="wallet-pass-meta-value wallet-pass-mono">{pnr}</p>
+        </div>
+        <div>
+          <p className="wallet-pass-kicker">Ποσό</p>
+          <p className="wallet-pass-meta-value">
+            {showActions ? `€${Number(booking.price || 0).toFixed(2)}` : '—'}
+          </p>
+        </div>
+      </div>
+
+      <div className="wallet-pass-perforation" aria-hidden>
+        <span />
+        <span />
+      </div>
+
+      <div className={`wallet-pass-qr-wrap${paid && !offline ? ' is-live' : ''}`}>
+        {offline && booking._offlineQrDataUrl && showActions ? (
+          <div className="bg-white p-3 rounded-2xl wallet-pass-qr">
+            <img src={booking._offlineQrDataUrl} alt="QR εισιτηρίου" width={168} height={168} />
+          </div>
+        ) : (
+          <TicketQrCode
+            booking={seatBooking}
+            size={168}
+            className="wallet-pass-qr"
+            onQrChange={showActions ? onQrChange : undefined}
+          />
+        )}
+        <p className="wallet-pass-qr-hint">
+          {offline
+            ? 'Χωρίς σύνδεση · τελευταίο αποθηκευμένο QR'
+            : paid
+              ? `Δείξτε το QR για τη θέση ${passenger.seat || ''} στον οδηγό`
+              : 'Το QR ενεργοποιείται μετά την πληρωμή'}
+        </p>
+        {mark ? <p className="wallet-pass-mark">MARK {mark}</p> : null}
+      </div>
+
+      {showActions ? (
+        <div className="wallet-pass-actions">
+          <WalletDeviceSave booking={seatBooking} />
+          {paid && booking.tripId ? (
+            <PassengerTrackCTA booking={booking} showEta={false} />
+          ) : (
+            <button type="button" className="wallet-pass-cta" onClick={() => onOpenDetails?.(booking)}>
+              Λεπτομέρειες κράτησης
+            </button>
+          )}
+          <div className="wallet-pass-secondary-row">
+            <button
+              type="button"
+              className="wallet-pass-secondary"
+              onClick={() => onOpenDetails?.(booking)}
+            >
+              Λεπτομέρειες
+            </button>
+            <Link
+              to={`/ticket/print/${encodeURIComponent(booking.id)}?print=1`}
+              className="wallet-pass-secondary"
+            >
+              PDF
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </article>
+  );
 }
 
 export default function WalletBoardingPass({
@@ -55,20 +168,26 @@ export default function WalletBoardingPass({
   const st = statusStyle(booking);
   const pnr = booking.pnr || booking.id;
   const mark = bookingFiscalMark(booking);
-  const seats = booking.seat || booking.seats || '—';
-  const party = getBookingPassengers(booking);
-  const companions = party.filter((p) => p.role === 'companion' && p.name);
-  const bookerDisplay =
-    passengerName ||
-    party.find((p) => p.role === 'booker')?.name ||
-    booking.customerName ||
-    booking.passengerName ||
-    booking.passenger_name ||
-    booking.name ||
-    '—';
+  let party = getBookingPassengers(booking);
+  if (!party.length) {
+    party = [
+      {
+        seat: booking.seat || (Array.isArray(booking.seats) ? booking.seats[0] : '') || '',
+        name:
+          passengerName ||
+          booking.customerName ||
+          booking.passengerName ||
+          booking.name ||
+          '—',
+        role: 'booker',
+      },
+    ];
+  } else if (passengerName && party[0]?.role === 'booker' && !party[0].name) {
+    party = [{ ...party[0], name: passengerName }, ...party.slice(1)];
+  }
 
   return (
-    <section className="wallet-pass" aria-label="Εισιτήριο επιβίβασης">
+    <section className="wallet-pass" aria-label="Εισιτήρια επιβίβασης">
       <div
         className="wallet-pass-hero"
         style={{ backgroundImage: coverImage ? `url(${coverImage})` : undefined }}
@@ -78,105 +197,30 @@ export default function WalletBoardingPass({
           <p className="wallet-pass-brand">{brandLabel}</p>
           <h1 className="wallet-pass-title">{booking.tripTitle || 'Εκδρομή'}</h1>
           <p className="wallet-pass-when">{formatTripWhen(booking)}</p>
+          {party.length > 1 ? (
+            <p className="wallet-pass-party-count">{party.length} ξεχωριστά εισιτήρια · 1 QR ανά επιβάτη</p>
+          ) : null}
         </div>
       </div>
 
-      <div className="wallet-pass-card wallet-pass-card-enter">
-        <div className="wallet-pass-card-top">
-          <div className="min-w-0">
-            <p className="wallet-pass-kicker">Επιβάτης</p>
-            <p className="wallet-pass-passenger truncate">{bookerDisplay}</p>
-          </div>
-          <span className={`wallet-pass-status ${st.className}`}>{booking.status || (paid ? 'Πληρωμένο' : '—')}</span>
-        </div>
-
-        {companions.length > 0 ? (
-          <ul className="wallet-pass-party" aria-label="Μέλη κράτησης">
-            {party.map((p) => (
-              <li key={`${p.seat}-${p.name}`}>
-                <span className="wallet-pass-party-seat">{p.seat || '—'}</span>
-                <span className="wallet-pass-party-name truncate">
-                  {p.name || '—'}
-                  {p.role === 'booker' ? ' · αγοραστής' : ''}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        <div className="wallet-pass-meta">
-          <div>
-            <p className="wallet-pass-kicker">Θέση</p>
-            <p className="wallet-pass-meta-value">{seats}</p>
-          </div>
-          <div>
-            <p className="wallet-pass-kicker">Κωδικός</p>
-            <p className="wallet-pass-meta-value wallet-pass-mono">{pnr}</p>
-          </div>
-          <div>
-            <p className="wallet-pass-kicker">Ποσό</p>
-            <p className="wallet-pass-meta-value">€{Number(booking.price || 0).toFixed(2)}</p>
-          </div>
-        </div>
-
-        <div className="wallet-pass-perforation" aria-hidden>
-          <span />
-          <span />
-        </div>
-
-        <div className={`wallet-pass-qr-wrap${paid && !offline ? ' is-live' : ''}`}>
-          {offline && booking._offlineQrDataUrl ? (
-            <div className="bg-white p-3 rounded-2xl wallet-pass-qr">
-              <img
-                src={booking._offlineQrDataUrl}
-                alt="QR εισιτηρίου"
-                width={168}
-                height={168}
-              />
-            </div>
-          ) : (
-            <TicketQrCode
-              booking={booking}
-              size={168}
-              className="wallet-pass-qr"
-              onQrChange={onQrChange}
-            />
-          )}
-          <p className="wallet-pass-qr-hint">
-            {offline
-              ? 'Χωρίς σύνδεση · τελευταίο αποθηκευμένο QR'
-              : paid
-                ? 'Δείξτε το QR στον οδηγό κατά την επιβίβαση'
-                : 'Το QR ενεργοποιείται μετά την πληρωμή'}
-          </p>
-          {mark ? <p className="wallet-pass-mark">MARK {mark}</p> : null}
-        </div>
-
-        <div className="wallet-pass-actions">
-          <WalletDeviceSave booking={booking} />
-          {paid && booking.tripId ? (
-            <PassengerTrackCTA booking={booking} showEta={false} />
-          ) : (
-            <button type="button" className="wallet-pass-cta" onClick={() => onOpenDetails?.(booking)}>
-              Λεπτομέρειες κράτησης
-            </button>
-          )}
-          <div className="wallet-pass-secondary-row">
-            <button
-              type="button"
-              className="wallet-pass-secondary"
-              onClick={() => onOpenDetails?.(booking)}
-            >
-              Λεπτομέρειες
-            </button>
-            <Link
-              to={`/ticket/print/${encodeURIComponent(booking.id)}?print=1`}
-              className="wallet-pass-secondary"
-            >
-              PDF
-            </Link>
-          </div>
-        </div>
+      <div className={`wallet-pass-stack${party.length > 1 ? ' is-multi' : ''}`}>
+        {party.map((p, index) => (
+          <PassengerTicketCard
+            key={`${p.seat}-${p.name}-${index}`}
+            booking={booking}
+            passenger={p}
+            coverImage={coverImage}
+            brandLabel={brandLabel}
+            paid={paid}
+            status={st}
+            pnr={pnr}
+            mark={index === 0 ? mark : null}
+            offline={offline}
+            onOpenDetails={onOpenDetails}
+            onQrChange={onQrChange}
+            showActions={index === 0}
+          />
+        ))}
       </div>
     </section>
   );
