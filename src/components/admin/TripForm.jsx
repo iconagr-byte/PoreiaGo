@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import { createFleetDriver, fetchFleetDrivers } from '../../services/platformApi.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-import LocationPicker from './LocationPicker.jsx';
+import TripRouteStopsPanel from './TripRouteStopsPanel.jsx';
 import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
 import HybridRoomingExtras from './hybrid/HybridRoomingExtras.jsx';
@@ -15,20 +12,6 @@ import {
   MARKET_INTERNATIONAL,
   MARKET_LABELS,
 } from '../../lib/trips/tripMarket.js';
-
-const redIcon = L.divIcon({
-  className: 'custom-red-pin',
-  html: `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ef4444" stroke="white" stroke-width="1.5" class="w-10 h-10 drop-shadow-lg" style="margin-top:-20px; margin-left:-8px;">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-      <circle cx="12" cy="10" r="3" fill="white"></circle>
-    </svg>
-  `,
-  iconSize: [24, 24],
-  iconAnchor: [12, 24],
-  popupAnchor: [0, -24],
-});
-L.Marker.prototype.options.icon = redIcon;
 
 const DURATION_PRESETS = ['Ημιημερήσια', 'Ημερήσια', '2 ημέρες', '3 ημέρες', 'Weekend', 'Πολυήμερη'];
 const BADGE_PRESETS = ['Προτεινόμενη', 'Νέα', 'Last seats', 'Early bird'];
@@ -311,32 +294,6 @@ export default function TripForm({
   const usedDriverIds = new Set(
     [formData.driverId, ...additionalFleet.map((r) => r.driverId)].filter(Boolean),
   );
-
-  const handleAddStop = () => {
-    const newId = Date.now();
-    patch({
-      stops: [
-        ...(formData.stops || []),
-        { id: newId, name: '', lat: 38.0, lng: 23.0, time: '12:00', image: null, description: '' },
-      ],
-    });
-    setActiveStopId(newId);
-  };
-
-  const handleRemoveStop = (id) => {
-    patch({ stops: formData.stops.filter((s) => s.id !== id) });
-    if (activeStopId === id) setActiveStopId(null);
-  };
-
-  const handleUpdateStop = (id, field, value) => {
-    patch({
-      stops: formData.stops.map((s) =>
-        s.id === id
-          ? { ...s, [field]: field === 'lat' || field === 'lng' ? parseFloat(value) : value }
-          : s,
-      ),
-    });
-  };
 
   const handleCoverImageUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -987,92 +944,14 @@ export default function TripForm({
       <Section
         icon="route"
         title="Διαδρομή & στάσεις"
-        hint="Κάντε κλικ στον χάρτη για να ορίσετε τοποθεσία."
-        action={
-          <button
-            type="button"
-            onClick={handleAddStop}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800"
-          >
-            <span className="material-symbols-outlined text-[16px]">add</span>
-            Νέα στάση
-          </button>
-        }
+        hint="Αναζήτηση τόπου, συντομεύσεις πόλεων, κλικ στον χάρτη και αναδιάταξη στάσεων."
       >
-        <div className="grid lg:grid-cols-2 gap-5">
-          <div>
-            {(formData.stops || []).length === 0 ? (
-              <p className="text-sm text-slate-500 italic py-8 text-center border border-dashed border-slate-200 rounded-xl">
-                Δεν έχουν προστεθεί στάσεις ακόμα.
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                {formData.stops.map((stop, index) => (
-                  <div
-                    key={stop.id}
-                    onClick={() => setActiveStopId(stop.id)}
-                    className={`rounded-xl border p-3 cursor-pointer transition ${
-                      activeStopId === stop.id
-                        ? 'border-slate-900 bg-slate-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
-                          activeStopId === stop.id
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {index + 1}
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        value={stop.name}
-                        onChange={(e) => handleUpdateStop(stop.id, 'name', e.target.value)}
-                        className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm"
-                        placeholder="Όνομα στάσης"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <input
-                        type="time"
-                        required
-                        value={stop.time}
-                        onChange={(e) => handleUpdateStop(stop.id, 'time', e.target.value)}
-                        className="w-[7.5rem] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveStop(stop.id);
-                        }}
-                        className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="h-[360px] rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-            <MapContainer center={[38.5, 23.0]} zoom={6} className="h-full w-full">
-              <TileLayer
-                attribution="&copy; OpenStreetMap"
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              />
-              <LocationPicker activeStopId={activeStopId} setFormData={setFormData} />
-              {(formData.stops || []).map((stop) => (
-                <Marker key={stop.id} position={[stop.lat, stop.lng]} />
-              ))}
-            </MapContainer>
-          </div>
-        </div>
+        <TripRouteStopsPanel
+          formData={formData}
+          setFormData={setFormData}
+          activeStopId={activeStopId}
+          setActiveStopId={setActiveStopId}
+        />
       </Section>
 
       <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-4 py-3 shadow-lg">
