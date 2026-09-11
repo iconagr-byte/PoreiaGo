@@ -433,3 +433,99 @@ def seed_booking_kwargs(
         "seat_label": seat_label,
         "metadata_json": meta,
     }
+
+def ensure_booking_from_admin_dict(tenant_id: UUID, data: dict[str, Any]) -> Booking:
+    """Build a Postgres Booking row from BackOffice / local cache JSON.
+
+    Used when cash/bank capture runs for an office booking that exists in the
+    ticket cache but was never written to Postgres (walk-in / offline create).
+    """
+    ref_raw = (
+        data.get("pnr")
+        or data.get("reference_code")
+        or data.get("referenceCode")
+        or data.get("id")
+        or ""
+    )
+    reference_code = normalize_reference(str(ref_raw))
+    total = Decimal(
+        str(
+            data.get("price")
+            if data.get("price") is not None
+            else data.get("amount")
+            if data.get("amount") is not None
+            else data.get("total_eur")
+            or 0
+        )
+    )
+    paid = Decimal(
+        str(
+            data.get("amountPaid")
+            if data.get("amountPaid") is not None
+            else data.get("amount_paid")
+            or 0
+        )
+    )
+    seats = data.get("seats") or []
+    if isinstance(seats, str):
+        seats = [s.strip() for s in seats.split(",") if s.strip()]
+    seat_label = data.get("seat") or data.get("seat_label") or ", ".join(seats) or None
+    status_raw = str(data.get("status") or "").strip().lower()
+    if status_raw in ("ακυρωμένη", "ακυρωμενη", "cancelled", "refunded"):
+        status = BookingStatus.CANCELLED
+    elif status_raw in ("ολοκληρώθηκε", "boarded", "checked_in"):
+        status = BookingStatus.BOARDED
+    elif paid > 0 and paid < total:
+        status = BookingStatus.CONFIRMED
+    elif paid >= total and total > 0:
+        status = BookingStatus.PAID
+    else:
+        status = BookingStatus.CONFIRMED
+
+    if paid <= 0:
+        payment_status = PaymentStatus.PENDING
+    elif paid >= total and total > 0:
+        payment_status = PaymentStatus.PAID
+    else:
+        payment_status = PaymentStatus.PARTIAL
+
+    meta = {
+        "trip_title": data.get("tripTitle") or data.get("trip_title") or data.get("excursionName"),
+        "seats": list(seats),
+        "phone": data.get("phone") or "",
+        "payment_method": data.get("paymentMethod") or data.get("payment_method"),
+        "payment_status": data.get("paymentStatus") or data.get("payment_status"),
+        "source": data.get("bookingSource") or data.get("source") or "office_cash_upsert",
+        "agent_name": data.get("agentName") or data.get("agent_name"),
+        "amount_paid": float(paid),
+        "balance_due": float(
+            data.get("balanceDue")
+            if data.get("balanceDue") is not None
+            else max(total - paid, Decimal("0"))
+        ),
+        "local_id": data.get("id"),
+    }
+    passengers = data.get("passengers")
+    if passengers:
+        meta["passengers"] = passengers
+
+    return Booking(
+        tenant_id=tenant_id,
+        reference_code=reference_code,
+        status=status,
+        payment_status=payment_status,
+        seat_label=seat_label,
+        passenger_name=str(
+            data.get("customerName")
+            or data.get("passenger_name")
+            or data.get("passengerName")
+            or "Επιβάτης"
+        ),
+        passenger_email=data.get("email") or data.get("passenger_email") or data.get("passengerEmail"),
+        total_price=total,
+        amount_paid=paid,
+        amount_eur=total,
+        metadata_json=meta,
+        notes=data.get("notes"),
+    )
+

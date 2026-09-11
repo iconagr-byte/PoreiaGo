@@ -42,9 +42,17 @@ async function parseError(res) {
       .filter(Boolean)
       .join(' · ');
   }
-  if (res.status === 404) {
+  // Only replace empty/generic 404s — keep explicit backend messages (e.g. missing booking).
+  if (res.status === 404 && (!detail || detail === 'Not Found')) {
     message =
       'Το API πληρωμών δεν είναι διαθέσιμο σε αυτό το περιβάλλον — δοκίμασε refresh ή επικοινώνησε με υποστήριξη';
+  }
+  if (
+    res.status >= 500 &&
+    (!detail || detail === 'Internal Server Error' || message === 'Internal Server Error')
+  ) {
+    message =
+      'Αποτυχία καταχώρησης πληρωμής στον server. Δοκίμασε ξανά σε λίγο ή επικοινώνησε με υποστήριξη.';
   }
   throw new Error(message);
 }

@@ -55,7 +55,7 @@ async def _resolve_tenant_id(tenant_id: UUID | None) -> UUID:
 
 async def _find_booking(session, tenant_id: UUID, booking_key: str):
     from app.models.booking import Booking
-    from api.admin_booking_mapper import normalize_reference
+    from api.admin_booking_mapper import booking_id_aliases, normalize_reference
 
     key = booking_key.strip()
     filters = []
@@ -66,9 +66,22 @@ async def _find_booking(session, tenant_id: UUID, booking_key: str):
     ref = normalize_reference(key)
     filters.append(Booking.reference_code == ref)
     filters.append(Booking.reference_code == key.upper())
-    if not filters:
+    # Local wallet ids look like B-HYDK37BA / B-BKHYDK37BA — also try peeled forms.
+    for alias in booking_id_aliases(key):
+        filters.append(Booking.reference_code == normalize_reference(alias))
+        filters.append(Booking.reference_code == alias.upper())
+    # De-dupe while preserving order
+    seen: set[str] = set()
+    unique_filters = []
+    for f in filters:
+        sig = str(f)
+        if sig in seen:
+            continue
+        seen.add(sig)
+        unique_filters.append(f)
+    if not unique_filters:
         return None
-    stmt = select(Booking).where(Booking.tenant_id == tenant_id, or_(*filters)).limit(1)
+    stmt = select(Booking).where(Booking.tenant_id == tenant_id, or_(*unique_filters)).limit(1)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
