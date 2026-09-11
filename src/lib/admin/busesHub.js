@@ -16,7 +16,7 @@ export const BUSES_HUB_TABS = [
   },
   {
     id: 'customers',
-    label: 'Πελάτες λεωφορείων',
+    label: 'Πελάτες',
     description: 'CRM επιβατών — χωριστά από ενοικιάσεις',
     icon: 'group',
     accent: 'violet',
