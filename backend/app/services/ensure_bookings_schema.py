@@ -34,7 +34,21 @@ _HEAL_STATEMENTS: tuple[str, ...] = (
     ),
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS seat_label VARCHAR(128)",
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS trip_id UUID",
-    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS reference_code VARCHAR(32)",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS reference_code VARCHAR(64)",
+    # Contabo refs from UUID keys can exceed VARCHAR(32) (BK- + 36-char UUID).
+    """
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'bookings'
+          AND column_name = 'reference_code'
+      ) THEN
+        ALTER TABLE bookings ALTER COLUMN reference_code TYPE VARCHAR(64);
+      END IF;
+    END $$
+    """,
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'pending'",
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS passenger_name VARCHAR(255)",
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS passenger_email VARCHAR(320)",
