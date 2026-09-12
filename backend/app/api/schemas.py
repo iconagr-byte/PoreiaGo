@@ -44,7 +44,7 @@ class MfaVerifyRequest(BaseModel):
 
 
 class BookingCreate(BaseModel):
-    trip_id: UUID | None = None
+    trip_id: int | None = None
     passenger_name: str
     passenger_email: EmailStr | None = None
     seat_label: str | None = None

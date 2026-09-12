@@ -6,7 +6,7 @@ import enum
 from decimal import Decimal
 from uuid import uuid4
 
-from sqlalchemy import Enum, ForeignKey, Numeric, String, Text
+from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,7 +38,8 @@ class Booking(Base, TimestampMixin, TenantScopedMixin):
         nullable=False,
         index=True,
     )
-    trip_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    # Contabo / office trips use integer ids (not SaaS UUID trips).
+    trip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     customer_user_id: Mapped[UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),

@@ -73,6 +73,14 @@ class EnsureBookingsSchemaTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("updated_at", blob)
         self.assertIn("created_at", blob)
 
+    def test_heal_sql_normalizes_trip_id_to_integer(self):
+        from app.services.ensure_bookings_schema import _HEAL_STATEMENTS
+
+        blob = "\n".join(_HEAL_STATEMENTS)
+        self.assertIn("trip_id INTEGER", blob)
+        self.assertIn("udt_name = 'uuid'", blob)
+        self.assertIn("ALTER COLUMN trip_id TYPE INTEGER", blob)
+
     def test_heal_sql_softens_legacy_not_null(self):
         from app.services.ensure_bookings_schema import _HEAL_STATEMENTS
 
@@ -81,6 +89,15 @@ class EnsureBookingsSchemaTests(unittest.IsolatedAsyncioTestCase):
 
     def test_ignores_unrelated_errors(self):
         self.assertFalse(is_bookings_schema_drift_error(RuntimeError("timeout")))
+
+    def test_detects_trip_id_datatype_mismatch(self):
+        exc = Exception(
+            "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) "
+            "<class 'asyncpg.exceptions.DatatypeMismatchError'>: "
+            'column "trip_id" is of type integer but expression is of type uuid '
+            "[SQL: INSERT INTO bookings (id, tenant_id, trip_id"
+        )
+        self.assertTrue(is_bookings_schema_drift_error(exc))
 
 
 class FindBookingHealTests(unittest.IsolatedAsyncioTestCase):

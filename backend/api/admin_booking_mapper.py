@@ -509,8 +509,11 @@ def ensure_booking_from_admin_dict(tenant_id: UUID, data: dict[str, Any]) -> Boo
     if passengers:
         meta["passengers"] = passengers
 
+    trip_id = _coerce_office_trip_id(data, meta)
+
     return Booking(
         tenant_id=tenant_id,
+        trip_id=trip_id,
         reference_code=reference_code,
         status=status,
         payment_status=payment_status,
@@ -528,4 +531,31 @@ def ensure_booking_from_admin_dict(tenant_id: UUID, data: dict[str, Any]) -> Boo
         metadata_json=meta,
         notes=data.get("notes"),
     )
+
+
+def _coerce_office_trip_id(data: dict[str, Any], meta: dict[str, Any]) -> int | None:
+    """Office / cache trips are integer ids — never UUID."""
+    for key in ("tripId", "trip_id", "external_trip_id", "externalTripId"):
+        raw = data.get(key)
+        if raw is None or raw == "":
+            continue
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            meta.setdefault("external_trip_id", value)
+            return value
+    for key in ("external_trip_id", "trip_id"):
+        raw = meta.get(key)
+        if raw is None or raw == "":
+            continue
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            meta.setdefault("external_trip_id", value)
+            return value
+    return None
 
