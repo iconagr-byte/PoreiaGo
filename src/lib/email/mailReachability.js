@@ -49,11 +49,12 @@ export function hostingWhitelistRequest({
 } = {}) {
   const ip = String(egressIp || APP_MAIL_EGRESS_IP).trim() || APP_MAIL_EGRESS_IP;
   return (
-    `Παρακαλώ επιτρέψτε εξωτερικές συνδέσεις IMAP/SMTP από το IP ${ip} ` +
-    `προς ${mailHost} στις θύρες ${imapPort} (IMAP SSL) και ${smtpPort} (SMTP SSL). ` +
-    `Επιτρέψτε remote AUTH (IMAP LOGIN + SMTP AUTH) — όχι μόνο άνοιγμα θυρών. ` +
-    `Το webmail μπορεί να δουλεύει ενώ το remote AUTH από αυτό το IP απορρίπτεται με 535. ` +
-    `Χωρίς whitelist το γραφείο δεν μπορεί να συγχρονίσει το mailbox.`
+    `Παρακαλώ επιβεβαιώστε ότι επιτρέπεται remote IMAP/SMTP AUTH από το IP ${ip} ` +
+    `(Contabo VPS της εφαρμογής — ΟΧΙ το παλιό GCP 34.141.98.145) ` +
+    `προς ${mailHost} στις θύρες ${imapPort} (IMAP SSL) και ${smtpPort} (SMTP SSL) ` +
+    `για τον λογαριασμό mailbox. Χρειάζεται remote AUTH (IMAP LOGIN + SMTP AUTH), ` +
+    `όχι μόνο άνοιγμα θυρών / «όλα ΟΚ στο webmail». ` +
+    `Από αυτό το IP παίρνουμε AUTHENTICATIONFAILED / 535 ενώ το TCP ανοίγει.`
   );
 }
 
@@ -94,12 +95,14 @@ export function mailTimeoutGuide({ mailHost, imapPort, smtpPort, egressIp } = {}
  * Guide when webmail works but IMAP/SMTP AUTH fails with Exim 535 from the app server.
  */
 export function mailRemoteAuthGuide({ mailHost, imapPort, smtpPort, egressIp } = {}) {
+  const ip = String(egressIp || APP_MAIL_EGRESS_IP).trim() || APP_MAIL_EGRESS_IP;
   return {
     title: 'Το webmail ανοίγει — η εφαρμογή όχι',
     summary:
-      'Αν το Intechs λέει ότι όλα είναι ΟΚ στο hosting, ζητήστε ρητά remote AUTH από το IP της εφαρμογής. Το webmail μπορεί να δουλεύει ενώ IMAP/SMTP από εξωτερικό IP απορρίπτεται με 535 Incorrect authentication data.',
-    nextStep: 'Στείλτε στον πάροχο hosting (cPanel / Intechs) το παρακάτω αίτημα whitelist (και remote AUTH, όχι μόνο άνοιγμα θυρών).',
-    ...mailReachabilityGuideBase({ mailHost, imapPort, smtpPort, egressIp }),
+      `Αν το Intechs λέει ότι «το έκαναν ήδη», επιβεβαιώστε ότι το επιτρεπόμενο IP είναι ${ip} (Contabo) και ΟΧΙ το παλιό Google IP 34.141.98.145. Επίσης remote AUTH (IMAP LOGIN + SMTP AUTH), όχι μόνο ανοιχτές θύρες. Το 535 / AUTHENTICATIONFAILED είναι ίδιο είτε για λάθος κωδικό είτε για block ανά IP.`,
+    nextStep:
+      'Στείλτε στο Intechs το παρακάτω αίτημα και ζητήστε επιβεβαίωση ποιο ακριβώς IP έχουν στη whitelist (CSF / cPHulk / SMTP Restrictions).',
+    ...mailReachabilityGuideBase({ mailHost, imapPort, smtpPort, egressIp: ip }),
   };
 }
 

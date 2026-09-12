@@ -13,7 +13,9 @@ describe('mailReachability', () => {
   it('uses Contabo egress IP', () => {
     expect(APP_MAIL_EGRESS_IP).toBe('169.58.199.186');
     expect(hostingWhitelistRequest({})).toContain('169.58.199.186');
-    expect(hostingWhitelistRequest({})).not.toContain('34.141.98.145');
+    // Mentions old GCP IP only as explicit "do NOT whitelist this" warning.
+    expect(hostingWhitelistRequest({})).toContain('34.141.98.145');
+    expect(hostingWhitelistRequest({})).toMatch(/ΟΧΙ το παλιό GCP/);
   });
 
   it('builds structured timeout guide with copyable request', () => {
@@ -47,5 +49,7 @@ describe('mailReachability', () => {
     });
     expect(g.title).toMatch(/webmail/i);
     expect(g.request).toContain('169.58.199.186');
+    expect(g.request).toContain('34.141.98.145');
+    expect(g.summary).toContain('34.141.98.145');
   });
 });
