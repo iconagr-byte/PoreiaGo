@@ -10,8 +10,8 @@ export const FLEET_VEHICLE_CATEGORIES = [
   },
   {
     id: 'Premium Express',
-    label: 'Premium εξπρές',
-    shortLabel: 'Premium εξπρές',
+    label: 'Εξπρές πολυτελείας',
+    shortLabel: 'Εξπρές',
     seats: 32,
     icon: 'directions_bus',
   },
@@ -24,8 +24,8 @@ export const FLEET_VEHICLE_CATEGORIES = [
   },
   {
     id: 'Van',
-    label: 'Van / μίνι λεωφορείο',
-    shortLabel: 'Van / μίνι',
+    label: 'Μικρό λεωφορείο / van',
+    shortLabel: 'Μικρό / van',
     seats: 9,
     icon: 'airport_shuttle',
   },
