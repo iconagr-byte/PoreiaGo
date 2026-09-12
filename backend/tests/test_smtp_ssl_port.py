@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+import unittest.mock
 
 
 class SmtpConfigTests(unittest.TestCase):
@@ -127,7 +128,60 @@ class SmtpConfigTests(unittest.TestCase):
 
 class MailProbeDiagnosticsTests(unittest.TestCase):
     def test_remote_auth_flag_when_imap_auth_fails_after_tcp(self):
-        from email_client.dynamic_mailer import test_account_connection
+        from email_client import dynamic_mailer as dm
+
+        account = {
+            "imap_host": "mail.example-office.gr",
+            "imap_port": 993,
+            "smtp_host": "mail.example-office.gr",
+            "smtp_port": 465,
+            "email_address": "info@example-office.gr",
+            "mail_username": "info@example-office.gr",
+            "mail_password": "DefinitelyWrongPass99",
+            "imap_secure": True,
+        }
+
+        def fake_imap(_cfg):
+            return {
+                "ok": False,
+                "tcp_ok": True,
+                "peer_ip": "1.2.3.4",
+                "auth_mechs": "PLAIN",
+                "server_reply": "[AUTHENTICATIONFAILED] Authentication failed.",
+                "error": Exception("[AUTHENTICATIONFAILED] Authentication failed."),
+            }
+
+        def fake_smtp(_cfg):
+            return {
+                "ok": False,
+                "tcp_ok": True,
+                "peer_ip": "1.2.3.4",
+                "auth_mechs": "PLAIN LOGIN",
+                "server_reply": "(535, b'Incorrect authentication data')",
+                "error": Exception("535 Incorrect authentication data"),
+            }
+
+        with (
+            unittest.mock.patch.object(dm, "probe_imap_login", side_effect=fake_imap),
+            unittest.mock.patch.object(dm, "probe_smtp_login", side_effect=fake_smtp),
+            unittest.mock.patch.object(dm, "discover_egress_ip", return_value="169.58.199.186"),
+        ):
+            result = dm.test_account_connection(account)
+
+        self.assertFalse(result["ok"])
+        self.assertFalse(result["imap"].get("ok"))
+        self.assertTrue(result.get("credentials_rejected") or result.get("remote_auth"))
+        self.assertTrue(result["remote_auth"])
+        self.assertFalse(result.get("wrong_mail_host"))
+        diag = result.get("diagnostics") or {}
+        self.assertTrue(diag.get("imap_tcp_ok"))
+        self.assertEqual(diag.get("egress_ip"), "169.58.199.186")
+        auth_debug = result.get("auth_debug") or {}
+        self.assertIn("password_len", auth_debug)
+        self.assertNotIn("DefinitelyWrongPass99", str(result))
+
+    def test_wrong_mail_host_flag_for_achillio_dns(self):
+        from email_client import dynamic_mailer as dm
 
         account = {
             "imap_host": "mail.achilliotravel.com",
@@ -139,22 +193,45 @@ class MailProbeDiagnosticsTests(unittest.TestCase):
             "mail_password": "DefinitelyWrongPass99",
             "imap_secure": True,
         }
-        result = test_account_connection(account)
+
+        def fake_imap(_cfg):
+            return {
+                "ok": False,
+                "tcp_ok": True,
+                "peer_ip": "185.104.144.132",
+                "auth_mechs": "PLAIN",
+                "server_reply": "[AUTHENTICATIONFAILED] Authentication failed.",
+                "error": Exception("[AUTHENTICATIONFAILED] Authentication failed."),
+            }
+
+        def fake_smtp(_cfg):
+            return {
+                "ok": False,
+                "tcp_ok": True,
+                "peer_ip": "185.104.144.132",
+                "auth_mechs": "PLAIN LOGIN",
+                "server_reply": "(535, b'Incorrect authentication data')",
+                "error": Exception("535 Incorrect authentication data"),
+            }
+
+        with (
+            unittest.mock.patch.object(dm, "probe_imap_login", side_effect=fake_imap),
+            unittest.mock.patch.object(dm, "probe_smtp_login", side_effect=fake_smtp),
+            unittest.mock.patch.object(dm, "discover_egress_ip", return_value="169.58.199.186"),
+        ):
+            result = dm.test_account_connection(account)
+
         self.assertFalse(result["ok"])
-        self.assertFalse(result["imap"].get("ok"))
-        # Prefer credentials_rejected; fall back to IMAP AUTH + remote_auth.
-        self.assertTrue(
-            result.get("credentials_rejected")
-            or result.get("remote_auth")
-            or "λάθος" in str(result.get("imap", {}).get("error") or "")
-        )
-        self.assertTrue(result["remote_auth"])
         diag = result.get("diagnostics") or {}
-        self.assertTrue(diag.get("imap_tcp_ok"))
-        self.assertIn("egress_ip", diag)
-        auth_debug = result.get("auth_debug") or {}
-        self.assertIn("password_len", auth_debug)
+        self.assertTrue(result.get("wrong_mail_host") or diag.get("wrong_mail_host"))
+        self.assertEqual(
+            result.get("suggested_mail_host") or diag.get("suggested_mail_host"),
+            "srv23.intechs.gr",
+        )
+        # Prefer wrong-host guidance over remote-auth whitelist for this DNS case.
+        self.assertFalse(result.get("remote_auth"))
         self.assertNotIn("DefinitelyWrongPass99", str(result))
+
 
 
 if __name__ == "__main__":

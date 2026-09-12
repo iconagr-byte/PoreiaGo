@@ -56,6 +56,16 @@ def is_smtp_auth_reject(exc: BaseException | str) -> bool:
 is_smtp_remote_auth_reject = is_smtp_auth_reject
 
 
+# DNS for these hosts points at the wrong shared cPanel box (AUTH fails;
+# webmail on the suggested host still works with the same password).
+WRONG_MAIL_HOST_HINTS = {
+    "mail.achilliotravel.com": {
+        "suggested_host": "srv23.intechs.gr",
+        "note": "mail.achilliotravel.com → srv24; mailbox on srv23",
+    },
+}
+
+
 def normalize_mail_password(password: str | None, *, host: str = "", email: str = "") -> str:
     """Normalize mailbox passwords without corrupting cPanel secrets.
 
@@ -328,6 +338,23 @@ def test_account_connection(account: dict) -> dict:
     except Exception:
         egress_ip = ""
 
+    imap_host = str(
+        (account.get("imap_host") or debug.get("imap_host") or "")
+    ).strip().lower()
+    wrong_hint = WRONG_MAIL_HOST_HINTS.get(imap_host)
+    # Known-wrong DNS host: SMTP 535 / IMAP AUTH fail after TCP is enough
+    # (IMAP can intermittently time out while SMTP AUTH still proves the box).
+    wrong_mail_host = bool(
+        wrong_hint
+        and (
+            (bool(imap_tcp) and imap_auth_fail)
+            or (bool(smtp_tcp) and smtp_auth_fail)
+        )
+    )
+    if wrong_mail_host:
+        # Prefer DNS/host guidance over remote-IP whitelist when host is known-wrong.
+        remote_auth = False
+
     diagnostics = {
         "egress_ip": egress_ip,
         "imap_tcp_ok": bool(imap_tcp),
@@ -338,6 +365,9 @@ def test_account_connection(account: dict) -> dict:
         "smtp_auth_mechs": smtp.get("auth_mechs"),
         "imap_peer_ip": imap.get("peer_ip"),
         "smtp_peer_ip": smtp.get("peer_ip"),
+        "wrong_mail_host": wrong_mail_host,
+        "suggested_mail_host": (wrong_hint or {}).get("suggested_host") if wrong_mail_host else None,
+        "wrong_mail_host_note": (wrong_hint or {}).get("note") if wrong_mail_host else None,
     }
     debug = {**debug, "egress_ip": egress_ip}
 
@@ -348,6 +378,8 @@ def test_account_connection(account: dict) -> dict:
         "auth_debug": debug,
         "diagnostics": diagnostics,
         "remote_auth": remote_auth,
+        "wrong_mail_host": wrong_mail_host,
+        "suggested_mail_host": diagnostics.get("suggested_mail_host"),
         "credentials_rejected": bool(auth_rejected),
     }
 
