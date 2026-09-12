@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import {
 import { LEAFLET_BASEMAP } from '../../../lib/maps/appleMapTheme.js';
+import {
   geocodePlaces,
   jitterLatLng,
   placesFromBookings,

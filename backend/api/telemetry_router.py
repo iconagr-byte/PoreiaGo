@@ -141,10 +141,10 @@ async def fleet_live(
                 vehicle_code=v.vehicle_code,
             )
             trip_title = await resolve_trip_title(v.trip_id, preferred=meta.get("trip_title"))
+            # Empty Redis trail → empty list. Do not fabricate a 1-point stub:
+            # the client accumulates from the live pin and a stub would replace
+            # that growing path on every poll.
             raw_trail = trails_by_vehicle.get(str(v.vehicle_id)) or []
-            # Always include current pin so a brand-new shift still draws a path start.
-            if not raw_trail:
-                raw_trail = [{"lat": v.lat, "lng": v.lng, "t": None, "s": v.speed_kmh, "h": meta.get("heading_deg")}]
             rows.append(
                 LiveVehicleResponse(
                     vehicle_id=v.vehicle_id,
