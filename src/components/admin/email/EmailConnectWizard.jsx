@@ -10,6 +10,7 @@ import {
 } from '../../../lib/email/emailProviderPresets.js';
 import {
   isMailTimeoutMessage,
+  isMailRemoteAuthPair,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
 } from '../../../lib/email/mailReachability.js';
@@ -260,14 +261,33 @@ export default function EmailConnectWizard({
         const debugLine = dbg
           ? `\n\nΈλεγχος με username «${dbg.username}», μήκος κωδικού ${dbg.password_len}.`
           : '';
+        const egress = r.diagnostics?.egress_ip || dbg?.egress_ip || '';
+        const egressLine = egress ? `\nIP εξόδου εφαρμογής: ${egress}` : '';
+        const remoteAuth =
+          Boolean(r.remote_auth) || isMailRemoteAuthPair(imapErr, smtpErr);
+        const mailHost = account.imap_host || account.smtp_host;
+        const imapPort = Number(account.imap_port) || 993;
+        const smtpPort = Number(account.smtp_port) || 465;
         setTestMsg({
           ok: false,
-          text:
-            (text || 'Αποτυχία σύνδεσης') +
-            '\n\nΕφόσον το TCP ανοίγει, ο mail server απέρριψε username/κωδικό — ξαναβάλτε τον κωδικό webmail.' +
-            debugLine,
+          remoteAuth,
+          egressIp: egress || undefined,
+          mailHost,
+          imapPort,
+          smtpPort,
+          text: remoteAuth
+            ? (text || 'Αποτυχία AUTH') + egressLine
+            : (text || 'Αποτυχία σύνδεσης') +
+              '\n\nΕφόσον το TCP ανοίγει, ο mail server απέρριψε username/κωδικό — ξαναβάλτε τον κωδικό webmail.' +
+              debugLine +
+              egressLine,
         });
-        toast.error(text || 'Αποτυχία σύνδεσης', { id: 'email-conn-test' });
+        toast.error(
+          remoteAuth
+            ? 'Το TCP ανοίγει — πιθανό block remote AUTH από hosting'
+            : text || 'Αποτυχία σύνδεσης',
+          { id: 'email-conn-test', duration: remoteAuth ? 6000 : 4000 },
+        );
       }
     } catch (err) {
       window.clearTimeout(tick);
@@ -672,6 +692,7 @@ export default function EmailConnectWizard({
               hint={undefined}
               timeout={testMsg.timeout}
               remoteAuth={testMsg.remoteAuth}
+              egressIp={testMsg.egressIp}
               mailHost={testMsg.mailHost}
               imapPort={testMsg.imapPort}
               smtpPort={testMsg.smtpPort}

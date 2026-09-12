@@ -297,10 +297,18 @@ async def update_settings(settings_id: str, patch: dict) -> dict | None:
         return None
     password = patch.get("mail_password")
     enc = None
-    if password is not None:
-        enc = encrypt_password(password) if password else existing.get("mail_password_enc", "")
-
     db = get_db()
+    if password is not None:
+        if password:
+            enc = encrypt_password(password)
+        else:
+            # Keep existing ciphertext — row dict from get_settings has no mail_password_enc.
+            cur = await db.execute(
+                "SELECT mail_password_enc FROM email_settings WHERE id = ?",
+                (settings_id,),
+            )
+            row = await cur.fetchone()
+            enc = (row["mail_password_enc"] if row else "") or ""
     fields = {
         "label": patch.get("label", existing["label"]),
         "email_address": patch.get("email_address", existing["email_address"]),

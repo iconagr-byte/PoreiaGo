@@ -47,12 +47,14 @@ export default function EmailConnectionResult({
   mailHost,
   imapPort,
   smtpPort,
+  egressIp,
 } = {}) {
   const [copied, setCopied] = useState(false);
+  const liveEgress = String(egressIp || '').trim() || APP_MAIL_EGRESS_IP;
   const guide = timeout
-    ? mailTimeoutGuide({ mailHost, imapPort, smtpPort })
+    ? mailTimeoutGuide({ mailHost, imapPort, smtpPort, egressIp: liveEgress })
     : remoteAuth
-      ? mailRemoteAuthGuide({ mailHost, imapPort, smtpPort })
+      ? mailRemoteAuthGuide({ mailHost, imapPort, smtpPort, egressIp: liveEgress })
       : null;
 
   if (ok) {
@@ -103,7 +105,7 @@ export default function EmailConnectionResult({
                   onClick={() => copyText(APP_MAIL_EGRESS_IP, 'IP αντιγράφηκε')}
                   className="inline-flex items-center rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[13px] font-bold text-[#0071e3] ring-1 ring-amber-300/80 hover:bg-white"
                 >
-                  {APP_MAIL_EGRESS_IP}
+                  {liveEgress}
                 </button>
               </p>
             </div>

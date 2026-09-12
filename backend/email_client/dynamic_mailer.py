@@ -14,6 +14,7 @@ from typing import Any
 
 from .attachment_utils import normalize_attachments
 from .imap_utf8 import connect_imap, format_imap_connect_error, is_timeout_error
+from .mail_probe import discover_egress_ip, probe_imap_login, probe_smtp_login, probe_tcp
 from .settings_store import get_settings
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,12 @@ DECRYPT_FAILED_HINT_EL = (
 
 def is_smtp_auth_reject(exc: BaseException | str) -> bool:
     msg = str(exc)
-    return "Incorrect authentication data" in msg or (
-        "535" in msg and "authentication" in msg.lower()
+    lower = msg.lower()
+    return (
+        "Incorrect authentication data" in msg
+        or "incorrect authentication data" in lower
+        or "authentication failed" in lower
+        or ("535" in msg and "auth" in lower)
     )
 
 
@@ -179,14 +184,52 @@ def test_imap_connection(account: dict) -> dict:
         return {"ok": False, "error": "Συμπληρώστε IMAP host και username"}
     if not (cfg.get("password") or "").strip():
         return {"ok": False, "error": MISSING_PASSWORD_HINT_EL}
-    try:
-        client = _connect_imap(cfg)
-        client.select(cfg.get("imap_mailbox", "INBOX"), readonly=True)
-        client.logout()
-        return {"ok": True, "message": "IMAP σύνδεση επιτυχής"}
-    except Exception as exc:
-        return {"ok": False, "error": format_imap_connect_error(exc)}
 
+    probe = probe_imap_login(
+        {
+            "host": cfg["host"],
+            "port": cfg["port"],
+            "user": cfg["user"],
+            "password": cfg["password"],
+            "use_ssl": cfg.get("use_ssl", True),
+            "imap_mailbox": cfg.get("imap_mailbox") or "INBOX",
+        }
+    )
+    if probe.get("ok"):
+        return {
+            "ok": True,
+            "message": probe.get("message") or "IMAP σύνδεση επιτυχής",
+            "tcp_ok": True,
+            "auth_mechs": probe.get("auth_mechs"),
+            "peer_ip": probe.get("peer_ip"),
+        }
+
+    if not probe.get("tcp_ok"):
+        tcp_err = probe.get("tcp_error") or "IMAP TCP failed"
+        exc: BaseException
+        if "time" in str(tcp_err).lower():
+            exc = TimeoutError(tcp_err)
+        else:
+            exc = OSError(tcp_err)
+        return {
+            "ok": False,
+            "error": format_imap_connect_error(exc),
+            "tcp_ok": False,
+            "server_reply": tcp_err,
+            "peer_ip": probe.get("peer_ip"),
+        }
+
+    err = probe.get("error")
+    if not isinstance(err, BaseException):
+        err = Exception(str(err or "IMAP AUTH failed"))
+    return {
+        "ok": False,
+        "error": format_imap_connect_error(err),
+        "tcp_ok": True,
+        "server_reply": probe.get("server_reply"),
+        "auth_mechs": probe.get("auth_mechs"),
+        "peer_ip": probe.get("peer_ip"),
+    }
 
 def test_smtp_connection(account: dict) -> dict:
     if account.get("password_decrypt_failed"):
@@ -196,33 +239,117 @@ def test_smtp_connection(account: dict) -> dict:
         return {"ok": False, "error": "Συμπληρώστε SMTP host και username"}
     if not (cfg.get("password") or "").strip():
         return {"ok": False, "error": MISSING_PASSWORD_HINT_EL}
-    try:
-        with _open_smtp(cfg) as smtp:
-            smtp.login(cfg["user"], cfg["password"])
-        return {"ok": True, "message": "SMTP σύνδεση επιτυχής"}
-    except Exception as exc:
-        return {"ok": False, "error": _format_smtp_error(exc)}
+
+    probe = probe_smtp_login(
+        {
+            "host": cfg["host"],
+            "port": cfg["port"],
+            "user": cfg["user"],
+            "password": cfg["password"],
+            "use_ssl": cfg.get("use_ssl"),
+            "use_tls": cfg.get("use_tls"),
+        }
+    )
+    if probe.get("ok"):
+        return {
+            "ok": True,
+            "message": probe.get("message") or "SMTP σύνδεση επιτυχής",
+            "tcp_ok": True,
+            "auth_mechs": probe.get("auth_mechs"),
+            "peer_ip": probe.get("peer_ip"),
+        }
+
+    if not probe.get("tcp_ok"):
+        tcp_err = probe.get("tcp_error") or "SMTP TCP failed"
+        exc: BaseException
+        if "time" in str(tcp_err).lower():
+            exc = TimeoutError(tcp_err)
+        else:
+            exc = OSError(tcp_err)
+        return {
+            "ok": False,
+            "error": _format_smtp_error(exc),
+            "tcp_ok": False,
+            "server_reply": tcp_err,
+            "peer_ip": probe.get("peer_ip"),
+        }
+
+    err = probe.get("error")
+    if not isinstance(err, BaseException):
+        err = Exception(str(err or "SMTP AUTH failed"))
+    return {
+        "ok": False,
+        "error": _format_smtp_error(err),
+        "tcp_ok": True,
+        "server_reply": probe.get("server_reply"),
+        "auth_mechs": probe.get("auth_mechs"),
+        "peer_ip": probe.get("peer_ip"),
+    }
+
+def _is_imap_auth_fail(error: str) -> bool:
+    text = str(error or "")
+    return (
+        "λάθος username ή κωδικός" in text
+        or "AUTHENTICATIONFAILED" in text
+        or "Authentication failed" in text
+    )
 
 
 def test_account_connection(account: dict) -> dict:
+    """Full IMAP+SMTP probe with egress IP + raw replies for hosting support."""
     imap = test_imap_connection(account)
     smtp = test_smtp_connection(account)
     debug = auth_debug_meta(account)
+
+    imap_tcp = imap.get("tcp_ok")
+    smtp_tcp = smtp.get("tcp_ok")
+    if imap_tcp is None:
+        imap_cfg = settings_to_imap_config(account)
+        if imap_cfg.get("host"):
+            imap_tcp = probe_tcp(imap_cfg["host"], imap_cfg["port"]).get("ok")
+    if smtp_tcp is None:
+        smtp_cfg = settings_to_smtp_config(account)
+        if smtp_cfg.get("host"):
+            smtp_tcp = probe_tcp(smtp_cfg["host"], smtp_cfg["port"]).get("ok")
+
+    imap_auth_fail = _is_imap_auth_fail(imap.get("error") or "")
+    smtp_auth_fail = is_smtp_auth_reject(smtp.get("error") or "")
     auth_rejected = (not imap.get("ok") and not smtp.get("ok")) and (
-        is_smtp_auth_reject(smtp.get("error") or "")
-        or "λάθος username ή κωδικός" in str(imap.get("error") or "")
-        or "AUTHENTICATIONFAILED" in str(imap.get("error") or "")
+        smtp_auth_fail or imap_auth_fail
     )
+    # IMAP AUTH failed after TCP opened → same symptom as wrong password OR hosting
+    # remote-AUTH IP block (Intechs often confirms "ports OK" while AUTH is restricted).
+    # SMTP 535 strengthens the signal but is not required (SMTP can flake independently).
+    remote_auth = bool(auth_rejected and bool(imap_tcp) and imap_auth_fail)
+
+    egress_ip = ""
+    try:
+        egress_ip = discover_egress_ip()
+    except Exception:
+        egress_ip = ""
+
+    diagnostics = {
+        "egress_ip": egress_ip,
+        "imap_tcp_ok": bool(imap_tcp),
+        "smtp_tcp_ok": bool(smtp_tcp),
+        "imap_server_reply": imap.get("server_reply"),
+        "smtp_server_reply": smtp.get("server_reply"),
+        "imap_auth_mechs": imap.get("auth_mechs"),
+        "smtp_auth_mechs": smtp.get("auth_mechs"),
+        "imap_peer_ip": imap.get("peer_ip"),
+        "smtp_peer_ip": smtp.get("peer_ip"),
+    }
+    debug = {**debug, "egress_ip": egress_ip}
+
     return {
-        "ok": imap.get("ok") and smtp.get("ok"),
+        "ok": bool(imap.get("ok") and smtp.get("ok")),
         "imap": imap,
         "smtp": smtp,
         "auth_debug": debug,
-        # Legacy flag name — UI now treats this as credential reject (not firewall).
-        "remote_auth": False,
+        "diagnostics": diagnostics,
+        "remote_auth": remote_auth,
         "credentials_rejected": bool(auth_rejected),
     }
-
 
 async def load_account(settings_id: str) -> dict:
     account = await get_settings(settings_id, with_password=True)
