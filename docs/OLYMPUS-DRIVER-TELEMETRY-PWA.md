@@ -105,7 +105,7 @@ python -m unittest tests.test_fleet_telemetry_ws -v
 2. `localStorage` (`saas_tenant_id`)
 3. Fallback demo: `VITE_DEMO_TENANT_ID`
 
-Ο χάρτης χρησιμοποιεί **Mapbox GL** (`react-map-gl`) όταν οριστεί `VITE_MAPBOX_TOKEN`· αλλιώς **Leaflet / CARTO** (χωρίς token).
+Ο χάρτης χρησιμοποιεί **Mapbox GL** (`react-map-gl`) όταν οριστεί `VITE_MAPBOX_TOKEN`· αλλιώς **Leaflet / OpenStreetMap** (χωρίς token).
 
 **Mapbox env** (προαιρετικό):
 

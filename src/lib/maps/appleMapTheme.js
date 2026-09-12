@@ -1,26 +1,18 @@
 /**
- * Apple-inspired live map theme — soft light basemap with place labels.
+ * Soft light Leaflet basemap with place labels.
  *
- * CARTO anonymous basemaps now watermark "API KEY REQUIRED".
- * Default to OpenStreetMap (no key). Optional VITE_CARTO_API_KEY restores CARTO light.
+ * Always use OpenStreetMap — CARTO anonymous tiles watermark "API KEY REQUIRED"
+ * and optional VITE_CARTO_API_KEY is ignored so a bad/placeholder key cannot
+ * put watermarks back on fleet / planned-vs-actual maps.
  */
 
-const cartoApiKey = String(import.meta.env.VITE_CARTO_API_KEY || '').trim();
-
-/** Shared Leaflet raster basemap — safe default without third-party API keys. */
-export const LEAFLET_BASEMAP = cartoApiKey
-  ? {
-      url: `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?apikey=${encodeURIComponent(cartoApiKey)}`,
-      attribution: '© OpenStreetMap · © CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19,
-    }
-  : {
-      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      attribution: '© OpenStreetMap contributors',
-      subdomains: 'abc',
-      maxZoom: 19,
-    };
+/** Shared Leaflet raster basemap — no third-party API keys. */
+export const LEAFLET_BASEMAP = {
+  url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  attribution: '© OpenStreetMap contributors',
+  subdomains: 'abc',
+  maxZoom: 19,
+};
 
 /**
  * Live map tiles — same as LEAFLET_BASEMAP (Greek πόλεις/δήμοι via overlay).
