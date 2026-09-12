@@ -5,6 +5,10 @@ import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
+  FLEET_VEHICLE_CATEGORIES,
+  fleetCategoryLabel,
+} from '../../lib/fleet/fleetVehicleCategories.js';
+import {
   updateFleetVehicle,
   uploadFleetVehiclePhoto,
 } from '../../services/platformApi.js';
@@ -275,7 +279,7 @@ export default function FleetVehiclesBoard({
                           {v.make} {v.model}
                         </h3>
                         <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
-                          {v.category} · {v.seat_count} θέσεις
+                          {fleetCategoryLabel(v.category)} · {v.seat_count} θέσεις
                         </span>
                       </div>
                       <p className="text-sm font-mono text-slate-500 mt-0.5">
@@ -451,7 +455,9 @@ export default function FleetVehiclesBoard({
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     Κατηγορία
                   </div>
-                  <div className="font-bold text-slate-900 mt-0.5">{selected.category}</div>
+                  <div className="font-bold text-slate-900 mt-0.5">
+                    {fleetCategoryLabel(selected.category)}
+                  </div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-3">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -590,9 +596,9 @@ export default function FleetVehiclesBoard({
                   value={quickForm.category}
                   onChange={(e) => setQuickForm((f) => ({ ...f, category: e.target.value }))}
                 >
-                  {['Luxury Coach', 'Premium Express', 'Standard', 'Van'].map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {FLEET_VEHICLE_CATEGORIES.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
                     </option>
                   ))}
                 </select>

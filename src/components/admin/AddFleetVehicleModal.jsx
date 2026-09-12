@@ -1,22 +1,19 @@
 import { useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+import {
+  FLEET_VEHICLE_CATEGORIES,
+  fleetCategoryMeta,
+} from '../../lib/fleet/fleetVehicleCategories.js';
 import { createFleetVehicle, uploadFleetVehiclePhoto } from '../../services/platformApi.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
-const CATEGORIES = [
-  { id: 'Luxury Coach', label: 'Luxury Coach', seats: 50 },
-  { id: 'Premium Express', label: 'Premium Express', seats: 32 },
-  { id: 'Standard', label: 'Standard Coach', seats: 55 },
-  { id: 'Van', label: 'Van / Minibus', seats: 9 },
-];
-
 const AMENITY_PRESETS = [
-  'Wi-Fi onboard',
+  'Wi-Fi',
   'USB θύρες',
   'Κλιματισμός',
   'Θέρμανση',
   'Ανακλινόμενα καθίσματα',
-  'WC onboard',
+  'WC',
   'Ψυγείο',
   'Αποσκευές',
 ];
@@ -50,7 +47,7 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
   const onCategory = (category) => {
-    const meta = CATEGORIES.find((c) => c.id === category) || CATEGORIES[2];
+    const meta = fleetCategoryMeta(category);
     setForm((f) => ({ ...f, category, seat_count: meta.seats }));
   };
 
@@ -72,7 +69,11 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
           public_image_url: f.public_image_url || uploaded[0],
         };
       });
-      toast.success(uploaded.length > 1 ? `Προστέθηκαν ${uploaded.length} φωτογραφίες` : 'Προστέθηκε φωτογραφία');
+      toast.success(
+        uploaded.length > 1
+          ? `Προστέθηκαν ${uploaded.length} φωτογραφίες`
+          : 'Προστέθηκε φωτογραφία',
+      );
     } catch (err) {
       toast.error(err.message || 'Αποτυχία ανεβάσματος');
     } finally {
@@ -122,48 +123,59 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/40">
       <form
         onSubmit={onSubmit}
-        className="w-full max-w-lg bg-white rounded-[28px] shadow-xl border border-black/[0.06] overflow-hidden"
+        className="flex w-full max-w-2xl max-h-[min(92dvh,880px)] flex-col overflow-hidden rounded-[24px] border border-black/[0.06] bg-white shadow-xl"
       >
-        <div className="px-6 py-5 border-b border-black/[0.05] flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-lg text-gray-900">Νέο όχημα</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Λεωφορείο, coach ή van στον στόλο σου</p>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/[0.05] px-5 py-4 sm:px-6">
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-bold text-gray-900">Νέο όχημα</h3>
+            <p className="mt-0.5 text-xs text-gray-500">Λεωφορείο ή van στον στόλο σου</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100"
+            aria-label="Κλείσιμο"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
-        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-3">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onCategory(c.id)}
-                className={`rounded-2xl border px-3 py-3 text-left text-sm font-bold transition-colors ${
-                  form.category === c.id
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-black/[0.08] text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[20px] block mb-1">
-                  {c.id === 'Van' ? 'airport_shuttle' : 'directions_bus'}
-                </span>
-                {c.label}
-              </button>
-            ))}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {FLEET_VEHICLE_CATEGORIES.map((c) => {
+              const selected = form.category === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onCategory(c.id)}
+                  className={`min-w-0 rounded-2xl border px-3 py-3 text-left transition-colors ${
+                    selected
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-black/[0.08] text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined mb-1 block text-[22px]">
+                    {c.icon}
+                  </span>
+                  <span className="block text-sm font-bold leading-snug">{c.label}</span>
+                  <span
+                    className={`mt-0.5 block text-[11px] font-semibold ${
+                      selected ? 'text-primary/80' : 'text-gray-400'
+                    }`}
+                  >
+                    {c.seats} θέσεις
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-sm font-bold text-gray-700">Φωτογραφίες</span>
               <button
                 type="button"
@@ -187,7 +199,7 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
                 {form.gallery_urls.map((url) => (
                   <div
                     key={url}
-                    className={`relative w-20 h-14 rounded-xl overflow-hidden border shrink-0 ${
+                    className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-xl border ${
                       url === form.public_image_url
                         ? 'border-sky-500 ring-2 ring-sky-200'
                         : 'border-black/[0.08]'
@@ -196,11 +208,11 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
                     <img
                       src={resolveSiteAssetUrl(url)}
                       alt=""
-                      className="w-full h-full object-cover"
+                      className="h-full w-full object-cover"
                     />
                     <button
                       type="button"
-                      className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                      className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
                       onClick={() =>
                         setForm((f) => {
                           const gallery_urls = f.gallery_urls.filter((u) => u !== url);
@@ -231,53 +243,53 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
             )}
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="block text-sm">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block min-w-0 text-sm">
               <span className="font-bold text-gray-700">Μάρκα</span>
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 outline-none focus:border-primary"
                 placeholder="Mercedes / Ford"
                 value={form.make}
                 onChange={(e) => setField('make', e.target.value)}
                 required
               />
             </label>
-            <label className="block text-sm">
+            <label className="block min-w-0 text-sm">
               <span className="font-bold text-gray-700">Μοντέλο</span>
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 outline-none focus:border-primary"
                 placeholder="Tourismo / Transit"
                 value={form.model}
                 onChange={(e) => setField('model', e.target.value)}
                 required
               />
             </label>
-            <label className="block text-sm">
+            <label className="block min-w-0 text-sm">
               <span className="font-bold text-gray-700">Πινακίδα</span>
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2 font-mono uppercase"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 font-mono uppercase outline-none focus:border-primary"
                 placeholder="ΧΑΗ-1234"
                 value={form.plate_number}
                 onChange={(e) => setField('plate_number', e.target.value)}
                 required
               />
             </label>
-            <label className="block text-sm">
+            <label className="block min-w-0 text-sm">
               <span className="font-bold text-gray-700">Έτος</span>
               <input
                 type="number"
                 min={1990}
                 max={2100}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 outline-none focus:border-primary"
                 value={form.year}
                 onChange={(e) => setField('year', e.target.value)}
                 required
               />
             </label>
-            <label className="block text-sm sm:col-span-2">
+            <label className="block min-w-0 text-sm sm:col-span-2">
               <span className="font-bold text-gray-700">VIN</span>
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2 font-mono uppercase"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 font-mono uppercase outline-none focus:border-primary"
                 placeholder="Τουλάχιστον 8 χαρακτήρες"
                 value={form.vin}
                 onChange={(e) => setField('vin', e.target.value)}
@@ -285,59 +297,59 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
                 minLength={8}
               />
             </label>
-            <label className="block text-sm">
+            <label className="block min-w-0 text-sm">
               <span className="font-bold text-gray-700">Χιλιόμετρα</span>
               <input
                 type="number"
                 min={0}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 outline-none focus:border-primary"
                 value={form.current_odometer}
                 onChange={(e) => setField('current_odometer', e.target.value)}
               />
             </label>
-            <label className="block text-sm">
+            <label className="block min-w-0 text-sm">
               <span className="font-bold text-gray-700">Θέσεις</span>
               <input
                 type="number"
                 min={8}
                 max={80}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 outline-none focus:border-primary"
                 value={form.seat_count}
                 onChange={(e) => setField('seat_count', e.target.value)}
               />
             </label>
-            <label className="block text-sm">
+            <label className="block min-w-0 text-sm">
               <span className="font-bold text-gray-700">Διάστημα service (km)</span>
               <input
                 type="number"
                 min={1000}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 outline-none focus:border-primary"
                 value={form.service_interval_km}
                 onChange={(e) => setField('service_interval_km', e.target.value)}
               />
             </label>
-            <label className="block text-sm">
+            <label className="block min-w-0 text-sm">
               <span className="font-bold text-gray-700">Τιμή αγοράς (€)</span>
               <input
                 type="number"
                 min={0}
                 step="0.01"
-                className="mt-1 w-full rounded-xl border px-3 py-2"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 outline-none focus:border-primary"
                 value={form.purchase_price}
                 onChange={(e) => setField('purchase_price', e.target.value)}
               />
             </label>
-            <label className="block text-sm sm:col-span-2">
+            <label className="block min-w-0 text-sm sm:col-span-2">
               <span className="font-bold text-gray-700">Σύντομη περιγραφή (website)</span>
               <input
-                className="mt-1 w-full rounded-xl border px-3 py-2"
+                className="mt-1 w-full min-w-0 rounded-xl border border-black/[0.1] px-3 py-2 outline-none focus:border-primary"
                 placeholder="π.χ. Van 9 θέσεων για transfers"
                 value={form.public_summary}
                 onChange={(e) => setField('public_summary', e.target.value)}
               />
             </label>
-            <div className="sm:col-span-2">
-              <div className="text-sm font-bold text-gray-700 mb-2">Παροχές</div>
+            <div className="min-w-0 sm:col-span-2">
+              <div className="mb-2 text-sm font-bold text-gray-700">Παροχές</div>
               <div className="flex flex-wrap gap-2">
                 {AMENITY_PRESETS.map((name) => {
                   const on = form.amenities.includes(name);
@@ -353,10 +365,10 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
                             : [...f.amenities, name],
                         }))
                       }
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold border ${
+                      className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
                         on
-                          ? 'bg-sky-600 text-white border-sky-600'
-                          : 'bg-white text-slate-700 border-slate-200'
+                          ? 'border-sky-600 bg-sky-600 text-white'
+                          : 'border-slate-200 bg-white text-slate-700'
                       }`}
                     >
                       {name}
@@ -376,18 +388,18 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-black/[0.05] flex justify-end gap-2 bg-gray-50/80">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-black/[0.05] bg-gray-50/90 px-5 py-3.5 sm:px-6">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-full text-sm font-bold text-gray-600 hover:bg-gray-100"
+            className="rounded-full px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100"
           >
             Ακύρωση
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold disabled:opacity-60"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
           >
             {saving ? 'Αποθήκευση…' : 'Προσθήκη οχήματος'}
           </button>

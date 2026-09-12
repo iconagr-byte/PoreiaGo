@@ -36,9 +36,9 @@ const BADGE_PRESETS = ['Προτεινόμενη', 'Νέα', 'Last seats', 'Earl
 const HIGHLIGHT_SUGGESTIONS = ['Ξενάγηση', 'Γεύμα', 'Wi‑Fi', 'A/C', 'USB φόρτιση', 'Ασφάλεια'];
 
 const VEHICLE_TYPE_OPTIONS = [
-  { value: 'Luxury Coach', label: 'Luxury Coach (50 θέσεις)' },
-  { value: 'Premium Express', label: 'Premium Express (30 θέσεις)' },
-  { value: 'VIP Minibus', label: 'VIP Minibus (15 θέσεις)' },
+  { value: 'Luxury Coach', label: 'Πολυτελές λεωφορείο (50 θέσεις)' },
+  { value: 'Premium Express', label: 'Premium εξπρές (30 θέσεις)' },
+  { value: 'VIP Minibus', label: 'VIP μίνι λεωφορείο (15 θέσεις)' },
 ];
 
 const emptyFleetRow = () => ({
