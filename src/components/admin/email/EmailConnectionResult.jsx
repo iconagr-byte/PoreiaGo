@@ -4,6 +4,7 @@ import {
   APP_MAIL_EGRESS_IP,
   mailRemoteAuthGuide,
   mailTimeoutGuide,
+  mailWrongHostGuide,
 } from '../../../lib/email/mailReachability.js';
 
 async function copyText(text, okMsg) {
@@ -44,18 +45,28 @@ export default function EmailConnectionResult({
   hint = '',
   timeout = false,
   remoteAuth = false,
+  wrongMailHost = false,
+  suggestedMailHost = '',
   mailHost,
   imapPort,
   smtpPort,
   egressIp,
+  onApplySuggestedHost,
 } = {}) {
   const [copied, setCopied] = useState(false);
   const liveEgress = String(egressIp || '').trim() || APP_MAIL_EGRESS_IP;
-  const guide = timeout
-    ? mailTimeoutGuide({ mailHost, imapPort, smtpPort, egressIp: liveEgress })
-    : remoteAuth
-      ? mailRemoteAuthGuide({ mailHost, imapPort, smtpPort, egressIp: liveEgress })
-      : null;
+  const guide = wrongMailHost
+    ? mailWrongHostGuide({
+        mailHost,
+        suggestedHost: suggestedMailHost,
+        imapPort,
+        smtpPort,
+      })
+    : timeout
+      ? mailTimeoutGuide({ mailHost, imapPort, smtpPort, egressIp: liveEgress })
+      : remoteAuth
+        ? mailRemoteAuthGuide({ mailHost, imapPort, smtpPort, egressIp: liveEgress })
+        : null;
 
   if (ok) {
     return (
@@ -81,7 +92,13 @@ export default function EmailConnectionResult({
     );
   }
 
-  if ((timeout || remoteAuth) && guide) {
+  if ((timeout || remoteAuth || wrongMailHost) && guide) {
+    const primaryCopyLabel = wrongMailHost
+      ? 'Αντιγραφή αιτήματος DNS για Intechs'
+      : 'Αντιγραφή αιτήματος για Intechs';
+    const primaryCopyOk = wrongMailHost
+      ? 'Αίτημα DNS αντιγράφηκε'
+      : 'Αίτημα whitelist αντιγράφηκε';
     return (
       <div
         className="overflow-hidden rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50 via-white to-[#f5f5f7] shadow-sm"
@@ -98,39 +115,79 @@ export default function EmailConnectionResult({
             <div className="min-w-0 flex-1">
               <p className="text-[15px] font-bold text-amber-950">{guide.title}</p>
               <p className="mt-0.5 text-[13px] leading-snug text-amber-950/75">{guide.summary}</p>
-              <p className="mt-2 text-[13px] leading-snug text-amber-950/90">
-                Χρειάζεται whitelist από τον πάροχο hosting για το IP{' '}
-                <button
-                  type="button"
-                  onClick={() => copyText(APP_MAIL_EGRESS_IP, 'IP αντιγράφηκε')}
-                  className="inline-flex items-center rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[13px] font-bold text-[#0071e3] ring-1 ring-amber-300/80 hover:bg-white"
-                >
-                  {liveEgress}
-                </button>
-              </p>
+              {wrongMailHost ? (
+                <p className="mt-2 text-[13px] leading-snug text-amber-950/90">
+                  Σωστό host:{' '}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyText(guide.facts.find((f) => f.id === 'good')?.value || '', 'Host αντιγράφηκε')
+                    }
+                    className="inline-flex items-center rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[13px] font-bold text-[#0071e3] ring-1 ring-amber-300/80 hover:bg-white"
+                  >
+                    {guide.facts.find((f) => f.id === 'good')?.value}
+                  </button>
+                </p>
+              ) : (
+                <p className="mt-2 text-[13px] leading-snug text-amber-950/90">
+                  Χρειάζεται whitelist από τον πάροχο hosting για το IP{' '}
+                  <button
+                    type="button"
+                    onClick={() => copyText(APP_MAIL_EGRESS_IP, 'IP αντιγράφηκε')}
+                    className="inline-flex items-center rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[13px] font-bold text-[#0071e3] ring-1 ring-amber-300/80 hover:bg-white"
+                  >
+                    {liveEgress}
+                  </button>
+                </p>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-2 pl-11">
+            {wrongMailHost && typeof onApplySuggestedHost === 'function' ? (
+              <button
+                type="button"
+                onClick={() => onApplySuggestedHost(guide.facts.find((f) => f.id === 'good')?.value)}
+                className="inline-flex items-center justify-center rounded-xl bg-[#0071e3] px-3.5 py-2 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#0077ed]"
+              >
+                Εφαρμογή σωστού host
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={async () => {
-                const okCopy = await copyText(guide.request, 'Αίτημα whitelist αντιγράφηκε');
+                const okCopy = await copyText(guide.request, primaryCopyOk);
                 if (okCopy) {
                   setCopied(true);
                   window.setTimeout(() => setCopied(false), 2000);
                 }
               }}
-              className="inline-flex items-center justify-center rounded-xl bg-[#0071e3] px-3.5 py-2 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#0077ed]"
+              className={`inline-flex items-center justify-center rounded-xl px-3.5 py-2 text-[13px] font-bold shadow-sm transition ${
+                wrongMailHost && typeof onApplySuggestedHost === 'function'
+                  ? 'border border-black/[0.1] bg-white font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]'
+                  : 'bg-[#0071e3] text-white hover:bg-[#0077ed]'
+              }`}
             >
-              {copied ? 'Αντιγράφηκε ✓' : 'Αντιγραφή αιτήματος για Intechs'}
+              {copied ? 'Αντιγράφηκε ✓' : primaryCopyLabel}
             </button>
-            <button
-              type="button"
-              onClick={() => copyText(APP_MAIL_EGRESS_IP, 'IP αντιγράφηκε')}
-              className="inline-flex items-center justify-center rounded-xl border border-black/[0.1] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
-            >
-              Μόνο IP
-            </button>
+            {!wrongMailHost ? (
+              <button
+                type="button"
+                onClick={() => copyText(APP_MAIL_EGRESS_IP, 'IP αντιγράφηκε')}
+                className="inline-flex items-center justify-center rounded-xl border border-black/[0.1] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+              >
+                Μόνο IP
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  copyText(guide.facts.find((f) => f.id === 'good')?.value || '', 'Host αντιγράφηκε')
+                }
+                className="inline-flex items-center justify-center rounded-xl border border-black/[0.1] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+              >
+                Μόνο host
+              </button>
+            )}
           </div>
         </div>
 
@@ -159,7 +216,7 @@ export default function EmailConnectionResult({
 
           <div className="rounded-xl border border-black/[0.08] bg-[#1d1d1f]/[0.03] p-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.05em] text-[#86868b]">
-              Αίτημα για hosting
+              {wrongMailHost ? 'Αίτημα DNS για hosting' : 'Αίτημα για hosting'}
             </p>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#1d1d1f]">{guide.request}</p>
           </div>

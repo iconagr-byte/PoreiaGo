@@ -14,10 +14,12 @@ import {
   parseEmailSettingsBytes,
 } from '../../../lib/email/emailSettingsImport.js';
 import {
+  ACHILLIO_CPANEL_MAIL_HOST,
   isMailTimeoutMessage,
   isMailRemoteAuthPair,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
+  resolveWrongMailHost,
 } from '../../../lib/email/mailReachability.js';
 import {
   buildEmailChecksFromResult,
@@ -121,10 +123,32 @@ function authFailResult(r, fallbackMsg, { mailHost, imapPort, smtpPort } = {}) {
   if (r?.imap && !r.imap.ok) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
   if (r?.smtp && !r.smtp.ok) parts.push(`SMTP: ${r.smtp.error || 'αποτυχία'}`);
   const msg = parts.join(' · ') || fallbackMsg || 'Αποτυχία σύνδεσης';
+  const resolvedHost =
+    mailHost || r?.auth_debug?.imap_host || r?.auth_debug?.smtp_host || '';
+  const wrongHint =
+    (r?.diagnostics?.wrong_mail_host && {
+      suggestedHost:
+        r.diagnostics.suggested_mail_host || ACHILLIO_CPANEL_MAIL_HOST,
+    }) ||
+    resolveWrongMailHost(resolvedHost);
+  const debugHint = formatAuthDebugHint(r?.auth_debug, r?.diagnostics);
+  if (wrongHint) {
+    return {
+      ok: false,
+      wrongMailHost: true,
+      suggestedMailHost: wrongHint.suggestedHost || ACHILLIO_CPANEL_MAIL_HOST,
+      message: msg,
+      hint: debugHint,
+      authDebug: r?.auth_debug || null,
+      diagnostics: r?.diagnostics || null,
+      mailHost: resolvedHost,
+      imapPort: imapPort || 993,
+      smtpPort: smtpPort || 465,
+    };
+  }
   const remoteAuth =
     Boolean(r?.remote_auth) ||
     isMailRemoteAuthPair(r?.imap?.error, r?.smtp?.error);
-  const debugHint = formatAuthDebugHint(r?.auth_debug, r?.diagnostics);
   if (remoteAuth) {
     return {
       ok: false,
@@ -133,7 +157,7 @@ function authFailResult(r, fallbackMsg, { mailHost, imapPort, smtpPort } = {}) {
       hint: debugHint,
       authDebug: r?.auth_debug || null,
       diagnostics: r?.diagnostics || null,
-      mailHost: mailHost || r?.auth_debug?.imap_host || r?.auth_debug?.smtp_host,
+      mailHost: resolvedHost,
       imapPort: imapPort || 993,
       smtpPort: smtpPort || 465,
     };
@@ -205,6 +229,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           'imap.mail.yahoo.com',
           'outlook.office365.com',
           'mail.achilliotravel.com',
+          ACHILLIO_CPANEL_MAIL_HOST,
         ].includes(String(f.imap_host || '').toLowerCase());
         if (known && (hostEmpty || wasProviderHost || String(f.imap_host || '').startsWith('mail.'))) {
           next.imap_host = prov.imap_host;
@@ -221,7 +246,19 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     setTestResult(null);
   };
 
+  const applySuggestedMailHost = (host) => {
+    const next = String(host || ACHILLIO_CPANEL_MAIL_HOST).trim() || ACHILLIO_CPANEL_MAIL_HOST;
+    setForm((f) => ({
+      ...f,
+      imap_host: next,
+      smtp_host: next,
+    }));
+    setTestResult(null);
+    toast.success(`Host → ${next}`, { id: 'email-wrong-host-fix' });
+  };
+
   const applyImapPreset = (preset) => {
+
     if (preset === '993') {
       setForm((f) => ({ ...f, imap_port: 993, imap_secure: true }));
     } else if (preset === '143') {
@@ -283,7 +320,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     if (host === 'imap.gmail.com') return 'gmail';
     if (host === 'imap.mail.yahoo.com') return 'yahoo';
     if (host === 'outlook.office365.com') return 'outlook';
-    if (host === 'mail.achilliotravel.com') return 'achillio';
+    if (host === 'mail.achilliotravel.com' || host === ACHILLIO_CPANEL_MAIL_HOST) return 'achillio';
     if (host.startsWith('mail.')) return 'custom';
     return '';
   })();
@@ -393,10 +430,15 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           const fail = authFailResult(r, undefined, { mailHost, imapPort, smtpPort });
           setTestResult(fail);
           toast.error(
-            fail.remoteAuth
-              ? 'Το TCP ανοίγει — πιθανό block remote AUTH από hosting (δείτε οδηγίες)'
-              : fail.message,
-            { id: 'email-conn-test', duration: fail.remoteAuth ? 6000 : 4000 },
+            fail.wrongMailHost
+              ? `Λάθος mail host — βάλτε ${fail.suggestedMailHost || ACHILLIO_CPANEL_MAIL_HOST}`
+              : fail.remoteAuth
+                ? 'Το TCP ανοίγει — πιθανό block remote AUTH από hosting (δείτε οδηγίες)'
+                : fail.message,
+            {
+              id: 'email-conn-test',
+              duration: fail.wrongMailHost || fail.remoteAuth ? 6000 : 4000,
+            },
           );
         }
       }
@@ -458,10 +500,15 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           const fail = authFailResult(r, 'Αποτυχία', { mailHost, imapPort, smtpPort });
           setTestResult(fail);
           toast.error(
-            fail.remoteAuth
-              ? 'Το TCP ανοίγει — πιθανό block remote AUTH από hosting (δείτε οδηγίες)'
-              : fail.message,
-            { id: 'email-conn-test', duration: fail.remoteAuth ? 6000 : 4000 },
+            fail.wrongMailHost
+              ? `Λάθος mail host — βάλτε ${fail.suggestedMailHost || ACHILLIO_CPANEL_MAIL_HOST}`
+              : fail.remoteAuth
+                ? 'Το TCP ανοίγει — πιθανό block remote AUTH από hosting (δείτε οδηγίες)'
+                : fail.message,
+            {
+              id: 'email-conn-test',
+              duration: fail.wrongMailHost || fail.remoteAuth ? 6000 : 4000,
+            },
           );
         }
       }
@@ -848,6 +895,9 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                           hint={testResult.hint}
                           timeout={testResult.timeout}
                           remoteAuth={testResult.remoteAuth}
+                          wrongMailHost={testResult.wrongMailHost}
+                          suggestedMailHost={testResult.suggestedMailHost}
+                          onApplySuggestedHost={applySuggestedMailHost}
                           egressIp={testResult.diagnostics?.egress_ip || testResult.authDebug?.egress_ip}
                           mailHost={testResult.mailHost || a.imap_host || a.smtp_host}
                           imapPort={testResult.imapPort || a.imap_port}
@@ -1196,7 +1246,10 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                   hint={testResult.hint}
                   timeout={testResult.timeout}
                   remoteAuth={testResult.remoteAuth}
-                          egressIp={testResult.diagnostics?.egress_ip || testResult.authDebug?.egress_ip}
+                  wrongMailHost={testResult.wrongMailHost}
+                  suggestedMailHost={testResult.suggestedMailHost}
+                  onApplySuggestedHost={applySuggestedMailHost}
+                  egressIp={testResult.diagnostics?.egress_ip || testResult.authDebug?.egress_ip}
                   mailHost={testResult.mailHost || form.imap_host || form.smtp_host}
                   imapPort={testResult.imapPort || form.imap_port}
                   smtpPort={testResult.smtpPort || form.smtp_port}

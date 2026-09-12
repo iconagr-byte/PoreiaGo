@@ -14,8 +14,8 @@ console.assert(yahoo.id === 'yahoo', 'yahoo.gr detect');
 
 const custom = detectProvider('info@achilliotravel.com');
 console.assert(custom.id === 'achillio', 'achillio detect');
-console.assert(custom.imap_host === 'mail.achilliotravel.com', 'custom imap host');
-console.assert(custom.smtp_host === 'mail.achilliotravel.com', 'custom smtp host');
+console.assert(custom.imap_host === 'srv23.intechs.gr', 'achillio imap host srv23');
+console.assert(custom.smtp_host === 'srv23.intechs.gr', 'achillio smtp host srv23');
 console.assert(custom.imap_port === 993, 'cPanel IMAP 993');
 console.assert(custom.smtp_port === 465, 'cPanel SMTP 465 SSL');
 console.assert(custom.smtp_secure === false, '465 uses implicit SSL not STARTTLS');
@@ -25,7 +25,7 @@ const achillio = buildAccountFromWizard({
   password: 'mailbox-pass',
   provider: custom,
 });
-console.assert(achillio.imap_host === 'mail.achilliotravel.com', 'wizard imap');
+console.assert(achillio.imap_host === 'srv23.intechs.gr', 'wizard imap srv23');
 console.assert(achillio.smtp_port === 465, 'wizard smtp 465');
 console.assert(achillio.imap_port === 993, 'wizard imap 993');
 

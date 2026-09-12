@@ -1,5 +1,11 @@
 /** Provider presets for autonomous personal-email connect (no hosting whitelist). */
 
+/**
+ * Achillio mailbox lives on Intechs srv23. DNS for mail.achilliotravel.com currently
+ * points at srv24 (wrong box) — AUTH fails there even when webmail on srv23 works.
+ */
+export const ACHILLIO_CPANEL_MAIL_HOST = 'srv23.intechs.gr';
+
 export const PROVIDERS = {
   gmail: {
     id: 'gmail',
@@ -87,13 +93,14 @@ export function detectProvider(email) {
       ...PROVIDERS.custom,
       id: 'achillio',
       label: 'Achillio Travel (cPanel)',
-      imap_host: 'mail.achilliotravel.com',
-      smtp_host: 'mail.achilliotravel.com',
+      imap_host: ACHILLIO_CPANEL_MAIL_HOST,
+      smtp_host: ACHILLIO_CPANEL_MAIL_HOST,
       imap_port: 993,
       imap_secure: true,
       smtp_port: 465,
       smtp_secure: false,
       help: [
+        `Host: ${ACHILLIO_CPANEL_MAIL_HOST} (όχι mail.achilliotravel.com — δείχνει λάθος server)`,
         'cPanel Secure SSL/TLS: IMAP 993 · SMTP 465',
         'Username: info@achilliotravel.com · κωδικός webmail',
       ],

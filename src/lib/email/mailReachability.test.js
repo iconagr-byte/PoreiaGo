@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   APP_MAIL_EGRESS_IP,
+  ACHILLIO_CPANEL_MAIL_HOST,
   hostingWhitelistRequest,
   isMailRemoteAuthRejectMessage,
   isMailRemoteAuthPair,
   mailRemoteAuthGuide,
   mailTimeoutGuide,
   mailTimeoutHintEl,
+  mailWrongHostGuide,
+  resolveWrongMailHost,
 } from './mailReachability.js';
 
 describe('mailReachability', () => {
@@ -51,5 +54,18 @@ describe('mailReachability', () => {
     expect(g.request).toContain('169.58.199.186');
     expect(g.request).toContain('34.141.98.145');
     expect(g.summary).toContain('34.141.98.145');
+  });
+
+  it('detects Achillio wrong mail host (DNS → srv24) and suggests srv23', () => {
+    const hint = resolveWrongMailHost('mail.achilliotravel.com');
+    expect(hint?.suggestedHost).toBe(ACHILLIO_CPANEL_MAIL_HOST);
+    const g = mailWrongHostGuide({
+      mailHost: 'mail.achilliotravel.com',
+      suggestedHost: ACHILLIO_CPANEL_MAIL_HOST,
+    });
+    expect(g.title).toMatch(/DNS|host/i);
+    expect(g.request).toContain('srv23.intechs.gr');
+    expect(g.request).toContain('mail.achilliotravel.com');
+    expect(g.facts.map((f) => f.id)).toEqual(['bad', 'good', 'imap', 'smtp']);
   });
 });
