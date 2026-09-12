@@ -37,8 +37,8 @@ const HIGHLIGHT_SUGGESTIONS = ['Ξενάγηση', 'Γεύμα', 'Wi‑Fi', 'A/C
 
 const VEHICLE_TYPE_OPTIONS = [
   { value: 'Luxury Coach', label: 'Πολυτελές λεωφορείο (50 θέσεις)' },
-  { value: 'Premium Express', label: 'Premium εξπρές (30 θέσεις)' },
-  { value: 'VIP Minibus', label: 'VIP μίνι λεωφορείο (15 θέσεις)' },
+  { value: 'Premium Express', label: 'Εξπρές πολυτελείας (30 θέσεις)' },
+  { value: 'VIP Minibus', label: 'VIP μικρό λεωφορείο (15 θέσεις)' },
 ];
 
 const emptyFleetRow = () => ({
