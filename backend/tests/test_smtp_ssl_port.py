@@ -124,5 +124,38 @@ class SmtpConfigTests(unittest.TestCase):
         self.assertNotIn("SecretPass99", str(meta))
 
 
+
+class MailProbeDiagnosticsTests(unittest.TestCase):
+    def test_remote_auth_flag_when_imap_auth_fails_after_tcp(self):
+        from email_client.dynamic_mailer import test_account_connection
+
+        account = {
+            "imap_host": "mail.achilliotravel.com",
+            "imap_port": 993,
+            "smtp_host": "mail.achilliotravel.com",
+            "smtp_port": 465,
+            "email_address": "info@achilliotravel.com",
+            "mail_username": "info@achilliotravel.com",
+            "mail_password": "DefinitelyWrongPass99",
+            "imap_secure": True,
+        }
+        result = test_account_connection(account)
+        self.assertFalse(result["ok"])
+        self.assertFalse(result["imap"].get("ok"))
+        # Prefer credentials_rejected; fall back to IMAP AUTH + remote_auth.
+        self.assertTrue(
+            result.get("credentials_rejected")
+            or result.get("remote_auth")
+            or "λάθος" in str(result.get("imap", {}).get("error") or "")
+        )
+        self.assertTrue(result["remote_auth"])
+        diag = result.get("diagnostics") or {}
+        self.assertTrue(diag.get("imap_tcp_ok"))
+        self.assertIn("egress_ip", diag)
+        auth_debug = result.get("auth_debug") or {}
+        self.assertIn("password_len", auth_debug)
+        self.assertNotIn("DefinitelyWrongPass99", str(result))
+
+
 if __name__ == "__main__":
     unittest.main()

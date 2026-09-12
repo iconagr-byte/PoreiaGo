@@ -15,6 +15,7 @@ import {
 } from '../../../lib/email/emailSettingsImport.js';
 import {
   isMailTimeoutMessage,
+  isMailRemoteAuthPair,
   MAIL_TIMEOUT_TOAST_EL,
   mailTimeoutHintEl,
 } from '../../../lib/email/mailReachability.js';
@@ -97,26 +98,54 @@ function syncErrorHint(error) {
   return 'Ελέγξτε host / κωδικό και πατήστε Συγχρονισμός IMAP στο Mailbox.';
 }
 
-function formatAuthDebugHint(debug) {
+function formatAuthDebugHint(debug, diagnostics) {
   if (!debug || typeof debug !== 'object') return '';
   const user = String(debug.username || '—');
   const len = Number(debug.password_len) || 0;
   const space = debug.password_has_space ? 'ναι' : 'όχι';
   const sha = String(debug.password_sha10 || '—');
+  const egress =
+    (diagnostics && diagnostics.egress_ip) || debug.egress_ip || '';
+  const egressLine = egress
+    ? ` IP εξόδου εφαρμογής: ${egress} — αν το webmail ανοίγει με τον ίδιο κωδικό, ζητήστε whitelist αυτού του IP στον πάροχο hosting.`
+    : '';
   return (
     `Έλεγχος με username «${user}», μήκος κωδικού ${len}, κενά μέσα στον κωδικό: ${space} ` +
-    `(sha10 ${sha}). Συγκρίνετε το μήκος με τον κωδικό webmail — αν διαφέρει, ο αποθηκευμένος κωδικός είναι λάθος.`
+    `(sha10 ${sha}). Συγκρίνετε το μήκος με τον κωδικό webmail — αν διαφέρει, ο αποθηκευμένος κωδικός είναι λάθος.` +
+    egressLine
   );
 }
 
-function authFailResult(r, fallbackMsg) {
+function authFailResult(r, fallbackMsg, { mailHost, imapPort, smtpPort } = {}) {
   const parts = [];
   if (r?.imap && !r.imap.ok) parts.push(`IMAP: ${r.imap.error || 'αποτυχία'}`);
   if (r?.smtp && !r.smtp.ok) parts.push(`SMTP: ${r.smtp.error || 'αποτυχία'}`);
   const msg = parts.join(' · ') || fallbackMsg || 'Αποτυχία σύνδεσης';
-  const debugHint = formatAuthDebugHint(r?.auth_debug);
+  const remoteAuth =
+    Boolean(r?.remote_auth) ||
+    isMailRemoteAuthPair(r?.imap?.error, r?.smtp?.error);
+  const debugHint = formatAuthDebugHint(r?.auth_debug, r?.diagnostics);
+  if (remoteAuth) {
+    return {
+      ok: false,
+      remoteAuth: true,
+      message: msg,
+      hint: debugHint,
+      authDebug: r?.auth_debug || null,
+      diagnostics: r?.diagnostics || null,
+      mailHost: mailHost || r?.auth_debug?.imap_host || r?.auth_debug?.smtp_host,
+      imapPort: imapPort || 993,
+      smtpPort: smtpPort || 465,
+    };
+  }
   const hint = [syncErrorHint(msg), debugHint].filter(Boolean).join('\n\n');
-  return { ok: false, message: msg, hint, authDebug: r?.auth_debug || null };
+  return {
+    ok: false,
+    message: msg,
+    hint,
+    authDebug: r?.auth_debug || null,
+    diagnostics: r?.diagnostics || null,
+  };
 }
 
 export default function EmailSettingsPanel({ onAccountChange, openConnectWizard = false }) {
@@ -361,9 +390,14 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           });
           toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
         } else {
-          const fail = authFailResult(r);
+          const fail = authFailResult(r, undefined, { mailHost, imapPort, smtpPort });
           setTestResult(fail);
-          toast.error(fail.message, { id: 'email-conn-test' });
+          toast.error(
+            fail.remoteAuth
+              ? 'Το TCP ανοίγει — πιθανό block remote AUTH από hosting (δείτε οδηγίες)'
+              : fail.message,
+            { id: 'email-conn-test', duration: fail.remoteAuth ? 6000 : 4000 },
+          );
         }
       }
     } catch (err) {
@@ -421,9 +455,14 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           });
           toast.error(MAIL_TIMEOUT_TOAST_EL, { id: 'email-conn-test', duration: 5000 });
         } else {
-          const fail = authFailResult(r, 'Αποτυχία');
+          const fail = authFailResult(r, 'Αποτυχία', { mailHost, imapPort, smtpPort });
           setTestResult(fail);
-          toast.error(fail.message, { id: 'email-conn-test' });
+          toast.error(
+            fail.remoteAuth
+              ? 'Το TCP ανοίγει — πιθανό block remote AUTH από hosting (δείτε οδηγίες)'
+              : fail.message,
+            { id: 'email-conn-test', duration: fail.remoteAuth ? 6000 : 4000 },
+          );
         }
       }
     } catch (err) {
@@ -809,6 +848,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                           hint={testResult.hint}
                           timeout={testResult.timeout}
                           remoteAuth={testResult.remoteAuth}
+                          egressIp={testResult.diagnostics?.egress_ip || testResult.authDebug?.egress_ip}
                           mailHost={testResult.mailHost || a.imap_host || a.smtp_host}
                           imapPort={testResult.imapPort || a.imap_port}
                           smtpPort={testResult.smtpPort || a.smtp_port}
@@ -1156,6 +1196,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                   hint={testResult.hint}
                   timeout={testResult.timeout}
                   remoteAuth={testResult.remoteAuth}
+                          egressIp={testResult.diagnostics?.egress_ip || testResult.authDebug?.egress_ip}
                   mailHost={testResult.mailHost || form.imap_host || form.smtp_host}
                   imapPort={testResult.imapPort || form.imap_port}
                   smtpPort={testResult.smtpPort || form.smtp_port}
