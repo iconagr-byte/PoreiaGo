@@ -33,7 +33,26 @@ _HEAL_STATEMENTS: tuple[str, ...] = (
         "ADD COLUMN IF NOT EXISTS payment_status VARCHAR(16) NOT NULL DEFAULT 'pending'"
     ),
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS seat_label VARCHAR(128)",
-    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS trip_id UUID",
+    "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS trip_id INTEGER",
+    # Contabo legacy: trip_id was integer; early SaaS DDL used UUID. Cash INSERT
+    # then fails with DatatypeMismatchError (uuid expression vs integer column)
+    # or the reverse. Normalize to INTEGER to match office excursion ids.
+    """
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'bookings'
+          AND column_name = 'trip_id'
+          AND udt_name = 'uuid'
+      ) THEN
+        ALTER TABLE bookings
+          ALTER COLUMN trip_id TYPE INTEGER
+          USING NULL;
+      END IF;
+    END $$
+    """,
     "ALTER TABLE IF EXISTS bookings ADD COLUMN IF NOT EXISTS reference_code VARCHAR(64)",
     # Contabo refs from UUID keys can exceed VARCHAR(32) (BK- + 36-char UUID).
     """
@@ -190,7 +209,7 @@ async def ensure_bookings_schema(session: AsyncSession, *, force: bool = False) 
 
 
 def is_bookings_schema_drift_error(exc: BaseException) -> bool:
-    """True when Postgres/SQLAlchemy reports missing bookings columns."""
+    """True when Postgres/SQLAlchemy reports missing/mismatched bookings columns."""
     msg = f"{exc.__class__.__name__}: {exc}".lower()
     if "undefinedcolumn" in msg or "does not exist" in msg:
         if "bookings." in msg or "column bookings" in msg or "customer_user_id" in msg:
@@ -198,6 +217,12 @@ def is_bookings_schema_drift_error(exc: BaseException) -> bool:
         if "payment_status" in msg or "amount_paid" in msg or "total_price" in msg:
             return True
         if "updated_at" in msg or "created_at" in msg:
+            return True
+    # Contabo: trip_id integer vs ORM uuid (or the reverse after partial migrates).
+    if "datatypemismatch" in msg or "datatype mismatch" in msg:
+        if "trip_id" in msg and "bookings" in msg:
+            return True
+        if "trip_id" in msg and ("uuid" in msg or "integer" in msg):
             return True
     return False
 

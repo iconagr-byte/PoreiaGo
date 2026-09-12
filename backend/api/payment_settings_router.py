@@ -547,17 +547,48 @@ async def record_cash_payment_admin(
                         ),
                     ) from exc
             except Exception as exc:
-                await db.rollback()
-                log.exception(
-                    "Cash upsert from cache failed booking_key=%s", booking_key
+                from app.services.ensure_bookings_schema import (
+                    ensure_bookings_schema,
+                    is_bookings_schema_drift_error,
                 )
-                raise HTTPException(
-                    status_code=500,
-                    detail=(
-                        "Αποτυχία αποθήκευσης κράτησης στη βάση (Postgres) πριν την "
-                        f"καταχώρηση μετρητών: {exc.__class__.__name__}: {exc}"
-                    ),
-                ) from exc
+
+                if is_bookings_schema_drift_error(exc):
+                    await db.rollback()
+                    await ensure_bookings_schema(db, force=True)
+                    await apply_tenant_rls(db, tenant_id)
+                    try:
+                        pg_booking = ensure_booking_from_admin_dict(tenant_id, booking)
+                        db.add(pg_booking)
+                        await db.flush()
+                        log.info(
+                            "Retried cash upsert after bookings schema heal key=%s",
+                            booking_key,
+                        )
+                    except Exception as retry_exc:
+                        await db.rollback()
+                        log.exception(
+                            "Cash upsert retry after heal failed booking_key=%s",
+                            booking_key,
+                        )
+                        raise HTTPException(
+                            status_code=500,
+                            detail=(
+                                "Αποτυχία αποθήκευσης κράτησης στη βάση (Postgres) πριν την "
+                                f"καταχώρηση μετρητών: {retry_exc.__class__.__name__}: {retry_exc}"
+                            ),
+                        ) from retry_exc
+                else:
+                    await db.rollback()
+                    log.exception(
+                        "Cash upsert from cache failed booking_key=%s", booking_key
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            "Αποτυχία αποθήκευσης κράτησης στη βάση (Postgres) πριν την "
+                            f"καταχώρηση μετρητών: {exc.__class__.__name__}: {exc}"
+                        ),
+                    ) from exc
 
         try:
             result = await BookingPaymentService(db).record_cash_payment(
