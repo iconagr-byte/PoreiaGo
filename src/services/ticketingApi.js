@@ -185,14 +185,24 @@ export function buildTicketEmailPayload(booking) {
   const base = booking.basePrice ?? bookingPrice * 0.8;
   const taxes = booking.taxes ?? bookingPrice * 0.2;
   const pnr = booking.pnr || booking.ticketRef || booking.id;
+  const extras = Array.isArray(booking.extras) ? booking.extras : [];
+  const extrasSummary = extras
+    .map((line) => {
+      const title = line?.title || line?.name || '';
+      if (!title) return '';
+      const qty = Number(line?.qty || line?.quantity || 1) || 1;
+      return qty > 1 ? `${title} ×${qty}` : title;
+    })
+    .filter(Boolean)
+    .join(' · ');
 
   return {
     email: booking.email,
-    customer_name: booking.customerName || '',
+    customer_name: booking.customerName || booking.passengerName || booking.name || '',
     trip_title: booking.tripTitle || '',
     date: booking.date || '',
     time: booking.time || null,
-    seat: booking.seat || '',
+    seat: booking.seat || (Array.isArray(booking.seats) ? booking.seats.join(', ') : '') || '',
     pnr: String(pnr),
     booking_id: String(booking.id),
     price: bookingPrice,
@@ -203,6 +213,20 @@ export function buildTicketEmailPayload(booking) {
     phone: booking.phone || null,
     trip_id: booking.tripId || null,
     tripId: booking.tripId || null,
+    luggage: booking.luggage || null,
+    dietary: booking.dietary || null,
+    amount_paid: booking.amountPaid != null ? Number(booking.amountPaid) : null,
+    balance_due: booking.balanceDue != null ? Number(booking.balanceDue) : null,
+    invoice_number: booking.invoiceNumber || null,
+    extras: extras.length
+      ? extras.map((line) => ({
+          title: line?.title || line?.name || '',
+          qty: Number(line?.qty || line?.quantity || 1) || 1,
+          lineTotalEur: line?.lineTotalEur ?? line?.total ?? null,
+        }))
+      : null,
+    extras_summary: extrasSummary || null,
+    notes: booking.notes || booking.specialRequests || null,
   };
 }
 
