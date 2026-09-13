@@ -315,8 +315,8 @@ export default function ContractsPanel({
           <div className="flex flex-wrap items-center gap-2">
             {demoMode && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
-                <span className="material-symbols-outlined text-[16px]">science</span>
-                Demo · {trialDays}η δοκιμή
+                <span className="material-symbols-outlined text-[16px]">timelapse</span>
+                Δοκιμή · {trialDays}η
               </span>
             )}
             {rentEnabled && (
@@ -669,7 +669,7 @@ export default function ContractsPanel({
                   >
                     {sameTrialPlan
                       ? `Δοκιμή ενεργή (${trialDays} ημέρες)`
-                      : `Ξεκινήστε δωρεάν δοκιμή ${trialDays} ημερών`}
+                      : `Ξεκινήστε δοκιμή ${trialDays} ημερών`}
                   </button>
                 )}
                 {checkoutReady && billingConfig?.portal_ready && (

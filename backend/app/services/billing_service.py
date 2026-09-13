@@ -51,8 +51,9 @@ def stripe_readiness() -> dict:
             missing.append(env_name)
     checkout_ready = not missing
     portal_ready = bool(settings.stripe_secret_key)
-    # Demo signup/trial without real charge: explicit flag OR Stripe not configured.
-    demo_mode = bool(getattr(settings, "billing_demo_mode", False)) or not checkout_ready
+    # Demo signup only when explicitly enabled — never auto-fallback when Stripe
+    # is missing (that made /grafeia/signup always show «Demo πληρωμή» in prod).
+    demo_mode = bool(getattr(settings, "billing_demo_mode", False))
     plans = ["starter", "professional", "rent"]
     if settings.stripe_price_enterprise:
         plans.append("enterprise")
