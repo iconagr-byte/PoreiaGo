@@ -1734,6 +1734,7 @@ select.emh-input {
     position: sticky;
     top: 0;
     z-index: 2;
+    background: linear-gradient(135deg, #fff 0%, var(--emh-accent-soft) 120%);
   }
 
   .emh-panel-preview {
