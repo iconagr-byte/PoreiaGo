@@ -53,3 +53,29 @@ def test_google_login_503_when_not_configured(monkeypatch):
     )
     assert res.status_code == 503
     assert "GOOGLE_CLIENT_ID" in res.json()["detail"]
+
+
+def test_google_config_rejects_docs_placeholder_client_id(monkeypatch):
+    monkeypatch.setenv(
+        "GOOGLE_CLIENT_ID",
+        "123456789-xxxx.apps.googleusercontent.com",
+    )
+    monkeypatch.delenv("VITE_GOOGLE_CLIENT_ID", raising=False)
+    res = _client().get("/api/auth/google/config")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["enabled"] is False
+    assert data["client_id"] is None
+
+
+def test_google_login_503_when_placeholder_client_id(monkeypatch):
+    monkeypatch.setenv(
+        "GOOGLE_CLIENT_ID",
+        "123456789-xxxx.apps.googleusercontent.com",
+    )
+    monkeypatch.delenv("VITE_GOOGLE_CLIENT_ID", raising=False)
+    res = _client().post(
+        "/api/auth/google",
+        json={"id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.e30.x"},
+    )
+    assert res.status_code == 503

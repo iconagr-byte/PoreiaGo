@@ -25,9 +25,16 @@ function GoogleLogo() {
   );
 }
 
-function DemoGoogleSignIn({ onDemoProfile, onError, disabled }) {
+function googleButtonLabel(text) {
+  if (text === 'signup_with') return 'Εγγραφή με Google';
+  if (text === 'continue_with') return 'Συνέχεια με Google';
+  return 'Σύνδεση με Google';
+}
+
+function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_with' }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('john@example.com');
+  const label = googleButtonLabel(text);
 
   const submit = (e) => {
     e.preventDefault();
@@ -58,7 +65,7 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled }) {
         className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-full border border-gray-300 bg-white hover:bg-gray-50 shadow-sm transition-colors disabled:opacity-50"
       >
         <GoogleLogo />
-        <span className="text-sm font-semibold text-gray-700">Σύνδεση με Google</span>
+        <span className="text-sm font-semibold text-gray-700">{label}</span>
       </button>
 
       {open && (
@@ -110,7 +117,8 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled }) {
   );
 }
 
-function GoogleUnavailable({ disabled }) {
+function GoogleUnavailable({ disabled, text = 'signin_with' }) {
+  const base = googleButtonLabel(text);
   return (
     <button
       type="button"
@@ -121,7 +129,7 @@ function GoogleUnavailable({ disabled }) {
     >
       <GoogleLogo />
       <span className="text-sm font-semibold">
-        {disabled ? 'Σύνδεση με Google…' : 'Σύνδεση με Google (μη διαθέσιμη)'}
+        {disabled ? `${base}…` : `${base} (μη διαθέσιμη)`}
       </span>
     </button>
   );
@@ -132,21 +140,32 @@ export default function GoogleSignInButton({
   onDemoProfile,
   onError,
   disabled = false,
+  /** GIS button label: signin_with | signup_with | continue_with */
+  text = 'signin_with',
 }) {
   const { loading, enabled } = useGoogleAuthConfig();
+  const buttonText =
+    text === 'signup_with' || text === 'continue_with' || text === 'signin_with'
+      ? text
+      : 'signin_with';
 
   if (loading) {
-    return <GoogleUnavailable disabled />;
+    return <GoogleUnavailable disabled text={buttonText} />;
   }
 
   if (!enabled) {
     // Local demo only — production must use a real OAuth Web Client ID.
     if (import.meta.env.DEV) {
       return (
-        <DemoGoogleSignIn onDemoProfile={onDemoProfile} onError={onError} disabled={disabled} />
+        <DemoGoogleSignIn
+          onDemoProfile={onDemoProfile}
+          onError={onError}
+          disabled={disabled}
+          text={buttonText}
+        />
       );
     }
-    return <GoogleUnavailable />;
+    return <GoogleUnavailable text={buttonText} />;
   }
 
   return (
@@ -162,7 +181,7 @@ export default function GoogleSignInButton({
         onError={() => onError?.('Η σύνδεση με Google απέτυχε')}
         theme="outline"
         size="large"
-        text="signin_with"
+        text={buttonText}
         shape="pill"
         locale="el"
         width="360"

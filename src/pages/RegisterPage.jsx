@@ -1,7 +1,13 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { loginAsCustomer } from '../lib/auth.js';
-import { registerCustomer, isCustomerAuthBackendAvailable } from '../services/customerAuthApi.js';
+import {
+  registerCustomer,
+  verifyGoogleLogin,
+  isCustomerAuthBackendAvailable,
+} from '../services/customerAuthApi.js';
+import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
+import { useGoogleAuthConfig } from '../components/GoogleAuthRoot.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import {
   clearWalletClaim,
@@ -37,8 +43,10 @@ export default function RegisterPage() {
       : '/rent/wallet'
     : location.state?.from || '/wallet';
   const rentIntent = pathRent || isRentReturn(redirectTo);
+  const { enabled: googleEnabled } = useGoogleAuthConfig();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
 
   const claim = useMemo(() => {
@@ -72,6 +80,23 @@ export default function RegisterPage() {
     }
   }, [location.pathname, location.state, navigate]);
 
+  const finishRegister = (email, profile = {}, accessToken = null) => {
+    loginAsCustomer(email, profile, accessToken);
+    const hadClaim = Boolean(claim);
+    clearWalletClaim();
+    if (rentIntent) {
+      navigate(redirectTo, { replace: true });
+    } else {
+      navigate(redirectTo === '/wallet' || redirectTo.startsWith('/wallet') ? redirectTo : '/wallet', {
+        replace: true,
+        state: walletHomeNavState({
+          highlightBooking,
+          fromClaim: hadClaim,
+        }),
+      });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -97,7 +122,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const result = await registerCustomer({ email, password, name });
-      loginAsCustomer(
+      finishRegister(
         result.email,
         {
           name: result.name,
@@ -107,19 +132,6 @@ export default function RegisterPage() {
         },
         result.access_token,
       );
-      const hadClaim = Boolean(claim);
-      clearWalletClaim();
-      if (rentIntent) {
-        navigate(redirectTo, { replace: true });
-      } else {
-        navigate(redirectTo === '/wallet' || redirectTo.startsWith('/wallet') ? redirectTo : '/wallet', {
-          replace: true,
-          state: walletHomeNavState({
-            highlightBooking,
-            fromClaim: hadClaim,
-          }),
-        });
-      }
     } catch (err) {
       const msg = err.message || 'Αποτυχία εγγραφής';
       if (msg.toLowerCase().includes('υπάρχει') || msg.toLowerCase().includes('already')) {
@@ -129,6 +141,34 @@ export default function RegisterPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleDemo = () => {
+    setError(
+      'Για demo Google χρειάζεται backend — χρησιμοποιήστε email ή ρυθμίστε Google OAuth.',
+    );
+  };
+
+  const handleGoogleCredential = async (credential) => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      const profile = await verifyGoogleLogin(credential);
+      finishRegister(
+        profile.email,
+        {
+          name: profile.name,
+          picture: profile.picture,
+          provider: profile.provider || 'google',
+          customerId: profile.customer_id,
+        },
+        profile.access_token,
+      );
+    } catch (err) {
+      setError(err.message || 'Αποτυχία εγγραφής με Google');
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -163,6 +203,7 @@ export default function RegisterPage() {
   const leadClass = rentIntent ? 'rent-auth-lead' : 'wallet-auth-lead';
   const linkClass = rentIntent ? 'rent-auth-link' : 'wallet-auth-link';
   const submitClass = rentIntent ? 'rent-auth-submit' : 'wallet-auth-submit';
+  const dividerClass = rentIntent ? 'rent-auth-divider' : 'wallet-auth-divider';
 
   return (
     <div className={shellClass}>
@@ -206,6 +247,23 @@ export default function RegisterPage() {
             </p>
           </div>
         ) : null}
+
+        <div className="space-y-3 mb-2">
+          <GoogleSignInButton
+            text="signup_with"
+            disabled={googleLoading || loading}
+            onSuccess={handleGoogleCredential}
+            onDemoProfile={handleGoogleDemo}
+            onError={setError}
+          />
+          {googleLoading ? (
+            <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
+          ) : null}
+        </div>
+
+        <div className={dividerClass}>
+          {googleEnabled ? 'ή με email' : 'με email / κωδικό'}
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {backendOk === false && (
@@ -290,7 +348,7 @@ export default function RegisterPage() {
             autoComplete="new-password"
           />
 
-          <button type="submit" disabled={loading} className={submitClass}>
+          <button type="submit" disabled={loading || googleLoading} className={submitClass}>
             {loading
               ? 'Δημιουργία…'
               : rentIntent

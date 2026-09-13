@@ -72,7 +72,9 @@ class WalletMagicConsumeRequest(BaseModel):
 
 
 def _google_client_id() -> str:
-    return (os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID") or "").strip()
+    from app.services.google_oauth import google_client_id
+
+    return google_client_id()
 
 
 def _public_base_url() -> str:
