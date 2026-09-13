@@ -68,10 +68,17 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             git clean -fd -e deploy/.env.prod -e deploy/.vapid_private.pem
-            # Optional: inject Google OAuth Web Client ID from Actions secret.
+            # Optional: inject Google OAuth Web Client ID (Actions secret, else workflow_dispatch input).
             GOOGLE_CID='${{ secrets.GOOGLE_CLIENT_ID }}'
+            if [ -z "$GOOGLE_CID" ]; then
+              GOOGLE_CID='${{ github.event.inputs.google_client_id }}'
+            fi
             ENVF=/opt/poreiago/deploy/.env.prod
             if [ -n "$GOOGLE_CID" ] && [ -f "$ENVF" ]; then
+              case "$GOOGLE_CID" in
+                *.apps.googleusercontent.com) ;;
+                *) echo "ERROR: GOOGLE_CLIENT_ID must end with .apps.googleusercontent.com"; exit 1 ;;
+              esac
               for KEY in GOOGLE_CLIENT_ID VITE_GOOGLE_CLIENT_ID; do
                 if grep -q "^${KEY}=" "$ENVF"; then
                   sed -i.bak "s|^${KEY}=.*|${KEY}=${GOOGLE_CID}|" "$ENVF"
@@ -79,6 +86,6 @@ jobs:
                   echo "${KEY}=${GOOGLE_CID}" >> "$ENVF"
                 fi
               done
-              echo "  ~ wrote GOOGLE_CLIENT_ID from GitHub Actions secret"
+              echo "  ~ wrote GOOGLE_CLIENT_ID into .env.prod"
             fi
             bash deploy/scripts/vm-deploy-all.sh
