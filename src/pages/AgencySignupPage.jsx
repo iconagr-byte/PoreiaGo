@@ -60,6 +60,8 @@ export default function AgencySignupPage() {
   const price = useMemo(() => displayPrice(plan, interval), [plan, interval]);
   const subdomainPreview = normalizeSubdomain(subdomain) || 'your-agency';
   const demoMode = billingConfig?.demo_mode === true;
+  const checkoutReady = billingConfig?.checkout_ready === true;
+  const paymentsUnavailable = Boolean(billingConfig) && !checkoutReady && !demoMode;
   const trialDays = billingConfig?.trial_days || 14;
 
   useEffect(() => {
@@ -69,7 +71,10 @@ export default function AgencySignupPage() {
         if (!cancelled) setBillingConfig(cfg);
       })
       .catch(() => {
-        if (!cancelled) setBillingConfig({ demo_mode: true, trial_days: 14 });
+        // Never fall back to demo — show «πληρωμές σε ρύθμιση» instead.
+        if (!cancelled) {
+          setBillingConfig({ demo_mode: false, checkout_ready: false, trial_days: 14 });
+        }
       });
     Promise.all([
       fetchPublicAgencyPlanCatalog().catch(() => mergeAgencyPlanCatalog(null)),
@@ -128,6 +133,11 @@ export default function AgencySignupPage() {
       return;
     }
 
+    if (paymentsUnavailable) {
+      setError('Οι πληρωμές ρυθμίζονται ακόμα — δοκιμάστε ξανά μόλις ενεργοποιηθεί το Stripe.');
+      return;
+    }
+
     setWorking(true);
     try {
       const result = await createSignupCheckout({
@@ -140,7 +150,7 @@ export default function AgencySignupPage() {
       });
       if (result?.checkout_url) {
         if (result.demo) {
-          toast.success(`Demo γραφείο έτοιμο — δοκιμή ${trialDays} ημερών`);
+          toast.success(`Το γραφείο είναι έτοιμο — δοκιμή ${trialDays} ημερών`);
         }
         window.location.href = result.checkout_url;
         return;
@@ -182,17 +192,21 @@ export default function AgencySignupPage() {
               </span>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-4">
                 {demoMode
-                  ? `Demo πληρωμή — ${trialDays} ημέρες δωρεάν`
-                  : 'Ξεκινήστε με Stripe Checkout'}
+                  ? `Δοκιμαστική ενεργοποίηση — ${trialDays} ημέρες`
+                  : paymentsUnavailable
+                    ? 'Εγγραφή γραφείου'
+                    : 'Ξεκινήστε με Stripe Checkout'}
               </h1>
               <p className="text-sm text-on-surface-variant mt-2 leading-relaxed">
                 {demoMode
-                  ? 'Χωρίς πραγματική χρέωση: δημιουργείται αμέσως ο tenant, ο admin λογαριασμός και trial συνδρομή για δοκιμή.'
-                  : 'Μετά την πληρωμή δημιουργείται αυτόματα ο tenant, ο admin λογαριασμός και η συνδρομή σας.'}
+                  ? 'Χωρίς χρέωση κάρτας: δημιουργείται αμέσως ο tenant, ο admin λογαριασμός και trial συνδρομή.'
+                  : paymentsUnavailable
+                    ? 'Οι online πληρωμές ρυθμίζονται. Επικοινωνήστε μαζί μας για ενεργοποίηση συμβολαίου.'
+                    : 'Μετά την πληρωμή δημιουργείται αυτόματα ο tenant, ο admin λογαριασμός και η συνδρομή σας.'}
               </p>
-              {demoMode ? (
-                <p className="mt-3 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2">
-                  Demo mode ενεργό — ιδανικό για δοκιμή νέου γραφείου.
+              {paymentsUnavailable ? (
+                <p className="mt-3 text-xs font-bold text-sky-900 bg-sky-50 border border-sky-200 rounded-2xl px-3 py-2">
+                  Πληρωμές σε ρύθμιση — το Stripe Checkout θα ανοίξει μόλις ολοκληρωθεί η σύνδεση.
                 </p>
               ) : null}
             </div>
@@ -361,30 +375,34 @@ export default function AgencySignupPage() {
 
               <button
                 type="submit"
-                disabled={working}
+                disabled={working || paymentsUnavailable}
                 className="w-full py-4 rounded-full bg-primary text-white font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-opacity flex items-center justify-center gap-2"
               >
                 {working ? (
                   <>
                     <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
-                    {demoMode ? 'Δημιουργία demo γραφείου…' : 'Μετάβαση στο Stripe…'}
+                    {demoMode ? 'Δημιουργία δοκιμαστικού γραφείου…' : 'Μετάβαση στο Stripe…'}
                   </>
                 ) : (
                   <>
                     <span className="material-symbols-outlined text-[20px]">
-                      {demoMode ? 'science' : 'lock'}
+                      {paymentsUnavailable ? 'hourglass_top' : demoMode ? 'rocket_launch' : 'lock'}
                     </span>
-                    {demoMode
-                      ? `Ενεργοποίηση demo (${trialDays} ημέρες)`
-                      : 'Συνέχεια στην πληρωμή'}
+                    {paymentsUnavailable
+                      ? 'Πληρωμές σε ρύθμιση'
+                      : demoMode
+                        ? `Έναρξη δοκιμής (${trialDays} ημέρες)`
+                        : 'Συνέχεια στην πληρωμή'}
                   </>
                 )}
               </button>
 
               <p className="text-xs text-center text-gray-500">
-                {demoMode
-                  ? 'Demo πληρωμή — χωρίς χρέωση κάρτας. Μπορείτε αργότερα να ενεργοποιήσετε πραγματικό Stripe.'
-                  : 'Με την εγγραφή αποδέχεστε τους όρους SaaS · η χρέωση ξεκινά μετά την ολοκλήρωση του Checkout'}
+                {paymentsUnavailable
+                  ? 'Μόλις συνδεθεί το Stripe, η εγγραφή θα ανοίγει Checkout με πραγματική πληρωμή.'
+                  : demoMode
+                    ? 'Δοκιμαστική ενεργοποίηση χωρίς χρέωση κάρτας — μετά μπορείτε να περάσετε σε Stripe.'
+                    : 'Με την εγγραφή αποδέχεστε τους όρους SaaS · η χρέωση ξεκινά μετά την ολοκλήρωση του Checkout'}
               </p>
             </form>
           </section>

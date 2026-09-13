@@ -227,6 +227,14 @@ async def signup_checkout(body: BillingSignupCheckoutRequest):
 
     readiness = stripe_readiness()
     use_demo = bool(readiness.get("demo_mode"))
+    if not use_demo and not readiness.get("checkout_ready"):
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Οι online πληρωμές ρυθμίζονται ακόμα (λείπει Stripe). "
+                "Επικοινωνήστε με την υποστήριξη PoreiaGo για ενεργοποίηση συμβολαίου."
+            ),
+        )
 
     async with AsyncSessionLocal() as db:
         try:

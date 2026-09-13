@@ -80,9 +80,12 @@ class Settings(BaseSettings):
         alias="BILLING_SIGNUP_CANCEL_URL",
     )
     billing_demo_mode: bool = Field(
-        default=True,
+        default=False,
         alias="BILLING_DEMO_MODE",
-        description="Allow office signup / trial without real Stripe charge (demo payment). Set false for live Stripe only.",
+        description=(
+            "Opt-in only: allow office signup / trial without real Stripe charge. "
+            "Default false — production shows real Checkout (or «πληρωμές σε ρύθμιση»)."
+        ),
     )
 
     usage_metering_enabled: bool = Field(default=True, alias="USAGE_METERING_ENABLED")

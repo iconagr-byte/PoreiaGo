@@ -26,7 +26,8 @@ class StripeReadinessTests(unittest.TestCase):
             gs.return_value = settings
             data = stripe_readiness()
         self.assertFalse(data["checkout_ready"])
-        self.assertTrue(data["demo_mode"])
+        # Missing Stripe must NOT auto-enable demo (that forced «Demo πληρωμή» in prod).
+        self.assertFalse(data["demo_mode"])
         self.assertIn("STRIPE_SECRET_KEY", data["missing_env"])
 
     def test_demo_mode_flag_with_stripe_ready(self):
