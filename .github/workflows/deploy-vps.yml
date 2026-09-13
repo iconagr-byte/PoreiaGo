@@ -11,6 +11,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      google_client_id:
+        description: "Optional OAuth Web Client ID to write into deploy/.env.prod (public; GIS does not need Client Secret)"
+        required: false
+        type: string
+
 
 # Only one VPS deploy at a time. Parallel SSH deploys fight over api-blue/Traefik
 # and surface Traefik's plain "404 page not found" on api.* while nginx returns 502 on www/api.
