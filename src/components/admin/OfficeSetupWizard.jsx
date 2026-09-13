@@ -27,9 +27,9 @@ import '../../styles/office-setup-wizard.css';
 /** Curated presets for fast onboarding — full gallery lives in Σχεδιασμός σελίδων. */
 const ONBOARD_THEME_IDS = [
   'aegean_classic',
-  'mediterranean_sun',
-  'island_minimal',
-  'luxury_coach',
+  'santorini_split',
+  'cycladic_white',
+  'olympia_luxe',
 ];
 const ONBOARD_THEMES = ONBOARD_THEME_IDS.map((id) => getHomepageThemeById(id));
 
@@ -264,7 +264,7 @@ export default function OfficeSetupWizard({
       const name = brand.footer_brand_name.trim() || office.company_name.trim();
       const theme = getHomepageThemeById(brand.theme_id);
       const patch = {
-        ...themeToAppearancePatch(theme),
+        ...themeToAppearancePatch(theme, { includeColors: true }),
         footer_brand_name: name,
         footer_contact_email: office.support_email.trim(),
         footer_contact_phone: brand.footer_contact_phone.trim(),
