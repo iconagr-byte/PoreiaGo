@@ -99,9 +99,13 @@ export function detectProvider(email) {
       imap_secure: true,
       smtp_port: 465,
       smtp_secure: false,
+      // Dovecot/cPanel hierarchy: Sent lives under INBOX, not bare "Sent".
+      imap_folder_sent: 'INBOX.Sent',
+      imap_folder_spam: 'INBOX.spam',
       help: [
-        `Host: ${ACHILLIO_CPANEL_MAIL_HOST} (όχι mail.achilliotravel.com — δείχνει λάθος server)`,
+        `Host: ${ACHILLIO_CPANEL_MAIL_HOST} ή mail.achilliotravel.com (μετά τη διόρθωση DNS)`,
         'cPanel Secure SSL/TLS: IMAP 993 · SMTP 465',
+        'Φάκελοι: Απεσταλμένα = INBOX.Sent · Spam = INBOX.spam',
         'Username: info@achilliotravel.com · κωδικός webmail',
       ],
     };
@@ -164,8 +168,8 @@ export function buildAccountFromWizard({
     imap_port: prov.imap_port,
     imap_secure: prov.imap_secure,
     imap_mailbox: 'INBOX',
-    imap_folder_sent: 'Sent',
-    imap_folder_spam: 'Spam',
+    imap_folder_sent: prov.imap_folder_sent || 'Sent',
+    imap_folder_spam: prov.imap_folder_spam || 'Spam',
     smtp_host: prov.smtp_host || (addr.includes('@') ? `mail.${addr.split('@')[1]}` : ''),
     smtp_port: prov.smtp_port,
     smtp_secure: prov.smtp_secure,

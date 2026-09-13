@@ -28,6 +28,9 @@ const achillio = buildAccountFromWizard({
 console.assert(achillio.imap_host === 'srv23.intechs.gr', 'wizard imap srv23');
 console.assert(achillio.smtp_port === 465, 'wizard smtp 465');
 console.assert(achillio.imap_port === 993, 'wizard imap 993');
+console.assert(achillio.imap_folder_sent === 'INBOX.Sent', 'wizard sent INBOX.Sent');
+console.assert(achillio.imap_folder_spam === 'INBOX.spam', 'wizard spam INBOX.spam');
+console.assert(custom.imap_folder_sent === 'INBOX.Sent', 'achillio sent folder');
 
 const bridged = buildAccountFromWizard({
   email: 'me@gmail.com',
