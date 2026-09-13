@@ -45,6 +45,89 @@ def _folder_names_from_cfg(cfg: dict) -> list[tuple[str, str]]:
     return out
 
 
+# cPanel/Dovecot often uses INBOX.Sent / INBOX.spam instead of bare "Sent"/"Spam".
+_SENT_FALLBACKS = ("INBOX.Sent", "Sent", "Sent Messages", "Sent Items")
+_SPAM_FALLBACKS = ("INBOX.spam", "INBOX.Junk", "Spam", "Junk", "Junk E-mail")
+
+
+def _parse_list_mailbox(raw: bytes | str) -> tuple[str, str]:
+    """Return (flags_upper, mailbox_name) from an IMAP LIST line."""
+    line = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+    flags = ""
+    if line.startswith("("):
+        end = line.find(")")
+        if end >= 0:
+            flags = line[1:end].upper()
+            line = line[end + 1 :].strip()
+    # drop separator token ("." or "/")
+    parts = line.split(None, 1)
+    if len(parts) == 2:
+        name = parts[1].strip()
+    else:
+        name = line.strip()
+    if len(name) >= 2 and name[0] == name[-1] and name[0] in "\"'":
+        name = name[1:-1]
+    return flags, name
+
+
+def _list_mailboxes(client: imaplib.IMAP4) -> list[tuple[str, str]]:
+    try:
+        status, data = client.list()
+    except Exception as exc:
+        logger.debug("IMAP LIST failed: %s", exc)
+        return []
+    if status != "OK" or not data:
+        return []
+    out: list[tuple[str, str]] = []
+    for raw in data:
+        if raw is None:
+            continue
+        out.append(_parse_list_mailbox(raw))
+    return out
+
+
+def _pick_special_mailbox(
+    listed: list[tuple[str, str]],
+    *,
+    flag: str,
+    preferred: str,
+    fallbacks: tuple[str, ...],
+) -> str:
+    """Prefer configured name if listed, else SPECIAL-USE flag, else known fallbacks."""
+    names = {name for _, name in listed}
+    if preferred and preferred in names:
+        return preferred
+    flag_u = flag.upper()
+    for flags, name in listed:
+        if flag_u in flags.split():
+            return name
+    for cand in fallbacks:
+        if cand in names:
+            return cand
+    return preferred
+
+
+def _resolve_folder_names(client: imaplib.IMAP4, cfg: dict) -> list[tuple[str, str]]:
+    """Map local folders to selectable IMAP boxes (cPanel INBOX.* aware)."""
+    configured = _folder_names_from_cfg(cfg)
+    listed = _list_mailboxes(client)
+    if not listed:
+        return configured
+
+    resolved: list[tuple[str, str]] = []
+    for imap_box, local_folder in configured:
+        if local_folder == FOLDER_SENT:
+            imap_box = _pick_special_mailbox(
+                listed, flag="\\Sent", preferred=imap_box, fallbacks=_SENT_FALLBACKS
+            )
+        elif local_folder == FOLDER_SPAM:
+            imap_box = _pick_special_mailbox(
+                listed, flag="\\Junk", preferred=imap_box, fallbacks=_SPAM_FALLBACKS
+            )
+        resolved.append((imap_box, local_folder))
+    return resolved
+
+
 def _decode_header_value(raw: str | bytes | None) -> str:
     if raw is None:
         return ""
@@ -142,12 +225,33 @@ def _fetch_all_from_imap(
     except Exception as exc:
         return [], [format_imap_connect_error(exc)]
     try:
-        for imap_box, local_folder in _folder_names_from_cfg(cfg):
+        for imap_box, local_folder in _resolve_folder_names(client, cfg):
             try:
                 status, _ = client.select(imap_box, readonly=True)
                 if status != "OK":
-                    errors.append(f"Cannot select {imap_box}")
-                    continue
+                    # Last-chance fallbacks when LIST was empty/partial.
+                    alt = None
+                    if local_folder == FOLDER_SENT:
+                        for cand in _SENT_FALLBACKS:
+                            if cand == imap_box:
+                                continue
+                            st, _ = client.select(cand, readonly=True)
+                            if st == "OK":
+                                alt = cand
+                                break
+                    elif local_folder == FOLDER_SPAM:
+                        for cand in _SPAM_FALLBACKS:
+                            if cand == imap_box:
+                                continue
+                            st, _ = client.select(cand, readonly=True)
+                            if st == "OK":
+                                alt = cand
+                                break
+                    if alt:
+                        imap_box = alt
+                    else:
+                        errors.append(f"Cannot select {imap_box}")
+                        continue
             except Exception as exc:
                 errors.append(f"{imap_box}: {exc}")
                 continue

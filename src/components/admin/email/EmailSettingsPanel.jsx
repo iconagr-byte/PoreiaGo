@@ -1080,20 +1080,26 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
                 />
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field id="imap-sent" label="Απεσταλμένα">
+                <Field
+                  id="imap-sent"
+                  label="Απεσταλμένα"
+                  hint="Στο cPanel συνήθως INBOX.Sent (όχι Sent)"
+                >
                   <input
                     id="imap-sent"
                     className={fieldClass}
                     value={form.imap_folder_sent}
                     onChange={set('imap_folder_sent')}
+                    placeholder="INBOX.Sent"
                   />
                 </Field>
-                <Field id="imap-spam" label="Spam">
+                <Field id="imap-spam" label="Spam" hint="Στο cPanel συχνά INBOX.spam ή INBOX.Junk">
                   <input
                     id="imap-spam"
                     className={fieldClass}
                     value={form.imap_folder_spam}
                     onChange={set('imap_folder_spam')}
+                    placeholder="INBOX.spam"
                   />
                 </Field>
               </div>
