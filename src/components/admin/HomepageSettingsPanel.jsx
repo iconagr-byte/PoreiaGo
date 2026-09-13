@@ -898,14 +898,14 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     }
   }, [form, loading]);
 
-  const handleThemePreview = (theme) => {
-    const patch = themeToAppearancePatch(theme);
+  const handleThemePreview = (theme, { includeColors = false } = {}) => {
+    const patch = themeToAppearancePatch(theme, { includeColors });
     setForm((p) => ({ ...p, ...patch }));
     toast.success(`Προεπισκόπηση: ${theme.nameEl}`, { id: 'theme-preview' });
   };
 
-  const handleThemeApply = async (theme) => {
-    const patch = themeToAppearancePatch(theme);
+  const handleThemeApply = async (theme, { includeColors = false } = {}) => {
+    const patch = themeToAppearancePatch(theme, { includeColors });
     setForm((p) => ({ ...p, ...patch }));
     setSaving(true);
     try {
@@ -914,7 +914,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       if (result.offline) {
         toast.success('Το θέμα αποθηκεύτηκε τοπικά', { id: 'theme-apply' });
       } else {
-        toast.success(`Εφαρμόστηκε το θέμα «${theme.nameEl}»`, { id: 'theme-apply' });
+        toast.success(includeColors ? `Εφαρμόστηκε διάταξη + χρώματα «${theme.nameEl}»` : `Εφαρμόστηκε διάταξη «${theme.nameEl}» — ρύθμισε χρώματα στα Γενικά`, { id: 'theme-apply' });
       }
     } catch (err) {
       if (err.message === 'AUTH_EXPIRED') return;
@@ -1304,7 +1304,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         {designPage === 'home' && section === 'themes' && (
           <PanelCard
             title="Θέματα αρχικής σελίδας"
-            description="Επίλεξε θέμα — εφαρμόζει χρώματα, header, hero, κάρτες και footer μαζί."
+            description="Επίλεξε διάταξη (header, hero, κάρτες, footer). Τα χρώματα ρυθμίζονται χωριστά στα Γενικά — ή τσεκάρισε «προτεινόμενα χρώματα»."
           >
             <ThemeGallery
               activeThemeId={form.homepage_theme_id || 'aegean_classic'}
