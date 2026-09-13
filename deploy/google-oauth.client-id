@@ -1,0 +1,12 @@
+# Public Google OAuth Web Client ID (safe to commit — embedded in the browser).
+# Used as deploy fallback when GOOGLE_CLIENT_ID is unset in .env.prod / Actions secrets.
+# Client Secret is NOT stored here and is not required for GIS ID-token Sign-In.
+#
+# Console: Authorized JavaScript origins must include:
+#   https://www.achilliotravel.com
+#   https://achilliotravel.com
+#   https://www.poreiago.com
+#   http://localhost:5173
+#
+# See deploy/GOOGLE-SIGNIN.md
+838114974488-8q36brogbldig001k9n88qrnciqle1j1.apps.googleusercontent.com
