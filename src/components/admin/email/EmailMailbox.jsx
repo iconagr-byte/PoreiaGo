@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { fetchEmailSettings } from '../../../services/emailSettingsApi.js';
 import {
+  bulkTrashMailboxMessages,
   deleteMailboxMessage,
   fetchMailboxFolders,
   fetchMailboxMessage,
@@ -85,6 +86,8 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
   const [fromEmail, setFromEmail] = useState('');
   const [lastSyncError, setLastSyncError] = useState('');
   const [replyBody, setReplyBody] = useState('<p></p>');
+  const [checkedIds, setCheckedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const autoSyncedFor = useRef('');
 
   const loadFolders = useCallback(async () => {
@@ -228,6 +231,51 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
     }
   };
 
+  const toggleChecked = (id, e) => {
+    e?.stopPropagation?.();
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allVisibleChecked =
+    messages.length > 0 && messages.every((m) => checkedIds.has(m.id));
+
+  const toggleCheckAll = () => {
+    if (allVisibleChecked) {
+      setCheckedIds(new Set());
+      return;
+    }
+    setCheckedIds(new Set(messages.map((m) => m.id)));
+  };
+
+  const handleBulkTrash = async () => {
+    const ids = [...checkedIds];
+    if (!ids.length) return;
+    if (!window.confirm(`Μετακίνηση ${ids.length} μηνυμάτων στον Κάδο;`)) return;
+    setBulkBusy(true);
+    try {
+      const r = await bulkTrashMailboxMessages(ids);
+      const n = r?.moved ?? ids.length;
+      toast.success(n === 1 ? '1 μήνυμα στον Κάδο' : `${n} μηνύματα στον Κάδο`);
+      setCheckedIds(new Set());
+      if (selectedId && ids.includes(selectedId)) {
+        setSelectedId(null);
+        setDetail(null);
+        setCustomer(null);
+      }
+      await loadMessages();
+      await loadFolders();
+    } catch (err) {
+      mailboxToastError(err.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const handleReply = async () => {
     if (!selectedId) return;
     try {
@@ -319,6 +367,7 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
                   setActiveFolder(f.name);
                   setSelectedId(null);
                   setDetail(null);
+                  setCheckedIds(new Set());
                 }}
                 className={`embox-folder-btn ${active ? 'embox-folder-btn-active' : ''}`}
                 style={
@@ -344,7 +393,29 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
         </aside>
 
         <section className="embox-list">
-          <div className="embox-list-head">{activeMeta.label}</div>
+          <div className="embox-list-head">
+            <label className="embox-check-all">
+              <input
+                type="checkbox"
+                checked={allVisibleChecked}
+                disabled={!messages.length || bulkBusy}
+                onChange={toggleCheckAll}
+                aria-label="Επιλογή όλων"
+              />
+              <span>{activeMeta.label}</span>
+            </label>
+            {checkedIds.size > 0 && (
+              <button
+                type="button"
+                className="embox-bulk-trash"
+                disabled={bulkBusy}
+                onClick={handleBulkTrash}
+              >
+                <Trash2 size={14} strokeWidth={2} aria-hidden />
+                {bulkBusy ? '…' : `Κάδος (${checkedIds.size})`}
+              </button>
+            )}
+          </div>
           {loading && <p className="embox-list-loading">Φόρτωση…</p>}
           {!loading && messages.length === 0 && (
             <p className="embox-list-empty">Δεν υπάρχουν μηνύματα.</p>
@@ -352,31 +423,43 @@ export default function EmailMailbox({ emailSettingsId = '', composeInitial = nu
           <ul className="embox-list-scroll">
             {messages.map((m) => {
               const display = activeFolder === 'Sent' ? m.recipient : m.sender;
+              const checked = checkedIds.has(m.id);
               return (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    onClick={() => selectMessage(m.id)}
-                    className={`embox-msg-btn ${selectedId === m.id ? 'embox-msg-btn-active' : ''} ${
-                      !m.is_read ? 'embox-msg-btn-unread' : ''
-                    }`}
-                  >
-                    <span
-                      className="embox-avatar"
-                      style={{ background: avatarGradient(display) }}
-                      aria-hidden
+                <li key={m.id} className={checked ? 'embox-msg-row-checked' : undefined}>
+                  <div className="embox-msg-row">
+                    <input
+                      type="checkbox"
+                      className="embox-msg-check"
+                      checked={checked}
+                      disabled={bulkBusy}
+                      onChange={(e) => toggleChecked(m.id, e)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Επιλογή: ${m.subject || 'μήνυμα'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => selectMessage(m.id)}
+                      className={`embox-msg-btn ${selectedId === m.id ? 'embox-msg-btn-active' : ''} ${
+                        !m.is_read ? 'embox-msg-btn-unread' : ''
+                      }`}
                     >
-                      {initialsFrom(display)}
-                    </span>
-                    <span className="embox-msg-body">
-                      <div className="embox-msg-from">{display || '—'}</div>
-                      <div className="embox-msg-subject">{m.subject || '(χωρίς θέμα)'}</div>
-                      <div className="embox-msg-meta">
-                        <span className="embox-msg-date">{formatDate(m.date)}</span>
-                        {!m.is_read && <span className="embox-unread-dot" title="Αδιάβαστο" />}
-                      </div>
-                    </span>
-                  </button>
+                      <span
+                        className="embox-avatar"
+                        style={{ background: avatarGradient(display) }}
+                        aria-hidden
+                      >
+                        {initialsFrom(display)}
+                      </span>
+                      <span className="embox-msg-body">
+                        <div className="embox-msg-from">{display || '—'}</div>
+                        <div className="embox-msg-subject">{m.subject || '(χωρίς θέμα)'}</div>
+                        <div className="embox-msg-meta">
+                          <span className="embox-msg-date">{formatDate(m.date)}</span>
+                          {!m.is_read && <span className="embox-unread-dot" title="Αδιάβαστο" />}
+                        </div>
+                      </span>
+                    </button>
+                  </div>
                 </li>
               );
             })}

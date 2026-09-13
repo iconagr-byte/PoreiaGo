@@ -16,6 +16,7 @@ from email_client.mailbox_service import (
     send_compose,
 )
 from email_client.schemas import (
+    BulkTrashBody,
     ComposeBody,
     CustomerCard,
     DraftBody,
@@ -113,6 +114,25 @@ async def list_mailbox_messages(
             payload["date"] = ""
         out.append(EmailMessageOut(**payload))
     return out
+
+
+@router.post("/api/mailbox/messages/bulk-trash")
+async def bulk_trash_mailbox_messages(body: BulkTrashBody):
+    """Move many messages to Trash in one request (UI multi-select)."""
+    ids = [str(i).strip() for i in (body.ids or []) if str(i).strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="Δεν επιλέχθηκαν μηνύματα")
+    if len(ids) > 200:
+        raise HTTPException(status_code=400, detail="Μέχρι 200 μηνύματα ανά ενέργεια")
+    moved = 0
+    missing: list[str] = []
+    for mid in ids:
+        updated = await move_to_trash(mid)
+        if updated:
+            moved += 1
+        else:
+            missing.append(mid)
+    return {"ok": True, "moved": moved, "missing": missing}
 
 
 @router.get("/api/mailbox/messages/{message_id}", response_model=EmailMessageDetail)

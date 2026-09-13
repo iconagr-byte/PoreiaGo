@@ -227,6 +227,10 @@
 }
 
 .embox-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.65rem 1rem;
   font-size: 0.7rem;
   font-weight: 700;
@@ -531,4 +535,76 @@
 .emhub-account-select:focus {
   outline: 2px solid #c7d2fe;
   outline-offset: 1px;
+}
+
+
+/* Bulk select */
+.embox-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.embox-check-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.embox-check-all input {
+  width: 15px;
+  height: 15px;
+  accent-color: #4f46e5;
+  cursor: pointer;
+}
+
+.embox-bulk-trash {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.28rem 0.55rem;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.embox-bulk-trash:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.embox-bulk-trash:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.embox-msg-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.embox-msg-check {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin: 0.95rem 0 0 0.75rem;
+  accent-color: #4f46e5;
+  cursor: pointer;
+}
+
+.embox-msg-row .embox-msg-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.embox-msg-row-checked {
+  background: #eef2ff;
 }
