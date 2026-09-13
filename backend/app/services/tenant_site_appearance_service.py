@@ -68,17 +68,55 @@ def _prune_huge_strings(value: Any, *, max_len: int = _MAX_SETTINGS_STRING) -> A
         return {k: _prune_huge_strings(v, max_len=max_len) for k, v in value.items()}
     if isinstance(value, list):
         return [_prune_huge_strings(v, max_len=max_len) for v in value]
-    if isinstance(value, str) and len(value) > max_len:
-        head = value[:80].lower()
-        if value.startswith("data:") or "base64" in head or ";base64," in value[:200]:
-            return ""
-        return value[:max_len]
+    if isinstance(value, str):
+        # Postgres TEXT rejects NUL (0x00) bytes — strip before json.dumps.
+        if "\x00" in value:
+            value = value.replace("\x00", "")
+        if len(value) > max_len:
+            head = value[:80].lower()
+            if value.startswith("data:") or "base64" in head or ";base64," in value[:200]:
+                return ""
+            return value[:max_len]
     return value
 
 
 def _safe_settings_json(settings: dict[str, Any]) -> str:
     cleaned = _prune_huge_strings(_prune_oversized_data_urls_deep(settings))
-    return json.dumps(cleaned, ensure_ascii=False, default=str)
+    return json.dumps(cleaned, ensure_ascii=False, default=str).replace("\x00", "")
+
+
+_BRAND_LOGO_PATCH_KEYS = frozenset(
+    {
+        "footer_brand_name",
+        "rent_office_name",
+        "logo_url",
+        "hero_image_url",
+        "logo_height_px",
+        "logo_max_width_px",
+        "logo_radius_px",
+        "logo_padding_px",
+        "logo_bg_mode",
+        "logo_shadow",
+        "logo_show_name",
+        "hero_image_focal",
+    }
+)
+
+
+def _is_brand_logo_only_patch(patch: dict[str, Any]) -> bool:
+    """True when the client is only saving brand name / logo sizing / media URLs."""
+    if not patch:
+        return False
+    return set(patch).issubset(_BRAND_LOGO_PATCH_KEYS)
+
+
+def coerce_appearance_for_response(data: dict[str, Any] | None) -> dict[str, Any]:
+    """Replace nulls with defaults so response models never see None for required fields."""
+    merged = {**DEFAULT_SITE_APPEARANCE, **(data or {})}
+    for key, default in DEFAULT_SITE_APPEARANCE.items():
+        if merged.get(key) is None:
+            merged[key] = default
+    return merged
 
 DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "logo_url": "",
@@ -490,64 +528,86 @@ class TenantSiteAppearanceService:
             ):
                 if size_key in updated:
                     settings["site_appearance"][size_key] = updated[size_key]
-        tenant.settings_json = _safe_settings_json(settings)
-        try:
-            await self._session.flush()
-        except Exception:
-            # Nuclear retry: keep only site_appearance + tiny branding bag.
-            await self._session.rollback()
-            tenant = await self._get_tenant(tenant_id)
-            slim = {
-                "site_appearance": {
-                    k: updated.get(k)
-                    for k in (
-                        "logo_url",
-                        "hero_image_url",
-                        "logo_height_px",
-                        "logo_max_width_px",
-                        "logo_radius_px",
-                        "logo_padding_px",
-                        "logo_bg_mode",
-                        "logo_shadow",
-                        "logo_show_name",
-                        "footer_brand_name",
-                        "rent_office_name",
-                        "hero_image_focal",
-                    )
-                    if k in updated
-                },
-                "branding": {
-                    "logo_url": str(updated.get("logo_url") or ""),
-                },
+        # Brand/logo-only saves: write a slim bag up front so poisoned slider/theme
+        # blobs in settings_json cannot 500 the «Αποθήκευση μάρκας» button.
+        if _is_brand_logo_only_patch(patch):
+            prev = _prune_huge_strings(
+                _prune_oversized_data_urls_deep(_parse_settings(tenant.settings_json))
+            )
+            prev_appearance = prev.get("site_appearance")
+            appearance_full = _prune_oversized_media(
+                {
+                    **DEFAULT_SITE_APPEARANCE,
+                    **(prev_appearance if isinstance(prev_appearance, dict) else {}),
+                    **updated,
+                }
+            )
+            appearance_full.pop("display_name", None)
+            appearance_full.pop("storage_source", None)
+            appearance_full.pop("tenant_slug", None)
+            brand_name = str(appearance_full.get("footer_brand_name") or "").strip()
+            if brand_name and not str(appearance_full.get("rent_office_name") or "").strip():
+                appearance_full["rent_office_name"] = brand_name
+            slim: dict[str, Any] = {
+                "site_appearance": appearance_full,
+                "branding": {"logo_url": str(appearance_full.get("logo_url") or "")},
             }
-            # Preserve non-appearance keys that are small enough.
-            prev = _prune_huge_strings(_prune_oversized_data_urls_deep(_parse_settings(tenant.settings_json)))
             for key, val in prev.items():
                 if key in ("site_appearance", "branding"):
                     continue
                 raw = json.dumps(val, ensure_ascii=False, default=str)
                 if len(raw) <= _MAX_SETTINGS_STRING:
                     slim[key] = val
-            appearance_full = _prune_oversized_media(
-                {**DEFAULT_SITE_APPEARANCE, **(prev.get("site_appearance") or {}), **updated}
-            )
+            tenant.settings_json = _safe_settings_json(slim)
+            updated = appearance_full
+        else:
+            tenant.settings_json = _safe_settings_json(settings)
+        try:
+            await self._session.flush()
+        except Exception:
+            # Nuclear retry: never re-merge poisoned prev site_appearance — that was
+            # recreating the same failing row. Keep DEFAULT + this patch only.
+            await self._session.rollback()
+            tenant = await self._get_tenant(tenant_id)
+            appearance_full = _prune_oversized_media({**DEFAULT_SITE_APPEARANCE, **updated})
             appearance_full.pop("display_name", None)
             appearance_full.pop("storage_source", None)
             appearance_full.pop("tenant_slug", None)
-            slim["site_appearance"] = appearance_full
+            brand_name = str(appearance_full.get("footer_brand_name") or "").strip()
+            if brand_name and not str(appearance_full.get("rent_office_name") or "").strip():
+                appearance_full["rent_office_name"] = brand_name
+            slim = {
+                "site_appearance": appearance_full,
+                "branding": {
+                    "logo_url": str(appearance_full.get("logo_url") or ""),
+                },
+            }
+            # Preserve non-appearance keys that are small enough (modules, etc.).
+            prev = _prune_huge_strings(
+                _prune_oversized_data_urls_deep(_parse_settings(tenant.settings_json))
+            )
+            for key, val in prev.items():
+                if key in ("site_appearance", "branding"):
+                    continue
+                raw = json.dumps(val, ensure_ascii=False, default=str)
+                if len(raw) <= _MAX_SETTINGS_STRING:
+                    slim[key] = val
             tenant.settings_json = _safe_settings_json(slim)
             await self._session.flush()
             updated = appearance_full
         try:
-            await self._audit.record(
-                tenant_id=tenant_id,
-                actor_id=None,
-                actor_email=actor_email or "tenant_admin",
-                action=AuditAction.UPDATE,
-                resource_type="site_appearance",
-                resource_id=str(tenant_id),
-                detail="Updated homepage appearance",
-            )
+            # Savepoint so a failed audit INSERT cannot poison this session
+            # (PendingRollbackError → false «Αποτυχία αποθήκευσης εμφάνισης»).
+            async with self._session.begin_nested():
+                await self._audit.record(
+                    tenant_id=tenant_id,
+                    actor_id=None,
+                    actor_email=actor_email or "tenant_admin",
+                    action=AuditAction.UPDATE,
+                    resource_type="site_appearance",
+                    resource_id=str(tenant_id),
+                    detail="Updated homepage appearance",
+                )
         except Exception:
             # Never block logo/theme saves on audit table issues.
             pass

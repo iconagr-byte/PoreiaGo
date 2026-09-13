@@ -1679,8 +1679,11 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               e.preventDefault();
               // Migrate legacy data: URLs (or stuck optimistic previews) via file upload,
               // then save sizing. Never PUT huge data URLs into Postgres.
+              const brandName = String(form.footer_brand_name || '').trim();
               const patch = {
-                footer_brand_name: String(form.footer_brand_name || '').trim(),
+                footer_brand_name: brandName,
+                // Keep rent header name in sync when the office renames itself here.
+                ...(brandName ? { rent_office_name: brandName } : {}),
                 logo_height_px: clampLogoHeight(form.logo_height_px),
                 logo_max_width_px: clampLogoMaxWidth(form.logo_max_width_px),
                 logo_radius_px: clampLogoRadius(form.logo_radius_px),
@@ -1719,6 +1722,9 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   // Sizing-only retry — logo file may already be on disk/Postgres.
                   const sizeOnly = {
                     footer_brand_name: patch.footer_brand_name,
+                    ...(patch.rent_office_name
+                      ? { rent_office_name: patch.rent_office_name }
+                      : {}),
                     logo_height_px: patch.logo_height_px,
                     logo_max_width_px: patch.logo_max_width_px,
                     logo_radius_px: patch.logo_radius_px,
