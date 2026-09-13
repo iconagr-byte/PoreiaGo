@@ -8,8 +8,25 @@ import httpx
 from fastapi import HTTPException
 
 
+def is_placeholder_google_client_id(client_id: str) -> bool:
+    """True for empty / docs-example Client IDs that must not enable Sign-In."""
+    value = (client_id or "").strip().lower()
+    if not value:
+        return True
+    if not value.endswith(".apps.googleusercontent.com"):
+        return True
+    if "xxxx" in value or "example" in value or "your-client" in value:
+        return True
+    if value.startswith("123456789-xxxx") or value.startswith("1234567890-xxxx"):
+        return True
+    return False
+
+
 def google_client_id() -> str:
-    return (os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID") or "").strip()
+    raw = (os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID") or "").strip()
+    if is_placeholder_google_client_id(raw):
+        return ""
+    return raw
 
 
 async def verify_google_id_token(id_token: str) -> dict:
