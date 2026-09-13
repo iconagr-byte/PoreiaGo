@@ -68,10 +68,15 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             git clean -fd -e deploy/.env.prod -e deploy/.vapid_private.pem
-            # Optional: inject Google OAuth Web Client ID (Actions secret, else workflow_dispatch input).
+            # Optional: inject Google OAuth Web Client ID
+            # Priority: Actions secret → workflow_dispatch input → deploy/google-oauth.client-id
             GOOGLE_CID='${{ secrets.GOOGLE_CLIENT_ID }}'
             if [ -z "$GOOGLE_CID" ]; then
               GOOGLE_CID='${{ github.event.inputs.google_client_id }}'
+            fi
+            if [ -z "$GOOGLE_CID" ] && [ -f deploy/google-oauth.client-id ]; then
+              GOOGLE_CID="$(grep -v '^[[:space:]]*#' deploy/google-oauth.client-id | grep -v '^[[:space:]]*$' | head -1 | tr -d '[:space:]')"
+              echo "  ~ using GOOGLE_CLIENT_ID from deploy/google-oauth.client-id"
             fi
             ENVF=/opt/poreiago/deploy/.env.prod
             if [ -n "$GOOGLE_CID" ] && [ -f "$ENVF" ]; then
