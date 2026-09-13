@@ -28,6 +28,7 @@ from app.services.tenant_office_asset_service import clear_office_asset, save_of
 from app.services.tenant_site_appearance_service import (
     DEFAULT_SITE_APPEARANCE,
     TenantSiteAppearanceService,
+    coerce_appearance_for_response,
 )
 
 logger = logging.getLogger(__name__)
@@ -115,8 +116,9 @@ async def update_branding_settings(
 
 def _appearance_response_payload(data: dict) -> TenantSiteAppearanceResponse:
     """Build response model — ignore unknown/extra keys from Postgres bags."""
+    coerced = coerce_appearance_for_response(data)
     fields = TenantSiteAppearanceResponse.model_fields
-    clean = {k: data[k] for k in fields if k in data}
+    clean = {k: coerced[k] for k in fields if k in coerced}
     return TenantSiteAppearanceResponse(**clean)
 
 
