@@ -263,18 +263,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         </div>
       ) : null}
 
-      <div className="space-y-3 mb-2">
-        <GoogleSignInButton
-          disabled={googleLoading || loading}
-          onSuccess={handleGoogleCredential}
-          onDemoProfile={handleGoogleDemo}
-          onError={setError}
-        />
-        {googleLoading ? <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p> : null}
-      </div>
-
-      <div className={dividerClass}>{googleEnabled ? 'ή με email' : 'με email / κωδικό'}</div>
-
       <form onSubmit={handleLogin} className="space-y-4">
         {backendOk === false ? (
           <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -331,6 +319,23 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           <span className="material-symbols-outlined text-sm">arrow_forward</span>
         </button>
       </form>
+
+      {googleEnabled ? (
+        <>
+          <div className={`${dividerClass} mt-5`}>ή με Google</div>
+          <div className="space-y-3 mt-2">
+            <GoogleSignInButton
+              disabled={googleLoading || loading}
+              onSuccess={handleGoogleCredential}
+              onDemoProfile={handleGoogleDemo}
+              onError={setError}
+            />
+            {googleLoading ? (
+              <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
+            ) : null}
+          </div>
+        </>
+      ) : null}
 
       <p className="text-sm text-center text-[#6e6e73] mt-5">
         Δεν έχετε λογαριασμό;{' '}
