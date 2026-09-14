@@ -137,7 +137,7 @@ export default function AdminLoginPage() {
             Σύνδεση Διαχείρισης
           </h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Google ή email + κωδικός — χωρίς τεχνικά IDs
+            Email + κωδικός ή Google — χωρίς τεχνικά IDs
           </p>
         </div>
 
@@ -147,26 +147,6 @@ export default function AdminLoginPage() {
               {error}
             </p>
           )}
-
-          <GoogleSignInButton
-            disabled={busy}
-            onSuccess={handleGoogleCredential}
-            onDemoProfile={() =>
-              setError('Για demo Google χρειάζεται GOOGLE_CLIENT_ID στο server — χρησιμοποιήστε email/κωδικό.')
-            }
-            onError={(msg) => setError(msg || 'Η σύνδεση με Google απέτυχε')}
-          />
-          {googleLoading ? (
-            <p className="text-xs text-center text-on-surface-variant">Επαλήθευση Google…</p>
-          ) : null}
-
-          <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-outline-variant/30" />
-            <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-              {googleEnabled ? 'ή με email' : 'με email / κωδικό'}
-            </span>
-            <span className="h-px flex-1 bg-outline-variant/30" />
-          </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
@@ -262,6 +242,32 @@ export default function AdminLoginPage() {
               <span className="material-symbols-outlined text-sm">dashboard</span>
             </button>
           </form>
+
+          {googleEnabled ? (
+            <>
+              <div className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-outline-variant/30" />
+                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                  ή με Google
+                </span>
+                <span className="h-px flex-1 bg-outline-variant/30" />
+              </div>
+
+              <GoogleSignInButton
+                disabled={busy}
+                onSuccess={handleGoogleCredential}
+                onDemoProfile={() =>
+                  setError(
+                    'Για demo Google χρειάζεται GOOGLE_CLIENT_ID στο server — χρησιμοποιήστε email/κωδικό.',
+                  )
+                }
+                onError={(msg) => setError(msg || 'Η σύνδεση με Google απέτυχε')}
+              />
+              {googleLoading ? (
+                <p className="text-xs text-center text-on-surface-variant">Επαλήθευση Google…</p>
+              ) : null}
+            </>
+          ) : null}
         </div>
       </div>
 

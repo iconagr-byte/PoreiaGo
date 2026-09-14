@@ -248,23 +248,6 @@ export default function RegisterPage() {
           </div>
         ) : null}
 
-        <div className="space-y-3 mb-2">
-          <GoogleSignInButton
-            text="signup_with"
-            disabled={googleLoading || loading}
-            onSuccess={handleGoogleCredential}
-            onDemoProfile={handleGoogleDemo}
-            onError={setError}
-          />
-          {googleLoading ? (
-            <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
-          ) : null}
-        </div>
-
-        <div className={dividerClass}>
-          {googleEnabled ? 'ή με email' : 'με email / κωδικό'}
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-5">
           {backendOk === false && (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -358,6 +341,24 @@ export default function RegisterPage() {
                   : 'Δημιουργία λογαριασμού'}
           </button>
         </form>
+
+        {googleEnabled ? (
+          <>
+            <div className={`${dividerClass} mt-5`}>ή με Google</div>
+            <div className="space-y-3 mt-2">
+              <GoogleSignInButton
+                text="signup_with"
+                disabled={googleLoading || loading}
+                onSuccess={handleGoogleCredential}
+                onDemoProfile={handleGoogleDemo}
+                onError={setError}
+              />
+              {googleLoading ? (
+                <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
+              ) : null}
+            </div>
+          </>
+        ) : null}
 
         <p className="text-sm text-center mt-6 text-[#6e6e73]">
           Έχετε ήδη λογαριασμό;{' '}
