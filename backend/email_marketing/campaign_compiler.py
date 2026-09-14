@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import html
 import json
-from typing import Any
 
 from .graphic_assets import BTN_RADIUS, BTN_SHADOW, HEADER_IMAGES, header_image_html
 from .products_catalog import product_email_block_html
@@ -17,12 +16,18 @@ def product_block_html(product: dict, *, checkout_base: str = "http://localhost:
     return product_email_block_html(p, checkout_base)
 
 
-def compile_block(block: dict, *, checkout_base: str = "http://localhost:5173") -> str:
+def compile_block(
+    block: dict,
+    *,
+    checkout_base: str = "http://localhost:5173",
+    brand: dict | None = None,
+) -> str:
+    brand = brand or {}
     btype = block.get("type") or "text"
     if btype == "header":
         url = str(block.get("url") or HEADER_IMAGES.get("default", ""))
-        alt = str(block.get("alt") or "AeroStride Travel")
-        return header_image_html(url, alt=alt)
+        alt = str(block.get("alt") or brand.get("name") or "Γραφείο")
+        return header_image_html(url, alt=alt, brand=brand)
     if btype == "text":
         content = block.get("content") or "<p></p>"
         return f'<div style="margin:12px 0;line-height:1.6;color:#334155;">{content}</div>'
@@ -55,14 +60,19 @@ def compile_blocks_to_html(
     *,
     preheader: str = "",
     checkout_base: str = "http://localhost:5173",
+    brand: dict | None = None,
 ) -> str:
-    inner = "".join(compile_block(b, checkout_base=checkout_base) for b in blocks)
+    brand = brand or {}
+    inner = "".join(
+        compile_block(b, checkout_base=checkout_base, brand=brand) for b in blocks
+    )
     pre = html.escape(preheader) if preheader else ""
     pre_span = (
         f'<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">{pre}</div>'
         if pre
         else ""
     )
+    footer = html.escape(str(brand.get("name") or "").strip() or "Γραφείο")
     return f"""<!DOCTYPE html>
 <html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,Segoe UI,Arial,sans-serif;">
@@ -71,7 +81,7 @@ def compile_blocks_to_html(
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,.08);">
 <tr><td style="padding:28px 24px;">{inner}</td></tr>
-<tr><td style="padding:16px 24px;background:#f8fafc;text-align:center;font-size:11px;color:#94a3b8;">AeroStride Travel</td></tr>
+<tr><td style="padding:16px 24px;background:#f8fafc;text-align:center;font-size:11px;color:#94a3b8;">{footer}</td></tr>
 </table></td></tr></table></body></html>"""
 
 

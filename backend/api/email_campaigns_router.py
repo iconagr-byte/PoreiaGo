@@ -6,8 +6,10 @@ import asyncio
 import json
 import logging
 import os
+import re
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from email_marketing import store
 from email_marketing.campaign_compiler import compile_blocks_to_html
@@ -49,6 +51,69 @@ from email_marketing.schemas import (
 
 router = APIRouter(tags=["Email Marketing"])
 logger = logging.getLogger(__name__)
+
+_PLATFORM_BRAND_RE = re.compile(r"^(aerostride|poreiago)$", re.I)
+_PLATFORM_LOGO_RE = re.compile(r"poreiago|aerostride", re.I)
+
+
+def _absolute_asset_url(url: str, *, base: str) -> str:
+    value = (url or "").strip()
+    if not value:
+        return ""
+    if value.startswith(("data:", "http://", "https://")):
+        return value
+    if value.startswith("/") and base:
+        return f"{base.rstrip('/')}{value}"
+    return value
+
+
+def _brand_from_appearance(appearance: dict, *, base: str) -> dict:
+    raw_logo = str(appearance.get("logo_url") or "").strip()
+    logo_url = ""
+    if raw_logo:
+        is_tenant_upload = (
+            raw_logo.startswith("data:image/")
+            or raw_logo.startswith("/api/site/assets/")
+            or raw_logo.startswith("/api/site/office-assets/")
+        )
+        if is_tenant_upload or not _PLATFORM_LOGO_RE.search(raw_logo):
+            logo_url = _absolute_asset_url(raw_logo, base=base)
+
+    raw_name = (
+        appearance.get("footer_brand_name")
+        or appearance.get("rent_office_name")
+        or appearance.get("display_name")
+        or ""
+    )
+    name = str(raw_name).strip()
+    if not name or _PLATFORM_BRAND_RE.match(name):
+        name = "Γραφείο"
+    return {"logo_url": logo_url, "name": name}
+
+
+async def _office_email_brand(request: Request | None = None) -> dict:
+    """Resolve office logo/name for campaign HTML (never AeroStride placeholders)."""
+    base = os.getenv("PUBLIC_APP_URL", "http://localhost:5173")
+    try:
+        if request is not None:
+            from api.request_tenant import admin_tenant_id
+            from app.core.database import AsyncSessionLocal
+            from app.services.tenant_site_appearance_service import TenantSiteAppearanceService
+
+            tid = admin_tenant_id(request)
+            async with AsyncSessionLocal() as session:
+                data = await TenantSiteAppearanceService(session).get_appearance(UUID(str(tid)))
+                if isinstance(data, dict):
+                    return _brand_from_appearance(data, base=base)
+    except Exception:
+        logger.debug("office email brand resolve skipped", exc_info=True)
+
+    try:
+        from api.site_appearance_router import _read_appearance
+
+        return _brand_from_appearance(_read_appearance() or {}, base=base)
+    except Exception:
+        return {"logo_url": "", "name": "Γραφείο"}
 
 
 async def _background_send_campaign(
@@ -138,7 +203,7 @@ async def campaign_inventory():
 
 
 @router.post("/api/campaigns/test-send", response_model=CampaignTestSendResult)
-async def test_send_campaign(body: CampaignTestSendRequest):
+async def test_send_campaign(request: Request, body: CampaignTestSendRequest):
     """Αποστολή δοκιμαστικού email σε έναν παραλήπτη (χωρίς μαζική καμπάνια)."""
     to = body.to_email.strip()
     if "@" not in to or "." not in to.split("@")[-1]:
@@ -147,10 +212,12 @@ async def test_send_campaign(body: CampaignTestSendRequest):
     base = os.getenv("PUBLIC_APP_URL", "http://localhost:5173")
     html = body.body_html or ""
     if body.blocks:
+        brand = await _office_email_brand(request)
         html = compile_blocks_to_html(
             body.blocks,
             preheader=body.preheader or "",
             checkout_base=base,
+            brand=brand,
         )
     if not html.strip():
         raise HTTPException(status_code=400, detail="Κενό περιεχόμενο email")
@@ -202,7 +269,7 @@ async def product_snippet(product_id: str):
 
 
 @router.post("/api/campaigns", response_model=EmailCampaignOut)
-async def create_campaign(body: EmailCampaignCreate):
+async def create_campaign(request: Request, body: EmailCampaignCreate):
     data = body.model_dump()
     blocks = data.pop("blocks", None)
     send_now = data.pop("send_now", False)
@@ -210,10 +277,12 @@ async def create_campaign(body: EmailCampaignCreate):
     base = os.getenv("PUBLIC_APP_URL", "http://localhost:5173")
 
     if blocks:
+        brand = await _office_email_brand(request)
         data["body_html"] = compile_blocks_to_html(
             blocks,
             preheader=data.get("preheader") or "",
             checkout_base=base,
+            brand=brand,
         )
         data["blocks_json"] = json.dumps(blocks, ensure_ascii=False)
 
@@ -241,7 +310,7 @@ async def get_campaign(campaign_id: str):
 
 
 @router.patch("/api/campaigns/{campaign_id}", response_model=EmailCampaignOut)
-async def update_campaign(campaign_id: str, body: EmailCampaignUpdate):
+async def update_campaign(campaign_id: str, request: Request, body: EmailCampaignUpdate):
     data = body.model_dump(exclude_unset=True)
     blocks = data.pop("blocks", None)
     base = os.getenv("PUBLIC_APP_URL", "http://localhost:5173")
@@ -251,10 +320,12 @@ async def update_campaign(campaign_id: str, body: EmailCampaignUpdate):
         preheader = data.get("preheader")
         if preheader is None and existing:
             preheader = existing.get("preheader") or ""
+        brand = await _office_email_brand(request)
         data["body_html"] = compile_blocks_to_html(
             blocks,
             preheader=preheader or "",
             checkout_base=base,
+            brand=brand,
         )
         data["blocks_json"] = json.dumps(blocks, ensure_ascii=False)
 

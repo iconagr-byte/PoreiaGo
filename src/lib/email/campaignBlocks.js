@@ -13,24 +13,27 @@ function esc(s) {
   return d.innerHTML;
 }
 
-export function headerBlockHtml(url, alt = 'PoreiaGo Travel', theme) {
+export function headerBlockHtml(url, alt = 'Γραφείο', theme, brand = {}) {
   const u = esc(url || HEADER_DEFAULT);
-  const a = esc(alt);
+  const a = esc(alt || brand.name || 'Γραφείο');
   const isHorizon = theme === 'horizon';
   const stripBg = isHorizon
     ? 'linear-gradient(135deg,#cde5ff 0%,#f6f3f5 100%)'
     : 'linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%)';
-  const brandColor = isHorizon ? '#005d90' : '#4f46e5';
-  const brandLabel = isHorizon ? 'Voyage Travel' : 'PoreiaGo Travel';
+  const brandColor = isHorizon ? '#005d90' : '#1d1d1f';
+  const logoUrl = String(brand.logoUrl || '').trim();
+  const brandName = esc(String(brand.name || '').trim() || 'Γραφείο');
+  const brandCell = logoUrl
+    ? `<img src="${esc(logoUrl)}" alt="${brandName}" height="28" style="display:block;height:28px;width:auto;max-width:180px;object-fit:contain;" />`
+    : `<span style="font-size:12px;letter-spacing:0.04em;color:${brandColor};font-weight:700;">${brandName}</span>`;
   return `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr><td style="padding:0;line-height:0;font-size:0;">
 <img src="${u}" alt="${a}" width="600" style="display:block;width:100%;max-width:600px;height:auto;min-height:180px;object-fit:cover;border-radius:8px 8px 0 0;" />
 </td></tr>
-<tr><td style="padding:16px 20px;background:${stripBg};border-bottom:1px solid #e2e8f0;">
+<tr><td style="padding:14px 20px;background:${stripBg};border-bottom:1px solid #e2e8f0;">
 <table role="presentation" width="100%"><tr>
-<td style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:${brandColor};font-weight:700;">${brandLabel}</td>
-<td align="right" style="font-size:11px;color:#64748b;">Horizon Ethos</td>
+<td valign="middle">${brandCell}</td>
 </tr></table>
 </td></tr>
 </table>`;
@@ -79,10 +82,10 @@ ${desc}${stock}
 </td></tr></table>`;
 }
 
-export function compileBlock(block, baseUrl = '') {
+export function compileBlock(block, baseUrl = '', brand = {}) {
   const t = block.type;
   if (t === 'header') {
-    return headerBlockHtml(block.url, block.alt, block.theme);
+    return headerBlockHtml(block.url, block.alt, block.theme, brand);
   }
   if (t === 'text') {
     return `<div style="margin:12px 0;line-height:1.6;color:#334155;">${block.content || ''}</div>`;
@@ -109,16 +112,15 @@ export function compileBlock(block, baseUrl = '') {
   return '';
 }
 
-export function compileBlocksToHtml(blocks, { preheader = '', baseUrl = '' } = {}) {
+export function compileBlocksToHtml(blocks, { preheader = '', baseUrl = '', brand = {} } = {}) {
   const list = blocks || [];
-  const inner = list.map((b) => compileBlock(b, baseUrl)).join('');
+  const inner = list.map((b) => compileBlock(b, baseUrl, brand)).join('');
   const pre = preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;">${esc(preheader)}</div>`
     : '';
   const isHorizon = list.some((b) => b.type === 'header' && b.theme === 'horizon');
-  const footerLabel = isHorizon
-    ? 'Voyage Travel · Horizon Ethos'
-    : 'PoreiaGo Travel';
+  const footerName = esc(String(brand.name || '').trim() || 'Γραφείο');
+  const footerLabel = footerName;
   const fonts = isHorizon
     ? '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">'
     : '';
@@ -139,7 +141,7 @@ ${pre}
 export function newBlock(type) {
   const id = `blk-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   if (type === 'header') {
-    return { id, type: 'header', url: HEADER_DEFAULT, alt: 'PoreiaGo Travel' };
+    return { id, type: 'header', url: HEADER_DEFAULT, alt: 'Γραφείο' };
   }
   if (type === 'text') return { id, type: 'text', content: '<p>Νέο κείμενο…</p>' };
   if (type === 'image') return { id, type: 'image', url: '', alt: '' };

@@ -45,6 +45,11 @@ import {
   updateCampaign,
 } from '../../../services/emailMarketingApi.js';
 import { fetchCampaignMetrics, sendCampaignTracked } from '../../../services/emailClientApi.js';
+import {
+  fetchAdminSiteAppearance,
+  resolveSiteAssetUrl,
+} from '../../../services/siteAppearanceApi.js';
+import { resolveOfficeBrand } from '../../../lib/branding/officeBrand.js';
 
 const TEST_EMAIL_STORAGE_KEY = 'emh_campaign_test_email';
 import ProductPickerModal from './ProductPickerModal.jsx';
@@ -80,6 +85,7 @@ export default function NewCampaignEditor({
   const [preheader, setPreheader] = useState(initialDraft?.preheader || '');
   const [audience, setAudience] = useState('all');
   const [segments, setSegments] = useState([]);
+  const [officeBrand, setOfficeBrand] = useState({ logoUrl: '', name: '' });
   const [blocks, setBlocks] = useState(
     initialDraft?.blocks?.length ? initialDraft.blocks : [newBlock('header'), newBlock('text')],
   );
@@ -170,9 +176,30 @@ export default function NewCampaignEditor({
     }
   }, [blocks, activeBlockId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const appearance = await fetchAdminSiteAppearance();
+        if (cancelled || !appearance) return;
+        const brand = resolveOfficeBrand(appearance);
+        const logoUrl = resolveSiteAssetUrl(brand.logoUrl || appearance.logo_url || '') || '';
+        setOfficeBrand({
+          logoUrl,
+          name: String(brand.displayName || brand.name || '').trim(),
+        });
+      } catch {
+        /* keep empty brand — preview falls back to text name if later set */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const previewHtml = useMemo(
-    () => compileBlocksToHtml(blocks, { preheader, baseUrl: API_BASE_PREVIEW }),
-    [blocks, preheader],
+    () => compileBlocksToHtml(blocks, { preheader, baseUrl: API_BASE_PREVIEW, brand: officeBrand }),
+    [blocks, preheader, officeBrand],
   );
 
   const applyTemplate = (tpl) => {

@@ -17,7 +17,7 @@ const BADGE = 'margin:0 0 8px 0;font-size:12px;font-weight:700;color:#266449;';
 function cta(label, href = 'http://localhost:5173/trips', style = HORIZON_CTA) {
   return { ...newBlock('cta'), label, href, ...style };
 }
-function header(url, alt = 'Voyage Travel') {
+function header(url, alt = 'Γραφείο') {
   return { ...newBlock('header'), url, alt, theme: 'horizon' };
 }
 function text(html) {

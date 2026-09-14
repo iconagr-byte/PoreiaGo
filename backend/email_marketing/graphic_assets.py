@@ -24,22 +24,36 @@ BTN_SHADOW = "0 4px 14px rgba(15,23,42,0.18)"
 def header_image_html(
     url: str,
     *,
-    alt: str = "AeroStride Travel",
+    alt: str = "Γραφείο",
     height: int = 220,
+    brand: dict | None = None,
 ) -> str:
-    """Full-width header hero — placeholder {{header_image}}."""
+    """Full-width header hero — office logo/name in the brand strip."""
+    brand = brand or {}
     safe_url = html.escape(url)
-    safe_alt = html.escape(alt)
+    brand_name = html.escape(str(brand.get("name") or "").strip() or "Γραφείο")
+    safe_alt = html.escape(alt or brand_name)
+    logo_url = str(brand.get("logo_url") or "").strip()
+    if logo_url:
+        safe_logo = html.escape(logo_url)
+        brand_cell = (
+            f'<img src="{safe_logo}" alt="{brand_name}" height="28" '
+            f'style="display:block;height:28px;width:auto;max-width:180px;object-fit:contain;" />'
+        )
+    else:
+        brand_cell = (
+            f'<span style="font-size:12px;letter-spacing:0.04em;color:#1d1d1f;font-weight:700;">'
+            f"{brand_name}</span>"
+        )
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr><td style="padding:0;line-height:0;font-size:0;">
 <img src="{safe_url}" alt="{safe_alt}" width="600" height="{height}"
   style="display:block;width:100%;max-width:600px;height:auto;min-height:{height}px;object-fit:cover;border-radius:8px 8px 0 0;" />
 </td></tr>
-<tr><td style="padding:16px 20px;background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);border-bottom:1px solid #e2e8f0;">
+<tr><td style="padding:14px 20px;background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);border-bottom:1px solid #e2e8f0;">
 <table role="presentation" width="100%"><tr>
-<td style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#4f46e5;font-weight:700;">AeroStride Travel</td>
-<td align="right" style="font-size:11px;color:#64748b;">Luxury Coach</td>
+<td valign="middle">{brand_cell}</td>
 </tr></table>
 </td></tr>
 </table>"""

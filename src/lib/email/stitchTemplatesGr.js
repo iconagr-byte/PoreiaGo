@@ -12,7 +12,7 @@ const TRAVEL_BLUE_CTA = { bg: '#0077b6', textColor: '#ffffff' };
 function cta(label, href = 'http://localhost:5173/trips', style = HORIZON_CTA) {
   return { ...newBlock('cta'), label, href, ...style };
 }
-function header(url, alt = 'Voyage Travel') {
+function header(url, alt = 'Γραφείο') {
   return { ...newBlock('header'), url, alt, theme: 'horizon' };
 }
 function text(html) {
