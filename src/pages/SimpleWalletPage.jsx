@@ -36,14 +36,19 @@ import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import {
+  DEFAULT_OFFICE_MODULES,
+  fetchOfficeModules,
+  shouldShowRentStorefront,
+} from '../services/officeModulesApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
 import '../styles/wallet-pass.css';
 
-const TABS = [
+const ALL_TABS = [
   { id: 'home', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
-  { id: 'rentals', label: 'Rent', icon: 'directions_car' },
+  { id: 'rentals', label: 'Rent', icon: 'directions_car', requiresRent: true },
   { id: 'lost_found', label: 'Απωλ.', icon: 'support_agent' },
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
@@ -142,6 +147,7 @@ function WalletAuthenticatedApp() {
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [brandLabel, setBrandLabel] = useState('My Wallet');
+  const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [showWelcome, setShowWelcome] = useState(
     () => Boolean(location.state?.fromClaim || location.state?.highlightBooking),
@@ -245,6 +251,32 @@ function WalletAuthenticatedApp() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchOfficeModules()
+      .then((mods) => {
+        if (!cancelled) setOfficeModules(mods);
+      })
+      .catch(() => {
+        if (!cancelled) setOfficeModules(DEFAULT_OFFICE_MODULES);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rentAvailable = shouldShowRentStorefront(officeModules);
+  const tabs = useMemo(
+    () => ALL_TABS.filter((tab) => !tab.requiresRent || rentAvailable),
+    [rentAvailable],
+  );
+
+  useEffect(() => {
+    if (!rentAvailable && activeTab === 'rentals') {
+      setActiveTab('home');
+    }
+  }, [rentAvailable, activeTab]);
 
   const featured = useMemo(
     () => pickFeaturedBooking(bookings, focusId || peekWalletFocusBooking()),
@@ -469,7 +501,7 @@ function WalletAuthenticatedApp() {
 
         {isDesktop && !isTicketView ? (
           <nav className="wallet-nav wallet-nav--desktop" aria-label="My Wallet">
-            {TABS.map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -593,7 +625,7 @@ function WalletAuthenticatedApp() {
           </div>
         )}
 
-        {activeTab === 'rentals' && (
+        {activeTab === 'rentals' && rentAvailable ? (
           <div className="wallet-stack">
             <section className="wallet-panel">
               <div className="wallet-panel-head">
@@ -614,7 +646,7 @@ function WalletAuthenticatedApp() {
             </section>
             <RentalCatalogPanel />
           </div>
-        )}
+        ) : null}
 
         {activeTab === 'lost_found' && <LostFoundPanel bookings={bookings} />}
 
@@ -676,7 +708,7 @@ function WalletAuthenticatedApp() {
 
         {!isDesktop && !isTicketView ? (
           <nav className="wallet-nav" aria-label="My Wallet">
-            {TABS.map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
