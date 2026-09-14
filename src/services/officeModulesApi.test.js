@@ -155,4 +155,13 @@ describe('shouldShowRentStorefront', () => {
       }),
     ).toBe(true);
   });
+
+  it('hides Rent for Achillio Travel even if rent_enabled is set', () => {
+    expect(
+      shouldShowRentStorefront({
+        rent_enabled: true,
+        office_kind: 'achillio_travel',
+      }),
+    ).toBe(false);
+  });
 });

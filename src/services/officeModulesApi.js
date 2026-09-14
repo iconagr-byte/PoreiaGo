@@ -107,7 +107,10 @@ export function shouldShowRentStorefront(modules, opts = {}) {
   const hostname =
     opts.hostname ||
     (typeof window !== 'undefined' ? window.location.hostname : '');
+  // PoreiaGo marketing keeps Rent as product demo.
   if (isPlatformMarketingHost(hostname)) return true;
+  // Achillio Travel is bus-only — never expose Rent on wallet / storefront.
+  if (modules?.office_kind === 'achillio_travel') return false;
   return Boolean(modules?.rent_enabled);
 }
 
