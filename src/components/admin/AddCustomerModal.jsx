@@ -109,6 +109,7 @@ export default function AddCustomerModal({
 
   const submit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     const cleanEmail = form.email.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
       toast.error('Συμπληρώστε έγκυρο email');

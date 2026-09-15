@@ -2196,9 +2196,12 @@ export default function BackOffice() {
         open={addCustomerOpen}
         serviceScope={customerServiceScope}
         onClose={() => setAddCustomerOpen(false)}
-        onCreated={(row) => {
+        onCreated={() => {
+          // Stay on the CRM list — opening the detail dumps into the «Εκδρομές»
+          // panel and feels like a jump away from Πελατολόγιο.
           refreshCustomersForScope(customerServiceScope);
-          setSelectedCustomer(row);
+          setSelectedCustomer(null);
+          setActiveTab('customers');
         }}
       />
 
