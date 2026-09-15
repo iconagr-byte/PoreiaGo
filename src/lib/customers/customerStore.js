@@ -383,3 +383,102 @@ export function syncCustomersFromRentalBookings(rentalBookings = []) {
     .sort((a, b) => String(b.last_rental_at || '').localeCompare(String(a.last_rental_at || '')));
   return { created, people };
 }
+
+/**
+ * Persist customer to office server (tenant JWT). Keeps localStorage as cache.
+ * @returns {Promise<object|null>}
+ */
+export async function saveCustomerToServer(input) {
+  const local = upsertCustomer(input);
+  if (!local) return null;
+  if (!isAuthenticatedOfficeSession()) return local;
+  try {
+    const {
+      createOfficeCustomer,
+      updateOfficeCustomer,
+    } = await import('../../services/officeCustomersApi.js');
+    const payload = {
+      id: local.id,
+      name: local.name,
+      email: local.email,
+      phone: local.phone,
+      company: local.company,
+      afm: local.afm,
+      city: local.city,
+      address: local.address,
+      notes: local.notes,
+      source: local.source,
+      serviceScope: local.serviceScope,
+      marketingOptIn: local.marketingOptIn,
+      tags: local.tags,
+      tier: local.tier,
+      picture: local.picture,
+      authProvider: local.authProvider,
+      joinDate: local.joinDate,
+    };
+    const isEdit = Boolean(input?.id);
+    const remote = isEdit
+      ? await updateOfficeCustomer(local.id, payload)
+      : await createOfficeCustomer(payload);
+    if (remote && remote.id) {
+      return upsertCustomer({ ...local, ...remote, id: remote.id });
+    }
+  } catch (err) {
+    console.warn('[customers] server save failed — kept local only', err);
+    throw err;
+  }
+  return local;
+}
+
+/**
+ * Soft-delete locally and on server.
+ */
+export async function deleteCustomerFromServer(idOrEmail, serviceScope) {
+  const existing =
+    getCustomerById(idOrEmail) ||
+    getCustomerByEmail(idOrEmail, serviceScope) ||
+    null;
+  const ok = deleteCustomer(idOrEmail, serviceScope);
+  if (!ok) return false;
+  if (!isAuthenticatedOfficeSession()) return true;
+  try {
+    const { deleteOfficeCustomer } = await import('../../services/officeCustomersApi.js');
+    const id = existing?.id || idOrEmail;
+    await deleteOfficeCustomer(id, serviceScope || existing?.serviceScope);
+  } catch (err) {
+    console.warn('[customers] server delete failed — local tombstone kept', err);
+  }
+  return true;
+}
+
+/**
+ * Pull CRM customers from server into localStorage (authenticated offices).
+ * Seeds server from local cache when server is empty.
+ */
+export async function hydrateCustomersFromServer(serviceScope) {
+  if (!isAuthenticatedOfficeSession()) {
+    return loadCustomersByService(serviceScope);
+  }
+  try {
+    const {
+      fetchOfficeCustomers,
+      replaceOfficeCustomers,
+    } = await import('../../services/officeCustomersApi.js');
+    let remote = await fetchOfficeCustomers(serviceScope);
+    const local = loadCustomersByService(serviceScope);
+    if ((!remote || remote.length === 0) && local.length > 0) {
+      // First run after deploy: push browser CRM up so nothing is lost.
+      remote = await replaceOfficeCustomers(local);
+    }
+    for (const row of remote || []) {
+      upsertCustomer({
+        ...row,
+        serviceScope: row.serviceScope || serviceScope,
+      });
+    }
+    return loadCustomersByService(serviceScope);
+  } catch (err) {
+    console.warn('[customers] hydrate failed — using local cache', err);
+    return loadCustomersByService(serviceScope);
+  }
+}

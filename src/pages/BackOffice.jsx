@@ -6,6 +6,7 @@ import {
   getCustomerByEmail,
   syncCustomersFromBookings,
   syncCustomersFromRentalBookings,
+  hydrateCustomersFromServer,
   CUSTOMER_SERVICE_BUSES,
   CUSTOMER_SERVICE_RENT,
 } from '../lib/customers/customerStore.js';
@@ -197,13 +198,26 @@ export default function BackOffice() {
   const officeMode = officeModeFromModules(officeModules);
   const rentMenuVisible = shouldShowRentMenu(officeModules);
   const rentOnly = officeMode === 'rent_only';
-  useEffect(() => {
-    if (rentOnly) setCustomerServiceScope(CUSTOMER_SERVICE_RENT);
-  }, [rentOnly]);
-
   const refreshCustomersForScope = (scope = customerServiceScope) => {
     setCustomers(loadCustomersByService(scope));
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    const scope = rentOnly ? CUSTOMER_SERVICE_RENT : customerServiceScope;
+    hydrateCustomersFromServer(scope)
+      .then((rows) => {
+        if (!cancelled && Array.isArray(rows)) setCustomers(rows);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [rentOnly, customerServiceScope]);
+
+  useEffect(() => {
+    if (rentOnly) setCustomerServiceScope(CUSTOMER_SERVICE_RENT);
+  }, [rentOnly]);
 
   useEffect(() => {
     let cancelled = false;

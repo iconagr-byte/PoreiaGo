@@ -797,6 +797,99 @@ async def remove_driver(request: Request, driver_id: str):
         raise HTTPException(status_code=404, detail="Driver not found") from None
 
 
+# --- Office CRM customers (durable, tenant-scoped) ---------------------------------
+
+
+class OfficeCustomerIn(BaseModel):
+    id: str | None = None
+    name: str = ""
+    email: str
+    phone: str = ""
+    company: str = ""
+    afm: str = ""
+    city: str = ""
+    address: str = ""
+    notes: str = ""
+    source: str = "manual"
+    serviceScope: str = "buses"
+    marketingOptIn: bool = True
+    tags: list[str] = Field(default_factory=list)
+    tier: str = "Silver"
+    picture: str = ""
+    authProvider: str = "email"
+    points: int | None = None
+    joinDate: str | None = None
+
+
+class OfficeCustomersReplaceIn(BaseModel):
+    customers: list[OfficeCustomerIn] = Field(default_factory=list)
+
+
+@router.get("/customers")
+async def list_office_customers(
+    request: Request,
+    service_scope: str | None = Query(default=None, alias="serviceScope"),
+):
+    from travel_platform.settings.office_customers_store import list_customers
+
+    tid = _request_tenant_id(request)
+    return {"customers": list_customers(tid, service_scope=service_scope)}
+
+
+@router.post("/customers", status_code=201)
+async def create_office_customer(request: Request, body: OfficeCustomerIn):
+    from travel_platform.settings.office_customers_store import upsert_customer
+
+    tid = _request_tenant_id(request)
+    try:
+        row = upsert_customer(tid, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return row
+
+
+@router.put("/customers/{customer_id}")
+async def update_office_customer(request: Request, customer_id: str, body: OfficeCustomerIn):
+    from travel_platform.settings.office_customers_store import upsert_customer
+
+    tid = _request_tenant_id(request)
+    payload = body.model_dump()
+    payload["id"] = customer_id
+    try:
+        row = upsert_customer(tid, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return row
+
+
+@router.delete("/customers/{customer_id}", status_code=204)
+async def delete_office_customer(
+    request: Request,
+    customer_id: str,
+    service_scope: str | None = Query(default=None, alias="serviceScope"),
+):
+    from travel_platform.settings.office_customers_store import delete_customer
+
+    tid = _request_tenant_id(request)
+    ok = delete_customer(tid, customer_id, service_scope=service_scope)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return Response(status_code=204)
+
+
+@router.post("/customers/replace")
+async def replace_office_customers(request: Request, body: OfficeCustomersReplaceIn):
+    """Replace tenant CRM snapshot (used when migrating localStorage → server)."""
+    from travel_platform.settings.office_customers_store import replace_customers_for_tenant
+
+    tid = _request_tenant_id(request)
+    rows = replace_customers_for_tenant(
+        tid,
+        [c.model_dump() for c in body.customers],
+    )
+    return {"customers": rows, "count": len(rows)}
+
+
 @router.get("/fleet/availability")
 async def get_fleet_availability(plate: str):
     """Check if vehicle plate can accept new bookings (maintenance / KTEO / service)."""

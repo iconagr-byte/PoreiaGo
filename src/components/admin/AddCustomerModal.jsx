@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { upsertCustomer } from '../../lib/customers/customerStore.js';
+import { saveCustomerToServer } from '../../lib/customers/customerStore.js';
 
 const TIER_OPTIONS = [
   { id: 'Silver', label: 'Silver', hint: 'Βασικό' },
@@ -107,7 +107,7 @@ export default function AddCustomerModal({
 
   const removeTag = (value) => patch({ tags: form.tags.filter((t) => t !== value) });
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const cleanEmail = form.email.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
@@ -122,7 +122,7 @@ export default function AddCustomerModal({
     }
     setBusy(true);
     try {
-      const row = upsertCustomer({
+      const row = await saveCustomerToServer({
         id: customer?.id,
         name: form.name.trim() || cleanEmail.split('@')[0],
         email: cleanEmail,
@@ -146,7 +146,7 @@ export default function AddCustomerModal({
       onCreated?.(row);
       onClose?.();
     } catch (err) {
-      toast.error(err?.message || 'Αποτυχία');
+      toast.error(err?.message || 'Αποτυχία αποθήκευσης στον server');
     } finally {
       setBusy(false);
     }
