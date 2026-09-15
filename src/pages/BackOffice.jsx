@@ -706,11 +706,12 @@ export default function BackOffice() {
       });
   }, [activeTab, selectedFleetVehicleId]);
 
-  const handleDeleteTrip = (id) => {
-    if (window.confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την εκδρομή;')) {
-      removeTripFromStore(id);
-      setTrips(loadTrips());
+  const handleDeleteTrip = async (id) => {
+    if (!window.confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την εκδρομή;')) {
+      return;
     }
+    await removeTripFromStore(id);
+    setTrips(loadTrips());
   };
 
   const dashboardKpis = useMemo(

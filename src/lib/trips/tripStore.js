@@ -17,6 +17,17 @@ import { stripDemoTrips } from '../admin/demoCatalog.js';
 
 const STORAGE_KEY_BASE = 'aerostride_trips_v1';
 
+// Prevent in-flight hydrate from resurrecting a trip that was just deleted.
+const recentlyDeletedTripIds = new Set();
+const DELETE_TOMBSTONE_MS = 60_000;
+
+function rememberDeletedTripId(id) {
+  const n = Number(id);
+  if (!Number.isFinite(n)) return;
+  recentlyDeletedTripIds.add(n);
+  setTimeout(() => recentlyDeletedTripIds.delete(n), DELETE_TOMBSTONE_MS);
+}
+
 function storageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
 }
@@ -123,14 +134,19 @@ export function upsertTrip(trip) {
   return withLog;
 }
 
-export function deleteTrip(tripId) {
+export async function deleteTrip(tripId) {
   const id = Number(tripId);
-  const trips = loadTrips().filter((t) => t.id !== id);
+  rememberDeletedTripId(id);
+  const trips = loadTrips().filter((t) => Number(t.id) !== id);
   saveTrips(trips);
-  // Rebuild public catalog without the deleted trip.
-  import('../../services/tripsSyncApi.js')
-    .then(({ syncTripsToPostgres }) => syncTripsToPostgres(trips, { replaceCatalog: true, pruneMissing: true }))
-    .catch(() => {});
+  // Rebuild public catalog + prune durable Postgres / catalog copies.
+  try {
+    const { syncTripsToPostgres } = await import('../../services/tripsSyncApi.js');
+    await syncTripsToPostgres(trips, { replaceCatalog: true, pruneMissing: true });
+  } catch (err) {
+    console.warn('[tripStore] delete sync failed', err);
+  }
+  return trips;
 }
 
 export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
@@ -319,6 +335,7 @@ export function mergeServerTripsIntoStore(serverTrips) {
     const mapped = catalogTripToLocal(raw);
     if (!mapped) continue;
     const id = Number(mapped.id);
+    if (recentlyDeletedTripIds.has(id)) continue;
     if (!byId.has(id)) {
       byId.set(id, mapped);
       added += 1;

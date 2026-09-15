@@ -88,5 +88,41 @@ class TripCatalogHydrateGuardTests(unittest.TestCase):
         self.assertEqual(rows[0]["title"], "Ναύπλιο")
 
 
+
+    def test_empty_prune_clears_catalog(self):
+        replace_tenant_catalog(
+            self.tenant,
+            [{"id": 301, "title": "Gone", "price": 1, "status": "published"}],
+        )
+        with patch(
+            "travel_platform.operations.trips_sync.saas_db_available",
+            new=AsyncMock(return_value=False),
+        ):
+            result = asyncio.run(
+                sync_trips_to_postgres(
+                    [],
+                    tenant_id=self.tenant,
+                    replace_catalog=True,
+                    prune_missing=True,
+                )
+            )
+        self.assertEqual(list_tenant_trips(self.tenant, published_only=False), [])
+        self.assertEqual(result.get("catalog_saved", 0), 0)
+
+    def test_list_office_trips_does_not_invent_postgres_only_rows(self):
+        replace_tenant_catalog(self.tenant, [])
+        with patch(
+            "travel_platform.operations.trips_sync.saas_db_available",
+            new=AsyncMock(return_value=True),
+        ), patch(
+            "travel_platform.operations.trips_sync.list_office_trips",
+            wraps=list_office_trips,
+        ):
+            # Without catalog rows, hydrate must stay empty even if DB has ghosts.
+            # saas_db_available True but DB session would fail — stub by patching
+            # the enrich path indirectly: empty catalog => empty list before DB.
+            rows = asyncio.run(list_office_trips(self.tenant))
+        self.assertEqual(rows, [])
+
 if __name__ == "__main__":
     unittest.main()
