@@ -597,12 +597,37 @@ async def _office_uses_tenant_platform_settings(request: Request):
         return None
 
 
+async def _resolve_office_platform_settings_tenant(request: Request):
+    """
+    Tenant UUID for Postgres platform settings, or None for PoreiaGo shared file.
+
+    Prefer JWT tenant; on Achillio Host fall back to host→tenant resolve so
+    saves never silently land in the shared PoreiaGo file store.
+    """
+    from uuid import UUID
+
+    tid = await _office_uses_tenant_platform_settings(request)
+    if tid is not None:
+        return tid
+    if not _host_looks_like_achillio(request):
+        return None
+    host_tid = await _resolve_achillio_tenant_id_from_request(request)
+    if not host_tid or host_tid == str(DEMO_TENANT_ID):
+        return None
+    try:
+        return UUID(str(host_tid))
+    except ValueError:
+        return None
+
+
 @router.get("/settings", response_model=PlatformSettingsResponse)
 async def get_settings(request: Request):
+    from fastapi import HTTPException
+
     from app.core.database import AsyncSessionLocal
     from app.services.tenant_platform_settings_service import TenantPlatformSettingsService
 
-    tid = await _office_uses_tenant_platform_settings(request)
+    tid = await _resolve_office_platform_settings_tenant(request)
     if tid is not None:
         try:
             async with AsyncSessionLocal() as db:
@@ -611,35 +636,50 @@ async def get_settings(request: Request):
                 return _settings_response_from_dict(data)
         except Exception:
             logger.debug("tenant platform settings get failed", exc_info=True)
-            from fastapi import HTTPException
-
             raise HTTPException(
                 status_code=503,
                 detail="Αδυναμία φόρτωσης ρυθμίσεων γραφείου",
             ) from None
+    if _host_looks_like_achillio(request):
+        raise HTTPException(
+            status_code=503,
+            detail="Αδυναμία φόρτωσης ρυθμίσεων γραφείου Achillio",
+        )
     s = get_platform_config()
     return _settings_response_from_dict(s.__dict__)
 
 
 @router.patch("/settings", response_model=PlatformSettingsResponse)
 async def patch_settings(request: Request, body: PlatformSettingsUpdate):
+    from fastapi import HTTPException
+
     from app.core.database import AsyncSessionLocal
     from app.services.tenant_platform_settings_service import TenantPlatformSettingsService
 
     patch = body.model_dump(exclude_unset=True)
-    tid = await _office_uses_tenant_platform_settings(request)
+    tid = await _resolve_office_platform_settings_tenant(request)
     if tid is not None:
-        async with AsyncSessionLocal() as db:
-            data = await TenantPlatformSettingsService(db).update_settings(tid, patch)
-            await db.commit()
-            return _settings_response_from_dict(data)
+        try:
+            async with AsyncSessionLocal() as db:
+                data = await TenantPlatformSettingsService(db).update_settings(tid, patch)
+                await db.commit()
+                return _settings_response_from_dict(data)
+        except Exception:
+            logger.debug("tenant platform settings patch failed", exc_info=True)
+            raise HTTPException(
+                status_code=503,
+                detail="Αδυναμία αποθήκευσης ρυθμίσεων γραφείου",
+            ) from None
 
-    # Shared file store — PoreiaGo platform only. Never write Achillio checkout
-    # into branding key "default".
+    # Shared file store — PoreiaGo platform only. Never write Achillio settings
+    # into the shared PoreiaGo file (company name, checkout, or otherwise).
+    if _host_looks_like_achillio(request):
+        raise HTTPException(
+            status_code=503,
+            detail="Αδυναμία αποθήκευσης ρυθμίσεων γραφείου Achillio",
+        )
     checkout = str(patch.get("checkout_base_url") or "").strip().lower()
     if "achilliotravel.com" in checkout:
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=403,
             detail=(

@@ -171,28 +171,22 @@ export async function updatePlatformSettings(patch) {
   const body = normalizePlatformSettings(patch);
 
   if (getSaasToken()) {
+    // Fail closed — never fall through to shared /api/admin/platform/settings
+    // (that file is PoreiaGo platform; Achillio office settings live in Postgres).
+    const data = await saasFetch('/api/v1/settings/platform', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+    saveSettingsLocally(data);
     try {
-      const data = await saasFetch('/api/v1/settings/platform', {
-        method: 'PATCH',
-        body: JSON.stringify(body),
-      });
-      saveSettingsLocally(data);
-      try {
-        localStorage.setItem(
-          'aerostride_checkout_settings_v1',
-          JSON.stringify(normalizeCheckoutSettings(data)),
-        );
-      } catch {
-        /* ignore */
-      }
-      return { data, source: data.storage_source === 'postgres' ? 'postgres' : 'server' };
-    } catch (saasErr) {
-      try {
-        return await updatePlatformSettingsLegacy(body);
-      } catch {
-        throw saasErr;
-      }
+      localStorage.setItem(
+        'aerostride_checkout_settings_v1',
+        JSON.stringify(normalizeCheckoutSettings(data)),
+      );
+    } catch {
+      /* ignore */
     }
+    return { data, source: data.storage_source === 'postgres' ? 'postgres' : 'server' };
   }
 
   return updatePlatformSettingsLegacy(body);

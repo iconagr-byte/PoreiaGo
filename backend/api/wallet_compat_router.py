@@ -214,23 +214,10 @@ async def get_current_branding(host: str | None = Query(default=None)):
     return BrandingAdminResponse(**_branding_dict(host))
 
 
-@router.get("/api/admin/platform/settings", response_model=PlatformSettingsResponse)
-async def get_platform_settings():
-    return PlatformSettingsResponse(**_settings_dict())
-
-
-@router.patch("/api/admin/platform/settings", response_model=PlatformSettingsResponse)
-async def patch_platform_settings(body: PlatformSettingsUpdate):
-    current = _settings_dict()
-    current.update(body.model_dump(exclude_unset=True))
-    _write_json(_SETTINGS_FILE, current)
-    if body.checkout_base_url:
-        branding_raw = _read_json(_BRANDING_FILE)
-        if "default" not in branding_raw:
-            branding_raw["default"] = {**_DEFAULT_BRANDING}
-        branding_raw["default"]["checkout_base_url"] = body.checkout_base_url
-        _write_json(_BRANDING_FILE, branding_raw)
-    return PlatformSettingsResponse(**current)
+# NOTE: Do NOT register /api/admin/platform/settings here.
+# wallet_compat was registered before admin_platform in wallet_main and
+# shadowed the tenant-aware Postgres handlers — Achillio saves appeared to
+# succeed while writing the shared PoreiaGo file store.
 
 
 @router.get("/api/admin/platform/branding", response_model=BrandingAdminResponse)
