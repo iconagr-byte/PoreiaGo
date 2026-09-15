@@ -887,11 +887,21 @@ export function getMasterQrPngUrl(tripId, { driverId } = {}) {
   return `${API_BASE}/api/admin/platform/operations/master-qr/${tripId}/png${qs ? `?${qs}` : ''}`;
 }
 
-export async function notifyDriverShiftPush({ tripId, driverId, message, tripTitle } = {}) {
+export async function notifyDriverShiftPush({
+  tripId,
+  driverId,
+  message,
+  tripTitle,
+  frontendBase,
+} = {}) {
   const body = { trip_id: Number(tripId) };
   if (driverId) body.driver_id = driverId;
   if (message) body.message = message;
   if (tripTitle) body.trip_title = tripTitle;
+  const origin =
+    frontendBase ||
+    (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '');
+  if (origin) body.frontend_base = origin;
   const res = await adminFetch('/api/admin/platform/operations/notify-driver-push', {
     method: 'POST',
     body: JSON.stringify(body),
