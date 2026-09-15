@@ -8,11 +8,7 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import {
-  clearPreferRentLookup,
-  hasPreferRentLookup,
-  referrerLooksLikeRent,
-} from '../lib/rental/preferRentLookup.js';
+import { hasPreferRentLookup, referrerLooksLikeRent } from '../lib/rental/preferRentLookup.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import '../styles/booking-lookup.css';
 
@@ -45,11 +41,10 @@ export default function BookingLookupPage() {
   const [fieldError, setFieldError] = useState({ email: '', reference: '' });
   const [helpOpen, setHelpOpen] = useState(false);
   const [phone, setPhone] = useState('');
-  const [rentGate, setRentGate] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    // Rent deep-link / RB-… / session from /rent → never stay on bus ticket finder.
+    // Rent deep-link / RB-… / session from /rent → dedicated rent finder (never show Rent here).
     const qRef = (
       searchParams.get('ref') ||
       searchParams.get('reference') ||
@@ -67,7 +62,6 @@ export default function BookingLookupPage() {
 
     if (preferRent) {
       const qs = searchParams.toString();
-      // Prefer Rent Wallet when no lookup params; otherwise rent find-booking.
       const hasLookup = Boolean(
         searchParams.get('email') ||
           searchParams.get('ref') ||
@@ -78,8 +72,6 @@ export default function BookingLookupPage() {
       navigate(`${target}${qs ? `?${qs}` : ''}`, { replace: true });
       return undefined;
     }
-
-    if (!forceBus && !cancelled) setRentGate(true);
 
     const qEmail = searchParams.get('email') || '';
     let saved = '';
@@ -214,44 +206,7 @@ export default function BookingLookupPage() {
             Συμπλήρωσε το email και τον κωδικό από το μήνυμα επιβεβαίωσης για να ανοίξεις το εισιτήριό σου.
           </p>
 
-          {rentGate ? (
-            <div className="booking-lookup-product-gate" role="group" aria-label="Τύπος κράτησης">
-              <p className="booking-lookup-product-gate-title">Τι ψάχνεις;</p>
-              <div className="booking-lookup-product-gate-actions">
-                <button
-                  type="button"
-                  className="booking-lookup-product-gate-bus"
-                  onClick={() => {
-                    clearPreferRentLookup();
-                    setRentGate(false);
-                  }}
-                >
-                  <span className="material-symbols-outlined" aria-hidden>
-                    directions_bus
-                  </span>
-                  Εισιτήριο λεωφορείου
-                </button>
-                <a href="/rent/wallet" className="booking-lookup-product-gate-rent">
-                  <span className="material-symbols-outlined" aria-hidden>
-                    car_rental
-                  </span>
-                  Ενοικίαση · Rent Wallet
-                </a>
-              </div>
-              <p className="booking-lookup-note" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
-                Από το μενού Rent πάτα πάντα το πράσινο Wallet — όχι αυτή τη μπλε φόρμα.
-              </p>
-            </div>
-          ) : (
-            <>
-              <p className="booking-lookup-note" style={{ marginTop: 0, marginBottom: '1rem' }}>
-                Ψάχνεις <strong>ενοικίαση οχήματος</strong>;{' '}
-                <Link to="/rent/wallet">Rent Wallet</Link>
-                {' · '}
-                <Link to="/rent/my-booking">Εύρεση κράτησης Rent</Link>
-              </p>
-
-              <form onSubmit={handleSubmit} className="booking-lookup-form" noValidate>
+          <form onSubmit={handleSubmit} className="booking-lookup-form" noValidate>
                 <label className={`booking-lookup-field ${fieldError.email ? 'has-error' : ''}`} htmlFor="email">
                   <span>Email κράτησης</span>
                   <div className="booking-lookup-input-wrap">
@@ -368,21 +323,19 @@ export default function BookingLookupPage() {
                 email.
               </p>
 
-              <div className="booking-lookup-footer-links">
-                <Link to="/login" className="booking-lookup-wallet">
-                  Σύνδεση στο My Wallet
-                </Link>
-                {tel ? (
-                  <a href={tel} className="booking-lookup-phone">
-                    <span className="material-symbols-outlined" aria-hidden>
-                      call
-                    </span>
-                    {phone}
-                  </a>
-                ) : null}
-              </div>
-            </>
-          )}
+          <div className="booking-lookup-footer-links">
+            <Link to="/login" className="booking-lookup-wallet">
+              Σύνδεση στο My Wallet
+            </Link>
+            {tel ? (
+              <a href={tel} className="booking-lookup-phone">
+                <span className="material-symbols-outlined" aria-hidden>
+                  call
+                </span>
+                {phone}
+              </a>
+            ) : null}
+          </div>
         </section>
       </main>
     </div>
