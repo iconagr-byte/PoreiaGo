@@ -4,12 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- Placeholder rewritten by nginx per Host (Achillio → Achillio Travel). -->
-    <title>__SPA_DOC_TITLE__</title>
-    <meta property="og:title" content="__SPA_DOC_TITLE__" />
-    <meta name="twitter:title" content="__SPA_DOC_TITLE__" />
-    <meta name="application-name" content="__SPA_DOC_APP_NAME__" />
-    <!-- Immediate host-aware title so crawlers / first paint never flash PoreiaGo on office domains. -->
+    <!--
+      Default = PoreiaGo marketing. Inline script + nginx sub_filter overwrite
+      immediately on office hosts (e.g. achilliotravel.com → Achillio Travel)
+      so Google never indexes the platform name on a customer domain.
+    -->
+    <title>PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία</title>
+    <meta property="og:title" content="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία" />
+    <meta name="twitter:title" content="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία" />
+    <meta name="application-name" content="PoreiaGo" />
     <script>
       (function () {
         var host = (location.hostname || '').toLowerCase();
@@ -36,7 +39,7 @@
           var slug = (isTenantSub ? parts[0] : apex.split('.')[0]) || apex;
           title = slug.charAt(0).toUpperCase() + slug.slice(1);
         } else {
-          title = 'PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία';
+          return; // keep PoreiaGo marketing title
         }
         document.title = title;
         function setMeta(attr, key, value) {
