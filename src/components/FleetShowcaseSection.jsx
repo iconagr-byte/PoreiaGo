@@ -61,14 +61,15 @@ export default function FleetShowcaseSection({
                 </div>
 
                 <div className="p-8 flex flex-col flex-1 min-h-0">
-                  <p className="text-on-surface-variant font-body-md text-sm mb-6 line-clamp-3 min-h-[3.75rem]">
+                  <p className="text-on-surface-variant font-body-md text-sm mb-4 line-clamp-3">
                     {bus.summary || '\u00a0'}
                   </p>
-                  <div className="mt-auto">
+                  {/* Pack κάτω από την περιγραφή — όχι mt-auto (άφηνε άσχημο κενό στις κοντές κάρτες). */}
+                  <div>
                     <p className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-3">
                       Παροχές
                     </p>
-                    <ul className="flex flex-wrap gap-2 min-h-[4.5rem] content-start">
+                    <ul className="flex flex-wrap gap-2 content-start">
                       {(bus.amenities || []).map((item) => (
                         <li
                           key={`${bus.id}-${item}`}
