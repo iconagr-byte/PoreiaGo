@@ -18,8 +18,38 @@ export function isPlatformMarketingContext() {
   return isPlatformMarketingHost(window.location.hostname);
 }
 
+/** Known custom-domain offices — never show PoreiaGo in the browser / SERP title. */
+export const KNOWN_TENANT_DOCUMENT_TITLES = {
+  'achilliotravel.com': 'Achillio Travel',
+};
+
 export function platformDocumentTitle() {
-  return `${PLATFORM_NAME} — Travel Operations Platform`;
+  return `${PLATFORM_NAME} — Πλατφόρμα για ταξιδιωτικά γραφεία`;
+}
+
+function apexHostname(hostname = '') {
+  return String(hostname || (typeof window !== 'undefined' ? window.location.hostname : ''))
+    .toLowerCase()
+    .replace(/^www\./, '');
+}
+
+/** Sync <title> + og/twitter meta so Google never keeps a PoreiaGo SERP on office domains. */
+export function syncDocumentMetaTitle(title) {
+  const next = String(title || '').trim();
+  if (!next || typeof document === 'undefined') return;
+  document.title = next;
+  const ensureMeta = (attr, key, content) => {
+    let el = document.head.querySelector(`meta[${attr}="${key}"]`);
+    if (!el) {
+      el = document.createElement('meta');
+      el.setAttribute(attr, key);
+      document.head.appendChild(el);
+    }
+    el.setAttribute('content', content);
+  };
+  ensureMeta('property', 'og:title', next);
+  ensureMeta('name', 'twitter:title', next);
+  ensureMeta('name', 'application-name', next.split('—')[0].trim() || next);
 }
 
 /**
@@ -29,11 +59,12 @@ export function platformDocumentTitle() {
 export function tenantDocumentTitle(displayName, hostname = '') {
   const name = String(displayName || '').trim();
   if (name && !PLATFORM_PLACEHOLDER_NAME_RE.test(name)) {
-    return name.includes('—') ? name : name;
+    return name;
   }
-  const host = String(hostname || (typeof window !== 'undefined' ? window.location.hostname : ''))
-    .toLowerCase()
-    .replace(/^www\./, '');
+  const host = apexHostname(hostname);
+  if (KNOWN_TENANT_DOCUMENT_TITLES[host]) {
+    return KNOWN_TENANT_DOCUMENT_TITLES[host];
+  }
   if (host && !isPlatformMarketingHost(host)) {
     // achilliotravel.com → Achilliotravel (better than PoreiaGo)
     const label = host.split('.')[0] || host;
@@ -112,9 +143,9 @@ export function applyBrandingToDocument(branding) {
 
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
   if (isTenantStorefrontHost(host) || !isPlatformMarketingHost(host)) {
-    document.title = tenantDocumentTitle(clean.display_name, host);
+    syncDocumentMetaTitle(tenantDocumentTitle(clean.display_name, host));
   } else {
-    document.title = platformDocumentTitle();
+    syncDocumentMetaTitle(platformDocumentTitle());
   }
 
   let styleEl = document.getElementById('tenant-branding-css');

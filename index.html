@@ -4,7 +4,50 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία</title>
+    <!-- Placeholder rewritten by nginx per Host (Achillio → Achillio Travel). -->
+    <title>__SPA_DOC_TITLE__</title>
+    <meta property="og:title" content="__SPA_DOC_TITLE__" />
+    <meta name="twitter:title" content="__SPA_DOC_TITLE__" />
+    <meta name="application-name" content="__SPA_DOC_APP_NAME__" />
+    <!-- Immediate host-aware title so crawlers / first paint never flash PoreiaGo on office domains. -->
+    <script>
+      (function () {
+        var host = (location.hostname || '').toLowerCase();
+        var apex = host.replace(/^www\./, '');
+        var known = { 'achilliotravel.com': 'Achillio Travel' };
+        var platformApex =
+          apex === 'poreiago.com' ||
+          host === 'localhost' ||
+          host === '127.0.0.1' ||
+          host === 'api.poreiago.com';
+        var parts = apex.split('.');
+        var isTenantSub =
+          parts.length === 3 &&
+          parts[1] === 'poreiago' &&
+          parts[2] === 'com' &&
+          parts[0] !== 'www' &&
+          parts[0] !== 'api' &&
+          parts[0] !== 'admin';
+        var isTenantCustom = !platformApex && !apex.endsWith('.poreiago.com');
+        var title;
+        if (known[apex]) {
+          title = known[apex];
+        } else if (isTenantSub || isTenantCustom) {
+          var slug = (isTenantSub ? parts[0] : apex.split('.')[0]) || apex;
+          title = slug.charAt(0).toUpperCase() + slug.slice(1);
+        } else {
+          title = 'PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία';
+        }
+        document.title = title;
+        function setMeta(attr, key, value) {
+          var el = document.querySelector('meta[' + attr + '="' + key + '"]');
+          if (el) el.setAttribute('content', value);
+        }
+        setMeta('property', 'og:title', title);
+        setMeta('name', 'twitter:title', title);
+        setMeta('name', 'application-name', title.split('—')[0].trim() || title);
+      })();
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
