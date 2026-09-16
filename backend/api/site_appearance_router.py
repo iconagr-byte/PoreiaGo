@@ -993,6 +993,11 @@ async def _resolve_office_seo_for_host(request: Request, host: str | None) -> di
         or request.url.scheme
         or "https"
     ).split(",")[0].strip()
+    if scheme not in {"http", "https"}:
+        scheme = "https"
+    # Public storefronts are always https in production SERP snippets.
+    if effective_host and "localhost" not in effective_host and "127.0.0.1" not in effective_host:
+        scheme = "https"
 
     display_name = ""
     footer_brand = ""
