@@ -128,9 +128,18 @@ else
       else
         echo "  conf mount source already matches repo"
       fi
+      SHARED="$DEPLOY_DIR/nginx/frontend-shared.inc"
+      if [[ -f "$SHARED" ]]; then
+        docker cp "$SHARED" "$FE_CID:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null \
+          || echo "WARN: could not docker cp frontend-shared.inc"
+      fi
     else
       if ! docker cp "$NGINX_CONF" "$FE_CID:/etc/nginx/conf.d/default.conf"; then
         echo "WARN: docker cp failed (busy/ro mount?) — will still try nginx reload"
+      fi
+      SHARED="$DEPLOY_DIR/nginx/frontend-shared.inc"
+      if [[ -f "$SHARED" ]]; then
+        docker cp "$SHARED" "$FE_CID:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null || true
       fi
     fi
     if docker exec "$FE_CID" nginx -t; then

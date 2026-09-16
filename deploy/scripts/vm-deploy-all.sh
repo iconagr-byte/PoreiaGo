@@ -105,6 +105,7 @@ refresh_external_frontend_dist() {
 repair_external_frontend_nginx() {
   local cid="$1"
   local conf="$DEPLOY_DIR/nginx/frontend.conf"
+  local shared="$DEPLOY_DIR/nginx/frontend-shared.inc"
   [[ -n "$cid" && -f "$conf" ]] || return 0
   echo "==> Repair external frontend nginx (/api → api-blue + Achillio SPA shell)"
   docker network connect aerostride-prod_edge "$cid" 2>/dev/null || true
@@ -112,10 +113,9 @@ repair_external_frontend_nginx() {
   local conf_src=""
   conf_src="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}' "$cid" 2>/dev/null || true)"
   if [[ -n "$conf_src" ]]; then
-    # Bind-mount: docker cp into the container hits "device or resource busy".
-    # Always sync OUR frontend.conf onto the host mount source (may be an old
-    # aerostride path that never picked up $spa_index / index.achillio.html).
-    if [[ -f "$conf_src" ]] || [[ -d "$(dirname "$conf_src")" ]]; then
+    local conf_dir
+    conf_dir="$(dirname "$conf_src")"
+    if [[ -d "$conf_dir" ]]; then
       if ! cmp -s "$conf" "$conf_src" 2>/dev/null; then
         echo "  syncing frontend.conf → mount source: $conf_src"
         cp "$conf" "$conf_src" \
@@ -123,12 +123,25 @@ repair_external_frontend_nginx() {
       else
         echo "  conf mount source already matches repo frontend.conf"
       fi
+      if [[ -f "$shared" ]]; then
+        echo "  syncing frontend-shared.inc → $conf_dir/frontend-shared.inc (host)"
+        cp "$shared" "$conf_dir/frontend-shared.inc" 2>/dev/null || true
+        # File-mount of default.conf alone does NOT expose sibling host files —
+        # always docker cp the include into the container conf.d.
+        echo "  docker cp frontend-shared.inc → container conf.d"
+        docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null \
+          || echo "  WARN: could not docker cp frontend-shared.inc"
+      fi
     else
-      echo "  WARN: mount source missing ($conf_src) — will try docker cp"
+      echo "  WARN: mount source dir missing ($conf_dir) — will try docker cp"
       docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null || true
+      [[ -f "$shared" ]] && docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null || true
     fi
-  elif ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
-    echo "  WARN: could not copy frontend.conf into container — reload anyway"
+  else
+    if ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
+      echo "  WARN: could not copy frontend.conf into container — reload anyway"
+    fi
+    [[ -f "$shared" ]] && docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null || true
   fi
 
   if docker exec "$cid" nginx -t 2>/dev/null; then
@@ -139,15 +152,22 @@ repair_external_frontend_nginx() {
     docker exec "$cid" nginx -t 2>&1 | sed 's/^/  /' || true
   fi
 
-  # Prove host-specific shell from inside the container (bypasses NPM TLS).
+  # Prove Achillio shell from inside the container (bypasses NPM TLS).
+  # Prefer curl — busybox wget often drops custom Host headers.
   local local_title=""
-  local_title="$(docker exec "$cid" wget -qO- --timeout=5 \
-    --header='Host: www.achilliotravel.com' http://127.0.0.1/ 2>/dev/null \
-    | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+  if docker exec "$cid" sh -c 'command -v curl >/dev/null' 2>/dev/null; then
+    local_title="$(docker exec "$cid" curl -sS --max-time 5 \
+      -H 'Host: www.achilliotravel.com' http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+  else
+    local_title="$(docker exec "$cid" wget -qO- --timeout=5 \
+      --header='Host: www.achilliotravel.com' http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+  fi
   echo "  localhost Host=www.achilliotravel.com <title> → ${local_title:-<empty>}"
   if ! echo "$local_title" | grep -qi 'achillio'; then
-    echo "  WARN: Achillio shell not active inside frontend — check index.achillio.html + \$spa_index"
-    docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; grep -n spa_index /etc/nginx/conf.d/default.conf | head -5' \
+    echo "  WARN: Achillio shell not active inside frontend — check index.achillio.html + server_name"
+    docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; grep -nE "server_name|index.achillio|try_files" /etc/nginx/conf.d/default.conf | head -20' \
       2>/dev/null | sed 's/^/  /' || true
   fi
 
