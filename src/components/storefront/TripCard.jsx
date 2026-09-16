@@ -78,7 +78,8 @@ function BookButton({ onClick, className = '' }) {
   );
 }
 
-function InfoButton({ onClick, className = '', iconOnly = false }) {
+/** Compact icon-only info control — fits beside Κράτηση without truncating label. */
+function InfoButton({ onClick, className = '' }) {
   return (
     <button
       type="button"
@@ -86,21 +87,20 @@ function InfoButton({ onClick, className = '', iconOnly = false }) {
         e.stopPropagation();
         onClick();
       }}
-      className={`inline-flex items-center justify-center gap-1.5 font-bold transition-all ${className}`}
+      className={`inline-flex h-10 w-10 min-w-10 shrink-0 items-center justify-center rounded-full border border-black/[0.08] bg-white/90 p-0 text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900 ${className}`}
       aria-label="Πληροφορίες εκδρομής"
       title="Πληροφορίες"
     >
-      <span className="material-symbols-outlined text-[18px] shrink-0" aria-hidden>
+      <span className="material-symbols-outlined text-[20px] leading-none" aria-hidden>
         info
       </span>
-      {iconOnly ? null : <span className="truncate">Πληροφορίες</span>}
     </button>
   );
 }
 
 /**
- * Info + book actions.
- * layout="full" → equal-width row (under price on narrow vertical cards).
+ * Info (discreet icon) + book actions.
+ * layout="full" → icon + stretch book (narrow vertical cards).
  * layout="row"  → side-by-side cluster (wide / horizontal cards).
  */
 function CardActions({
@@ -109,18 +109,14 @@ function CardActions({
   infoClassName = '',
   bookClassName = '',
   layout = 'full',
-  iconOnlyInfo = false,
 }) {
   if (layout === 'full') {
     return (
-      <div className="grid w-full grid-cols-2 gap-2">
-        <InfoButton
-          onClick={onInfo}
-          className={`min-w-0 text-sm px-2.5 py-2.5 rounded-full border border-black/[0.1] bg-white text-slate-700 hover:bg-slate-50 ${infoClassName}`}
-        />
+      <div className="flex w-full items-center gap-2">
+        <InfoButton onClick={onInfo} className={infoClassName} />
         <BookButton
           onClick={onBook}
-          className={`min-w-0 text-sm px-2.5 py-2.5 rounded-full ${bookClassName}`}
+          className={`min-w-0 flex-1 text-sm px-2.5 py-2.5 rounded-full ${bookClassName}`}
         />
       </div>
     );
@@ -128,14 +124,7 @@ function CardActions({
 
   return (
     <div className="flex items-center gap-2 shrink-0">
-      <InfoButton
-        onClick={onInfo}
-        iconOnly={iconOnlyInfo}
-        className={
-          infoClassName ||
-          'text-sm px-3.5 py-2.5 rounded-full border border-black/[0.1] bg-white text-slate-700 hover:bg-slate-50'
-        }
-      />
+      <InfoButton onClick={onInfo} className={infoClassName} />
       <BookButton onClick={onBook} className={bookClassName} />
     </div>
   );
