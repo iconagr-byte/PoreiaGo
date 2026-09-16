@@ -15,6 +15,14 @@ from travel_platform.operations.trip_ops_store import upsert_trip_ops_batch
 logger = logging.getLogger(__name__)
 
 
+def _normalize_image_list(raw: dict[str, Any]) -> list[str]:
+    for key in ("images", "gallery", "gallery_urls"):
+        val = raw.get(key)
+        if isinstance(val, list):
+            return [str(u).strip() for u in val if str(u or "").strip()]
+    return []
+
+
 def _normalize_trip_row(raw: dict[str, Any]) -> dict[str, Any] | None:
     try:
         trip_id = int(raw.get("id"))
@@ -53,6 +61,7 @@ def _normalize_trip_row(raw: dict[str, Any]) -> dict[str, Any] | None:
         "totalSeats": raw.get("totalSeats") or raw.get("total_seats") or total_seats,
         "description": raw.get("description"),
         "image": raw.get("image") or raw.get("image_url"),
+        "images": _normalize_image_list(raw),
         "hook": raw.get("hook"),
         "durationLabel": raw.get("durationLabel") or raw.get("duration_label"),
         "badge": raw.get("badge"),

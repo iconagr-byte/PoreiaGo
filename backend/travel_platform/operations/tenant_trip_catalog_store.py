@@ -47,6 +47,14 @@ def _path_for(tenant_id: str) -> Path | None:
     return _catalog_dir() / f"{key}.json"
 
 
+def _normalize_images(raw: dict[str, Any]) -> list[str]:
+    for key in ("images", "gallery", "gallery_urls"):
+        val = raw.get(key)
+        if isinstance(val, list):
+            return [str(u).strip() for u in val if str(u or "").strip()]
+    return []
+
+
 def _normalize_public_trip(raw: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
@@ -95,6 +103,7 @@ def _normalize_public_trip(raw: dict[str, Any]) -> dict[str, Any] | None:
         ),
         "description": str(raw.get("description") or "").strip(),
         "image": str(raw.get("image") or raw.get("image_url") or "").strip(),
+        "images": _normalize_images(raw),
         "hook": str(raw.get("hook") or "").strip(),
         "durationLabel": str(raw.get("durationLabel") or raw.get("duration_label") or "").strip(),
         "badge": str(raw.get("badge") or "").strip(),
