@@ -52,20 +52,19 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
     def test_nginx_avoids_wallet_directory_trap(self):
         conf = (ROOT / "deploy" / "nginx" / "frontend.conf").read_text(encoding="utf-8")
         shared = (ROOT / "deploy" / "nginx" / "frontend-shared.inc").read_text(encoding="utf-8")
-        # Dual server blocks: PoreiaGo marketing vs Achillio/default SERP-safe shell.
-        self.assertIn("server_name poreiago.com www.poreiago.com;", conf)
-        self.assertIn("try_files $uri /index.poreiago.html;", conf)
-        self.assertIn("try_files $uri /index.html;", conf)
-        self.assertIn("achilliotravel.com", conf)
+        # Host/XFH-based SPA shell (NPM may not preserve Host for server_name).
+        self.assertIn("map $http_x_forwarded_host $spa_from_xfh", conf)
+        self.assertIn("index.poreiago.html", conf)
+        self.assertIn("set $spa_shell /index.html;", conf)
+        self.assertIn("try_files $uri $spa_shell;", conf)
         self.assertIn("frontend-shared.inc", conf)
         self.assertIn("Service-Worker-Allowed", shared)
         self.assertNotIn("try_files $uri $uri/ /index.html;", conf)
-        self.assertNotIn("try_files $uri $uri/ /index.poreiago.html;", conf)
+        self.assertNotIn("try_files $uri $uri/ $spa_shell;", conf)
         # Wallet deep links must hit the SPA shell, not a static /wallet/ directory.
         self.assertIn("location = /wallet", conf)
         self.assertIn("location ^~ /wallet/", conf)
-        self.assertIn("try_files /index.poreiago.html =404;", conf)
-        self.assertIn("try_files /index.html =404;", conf)
+        self.assertIn("try_files $spa_shell =404;", conf)
 
 
 if __name__ == "__main__":

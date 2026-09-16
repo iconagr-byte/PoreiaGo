@@ -155,6 +155,14 @@ repair_external_frontend_nginx() {
   fi
   echo "  localhost default <title> → ${default_title:-<empty>}"
   echo "  localhost Host=www.achilliotravel.com <title> → ${local_title:-<empty>}"
+  local pg_title=""
+  if docker exec "$cid" sh -c 'command -v curl >/dev/null' 2>/dev/null; then
+    pg_title="$(docker exec "$cid" curl -sS --max-time 5 \
+      -H 'Host: www.poreiago.com' -H 'X-Forwarded-Host: www.poreiago.com' \
+      http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+  fi
+  echo "  localhost Host+XFH=poreiago.com <title> → ${pg_title:-<empty>}"
   if ! echo "$default_title" | grep -qi 'achillio'; then
     echo "  WARN: default index.html is not Achillio Travel — check ensure_achillio_spa_shell"
     docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; rg -n "<title>" /usr/share/nginx/html/index.html | head -3' \
@@ -581,11 +589,27 @@ echo "  www.achilliotravel.com <title> → ${ACH_TITLE:-<empty>}"
 if echo "$ACH_TITLE" | grep -qi 'achillio'; then
   echo "  OK: Achillio Travel static title"
 elif echo "$ACH_TITLE" | grep -qi 'poreiago'; then
-  echo "  ERROR: Achillio still serves PoreiaGo in <title> — check index.achillio.html + \$spa_index"
+  echo "  ERROR: Achillio still serves PoreiaGo in <title> — check index.html default shell"
   exit 1
 else
   echo "  ERROR: unexpected Achillio title (${ACH_TITLE:-empty})"
   exit 1
+fi
+
+echo "==> PoreiaGo SERP title (static HTML — Googlebot)"
+PG_TITLE=$(curl -sS -A 'Googlebot' --max-time 15 "https://www.poreiago.com/" \
+  | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)
+echo "  www.poreiago.com <title> → ${PG_TITLE:-<empty>}"
+if echo "$PG_TITLE" | grep -qi 'poreiago'; then
+  echo "  OK: PoreiaGo marketing static title"
+else
+  echo "  WARN: poreiago.com title is not PoreiaGo (Host/XFH routing may be missing)"
+  # Probe with explicit forwarded host via localhost frontend if available.
+  if curl -sS --max-time 5 -H 'Host: www.poreiago.com' -H 'X-Forwarded-Host: www.poreiago.com' \
+      "http://127.0.0.1:${NPM_APP_PORT:-8003}/" 2>/dev/null \
+      | tr '\n' ' ' | grep -qi 'PoreiaGo'; then
+    echo "  OK: localhost + X-Forwarded-Host serves PoreiaGo (NPM Host rewrite issue)"
+  fi
 fi
 
 echo ""
