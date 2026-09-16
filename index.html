@@ -5,13 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!--
-      Default = PoreiaGo marketing. On build, vite also writes dist/index.achillio.html
-      with Achillio Travel as the document title; nginx serves that shell for
-      achilliotravel.com so Googlebot never indexes PoreiaGo on the office domain
-      (sub_filter alone is unreliable).
+      Source shell for Vite. Production HTML title/description are rewritten
+      per office Host by /api/site/seo-shell (nginx @seo_shell). Build also
+      writes dist/index.achillio.html + index.poreiago.html as static fallbacks.
     -->
     <title>PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία</title>
+    <meta name="description" content="PoreiaGo — πλατφόρμα κρατήσεων, στόλου και wallet για ταξιδιωτικά γραφεία." />
     <meta property="og:title" content="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία" />
+    <meta property="og:description" content="PoreiaGo — πλατφόρμα κρατήσεων, στόλου και wallet για ταξιδιωτικά γραφεία." />
+    <meta property="og:site_name" content="PoreiaGo" />
     <meta name="twitter:title" content="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία" />
     <meta name="application-name" content="PoreiaGo" />
     <script>
@@ -19,6 +21,10 @@
         var host = (location.hostname || '').toLowerCase();
         var apex = host.replace(/^www\./, '');
         var known = { 'achilliotravel.com': 'Achillio Travel' };
+        var knownDesc = {
+          'achilliotravel.com':
+            'Achillio Travel — εκδρομές με λεωφορείο στην Ελλάδα. Κράτηση θέσης, εισιτήρια και My Wallet στο achilliotravel.com.',
+        };
         var platformApex =
           apex === 'poreiago.com' ||
           host === 'localhost' ||
@@ -34,8 +40,10 @@
           parts[0] !== 'admin';
         var isTenantCustom = !platformApex && !apex.endsWith('.poreiago.com');
         var title;
+        var description = '';
         if (known[apex]) {
           title = known[apex];
+          description = knownDesc[apex] || '';
         } else if (isTenantSub || isTenantCustom) {
           var slug = (isTenantSub ? parts[0] : apex.split('.')[0]) || apex;
           title = slug.charAt(0).toUpperCase() + slug.slice(1);
@@ -44,12 +52,23 @@
         }
         document.title = title;
         function setMeta(attr, key, value) {
+          if (!value) return;
           var el = document.querySelector('meta[' + attr + '="' + key + '"]');
-          if (el) el.setAttribute('content', value);
+          if (!el) {
+            el = document.createElement('meta');
+            el.setAttribute(attr, key);
+            document.head.appendChild(el);
+          }
+          el.setAttribute('content', value);
         }
         setMeta('property', 'og:title', title);
         setMeta('name', 'twitter:title', title);
         setMeta('name', 'application-name', title.split('—')[0].trim() || title);
+        setMeta('property', 'og:site_name', title.split('—')[0].trim() || title);
+        if (description) {
+          setMeta('name', 'description', description);
+          setMeta('property', 'og:description', description);
+        }
       })();
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">

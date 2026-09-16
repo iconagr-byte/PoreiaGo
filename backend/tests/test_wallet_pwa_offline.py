@@ -56,7 +56,9 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         self.assertIn("map $http_x_forwarded_host $spa_from_xfh", conf)
         self.assertIn("index.poreiago.html", conf)
         self.assertIn("set $spa_shell /index.html;", conf)
-        self.assertIn("try_files $uri $spa_shell;", conf)
+        self.assertIn("try_files $uri @seo_shell;", conf)
+        self.assertIn("location @seo_shell", conf)
+        self.assertIn("/api/site/seo-shell", conf)
         self.assertIn("frontend-shared.inc", conf)
         self.assertIn("Service-Worker-Allowed", shared)
         self.assertNotIn("try_files $uri $uri/ /index.html;", conf)
@@ -64,7 +66,7 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         # Wallet deep links must hit the SPA shell, not a static /wallet/ directory.
         self.assertIn("location = /wallet", conf)
         self.assertIn("location ^~ /wallet/", conf)
-        self.assertIn("try_files $spa_shell =404;", conf)
+        self.assertIn("@seo_shell", conf)
 
 
 if __name__ == "__main__":

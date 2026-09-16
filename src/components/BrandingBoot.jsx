@@ -30,6 +30,15 @@ export default function BrandingBoot() {
       if (cached && !isPlatformMarketingHost(host)) applyBrandingToDocument(cached);
     }
 
+    // Prefer server SEO payload (same source Googlebot sees via seo-shell).
+    fetch(`/api/site/seo?host=${encodeURIComponent(host)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((seo) => {
+        if (!seo?.title) return;
+        syncDocumentMetaTitle(seo.title, seo.description || '');
+      })
+      .catch(() => {});
+
     fetchBranding(host)
       .then((branding) => {
         cacheBranding(branding);

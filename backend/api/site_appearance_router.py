@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from app.core.data_paths import migrate_file_once, poreiago_data_dir
@@ -966,6 +966,177 @@ async def get_public_office_modules(
         plan="starter",
         mode="trips_only",
     )
+
+
+class OfficeSeoResponse(BaseModel):
+    title: str
+    site_name: str
+    description: str
+    canonical_url: str
+    is_platform: bool = False
+    office_kind: str = "customer"
+
+
+async def _resolve_office_seo_for_host(request: Request, host: str | None) -> dict:
+    from app.services.office_seo import resolve_seo_payload
+
+    effective_host = (host or "").strip() or (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or ""
+    ).split(",")[0].strip()
+    if effective_host:
+        effective_host = effective_host.split(":")[0].strip().lower()
+
+    scheme = (
+        request.headers.get("x-forwarded-proto")
+        or request.url.scheme
+        or "https"
+    ).split(",")[0].strip()
+
+    display_name = ""
+    footer_brand = ""
+    hero_title = ""
+    hero_subtitle = ""
+    custom_domain = ""
+
+    if effective_host:
+        try:
+            from app.core.database import AsyncSessionLocal
+            from olympus.tenant.domain_resolver import DomainResolver
+            from app.services.tenant_site_appearance_service import TenantSiteAppearanceService
+            from app.services.tenant_modules import is_achillio_travel_office
+            from sqlalchemy import select
+            from app.models.tenant import Tenant
+
+            async with AsyncSessionLocal() as session:
+                resolved = await DomainResolver(session).resolve(effective_host)
+                if resolved:
+                    row = await session.execute(
+                        select(Tenant).where(Tenant.id == resolved.tenant_id)
+                    )
+                    tenant = row.scalar_one_or_none()
+                    if tenant:
+                        custom_domain = str(getattr(tenant, "custom_domain", None) or "")
+                        legal = str(getattr(tenant, "legal_name", None) or "").strip()
+                        display_name = legal
+                        if is_achillio_travel_office(tenant):
+                            display_name = display_name or "Achillio Travel"
+                    appearance = await TenantSiteAppearanceService(session).get_appearance(
+                        resolved.tenant_id
+                    )
+                    footer_brand = str(appearance.get("footer_brand_name") or "").strip()
+                    hero_title = str(appearance.get("hero_title") or "").strip()
+                    hero_subtitle = str(appearance.get("hero_subtitle") or "").strip()
+                    if not display_name:
+                        display_name = footer_brand
+        except Exception:
+            logger.debug(
+                "office SEO tenant resolve failed for host=%s",
+                effective_host,
+                exc_info=True,
+            )
+
+        if not display_name:
+            try:
+                from api.wallet_compat_router import _branding_dict
+
+                branding = _branding_dict(effective_host)
+                display_name = str(branding.get("display_name") or "").strip()
+                custom_domain = custom_domain or str(branding.get("custom_domain") or "")
+            except Exception:
+                pass
+
+    return resolve_seo_payload(
+        host=effective_host,
+        display_name=display_name,
+        footer_brand_name=footer_brand,
+        hero_title=hero_title,
+        hero_subtitle=hero_subtitle,
+        custom_domain=custom_domain,
+        scheme=scheme,
+    )
+
+
+@router.get("/api/site/seo", response_model=OfficeSeoResponse)
+async def get_public_office_seo(
+    request: Request,
+    host: str | None = Query(default=None),
+):
+    """Public SEO fields for the current office host (title, description, canonical)."""
+    return OfficeSeoResponse(**(await _resolve_office_seo_for_host(request, host)))
+
+
+@router.get("/api/site/seo-shell", response_class=HTMLResponse)
+async def get_public_office_seo_shell(
+    request: Request,
+    host: str | None = Query(default=None),
+):
+    """
+    SPA index.html with host-aware <title>/meta/JSON-LD injected.
+
+    Nginx proxies document fallbacks here so Googlebot never indexes PoreiaGo
+    on a tenant custom domain (or vice versa).
+    """
+    import httpx
+    from app.services.office_seo import inject_office_seo_into_html, spa_shell_internal_url
+
+    seo = await _resolve_office_seo_for_host(request, host)
+    shell_url = spa_shell_internal_url(is_platform=bool(seo.get("is_platform")))
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            upstream = await client.get(shell_url)
+            upstream.raise_for_status()
+            raw = upstream.text
+    except Exception:
+        logger.exception("seo-shell failed to fetch %s — using minimal document", shell_url)
+        esc_title = seo["title"].replace("<", "")
+        esc_desc = seo["description"].replace('"', "'")
+        raw = (
+            "<!doctype html><html lang=\"el\"><head>"
+            f"<title>{esc_title}</title>"
+            f'<meta name="description" content="{esc_desc}" />'
+            "</head><body><div id=\"root\"></div>"
+            '<script type="module" src="/assets/index.js"></script>'
+            "</body></html>"
+        )
+
+    html_out = inject_office_seo_into_html(raw, seo)
+    return HTMLResponse(
+        content=html_out,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Office-SEO": str(seo.get("site_name") or "office")[:80],
+        },
+    )
+
+
+@router.get("/robots.txt")
+@router.get("/api/site/robots.txt")
+async def get_public_robots(request: Request, host: str | None = Query(default=None)):
+    seo = await _resolve_office_seo_for_host(request, host)
+    origin = str(seo.get("canonical_url") or "https://www.poreiago.com/").rstrip("/")
+    body = f"User-agent: *\nAllow: /\nSitemap: {origin}/sitemap.xml\n"
+    return Response(content=body, media_type="text/plain; charset=utf-8")
+
+
+@router.get("/sitemap.xml")
+@router.get("/api/site/sitemap.xml")
+async def get_public_sitemap(request: Request, host: str | None = Query(default=None)):
+    seo = await _resolve_office_seo_for_host(request, host)
+    origin = str(seo.get("canonical_url") or "https://www.poreiago.com/").rstrip("/")
+    paths = ["/", "/my-booking", "/login"]
+    parts = []
+    for path in paths:
+        loc = f"{origin}/" if path == "/" else f"{origin}{path}"
+        parts.append(f"  <url><loc>{loc}</loc></url>")
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(parts)
+        + "\n</urlset>\n"
+    )
+    return Response(content=body, media_type="application/xml; charset=utf-8")
 
 
 class PublicTripResponse(BaseModel):

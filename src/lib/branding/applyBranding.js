@@ -33,12 +33,13 @@ function apexHostname(hostname = '') {
     .replace(/^www\./, '');
 }
 
-/** Sync <title> + og/twitter meta so Google never keeps a PoreiaGo SERP on office domains. */
-export function syncDocumentMetaTitle(title) {
+/** Sync <title> + og/twitter/description meta for office SERP snippets. */
+export function syncDocumentMetaTitle(title, description = '') {
   const next = String(title || '').trim();
   if (!next || typeof document === 'undefined') return;
   document.title = next;
   const ensureMeta = (attr, key, content) => {
+    if (!content) return;
     let el = document.head.querySelector(`meta[${attr}="${key}"]`);
     if (!el) {
       el = document.createElement('meta');
@@ -50,6 +51,12 @@ export function syncDocumentMetaTitle(title) {
   ensureMeta('property', 'og:title', next);
   ensureMeta('name', 'twitter:title', next);
   ensureMeta('name', 'application-name', next.split('—')[0].trim() || next);
+  ensureMeta('property', 'og:site_name', next.split('—')[0].trim() || next);
+  const desc = String(description || '').trim();
+  if (desc) {
+    ensureMeta('name', 'description', desc);
+    ensureMeta('property', 'og:description', desc);
+  }
 }
 
 /**
