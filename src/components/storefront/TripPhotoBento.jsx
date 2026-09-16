@@ -1,31 +1,12 @@
 /**
  * Airbnb-style photo collage for trip detail pages.
- * 1 featured (left) + 4 tiles (2×2 right). Empty slots = placeholders until uploads exist.
+ * 1 featured (left) + 4 tiles (2×2 right). Fills from trip.images / gallery / cover / stops.
  */
+import { collectTripPhotoUrls } from '../../lib/trips/tripPhotos.js';
+
 const SLOT_COUNT = 5;
 
-function collectTripPhotoUrls(trip) {
-  if (!trip || typeof trip !== 'object') return [];
-  const raw = [
-    ...(Array.isArray(trip.images) ? trip.images : []),
-    ...(Array.isArray(trip.gallery) ? trip.gallery : []),
-    ...(Array.isArray(trip.photos) ? trip.photos : []),
-    ...(Array.isArray(trip.gallery_urls) ? trip.gallery_urls : []),
-    trip.image,
-    trip.image_url,
-  ];
-  const seen = new Set();
-  const out = [];
-  for (const item of raw) {
-    const url = typeof item === 'string' ? item.trim() : String(item?.url || '').trim();
-    if (!url || seen.has(url)) continue;
-    seen.add(url);
-    out.push(url);
-  }
-  return out;
-}
-
-function PhotoSlot({ src, featured = false, index = 0 }) {
+function PhotoSlot({ src, featured = false, index = 0, alt = '' }) {
   return (
     <div
       className={`relative h-full min-h-0 w-full overflow-hidden bg-slate-100 ${
@@ -35,7 +16,7 @@ function PhotoSlot({ src, featured = false, index = 0 }) {
       {src ? (
         <img
           src={src}
-          alt=""
+          alt={alt || (featured ? 'Κύρια φωτογραφία εκδρομής' : `Φωτογραφία ${index + 1}`)}
           className="absolute inset-0 h-full w-full object-cover"
           loading={featured ? 'eager' : 'lazy'}
         />
@@ -56,25 +37,22 @@ function PhotoSlot({ src, featured = false, index = 0 }) {
   );
 }
 
-/**
- * Layout-only collage for now (no stock images).
- * Set `useTripPhotos` when office gallery uploads are ready.
- */
-export default function TripPhotoBento({ trip, useTripPhotos = false }) {
-  const urls = useTripPhotos ? collectTripPhotoUrls(trip) : [];
+export default function TripPhotoBento({ trip }) {
+  const urls = collectTripPhotoUrls(trip);
   const slots = Array.from({ length: SLOT_COUNT }, (_, i) => urls[i] || null);
+  const title = String(trip?.title || trip?.destination || '').trim();
 
   return (
     <section className="w-full" aria-label="Φωτογραφίες εκδρομής">
       {/* Mobile: featured on top + 2×2 below. Desktop: Airbnb bento. */}
       <div className="flex flex-col gap-2 sm:hidden">
         <div className="h-48 w-full">
-          <PhotoSlot src={slots[0]} featured index={0} />
+          <PhotoSlot src={slots[0]} featured index={0} alt={title} />
         </div>
         <div className="grid grid-cols-2 gap-2">
           {slots.slice(1).map((src, i) => (
             <div key={i} className="h-24">
-              <PhotoSlot src={src} index={i + 1} />
+              <PhotoSlot src={src} index={i + 1} alt={title} />
             </div>
           ))}
         </div>
@@ -82,19 +60,19 @@ export default function TripPhotoBento({ trip, useTripPhotos = false }) {
 
       <div className="hidden h-[340px] grid-cols-[2fr_1fr_1fr] grid-rows-2 gap-2.5 sm:grid md:h-[400px]">
         <div className="row-span-2 min-h-0">
-          <PhotoSlot src={slots[0]} featured index={0} />
+          <PhotoSlot src={slots[0]} featured index={0} alt={title} />
         </div>
         <div className="min-h-0">
-          <PhotoSlot src={slots[1]} index={1} />
+          <PhotoSlot src={slots[1]} index={1} alt={title} />
         </div>
         <div className="min-h-0">
-          <PhotoSlot src={slots[2]} index={2} />
+          <PhotoSlot src={slots[2]} index={2} alt={title} />
         </div>
         <div className="min-h-0">
-          <PhotoSlot src={slots[3]} index={3} />
+          <PhotoSlot src={slots[3]} index={3} alt={title} />
         </div>
         <div className="min-h-0">
-          <PhotoSlot src={slots[4]} index={4} />
+          <PhotoSlot src={slots[4]} index={4} alt={title} />
         </div>
       </div>
     </section>
