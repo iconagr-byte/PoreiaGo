@@ -183,7 +183,7 @@ ensure_achillio_spa_shell() {
   local index="$REPO_ROOT/dist/index.html"
   local achillio="$REPO_ROOT/dist/index.achillio.html"
   local poreiago_out="$REPO_ROOT/dist/index.poreiago.html"
-  local title="Achillio Travel"
+  local title="Achillio Travel — Εκδρομές με λεωφορείο"
   local poreiago="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία"
   [[ -f "$index" ]] || { echo "  ERROR: missing $index"; return 1; }
 

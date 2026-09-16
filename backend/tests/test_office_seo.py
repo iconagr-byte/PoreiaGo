@@ -14,7 +14,7 @@ from app.services.office_seo import (
 class OfficeSeoTests(unittest.TestCase):
     def test_achillio_host_never_poreiago(self):
         seo = resolve_seo_payload(host="www.achilliotravel.com")
-        self.assertEqual(seo["title"], "Achillio Travel")
+        self.assertEqual(seo["title"], "Achillio Travel — Εκδρομές με λεωφορείο")
         self.assertIn("Achillio", seo["description"])
         self.assertNotIn("PoreiaGo", seo["title"])
         self.assertFalse(seo["is_platform"])
@@ -45,7 +45,7 @@ class OfficeSeoTests(unittest.TestCase):
   </head><body></body></html>"""
         seo = resolve_seo_payload(host="achilliotravel.com")
         out = inject_office_seo_into_html(raw, seo)
-        self.assertIn("<title>Achillio Travel</title>", out)
+        self.assertIn("<title>Achillio Travel — Εκδρομές με λεωφορείο</title>", out)
         self.assertIn('content="Achillio Travel"', out)
         self.assertIn('name="description"', out)
         self.assertIn("application/ld+json", out)

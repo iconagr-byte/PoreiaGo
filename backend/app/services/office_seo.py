@@ -21,7 +21,7 @@ PLATFORM_NAME = "PoreiaGo"
 # Known custom domains when branding API is briefly unavailable.
 KNOWN_OFFICE_SEO: dict[str, dict[str, str]] = {
     "achilliotravel.com": {
-        "title": "Achillio Travel",
+        "title": "Achillio Travel — Εκδρομές με λεωφορείο",
         "site_name": "Achillio Travel",
         "description": (
             "Achillio Travel — εκδρομές με λεωφορείο στην Ελλάδα. "

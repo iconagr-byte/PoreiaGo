@@ -6,7 +6,7 @@ import path from 'node:path'
 
 const API_TARGET = process.env.VITE_DEV_API_PROXY || 'http://127.0.0.1:8001'
 
-const ACHILLIO_DOC_TITLE = 'Achillio Travel'
+const ACHILLIO_DOC_TITLE = 'Achillio Travel — Εκδρομές με λεωφορείο'
 const POREIAGO_DOC_TITLE = 'PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία'
 
 /**
@@ -29,11 +29,11 @@ function writeAchillioSpaShell() {
   achillioHtml = achillioHtml.split(POREIAGO_DESC).join(ACHILLIO_DESC)
   achillioHtml = achillioHtml.replace(
     /name="application-name" content="PoreiaGo"/g,
-    `name="application-name" content="${ACHILLIO_DOC_TITLE}"`,
+    'name="application-name" content="Achillio Travel"',
   )
   achillioHtml = achillioHtml.replace(
     /property="og:site_name" content="PoreiaGo"/g,
-    `property="og:site_name" content="${ACHILLIO_DOC_TITLE}"`,
+    'property="og:site_name" content="Achillio Travel"',
   )
   if (!achillioHtml.includes(`<title>${ACHILLIO_DOC_TITLE}</title>`)) {
     throw new Error('achillio-spa-shell: failed to rewrite document title')

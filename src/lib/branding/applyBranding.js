@@ -20,7 +20,7 @@ export function isPlatformMarketingContext() {
 
 /** Known custom-domain offices — never show PoreiaGo in the browser / SERP title. */
 export const KNOWN_TENANT_DOCUMENT_TITLES = {
-  'achilliotravel.com': 'Achillio Travel',
+  'achilliotravel.com': 'Achillio Travel — Εκδρομές με λεωφορείο',
 };
 
 export function platformDocumentTitle() {

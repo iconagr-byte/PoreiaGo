@@ -66,7 +66,8 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         # Wallet deep links must hit the SPA shell, not a static /wallet/ directory.
         self.assertIn("location = /wallet", conf)
         self.assertIn("location ^~ /wallet/", conf)
-        self.assertIn("@seo_shell", conf)
+        self.assertIn("location = /", conf)
+        self.assertIn("try_files /dev/null @seo_shell;", conf)
 
 
 if __name__ == "__main__":
