@@ -305,6 +305,13 @@ export function catalogTripToLocal(row) {
     totalSeats: row.totalSeats ?? row.total_seats ?? row.capacity ?? 30,
     description: row.description || '',
     image: row.image || row.image_url || '',
+    images: Array.isArray(row.images)
+      ? row.images
+      : Array.isArray(row.gallery)
+        ? row.gallery
+        : Array.isArray(row.gallery_urls)
+          ? row.gallery_urls
+          : [],
     hook: row.hook || '',
     durationLabel: row.durationLabel || row.duration_label || '',
     badge: row.badge || '',
