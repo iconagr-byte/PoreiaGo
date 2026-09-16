@@ -16,6 +16,13 @@ export function currentHostname() {
   return String(window.location.hostname || '').toLowerCase().split(':')[0];
 }
 
+/** Achillio Travel custom domain — bus-only, never Rent storefront. */
+export function isAchillioTravelHost(hostname = currentHostname()) {
+  const host = String(hostname || '').toLowerCase().split(':')[0];
+  const apex = host.replace(/^www\./, '');
+  return apex === 'achilliotravel.com' || host.endsWith('.achilliotravel.com');
+}
+
 /** True on the SaaS marketing host (not a tenant white-label site). */
 export function isPlatformMarketingHost(hostname = currentHostname()) {
   const host = String(hostname || '').toLowerCase();

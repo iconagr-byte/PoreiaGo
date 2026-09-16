@@ -10,6 +10,11 @@ vi.mock('../lib/saasJwt.js', () => ({
 
 vi.mock('../lib/platform/tenantHost.js', () => ({
   isPlatformMarketingHost: vi.fn(() => false),
+  isAchillioTravelHost: vi.fn((hostname = '') => {
+    const host = String(hostname || '').toLowerCase().split(':')[0];
+    const apex = host.replace(/^www\./, '');
+    return apex === 'achilliotravel.com' || host.endsWith('.achilliotravel.com');
+  }),
 }));
 
 import { canAccessPlatformOperatorUi, isImpersonating } from '../lib/saasJwt.js';
@@ -162,6 +167,15 @@ describe('shouldShowRentStorefront', () => {
         rent_enabled: true,
         office_kind: 'achillio_travel',
       }),
+    ).toBe(false);
+  });
+
+  it('hides Rent on achilliotravel.com hostname even if rent_enabled is set', () => {
+    expect(
+      shouldShowRentStorefront(
+        { rent_enabled: true, office_kind: 'customer' },
+        { hostname: 'www.achilliotravel.com' },
+      ),
     ).toBe(false);
   });
 });

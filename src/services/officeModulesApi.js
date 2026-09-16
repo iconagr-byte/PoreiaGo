@@ -6,7 +6,7 @@ import {
   officeModeFromModules,
   resolveDesignPageForModules,
 } from '../lib/admin/officeDesignPages.js';
-import { isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
+import { isAchillioTravelHost, isPlatformMarketingHost } from '../lib/platform/tenantHost.js';
 import { canAccessPlatformOperatorUi, isImpersonating } from '../lib/saasJwt.js';
 
 export {
@@ -107,6 +107,8 @@ export function shouldShowRentStorefront(modules, opts = {}) {
   const hostname =
     opts.hostname ||
     (typeof window !== 'undefined' ? window.location.hostname : '');
+  // Achillio Travel domain is bus-only even if modules API drifts.
+  if (isAchillioTravelHost(hostname)) return false;
   // PoreiaGo marketing keeps Rent as product demo.
   if (isPlatformMarketingHost(hostname)) return true;
   // Achillio Travel is bus-only — never expose Rent on wallet / storefront.

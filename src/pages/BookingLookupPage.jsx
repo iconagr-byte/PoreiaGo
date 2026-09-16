@@ -75,6 +75,8 @@ export default function BookingLookupPage() {
       /* ignore */
     }
 
+    setRentGate(false);
+
     fetchOfficeModules()
       .then((modules) => {
         if (cancelled) return;

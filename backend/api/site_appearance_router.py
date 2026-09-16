@@ -877,6 +877,8 @@ class OfficeModulesResponse(BaseModel):
     rent_enabled: bool = False
     plan: str = "starter"
     mode: str = "trips_only"
+    tenant_slug: str | None = None
+    office_kind: str = "customer"
 
 
 @router.get("/api/site/modules", response_model=OfficeModulesResponse)
@@ -898,6 +900,7 @@ async def get_public_office_modules(
             from olympus.tenant.domain_resolver import DomainResolver
             from app.services.tenant_modules import (
                 apply_known_office_rent_policy,
+                is_achillio_travel_office,
                 is_poreiago_platform_office,
                 modules_for_tenant,
             )
@@ -926,14 +929,23 @@ async def get_public_office_modules(
                                 exc_info=True,
                             )
                         mods = modules_for_tenant(tenant)
-                        if is_poreiago_platform_office(tenant):
+                        if is_achillio_travel_office(tenant):
+                            kind = "achillio_travel"
+                        elif is_poreiago_platform_office(tenant):
+                            kind = "poreiago_platform"
                             mods = {
                                 **mods,
                                 "rent_enabled": True,
                                 "trips_enabled": True,
                                 "mode": "both",
                             }
-                        return OfficeModulesResponse(**mods)
+                        else:
+                            kind = "customer"
+                        return OfficeModulesResponse(
+                            **mods,
+                            tenant_slug=tenant.slug,
+                            office_kind=kind,
+                        )
         except Exception:
             logger.exception("office modules resolve failed for host=%s", effective_host)
 
