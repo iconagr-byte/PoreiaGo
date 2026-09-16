@@ -583,11 +583,18 @@ for host in www.poreiago.com www.achilliotravel.com; do
 done
 
 echo "==> Achillio SERP title (static HTML — Googlebot)"
-ACH_HTML=$(curl -sS -A 'Googlebot' --max-time 15 "https://www.achilliotravel.com/" || true)
+ACH_HDR=$(mktemp)
+ACH_HTML=$(curl -sS -A 'Googlebot' -D "$ACH_HDR" --max-time 15 "https://www.achilliotravel.com/" || true)
 ACH_TITLE=$(printf '%s' "$ACH_HTML" | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)
 ACH_DESC=$(printf '%s' "$ACH_HTML" | tr '\n' ' ' | sed -n 's/.*name="description" content="\([^"]*\)".*/\1/p' || true)
 echo "  www.achilliotravel.com <title> → ${ACH_TITLE:-<empty>}"
 echo "  www.achilliotravel.com description → ${ACH_DESC:0:80}"
+if grep -qi 'X-Office-SEO' "$ACH_HDR" 2>/dev/null; then
+  echo "  OK: seo-shell header X-Office-SEO present"
+else
+  echo "  WARN: X-Office-SEO missing — homepage may still be static index"
+fi
+rm -f "$ACH_HDR"
 if echo "$ACH_TITLE" | grep -qi 'achillio'; then
   echo "  OK: Achillio Travel static title"
 elif echo "$ACH_TITLE" | grep -qi 'poreiago'; then

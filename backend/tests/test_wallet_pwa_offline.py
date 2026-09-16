@@ -67,7 +67,8 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         self.assertIn("location = /wallet", conf)
         self.assertIn("location ^~ /wallet/", conf)
         self.assertIn("location = /", conf)
-        self.assertIn("try_files /dev/null @seo_shell;", conf)
+        self.assertIn("proxy_pass http://$api_upstream/api/site/seo-shell;", conf)
+        self.assertIn("location @seo_shell", conf)
 
 
 if __name__ == "__main__":
