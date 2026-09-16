@@ -113,13 +113,14 @@ location = /driver-sw.js {
 }
 
 location = /index.html {
-    add_header Cache-Control "no-cache";
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+    add_header Pragma "no-cache";
 }
 location = /index.achillio.html {
-    add_header Cache-Control "no-cache";
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
 }
 location = /index.poreiago.html {
-    add_header Cache-Control "no-cache";
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
 }
 
 location /assets/ {
