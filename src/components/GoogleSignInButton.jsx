@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
 
-function GoogleLogo() {
+function GoogleLogo({ className = '' }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+    <svg className={className} width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
       <path
         fill="#EA4335"
         d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.98 13.72 17.98 9.5 24 9.5z"
@@ -29,6 +29,24 @@ function googleButtonLabel(text) {
   if (text === 'signup_with') return 'Εγγραφή με Google';
   if (text === 'continue_with') return 'Συνέχεια με Google';
   return 'Σύνδεση με Google';
+}
+
+/** Shared Apple-style shell — matches wallet / rent login forms. */
+function StyledGoogleShell({ label, disabled = false }) {
+  return (
+    <div
+      className={`flex w-full items-center justify-center gap-3 rounded-2xl border border-black/[0.08] bg-white px-5 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all ${
+        disabled
+          ? 'opacity-60'
+          : 'group-hover:border-black/[0.14] group-hover:bg-[#fbfbfd] group-hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
+      }`}
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f5f5f7] ring-1 ring-black/[0.04]">
+        <GoogleLogo />
+      </span>
+      <span className="text-[15px] font-semibold tracking-tight text-[#1d1d1f]">{label}</span>
+    </div>
+  );
 }
 
 function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_with' }) {
@@ -62,25 +80,26 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_wit
         type="button"
         disabled={disabled}
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-full border border-gray-300 bg-white hover:bg-gray-50 shadow-sm transition-colors disabled:opacity-50"
+        className="group w-full disabled:cursor-not-allowed"
       >
-        <GoogleLogo />
-        <span className="text-sm font-semibold text-gray-700">{label}</span>
+        <StyledGoogleShell label={label} disabled={disabled} />
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <GoogleLogo />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f7]">
+                <GoogleLogo />
+              </span>
               <div>
-                <h2 className="font-bold text-gray-900">Google Sign-In</h2>
-                <p className="text-xs text-gray-500">Demo λειτουργία — τοπική δοκιμή</p>
+                <h2 className="font-bold text-[#1d1d1f]">Google Sign-In</h2>
+                <p className="text-xs text-[#6e6e73]">Demo λειτουργία — τοπική δοκιμή</p>
               </div>
             </div>
             <form onSubmit={submit} className="space-y-4">
               <div>
-                <label htmlFor="google-demo-email" className="text-sm font-medium text-gray-700">
+                <label htmlFor="google-demo-email" className="text-sm font-medium text-[#1d1d1f]">
                   Gmail / email πελάτη
                 </label>
                 <input
@@ -88,7 +107,7 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_wit
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/30 outline-none"
+                  className="mt-1 w-full rounded-xl border border-black/[0.08] px-4 py-3 outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="name@gmail.com"
                   autoFocus
                   required
@@ -98,13 +117,13 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_wit
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="flex-1 py-3 rounded-full border border-gray-200 text-gray-600 font-bold text-sm"
+                  className="flex-1 rounded-full border border-black/[0.08] py-3 text-sm font-bold text-[#6e6e73]"
                 >
                   Ακύρωση
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-full bg-primary-container text-white font-bold text-sm"
+                  className="flex-1 rounded-full bg-[#1d1d1f] py-3 text-sm font-bold text-white"
                 >
                   Συνέχεια
                 </button>
@@ -118,20 +137,86 @@ function DemoGoogleSignIn({ onDemoProfile, onError, disabled, text = 'signin_wit
 }
 
 function GoogleUnavailable({ disabled, text = 'signin_with' }) {
-  const base = googleButtonLabel(text);
+  const label = googleButtonLabel(text);
   return (
-    <button
-      type="button"
-      disabled
+    <div
+      className="w-full cursor-not-allowed"
       title="Ορίστε GOOGLE_CLIENT_ID στο deploy/.env.prod — βλ. deploy/GOOGLE-SIGNIN.md"
-      className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-full border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed disabled:opacity-70"
       aria-disabled="true"
     >
-      <GoogleLogo />
-      <span className="text-sm font-semibold">
-        {disabled ? `${base}…` : `${base} (μη διαθέσιμη)`}
-      </span>
-    </button>
+      <StyledGoogleShell
+        label={disabled ? `${label}…` : `${label} (μη διαθέσιμη)`}
+        disabled
+      />
+    </div>
+  );
+}
+
+/**
+ * Beautiful custom Google button. The official GIS iframe (often the ugly
+ * “Sign in as …” personalized pill) sits invisible on top for clicks / OAuth.
+ */
+function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
+  const wrapRef = useRef(null);
+  const [width, setWidth] = useState(320);
+  const label = googleButtonLabel(text);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return undefined;
+    const measure = () => {
+      const w = Math.round(el.getBoundingClientRect().width);
+      if (w > 0) setWidth(Math.min(400, Math.max(240, w)));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={wrapRef}
+      className={`group relative w-full ${disabled ? 'pointer-events-none opacity-50' : ''}`}
+    >
+      <StyledGoogleShell label={label} disabled={disabled} />
+      {/* Invisible official GIS control — preserves id_token credential flow */}
+      <div
+        className="absolute inset-0 z-10 overflow-hidden opacity-0 [&_iframe]:!h-full [&_iframe]:!min-h-full"
+        aria-hidden
+      >
+        <GoogleLogin
+          onSuccess={(response) => {
+            if (!response.credential) {
+              onError?.('Δεν ελήφθη διαπιστευτήριο Google');
+              return;
+            }
+            onSuccess(response.credential);
+          }}
+          onError={() => onError?.('Η σύνδεση με Google απέτυχε')}
+          theme="outline"
+          size="large"
+          text={text}
+          shape="pill"
+          locale="el"
+          width={String(width)}
+          useOneTap={false}
+          containerProps={{
+            style: {
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -154,7 +239,6 @@ export default function GoogleSignInButton({
   }
 
   if (!enabled) {
-    // Local demo only — production must use a real OAuth Web Client ID.
     if (import.meta.env.DEV) {
       return (
         <DemoGoogleSignIn
@@ -169,24 +253,11 @@ export default function GoogleSignInButton({
   }
 
   return (
-    <div className={`flex justify-center w-full ${disabled ? 'pointer-events-none opacity-50' : ''}`}>
-      <GoogleLogin
-        onSuccess={(response) => {
-          if (!response.credential) {
-            onError?.('Δεν ελήφθη διαπιστευτήριο Google');
-            return;
-          }
-          onSuccess(response.credential);
-        }}
-        onError={() => onError?.('Η σύνδεση με Google απέτυχε')}
-        theme="outline"
-        size="large"
-        text={buttonText}
-        shape="pill"
-        locale="el"
-        width="360"
-        useOneTap={false}
-      />
-    </div>
+    <LiveGoogleSignIn
+      onSuccess={onSuccess}
+      onError={onError}
+      disabled={disabled}
+      text={buttonText}
+    />
   );
 }
