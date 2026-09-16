@@ -1,8 +1,30 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import fs from 'node:fs'
+import path from 'node:path'
 
 const API_TARGET = process.env.VITE_DEV_API_PROXY || 'http://127.0.0.1:8001'
+
+const ACHILLIO_DOC_TITLE = 'Achillio Travel'
+
+/** Googlebot reads static <title> — sub_filter is unreliable with sendfile/edge caches. */
+function writeAchillioSpaShell() {
+  const indexPath = path.resolve('dist/index.html')
+  if (!fs.existsSync(indexPath)) return
+  const poreiagoTitle = 'PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία'
+  let html = fs.readFileSync(indexPath, 'utf8')
+  // Replace PoreiaGo title strings only (avoid matching text inside HTML comments).
+  html = html.split(poreiagoTitle).join(ACHILLIO_DOC_TITLE)
+  html = html.replace(
+    /name="application-name" content="PoreiaGo"/g,
+    `name="application-name" content="${ACHILLIO_DOC_TITLE}"`,
+  )
+  if (!html.includes(`<title>${ACHILLIO_DOC_TITLE}</title>`)) {
+    throw new Error('achillio-spa-shell: failed to rewrite document title')
+  }
+  fs.writeFileSync(path.resolve('dist/index.achillio.html'), html)
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -21,6 +43,12 @@ export default defineConfig({
           }
           next()
         })
+      },
+    },
+    {
+      name: 'achillio-spa-shell',
+      closeBundle() {
+        writeAchillioSpaShell()
       },
     },
   ],

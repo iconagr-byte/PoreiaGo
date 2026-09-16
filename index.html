@@ -5,9 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!--
-      Default = PoreiaGo marketing. Inline script + nginx sub_filter overwrite
-      immediately on office hosts (e.g. achilliotravel.com → Achillio Travel)
-      so Google never indexes the platform name on a customer domain.
+      Default = PoreiaGo marketing. On build, vite also writes dist/index.achillio.html
+      with Achillio Travel as the document title; nginx serves that shell for
+      achilliotravel.com so Googlebot never indexes PoreiaGo on the office domain
+      (sub_filter alone is unreliable).
     -->
     <title>PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία</title>
     <meta property="og:title" content="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία" />

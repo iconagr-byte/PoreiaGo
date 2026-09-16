@@ -482,6 +482,18 @@ for host in www.poreiago.com www.achilliotravel.com; do
     | openssl x509 -noout -subject -issuer 2>/dev/null | sed "s/^/  /" || true
 done
 
+echo "==> Achillio SERP title (static HTML — Googlebot)"
+ACH_TITLE=$(curl -sS -A 'Googlebot' --max-time 15 "https://www.achilliotravel.com/" \
+  | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)
+echo "  www.achilliotravel.com <title> → ${ACH_TITLE:-<empty>}"
+if echo "$ACH_TITLE" | grep -qi 'poreiago'; then
+  echo "  ERROR: Achillio still serves PoreiaGo in <title> — check index.achillio.html + \$spa_index"
+elif echo "$ACH_TITLE" | grep -qi 'achillio'; then
+  echo "  OK: Achillio Travel static title"
+else
+  echo "  WARN: unexpected Achillio title (Google may still reindex)"
+fi
+
 echo ""
 echo "=============================================="
 echo " DONE"
