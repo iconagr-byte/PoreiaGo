@@ -24,6 +24,13 @@ function writeAchillioSpaShell() {
     'Achillio Travel — εκδρομές με λεωφορείο στην Ελλάδα. Κράτηση θέσης, εισιτήρια και My Wallet στο achilliotravel.com.'
   const POREIAGO_DESC =
     'PoreiaGo — πλατφόρμα κρατήσεων, στόλου και wallet για ταξιδιωτικά γραφεία.'
+  const ACHILLIO_LD = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'TravelAgency',
+    name: 'Achillio Travel',
+    url: 'https://www.achilliotravel.com/',
+    description: ACHILLIO_DESC,
+  })
 
   let achillioHtml = poreiagoHtml.split(POREIAGO_DOC_TITLE).join(ACHILLIO_DOC_TITLE)
   achillioHtml = achillioHtml.split(POREIAGO_DESC).join(ACHILLIO_DESC)
@@ -35,6 +42,18 @@ function writeAchillioSpaShell() {
     /property="og:site_name" content="PoreiaGo"/g,
     'property="og:site_name" content="Achillio Travel"',
   )
+  if (!achillioHtml.includes('rel="canonical"')) {
+    achillioHtml = achillioHtml.replace(
+      '</title>',
+      '</title>\n    <link rel="canonical" href="https://www.achilliotravel.com/" />',
+    )
+  }
+  if (!achillioHtml.includes('application/ld+json')) {
+    achillioHtml = achillioHtml.replace(
+      '</head>',
+      `    <script type="application/ld+json">${ACHILLIO_LD}</script>\n    <noscript><h1>Achillio Travel</h1><p>${ACHILLIO_DESC}</p></noscript>\n  </head>`,
+    )
+  }
   if (!achillioHtml.includes(`<title>${ACHILLIO_DOC_TITLE}</title>`)) {
     throw new Error('achillio-spa-shell: failed to rewrite document title')
   }

@@ -137,6 +137,28 @@ repair_external_frontend_nginx() {
     docker exec "$cid" nginx -t 2>&1 | sed 's/^/  /' || true
   fi
 
+  # Ensure frontend can resolve api-blue (homepage seo-shell proxy).
+  docker network connect aerostride-prod_edge "$cid" 2>/dev/null || true
+  local api_cid=""
+  api_cid="$(docker ps --filter "name=api-blue" --format '{{.ID}}' | head -1 || true)"
+  if [[ -n "$api_cid" ]]; then
+    local api_net=""
+    api_net="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' "$api_cid" 2>/dev/null | head -1 || true)"
+    if [[ -n "$api_net" ]]; then
+      docker network connect "$api_net" "$cid" 2>/dev/null || true
+    fi
+  fi
+
+  # If api-blue DNS fails from this frontend, point seo upstream at host-published API :8004.
+  if ! docker exec "$cid" wget -qO- --timeout=4 http://api-blue:8000/health 2>/dev/null | grep -q '"status"'; then
+    echo "  api-blue DNS unreachable from frontend — using host gateway :${NPM_API_PORT:-8004}"
+    local gw="172.17.0.1"
+    gw="$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null || echo 172.17.0.1)"
+    docker exec "$cid" sh -c \
+      "sed -i 's/api-blue:8000/${gw}:${NPM_API_PORT:-8004}/g' /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/frontend-shared.inc 2>/dev/null || true"
+    docker exec "$cid" nginx -t 2>/dev/null && docker exec "$cid" nginx -s reload 2>/dev/null || true
+  fi
+
   # Prove default shell (no Host) is Achillio — Contabo often ignores server_name.
   local default_title=""
   local local_title=""
@@ -206,7 +228,7 @@ elif not __import__("os").path.isfile(por_path):
     open(por_path, "w", encoding="utf-8").write(html)
 ach = html.replace(old, new).replace(
     'name="application-name" content="PoreiaGo"',
-    f'name="application-name" content="{new}"',
+    'name="application-name" content="Achillio Travel"',
 )
 if f"<title>{new}</title>" not in ach:
     raise SystemExit("failed to rewrite Achillio document title")
