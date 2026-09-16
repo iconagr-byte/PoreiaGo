@@ -404,9 +404,9 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   footer_template: 'classic_columns',
   rent_fleet_layout_template: 'rent_grid_three',
   rent_fleet_card_template: 'rent_premium',
-  /** International section — stacked horizontal cards between Greece and fleet. */
-  intl_trips_layout_template: 'editorial_stack',
-  intl_trip_card_template: 'abroad_horizontal',
+  /** Kept in sync with trips_* — one card style for Greece + abroad. */
+  intl_trips_layout_template: 'grid_three',
+  intl_trip_card_template: 'premium',
   trips_section_eyebrow: 'Ανακαλύψτε',
   trips_section_title: 'Εκδρομές στην Ελλάδα',
   trips_section_subtitle:
@@ -414,7 +414,7 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   intl_section_eyebrow: 'Διεθνή δρομολόγια',
   intl_section_title: 'Ταξίδια προς το Εξωτερικό',
   intl_section_subtitle:
-    'Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη.',
+    'Διεθνείς εκδρομές με λεωφορείο — ίδια εμφάνιση κάρτας με τις εγχώριες.',
 };
 
 export function getTemplateById(list, id) {

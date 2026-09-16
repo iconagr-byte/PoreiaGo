@@ -90,14 +90,13 @@ export default function PlatformOpsShowcase() {
           compact
           eyebrow="Εξωτερικό"
           title="Εκδρομές εξωτερικού"
-          subtitle="Παρίσι · Ρώμη · Πράγα & Βιέννη — οριζόντια κάρτα λεωφορείου."
+          subtitle="Παρίσι · Ρώμη · Πράγα & Βιέννη — ίδια κάρτα εμφάνισης με τις εγχώριες."
           trips={intlTrips}
           emptyMessage="Δεν υπάρχουν διεθνείς εκδρομές προς εμφάνιση."
           siteAppearance={{
             ...DEFAULT_SITE_APPEARANCE,
-            // Stack of 3 wide horizontal cards (not a thin carousel strip).
-            trips_layout_template: 'editorial_stack',
-            trip_card_template: 'abroad_horizontal',
+            trips_layout_template: 'grid_three',
+            trip_card_template: 'premium',
           }}
           pricingSettings={DEFAULT_PLATFORM_SETTINGS}
           sectionClassName="!bg-transparent !pt-2 !pb-10 md:!pb-12 pg-apple-abroad-strip"

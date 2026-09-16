@@ -457,18 +457,11 @@ export default function StorefrontDemoPage() {
               title={siteAppearance.intl_section_title || 'Εκδρομές εξωτερικού'}
               subtitle={
                 siteAppearance.intl_section_subtitle ||
-                'Οριζόντιες κάρτες — Παρίσι, Ρώμη και άλλες διεθνείς εκδρομές με λεωφορείο.'
+                'Διεθνείς εκδρομές με λεωφορείο — ίδια εμφάνιση κάρτας με τις εγχώριες.'
               }
               trips={filteredInternational}
               emptyMessage="Δεν βρέθηκαν διεθνή δρομολόγια με τα κριτήριά σας."
-              siteAppearance={{
-                ...siteAppearance,
-                // Abroad strip between Greece and fleet — stacked horizontal cards.
-                trips_layout_template:
-                  siteAppearance.intl_trips_layout_template || 'editorial_stack',
-                trip_card_template:
-                  siteAppearance.intl_trip_card_template || 'abroad_horizontal',
-              }}
+              siteAppearance={siteAppearance}
               pricingSettings={pricingSettings}
               compact
               hidden={!showInternational || filteredInternational.length === 0}
