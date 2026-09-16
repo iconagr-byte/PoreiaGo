@@ -59,6 +59,8 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         self.assertIn("try_files $uri @seo_shell;", conf)
         self.assertIn("location @seo_shell", conf)
         self.assertIn("/api/site/seo-shell", conf)
+        self.assertIn("achillio_force_www", conf)
+        self.assertIn("https://www.achilliotravel.com", conf)
         self.assertIn("frontend-shared.inc", conf)
         self.assertIn("Service-Worker-Allowed", shared)
         self.assertNotIn("try_files $uri $uri/ /index.html;", conf)

@@ -604,6 +604,24 @@ for host in www.poreiago.com www.achilliotravel.com; do
     | openssl x509 -noout -subject -issuer 2>/dev/null | sed "s/^/  /" || true
 done
 
+echo "==> Achillio apex → www (single SERP URL)"
+ACH_APEX_CODE=$(curl -sS -o /dev/null -w "%{http_code}" -A 'Googlebot' --max-time 15 \
+  -H 'Host: achilliotravel.com' -H 'X-Forwarded-Host: achilliotravel.com' \
+  "http://127.0.0.1:${NPM_APP_PORT:-8003}/" 2>/dev/null || echo "fail")
+ACH_APEX_LOC=$(curl -sS -I -A 'Googlebot' --max-time 15 \
+  -H 'Host: achilliotravel.com' -H 'X-Forwarded-Host: achilliotravel.com' \
+  "http://127.0.0.1:${NPM_APP_PORT:-8003}/" 2>/dev/null | tr -d '\r' | awk 'tolower($1)=="location:"{print $2; exit}')
+echo "  localhost Host=achilliotravel.com → ${ACH_APEX_CODE} ${ACH_APEX_LOC}"
+if echo "$ACH_APEX_CODE" | grep -qE '301|302'; then
+  if echo "$ACH_APEX_LOC" | grep -qi 'www.achilliotravel.com'; then
+    echo "  OK: apex redirects to www"
+  else
+    echo "  WARN: apex redirect Location is not www ($ACH_APEX_LOC)"
+  fi
+else
+  echo "  WARN: apex did not 301 (public NPM may still need Force SSL / www redirect)"
+fi
+
 echo "==> Achillio SERP title (static HTML — Googlebot)"
 ACH_HDR=$(mktemp)
 ACH_HTML=$(curl -sS -A 'Googlebot' -D "$ACH_HDR" --max-time 15 "https://www.achilliotravel.com/" || true)
