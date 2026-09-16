@@ -195,6 +195,18 @@ async def upsert_message(data: dict) -> dict | None:
     now = _now()
     if existing:
         eid = existing["id"]
+        # Durable trash: IMAP sync of INBOX/Sent/Spam must not resurrect
+        # messages the user already moved to Κάδος (local or IMAP).
+        cur = await db.execute(
+            "SELECT folder FROM email_messages WHERE id = ?",
+            (eid,),
+        )
+        prev = await cur.fetchone()
+        incoming_folder = data.get("folder", FOLDER_INBOX)
+        if prev and prev["folder"] == FOLDER_TRASH and incoming_folder != FOLDER_TRASH:
+            folder = FOLDER_TRASH
+        else:
+            folder = incoming_folder
         await db.execute(
             """
             UPDATE email_messages
@@ -209,7 +221,7 @@ async def upsert_message(data: dict) -> dict | None:
                 data.get("recipient", ""),
                 data.get("body_html", ""),
                 data.get("body_text"),
-                data.get("folder", FOLDER_INBOX),
+                folder,
                 1 if data.get("is_read") else 0,
                 data.get("date") or now,
                 data.get("imap_uid"),

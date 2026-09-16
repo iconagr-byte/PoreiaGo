@@ -148,6 +148,7 @@ def settings_to_imap_config(account: dict) -> dict[str, Any]:
         "imap_mailbox": account.get("imap_mailbox") or "INBOX",
         "imap_folder_sent": account.get("imap_folder_sent") or "Sent",
         "imap_folder_spam": account.get("imap_folder_spam") or "Spam",
+        "imap_folder_trash": account.get("imap_folder_trash") or "Trash",
     }
 
 
