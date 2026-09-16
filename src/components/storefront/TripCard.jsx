@@ -71,8 +71,52 @@ function BookButton({ onClick, className = '' }) {
       className={`inline-flex items-center gap-2 font-bold transition-all ${className}`}
     >
       Κράτηση
-      <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+      <span className="material-symbols-outlined text-[18px]" aria-hidden>
+        arrow_forward
+      </span>
     </button>
+  );
+}
+
+function InfoButton({ onClick, className = '' }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`inline-flex items-center gap-1.5 font-bold transition-all ${className}`}
+      aria-label="Πληροφορίες εκδρομής"
+    >
+      <span className="material-symbols-outlined text-[18px]" aria-hidden>
+        info
+      </span>
+      Πληροφορίες
+    </button>
+  );
+}
+
+/** Secondary info + primary book — for storefront trip cards. */
+function CardActions({
+  onInfo,
+  onBook,
+  infoClassName = 'text-sm px-3.5 py-2.5 rounded-full border border-black/[0.1] bg-white text-slate-700 hover:bg-slate-50 shrink-0',
+  bookClassName = '',
+  compact = false,
+}) {
+  return (
+    <div className={`flex items-center shrink-0 ${compact ? 'gap-1.5' : 'gap-2'}`}>
+      <InfoButton
+        onClick={onInfo}
+        className={
+          compact
+            ? 'text-xs px-2.5 py-2 rounded-full border border-black/[0.1] bg-white text-slate-700 hover:bg-slate-50 shrink-0'
+            : infoClassName
+        }
+      />
+      <BookButton onClick={onBook} className={bookClassName} />
+    </div>
   );
 }
 
@@ -111,7 +155,9 @@ export default function TripCard({
 }) {
   const navigate = useNavigate();
   const priceQuote = computeDynamicPrice(trip, pricingSettings);
-  const go = () => navigate(`/trip/${trip.id}`);
+  const goInfo = () => navigate(`/trip/${trip.id}`);
+  const goBook = () => navigate(`/select-seat/${trip.id}`);
+  const go = goInfo;
   const img = trip.image || '/images/hero-bus-achillio.png';
   const altLayout = layoutId === 'alternating_rows' && index % 2 === 1;
   const useDestinationPoster =
@@ -173,7 +219,12 @@ export default function TripCard({
           <TripMeta trip={trip} compact />
           <div className="mt-2 flex items-center justify-between gap-2">
             <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="sm" />
-            <BookButton onClick={go} className="text-sm text-primary px-3 py-1.5 rounded-full bg-primary/10" />
+            <CardActions
+              onInfo={goInfo}
+              onBook={goBook}
+              compact
+              bookClassName="text-sm text-primary px-3 py-1.5 rounded-full bg-primary/10"
+            />
           </div>
         </div>
       </article>
@@ -237,9 +288,11 @@ export default function TripCard({
                 {Number.isFinite(amount) ? amount.toFixed(0) : '—'}
               </p>
             </div>
-            <BookButton
-              onClick={go}
-              className="text-base px-6 py-3 rounded-full bg-sky-600 text-white hover:bg-sky-500 shrink-0"
+            <CardActions
+              onInfo={goInfo}
+              onBook={goBook}
+              bookClassName="text-base px-6 py-3 rounded-full bg-sky-600 text-white hover:bg-sky-500 shrink-0"
+              infoClassName="text-sm px-4 py-3 rounded-full border border-sky-200 bg-white text-sky-800 hover:bg-sky-50 shrink-0"
             />
           </div>
         </div>
@@ -284,9 +337,11 @@ export default function TripCard({
                 size={solo ? 'md' : 'lg'}
               />
             </div>
-            <BookButton
-              onClick={go}
-              className="px-5 py-2.5 rounded-full bg-white text-slate-900 text-sm shrink-0"
+            <CardActions
+              onInfo={goInfo}
+              onBook={goBook}
+              bookClassName="px-5 py-2.5 rounded-full bg-white text-slate-900 text-sm shrink-0"
+              infoClassName="px-4 py-2.5 rounded-full border border-white/50 bg-white/15 text-white text-sm hover:bg-white/25 shrink-0"
             />
           </div>
         </div>
@@ -300,9 +355,13 @@ export default function TripCard({
         <img src={img} alt="" className="w-full h-36 rounded-xl object-cover mb-4" />
         <h3 className="font-bold text-lg text-on-surface mb-2">{trip.title}</h3>
         <TripMeta trip={trip} compact />
-        <div className="mt-4 pt-4 border-t flex items-center justify-between">
+        <div className="mt-4 pt-4 border-t flex items-center justify-between gap-2">
           <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="md" />
-          <BookButton onClick={go} className="text-sm text-white px-5 py-2 rounded-full bg-slate-900" />
+          <CardActions
+            onInfo={goInfo}
+            onBook={goBook}
+            bookClassName="text-sm text-white px-5 py-2 rounded-full bg-slate-900"
+          />
         </div>
       </article>
     );
@@ -317,9 +376,14 @@ export default function TripCard({
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary mb-2">Featured trip</p>
         <h3 className="text-3xl font-display font-bold text-on-surface leading-tight mb-3">{trip.title}</h3>
         <p className="text-on-surface-variant mb-4 line-clamp-2">{trip.hook || trip.description || ''}</p>
-        <div className="flex items-center justify-between border-t pt-4">
+        <div className="flex items-center justify-between gap-2 border-t pt-4">
           <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="lg" />
-          <BookButton onClick={go} className="text-sm underline underline-offset-4 text-on-surface" />
+          <CardActions
+            onInfo={goInfo}
+            onBook={goBook}
+            bookClassName="text-sm underline underline-offset-4 text-on-surface"
+            infoClassName="text-sm text-primary font-bold"
+          />
         </div>
       </article>
     );
@@ -332,9 +396,14 @@ export default function TripCard({
         <div className="p-6 border-t-2 border-slate-900">
           <h3 className="text-xl font-black uppercase tracking-tight mb-3">{trip.title}</h3>
           <TripMeta trip={trip} />
-          <div className="mt-6 flex items-center justify-between border-t-2 border-slate-200 pt-4">
+          <div className="mt-6 flex items-center justify-between gap-2 border-t-2 border-slate-200 pt-4">
             <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="md" />
-            <BookButton onClick={go} className="text-sm px-4 py-2 border-2 border-slate-900 rounded-none" />
+            <CardActions
+              onInfo={goInfo}
+              onBook={goBook}
+              bookClassName="text-sm px-4 py-2 border-2 border-slate-900 rounded-none"
+              infoClassName="text-sm px-3 py-2 border border-slate-400 rounded-none text-slate-700 hover:bg-slate-50"
+            />
           </div>
         </div>
       </article>
@@ -349,11 +418,12 @@ export default function TripCard({
         </div>
         <h3 className="font-bold text-on-surface mb-2">{trip.title}</h3>
         <TripMeta trip={trip} compact />
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between gap-2">
           <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="md" />
-          <BookButton
-            onClick={go}
-            className="text-sm text-white px-5 py-2.5 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 shadow-lg"
+          <CardActions
+            onInfo={goInfo}
+            onBook={goBook}
+            bookClassName="text-sm text-white px-5 py-2.5 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 shadow-lg"
           />
         </div>
       </article>
@@ -373,11 +443,12 @@ export default function TripCard({
           <h3 className="text-3xl font-bold text-on-surface mb-4">{trip.title}</h3>
           <TripMeta trip={trip} />
           <p className="text-on-surface-variant mt-4 mb-6">{trip.hook || ''}</p>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 flex-wrap">
             <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="lg" />
-            <BookButton
-              onClick={go}
-              className="text-sm text-white px-6 py-3 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600"
+            <CardActions
+              onInfo={goInfo}
+              onBook={goBook}
+              bookClassName="text-sm text-white px-6 py-3 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600"
             />
           </div>
         </div>
@@ -399,7 +470,12 @@ export default function TripCard({
           <TripMeta trip={trip} compact />
           <div className="mt-auto pt-4 flex items-end justify-between gap-3">
             <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="md" />
-            <BookButton onClick={go} className="text-sm text-[#0071e3] font-semibold" />
+            <CardActions
+              onInfo={goInfo}
+              onBook={goBook}
+              bookClassName="text-sm text-[#0071e3] font-semibold"
+              infoClassName="text-sm text-[#1d1d1f]/80 font-semibold"
+            />
           </div>
         </div>
       </article>
@@ -428,9 +504,11 @@ export default function TripCard({
             <div className="[&_*]:text-white">
               <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="md" />
             </div>
-            <BookButton
-              onClick={go}
-              className="text-sm px-4 py-2.5 rounded-full bg-amber-500 text-slate-950 font-bold"
+            <CardActions
+              onInfo={goInfo}
+              onBook={goBook}
+              bookClassName="text-sm px-4 py-2.5 rounded-full bg-amber-500 text-slate-950 font-bold"
+              infoClassName="text-sm px-3 py-2.5 rounded-full border border-white/25 text-white/90 hover:bg-white/10"
             />
           </div>
         </div>
@@ -460,9 +538,11 @@ export default function TripCard({
           <div className="text-white/80 mb-4">
             <TripMeta trip={trip} compact />
           </div>
-          <BookButton
-            onClick={go}
-            className="text-sm px-5 py-2.5 rounded-full bg-white text-slate-900 font-bold"
+          <CardActions
+            onInfo={goInfo}
+            onBook={goBook}
+            bookClassName="text-sm px-5 py-2.5 rounded-full bg-white text-slate-900 font-bold"
+            infoClassName="text-sm px-4 py-2.5 rounded-full border border-white/40 bg-white/10 text-white hover:bg-white/20"
           />
         </div>
       </article>
@@ -487,9 +567,11 @@ export default function TripCard({
           <TripMeta trip={trip} compact />
           <div className="mt-auto pt-4 flex items-end justify-between gap-2">
             <TripPriceDisplay trip={trip} quote={priceQuote} fetchServer={false} size="md" />
-            <BookButton
-              onClick={go}
-              className="text-sm px-4 py-2 rounded-lg bg-slate-900 text-white font-bold"
+            <CardActions
+              onInfo={goInfo}
+              onBook={goBook}
+              compact
+              bookClassName="text-sm px-4 py-2 rounded-lg bg-slate-900 text-white font-bold"
             />
           </div>
         </div>
@@ -554,10 +636,15 @@ export default function TripCard({
             fetchServer={false}
             size={solo ? 'md' : 'lg'}
           />
-          <BookButton
-            onClick={go}
-            className={`bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full text-sm hover:scale-[1.02] hover:shadow-lg shrink-0 ${
-              solo ? 'px-4 py-2.5' : 'px-6 py-3.5'
+          <CardActions
+            onInfo={goInfo}
+            onBook={goBook}
+            compact={solo}
+            bookClassName={`bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full text-sm hover:scale-[1.02] hover:shadow-lg shrink-0 ${
+              solo ? 'px-3.5 py-2.5' : 'px-6 py-3.5'
+            }`}
+            infoClassName={`rounded-full border border-black/[0.1] bg-white text-slate-700 hover:bg-slate-50 text-sm shrink-0 ${
+              solo ? 'px-2.5 py-2' : 'px-4 py-3'
             }`}
           />
         </div>
