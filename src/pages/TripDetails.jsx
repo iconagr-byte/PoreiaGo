@@ -5,6 +5,7 @@ import { isInternationalTrip, MARKET_LABELS } from '../lib/trips/tripMarket.js';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { fleetCategoryLabel } from '../lib/fleet/fleetVehicleCategories.js';
 import TripPriceDisplay from '../components/TripPriceDisplay.jsx';
+import TripPhotoBento from '../components/storefront/TripPhotoBento.jsx';
 import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -167,6 +168,9 @@ export default function TripDetails() {
             <p className="text-on-surface-variant font-body-lg max-w-3xl mt-4 leading-relaxed">
               {trip.description}
             </p>
+            <div className="mt-8 md:mt-10">
+              <TripPhotoBento trip={trip} />
+            </div>
           </div>
         </div>
       </div>
