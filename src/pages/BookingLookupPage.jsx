@@ -14,6 +14,7 @@ import {
   referrerLooksLikeRent,
 } from '../lib/rental/preferRentLookup.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import { fetchOfficeModules, shouldShowRentStorefront } from '../services/officeModulesApi.js';
 import '../styles/booking-lookup.css';
 
 const EMAIL_KEY = 'poreiago_lookup_email_v1';
@@ -46,10 +47,11 @@ export default function BookingLookupPage() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [phone, setPhone] = useState('');
   const [rentGate, setRentGate] = useState(false);
+  const [rentAvailable, setRentAvailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    // Rent deep-link / RB-… / session from /rent → never stay on bus ticket finder.
+    // Rent deep-link / RB-… / session from /rent → never stay on bus ticket finder (if Rent enabled).
     const qRef = (
       searchParams.get('ref') ||
       searchParams.get('reference') ||
@@ -65,22 +67,6 @@ export default function BookingLookupPage() {
         referrerLooksLikeRent() ||
         qRef.startsWith('RB-'));
 
-    if (preferRent) {
-      const qs = searchParams.toString();
-      // Prefer Rent Wallet when no lookup params; otherwise rent find-booking.
-      const hasLookup = Boolean(
-        searchParams.get('email') ||
-          searchParams.get('ref') ||
-          searchParams.get('reference') ||
-          searchParams.get('code'),
-      );
-      const target = hasLookup || qRef.startsWith('RB-') ? '/rent/my-booking' : '/rent/wallet';
-      navigate(`${target}${qs ? `?${qs}` : ''}`, { replace: true });
-      return undefined;
-    }
-
-    if (!forceBus && !cancelled) setRentGate(true);
-
     const qEmail = searchParams.get('email') || '';
     let saved = '';
     try {
@@ -88,10 +74,41 @@ export default function BookingLookupPage() {
     } catch {
       /* ignore */
     }
-    if (!cancelled) {
-      setEmail((qEmail || saved).trim().toLowerCase());
-      if (qRef) setReference(normalizeReference(qRef));
-    }
+
+    fetchOfficeModules()
+      .then((modules) => {
+        if (cancelled) return;
+        const rentOk = shouldShowRentStorefront(modules);
+        setRentAvailable(rentOk);
+
+        if (preferRent && rentOk) {
+          const qs = searchParams.toString();
+          const hasLookup = Boolean(
+            searchParams.get('email') ||
+              searchParams.get('ref') ||
+              searchParams.get('reference') ||
+              searchParams.get('code'),
+          );
+          const target = hasLookup || qRef.startsWith('RB-') ? '/rent/my-booking' : '/rent/wallet';
+          navigate(`${target}${qs ? `?${qs}` : ''}`, { replace: true });
+          return;
+        }
+        if (preferRent && !rentOk) {
+          clearPreferRentLookup();
+        }
+
+        if (!forceBus && rentOk) setRentGate(true);
+
+        setEmail((qEmail || saved).trim().toLowerCase());
+        if (qRef) setReference(normalizeReference(qRef));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRentAvailable(false);
+        setEmail((qEmail || saved).trim().toLowerCase());
+        if (qRef) setReference(normalizeReference(qRef));
+      });
+
     fetchSiteAppearance()
       .then((data) => {
         if (!cancelled) setPhone(String(data?.footer_contact_phone || '').trim());
@@ -244,12 +261,14 @@ export default function BookingLookupPage() {
             </div>
           ) : (
             <>
-              <p className="booking-lookup-note" style={{ marginTop: 0, marginBottom: '1rem' }}>
-                Ψάχνεις <strong>ενοικίαση οχήματος</strong>;{' '}
-                <Link to="/rent/wallet">Rent Wallet</Link>
-                {' · '}
-                <Link to="/rent/my-booking">Εύρεση κράτησης Rent</Link>
-              </p>
+              {rentAvailable ? (
+                <p className="booking-lookup-note" style={{ marginTop: 0, marginBottom: '1rem' }}>
+                  Ψάχνεις <strong>ενοικίαση οχήματος</strong>;{' '}
+                  <Link to="/rent/wallet">Rent Wallet</Link>
+                  {' · '}
+                  <Link to="/rent/my-booking">Εύρεση κράτησης Rent</Link>
+                </p>
+              ) : null}
 
               <form onSubmit={handleSubmit} className="booking-lookup-form" noValidate>
                 <label className={`booking-lookup-field ${fieldError.email ? 'has-error' : ''}`} htmlFor="email">
