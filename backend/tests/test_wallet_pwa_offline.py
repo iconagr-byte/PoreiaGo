@@ -53,7 +53,8 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         conf = (ROOT / "deploy" / "nginx" / "frontend.conf").read_text(encoding="utf-8")
         # Host-specific SPA shell ($spa_index → index.html or index.achillio.html).
         self.assertIn("try_files $uri $spa_index;", conf)
-        self.assertIn("map $host $spa_index", conf)
+        self.assertIn("map \"$host:$http_x_forwarded_host\" $spa_index", conf)
+        self.assertIn("achilliotravel", conf)
         self.assertNotIn("try_files $uri $uri/ /index.html;", conf)
         self.assertNotIn("try_files $uri $uri/ $spa_index;", conf)
         self.assertIn("Service-Worker-Allowed", conf)

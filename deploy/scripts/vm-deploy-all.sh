@@ -100,31 +100,96 @@ refresh_external_frontend_dist() {
 }
 
 # Contabo poreiago-frontend often only serves static files — POST /api → 405.
-# Install repo frontend.conf so /api + /ws + /health proxy to api-blue.
+# Install repo frontend.conf so /api + /ws + /health proxy to api-blue,
+# and so achilliotravel.com serves index.achillio.html (static SERP title).
 repair_external_frontend_nginx() {
   local cid="$1"
   local conf="$DEPLOY_DIR/nginx/frontend.conf"
   [[ -n "$cid" && -f "$conf" ]] || return 0
-  echo "==> Repair external frontend nginx (/api → api-blue)"
+  echo "==> Repair external frontend nginx (/api → api-blue + Achillio SPA shell)"
   docker network connect aerostride-prod_edge "$cid" 2>/dev/null || true
-  # Compose bind-mounts frontend.conf:ro — docker cp hits "device or resource busy".
-  if docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$cid" \
-    | grep -qx '/etc/nginx/conf.d/default.conf'; then
-    echo "  conf bind-mounted from host — reload only"
+
+  local conf_src=""
+  conf_src="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}' "$cid" 2>/dev/null || true)"
+  if [[ -n "$conf_src" ]]; then
+    # Bind-mount: docker cp into the container hits "device or resource busy".
+    # Always sync OUR frontend.conf onto the host mount source (may be an old
+    # aerostride path that never picked up $spa_index / index.achillio.html).
+    if [[ -f "$conf_src" ]] || [[ -d "$(dirname "$conf_src")" ]]; then
+      if ! cmp -s "$conf" "$conf_src" 2>/dev/null; then
+        echo "  syncing frontend.conf → mount source: $conf_src"
+        cp "$conf" "$conf_src" \
+          || echo "  WARN: could not write $conf_src (permissions?)"
+      else
+        echo "  conf mount source already matches repo frontend.conf"
+      fi
+    else
+      echo "  WARN: mount source missing ($conf_src) — will try docker cp"
+      docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null || true
+    fi
   elif ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
     echo "  WARN: could not copy frontend.conf into container — reload anyway"
   fi
+
   if docker exec "$cid" nginx -t 2>/dev/null; then
     docker exec "$cid" nginx -s reload 2>/dev/null || true
     echo "  nginx reloaded with same-origin /api proxy"
   else
-    echo "  WARN: nginx -t failed after conf copy — check container image"
+    echo "  WARN: nginx -t failed after conf sync — check container image"
+    docker exec "$cid" nginx -t 2>&1 | sed 's/^/  /' || true
   fi
+
+  # Prove host-specific shell from inside the container (bypasses NPM TLS).
+  local local_title=""
+  local_title="$(docker exec "$cid" wget -qO- --timeout=5 \
+    --header='Host: www.achilliotravel.com' http://127.0.0.1/ 2>/dev/null \
+    | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
+  echo "  localhost Host=www.achilliotravel.com <title> → ${local_title:-<empty>}"
+  if ! echo "$local_title" | grep -qi 'achillio'; then
+    echo "  WARN: Achillio shell not active inside frontend — check index.achillio.html + \$spa_index"
+    docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; grep -n spa_index /etc/nginx/conf.d/default.conf | head -5' \
+      2>/dev/null | sed 's/^/  /' || true
+  fi
+
   if docker exec "$cid" wget -qO- --timeout=5 http://127.0.0.1/health 2>/dev/null | grep -q '"status"'; then
     echo "  frontend /health → api-blue OK"
   else
     echo "  WARN: frontend /health still not JSON — api-blue may be off the edge network"
   fi
+}
+
+# Googlebot reads static <title>. Ensure dist/index.achillio.html exists after vite build.
+ensure_achillio_spa_shell() {
+  local index="$REPO_ROOT/dist/index.html"
+  local out="$REPO_ROOT/dist/index.achillio.html"
+  local title="Achillio Travel"
+  local poreiago="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία"
+  [[ -f "$index" ]] || { echo "  ERROR: missing $index"; return 1; }
+  if [[ -f "$out" ]] && grep -q "<title>${title}</title>" "$out"; then
+    echo "  dist/index.achillio.html already has Achillio Travel title"
+    return 0
+  fi
+  echo "  writing dist/index.achillio.html (static Achillio Travel title)"
+  # Prefer python for reliable Unicode replace; sed fallback for minimal images.
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$index" "$out" "$poreiago" "$title" <<'PY'
+import sys
+src, dst, old, new = sys.argv[1:5]
+html = open(src, encoding="utf-8").read()
+html = html.replace(old, new)
+html = html.replace('name="application-name" content="PoreiaGo"',
+                    f'name="application-name" content="{new}"')
+if f"<title>{new}</title>" not in html:
+    raise SystemExit("failed to rewrite Achillio document title")
+open(dst, "w", encoding="utf-8").write(html)
+PY
+  else
+    cp "$index" "$out"
+    sed -i "s/${poreiago}/${title}/g" "$out"
+    sed -i 's/name="application-name" content="PoreiaGo"/name="application-name" content="Achillio Travel"/g' "$out"
+  fi
+  grep -q "<title>${title}</title>" "$out" \
+    || { echo "  ERROR: index.achillio.html title rewrite failed"; return 1; }
 }
 
 configure_compose_for_edge() {
@@ -220,6 +285,9 @@ VITE_OLYMPUS_BASE_DOMAIN="$PLATFORM_DOMAIN" \
 VITE_OLYMPUS_INGRESS_CNAME="$INGRESS_CNAME" \
 VITE_GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID_VAL" \
 npm run build
+
+echo "==> Ensure Achillio Travel SPA shell (static SERP title)"
+ensure_achillio_spa_shell
 
 echo "==> API Docker image"
 docker build -t "$API_IMAGE" "$REPO_ROOT/backend"
@@ -486,12 +554,14 @@ echo "==> Achillio SERP title (static HTML — Googlebot)"
 ACH_TITLE=$(curl -sS -A 'Googlebot' --max-time 15 "https://www.achilliotravel.com/" \
   | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)
 echo "  www.achilliotravel.com <title> → ${ACH_TITLE:-<empty>}"
-if echo "$ACH_TITLE" | grep -qi 'poreiago'; then
-  echo "  ERROR: Achillio still serves PoreiaGo in <title> — check index.achillio.html + \$spa_index"
-elif echo "$ACH_TITLE" | grep -qi 'achillio'; then
+if echo "$ACH_TITLE" | grep -qi 'achillio'; then
   echo "  OK: Achillio Travel static title"
+elif echo "$ACH_TITLE" | grep -qi 'poreiago'; then
+  echo "  ERROR: Achillio still serves PoreiaGo in <title> — check index.achillio.html + \$spa_index"
+  exit 1
 else
-  echo "  WARN: unexpected Achillio title (Google may still reindex)"
+  echo "  ERROR: unexpected Achillio title (${ACH_TITLE:-empty})"
+  exit 1
 fi
 
 echo ""

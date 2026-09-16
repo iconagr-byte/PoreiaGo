@@ -116,13 +116,18 @@ else
   docker network connect aerostride-prod_edge "$API_CID" 2>/dev/null || true
 
   if [[ -f "$NGINX_CONF" ]]; then
-    echo "==> Installing frontend.conf (same-origin /api → api-blue)"
-    # Compose mounts deploy/nginx/frontend.conf → default.conf:ro — docker cp
-    # then fails with "device or resource busy". Host file is already the source;
-    # only docker cp into non-mounted frontends (e.g. legacy poreiago-frontend).
-    if docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$FE_CID" \
-      | grep -qx '/etc/nginx/conf.d/default.conf'; then
-      echo "  conf is bind-mounted from host — skip docker cp, reload only"
+    echo "==> Installing frontend.conf (same-origin /api → api-blue + Achillio shell)"
+    # Compose mounts conf:ro — docker cp then fails with "device or resource busy".
+    # Sync OUR repo conf onto the host mount source (may be a stale aerostride path).
+    conf_src="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}' "$FE_CID" 2>/dev/null || true)"
+    if [[ -n "$conf_src" ]]; then
+      if ! cmp -s "$NGINX_CONF" "$conf_src" 2>/dev/null; then
+        echo "  syncing frontend.conf → $conf_src"
+        cp "$NGINX_CONF" "$conf_src" \
+          || echo "WARN: could not write mount source $conf_src"
+      else
+        echo "  conf mount source already matches repo"
+      fi
     else
       if ! docker cp "$NGINX_CONF" "$FE_CID:/etc/nginx/conf.d/default.conf"; then
         echo "WARN: docker cp failed (busy/ro mount?) — will still try nginx reload"
@@ -141,8 +146,22 @@ else
   # Refresh static SPA if dist exists (does not replace nginx.conf).
   if [[ -d "$REPO_ROOT/dist" ]]; then
     echo "==> Refreshing dist/ into frontend html root"
+    # Ensure Achillio shell exists even if vite plugin was skipped.
+    if [[ -f "$REPO_ROOT/dist/index.html" ]] && [[ ! -f "$REPO_ROOT/dist/index.achillio.html" ]]; then
+      echo "  generating missing index.achillio.html"
+      python3 - "$REPO_ROOT/dist/index.html" "$REPO_ROOT/dist/index.achillio.html" <<'PY' || true
+import sys
+src, dst = sys.argv[1:3]
+old = "PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία"
+new = "Achillio Travel"
+html = open(src, encoding="utf-8").read().replace(old, new)
+html = html.replace('name="application-name" content="PoreiaGo"',
+                    f'name="application-name" content="{new}"')
+open(dst, "w", encoding="utf-8").write(html)
+PY
+    fi
     docker cp "$REPO_ROOT/dist/." "$FE_CID:/usr/share/nginx/html/" 2>/dev/null \
-      || echo "WARN: dist copy failed"
+      || echo "WARN: dist copy failed (bind-mount may already expose dist/)"
   fi
 fi
 
