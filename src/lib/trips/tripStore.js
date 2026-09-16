@@ -171,6 +171,7 @@ export function createEmptyTripForm(defaultMarket = MARKET_DOMESTIC) {
     /** Extra coaches beyond the primary driver/vehicle pair. */
     additionalFleet: [],
     image: '',
+    images: [],
     hook: '',
     durationLabel: 'Ημερήσια',
     badge: '',
@@ -199,6 +200,14 @@ export function tripToFormData(trip) {
   if (!trip) return createEmptyTripForm();
   return normalizeHybridTripFields({
     ...trip,
+    image: trip.image || '',
+    images: Array.isArray(trip.images)
+      ? trip.images.map((u) => String(u || '').trim()).filter(Boolean)
+      : Array.isArray(trip.gallery)
+        ? trip.gallery.map((u) => String(u || '').trim()).filter(Boolean)
+        : Array.isArray(trip.gallery_urls)
+          ? trip.gallery_urls.map((u) => String(u || '').trim()).filter(Boolean)
+          : [],
     departureTime: trip.departureTime ? trip.departureTime.substring(0, 16) : '',
     arrivalTime: trip.arrivalTime ? trip.arrivalTime.substring(0, 16) : '',
     stops: trip.stops ? [...trip.stops] : [],
@@ -245,6 +254,9 @@ export function formDataToTrip(formData, existingId = null) {
     badge: String(formData.badge || '').trim(),
     meetingPoint: String(formData.meetingPoint || '').trim(),
     highlights,
+    images: Array.isArray(formData.images)
+      ? formData.images.map((u) => String(u || '').trim()).filter(Boolean)
+      : [],
     currency: formData.currency || 'EUR',
     targetMarginPct: Number(formData.targetMarginPct) || 25,
     connectionThresholdMin: Number(formData.connectionThresholdMin) || 90,

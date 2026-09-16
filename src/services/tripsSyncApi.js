@@ -26,6 +26,9 @@ function tripToPayload(trip) {
     featured: Boolean(trip.featured),
     description: trip.description || '',
     image: trip.image || '',
+    images: Array.isArray(trip.images)
+      ? trip.images.map((u) => String(u || '').trim()).filter(Boolean)
+      : [],
     hook: trip.hook || '',
     durationLabel: trip.durationLabel || '',
     badge: trip.badge || '',

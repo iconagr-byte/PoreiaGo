@@ -201,8 +201,12 @@ export default function TripForm({
 }) {
   const [drivers, setDrivers] = useState([]);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
   const [highlightDraft, setHighlightDraft] = useState('');
   const [quickAddFor, setQuickAddFor] = useState(null); // 'primary' | number index | null
+
+  const galleryImages = Array.isArray(formData.images) ? formData.images : [];
+  const MAX_GALLERY = 8;
 
   useEffect(() => {
     fetchFleetDrivers().then(setDrivers);
@@ -363,6 +367,70 @@ export default function TripForm({
     }
   };
 
+  const handleGalleryUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const room = Math.max(0, MAX_GALLERY - galleryImages.length);
+    if (room <= 0) {
+      toast.error(`Μέχρι ${MAX_GALLERY} φωτογραφίες στο gallery`);
+      e.target.value = '';
+      return;
+    }
+    const batch = files.slice(0, room);
+    setGalleryUploading(true);
+    try {
+      const uploaded = [];
+      for (const file of batch) {
+        if (file.size > 12 * 1024 * 1024) {
+          toast.error(`${file.name}: πολύ μεγάλο (μέγ. 12MB)`);
+          continue;
+        }
+        try {
+          uploaded.push(await fileToTripCoverDataUrl(file));
+        } catch (err) {
+          toast.error(
+            err.message?.includes('large')
+              ? `${file.name}: πολύ μεγάλη μετά τη συμπίεση`
+              : `Αποτυχία: ${file.name}`,
+          );
+        }
+      }
+      if (!uploaded.length) return;
+      setFormData((prev) => {
+        const nextImages = [...(Array.isArray(prev.images) ? prev.images : []), ...uploaded];
+        return {
+          ...prev,
+          images: nextImages,
+          image: prev.image || uploaded[0],
+        };
+      });
+      toast.success(
+        uploaded.length > 1
+          ? `Προστέθηκαν ${uploaded.length} φωτογραφίες`
+          : 'Προστέθηκε φωτογραφία',
+      );
+    } finally {
+      setGalleryUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeGalleryImage = (url) => {
+    setFormData((prev) => {
+      const nextImages = (Array.isArray(prev.images) ? prev.images : []).filter((u) => u !== url);
+      return {
+        ...prev,
+        images: nextImages,
+        image: prev.image === url ? nextImages[0] || '' : prev.image,
+      };
+    });
+  };
+
+  const setCoverFromGallery = (url) => {
+    patch({ image: url });
+    toast.success('Ορίστηκε ως κύρια φωτογραφία κάρτας');
+  };
+
   const addHighlight = (raw) => {
     const value = String(raw || '').trim();
     if (!value) return;
@@ -501,7 +569,11 @@ export default function TripForm({
         )}
       </Section>
 
-      <Section icon="photo_camera" title="Εικόνα & κάρτα" hint="Η φωτογραφία εμφανίζεται στην αρχική σελίδα.">
+      <Section
+        icon="photo_camera"
+        title="Εικόνα & κάρτα"
+        hint="Κύρια φωτογραφία κάρτας + gallery για τη σελίδα εκδρομής (bento)."
+      >
         <div className="grid lg:grid-cols-[220px_1fr] gap-5">
           <div
             className={`relative h-44 rounded-xl overflow-hidden border border-dashed flex items-center justify-center ${
@@ -529,12 +601,12 @@ export default function TripForm({
             <div className="flex flex-wrap gap-2">
               <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold cursor-pointer hover:bg-slate-800">
                 <span className="material-symbols-outlined text-[18px]">upload</span>
-                {formData.image ? 'Αλλαγή' : 'Ανέβασμα'}
+                {formData.image ? 'Αλλαγή κύριας' : 'Ανέβασμα κύριας'}
                 <input
                   type="file"
                   accept={TRIP_COVER_ACCEPT}
                   className="hidden"
-                  disabled={coverUploading}
+                  disabled={coverUploading || galleryUploading}
                   onChange={handleCoverImageUpload}
                 />
               </label>
@@ -544,7 +616,7 @@ export default function TripForm({
                   onClick={() => patch({ image: '' })}
                   className="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50"
                 >
-                  Αφαίρεση
+                  Αφαίρεση κύριας
                 </button>
               )}
             </div>
@@ -594,6 +666,90 @@ export default function TripForm({
               />
             </Field>
           </div>
+        </div>
+
+        <div className="pt-2 border-t border-slate-100">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Gallery εκδρομής
+              </span>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Έως {MAX_GALLERY} φωτογραφίες — εμφανίζονται στη σελίδα λεπτομερειών (bento).
+              </p>
+            </div>
+            <label
+              className={`inline-flex items-center gap-1 text-xs font-bold text-sky-700 hover:underline cursor-pointer ${
+                galleryUploading || galleryImages.length >= MAX_GALLERY
+                  ? 'opacity-50 pointer-events-none'
+                  : ''
+              }`}
+            >
+              {galleryUploading ? 'Ανέβασμα…' : '+ Προσθήκη'}
+              <input
+                type="file"
+                accept={TRIP_COVER_ACCEPT}
+                multiple
+                className="hidden"
+                disabled={galleryUploading || galleryImages.length >= MAX_GALLERY}
+                onChange={handleGalleryUpload}
+              />
+            </label>
+          </div>
+          {galleryImages.length ? (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {galleryImages.map((url, idx) => (
+                <div
+                  key={`${idx}-${String(url).slice(0, 48)}`}
+                  className={`relative h-16 w-24 shrink-0 overflow-hidden rounded-xl border ${
+                    url === formData.image
+                      ? 'border-sky-500 ring-2 ring-sky-200'
+                      : 'border-slate-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    title="Ορισμός ως κύρια"
+                    className="absolute inset-0"
+                    onClick={() => setCoverFromGallery(url)}
+                  >
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
+                    onClick={() => removeGalleryImage(url)}
+                    aria-label="Αφαίρεση"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">close</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <label className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 py-8 text-sm text-slate-500 hover:bg-slate-50">
+              <span className="material-symbols-outlined mb-1 text-[28px] opacity-40">
+                photo_library
+              </span>
+              Σύρε ή επίλεξε φωτογραφίες της εκδρομής
+              <input
+                type="file"
+                accept={TRIP_COVER_ACCEPT}
+                multiple
+                className="hidden"
+                disabled={galleryUploading}
+                onChange={handleGalleryUpload}
+              />
+            </label>
+          )}
+          {galleryUploading && (
+            <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+              <span className="material-symbols-outlined animate-spin text-[16px]">
+                progress_activity
+              </span>
+              Συμπίεση & αποθήκευση…
+            </p>
+          )}
         </div>
       </Section>
 
