@@ -81,7 +81,7 @@ export const mockTrips = [
     availableSeats: 18,
     driverName: 'Γιώργος Γεωργίου',
     vehiclePlate: 'YZA-9901',
-    image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1200&q=80',
+    image: '/images/demo/paris-1.jpg',
     images: galleryForDemoTrip('paris'),
     hook: 'Άφιξη στην πιο γοητευτική πρωτεύουσα της Ευρώπης',
     description:
@@ -106,7 +106,7 @@ export const mockTrips = [
     availableSeats: 24,
     driverName: 'Νίκος Παπαδόπουλος',
     vehiclePlate: 'XAH-4021',
-    image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=1200&q=80',
+    image: '/images/demo/rome-1.jpg',
     images: galleryForDemoTrip('rome'),
     hook: 'Ιστορία, κουζίνα & άνεση σε ένα ταξίδι',
     description:
@@ -130,8 +130,8 @@ export const mockTrips = [
     availableSeats: 20,
     driverName: 'Ανδρέας Ανδρέου',
     vehiclePlate: 'XAH-4022',
-    // Charles Bridge / Prague old town — not a generic stock mismatch.
-    image: 'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=1400&q=80',
+    // Charles Bridge / Prague old town
+    image: '/images/demo/prague-1.jpg',
     images: galleryForDemoTrip('prague_vienna'),
     hook: 'Δύο κορυφαίες ευρωπαϊκές πρωτεύουσες, ένα ταξίδι',
     description:
