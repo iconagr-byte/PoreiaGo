@@ -112,30 +112,15 @@ repair_external_frontend_nginx() {
 
   local conf_src=""
   conf_src="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}' "$cid" 2>/dev/null || true)"
-  if [[ -n "$conf_src" ]]; then
-    local conf_dir
-    conf_dir="$(dirname "$conf_src")"
-    if [[ -d "$conf_dir" ]]; then
-      if ! cmp -s "$conf" "$conf_src" 2>/dev/null; then
-        echo "  syncing frontend.conf → mount source: $conf_src"
-        cp "$conf" "$conf_src" \
-          || echo "  WARN: could not write $conf_src (permissions?)"
-      else
-        echo "  conf mount source already matches repo frontend.conf"
-      fi
-      if [[ -f "$shared" ]]; then
-        echo "  syncing frontend-shared.inc → $conf_dir/frontend-shared.inc (host)"
-        cp "$shared" "$conf_dir/frontend-shared.inc" 2>/dev/null || true
-        # File-mount of default.conf alone does NOT expose sibling host files —
-        # always docker cp the include into the container conf.d.
-        echo "  docker cp frontend-shared.inc → container conf.d"
-        docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null \
-          || echo "  WARN: could not docker cp frontend-shared.inc"
-      fi
-    else
-      echo "  WARN: mount source dir missing ($conf_dir) — will try docker cp"
-      docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null || true
-      [[ -f "$shared" ]] && docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null || true
+  if [[ -n "$conf_src" && -d "$(dirname "$conf_src")" ]]; then
+    echo "  force-sync frontend.conf → $conf_src"
+    cp "$conf" "$conf_src" || echo "  WARN: could not write $conf_src"
+    if [[ -f "$shared" ]]; then
+      conf_dir="$(dirname "$conf_src")"
+      cp "$shared" "$conf_dir/frontend-shared.inc" 2>/dev/null || true
+      echo "  docker cp frontend-shared.inc → container conf.d"
+      docker cp "$shared" "$cid:/etc/nginx/conf.d/frontend-shared.inc" 2>/dev/null \
+        || echo "  WARN: could not docker cp frontend-shared.inc"
     fi
   else
     if ! docker cp "$conf" "$cid:/etc/nginx/conf.d/default.conf" 2>/dev/null; then
@@ -152,22 +137,27 @@ repair_external_frontend_nginx() {
     docker exec "$cid" nginx -t 2>&1 | sed 's/^/  /' || true
   fi
 
-  # Prove Achillio shell from inside the container (bypasses NPM TLS).
-  # Prefer curl — busybox wget often drops custom Host headers.
+  # Prove default shell (no Host) is Achillio — Contabo often ignores server_name.
+  local default_title=""
   local local_title=""
   if docker exec "$cid" sh -c 'command -v curl >/dev/null' 2>/dev/null; then
+    default_title="$(docker exec "$cid" curl -sS --max-time 5 http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
     local_title="$(docker exec "$cid" curl -sS --max-time 5 \
       -H 'Host: www.achilliotravel.com' http://127.0.0.1/ 2>/dev/null \
       | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
   else
+    default_title="$(docker exec "$cid" wget -qO- --timeout=5 http://127.0.0.1/ 2>/dev/null \
+      | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
     local_title="$(docker exec "$cid" wget -qO- --timeout=5 \
       --header='Host: www.achilliotravel.com' http://127.0.0.1/ 2>/dev/null \
       | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
   fi
+  echo "  localhost default <title> → ${default_title:-<empty>}"
   echo "  localhost Host=www.achilliotravel.com <title> → ${local_title:-<empty>}"
-  if ! echo "$local_title" | grep -qi 'achillio'; then
-    echo "  WARN: Achillio shell not active inside frontend — check index.achillio.html + server_name"
-    docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; grep -nE "server_name|index.achillio|try_files" /etc/nginx/conf.d/default.conf | head -20' \
+  if ! echo "$default_title" | grep -qi 'achillio'; then
+    echo "  WARN: default index.html is not Achillio Travel — check ensure_achillio_spa_shell"
+    docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; rg -n "<title>" /usr/share/nginx/html/index.html | head -3' \
       2>/dev/null | sed 's/^/  /' || true
   fi
 
@@ -178,38 +168,52 @@ repair_external_frontend_nginx() {
   fi
 }
 
-# Googlebot reads static <title>. Ensure dist/index.achillio.html exists after vite build.
+# Googlebot reads static <title>. Contabo Host routing is unreliable, so:
+# - index.poreiago.html = PoreiaGo marketing
+# - index.html + index.achillio.html = Achillio Travel (default SERP-safe)
 ensure_achillio_spa_shell() {
   local index="$REPO_ROOT/dist/index.html"
-  local out="$REPO_ROOT/dist/index.achillio.html"
+  local achillio="$REPO_ROOT/dist/index.achillio.html"
+  local poreiago_out="$REPO_ROOT/dist/index.poreiago.html"
   local title="Achillio Travel"
   local poreiago="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία"
   [[ -f "$index" ]] || { echo "  ERROR: missing $index"; return 1; }
-  if [[ -f "$out" ]] && grep -q "<title>${title}</title>" "$out"; then
-    echo "  dist/index.achillio.html already has Achillio Travel title"
+
+  if grep -q "<title>${title}</title>" "$index" \
+    && [[ -f "$achillio" ]] && [[ -f "$poreiago_out" ]]; then
+    echo "  dist shells ready (index.html=Achillio, index.poreiago.html=PoreiaGo)"
     return 0
   fi
-  echo "  writing dist/index.achillio.html (static Achillio Travel title)"
-  # Prefer python for reliable Unicode replace; sed fallback for minimal images.
+
+  echo "  writing Achillio default index + PoreiaGo shell"
   if command -v python3 >/dev/null 2>&1; then
-    python3 - "$index" "$out" "$poreiago" "$title" <<'PY'
+    python3 - "$index" "$achillio" "$poreiago_out" "$poreiago" "$title" <<'PY'
 import sys
-src, dst, old, new = sys.argv[1:5]
+src, ach_path, por_path, old, new = sys.argv[1:6]
 html = open(src, encoding="utf-8").read()
-html = html.replace(old, new)
-html = html.replace('name="application-name" content="PoreiaGo"',
-                    f'name="application-name" content="{new}"')
-if f"<title>{new}</title>" not in html:
+# Preserve PoreiaGo marketing shell first (before rewriting src).
+if old in html:
+    open(por_path, "w", encoding="utf-8").write(html)
+elif not __import__("os").path.isfile(por_path):
+    open(por_path, "w", encoding="utf-8").write(html)
+ach = html.replace(old, new).replace(
+    'name="application-name" content="PoreiaGo"',
+    f'name="application-name" content="{new}"',
+)
+if f"<title>{new}</title>" not in ach:
     raise SystemExit("failed to rewrite Achillio document title")
-open(dst, "w", encoding="utf-8").write(html)
+open(ach_path, "w", encoding="utf-8").write(ach)
+open(src, "w", encoding="utf-8").write(ach)
 PY
   else
-    cp "$index" "$out"
-    sed -i "s/${poreiago}/${title}/g" "$out"
-    sed -i 's/name="application-name" content="PoreiaGo"/name="application-name" content="Achillio Travel"/g' "$out"
+    cp "$index" "$poreiago_out"
+    cp "$index" "$achillio"
+    sed -i "s/${poreiago}/${title}/g" "$achillio"
+    sed -i 's/name="application-name" content="PoreiaGo"/name="application-name" content="Achillio Travel"/g' "$achillio"
+    cp "$achillio" "$index"
   fi
-  grep -q "<title>${title}</title>" "$out" \
-    || { echo "  ERROR: index.achillio.html title rewrite failed"; return 1; }
+  grep -q "<title>${title}</title>" "$index" \
+    || { echo "  ERROR: index.html Achillio title rewrite failed"; return 1; }
 }
 
 configure_compose_for_edge() {

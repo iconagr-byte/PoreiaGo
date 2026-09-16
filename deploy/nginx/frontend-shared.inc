@@ -118,6 +118,9 @@ location = /index.html {
 location = /index.achillio.html {
     add_header Cache-Control "no-cache";
 }
+location = /index.poreiago.html {
+    add_header Cache-Control "no-cache";
+}
 
 location /assets/ {
     expires 30d;

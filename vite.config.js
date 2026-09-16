@@ -7,23 +7,30 @@ import path from 'node:path'
 const API_TARGET = process.env.VITE_DEV_API_PROXY || 'http://127.0.0.1:8001'
 
 const ACHILLIO_DOC_TITLE = 'Achillio Travel'
+const POREIAGO_DOC_TITLE = 'PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία'
 
-/** Googlebot reads static <title> — sub_filter is unreliable with sendfile/edge caches. */
+/**
+ * Googlebot reads static <title>. Contabo often ignores Host-based shells, so:
+ * - index.poreiago.html keeps PoreiaGo marketing title
+ * - index.html + index.achillio.html get Achillio Travel (safe default SERP)
+ */
 function writeAchillioSpaShell() {
   const indexPath = path.resolve('dist/index.html')
   if (!fs.existsSync(indexPath)) return
-  const poreiagoTitle = 'PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία'
-  let html = fs.readFileSync(indexPath, 'utf8')
-  // Replace PoreiaGo title strings only (avoid matching text inside HTML comments).
-  html = html.split(poreiagoTitle).join(ACHILLIO_DOC_TITLE)
-  html = html.replace(
+  const poreiagoHtml = fs.readFileSync(indexPath, 'utf8')
+  fs.writeFileSync(path.resolve('dist/index.poreiago.html'), poreiagoHtml)
+
+  let achillioHtml = poreiagoHtml.split(POREIAGO_DOC_TITLE).join(ACHILLIO_DOC_TITLE)
+  achillioHtml = achillioHtml.replace(
     /name="application-name" content="PoreiaGo"/g,
     `name="application-name" content="${ACHILLIO_DOC_TITLE}"`,
   )
-  if (!html.includes(`<title>${ACHILLIO_DOC_TITLE}</title>`)) {
+  if (!achillioHtml.includes(`<title>${ACHILLIO_DOC_TITLE}</title>`)) {
     throw new Error('achillio-spa-shell: failed to rewrite document title')
   }
-  fs.writeFileSync(path.resolve('dist/index.achillio.html'), html)
+  fs.writeFileSync(path.resolve('dist/index.achillio.html'), achillioHtml)
+  // Default index.html → Achillio so SERP is correct even when Host routing fails.
+  fs.writeFileSync(indexPath, achillioHtml)
 }
 
 // https://vite.dev/config/
