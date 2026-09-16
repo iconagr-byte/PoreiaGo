@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import {
   FLEET_VEHICLE_CATEGORIES,
@@ -41,6 +42,20 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -122,24 +137,43 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/40">
+  // Portal above admin sticky header / hub stacking contexts so the X is clickable.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-4 bg-black/40"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
       <form
         onSubmit={onSubmit}
-        className="flex w-full max-w-2xl max-h-[min(92dvh,880px)] flex-col overflow-hidden rounded-[24px] border border-black/[0.06] bg-white shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-fleet-vehicle-title"
+        className="relative z-[1] flex w-full max-w-2xl max-h-[min(90dvh,880px)] flex-col overflow-hidden rounded-[24px] border border-black/[0.06] bg-white shadow-xl"
+        onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/[0.05] px-5 py-4 sm:px-6">
+        <div className="relative z-20 flex shrink-0 items-center justify-between gap-3 border-b border-black/[0.05] bg-white px-5 py-4 sm:px-6">
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-bold text-gray-900">Νέο όχημα</h3>
+            <h3 id="add-fleet-vehicle-title" className="truncate text-lg font-bold text-gray-900">
+              Νέο όχημα
+            </h3>
             <p className="mt-0.5 text-xs text-gray-500">Λεωφορείο ή van στον στόλο σου</p>
           </div>
           <button
             type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose?.();
+            }}
+            className="relative z-30 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-900"
             aria-label="Κλείσιμο"
           >
-            <span className="material-symbols-outlined">close</span>
+            <span className="material-symbols-outlined text-[22px]" aria-hidden>
+              close
+            </span>
           </button>
         </div>
 
@@ -405,6 +439,7 @@ export default function AddFleetVehicleModal({ open, onClose, onCreated }) {
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
