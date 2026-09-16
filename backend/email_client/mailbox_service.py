@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import uuid
 
 from ticketing.customer_accounts import get_account
 
 from .constants import FOLDER_SENT, FOLDER_TRASH
-from .dynamic_mailer import load_account, send_email_smtp
-from .settings_store import get_settings_for_send
+from .dynamic_mailer import load_account, send_email_smtp, settings_to_imap_config
+from .imap_trash import imap_move_message_to_trash
+from .settings_store import get_settings, get_settings_for_send
 from .store import get_message, record_sent_local, save_draft, update_message
+
+logger = logging.getLogger(__name__)
 
 
 async def _smtp_account_for_message(msg: dict | None, email_settings_id: str | None) -> dict:
@@ -105,6 +110,40 @@ async def forward_message(
 
 
 async def move_to_trash(message_pk: str) -> dict | None:
+    """Move to Κάδος locally and best-effort on IMAP so sync cannot resurrect it."""
+    msg = await get_message(message_pk)
+    if not msg:
+        return None
+    if msg.get("folder") == FOLDER_TRASH:
+        return msg
+
+    sid = msg.get("email_settings_id")
+    mid = (msg.get("message_id") or "").strip()
+    if sid and mid:
+        try:
+            account = await get_settings(sid, with_password=True)
+            if account and (account.get("mail_password") or "").strip() and account.get("imap_host"):
+                cfg = settings_to_imap_config(account)
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    None,
+                    lambda: imap_move_message_to_trash(
+                        cfg,
+                        message_id=mid,
+                        local_folder=msg.get("folder") or "Inbox",
+                        imap_uid=msg.get("imap_uid"),
+                    ),
+                )
+                if not result.get("ok"):
+                    logger.warning(
+                        "IMAP trash for %s: %s",
+                        message_pk,
+                        result.get("error"),
+                    )
+        except Exception as exc:
+            # Local trash still applies; upsert_message preserves Trash across sync.
+            logger.warning("IMAP trash skipped for %s: %s", message_pk, exc)
+
     return await update_message(message_pk, {"folder": FOLDER_TRASH, "is_read": True})
 
 
