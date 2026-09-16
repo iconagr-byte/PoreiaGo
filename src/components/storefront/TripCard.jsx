@@ -302,7 +302,7 @@ export default function TripCard({
               onInfo={goInfo}
               onBook={goBook}
               bookClassName="text-base px-6 py-3 rounded-full bg-sky-600 text-white hover:bg-sky-500 shrink-0"
-              infoClassName="text-sm px-4 py-3 rounded-full border border-sky-200 bg-white text-sky-800 hover:bg-sky-50 shrink-0"
+              infoClassName="border-sky-200 bg-white text-sky-800 hover:bg-sky-50"
             />
           </div>
         </div>
@@ -393,7 +393,7 @@ export default function TripCard({
             onInfo={goInfo}
             onBook={goBook}
             bookClassName="text-sm underline underline-offset-4 text-on-surface"
-            infoClassName="text-sm text-primary font-bold px-0 py-0 border-0 bg-transparent"
+            infoClassName="border-0 bg-transparent text-primary hover:bg-primary/5"
           />
         </div>
       </article>
