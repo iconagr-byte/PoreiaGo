@@ -619,7 +619,22 @@ if echo "$ACH_APEX_CODE" | grep -qE '301|302'; then
     echo "  WARN: apex redirect Location is not www ($ACH_APEX_LOC)"
   fi
 else
-  echo "  WARN: apex did not 301 (public NPM may still need Force SSL / www redirect)"
+  echo "  WARN: apex did not 301 via Host header — retry inside frontend container"
+  if [[ -n "${FE_CID:-}" ]]; then
+    IN_CODE=$(docker exec "$FE_CID" curl -sS -o /dev/null -w "%{http_code}" --max-time 5 \
+      -H 'Host: achilliotravel.com' -H 'X-Forwarded-Host: achilliotravel.com' \
+      http://127.0.0.1/ 2>/dev/null || echo fail)
+    IN_LOC=$(docker exec "$FE_CID" curl -sS -I --max-time 5 \
+      -H 'Host: achilliotravel.com' -H 'X-Forwarded-Host: achilliotravel.com' \
+      http://127.0.0.1/ 2>/dev/null | tr -d '\r' | awk 'tolower($1)=="location:"{print $2; exit}')
+    echo "  in-container Host=achilliotravel.com → ${IN_CODE} ${IN_LOC}"
+    if echo "$IN_CODE" | grep -qE '301|302' && echo "$IN_LOC" | grep -qi 'www.achilliotravel.com'; then
+      echo "  OK: in-container apex→www (NPM edge may still need Redirection Host for public 301)"
+    else
+      echo "  WARN: nginx apex map still not 301 — check frontend.conf bind-mount + reload"
+    fi
+  fi
+  echo "  TIP: NPM → Redirection Hosts: achilliotravel.com → https://www.achilliotravel.com (301)"
 fi
 
 echo "==> Achillio SERP title (static HTML — Googlebot)"
