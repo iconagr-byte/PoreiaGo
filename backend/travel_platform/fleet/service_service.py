@@ -90,6 +90,34 @@ def _default_seats(category: str) -> int:
     return DEFAULT_SEATS.get(category, 49)
 
 
+# Stable English category ids → Greek labels (matches src/lib/fleet/fleetVehicleCategories.js).
+_CATEGORY_LABEL_EL: dict[str, str] = {
+    "Luxury Coach": "Πολυτελές λεωφορείο",
+    "Premium Express": "Εξπρές πολυτελείας",
+    "Standard": "Κλασικό λεωφορείο",
+    "Van": "Μικρό λεωφορείο / van",
+}
+
+
+def _category_label_el(category: str | None) -> str:
+    raw = str(category or "").strip()
+    if not raw:
+        return "—"
+    if raw in _CATEGORY_LABEL_EL:
+        return _CATEGORY_LABEL_EL[raw]
+    # Soft match for legacy / free-text values.
+    lower = raw.lower()
+    if "van" in lower or "minibus" in lower:
+        return _CATEGORY_LABEL_EL["Van"]
+    if "express" in lower or "premium" in lower:
+        return _CATEGORY_LABEL_EL["Premium Express"]
+    if "luxury" in lower or "coach" in lower:
+        return _CATEGORY_LABEL_EL["Luxury Coach"]
+    if "standard" in lower or "classic" in lower:
+        return _CATEGORY_LABEL_EL["Standard"]
+    return raw
+
+
 @dataclass
 class Vehicle:
     id: str
@@ -406,11 +434,12 @@ class ServiceService:
                     "make": v.make,
                     "model": v.model,
                     "category": v.category,
+                    "category_label": _category_label_el(v.category),
                     "year": v.year,
                     "seat_count": v.seat_count,
                     "amenities": amenities,
                     "summary": v.public_summary
-                    or f"{v.category} · {v.seat_count} θέσεις · Euro VI",
+                    or f"{_category_label_el(v.category)} · {v.seat_count} θέσεις · Euro VI",
                     "image_url": v.public_image_url or "/images/hero-bus-achillio.png",
                     "status_label": status_label,
                 }

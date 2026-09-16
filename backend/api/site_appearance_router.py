@@ -843,6 +843,7 @@ class PublicFleetVehicleResponse(BaseModel):
     make: str
     model: str
     category: str
+    category_label: str = ""
     year: int
     seat_count: int
     amenities: list[str]

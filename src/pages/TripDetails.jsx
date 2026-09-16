@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
 import { isInternationalTrip, MARKET_LABELS } from '../lib/trips/tripMarket.js';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
+import { fleetCategoryLabel } from '../lib/fleet/fleetVehicleCategories.js';
 import TripPriceDisplay from '../components/TripPriceDisplay.jsx';
 import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
@@ -195,7 +196,9 @@ export default function TripDetails() {
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Οχημα</div>
-                  <div className="font-label-lg text-on-surface">{trip.vehicleType}</div>
+                  <div className="font-label-lg text-on-surface">
+                    {fleetCategoryLabel(trip.vehicleType)}
+                  </div>
                 </div>
               </div>
               
