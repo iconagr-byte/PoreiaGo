@@ -19,6 +19,17 @@
     <script>
       (function () {
         var host = (location.hostname || '').toLowerCase();
+        // Apex without www was indexed by Google with a stale PoreiaGo title.
+        // Prefer www as the single public URL (nginx 301 when Host/XFH survive NPM).
+        if (host === 'achilliotravel.com') {
+          location.replace(
+            'https://www.achilliotravel.com' +
+              location.pathname +
+              location.search +
+              location.hash
+          );
+          return;
+        }
         var apex = host.replace(/^www\./, '');
         var known = { 'achilliotravel.com': 'Achillio Travel — Εκδρομές με λεωφορείο' };
         var knownDesc = {

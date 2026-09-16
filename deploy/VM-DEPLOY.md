@@ -136,10 +136,17 @@ cd /opt/poreiago && RUN_SEED=1 bash deploy/scripts/vm-deploy-all.sh
 | A | `@` (achilliotravel.com) | `169.58.199.186` |
 | CNAME | `www` | `www.poreiago.com` |
 
-Μετά το DNS (συνήθως λίγα λεπτά–ώρες), στο NPM πρόσθεσε Proxy Host για το apex
-(ή redirect → www) με SSL Let’s Encrypt. Στο Postgres το `tenants.custom_domain`
-πρέπει να είναι `achilliotravel.com` **μόνο** στο γραφείο Achillio Travel
-(`admin-achillio-gr`) — τρέξε `repair-achillio-office.sh` αν λείπει.
+Μετά το DNS (συνήθως λίγα λεπτά–ώρες), στο NPM:
+
+1. **Redirection Host** (προτιμητέο για Google SERP):  
+   `achilliotravel.com` → `https://www.achilliotravel.com` με **301 Permanent**.  
+   Έτσι το Google ενώνει apex + www σε ένα URL και σταματάει παλιούς τίτλους (π.χ. PoreiaGo).
+2. Ή Proxy Host για το apex με SSL Let’s Encrypt (το nginx κάνει 301 → www όταν
+   περνάει `Host` / `X-Forwarded-Host`).
+
+Στο Postgres το `tenants.custom_domain` πρέπει να είναι `achilliotravel.com` **μόνο**
+στο γραφείο Achillio Travel (`admin-achillio-gr`) — τρέξε `repair-achillio-office.sh`
+αν λείπει.
 
 Παλιό GCP IP `34.141.98.145` **μην** το αφήνεις στο apex — το HTTPS αποτυγχάνει.
 

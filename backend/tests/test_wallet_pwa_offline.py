@@ -60,7 +60,11 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         self.assertIn("location @seo_shell", conf)
         self.assertIn("/api/site/seo-shell", conf)
         self.assertIn("achillio_force_www", conf)
+        self.assertIn('map "$host|$http_x_forwarded_host" $achillio_force_www', conf)
         self.assertIn("https://www.achilliotravel.com", conf)
+        # Nested if+set for the redirect must stay gone (silently no-op on Contabo).
+        self.assertNotIn("achillio_apex_from_host", conf)
+        self.assertNotIn("achillio_apex_from_xfh", conf)
         self.assertIn("frontend-shared.inc", conf)
         self.assertIn("Service-Worker-Allowed", shared)
         self.assertNotIn("try_files $uri $uri/ /index.html;", conf)
