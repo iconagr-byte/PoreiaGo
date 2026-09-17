@@ -2,8 +2,10 @@ import { Link } from 'react-router-dom';
 import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
 
 /**
- * Staff / office backoffice entry — shown on tenant storefronts (e.g. Achillio Travel).
- * Kept out of PoreiaGo marketing so the SaaS homepage stays product-first.
+ * Staff / office backoffice entry for tenant storefronts (e.g. Achillio).
+ * Not shown in the public header — only discreet footer — so customers
+ * don't see a prominent admin CTA (security-through-less-exposure + UX).
+ * Staff still use /admin/login directly or the footer link.
  */
 export default function OfficeLoginLink({
   variant = 'dark',
