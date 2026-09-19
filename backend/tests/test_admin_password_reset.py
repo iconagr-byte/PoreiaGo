@@ -6,7 +6,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-os.environ.setdefault("ADMIN_AUTH_DISABLED", "1")
+# Ensure JWT secret for token HMAC before first import of reset helpers.
 os.environ.setdefault("AUTH_JWT_SECRET", "test-admin-password-reset-secret-32chars")
 
 
@@ -50,9 +50,12 @@ class AdminPasswordResetTokenTests(unittest.TestCase):
         from fastapi.testclient import TestClient
 
         from main import app
+        from travel_platform.settings.admin_password_reset import (
+            build_reset_url,
+            create_reset_token,
+        )
         from travel_platform.settings.users_store import create_user, get_user, list_users
 
-        # Isolate seed: create a known user
         email = "reset-demo@example.com"
         for u in list(list_users()):
             if u.email == email:
@@ -69,42 +72,54 @@ class AdminPasswordResetTokenTests(unittest.TestCase):
             password="oldpass99",
         )
         old_hash = user.password_hash
-        client = TestClient(app)
-        send = client.post(f"/api/admin/platform/users/{user.id}/send-password-reset", json={})
-        self.assertEqual(send.status_code, 200, send.text)
-        body = send.json()
-        self.assertTrue(body.get("ok"))
-        # With mocked/failing SMTP we may get reset_url; otherwise craft token.
-        reset_url = body.get("reset_url")
-        if not reset_url:
-            from travel_platform.settings.admin_password_reset import (
-                build_reset_url,
-                create_reset_token,
-            )
 
-            token = create_reset_token(
-                user_id=user.id,
-                tenant_id="",
-                password_hash=old_hash,
-            )
-            reset_url = build_reset_url(token)
-        token = reset_url.split("token=", 1)[-1]
-
-        confirm = client.post(
-            "/api/admin/platform/password-reset/confirm",
-            json={"token": token, "new_password": "newpass99"},
+        # Craft token directly (avoids auth middleware / SMTP). Confirm is public.
+        token = create_reset_token(
+            user_id=user.id,
+            tenant_id="",
+            password_hash=old_hash,
         )
-        self.assertEqual(confirm.status_code, 200, confirm.text)
+        reset_url = build_reset_url(token)
+        self.assertIn("/admin/reset-password?token=", reset_url)
+
+        with patch.dict(
+            os.environ,
+            {
+                "ADMIN_AUTH_DISABLED": "1",
+                "ENVIRONMENT": "test",
+                "AUTH_JWT_SECRET": "test-admin-password-reset-secret-32chars",
+            },
+            clear=False,
+        ):
+            client = TestClient(app)
+            # Authenticated send path (dev admin context)
+            send = client.post(
+                f"/api/admin/platform/users/{user.id}/send-password-reset",
+                json={},
+            )
+            self.assertEqual(send.status_code, 200, send.text)
+            body = send.json()
+            self.assertTrue(body.get("ok"))
+            self.assertEqual(body.get("email"), email)
+
+            confirm = client.post(
+                "/api/admin/platform/password-reset/confirm",
+                json={"token": token, "new_password": "newpass99"},
+            )
+            self.assertEqual(confirm.status_code, 200, confirm.text)
+
         updated = get_user(user.id)
         self.assertIsNotNone(updated)
         self.assertNotEqual(updated.password_hash, old_hash)
 
         # Old token must fail (fingerprint changed)
-        again = client.post(
-            "/api/admin/platform/password-reset/confirm",
-            json={"token": token, "new_password": "another99"},
-        )
-        self.assertEqual(again.status_code, 400)
+        with patch.dict(os.environ, {"ENVIRONMENT": "test"}, clear=False):
+            client = TestClient(app)
+            again = client.post(
+                "/api/admin/platform/password-reset/confirm",
+                json={"token": token, "new_password": "another99"},
+            )
+            self.assertEqual(again.status_code, 400)
 
 
 class AdminPasswordResetPublicPathTests(unittest.TestCase):
