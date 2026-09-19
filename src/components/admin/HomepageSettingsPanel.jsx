@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TemplatePicker from './homepage/TemplatePicker.jsx';
 import ThemeGallery from './homepage/ThemeGallery.jsx';
+import RentThemeGallery from './homepage/RentThemeGallery.jsx';
 import PageDesignWizardShell from './homepage/PageDesignWizardShell.jsx';
 import '../../styles/page-design-wizard.css';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
@@ -23,6 +24,10 @@ import {
   getHomepageThemeById,
   themeToAppearancePatch,
 } from '../../lib/homepage/homepageThemes.js';
+import {
+  getRentPageThemeById,
+  rentThemeToAppearancePatch,
+} from '../../lib/homepage/rentPageThemes.js';
 import { pushHomepagePreviewDraft } from '../../lib/homepage/homepagePreview.js';
 import { pageSliderPatch } from '../../lib/homepage/pageSlider.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
@@ -100,6 +105,7 @@ const HOME_SECTIONS = [
 
 const RENT_SECTIONS = [
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-teal-600' },
+  { id: 'themes', label: 'Θέματα', icon: 'palette', accent: 'bg-fuchsia-500' },
   { id: 'copy', label: 'Όνομα & κείμενα', icon: 'edit_note', accent: 'bg-cyan-600' },
   { id: 'fleet', label: 'Καρτέλες στόλου', icon: 'directions_car', accent: 'bg-sky-600' },
   { id: 'slider', label: 'Slider', icon: 'slideshow', accent: 'bg-emerald-600' },
@@ -848,11 +854,38 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       if (result.offline) {
         toast.success('Το θέμα αποθηκεύτηκε τοπικά', { id: 'theme-apply' });
       } else {
-        toast.success(includeColors ? `Εφαρμόστηκε διάταξη + χρώματα «${theme.nameEl}»` : `Εφαρμόστηκε διάταξη «${theme.nameEl}» — ρύθμισε χρώματα στα Γενικά`, { id: 'theme-apply' });
+        toast.success(
+          includeColors
+            ? `Εφαρμόστηκε διάταξη + χρώματα «${theme.nameEl}»`
+            : `Εφαρμόστηκε διάταξη «${theme.nameEl}» — ρύθμισε χρώματα στα Γενικά`,
+          { id: 'theme-apply' },
+        );
       }
     } catch (err) {
       if (err.message === 'AUTH_EXPIRED') return;
-      toast.error(err.message || 'Αποτυχία εφαρμογής θέματος', { id: 'theme-apply-err' });
+      toast.error(err.message || 'Αποτυχία εφαρμογής θέματος', { id: 'theme-apply' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRentThemePreview = (theme, opts = {}) => {
+    const patch = rentThemeToAppearancePatch(theme, opts);
+    setForm((p) => ({ ...p, ...patch }));
+    toast.success(`Προεπισκόπηση /rent: ${theme.nameEl}`, { id: 'rent-theme-preview' });
+  };
+
+  const handleRentThemeApply = async (theme, opts = {}) => {
+    const patch = rentThemeToAppearancePatch(theme, opts);
+    setForm((p) => ({ ...p, ...patch }));
+    setSaving(true);
+    try {
+      const result = await updateSiteAppearance(patch);
+      setForm((p) => ({ ...p, ...result.data }));
+      toast.success(`Εφαρμόστηκε θέμα /rent «${theme.nameEl}»`, { id: 'rent-theme-apply' });
+    } catch (err) {
+      if (err.message === 'AUTH_EXPIRED') return;
+      toast.error(err.message || 'Αποτυχία εφαρμογής θέματος /rent', { id: 'rent-theme-apply' });
     } finally {
       setSaving(false);
     }
@@ -1026,6 +1059,10 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                         ).label,
                       },
                       {
+                        label: 'Θέμα /rent',
+                        value: getRentPageThemeById(form.rent_theme_id || 'cupertino_soft').nameEl,
+                      },
+                      {
                         label: 'Στυλ κάρτας',
                         value: getTemplateById(
                           RENT_FLEET_CARD_TEMPLATES,
@@ -1052,6 +1089,23 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   description="Επεξεργαστείτε όνομα, τίτλους, κείμενα και hero slider."
                 >
                   <div className="grid sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => selectSection('themes')}
+                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-fuchsia-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
+                    >
+                      <span className="w-11 h-11 rounded-xl bg-fuchsia-500 text-white flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined">palette</span>
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-bold text-slate-900 group-hover:text-fuchsia-800">
+                          Θέματα
+                        </span>
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          15 Apple θέματα — διάταξη & κάρτες
+                        </span>
+                      </span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => selectSection('fleet')}
@@ -1099,6 +1153,20 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 </PanelCard>
               </>
             )}
+            {section === 'themes' && (
+              <PanelCard
+                title="Θέματα /rent"
+                description="15 φρέσκα Apple θέματα — διάταξη στόλου + κάρτες. Μετά μπορείτε να αλλάξετε τα πάντα χειροκίνητα."
+              >
+                <RentThemeGallery
+                  activeThemeId={form.rent_theme_id || 'cupertino_soft'}
+                  onPreview={handleRentThemePreview}
+                  onApply={handleRentThemeApply}
+                  applying={saving}
+                />
+              </PanelCard>
+            )}
+
             {section === 'copy' && (
               <PanelCard
                 title="Όνομα & κείμενα /rent"
