@@ -74,6 +74,35 @@ class PlatformUserUpdate(BaseModel):
     password: str | None = Field(None, min_length=6, max_length=128)
 
 
+class AdminPasswordResetSendByUser(BaseModel):
+    """Optional note — reserved for future audit UI."""
+
+    note: str | None = Field(None, max_length=200)
+
+
+class AdminPasswordResetSendByEmail(BaseModel):
+    email: EmailStr
+    tenant_id: str | None = Field(
+        None,
+        description="Optional tenant UUID when the same email exists in multiple offices",
+    )
+
+
+class AdminPasswordResetConfirm(BaseModel):
+    token: str = Field(..., min_length=20, max_length=2048)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
+class AdminPasswordResetSendResponse(BaseModel):
+    ok: bool = True
+    message: str
+    email: str | None = None
+    user_id: str | None = None
+    tenant_id: str | None = None
+    # Dev/test only when email transport is unavailable — never in production responses ideally
+    reset_url: str | None = None
+
+
 class BackupInfoResponse(BaseModel):
     id: str
     filename: str

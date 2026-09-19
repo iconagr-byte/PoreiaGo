@@ -11,6 +11,7 @@ import GdprCompliancePanel from './GdprCompliancePanel.jsx';
 import LoginAuditPanel from './LoginAuditPanel.jsx';
 import ContractsPanel from './ContractsPanel.jsx';
 import SuperAdminPanel from './SuperAdminPanel.jsx';
+import AdminPasswordResetPanel from './AdminPasswordResetPanel.jsx';
 import SaasConnectionPanel from './SaasConnectionPanel.jsx';
 import BackupPanel from './BackupPanel.jsx';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
@@ -32,6 +33,7 @@ export default function SettingsTabPanels({
   }
 
   if (tab === 'tenants') return <SuperAdminPanel />;
+  if (tab === 'password_reset') return <AdminPasswordResetPanel />;
   if (tab === 'saas_infra') return <SaasConnectionPanel />;
   if (tab === 'backup') return <BackupPanel />;
 

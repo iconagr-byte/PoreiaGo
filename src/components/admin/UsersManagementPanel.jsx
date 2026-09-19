@@ -4,6 +4,7 @@ import {
   createPlatformUser,
   deletePlatformUser,
   fetchPlatformUsers,
+  sendPlatformUserPasswordReset,
   updatePlatformUser,
 } from '../../services/platformApi.js';
 
@@ -77,11 +78,30 @@ export default function UsersManagementPanel() {
     }
   };
 
+  const onSendReset = async (u) => {
+    if (!window.confirm(`Αποστολή συνδέσμου επαναφοράς στο ${u.email};`)) return;
+    try {
+      const res = await sendPlatformUserPasswordReset(u.id);
+      toast.success(res.message || 'Στάλθηκε το link');
+      if (res.reset_url) {
+        try {
+          await navigator.clipboard?.writeText(res.reset_url);
+          toast.success('Ο σύνδεσμος αντιγράφηκε (email απέτυχε ή fallback)');
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία αποστολής');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-3">
         <p className="text-sm text-gray-500">
-          Λογαριασμοί backoffice αυτού του γραφείου (είσοδος με email/κωδικό). Στην επεξεργασία μπορείτε να ορίσετε νέο κωδικό.
+          Λογαριασμοί backoffice αυτού του γραφείου. Μπορείτε να ορίσετε νέο κωδικό στην επεξεργασία
+          ή να στείλετε σύνδεσμο επαναφοράς με email.
         </p>
         <button
           type="button"
@@ -126,6 +146,14 @@ export default function UsersManagementPanel() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => onSendReset(u)}
+                      disabled={!u.is_active}
+                      className="text-sky-700 font-bold text-xs hover:underline disabled:opacity-40"
+                    >
+                      Reset link
+                    </button>
                     <button type="button" onClick={() => openEdit(u)} className="text-primary font-bold text-xs hover:underline">
                       Επεξεργασία
                     </button>
