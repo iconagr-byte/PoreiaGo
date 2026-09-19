@@ -52,8 +52,10 @@ async function parseError(res) {
   let detail = err.detail ?? res.statusText ?? 'Request failed';
   if (Array.isArray(detail)) {
     detail = detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
-  } else if (typeof detail === 'object') {
-    detail = JSON.stringify(detail);
+  } else if (typeof detail === 'object' && detail !== null) {
+    const e = new Error(detail.message || JSON.stringify(detail));
+    e.detail = detail;
+    throw e;
   }
   throw new Error(String(detail));
 }
@@ -286,6 +288,40 @@ export async function deletePlatformUser(userId) {
     method: 'DELETE',
   });
   if (!res.ok && res.status !== 204) await parseError(res);
+}
+
+/** Superadmin / office admin: email a password-reset link for a backoffice user. */
+export async function sendPlatformUserPasswordReset(userId) {
+  const res = await adminFetch(`/api/admin/platform/users/${userId}/send-password-reset`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Platform superadmin: send reset by email (optional tenant scope). */
+export async function sendAdminPasswordResetByEmail({ email, tenantId } = {}) {
+  const res = await adminFetch('/api/admin/platform/password-reset/send', {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      ...(tenantId ? { tenant_id: tenantId } : {}),
+    }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
+}
+
+/** Public: confirm admin password reset with emailed token. */
+export async function confirmAdminPasswordReset({ token, newPassword }) {
+  const res = await fetch(`${API_BASE}/api/admin/platform/password-reset/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json();
 }
 
 export async function fetchBackups() {

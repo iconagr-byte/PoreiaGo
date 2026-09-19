@@ -27,6 +27,7 @@ export const RENT_ONLY_SETTINGS_TAB_IDS = new Set([
 
 export const PLATFORM_OPERATOR_TABS = [
   { id: 'tenants', label: 'Γραφεία', icon: 'domain', section: 'platform' },
+  { id: 'password_reset', label: 'Κωδικοί', icon: 'lock_reset', section: 'platform' },
   { id: 'saas_infra', label: 'SaaS Infra', icon: 'dns', section: 'platform' },
   { id: 'backup', label: 'Backup', icon: 'backup', section: 'platform' },
   // Partner webhooks / growth tools — platform only (όχι νέο γραφείο).
