@@ -6,7 +6,10 @@ import {
   sendPlatformUserPasswordReset,
   fetchPlatformUsers,
 } from '../../services/platformApi.js';
-import { fetchPlatformTenants } from '../../services/platformSaasApi.js';
+import {
+  fetchPlatformTenantOptions,
+  formatPlatformTenantLabel,
+} from '../../services/platformSaasApi.js';
 
 const ROLE_LABELS = {
   admin: 'Διαχειριστής',
@@ -20,10 +23,6 @@ function initials(name, email) {
   const parts = raw.split(/\s+/).filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return raw.slice(0, 2).toUpperCase();
-}
-
-function tenantLabel(t) {
-  return t?.legal_name || t?.name || t?.slug || t?.id || '—';
 }
 
 /**
@@ -57,13 +56,8 @@ export default function AdminPasswordResetPanel() {
 
   useEffect(() => {
     if (!superAdmin) return;
-    fetchPlatformTenants({ limit: 100 })
-      .then((rows) => {
-        if (Array.isArray(rows)) setTenants(rows);
-        else if (Array.isArray(rows?.items)) setTenants(rows.items);
-        else if (Array.isArray(rows?.tenants)) setTenants(rows.tenants);
-        else setTenants([]);
-      })
+    fetchPlatformTenantOptions({ limit: 100 })
+      .then((rows) => setTenants(rows))
       .catch(() => setTenants([]));
     loadUsers();
   }, [superAdmin, loadUsers]);
@@ -309,7 +303,7 @@ export default function AdminPasswordResetPanel() {
                     <option value="">Αυτόματα / όλα</option>
                     {tenants.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {tenantLabel(t)}
+                        {formatPlatformTenantLabel(t)}
                       </option>
                     ))}
                   </select>
