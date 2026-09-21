@@ -379,3 +379,43 @@ class FleetDigestSendResponse(BaseModel):
     sms: dict[str, Any] | None = None
     skipped: bool = False
     reason: str | None = None
+
+
+class TeltonikaDeviceUpsert(BaseModel):
+    id: str | None = None
+    imei: str = Field(..., min_length=14, max_length=20)
+    vehicle_code: str = Field(..., min_length=1, max_length=64)
+    label: str | None = Field(None, max_length=120)
+    driver_id: str | None = None
+    enabled: bool = True
+
+
+class TeltonikaDeviceResponse(BaseModel):
+    id: str
+    imei: str
+    tenant_id: str
+    vehicle_code: str
+    label: str | None = None
+    driver_id: str | None = None
+    enabled: bool = True
+    created_at: str | None = None
+    updated_at: str | None = None
+    last_seen_at: str | None = None
+    last_lat: float | None = None
+    last_lng: float | None = None
+    last_speed_kmh: float | None = None
+    points_accepted: int = 0
+
+
+class TeltonikaServerStatusResponse(BaseModel):
+    enabled: bool
+    listening: bool
+    host: str
+    port: int
+    public_endpoint: str | None = None
+    active_connections: int = 0
+    accepted_imeis: int = 0
+    rejected_imeis: int = 0
+    packets_ok: int = 0
+    packets_bad: int = 0
+    last_error: str | None = None

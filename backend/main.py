@@ -319,6 +319,14 @@ async def lifespan(app: FastAPI):
     if start_consumer and process_telemetry_payload:
         await start_consumer(process_telemetry_payload)
     try:
+        from travel_platform.telemetry.teltonika import start_teltonika_tcp_server
+
+        await start_teltonika_tcp_server()
+    except Exception as teltonika_exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Teltonika TCP server skipped: %s", teltonika_exc
+        )
+    try:
         from travel_platform.telemetry.coordinate_flush_worker import start_coordinate_flush_worker
 
         start_coordinate_flush_worker()
@@ -354,6 +362,12 @@ async def lifespan(app: FastAPI):
         apply_telemetry_settings_to_services()
         await start_eta_refresh_loop(get_live_fleet())
     yield
+    try:
+        from travel_platform.telemetry.teltonika import stop_teltonika_tcp_server
+
+        await stop_teltonika_tcp_server()
+    except Exception:
+        pass
     try:
         from email_client.sync_worker import stop_imap_sync_worker
 
