@@ -64,15 +64,15 @@ class AdminPasswordResetTokenTests(unittest.TestCase):
             captured["html"] = body_html
             return "ref"
 
-        with patch.object(mod, "send_admin_reset_email", wraps=mod.send_admin_reset_email):
+        async def _run():
             with patch("ticketing.email_dispatch.send_email", new=AsyncMock(side_effect=fake_send)):
-                asyncio.get_event_loop().run_until_complete(
-                    mod.send_admin_reset_email(
-                        to_email="a@b.com",
-                        full_name='<script>alert(1)</script>',
-                        reset_url='https://x.example/admin/reset-password?token=abc',
-                    )
+                await mod.send_admin_reset_email(
+                    to_email="a@b.com",
+                    full_name="<script>alert(1)</script>",
+                    reset_url="https://x.example/admin/reset-password?token=abc",
                 )
+
+        asyncio.run(_run())
         self.assertNotIn("<script>", captured["html"])
         self.assertIn("&lt;script&gt;", captured["html"])
 
