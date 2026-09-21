@@ -334,8 +334,21 @@ export async function fetchBackups() {
   return [];
 }
 
-export async function createBackup() {
-  const res = await adminFetch('/api/admin/platform/backups', { method: 'POST' });
+/**
+ * @param {{ scope?: 'platform'|'office'|'database', tenantId?: string, clientExtras?: object }} [opts]
+ */
+export async function createBackup(opts = {}) {
+  const scope = opts.scope || 'platform';
+  const body = {
+    scope,
+    tenant_id: opts.tenantId || null,
+    client_extras: opts.clientExtras || null,
+  };
+  const res = await adminFetch('/api/admin/platform/backups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) await parseError(res);
   return res.json();
 }
@@ -362,7 +375,7 @@ export async function downloadBackupFile(backupId, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = filename || `backup-${backupId}.json`;
+  link.download = filename || `backup-${backupId}`;
   link.click();
   URL.revokeObjectURL(url);
 }

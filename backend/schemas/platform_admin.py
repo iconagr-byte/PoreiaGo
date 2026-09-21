@@ -109,6 +109,17 @@ class BackupInfoResponse(BaseModel):
     size_bytes: int
     created_at: datetime
     includes: list[str]
+    scope: str = "platform"
+    tenant_id: str | None = None
+    tenant_label: str | None = None
+    kind: str = "json"
+    restorable: bool = True
+
+
+class BackupCreateRequest(BaseModel):
+    scope: Literal["platform", "office", "database"] = "platform"
+    tenant_id: str | None = None
+    client_extras: dict | None = None
 
 
 class BackupCreateResponse(BaseModel):
@@ -122,6 +133,11 @@ class BackupRestoreResponse(BaseModel):
     restored_users: int = 0
     restored_settings: bool = False
     restored_drivers: int = 0
+    restored_customers: int = 0
+    restored_trips: int = 0
+    scope: str | None = None
+    tenant_id: str | None = None
+    admin_ui: dict | None = None
 
 
 class FleetDriverResponse(BaseModel):
