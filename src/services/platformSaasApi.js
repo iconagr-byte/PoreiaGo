@@ -1,4 +1,10 @@
 import { getSaasToken, saasFetch } from './saasApi.js';
+import {
+  formatPlatformTenantLabel,
+  normalizePlatformTenantList,
+} from '../lib/platform/tenantOptions.js';
+
+export { formatPlatformTenantLabel, normalizePlatformTenantList };
 
 export async function fetchPlatformOverview() {
   return saasFetch('/api/v1/platform/overview');
@@ -16,6 +22,12 @@ export async function fetchPlatformTenants({ offset = 0, limit = 50, q, isActive
   }
   if (plan) params.set('plan', plan);
   return saasFetch(`/api/v1/platform/tenants?${params}`);
+}
+
+/** Convenience: list tenants already unwrapped + id-deduped for select UIs. */
+export async function fetchPlatformTenantOptions(opts = {}) {
+  const payload = await fetchPlatformTenants(opts);
+  return normalizePlatformTenantList(payload);
 }
 
 export async function createPlatformTenant(body) {
