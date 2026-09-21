@@ -23,7 +23,9 @@ import { ticketPrintPath } from '../../lib/ticketing/printTicket.js';
 import { getBookingPassengers } from '../../lib/ticketing/bookingPassengers.js';
 
 function tripImageFor(booking, coverImage) {
-  return coverImage || '/images/hero-bus-achillio.png';
+  const raw = String(coverImage || '').trim();
+  if (!raw || raw.includes('hero-bus-achillio')) return '';
+  return raw;
 }
 
 export default function WalletTicketDetail({

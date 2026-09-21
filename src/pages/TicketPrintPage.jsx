@@ -149,6 +149,7 @@ export default function TicketPrintPage() {
       try {
         const mod = await import('../lib/ticketing/bookingStore.js');
         const { getTripById, loadTrips } = await import('../lib/trips/tripStore.js');
+        const { tripCoverUrl } = await import('../lib/trips/tripPhotos.js');
         const { mockBookings } = await import('../data/mockData.js');
         const { issueSignedQrToken } = await import('../lib/ticketing/qrToken.js');
 
@@ -185,7 +186,7 @@ export default function TicketPrintPage() {
           setResolved({
             passes,
             tripTitle: trip?.title || booking.tripTitle || 'Εκδρομή',
-            coverImage: trip?.image || '/images/hero-bus-achillio.png',
+            coverImage: tripCoverUrl(trip),
           });
         }
       } catch (err) {

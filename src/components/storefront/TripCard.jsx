@@ -2,6 +2,22 @@ import { useNavigate } from 'react-router-dom';
 import TripPriceDisplay from '../TripPriceDisplay.jsx';
 import { computeDynamicPrice } from '../../lib/revenue/dynamicPricing.js';
 import { isInternationalTrip } from '../../lib/trips/tripMarket.js';
+import { tripCoverUrl } from '../../lib/trips/tripPhotos.js';
+
+/** Cover image, or neutral placeholder when the trip has no upload. */
+function TripCover({ src, alt = '', className = '' }) {
+  if (src) {
+    return <img src={src} alt={alt} className={className} />;
+  }
+  return (
+    <div
+      className={`${className} flex items-center justify-center bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800`.trim()}
+      aria-hidden
+    >
+      <span className="material-symbols-outlined text-white/20 text-[42px]">photo_camera</span>
+    </div>
+  );
+}
 
 /** Bus seat class for abroad cards — never airline «Economy». */
 function busSeatClassLabel(trip) {
@@ -168,7 +184,7 @@ export default function TripCard({
   const goInfo = () => navigate(`/trip/${trip.id}`);
   const goBook = () => navigate(`/select-seat/${trip.id}`);
   const go = goInfo;
-  const img = trip.image || '/images/hero-bus-achillio.png';
+  const img = tripCoverUrl(trip);
   const altLayout = layoutId === 'alternating_rows' && index % 2 === 1;
   const useDestinationPoster =
     templateId === 'destination_poster' || layoutId === 'destination_bento';
@@ -192,7 +208,7 @@ export default function TripCard({
           }
         }}
       >
-        <img
+        <TripCover
           src={img}
           alt={place}
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
@@ -223,7 +239,7 @@ export default function TripCard({
         className="flex gap-4 p-3 rounded-2xl border border-black/[0.06] bg-white hover:shadow-md transition-shadow cursor-pointer"
         onClick={go}
       >
-        <img src={img} alt="" className="w-24 h-24 rounded-xl object-cover shrink-0" />
+        <TripCover src={img} alt="" className="w-24 h-24 rounded-xl object-cover shrink-0" />
         <div className="min-w-0 flex-1 flex flex-col justify-center">
           <h3 className="font-bold text-on-surface truncate">{trip.title}</h3>
           <TripMeta trip={trip} compact />
@@ -254,7 +270,7 @@ export default function TripCard({
         onClick={go}
       >
         <div className="relative sm:w-[46%] lg:w-[48%] h-56 sm:h-auto sm:min-h-[240px] lg:min-h-[280px] shrink-0 overflow-hidden">
-          <img
+          <TripCover
             src={img}
             alt={destination}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
@@ -318,7 +334,7 @@ export default function TripCard({
         } rounded-[28px] overflow-hidden group cursor-pointer shadow-lg`}
         onClick={go}
       >
-        <img src={img} alt={trip.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+        <TripCover src={img} alt={trip.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
         <div
           className={`absolute inset-0 flex flex-col justify-end text-white ${
@@ -362,7 +378,7 @@ export default function TripCard({
   if (templateId === 'minimal_clean') {
     return (
       <article className="bg-white rounded-2xl border border-black/[0.05] p-5 hover:shadow-lg transition-shadow">
-        <img src={img} alt="" className="w-full h-36 rounded-xl object-cover mb-4" />
+        <TripCover src={img} alt="" className="w-full h-36 rounded-xl object-cover mb-4" />
         <h3 className="font-bold text-lg text-on-surface mb-2">{trip.title}</h3>
         <TripMeta trip={trip} compact />
         <div className="mt-4 pt-4 border-t flex flex-col gap-3">
@@ -381,7 +397,7 @@ export default function TripCard({
     return (
       <article className="group cursor-pointer" onClick={go}>
         <div className="overflow-hidden rounded-none mb-5">
-          <img src={img} alt="" className="w-full h-56 object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+          <TripCover src={img} alt="" className="w-full h-56 object-cover group-hover:scale-[1.02] transition-transform duration-500" />
         </div>
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary mb-2">Featured trip</p>
         <h3 className="text-3xl font-display font-bold text-on-surface leading-tight mb-3">{trip.title}</h3>
@@ -403,7 +419,7 @@ export default function TripCard({
   if (templateId === 'bordered_sharp') {
     return (
       <article className="border-2 border-slate-900 bg-white overflow-hidden hover:-translate-y-0.5 transition-transform">
-        <img src={img} alt="" className="w-full h-44 object-cover" />
+        <TripCover src={img} alt="" className="w-full h-44 object-cover" />
         <div className="p-6 border-t-2 border-slate-900">
           <h3 className="text-xl font-black uppercase tracking-tight mb-3">{trip.title}</h3>
           <TripMeta trip={trip} />
@@ -425,7 +441,7 @@ export default function TripCard({
     return (
       <article className="rounded-[28px] border border-white/40 bg-white/60 backdrop-blur-xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:bg-white/80 transition-colors">
         <div className="rounded-2xl overflow-hidden mb-4">
-          <img src={img} alt="" className="w-full h-44 object-cover" />
+          <TripCover src={img} alt="" className="w-full h-44 object-cover" />
         </div>
         <h3 className="font-bold text-on-surface mb-2">{trip.title}</h3>
         <TripMeta trip={trip} compact />
@@ -448,7 +464,7 @@ export default function TripCard({
         onClick={go}
       >
         <div className="w-full md:w-1/2 rounded-[32px] overflow-hidden shadow-xl">
-          <img src={img} alt="" className="w-full h-64 md:h-80 object-cover group-hover:scale-105 transition-transform duration-700" />
+          <TripCover src={img} alt="" className="w-full h-64 md:h-80 object-cover group-hover:scale-105 transition-transform duration-700" />
         </div>
         <div className="w-full md:w-1/2 md:px-4">
           <h3 className="text-3xl font-bold text-on-surface mb-4">{trip.title}</h3>
@@ -475,7 +491,7 @@ export default function TripCard({
         onClick={go}
       >
         <div className="relative h-44 overflow-hidden shrink-0">
-          <img src={img} alt={trip.title} className="w-full h-full object-cover" />
+          <TripCover src={img} alt={trip.title} className="w-full h-full object-cover" />
         </div>
         <div className="p-5 flex flex-col flex-1">
           <h3 className="text-[17px] font-semibold text-[#1d1d1f] tracking-tight mb-2">{trip.title}</h3>
@@ -501,7 +517,7 @@ export default function TripCard({
         onClick={go}
       >
         <div className="relative h-48 overflow-hidden shrink-0">
-          <img src={img} alt={trip.title} className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700" />
+          <TripCover src={img} alt={trip.title} className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#121214] via-transparent to-transparent" />
           <span className="absolute top-3 left-3 z-10 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300/90">
             Luxury
@@ -534,7 +550,7 @@ export default function TripCard({
         className="group relative h-full min-h-[340px] rounded-[28px] overflow-hidden cursor-pointer shadow-lg"
         onClick={go}
       >
-        <img
+        <TripCover
           src={img}
           alt={trip.title}
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
@@ -568,7 +584,7 @@ export default function TripCard({
         onClick={go}
       >
         <div className="relative sm:w-[42%] h-40 sm:h-auto shrink-0 overflow-hidden">
-          <img src={img} alt={trip.title} className="w-full h-full object-cover min-h-[160px]" />
+          <TripCover src={img} alt={trip.title} className="w-full h-full object-cover min-h-[160px]" />
           <span className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-wider bg-white/95 px-2 py-1 rounded">
             Ticket
           </span>
@@ -600,7 +616,7 @@ export default function TripCard({
     >
       <div className={`relative w-full overflow-hidden shrink-0 ${solo ? 'h-32 sm:h-36' : 'h-48'}`}>
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
-        <img
+        <TripCover
           src={img}
           alt={trip.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
