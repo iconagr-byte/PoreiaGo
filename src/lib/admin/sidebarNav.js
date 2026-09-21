@@ -95,7 +95,6 @@ export const LEGACY_NAV_IDS = new Set([
   'payments',
   'fleet_active_drivers',
   'fleet_rental',
-  'settings_telematics',
   'hybrid_sla',
   // Miles+Bonus / Επιβραβεύσεις — hidden from sidebar (code kept, not deleted).
   'loyalty',

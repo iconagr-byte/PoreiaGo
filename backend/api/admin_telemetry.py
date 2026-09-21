@@ -28,6 +28,9 @@ from schemas.telemetry import (
     TelemetrySettingsUpdate,
     TripRouteCompareResponse,
     TripRouteResponse,
+    TeltonikaDeviceResponse,
+    TeltonikaDeviceUpsert,
+    TeltonikaServerStatusResponse,
 )
 from travel_platform.telemetry.alerts import TelemetryAlertBus
 from travel_platform.telemetry.fleet_eta_service import fetch_fleet_etas
@@ -343,3 +346,44 @@ async def admin_planned_vs_actual_post(
         limit=limit,
     )
     return PlannedVsActualResponse(**payload)
+
+
+@router.get("/teltonika/status", response_model=TeltonikaServerStatusResponse)
+async def admin_teltonika_status(tenant_id: Annotated[UUID, Depends(get_tenant_id)]):
+    """TCP listener status (shared host). tenant_id required by auth middleware."""
+    del tenant_id
+    from travel_platform.telemetry.teltonika import get_teltonika_status
+
+    return TeltonikaServerStatusResponse(**get_teltonika_status())
+
+
+@router.get("/teltonika/devices", response_model=list[TeltonikaDeviceResponse])
+async def admin_list_teltonika_devices(tenant_id: Annotated[UUID, Depends(get_tenant_id)]):
+    from travel_platform.telemetry.teltonika import list_devices
+
+    return [TeltonikaDeviceResponse(**row) for row in list_devices(str(tenant_id))]
+
+
+@router.post("/teltonika/devices", response_model=TeltonikaDeviceResponse)
+async def admin_upsert_teltonika_device(
+    body: TeltonikaDeviceUpsert,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    from travel_platform.telemetry.teltonika import upsert_device
+
+    try:
+        row = upsert_device(body.model_dump(), tenant_id=str(tenant_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return TeltonikaDeviceResponse(**row)
+
+
+@router.delete("/teltonika/devices/{device_id}", status_code=204)
+async def admin_delete_teltonika_device(
+    device_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    from travel_platform.telemetry.teltonika import delete_device
+
+    if not delete_device(device_id, tenant_id=str(tenant_id)):
+        raise HTTPException(status_code=404, detail="Device not found")

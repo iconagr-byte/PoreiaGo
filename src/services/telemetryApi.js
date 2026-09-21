@@ -407,3 +407,44 @@ function getMockFleet() {
     },
   ];
 }
+
+async function parseAdminError(res) {
+  const err = await res.json().catch(() => ({}));
+  const detail = err.detail;
+  if (typeof detail === 'string') throw new Error(detail);
+  throw new Error(err.message || `HTTP ${res.status}`);
+}
+
+export async function fetchTeltonikaStatus(authHeaders = adminAuthHeaders()) {
+  const res = await fetch(`${API_BASE}/api/admin/telemetry/teltonika/status`, {
+    headers: authHeaders,
+  });
+  if (!res.ok) await parseAdminError(res);
+  return res.json();
+}
+
+export async function fetchTeltonikaDevices(authHeaders = adminAuthHeaders()) {
+  const res = await fetch(`${API_BASE}/api/admin/telemetry/teltonika/devices`, {
+    headers: authHeaders,
+  });
+  if (!res.ok) await parseAdminError(res);
+  return res.json();
+}
+
+export async function createTeltonikaDevice(body, authHeaders = adminAuthHeaders()) {
+  const res = await fetch(`${API_BASE}/api/admin/telemetry/teltonika/devices`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) await parseAdminError(res);
+  return res.json();
+}
+
+export async function deleteTeltonikaDevice(deviceId, authHeaders = adminAuthHeaders()) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/teltonika/devices/${encodeURIComponent(deviceId)}`,
+    { method: 'DELETE', headers: authHeaders },
+  );
+  if (!res.ok && res.status !== 204) await parseAdminError(res);
+}

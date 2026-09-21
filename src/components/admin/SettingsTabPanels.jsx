@@ -14,6 +14,7 @@ import SuperAdminPanel from './SuperAdminPanel.jsx';
 import AdminPasswordResetPanel from './AdminPasswordResetPanel.jsx';
 import SaasConnectionPanel from './SaasConnectionPanel.jsx';
 import BackupPanel from './BackupPanel.jsx';
+import TeltonikaDevicesPanel from './TeltonikaDevicesPanel.jsx';
 import { isSaasSuperAdmin } from '../../lib/saasJwt.js';
 import { PLATFORM_ONLY_TAB_IDS } from '../../lib/admin/settingsTabs.js';
 
@@ -36,6 +37,7 @@ export default function SettingsTabPanels({
   if (tab === 'password_reset') return <AdminPasswordResetPanel />;
   if (tab === 'saas_infra') return <SaasConnectionPanel />;
   if (tab === 'backup') return <BackupPanel />;
+  if (tab === 'telematics') return <TeltonikaDevicesPanel />;
 
   if (tab === 'platform') {
     return (
