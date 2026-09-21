@@ -114,6 +114,7 @@ class BackupInfoResponse(BaseModel):
     tenant_label: str | None = None
     kind: str = "json"
     restorable: bool = True
+    db_mode: str | None = None
 
 
 class BackupCreateRequest(BaseModel):

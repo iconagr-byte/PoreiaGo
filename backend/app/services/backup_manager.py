@@ -68,6 +68,27 @@ class BackupManager:
         data = src.read_bytes()
         dest.write_bytes(fernet.encrypt(data))
 
+    # Tables with a tenant_id column that are safe to dump per office.
+    OFFICE_PG_TABLES = (
+        "bookings",
+        "users",
+        "audit_logs",
+        "stops",
+        "trip_coordinates",
+        "fiscal_invoices",
+        "loyalty_accounts",
+        "miles_transactions",
+        "tenant_api_keys",
+        "rental_vehicles",
+        "rental_bookings",
+        "vehicle_inspections",
+        "aade_submissions",
+        "flights",
+        "trip_segments",
+        "passenger_flight_seats",
+        "luggage_checkins",
+    )
+
     async def dump_tenant_schema(self, tenant: Tenant, out_dir: Path) -> Path:
         pg = self._parse_pg_url()
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -85,7 +106,10 @@ class BackupManager:
             "-f", str(sql_path),
         ]
         if isolation == "shared_rls":
-            cmd.extend(["--table", "bookings", "--table", "users", "--table", "audit_logs"])
+            for table in self.OFFICE_PG_TABLES:
+                cmd.extend(["--table", table])
+            # tenants row (uses id, not tenant_id) — separate filter not possible in one
+            # --where; include office tables only. Tenant meta is also in JSON office backup.
             cmd.extend(["--where", f"tenant_id='{tenant.id}'"])
         elif isolation == "schema":
             schema = f"tenant_{tenant.slug.replace('-', '_')}"
@@ -108,7 +132,28 @@ class BackupManager:
         )
         _, stderr = await proc.communicate()
         if proc.returncode != 0:
-            raise RuntimeError(stderr.decode())
+            # Retry with the minimal known-good table set if some tables are missing.
+            err = stderr.decode()
+            if isolation == "shared_rls" and "does not exist" in err.lower():
+                cmd = [
+                    "pg_dump",
+                    "-h", pg["host"],
+                    "-p", pg["port"],
+                    "-U", pg["user"],
+                    "-d", pg["dbname"],
+                    "-F", "p",
+                    "-f", str(sql_path),
+                    "--table", "bookings",
+                    "--table", "users",
+                    "--table", "audit_logs",
+                    "--where", f"tenant_id='{tenant.id}'",
+                ]
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd, env=env, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                )
+                _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise RuntimeError(stderr.decode())
 
         gz_path = sql_path.with_suffix(".sql.gz")
         with open(sql_path, "rb") as src, gzip.open(gz_path, "wb") as dst:
