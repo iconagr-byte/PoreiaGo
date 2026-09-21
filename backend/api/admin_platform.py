@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 from travel_platform.settings.backup_service import (
     create_database_backup,
     create_office_backup,
+    create_office_database_backup,
     create_platform_backup,
     delete_backup,
     list_backups,
@@ -1566,6 +1567,7 @@ def _backup_info_response(b: dict) -> BackupInfoResponse:
         tenant_label=b.get("tenant_label"),
         kind=str(b.get("kind") or "json"),
         restorable=bool(b.get("restorable", b.get("scope") != "database")),
+        db_mode=b.get("db_mode"),
     )
 
 
@@ -1590,8 +1592,12 @@ async def post_backup(request: Request, body: BackupCreateRequest | None = None)
             )
             msg = f"Backup γραφείου «{b.get('tenant_label') or payload.tenant_id}» έτοιμο"
         elif scope == "database":
-            b = await create_database_backup()
-            msg = "Database dump έτοιμο (λήψη μόνο — όχι restore από UI)"
+            if payload.tenant_id:
+                b = await create_office_database_backup(payload.tenant_id)
+                msg = f"Database dump γραφείου «{b.get('tenant_label') or payload.tenant_id}» έτοιμο"
+            else:
+                b = await create_database_backup()
+                msg = "Πλήρες database dump έτοιμο (λήψη μόνο — όχι restore από UI)"
         else:
             b = create_platform_backup()
             msg = "Backup πλατφόρμας έτοιμο"

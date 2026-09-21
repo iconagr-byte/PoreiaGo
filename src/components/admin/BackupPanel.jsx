@@ -30,11 +30,11 @@ const SCOPES = [
     blurb: 'Ρυθμίσεις πλατφόρμας, telematics, χρήστες & οδηγοί όλων των γραφείων.',
     accent: 'from-slate-700 to-slate-900',
   },
-  {
+    {
     id: 'database',
     title: 'Βάση δεδομένων',
     icon: 'database',
-    blurb: 'Πλήρες Postgres dump (.sql.gz). Ξεχωριστά από τα JSON — μόνο λήψη.',
+    blurb: 'Postgres dump — όλη η βάση ή μόνο ένα γραφείο. Μόνο λήψη.',
     accent: 'from-violet-700 to-indigo-900',
   },
 ];
@@ -53,7 +53,8 @@ const INCLUDE_LABELS = {
   platform_settings: 'Ρυθμίσεις',
   telemetry_settings: 'Telematics',
   users: 'Χρήστες',
-  postgres_dump: 'Postgres',
+  postgres_dump: 'Postgres (όλη)',
+  postgres_office_dump: 'Postgres (γραφείο)',
 };
 
 function formatSize(bytes) {
@@ -131,6 +132,7 @@ export default function BackupPanel() {
   const [working, setWorking] = useState(false);
   const [scope, setScope] = useState('office');
   const [tenantId, setTenantId] = useState('');
+  const [dbMode, setDbMode] = useState('office'); // 'office' | 'full' — under database scope
   const [filter, setFilter] = useState('all'); // all | office | platform | database
   const [query, setQuery] = useState('');
   const [confirmRestore, setConfirmRestore] = useState(null);
@@ -182,7 +184,9 @@ export default function BackupPanel() {
   }, [backups]);
 
   const onCreate = async () => {
-    if (scope === 'office' && !tenantId) {
+    const needsOffice =
+      scope === 'office' || (scope === 'database' && dbMode === 'office');
+    if (needsOffice && !tenantId) {
       toast.error('Επίλεξε γραφείο');
       return;
     }
@@ -190,7 +194,7 @@ export default function BackupPanel() {
     try {
       const res = await createBackup({
         scope,
-        tenantId: scope === 'office' ? tenantId : undefined,
+        tenantId: needsOffice ? tenantId : undefined,
         clientExtras: scope === 'office' ? collectClientExtras() : undefined,
       });
       toast.success(res.message || 'Backup OK');
@@ -304,7 +308,47 @@ export default function BackupPanel() {
           })}
         </div>
 
-        {scope === 'office' ? (
+        {scope === 'database' ? (
+          <div className="space-y-3">
+            <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 text-sm font-bold">
+              <button
+                type="button"
+                onClick={() => setDbMode('office')}
+                className={`rounded-xl px-4 py-2 transition ${
+                  dbMode === 'office' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-white'
+                }`}
+              >
+                Ανά γραφείο
+              </button>
+              <button
+                type="button"
+                onClick={() => setDbMode('full')}
+                className={`rounded-xl px-4 py-2 transition ${
+                  dbMode === 'full' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-white'
+                }`}
+              >
+                Όλη η βάση
+              </button>
+            </div>
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950">
+              {dbMode === 'office' ? (
+                <>
+                  Δημιουργεί <strong>Postgres dump ενός γραφείου</strong> (φίλτρο{' '}
+                  <code className="text-xs bg-white/80 px-1 rounded">tenant_id</code>). Η επαναφορά γίνεται
+                  μόνο στον server με <code className="text-xs bg-white/80 px-1 rounded">pg_restore</code>.
+                </>
+              ) : (
+                <>
+                  Δημιουργεί <strong>πλήρες Postgres dump</strong> όλης της πλατφόρμας. Η επαναφορά γίνεται μόνο
+                  στον server με <code className="text-xs bg-white/80 px-1 rounded">pg_restore</code> — όχι από
+                  αυτό το μενού.
+                </>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {scope === 'office' || (scope === 'database' && dbMode === 'office') ? (
           <label className="block text-sm max-w-md">
             <span className="font-bold text-slate-700">Γραφείο</span>
             <select
@@ -319,25 +363,29 @@ export default function BackupPanel() {
                 </option>
               ))}
             </select>
-            <p className="mt-1.5 text-[11px] text-slate-400">
-              Περιλαμβάνει εμφάνιση, μενού (από αυτόν τον browser), πελάτες, εκδρομές, οδηγούς,
-              πληρωμές, θέσεις, κρατήσεις.
-            </p>
+            {scope === 'office' ? (
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                Περιλαμβάνει εμφάνιση, μενού (από αυτόν τον browser), πελάτες, εκδρομές, οδηγούς,
+                πληρωμές, θέσεις, κρατήσεις (JSON — επαναφέρεται από το UI).
+              </p>
+            ) : (
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                Postgres dump μόνο για τις γραμμές αυτού του γραφείου (bookings, users, rentals…).
+                Μόνο λήψη — restore με pg_restore στον server.
+              </p>
+            )}
           </label>
-        ) : null}
-
-        {scope === 'database' ? (
-          <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950">
-            Δημιουργεί <strong>πλήρες Postgres dump</strong>. Η επαναφορά γίνεται μόνο στον server με{' '}
-            <code className="text-xs bg-white/80 px-1 rounded">pg_restore</code> — όχι από αυτό το μενού.
-          </div>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <p className="text-xs text-slate-400 max-w-md">{activeScope.blurb}</p>
           <button
             type="button"
-            disabled={working || (scope === 'office' && !tenantId)}
+            disabled={
+              working ||
+              (scope === 'office' && !tenantId) ||
+              (scope === 'database' && dbMode === 'office' && !tenantId)
+            }
             onClick={onCreate}
             className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
           >

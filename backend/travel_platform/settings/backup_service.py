@@ -152,11 +152,12 @@ def list_backups() -> list[dict[str, Any]]:
                 "size_bytes": stat.st_size,
                 "created_at": payload.get("created_at") or created,
                 "scope": SCOPE_DATABASE,
-                "tenant_id": None,
-                "tenant_label": None,
+                "tenant_id": payload.get("tenant_id"),
+                "tenant_label": payload.get("tenant_label"),
                 "includes": payload.get("includes") or ["postgres_dump"],
                 "kind": "database",
                 "restorable": False,
+                "db_mode": payload.get("db_mode") or ("office" if payload.get("tenant_id") else "full"),
             }
         )
 
@@ -374,6 +375,7 @@ async def create_database_backup() -> dict[str, Any]:
             "includes": ["postgres_dump"],
             "filename": dest.name,
             "id": backup_id,
+            "db_mode": "full",
         }
         meta_path = root / f"{backup_id}.meta.json"
         meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
@@ -388,10 +390,72 @@ async def create_database_backup() -> dict[str, Any]:
             "includes": ["postgres_dump"],
             "kind": "database",
             "restorable": False,
+            "db_mode": "full",
             "path": str(dest),
         }
     finally:
         shutil.rmtree(tmp_parent, ignore_errors=True)
+
+
+async def create_office_database_backup(tenant_id: str) -> dict[str, Any]:
+    """Postgres dump filtered to one office (tenant_id). Download-only."""
+    import tempfile
+
+    from sqlalchemy import select
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+    from app.services.backup_manager import BackupManager
+
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        raise ValueError("Απαιτείται γραφείο για DB backup ανά γραφείο")
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Tenant).where(Tenant.id == UUID(tid)).limit(1))
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            raise ValueError(f"Το γραφείο δεν βρέθηκε: {tenant_id}")
+
+    now = _now()
+    slug = str(tenant.slug or "office")[:40]
+    backup_id = f"database-office-{slug}-{now.strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:6]}"
+    root = _ensure_dir()
+    tmp_dir = Path(tempfile.mkdtemp(prefix="office_pg_dump_"))
+    try:
+        dump_path = await BackupManager().dump_tenant_schema(tenant, tmp_dir)
+        dest = root / f"{backup_id}.sql.gz"
+        shutil.move(str(dump_path), str(dest))
+        label = tenant.legal_name or tenant.slug or tid
+        meta = {
+            "version": 2,
+            "scope": SCOPE_DATABASE,
+            "created_at": now.isoformat(),
+            "includes": ["postgres_office_dump"],
+            "filename": dest.name,
+            "id": backup_id,
+            "tenant_id": tid,
+            "tenant_label": label,
+            "db_mode": "office",
+        }
+        meta_path = root / f"{backup_id}.meta.json"
+        meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+        return {
+            "id": backup_id,
+            "filename": dest.name,
+            "size_bytes": dest.stat().st_size,
+            "created_at": now.isoformat(),
+            "scope": SCOPE_DATABASE,
+            "tenant_id": tid,
+            "tenant_label": label,
+            "includes": ["postgres_office_dump"],
+            "kind": "database",
+            "restorable": False,
+            "db_mode": "office",
+            "path": str(dest),
+        }
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def resolve_backup_path(backup_id: str) -> Path:
