@@ -91,8 +91,8 @@ export default function AdminPasswordResetPanel() {
           <div>
             <h2 className="text-lg font-bold text-slate-900">Επαναφορά κωδικού γραφείου</h2>
             <p className="text-sm text-slate-500 mt-1">
-              Στέλνει email με σύνδεσμο 1 ώρας στο `/admin/reset-password`. Ισχύει για λογαριασμούς
-              backoffice (όχι My Wallet πελατών).
+              Στέλνει email με σύνδεσμο 1 ώρας στο `/admin/reset-password` (HMAC, one-shot μετά την
+              αλλαγή). Μόνο superadmin / διαχειριστής γραφείου. Δεν ισχύει για My Wallet πελατών.
             </p>
           </div>
         </div>

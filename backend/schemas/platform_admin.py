@@ -90,7 +90,7 @@ class AdminPasswordResetSendByEmail(BaseModel):
 
 class AdminPasswordResetConfirm(BaseModel):
     token: str = Field(..., min_length=20, max_length=2048)
-    new_password: str = Field(..., min_length=6, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
 
 
 class AdminPasswordResetSendResponse(BaseModel):
@@ -99,7 +99,7 @@ class AdminPasswordResetSendResponse(BaseModel):
     email: str | None = None
     user_id: str | None = None
     tenant_id: str | None = None
-    # Dev/test only when email transport is unavailable — never in production responses ideally
+    # Only returned to superadmin when SMTP fails (manual handoff). Never for tenant_admin.
     reset_url: str | None = None
 
 

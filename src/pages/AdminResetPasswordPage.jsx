@@ -70,7 +70,7 @@ export default function AdminResetPasswordPage() {
                 id="password"
                 name="password"
                 type={showPassword ? 'text' : 'password'}
-                minLength={6}
+                minLength={8}
                 required
                 className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-slate-900/10 outline-none"
               />
@@ -85,6 +85,7 @@ export default function AdminResetPasswordPage() {
                 </span>
               </button>
             </div>
+            <p className="text-[11px] text-slate-400">Τουλάχιστον 8 χαρακτήρες, γράμματα και αριθμοί.</p>
           </div>
           <div className="space-y-2">
             <label className="block text-sm font-bold" htmlFor="confirm">
@@ -94,7 +95,7 @@ export default function AdminResetPasswordPage() {
               id="confirm"
               name="confirm"
               type={showPassword ? 'text' : 'password'}
-              minLength={6}
+              minLength={8}
               required
               className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-slate-900/10 outline-none"
             />
