@@ -7,7 +7,10 @@ import {
   fetchBackups,
   restoreBackup,
 } from '../../services/platformApi.js';
-import { fetchPlatformTenants } from '../../services/platformSaasApi.js';
+import {
+  fetchPlatformTenantOptions,
+  formatPlatformTenantLabel,
+} from '../../services/platformSaasApi.js';
 import {
   NAV_LAYOUT_STORAGE_KEY,
   NAV_ORDER_STORAGE_KEY,
@@ -70,10 +73,6 @@ function formatDate(iso) {
   } catch {
     return iso;
   }
-}
-
-function tenantLabel(t) {
-  return t?.legal_name || t?.name || t?.slug || t?.id || '—';
 }
 
 function collectClientExtras() {
@@ -145,13 +144,8 @@ export default function BackupPanel() {
 
   useEffect(() => {
     load();
-    fetchPlatformTenants({ limit: 100 })
-      .then((rows) => {
-        if (Array.isArray(rows)) setTenants(rows);
-        else if (Array.isArray(rows?.items)) setTenants(rows.items);
-        else if (Array.isArray(rows?.tenants)) setTenants(rows.tenants);
-        else setTenants([]);
-      })
+    fetchPlatformTenantOptions({ limit: 100 })
+      .then((rows) => setTenants(rows))
       .catch(() => setTenants([]));
   }, [load]);
 
@@ -359,7 +353,7 @@ export default function BackupPanel() {
               <option value="">— Επίλεξε γραφείο —</option>
               {tenants.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {tenantLabel(t)}
+                  {formatPlatformTenantLabel(t)}
                 </option>
               ))}
             </select>
