@@ -554,7 +554,11 @@ async def remove_user(request: Request, user_id: str):
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-async def _send_reset_for_db_user(user) -> AdminPasswordResetSendResponse:
+async def _send_reset_for_db_user(
+    user,
+    *,
+    include_reset_url: bool = False,
+) -> AdminPasswordResetSendResponse:
     from travel_platform.settings.admin_password_reset import (
         build_reset_url,
         create_reset_token,
@@ -582,17 +586,39 @@ async def _send_reset_for_db_user(user) -> AdminPasswordResetSendResponse:
         )
     except Exception as exc:
         logger.warning("admin password reset email failed for %s: %s", user.email, exc)
-        # Still return URL so superadmin can copy/paste if SMTP is down.
         return AdminPasswordResetSendResponse(
             ok=True,
             message=(
-                f"Το email απέτυχε ({exc}). Αντιγράψτε τον σύνδεσμο και στείλτε τον χειροκίνητα."
+                "Το email απέτυχε. "
+                + (
+                    "Αντιγράψτε τον σύνδεσμο και στείλτε τον χειροκίνητα."
+                    if include_reset_url
+                    else "Ελέγξτε SMTP ή δοκιμάστε ξανά."
+                )
             ),
             email=user.email,
             user_id=str(user.id),
             tenant_id=str(user.tenant_id),
-            reset_url=reset_url,
+            reset_url=reset_url if include_reset_url else None,
         )
+
+
+def _require_password_reset_sender(request: Request) -> bool:
+    """tenant_admin or superadmin may send reset links. Returns is_superadmin."""
+    roles = {str(r).lower() for r in (getattr(request.state, "roles", None) or [])}
+    if "superadmin" in roles:
+        return True
+    if "tenant_admin" in roles:
+        return False
+    # Dev synthetic context without roles: treat as non-superadmin admin.
+    if os.getenv("ADMIN_AUTH_DISABLED", "").lower() in ("1", "true", "yes"):
+        env = (os.getenv("ENVIRONMENT") or "development").lower()
+        if env in ("development", "dev", "local", "test"):
+            return False
+    raise HTTPException(
+        status_code=403,
+        detail="Μόνο διαχειριστής γραφείου ή superadmin μπορεί να στείλει reset link",
+    )
 
 
 @router.post(
@@ -604,8 +630,9 @@ async def send_user_password_reset(
     user_id: str,
     body: AdminPasswordResetSendByUser | None = None,
 ):
-    """Superadmin / office admin: email a one-hour reset link for a backoffice user."""
+    """Office admin / superadmin: email a one-hour reset link for a backoffice user."""
     _ = body  # reserved
+    is_sa = _require_password_reset_sender(request)
     tid = _parse_tenant_uuid(request)
     if tid is not None:
         from uuid import UUID
@@ -622,11 +649,41 @@ async def send_user_password_reset(
                 async with AsyncSessionLocal() as db:
                     user = await get_tenant_user(db, tid, uid)
                     if user and user.is_active:
-                        return await _send_reset_for_db_user(user)
+                        result = await _send_reset_for_db_user(
+                            user, include_reset_url=is_sa
+                        )
+                        try:
+                            from travel_platform.settings.login_audit_store import (
+                                record_login_from_request,
+                            )
+
+                            record_login_from_request(
+                                request,
+                                actor_type="admin",
+                                identity=str(
+                                    getattr(request.state, "email", None)
+                                    or getattr(request.state, "sub", None)
+                                    or "admin"
+                                ),
+                                success=True,
+                                method="password_reset_send",
+                                detail=f"reset_link_sent:{user.email}",
+                                tenant_id=str(tid),
+                            )
+                        except Exception:
+                            pass
+                        return result
+            except HTTPException:
+                raise
             except Exception as exc:
                 logger.warning("send-password-reset DB lookup failed: %s", exc)
 
-    # In-memory demo users (local without tenant JWT / offline)
+    from travel_platform.settings.admin_password_reset import memory_fallback_allowed
+
+    if not memory_fallback_allowed():
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # In-memory demo users (local/dev/test only)
     from travel_platform.settings.admin_password_reset import (
         build_reset_url,
         create_reset_token,
@@ -653,8 +710,8 @@ async def send_user_password_reset(
         url_out = None
     except Exception as exc:
         logger.warning("admin password reset email failed: %s", exc)
-        msg = f"Το email απέτυχε — αντιγράψτε τον σύνδεσμο."
-        url_out = reset_url
+        msg = "Το email απέτυχε — αντιγράψτε τον σύνδεσμο." if is_sa else "Το email απέτυχε."
+        url_out = reset_url if is_sa else None
     return AdminPasswordResetSendResponse(
         ok=True,
         message=msg,
@@ -690,7 +747,6 @@ async def send_password_reset_by_email(
             users = [u for u in users if u.tenant_id == want]
         active = [u for u in users if u.is_active]
         if not active:
-            # Anti-enumeration for external callers; superadmin still gets a clear message.
             raise HTTPException(
                 status_code=404,
                 detail="Δεν βρέθηκε ενεργός λογαριασμός με αυτό το email",
@@ -711,32 +767,68 @@ async def send_password_reset_by_email(
                     ],
                 },
             )
-        return await _send_reset_for_db_user(active[0])
+        result = await _send_reset_for_db_user(active[0], include_reset_url=True)
+        try:
+            from travel_platform.settings.login_audit_store import record_login_from_request
+
+            record_login_from_request(
+                request,
+                actor_type="admin",
+                identity=str(
+                    getattr(request.state, "email", None)
+                    or getattr(request.state, "sub", None)
+                    or "superadmin"
+                ),
+                success=True,
+                method="password_reset_send",
+                detail=f"reset_link_sent:{active[0].email}",
+                tenant_id=str(active[0].tenant_id),
+            )
+        except Exception:
+            pass
+        return result
 
 
 @router.post("/password-reset/confirm")
-async def confirm_admin_password_reset(body: AdminPasswordResetConfirm):
+async def confirm_admin_password_reset(request: Request, body: AdminPasswordResetConfirm):
     """Public: set a new backoffice password with a signed reset token."""
     from app.core.database import AsyncSessionLocal
     from travel_platform.settings.admin_password_reset import (
+        allow_confirm_attempt,
         apply_password_reset,
+        fingerprints_match,
+        memory_fallback_allowed,
         parse_reset_token,
+        password_fingerprint,
+        validate_new_admin_password,
     )
     from travel_platform.settings.users_store import get_user, update_user
 
+    client_ip = (
+        (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or "unknown"
+    )
+    if not allow_confirm_attempt(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Πολλές προσπάθειες — δοκιμάστε ξανά σε λίγο",
+        )
+
     try:
+        validate_new_admin_password(body.new_password)
         parsed = parse_reset_token(body.token)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Memory demo users (no tenant_id in token)
+    # Memory demo users (no tenant_id in token) — non-production only
     if not parsed.get("tenant_id"):
+        if not memory_fallback_allowed():
+            raise HTTPException(status_code=400, detail="Μη έγκυρος σύνδεσμος επαναφοράς")
         mem = get_user(parsed["user_id"])
         if not mem or not mem.is_active:
             raise HTTPException(status_code=400, detail="Μη έγκυρος σύνδεσμος επαναφοράς")
-        from travel_platform.settings.admin_password_reset import password_fingerprint
-
-        if password_fingerprint(mem.password_hash) != parsed["fingerprint"]:
+        if not fingerprints_match(password_fingerprint(mem.password_hash), parsed["fingerprint"]):
             raise HTTPException(
                 status_code=400,
                 detail="Ο σύνδεσμος έχει ήδη χρησιμοποιηθεί ή ο κωδικός άλλαξε",
@@ -753,6 +845,24 @@ async def confirm_admin_password_reset(body: AdminPasswordResetConfirm):
                 db, token=body.token, new_password=body.new_password
             )
             await db.commit()
+            try:
+                from travel_platform.settings.login_audit_store import (
+                    record_login_from_request,
+                )
+
+                record_login_from_request(
+                    request,
+                    actor_type="admin",
+                    identity=user.email,
+                    success=True,
+                    method="password_reset_confirm",
+                    detail="password_changed_via_reset_link",
+                    tenant_id=str(user.tenant_id),
+                    actor_id=str(user.id),
+                    actor_name=user.full_name,
+                )
+            except Exception:
+                pass
             return {
                 "ok": True,
                 "email": user.email,

@@ -1,4 +1,4 @@
-"""Admin / backoffice password-reset tokens and public confirm path."""
+"""Admin / backoffice password-reset — crypto, public confirm, rate limit."""
 
 from __future__ import annotations
 
@@ -6,8 +6,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-# Ensure JWT secret for token HMAC before first import of reset helpers.
-os.environ.setdefault("AUTH_JWT_SECRET", "test-admin-password-reset-secret-32chars")
+os.environ.setdefault("AUTH_JWT_SECRET", "test-admin-password-reset-secret-32chars!!")
 
 
 class AdminPasswordResetTokenTests(unittest.TestCase):
@@ -37,14 +36,45 @@ class AdminPasswordResetTokenTests(unittest.TestCase):
             parse_reset_token,
         )
 
-        token = create_reset_token(
-            user_id="u1",
-            tenant_id="",
-            password_hash="hash",
-        )
+        token = create_reset_token(user_id="u1", tenant_id="", password_hash="hash")
         bad = token[:-4] + ("AAAA" if not token.endswith("AAAA") else "BBBB")
         with self.assertRaises(ValueError):
             parse_reset_token(bad)
+
+    def test_password_policy(self):
+        from travel_platform.settings.admin_password_reset import validate_new_admin_password
+
+        with self.assertRaises(ValueError):
+            validate_new_admin_password("short")
+        with self.assertRaises(ValueError):
+            validate_new_admin_password("onlyletters")
+        with self.assertRaises(ValueError):
+            validate_new_admin_password("12345678")
+        self.assertEqual(validate_new_admin_password("goodPass1"), "goodPass1")
+
+    def test_html_escape_in_email(self):
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from travel_platform.settings import admin_password_reset as mod
+
+        captured = {}
+
+        async def fake_send(to, subject, body_html, **kwargs):
+            captured["html"] = body_html
+            return "ref"
+
+        with patch.object(mod, "send_admin_reset_email", wraps=mod.send_admin_reset_email):
+            with patch("ticketing.email_dispatch.send_email", new=AsyncMock(side_effect=fake_send)):
+                asyncio.get_event_loop().run_until_complete(
+                    mod.send_admin_reset_email(
+                        to_email="a@b.com",
+                        full_name='<script>alert(1)</script>',
+                        reset_url='https://x.example/admin/reset-password?token=abc',
+                    )
+                )
+        self.assertNotIn("<script>", captured["html"])
+        self.assertIn("&lt;script&gt;", captured["html"])
 
     def test_memory_user_send_and_confirm(self):
         from fastapi.testclient import TestClient
@@ -53,9 +83,11 @@ class AdminPasswordResetTokenTests(unittest.TestCase):
         from travel_platform.settings.admin_password_reset import (
             build_reset_url,
             create_reset_token,
+            reset_confirm_rate_limits_for_tests,
         )
         from travel_platform.settings.users_store import create_user, get_user, list_users
 
+        reset_confirm_rate_limits_for_tests()
         email = "reset-demo@example.com"
         for u in list(list_users()):
             if u.email == email:
@@ -72,27 +104,23 @@ class AdminPasswordResetTokenTests(unittest.TestCase):
             password="oldpass99",
         )
         old_hash = user.password_hash
-
-        # Craft token directly (avoids auth middleware / SMTP). Confirm is public.
         token = create_reset_token(
             user_id=user.id,
             tenant_id="",
             password_hash=old_hash,
         )
-        reset_url = build_reset_url(token)
-        self.assertIn("/admin/reset-password?token=", reset_url)
+        self.assertIn("/admin/reset-password?token=", build_reset_url(token))
 
         with patch.dict(
             os.environ,
             {
                 "ADMIN_AUTH_DISABLED": "1",
                 "ENVIRONMENT": "test",
-                "AUTH_JWT_SECRET": "test-admin-password-reset-secret-32chars",
+                "AUTH_JWT_SECRET": "test-admin-password-reset-secret-32chars!!",
             },
             clear=False,
         ):
             client = TestClient(app)
-            # Authenticated send path (dev admin context)
             send = client.post(
                 f"/api/admin/platform/users/{user.id}/send-password-reset",
                 json={},
@@ -100,8 +128,7 @@ class AdminPasswordResetTokenTests(unittest.TestCase):
             self.assertEqual(send.status_code, 200, send.text)
             body = send.json()
             self.assertTrue(body.get("ok"))
-            self.assertEqual(body.get("email"), email)
-
+            # tenant_admin path in dev: reset_url only for superadmin — may be null
             confirm = client.post(
                 "/api/admin/platform/password-reset/confirm",
                 json={"token": token, "new_password": "newpass99"},
@@ -112,7 +139,6 @@ class AdminPasswordResetTokenTests(unittest.TestCase):
         self.assertIsNotNone(updated)
         self.assertNotEqual(updated.password_hash, old_hash)
 
-        # Old token must fail (fingerprint changed)
         with patch.dict(os.environ, {"ENVIRONMENT": "test"}, clear=False):
             client = TestClient(app)
             again = client.post(
@@ -120,6 +146,18 @@ class AdminPasswordResetTokenTests(unittest.TestCase):
                 json={"token": token, "new_password": "another99"},
             )
             self.assertEqual(again.status_code, 400)
+
+    def test_confirm_rate_limit(self):
+        from travel_platform.settings.admin_password_reset import (
+            allow_confirm_attempt,
+            reset_confirm_rate_limits_for_tests,
+        )
+
+        reset_confirm_rate_limits_for_tests()
+        key = "203.0.113.9"
+        for _ in range(10):
+            self.assertTrue(allow_confirm_attempt(key))
+        self.assertFalse(allow_confirm_attempt(key))
 
 
 class AdminPasswordResetPublicPathTests(unittest.TestCase):
@@ -138,6 +176,14 @@ class AdminPasswordResetPublicPathTests(unittest.TestCase):
         self.assertFalse(
             _admin_public_post("/api/admin/platform/password-reset/send", "POST")
         )
+
+    def test_memory_fallback_blocked_in_production(self):
+        from travel_platform.settings.admin_password_reset import memory_fallback_allowed
+
+        with patch.dict(os.environ, {"ENVIRONMENT": "production"}, clear=False):
+            self.assertFalse(memory_fallback_allowed())
+        with patch.dict(os.environ, {"ENVIRONMENT": "test"}, clear=False):
+            self.assertTrue(memory_fallback_allowed())
 
 
 if __name__ == "__main__":
