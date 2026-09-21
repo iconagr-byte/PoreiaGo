@@ -30,4 +30,16 @@ describe('demo trip galleries', () => {
     });
     assert.deepEqual(urls, ['/a.jpg', '/b.jpg', '/cover.png', '/stop.png']);
   });
+
+  it('skips platform Achillio default bus and empty covers', () => {
+    const urls = collectTripPhotoUrls({
+      image: '/images/hero-bus-achillio.png',
+      images: ['/images/hero-bus-achillio.png', '/real.jpg'],
+    });
+    assert.deepEqual(urls, ['/real.jpg']);
+    assert.equal(
+      collectTripPhotoUrls({ image: '', images: [] }).length,
+      0,
+    );
+  });
 });

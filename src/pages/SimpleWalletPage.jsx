@@ -24,6 +24,7 @@ import { loadLastPass, patchLastPassQr, saveLastPass } from '../lib/wallet/lastP
 import { setupWalletPwa } from '../lib/wallet/registerWalletPwa.js';
 import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookingStore.js';
 import { loadTrips } from '../lib/trips/tripStore.js';
+import { tripCoverUrl } from '../lib/trips/tripPhotos.js';
 import { isPaid, statusStyle } from '../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../lib/fiscal/fiscalDisplay.js';
 import PassengerTrackCTA from '../components/passenger/PassengerTrackCTA.jsx';
@@ -77,7 +78,7 @@ function tripImageFor(booking) {
   const t =
     trips.find((x) => x.id === booking.tripId) ||
     trips.find((x) => x.title === booking.tripTitle);
-  return t?.image || '/images/hero-bus-achillio.png';
+  return tripCoverUrl(t);
 }
 
 function pickFeaturedBooking(bookings, highlightId) {

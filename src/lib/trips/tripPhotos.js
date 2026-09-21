@@ -1,3 +1,13 @@
+/** Platform default — not a real trip upload; never show as excursion cover. */
+const PLATFORM_DEFAULT_BUS = 'hero-bus-achillio';
+
+function isRealTripPhoto(url) {
+  const u = String(url || '').trim();
+  if (!u) return false;
+  if (u.includes(PLATFORM_DEFAULT_BUS)) return false;
+  return true;
+}
+
 /** Collect unique photo URLs for trip cards / detail bento. */
 export function collectTripPhotoUrls(trip) {
   if (!trip || typeof trip !== 'object') return [];
@@ -16,9 +26,14 @@ export function collectTripPhotoUrls(trip) {
   const out = [];
   for (const item of raw) {
     const url = typeof item === 'string' ? item.trim() : String(item?.url || '').trim();
-    if (!url || seen.has(url)) continue;
+    if (!isRealTripPhoto(url) || seen.has(url)) continue;
     seen.add(url);
     out.push(url);
   }
   return out;
+}
+
+/** First real trip photo, or empty string when none uploaded. */
+export function tripCoverUrl(trip) {
+  return collectTripPhotoUrls(trip)[0] || '';
 }
