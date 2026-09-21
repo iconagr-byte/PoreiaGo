@@ -21,12 +21,13 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 from travel_platform.settings.backup_service import (
-    BACKUP_DIR,
-    create_backup,
+    create_database_backup,
+    create_office_backup,
+    create_platform_backup,
     delete_backup,
     list_backups,
-    read_backup,
-    restore_backup,
+    resolve_backup_path,
+    restore_backup_async,
 )
 from travel_platform.settings.platform_store import get_platform_config, update_platform_config
 from travel_platform.settings.drivers_store import (
@@ -47,6 +48,7 @@ from travel_platform.settings.users_store import (
 )
 from travel_platform.fleet.service_service import UPLOAD_DIR, service_service
 from schemas.platform_admin import (
+    BackupCreateRequest,
     BackupCreateResponse,
     BackupInfoResponse,
     BackupRestoreResponse,
@@ -1552,54 +1554,78 @@ def _require_superadmin(request: Request) -> None:
         )
 
 
+def _backup_info_response(b: dict) -> BackupInfoResponse:
+    return BackupInfoResponse(
+        id=b["id"],
+        filename=b["filename"],
+        size_bytes=b["size_bytes"],
+        created_at=datetime.fromisoformat(str(b["created_at"]).replace("Z", "+00:00")),
+        includes=list(b.get("includes") or []),
+        scope=str(b.get("scope") or "platform"),
+        tenant_id=b.get("tenant_id"),
+        tenant_label=b.get("tenant_label"),
+        kind=str(b.get("kind") or "json"),
+        restorable=bool(b.get("restorable", b.get("scope") != "database")),
+    )
+
+
 @router.get("/backups", response_model=list[BackupInfoResponse])
 async def get_backups(request: Request):
     _require_superadmin(request)
-    return [
-        BackupInfoResponse(
-            id=b["id"],
-            filename=b["filename"],
-            size_bytes=b["size_bytes"],
-            created_at=datetime.fromisoformat(b["created_at"].replace("Z", "+00:00")),
-            includes=b["includes"],
-        )
-        for b in list_backups()
-    ]
+    return [_backup_info_response(b) for b in list_backups()]
 
 
 @router.post("/backups", response_model=BackupCreateResponse)
-async def post_backup(request: Request):
+async def post_backup(request: Request, body: BackupCreateRequest | None = None):
     _require_superadmin(request)
-    b = create_backup()
-    return BackupCreateResponse(
-        backup=BackupInfoResponse(
-            id=b["id"],
-            filename=b["filename"],
-            size_bytes=b["size_bytes"],
-            created_at=datetime.fromisoformat(b["created_at"].replace("Z", "+00:00")),
-            includes=b["includes"],
-        ),
-        message="Το backup δημιουργήθηκε επιτυχώς",
-    )
+    payload = body or BackupCreateRequest()
+    scope = payload.scope or "platform"
+    try:
+        if scope == "office":
+            if not payload.tenant_id:
+                raise HTTPException(status_code=400, detail="Επίλεξε γραφείο για office backup")
+            b = await create_office_backup(
+                payload.tenant_id,
+                client_extras=payload.client_extras,
+            )
+            msg = f"Backup γραφείου «{b.get('tenant_label') or payload.tenant_id}» έτοιμο"
+        elif scope == "database":
+            b = await create_database_backup()
+            msg = "Database dump έτοιμο (λήψη μόνο — όχι restore από UI)"
+        else:
+            b = create_platform_backup()
+            msg = "Backup πλατφόρμας έτοιμο"
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Αποτυχία backup: {exc}") from exc
+
+    return BackupCreateResponse(backup=_backup_info_response(b), message=msg)
 
 
 @router.post("/backups/{backup_id}/restore", response_model=BackupRestoreResponse)
 async def post_restore(request: Request, backup_id: str):
     _require_superadmin(request)
     try:
-        result = restore_backup(backup_id)
+        result = await restore_backup_async(backup_id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Backup not found") from None
-    return BackupRestoreResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return BackupRestoreResponse(**{k: v for k, v in result.items() if k in BackupRestoreResponse.model_fields})
 
 
 @router.get("/backups/{backup_id}/download")
 async def download_backup(request: Request, backup_id: str):
     _require_superadmin(request)
-    path = BACKUP_DIR / f"{backup_id}.json"
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Backup not found")
-    return FileResponse(path, filename=path.name, media_type="application/json")
+    try:
+        path = resolve_backup_path(backup_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Backup not found") from None
+    media = "application/gzip" if path.name.endswith(".gz") else "application/json"
+    return FileResponse(path, filename=path.name, media_type=media)
 
 
 @router.delete("/backups/{backup_id}", status_code=204)

@@ -886,8 +886,8 @@ def delete_driver(driver_id: str, *, tenant_id: str | None = None) -> None:
     _persist()
 
 
-def drivers_for_export() -> list[dict]:
-    return [_driver_to_row(d) for d in list_drivers()]
+def drivers_for_export(tenant_id: str | None = None) -> list[dict]:
+    return [_driver_to_row(d) for d in list_drivers(tenant_id=tenant_id)]
 
 
 def replace_drivers_from_backup(rows: list[dict]) -> int:
@@ -898,3 +898,20 @@ def replace_drivers_from_backup(rows: list[dict]) -> int:
         _drivers[driver.id] = driver
     _persist()
     return len(_drivers)
+
+
+def replace_drivers_for_tenant(tenant_id: str, rows: list[dict]) -> int:
+    """Replace only this office's drivers — leave other tenants untouched."""
+    global _drivers
+    tid = _normalize_tenant_id(tenant_id)
+    kept = {did: d for did, d in _ensure().items() if _driver_tenant_id(d) != tid}
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        patched = {**row, "tenant_id": tid}
+        driver = _driver_from_row(patched)
+        driver.tenant_id = tid
+        kept[driver.id] = driver
+    _drivers = kept
+    _persist()
+    return sum(1 for d in _drivers.values() if _driver_tenant_id(d) == tid)
