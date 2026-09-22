@@ -35,6 +35,7 @@ import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.
 import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
+import RentGuestNav from '../components/rental/RentGuestNav.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
 import RentBrandMark from '../components/rental/RentBrandMark.jsx';
@@ -196,22 +197,33 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
     <div className={`rent-phone-stage${isMobile ? '' : ' rent-phone-stage--desktop'}`}>
       <div className="rent-app rent-app--guest">
         <header className="rent-topbar rent-topbar--guest">
-          <button
-            type="button"
-            className="rent-topbar-brand"
-            aria-label={branding.brandLabel}
-            onClick={() => {
-              /* no-op */
-            }}
-          >
-            <RentBrandMark
-              label={branding.brandLabel}
-              logoUrl={branding.logoUrl}
-              showName={branding.showName}
-              subtitle={branding.brandSubtitle}
+          <div className="rent-topbar-row">
+            <button
+              type="button"
+              className="rent-topbar-brand"
+              aria-label={branding.brandLabel}
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            >
+              <RentBrandMark
+                label={branding.brandLabel}
+                logoUrl={branding.logoUrl}
+                showName={branding.showName}
+                subtitle={branding.brandSubtitle}
+              />
+            </button>
+            <RentGuestNav />
+            <RentGuestTopActions
+              onAccount={onRequireLogin}
+              phone={String(siteAppearance?.footer_contact_phone || '').trim()}
+              onFindVehicle={() => {
+                document
+                  .getElementById('rent-guest-search')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
             />
-          </button>
-          <RentGuestTopActions onAccount={onRequireLogin} />
+          </div>
         </header>
 
         <main className="rent-home rent-home--guest-land">

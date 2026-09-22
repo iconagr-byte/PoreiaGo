@@ -51,7 +51,7 @@ export default function RentGuestLandingExtras({
         </div>
       </section>
 
-      <section className="rent-land-band rent-land-band--dark" aria-label="Πώς λειτουργεί">
+      <section id="rent-guest-how" className="rent-land-band rent-land-band--dark" aria-label="Πώς λειτουργεί">
         <div className="rent-land-inner">
           <header className="rent-land-head rent-land-head--center">
             <h2 className="rent-land-title rent-land-title--light">Πώς κλείνεις</h2>
@@ -79,7 +79,7 @@ export default function RentGuestLandingExtras({
         </div>
       </section>
 
-      <section className="rent-land-band rent-land-band--mist" aria-label="Τι περιλαμβάνει">
+      <section id="rent-guest-services" className="rent-land-band rent-land-band--mist" aria-label="Τι περιλαμβάνει">
         <div className="rent-land-inner">
           <header className="rent-land-head">
             <p className="rent-land-eyebrow">Υπηρεσία</p>
