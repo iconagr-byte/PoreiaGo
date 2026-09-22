@@ -935,7 +935,7 @@
 
 @media (min-width: 900px) {
   .rent-topbar-brand {
-    max-width: min(28vw, 16rem);
+    max-width: min(36vw, 20rem);
   }
 
   .rent-top-chip--menu .rent-top-chip-label {
