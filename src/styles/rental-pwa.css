@@ -4103,7 +4103,7 @@
 
 .rent-phone-stage--desktop .rent-app--guest .rent-topbar-brand {
   color: var(--rent-ink);
-  max-width: 16rem;
+  max-width: 20rem;
 }
 
 .rent-phone-stage--desktop .rent-app--guest .rent-btn-ghost {
