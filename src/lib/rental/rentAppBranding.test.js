@@ -5,20 +5,25 @@ import {
   DEFAULT_RENT_APP_BRANDING,
   isGenericRentOfficeLabel,
   resolveRentAppBranding,
+  splitRentBrandLabel,
 } from './rentAppBranding.js';
 
 const empty = resolveRentAppBranding({});
-console.assert(empty.brandLabel === 'Ενοικιάσεις', 'default brand');
+console.assert(empty.brandLabel === 'Poreiago Rent', 'default brand');
 console.assert(empty.brandSubtitle === '', 'no default subtitle');
 console.assert(empty.title === DEFAULT_RENT_APP_BRANDING.rent_hero_title, 'default title');
 console.assert(empty.logoUrl === '', 'no logo by default');
 
 console.assert(isGenericRentOfficeLabel('Γραφείο') === true, 'generic greek');
 console.assert(isGenericRentOfficeLabel('Office') === true, 'generic en');
+console.assert(isGenericRentOfficeLabel('Ενοικιάσεις') === true, 'generic rentals');
 console.assert(isGenericRentOfficeLabel('Achillio Travel') === false, 'real name');
 
 const grafio = resolveRentAppBranding({ footer_brand_name: 'Γραφείο' });
-console.assert(grafio.brandLabel === 'Ενοικιάσεις', 'strip placeholder Γραφείο');
+console.assert(grafio.brandLabel === 'Poreiago Rent', 'strip placeholder Γραφείο');
+
+const enoik = resolveRentAppBranding({ rent_office_name: 'Ενοικιάσεις' });
+console.assert(enoik.brandLabel === 'Poreiago Rent', 'strip Ενοικιάσεις');
 
 const office = resolveRentAppBranding({
   rent_office_name: 'Achillio Rent',
@@ -30,7 +35,7 @@ console.assert(office.brandLabel === 'Achillio Rent', 'custom office');
 console.assert(office.title === 'Κλείσε αυτοκίνητο σήμερα', 'custom title');
 console.assert(office.isCustomized === true, 'customized flag');
 console.assert(office.logoUrl === '/api/site/assets/logo', 'logo kept');
-console.assert(office.brandSubtitle === 'Ενοικιάσεις', 'subtitle when real office');
+console.assert(office.brandSubtitle === '', 'no subtitle under wordmark');
 
 const guest = resolveRentAppBranding(
   { rent_guest_hero_title: 'Δες στόλο' },
@@ -51,5 +56,8 @@ console.assert(obsolete.copy === '', 'obsolete guest copy stripped');
 
 const fromFooter = resolveRentAppBranding({ footer_brand_name: 'Poreia Office' });
 console.assert(fromFooter.brandLabel === 'Poreia Office', 'footer fallback');
+
+const split = splitRentBrandLabel('Poreiago Rent');
+console.assert(split.primary === 'Poreiago' && split.accent === 'Rent', 'split wordmark');
 
 console.log('rentAppBranding: OK');

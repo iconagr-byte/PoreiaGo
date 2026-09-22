@@ -7,6 +7,7 @@ import { isPlatformPlaceholderLogo } from '../branding/officeBrand.js';
 
 export const DEFAULT_RENT_APP_BRANDING = {
   rent_office_name: '',
+  rent_brand_label: 'Poreiago Rent',
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
@@ -17,7 +18,8 @@ export const DEFAULT_RENT_APP_BRANDING = {
 };
 
 /** Names that look like empty admin placeholders — never show alone on /rent. */
-const GENERIC_OFFICE_LABEL_RE = /^(γραφείο|office|το γραφείο|agency)$/i;
+const GENERIC_OFFICE_LABEL_RE =
+  /^(γραφείο|office|το γραφείο|agency|ενοικιάσεις|enoikiaseis|rentals?)$/i;
 
 /** Legacy guest copy removed from /rent hero — treat as empty if still stored. */
 const OBSOLETE_RENT_GUEST_HERO_COPY =
@@ -25,6 +27,16 @@ const OBSOLETE_RENT_GUEST_HERO_COPY =
 
 export function isGenericRentOfficeLabel(name) {
   return !String(name || '').trim() || GENERIC_OFFICE_LABEL_RE.test(String(name).trim());
+}
+
+/** Split «Poreiago Rent» style labels into word + Rent accent. */
+export function splitRentBrandLabel(label) {
+  const name = String(label || '').trim() || DEFAULT_RENT_APP_BRANDING.rent_brand_label;
+  const match = name.match(/^(.*)\s+(Rent)$/i);
+  if (match && match[1].trim()) {
+    return { primary: match[1].trim(), accent: match[2] };
+  }
+  return { primary: name, accent: '' };
 }
 
 /**
@@ -41,8 +53,7 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     .map((v) => String(v || '').trim())
     .filter((v) => v && !isGenericRentOfficeLabel(v));
 
-  const office = candidates[0] || 'Ενοικιάσεις';
-  const hasRealOfficeName = candidates.length > 0;
+  const office = candidates[0] || DEFAULT_RENT_APP_BRANDING.rent_brand_label;
 
   const rawLogo = appearance.logo_url || '';
   const logoUrl = isPlatformPlaceholderLogo(rawLogo) ? '' : String(rawLogo).trim();
@@ -73,8 +84,8 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     brandLabel: office,
     logoUrl,
     showName: appearance.logo_show_name !== false,
-    /** Secondary line under the name — only when a real office brand exists. */
-    brandSubtitle: hasRealOfficeName ? 'Ενοικιάσεις' : '',
+    /** No subtitle under the wordmark — keeps the header clean. */
+    brandSubtitle: '',
     title,
     titleAccent,
     copy,

@@ -214,23 +214,23 @@
 }
 
 .rent-hero-brand--landing .rent-brand-mark-name {
-  font-size: clamp(1.15rem, 3.5vw, 1.45rem);
-  max-width: min(70vw, 18rem);
+  font-size: clamp(1.35rem, 4vw, 1.7rem);
+  max-width: min(78vw, 22rem);
 }
 
 .rent-hero-brand--landing .rent-brand-mark-badge {
-  width: 2.7rem;
-  height: 2.7rem;
-  border-radius: 0.95rem;
+  width: 3.35rem;
+  height: 3.35rem;
+  border-radius: 1.1rem;
 }
 
 .rent-hero-brand--landing .rent-brand-mark-icon {
-  font-size: 1.35rem;
+  font-size: 1.65rem;
 }
 
 .rent-hero-brand--landing .rent-brand-mark-logo-wrap {
-  height: 2.7rem;
-  max-width: 9rem;
+  height: 3.35rem;
+  max-width: 10.5rem;
 }
 
 .rent-hero-title {
@@ -497,8 +497,8 @@
   text-align: left;
   display: inline-flex;
   align-items: center;
-  max-width: min(48vw, 15rem);
-  min-height: 2.5rem;
+  max-width: min(64vw, 18rem);
+  min-height: 3.15rem;
   flex-shrink: 0;
 }
 
@@ -512,43 +512,57 @@
 .rent-brand-mark {
   display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.8rem;
   min-width: 0;
   max-width: 100%;
 }
 
 .rent-brand-mark-badge {
   flex-shrink: 0;
-  width: 2.55rem;
-  height: 2.55rem;
-  border-radius: 0.95rem;
+  width: 3.15rem;
+  height: 3.15rem;
+  border-radius: 1.05rem;
   display: grid;
   place-items: center;
-  background: linear-gradient(155deg, #12a594 0%, #0b3d4a 72%);
+  position: relative;
+  background:
+    radial-gradient(120% 100% at 18% 12%, rgba(255, 255, 255, 0.38) 0%, transparent 42%),
+    linear-gradient(155deg, #1bb9a4 0%, #0d8f7f 42%, #0b3d4a 100%);
   color: #fff;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.28) inset,
-    0 8px 18px rgba(11, 61, 74, 0.26);
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 0 0 1px rgba(11, 61, 74, 0.12),
+    0 10px 22px rgba(11, 61, 74, 0.28);
+}
+
+.rent-brand-mark-badge::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  pointer-events: none;
 }
 
 .rent-brand-mark-icon {
-  font-size: 1.28rem;
+  font-size: 1.55rem;
   font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
   line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
 }
 
 .rent-brand-mark-logo-wrap {
   flex-shrink: 0;
-  height: 2.55rem;
-  max-width: 7.5rem;
+  height: 3.15rem;
+  max-width: 9.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.15rem 0.35rem;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
 }
 
 .rent-brand-mark-logo {
@@ -569,15 +583,28 @@
 
 .rent-brand-mark-name {
   font-family: var(--wallet-display);
-  font-size: 1.08rem;
-  font-weight: 740;
-  letter-spacing: -0.04em;
-  line-height: 1.12;
+  font-size: 1.28rem;
+  font-weight: 760;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
   color: var(--rent-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 11rem;
+  max-width: min(52vw, 14.5rem);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.rent-brand-mark-word {
+  color: inherit;
+}
+
+.rent-brand-mark-rent {
+  color: var(--rent-teal);
+  font-weight: 780;
+  letter-spacing: -0.03em;
 }
 
 .rent-brand-mark-sub {
@@ -592,18 +619,28 @@
 
 .rent-brand-mark--compact .rent-brand-mark-badge,
 .rent-brand-mark--compact .rent-brand-mark-logo-wrap {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.7rem;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 0.8rem;
+}
+
+.rent-brand-mark--compact .rent-brand-mark-icon {
+  font-size: 1.15rem;
 }
 
 .rent-brand-mark--compact .rent-brand-mark-name {
-  font-size: 0.95rem;
+  font-size: 1.02rem;
+  max-width: 11rem;
 }
 
-.rent-brand-mark--on-dark .rent-brand-mark-name {
+.rent-brand-mark--on-dark .rent-brand-mark-name,
+.rent-brand-mark--on-dark .rent-brand-mark-word {
   color: #fff;
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
+
+.rent-brand-mark--on-dark .rent-brand-mark-rent {
+  color: #9af0d8;
 }
 
 .rent-brand-mark--on-dark .rent-brand-mark-sub {
@@ -611,7 +648,9 @@
 }
 
 .rent-brand-mark--on-dark .rent-brand-mark-badge {
-  background: linear-gradient(155deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 100%);
+  background:
+    radial-gradient(120% 100% at 18% 12%, rgba(255, 255, 255, 0.28) 0%, transparent 42%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 100%);
   border: 1px solid rgba(255, 255, 255, 0.28);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
 }
@@ -896,7 +935,7 @@
 
 @media (min-width: 900px) {
   .rent-topbar-brand {
-    max-width: min(28vw, 16rem);
+    max-width: min(36vw, 20rem);
   }
 
   .rent-top-chip--menu .rent-top-chip-label {
@@ -4064,7 +4103,7 @@
 
 .rent-phone-stage--desktop .rent-app--guest .rent-topbar-brand {
   color: var(--rent-ink);
-  max-width: 16rem;
+  max-width: 20rem;
 }
 
 .rent-phone-stage--desktop .rent-app--guest .rent-btn-ghost {
