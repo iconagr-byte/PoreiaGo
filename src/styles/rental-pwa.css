@@ -834,6 +834,29 @@
   font-size: 1.2rem;
 }
 
+.rent-top-menu--guest {
+  min-width: 15.5rem;
+  max-height: min(70vh, 28rem);
+  overflow-y: auto;
+}
+
+.rent-top-menu-sep {
+  height: 1px;
+  margin: 0.35rem 0.45rem;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.rent-top-menu-item--static {
+  cursor: default;
+  color: #047857;
+  font-weight: 700;
+}
+
+.rent-top-menu-item--static:hover {
+  background: rgba(16, 185, 129, 0.08);
+  color: #047857;
+}
+
 .rent-top-menu--account {
   min-width: 11.5rem;
 }
@@ -872,32 +895,12 @@
 }
 
 @media (min-width: 900px) {
-  .rent-guest-nav {
-    display: inline-flex;
-  }
-
-  .rent-guest-nav-mobile {
-    display: none;
-  }
-
-  .rent-top-trust {
-    display: inline-flex;
-  }
-
   .rent-topbar-brand {
     max-width: min(28vw, 16rem);
   }
-}
 
-@media (max-width: 899px) {
-  .rent-top-chip--cta .rent-top-chip-label,
-  .rent-top-chip--ghost .rent-top-chip-label {
-    display: none;
-  }
-
-  .rent-top-chip--cta,
-  .rent-top-chip--ghost {
-    padding: 0.35rem 0.45rem;
+  .rent-top-chip--menu .rent-top-chip-label {
+    display: inline;
   }
 }
 
