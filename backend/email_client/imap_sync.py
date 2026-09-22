@@ -383,7 +383,13 @@ async def sync_imap_to_database_async(
     if email_settings_id:
         account = await get_settings(email_settings_id, with_password=True)
         if not account:
-            return {"ok": False, "error": "Account not found", "synced": 0, "folders": {}, "errors": []}
+            return {
+                "ok": False,
+                "error": "Ο λογαριασμός email δεν βρέθηκε — επιλέξτε ή αποθηκεύστε ξανά από Ρυθμίσεις Email",
+                "synced": 0,
+                "folders": {},
+                "errors": [],
+            }
         return await sync_account_imap(account, batch_per_folder=batch_per_folder)
 
     # Background / bulk sync must include tenant:* accounts, not only owner_key=default.
