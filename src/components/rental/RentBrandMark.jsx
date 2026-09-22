@@ -1,14 +1,19 @@
 import { useState } from 'react';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import {
+  DEFAULT_RENT_APP_BRANDING,
+  splitRentBrandLabel,
+} from '../../lib/rental/rentAppBranding.js';
+
+const DEFAULT_LABEL = DEFAULT_RENT_APP_BRANDING.rent_brand_label;
 
 /**
  * Rent header / hero brand — logo image when available, otherwise teal mark + wordmark.
- * Replaces the bare «Γραφείο» text that looked like a placeholder.
  *
  * @param {'default' | 'onDark'} variant
  */
 export default function RentBrandMark({
-  label = 'Ενοικιάσεις',
+  label = DEFAULT_LABEL,
   logoUrl = '',
   showName = true,
   subtitle = '',
@@ -16,7 +21,8 @@ export default function RentBrandMark({
   variant = 'default',
 } = {}) {
   const [imgBroken, setImgBroken] = useState(false);
-  const name = String(label || '').trim() || 'Ενοικιάσεις';
+  const name = String(label || '').trim() || DEFAULT_LABEL;
+  const { primary, accent } = splitRentBrandLabel(name);
   const src = !imgBroken && logoUrl ? resolveSiteAssetUrl(logoUrl) : '';
   const sub = String(subtitle || '').trim();
   const showSub = Boolean(sub) && sub.toLowerCase() !== name.toLowerCase();
@@ -29,6 +35,16 @@ export default function RentBrandMark({
     .filter(Boolean)
     .join(' ');
 
+  const wordmark = (
+    <span className="rent-brand-mark-copy">
+      <span className="rent-brand-mark-name">
+        <span className="rent-brand-mark-word">{primary}</span>
+        {accent ? <span className="rent-brand-mark-rent">{accent}</span> : null}
+      </span>
+      {showSub ? <span className="rent-brand-mark-sub">{sub}</span> : null}
+    </span>
+  );
+
   if (src) {
     return (
       <span className={rootClass}>
@@ -40,12 +56,7 @@ export default function RentBrandMark({
             onError={() => setImgBroken(true)}
           />
         </span>
-        {showName ? (
-          <span className="rent-brand-mark-copy">
-            <span className="rent-brand-mark-name">{name}</span>
-            {showSub ? <span className="rent-brand-mark-sub">{sub}</span> : null}
-          </span>
-        ) : null}
+        {showName ? wordmark : null}
       </span>
     );
   }
@@ -55,10 +66,7 @@ export default function RentBrandMark({
       <span className="rent-brand-mark-badge" aria-hidden>
         <span className="material-symbols-outlined rent-brand-mark-icon">directions_car</span>
       </span>
-      <span className="rent-brand-mark-copy">
-        <span className="rent-brand-mark-name">{name}</span>
-        {showSub ? <span className="rent-brand-mark-sub">{sub}</span> : null}
-      </span>
+      {wordmark}
     </span>
   );
 }
