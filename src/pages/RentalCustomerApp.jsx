@@ -35,7 +35,6 @@ import RentGuestLandingExtras from '../components/rental/RentGuestLandingExtras.
 import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
-import RentGuestNav from '../components/rental/RentGuestNav.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
 import RentBrandMark from '../components/rental/RentBrandMark.jsx';
@@ -213,7 +212,6 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                 subtitle={branding.brandSubtitle}
               />
             </button>
-            <RentGuestNav />
             <RentGuestTopActions
               onAccount={onRequireLogin}
               phone={String(siteAppearance?.footer_contact_phone || '').trim()}

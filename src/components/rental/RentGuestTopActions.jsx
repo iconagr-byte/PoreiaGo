@@ -3,13 +3,25 @@ import { Link } from 'react-router-dom';
 import { getRentLang, setRentLang } from '../../lib/rental/rentI18n.js';
 import { markPreferRentLookup } from '../../lib/rental/preferRentLookup.js';
 
+const NAV_ITEMS = [
+  { id: 'rent-guest-search', el: 'Αναζήτηση', en: 'Search', icon: 'search' },
+  { id: 'rent-guest-fleet', el: 'Στόλος', en: 'Fleet', icon: 'directions_car' },
+  { id: 'rent-guest-how', el: 'Πώς κλείνεις', en: 'How it works', icon: 'route' },
+  { id: 'rent-guest-services', el: 'Υπηρεσίες', en: 'Services', icon: 'verified_user' },
+];
+
 function phoneHref(phone) {
   const digits = String(phone || '').replace(/[^\d+]/g, '');
   return digits ? `tel:${digits}` : '';
 }
 
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  el?.scrollIntoView({ behavior: 'smooth', block: id === 'rent-guest-search' ? 'center' : 'start' });
+}
+
 /**
- * Guest header — find booking / support / account / language / Rent My Wallet.
+ * Guest header — one compact Menu + language + Rent My Wallet.
  * My Wallet always opens /rent/wallet — never bus /my-booking.
  */
 export default function RentGuestTopActions({
@@ -18,7 +30,7 @@ export default function RentGuestTopActions({
   phone = '',
 } = {}) {
   const [lang, setLang] = useState(() => getRentLang());
-  const [accountOpen, setAccountOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef(null);
   const tel = phoneHref(phone);
 
@@ -27,24 +39,26 @@ export default function RentGuestTopActions({
   }, []);
 
   useEffect(() => {
-    if (!accountOpen) return undefined;
+    if (!menuOpen) return undefined;
     const onDoc = (e) => {
-      if (!rootRef.current?.contains(e.target)) setAccountOpen(false);
+      if (!rootRef.current?.contains(e.target)) setMenuOpen(false);
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [accountOpen]);
+  }, [menuOpen]);
 
   const el = lang !== 'en';
+  const menuLabel = el ? 'Μενού' : 'Menu';
   const bookingLabel = el ? 'Η κράτησή μου' : 'My booking';
   const findLabel = el ? 'Βρες όχημα' : 'Find a car';
   const walletLabel = 'My Wallet';
   const loginLabel = el ? 'Είσοδος' : 'Sign in';
   const registerLabel = el ? 'Εγγραφή' : 'Register';
-  const accountAria = el ? 'Λογαριασμός' : 'Account';
   const walletTitle = el ? 'My Wallet ενοικιάσεων' : 'Rent My Wallet';
-  const supportLabel = el ? 'Κλήση' : 'Call';
-  const checkInHint = el ? 'Online check-in' : 'Online check-in';
+  const supportLabel = el ? 'Κλήση γραφείου' : 'Call office';
+  const checkInHint = 'Online check-in';
+  const browseKicker = el ? 'Περιήγηση' : 'Browse';
+  const accountKicker = el ? 'Λογαριασμός' : 'Account';
 
   const switchLang = (next) => {
     const value = setRentLang(next);
@@ -56,74 +70,97 @@ export default function RentGuestTopActions({
     }
   };
 
+  const close = () => setMenuOpen(false);
+
+  const goSection = (id) => {
+    close();
+    scrollToSection(id);
+  };
+
   return (
     <div className="rent-top-actions" ref={rootRef}>
-      <span className="rent-top-trust" title={checkInHint}>
-        <span className="rent-top-trust-dot" aria-hidden />
-        <span className="rent-top-trust-label">{checkInHint}</span>
-      </span>
-
-      {tel ? (
-        <a
-          href={tel}
-          className="rent-top-chip rent-top-chip--ghost"
-          title={el ? 'Τηλέφωνο γραφείου' : 'Office phone'}
-        >
-          <span className="material-symbols-outlined" aria-hidden>
-            call
-          </span>
-          <span className="rent-top-chip-label">{supportLabel}</span>
-        </a>
-      ) : null}
-
-      {typeof onFindVehicle === 'function' ? (
-        <button
-          type="button"
-          className="rent-top-chip rent-top-chip--cta"
-          onClick={onFindVehicle}
-          title={findLabel}
-        >
-          <span className="material-symbols-outlined" aria-hidden>
-            search
-          </span>
-          <span className="rent-top-chip-label">{findLabel}</span>
-        </button>
-      ) : null}
-
-      <a
-        href="/rent/my-booking"
-        className="rent-top-chip"
-        title={el ? 'Εύρεση κράτησης ενοικίασης' : 'Find rent booking'}
-      >
-        <span className="material-symbols-outlined" aria-hidden>
-          confirmation_number
-        </span>
-        <span className="rent-top-chip-label">{bookingLabel}</span>
-      </a>
-
       <div className="rent-top-chip-wrap">
         <button
           type="button"
-          className={`rent-top-icon-btn${accountOpen ? ' is-open' : ''}`}
-          aria-label={accountAria}
-          aria-expanded={accountOpen}
+          className={`rent-top-chip rent-top-chip--menu${menuOpen ? ' is-open' : ''}`}
+          aria-label={menuLabel}
+          aria-expanded={menuOpen}
           aria-haspopup="menu"
-          title={accountAria}
-          onClick={() => setAccountOpen((v) => !v)}
+          title={menuLabel}
+          onClick={() => setMenuOpen((v) => !v)}
         >
           <span className="material-symbols-outlined" aria-hidden>
-            person
+            {menuOpen ? 'close' : 'menu'}
           </span>
+          <span className="rent-top-chip-label">{menuLabel}</span>
         </button>
-        {accountOpen ? (
-          <div className="rent-top-menu rent-top-menu--account" role="menu">
-            <p className="rent-top-menu-kicker">{el ? 'Λογαριασμός Rent' : 'Rent account'}</p>
+        {menuOpen ? (
+          <div className="rent-top-menu rent-top-menu--guest" role="menu">
+            <p className="rent-top-menu-kicker">{browseKicker}</p>
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="menuitem"
+                className="rent-top-menu-item"
+                onClick={() => goSection(item.id)}
+              >
+                <span className="material-symbols-outlined" aria-hidden>
+                  {item.icon}
+                </span>
+                {el ? item.el : item.en}
+              </button>
+            ))}
+
+            <div className="rent-top-menu-sep" role="separator" />
+
             <button
               type="button"
               role="menuitem"
               className="rent-top-menu-item"
               onClick={() => {
-                setAccountOpen(false);
+                close();
+                if (typeof onFindVehicle === 'function') onFindVehicle();
+                else scrollToSection('rent-guest-search');
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                travel_explore
+              </span>
+              {findLabel}
+            </button>
+            <a
+              href="/rent/my-booking"
+              role="menuitem"
+              className="rent-top-menu-item"
+              onClick={close}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                confirmation_number
+              </span>
+              {bookingLabel}
+            </a>
+            <span className="rent-top-menu-item rent-top-menu-item--static" role="menuitem">
+              <span className="rent-top-trust-dot" aria-hidden />
+              {checkInHint}
+            </span>
+            {tel ? (
+              <a href={tel} role="menuitem" className="rent-top-menu-item" onClick={close}>
+                <span className="material-symbols-outlined" aria-hidden>
+                  call
+                </span>
+                {supportLabel}
+              </a>
+            ) : null}
+
+            <div className="rent-top-menu-sep" role="separator" />
+            <p className="rent-top-menu-kicker">{accountKicker}</p>
+            <button
+              type="button"
+              role="menuitem"
+              className="rent-top-menu-item"
+              onClick={() => {
+                close();
                 onAccount?.();
               }}
             >
@@ -137,19 +174,14 @@ export default function RentGuestTopActions({
               role="menuitem"
               className="rent-top-menu-item"
               state={{ from: { pathname: '/rent/wallet' }, rentEntrance: true }}
-              onClick={() => setAccountOpen(false)}
+              onClick={close}
             >
               <span className="material-symbols-outlined" aria-hidden>
                 person_add
               </span>
               {registerLabel}
             </Link>
-            <a
-              href="/rent/wallet"
-              role="menuitem"
-              className="rent-top-menu-item"
-              onClick={() => setAccountOpen(false)}
-            >
+            <a href="/rent/wallet" role="menuitem" className="rent-top-menu-item" onClick={close}>
               <span className="material-symbols-outlined" aria-hidden>
                 account_balance_wallet
               </span>
