@@ -22,6 +22,10 @@ import {
   buildEmailChecksFromResult,
   buildPendingEmailChecks,
 } from '../../../lib/email/emailConnectionChecks.js';
+import {
+  readActiveEmailAccountId,
+  writeActiveEmailAccountId,
+} from '../../../lib/email/activeEmailAccount.js';
 import { PROVIDERS, detectProvider } from '../../../lib/email/emailProviderPresets.js';
 import EmailConnectWizard from './EmailConnectWizard.jsx';
 import EmailConnectionCheckList from './EmailConnectionCheckList.jsx';
@@ -108,7 +112,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
     try {
       const list = await fetchEmailSettings();
       setAccounts(list);
-      if (list.length && onAccountChange && !localStorage.getItem('email_active_account')) {
+      if (list.length && onAccountChange && !readActiveEmailAccountId()) {
         onAccountChange(list[0].id);
       }
     } catch (err) {
@@ -434,7 +438,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
         const created = await createEmailSettings(payload);
         toast.success('Ο λογαριασμός αποθηκεύτηκε');
         onAccountChange?.(created.id);
-        localStorage.setItem('email_active_account', created.id);
+        writeActiveEmailAccountId(created.id);
       } else {
         const patch = { ...payload };
         if (!patch.mail_password) delete patch.mail_password;
@@ -512,7 +516,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
             });
             toast.success('Ο λογαριασμός εισήχθη και αποθηκεύτηκε');
             onAccountChange?.(created.id);
-            localStorage.setItem('email_active_account', created.id);
+            writeActiveEmailAccountId(created.id);
             setEditingId(null);
             load();
             return;
@@ -639,7 +643,7 @@ export default function EmailSettingsPanel({ onAccountChange, openConnectWizard 
           onConnected={(created) => {
             setShowWizard(false);
             onAccountChange?.(created.id);
-            localStorage.setItem('email_active_account', created.id);
+            writeActiveEmailAccountId(created.id);
             load();
           }}
         />
