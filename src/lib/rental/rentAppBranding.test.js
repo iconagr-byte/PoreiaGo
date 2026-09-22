@@ -9,7 +9,7 @@ import {
 
 const empty = resolveRentAppBranding({});
 console.assert(empty.brandLabel === 'Ενοικιάσεις', 'default brand');
-console.assert(empty.brandSubtitle === 'Self-drive · Wallet', 'default subtitle');
+console.assert(empty.brandSubtitle === '', 'no default subtitle');
 console.assert(empty.title === DEFAULT_RENT_APP_BRANDING.rent_hero_title, 'default title');
 console.assert(empty.logoUrl === '', 'no logo by default');
 

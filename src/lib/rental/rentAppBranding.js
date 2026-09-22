@@ -73,8 +73,8 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     brandLabel: office,
     logoUrl,
     showName: appearance.logo_show_name !== false,
-    /** Secondary line under the name — office tag or default rent cue. */
-    brandSubtitle: hasRealOfficeName ? 'Ενοικιάσεις' : 'Self-drive · Wallet',
+    /** Secondary line under the name — only when a real office brand exists. */
+    brandSubtitle: hasRealOfficeName ? 'Ενοικιάσεις' : '',
     title,
     titleAccent,
     copy,
