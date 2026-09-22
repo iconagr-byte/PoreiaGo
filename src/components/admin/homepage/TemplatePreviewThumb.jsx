@@ -182,6 +182,16 @@ function CardThumb({ id }) {
       </ThumbFrame>
     );
   }
+  if (id === 'rent_glass' || id === 'rent_editorial' || id === 'rent_price_first' || id === 'rent_pill') {
+    return (
+      <ThumbFrame className="bg-[#f5f5f7] p-1.5 flex flex-col gap-1">
+        <div className={`rounded ${id === 'rent_price_first' ? 'h-[30%]' : 'h-[55%]'} bg-gradient-to-br from-sky-300 to-slate-400`} />
+        <div className="h-1 bg-slate-400/70 rounded" />
+        <div className="h-1 w-2/3 bg-slate-300 rounded" />
+        {id === 'rent_pill' ? <div className="mt-auto h-2 w-1/3 bg-[#0071e3] rounded-full" /> : null}
+      </ThumbFrame>
+    );
+  }
   if (id === 'rent_premium' || id === 'rent_soft') {
     return (
       <ThumbFrame className="bg-white p-1.5 flex flex-col gap-1">
@@ -321,6 +331,32 @@ function LayoutThumb({ id }) {
       <ThumbFrame className="bg-white p-2 grid grid-cols-2 gap-1">
         <div className="bg-slate-200 rounded" />
         <div className="bg-slate-200 rounded" />
+      </ThumbFrame>
+    );
+  }
+  if (id === 'rent_bento') {
+    return (
+      <ThumbFrame className="bg-white p-2 grid grid-cols-3 grid-rows-2 gap-1">
+        <div className="col-span-2 row-span-2 bg-slate-300 rounded" />
+        <div className="bg-slate-200 rounded" />
+        <div className="bg-slate-200 rounded" />
+      </ThumbFrame>
+    );
+  }
+  if (id === 'rent_magazine') {
+    return (
+      <ThumbFrame className="bg-white p-2 flex flex-col gap-1">
+        <div className="h-[48%] bg-slate-400 rounded" />
+        <div className="h-[48%] bg-slate-300 rounded" />
+      </ThumbFrame>
+    );
+  }
+  if (id === 'rent_dense') {
+    return (
+      <ThumbFrame className="bg-white p-1.5 grid grid-cols-4 gap-0.5">
+        {[0,1,2,3,4,5,6,7].map((i) => (
+          <div key={i} className="aspect-square bg-slate-200 rounded-sm" />
+        ))}
       </ThumbFrame>
     );
   }

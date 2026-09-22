@@ -195,6 +195,7 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "footer_template": "classic_columns",
     "intl_trips_layout_template": "editorial_stack",
     "intl_trip_card_template": "abroad_horizontal",
+    "rent_theme_id": "cupertino_soft",
     "rent_fleet_layout_template": "rent_grid_three",
     "rent_fleet_card_template": "rent_premium",
     "trips_section_eyebrow": "Ανακαλύψτε",

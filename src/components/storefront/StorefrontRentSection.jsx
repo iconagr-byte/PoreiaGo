@@ -77,6 +77,7 @@ function RentVehicleCard({ vehicle, templateId, featured = false }) {
       <Link
         to="/rent"
         className="group block overflow-hidden rounded-[22px] bg-[#f5f5f7] border border-black/[0.05] hover:bg-white hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)] transition-all"
+        style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif" }}
       >
         <div
           className={`bg-slate-200 bg-cover bg-center ${featured ? 'aspect-[16/9]' : 'aspect-[16/10]'}`}
@@ -89,6 +90,102 @@ function RentVehicleCard({ vehicle, templateId, featured = false }) {
             <p className="mt-2 text-sm text-[#6e6e73] line-clamp-2">{v.display_blurb}</p>
           ) : null}
           {priceLabel ? <p className="mt-3 text-sm font-semibold text-[#0071e3]">{priceLabel}</p> : null}
+        </div>
+      </Link>
+    );
+  }
+
+  if (templateId === 'rent_glass') {
+    return (
+      <Link
+        to="/rent"
+        className="group block overflow-hidden rounded-[24px] border border-white/60 bg-white/55 backdrop-blur-xl shadow-[0_8px_28px_rgba(0,0,0,0.06)] hover:bg-white/80 transition-all"
+        style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif" }}
+      >
+        <div
+          className={`bg-slate-200/80 bg-cover bg-center ${featured ? 'aspect-[16/9]' : 'aspect-[16/10]'}`}
+          style={photo ? { backgroundImage: `url('${photo}')` } : undefined}
+        />
+        <div className="p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-700/80">{category}</p>
+          <h3 className="mt-1 text-[17px] font-semibold text-[#1d1d1f] tracking-tight">{name}</h3>
+          {priceLabel ? <p className="mt-3 text-sm font-semibold text-[#0071e3]">{priceLabel}</p> : null}
+        </div>
+      </Link>
+    );
+  }
+
+  if (templateId === 'rent_editorial') {
+    return (
+      <Link
+        to="/rent"
+        className="group block overflow-hidden rounded-[28px] bg-white border border-black/[0.04]"
+        style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif" }}
+      >
+        <div
+          className={`bg-slate-200 bg-cover bg-center ${featured ? 'aspect-[21/9]' : 'aspect-[16/9]'}`}
+          style={photo ? { backgroundImage: `url('${photo}')` } : undefined}
+        />
+        <div className="p-6 md:p-8">
+          <p className="text-[12px] font-semibold tracking-wide text-[#86868b]">{category}</p>
+          <h3 className="mt-2 text-2xl md:text-3xl font-semibold text-[#1d1d1f] tracking-tight leading-tight">
+            {name}
+          </h3>
+          {v.display_blurb ? (
+            <p className="mt-3 text-[15px] text-[#6e6e73] leading-relaxed line-clamp-3">{v.display_blurb}</p>
+          ) : null}
+          {priceLabel ? <p className="mt-5 text-[15px] font-semibold text-[#0071e3]">{priceLabel}</p> : null}
+        </div>
+      </Link>
+    );
+  }
+
+  if (templateId === 'rent_price_first') {
+    return (
+      <Link
+        to="/rent"
+        className="group flex items-center gap-4 overflow-hidden rounded-2xl border border-black/[0.06] bg-white p-4 hover:shadow-md transition-shadow"
+        style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif" }}
+      >
+        <div className="min-w-0 flex-1">
+          {priceLabel ? (
+            <p className="text-2xl font-semibold tracking-tight text-[#1d1d1f]">{priceLabel}</p>
+          ) : (
+            <p className="text-2xl font-semibold text-[#86868b]">—</p>
+          )}
+          <h3 className="mt-1 text-[15px] font-semibold text-[#1d1d1f] truncate">{name}</h3>
+          <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#86868b]">{category}</p>
+        </div>
+        <div
+          className="w-20 h-16 shrink-0 rounded-xl bg-slate-200 bg-cover bg-center"
+          style={photo ? { backgroundImage: `url('${photo}')` } : undefined}
+        />
+      </Link>
+    );
+  }
+
+  if (templateId === 'rent_pill') {
+    return (
+      <Link
+        to="/rent"
+        className="group flex flex-col overflow-hidden rounded-[28px] bg-[#f5f5f7] border border-black/[0.04] hover:bg-white transition-colors"
+        style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif" }}
+      >
+        <div
+          className={`bg-slate-200 bg-cover bg-center ${featured ? 'aspect-[16/9]' : 'aspect-[4/3]'}`}
+          style={photo ? { backgroundImage: `url('${photo}')` } : undefined}
+        />
+        <div className="p-4 flex flex-col gap-3">
+          <div>
+            <p className="text-[11px] font-semibold text-[#86868b]">{category}</p>
+            <h3 className="mt-0.5 text-[15px] font-semibold text-[#1d1d1f] tracking-tight truncate">{name}</h3>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            {priceLabel ? <p className="text-sm font-semibold text-[#1d1d1f]">{priceLabel}</p> : <span />}
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-[#0071e3] text-white text-[12px] font-semibold">
+              Κράτηση
+            </span>
+          </div>
         </div>
       </Link>
     );
