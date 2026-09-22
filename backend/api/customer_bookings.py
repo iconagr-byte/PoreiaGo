@@ -53,14 +53,28 @@ async def _wallet_tenant(request: Request) -> str:
     return tid
 
 
+async def _pull_saas_into_wallet(account: dict, tid: str) -> int:
+    """Office / guest SaaS bookings → wallet SQLite (same email + office)."""
+    try:
+        from app.services.customer_wallet_booking_sync import pull_postgres_bookings_into_wallet
+
+        return await pull_postgres_bookings_into_wallet(
+            customer_email=account["email"],
+            tenant_id=tid,
+        )
+    except Exception:
+        return 0
+
+
 @router.get("/api/customer/bookings")
 async def my_bookings(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
     tid = await _wallet_tenant(request)
+    pulled = await _pull_saas_into_wallet(account, tid)
     items = await list_bookings_for_email(account["email"], tenant_id=tid)
-    return {"items": items, "total": len(items)}
+    return {"items": items, "total": len(items), "pulled_from_saas": pulled}
 
 
 @router.post("/api/customer/bookings/sync")
@@ -72,7 +86,7 @@ async def sync_my_bookings(
     """Bulk upsert — client στέλνει τοπικές κρατήσεις, server επιστρέφει πλήρη λίστα."""
     tid = await _wallet_tenant(request)
     try:
-        items = await upsert_many_for_customer(
+        await upsert_many_for_customer(
             account["email"],
             account.get("customer_id"),
             body.bookings,
@@ -80,7 +94,16 @@ async def sync_my_bookings(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"items": items, "total": len(items), "synced": len(body.bookings)}
+    # Also pull office walk-in / checkout rows from Postgres so Wallet shows
+    # tickets without requiring «κωδικός κράτησης» claim.
+    pulled = await _pull_saas_into_wallet(account, tid)
+    items = await list_bookings_for_email(account["email"], tenant_id=tid)
+    return {
+        "items": items,
+        "total": len(items),
+        "synced": len(body.bookings),
+        "pulled_from_saas": pulled,
+    }
 
 
 @router.post("/api/customer/bookings")
