@@ -102,6 +102,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const [fleetLoading, setFleetLoading] = useState(true);
   const [homeCategory, setHomeCategory] = useState('');
   const [homeQuery, setHomeQuery] = useState('');
+  const [fleetSort, setFleetSort] = useState('default');
   const [searchActive, setSearchActive] = useState(false);
   const [detailVehicle, setDetailVehicle] = useState(null);
   const { favorites, toggleFavorite } = useRentFavorites();
@@ -176,20 +177,37 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const showingDemoFleet = useMemo(() => isClientDemoFleet(homeFleet), [homeFleet]);
   const homeCategories = useMemo(() => rentHomeCategoryFilters(homeFleet), [homeFleet]);
 
-  const filteredHomeFleet = homeFleet
-    .filter((v) => (homeCategory ? v.category === homeCategory : true))
-    .filter((v) => {
-      const q = homeQuery.trim().toLowerCase();
-      if (!q) return true;
-      return `${v.model || ''} ${v.category || ''} ${v.category_label || ''} ${v.display_blurb || v.description || ''}`
-        .toLowerCase()
-        .includes(q);
-    });
+  const filteredHomeFleet = useMemo(() => {
+    const rows = homeFleet
+      .filter((v) => (homeCategory ? v.category === homeCategory : true))
+      .filter((v) => {
+        const q = homeQuery.trim().toLowerCase();
+        if (!q) return true;
+        return `${v.model || ''} ${v.category || ''} ${v.category_label || ''} ${v.display_blurb || v.description || ''}`
+          .toLowerCase()
+          .includes(q);
+      });
+
+    if (fleetSort === 'price_asc' || fleetSort === 'price_desc') {
+      const dir = fleetSort === 'price_asc' ? 1 : -1;
+      return [...rows].sort((a, b) => {
+        const pa = Number(a?.daily_rate_eur);
+        const pb = Number(b?.daily_rate_eur);
+        const aOk = Number.isFinite(pa);
+        const bOk = Number.isFinite(pb);
+        if (!aOk && !bOk) return 0;
+        if (!aOk) return 1;
+        if (!bOk) return -1;
+        return (pa - pb) * dir;
+      });
+    }
+    return rows;
+  }, [homeFleet, homeCategory, homeQuery, fleetSort]);
 
   const fleetSubtitle = searchActive
     ? `${filteredHomeFleet.length} διαθέσιμα για τις ημερομηνίες σου`
     : showingDemoFleet
-      ? `${carCount} επιβατικά · ${vanCount} van · demo προεπισκόπηση πλατφόρμας`
+      ? `${carCount} επιβατικά · ${vanCount} van · demo προεπισκόπηση`
       : `${carCount} επιβατικά · ${vanCount} van`;
 
   return (
@@ -303,38 +321,56 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               <div className="rent-land-inner">
                 <header className="rent-pick-head">
                   <div className="rent-pick-head-main">
+                    <p className="rent-pick-eyebrow">Στόλος</p>
                     <h2 className="rent-pick-head-title">
-                      Επιλογές ενοικίασης οχήματος
-                      <span className="rent-pick-head-where">
-                        για
-                        <span className="rent-pick-loc">{branding.brandLabel || 'το γραφείο'}</span>
-                      </span>
+                      Επίλεξε όχημα
+                      <span className="rent-pick-count">{filteredHomeFleet.length}</span>
                     </h2>
                     <p className="rent-pick-head-sub">{fleetSubtitle}</p>
                   </div>
-                  <div className="rent-pick-filters">
-                    <label className="rent-pick-filter">
-                      <span>Φίλτρα</span>
-                      <select
-                        value={homeCategory}
-                        onChange={(e) => setHomeCategory(e.target.value)}
-                      >
-                        {homeCategories.map((c) => (
-                          <option key={c || 'all'} value={c}>
-                            {homeCategoryLabel(c) || 'Επίλεξε'}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="rent-pick-filter rent-pick-filter--search">
-                      <span>Αναζήτηση</span>
-                      <input
-                        type="search"
-                        value={homeQuery}
-                        onChange={(e) => setHomeQuery(e.target.value)}
-                        placeholder="Μοντέλο…"
-                      />
-                    </label>
+
+                  <div className="rent-pick-toolbar">
+                    <div className="rent-pick-cats" role="tablist" aria-label="Κατηγορία">
+                      {homeCategories.map((c) => (
+                        <button
+                          key={c || 'all'}
+                          type="button"
+                          role="tab"
+                          aria-selected={homeCategory === c}
+                          className={`rent-pick-cat${homeCategory === c ? ' is-active' : ''}`}
+                          onClick={() => setHomeCategory(c)}
+                        >
+                          {homeCategoryLabel(c)}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="rent-pick-filters">
+                      <label className="rent-pick-filter rent-pick-filter--search">
+                        <span className="material-symbols-outlined" aria-hidden>
+                          search
+                        </span>
+                        <input
+                          type="search"
+                          value={homeQuery}
+                          onChange={(e) => setHomeQuery(e.target.value)}
+                          placeholder="Μοντέλο ή κατηγορία…"
+                          aria-label="Αναζήτηση οχήματος"
+                        />
+                      </label>
+                      <label className="rent-pick-filter rent-pick-filter--sort">
+                        <span className="visually-hidden">Ταξινόμηση</span>
+                        <select
+                          value={fleetSort}
+                          onChange={(e) => setFleetSort(e.target.value)}
+                          aria-label="Ταξινόμηση"
+                        >
+                          <option value="default">Προεπιλογή</option>
+                          <option value="price_asc">Τιμή ↑</option>
+                          <option value="price_desc">Τιμή ↓</option>
+                        </select>
+                      </label>
+                    </div>
                   </div>
                 </header>
 
@@ -354,11 +390,29 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                     ))}
                   </div>
                 ) : (
-                  <p className="rent-home-fleet-empty">
-                    {searchActive
-                      ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες.'
-                      : 'Δεν υπάρχουν διαθέσιμα οχήματα.'}
-                  </p>
+                  <div className="rent-pick-empty">
+                    <span className="material-symbols-outlined" aria-hidden>
+                      directions_car
+                    </span>
+                    <p>
+                      {searchActive
+                        ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες.'
+                        : 'Δεν βρέθηκαν οχήματα με αυτά τα φίλτρα.'}
+                    </p>
+                    {homeCategory || homeQuery ? (
+                      <button
+                        type="button"
+                        className="rent-pick-empty-reset"
+                        onClick={() => {
+                          setHomeCategory('');
+                          setHomeQuery('');
+                          setFleetSort('default');
+                        }}
+                      >
+                        Καθαρισμός φίλτρων
+                      </button>
+                    ) : null}
+                  </div>
                 )}
               </div>
             </section>
