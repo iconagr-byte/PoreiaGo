@@ -8,17 +8,19 @@ import {
 } from '../../lib/rental/rentBookingSearch.js';
 
 /**
- * Hertz-like rent search bar — themed with rent teal, wired to office locations.
+ * Rent search bar — Hertz/Rentalcars horizontal strip, rent teal brand.
+ * variant="hero" = booking.com-style single strip inside the hero.
  */
 export default function RentBookingSearchBar({
   brandLabel = 'Γραφείο',
   footerAddress = '',
   pickupLocations = [],
-  /** When set (e.g. hero chip click), sync the pickup select. */
   preferredPickup = '',
   onSearch,
   compact = false,
+  variant = 'default',
 } = {}) {
+  const isHero = variant === 'hero';
   const locations = useMemo(
     () => buildRentLocationOptions({ brandLabel, footerAddress, pickupLocations }),
     [brandLabel, footerAddress, pickupLocations],
@@ -26,6 +28,7 @@ export default function RentBookingSearchBar({
 
   const [differentDropoff, setDifferentDropoff] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
+  const [driverAgeOk, setDriverAgeOk] = useState(true);
   const [pickupLocation, setPickupLocation] = useState(locations[0]?.value || 'Γραφείο');
   const [dropoffLocation, setDropoffLocation] = useState(locations[0]?.value || 'Γραφείο');
   const [startTime, setStartTime] = useState(() => defaultPickupDateTime());
@@ -107,34 +110,29 @@ export default function RentBookingSearchBar({
       end_time: endTime,
       promo_code: promoOpen ? String(promoCode || '').trim() : '',
       one_way: differentDropoff,
+      driver_age_ok: driverAgeOk,
     });
     onSearch?.(prefs);
   };
 
-  return (
-    <section className={`rent-search${compact ? ' rent-search--compact' : ''}`} aria-label="Αναζήτηση ενοικίασης">
-      <form className="rent-search-panel" onSubmit={handleSubmit}>
-        <label className="rent-search-toggle">
-          <input
-            type="checkbox"
-            checked={differentDropoff}
-            onChange={(e) => {
-              const on = e.target.checked;
-              setDifferentDropoff(on);
-              if (!on) setDropoffLocation(pickupLocation);
-            }}
-          />
-          <span className="rent-search-switch" aria-hidden />
-          <span>Θα παραδώσω σε διαφορετικό σημείο</span>
-        </label>
+  const rootClass = [
+    'rent-search',
+    compact ? 'rent-search--compact' : '',
+    isHero ? 'rent-search--hero' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
+  return (
+    <section className={rootClass} aria-label="Αναζήτηση ενοικίασης" id="rent-guest-search">
+      <form className="rent-search-panel" onSubmit={handleSubmit}>
         <div className={`rent-search-row${differentDropoff ? ' rent-search-row--split' : ''}`}>
           <div className="rent-search-field rent-search-field--place">
             <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
-              location_on
+              search
             </span>
             <div className="rent-search-field-body">
-              <span className="rent-search-label">Σημείο έναρξης ενοικίασης</span>
+              <span className="rent-search-label">Σημείο παραλαβής</span>
               <select
                 value={pickupLocation}
                 onChange={(e) => {
@@ -174,68 +172,99 @@ export default function RentBookingSearchBar({
             </div>
           ) : null}
 
-          <div className="rent-search-field">
+          <div className="rent-search-field rent-search-field--date">
             <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
               calendar_month
             </span>
             <div className="rent-search-field-body">
-              <span className="rent-search-label">Πότε θα παραλάβεις;</span>
-              <div className="rent-search-datetime">
-                <input
-                  type="date"
-                  value={pickupParts.date}
-                  onChange={(e) => {
-                    const next = mergeDateTime(e.target.value, pickupParts.time);
-                    setStartTime(next);
-                    if (endTime && next && new Date(endTime) <= new Date(next)) {
-                      setEndTime(defaultReturnDateTime(next));
-                    }
-                  }}
-                  aria-label="Ημερομηνία παραλαβής"
-                />
-                <input
-                  type="time"
-                  value={pickupParts.time}
-                  onChange={(e) => setStartTime(mergeDateTime(pickupParts.date, e.target.value))}
-                  aria-label="Ώρα παραλαβής"
-                />
-              </div>
+              <span className="rent-search-label">Παραλαβή</span>
+              <input
+                type="date"
+                value={pickupParts.date}
+                onChange={(e) => {
+                  const next = mergeDateTime(e.target.value, pickupParts.time);
+                  setStartTime(next);
+                  if (endTime && next && new Date(endTime) <= new Date(next)) {
+                    setEndTime(defaultReturnDateTime(next));
+                  }
+                }}
+                aria-label="Ημερομηνία παραλαβής"
+              />
             </div>
           </div>
 
-          <div className="rent-search-field">
+          <div className="rent-search-field rent-search-field--time">
+            <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
+              schedule
+            </span>
+            <div className="rent-search-field-body">
+              <span className="rent-search-label">Ώρα</span>
+              <input
+                type="time"
+                value={pickupParts.time}
+                onChange={(e) => setStartTime(mergeDateTime(pickupParts.date, e.target.value))}
+                aria-label="Ώρα παραλαβής"
+              />
+            </div>
+          </div>
+
+          <div className="rent-search-field rent-search-field--date">
             <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
               event_available
             </span>
             <div className="rent-search-field-body">
-              <span className="rent-search-label">Πότε θα παραδώσεις;</span>
-              <div className="rent-search-datetime">
-                <input
-                  type="date"
-                  value={returnParts.date}
-                  onChange={(e) => setEndTime(mergeDateTime(e.target.value, returnParts.time))}
-                  aria-label="Ημερομηνία επιστροφής"
-                />
-                <input
-                  type="time"
-                  value={returnParts.time}
-                  onChange={(e) => setEndTime(mergeDateTime(returnParts.date, e.target.value))}
-                  aria-label="Ώρα επιστροφής"
-                />
-              </div>
+              <span className="rent-search-label">Επιστροφή</span>
+              <input
+                type="date"
+                value={returnParts.date}
+                onChange={(e) => setEndTime(mergeDateTime(e.target.value, returnParts.time))}
+                aria-label="Ημερομηνία επιστροφής"
+              />
+            </div>
+          </div>
+
+          <div className="rent-search-field rent-search-field--time">
+            <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
+              schedule
+            </span>
+            <div className="rent-search-field-body">
+              <span className="rent-search-label">Ώρα</span>
+              <input
+                type="time"
+                value={returnParts.time}
+                onChange={(e) => setEndTime(mergeDateTime(returnParts.date, e.target.value))}
+                aria-label="Ώρα επιστροφής"
+              />
             </div>
           </div>
 
           <button type="submit" className="rent-search-submit">
             Αναζήτηση
-            <span className="material-symbols-outlined" aria-hidden>
-              arrow_forward
-            </span>
           </button>
         </div>
 
         <div className="rent-search-footer">
-          <label className="rent-search-promo">
+          <label className="rent-search-check">
+            <input
+              type="checkbox"
+              checked={differentDropoff}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setDifferentDropoff(on);
+                if (!on) setDropoffLocation(pickupLocation);
+              }}
+            />
+            <span>Παράδοση σε διαφορετικό σημείο</span>
+          </label>
+          <label className="rent-search-check">
+            <input
+              type="checkbox"
+              checked={driverAgeOk}
+              onChange={(e) => setDriverAgeOk(e.target.checked)}
+            />
+            <span>Οδηγός ηλικίας 25–70;</span>
+          </label>
+          <label className="rent-search-check">
             <input
               type="checkbox"
               checked={promoOpen}
@@ -247,7 +276,7 @@ export default function RentBookingSearchBar({
                 });
               }}
             />
-            <span>Έχεις κωδικό προσφοράς;</span>
+            <span>Κωδικός προσφοράς</span>
           </label>
           {promoOpen ? (
             <input
