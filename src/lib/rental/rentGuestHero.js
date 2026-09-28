@@ -1,8 +1,7 @@
 /** Guest /rent hero — Rentalcars-style composition (search-first). */
 
-/** Myrtos (Kefalonia) — cliff road above turquoise Greek-island sea. */
 export const RENT_GUEST_HERO_IMAGE =
-  'https://images.unsplash.com/photo-1658742758836-a69cdda37f10?auto=format&fit=crop&w=2000&q=85';
+  'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=2000&q=85';
 
 export const RENT_GUEST_HERO = {
   title: 'Ενοικίαση αυτοκινήτου',

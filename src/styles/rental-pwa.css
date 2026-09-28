@@ -129,20 +129,12 @@
 }
 
 .rent-hero-shade--booking {
-  /* Stronger veil so white type stays readable on bright Aegean daylight. */
-  background:
-    linear-gradient(90deg, rgba(2, 28, 36, 0.62) 0%, rgba(2, 28, 36, 0.28) 55%, rgba(2, 28, 36, 0.18) 100%),
-    linear-gradient(
-      180deg,
-      rgba(2, 28, 36, 0.5) 0%,
-      rgba(2, 28, 36, 0.28) 42%,
-      rgba(2, 28, 36, 0.78) 100%
-    );
-}
-
-.rent-hero--booking .rent-hero-media img {
-  /* Keep cliff road + turquoise bay in frame. */
-  object-position: 62% 42%;
+  background: linear-gradient(
+    180deg,
+    rgba(2, 28, 36, 0.55) 0%,
+    rgba(2, 28, 36, 0.35) 45%,
+    rgba(2, 28, 36, 0.82) 100%
+  );
 }
 
 .rent-hero-booking-inner {
