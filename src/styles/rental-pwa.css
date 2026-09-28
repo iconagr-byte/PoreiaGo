@@ -123,8 +123,8 @@
 
 /* Rentalcars-style booking hero (search in-hero, rent only — no stays/flights) */
 .rent-hero--booking {
-  min-height: min(72dvh, 640px);
-  padding: 4.5rem 1.15rem 2.5rem;
+  min-height: min(84dvh, 760px);
+  padding: 4.5rem 1.15rem 2.85rem;
   justify-content: flex-end;
 }
 
@@ -147,7 +147,8 @@
 }
 
 .rent-hero--booking .rent-hero-media img {
-  object-position: 45% 40%;
+  /* Keep beach strip + cliff face in frame as hero grows downward. */
+  object-position: 50% 42%;
 }
 
 /* Soft text shadow so white copy stays readable without drowning the photo. */
@@ -2702,8 +2703,8 @@
 
 @media (min-width: 900px) {
   .rent-hero--booking {
-    min-height: min(68dvh, 620px);
-    padding: 5.5rem max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem)) 3rem;
+    min-height: min(82dvh, 740px);
+    padding: 5.5rem max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem)) 3.25rem;
     justify-content: center;
   }
 
