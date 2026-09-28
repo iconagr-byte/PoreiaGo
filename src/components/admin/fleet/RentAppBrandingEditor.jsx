@@ -8,6 +8,10 @@ import {
   resolveRentAppBranding,
 } from '../../../lib/rental/rentAppBranding.js';
 import {
+  RENT_GUEST_HERO_BENEFITS,
+  resolveRentGuestHeroBenefits,
+} from '../../../lib/rental/rentGuestHero.js';
+import {
   fetchAdminSiteAppearance,
   updateSiteAppearance,
 } from '../../../services/siteAppearanceApi.js';
@@ -45,9 +49,15 @@ const FIELDS = [
     placeholder: DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title,
   },
   {
+    key: 'rent_guest_hero_title_accent',
+    label: 'Έμφαση τίτλου (πριν τη σύνδεση)',
+    hint: 'Δεύτερο μέρος του τίτλου με διαφορετικό χρώμα — αφήστε κενό για απόκρυψη',
+    placeholder: DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent,
+  },
+  {
     key: 'rent_guest_hero_copy',
     label: 'Κείμενο επισκέπτη',
-    hint: 'Εμφανίζεται στη δημόσια προεπισκόπηση',
+    hint: 'Εμφανίζεται στη δημόσια προεπισκόπηση κάτω από τον τίτλο',
     placeholder: DEFAULT_RENT_APP_BRANDING.rent_guest_hero_copy,
     multiline: true,
   },
@@ -57,6 +67,7 @@ function formFromAppearance(data) {
   const locs = Array.isArray(data?.rent_pickup_locations)
     ? data.rent_pickup_locations.map((x) => String(x || '').trim()).filter(Boolean)
     : [];
+  const benefits = resolveRentGuestHeroBenefits(data?.rent_guest_hero_benefits);
   return {
     rent_office_name: data?.rent_office_name || data?.footer_brand_name || data?.display_name || '',
     rent_hero_title: data?.rent_hero_title || DEFAULT_RENT_APP_BRANDING.rent_hero_title,
@@ -64,8 +75,17 @@ function formFromAppearance(data) {
     rent_cta_label: data?.rent_cta_label || DEFAULT_RENT_APP_BRANDING.rent_cta_label,
     rent_guest_hero_title:
       data?.rent_guest_hero_title || DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title,
+    rent_guest_hero_title_accent:
+      data?.rent_guest_hero_title_accent ??
+      DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent,
     rent_guest_hero_copy:
       data?.rent_guest_hero_copy || DEFAULT_RENT_APP_BRANDING.rent_guest_hero_copy,
+    rent_guest_hero_benefits_text: benefits.join('\n'),
+    rent_search_show_dropoff_toggle: data?.rent_search_show_dropoff_toggle !== false,
+    rent_search_show_promo: data?.rent_search_show_promo !== false,
+    rent_search_submit_label:
+      String(data?.rent_search_submit_label || '').trim() ||
+      DEFAULT_RENT_APP_BRANDING.rent_search_submit_label,
     rent_pickup_locations_text: locs.join('\n'),
   };
 }
@@ -75,7 +95,7 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
   const [saved, setSaved] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [previewGuest, setPreviewGuest] = useState(false);
+  const [previewGuest, setPreviewGuest] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,22 +116,42 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
   }, [load]);
 
   const dirty = JSON.stringify(form) !== saved;
+  const previewAppearance = useMemo(
+    () => ({
+      ...form,
+      rent_guest_hero_benefits: resolveRentGuestHeroBenefits(
+        form.rent_guest_hero_benefits_text,
+        { allowEmpty: true },
+      ),
+    }),
+    [form],
+  );
   const preview = useMemo(
-    () => resolveRentAppBranding(form, { guest: previewGuest }),
-    [form, previewGuest],
+    () => resolveRentAppBranding(previewAppearance, { guest: previewGuest }),
+    [previewAppearance, previewGuest],
   );
 
   const onSave = async (e) => {
     e?.preventDefault?.();
     setSaving(true);
     try {
+      const benefits = resolveRentGuestHeroBenefits(form.rent_guest_hero_benefits_text, {
+        allowEmpty: true,
+      });
       const payload = {
         rent_office_name: form.rent_office_name.trim(),
         rent_hero_title: form.rent_hero_title.trim(),
         rent_hero_copy: form.rent_hero_copy.trim(),
         rent_cta_label: form.rent_cta_label.trim(),
         rent_guest_hero_title: form.rent_guest_hero_title.trim(),
+        rent_guest_hero_title_accent: form.rent_guest_hero_title_accent.trim(),
         rent_guest_hero_copy: form.rent_guest_hero_copy.trim(),
+        rent_guest_hero_benefits: benefits.length ? benefits : [...RENT_GUEST_HERO_BENEFITS],
+        rent_search_show_dropoff_toggle: Boolean(form.rent_search_show_dropoff_toggle),
+        rent_search_show_promo: Boolean(form.rent_search_show_promo),
+        rent_search_submit_label:
+          form.rent_search_submit_label.trim() ||
+          DEFAULT_RENT_APP_BRANDING.rent_search_submit_label,
       };
       // Keep storefront brand in sync when rent office name is set.
       if (payload.rent_office_name) {
@@ -188,6 +228,66 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
           ))}
 
           <label className="rent-brand-field">
+            <span className="rent-brand-field-label">Checkmarks hero (πλεονεκτήματα)</span>
+            <span className="rent-brand-field-hint">
+              Ένα ανά γραμμή — εμφανίζονται κάτω από τον τίτλο επισκέπτη (μέχρι 8).
+            </span>
+            <textarea
+              rows={4}
+              className="rent-brand-input"
+              value={form.rent_guest_hero_benefits_text}
+              placeholder={RENT_GUEST_HERO_BENEFITS.join('\n')}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, rent_guest_hero_benefits_text: e.target.value }))
+              }
+            />
+          </label>
+
+          <fieldset className="rent-brand-field rent-brand-field--checks">
+            <legend className="rent-brand-field-label">Μπάρα αναζήτησης (hero)</legend>
+            <span className="rent-brand-field-hint">
+              Εμφάνιση επιλογών κάτω από τη γραμμή ημερομηνιών.
+            </span>
+            <label className="rent-brand-check">
+              <input
+                type="checkbox"
+                checked={Boolean(form.rent_search_show_dropoff_toggle)}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    rent_search_show_dropoff_toggle: e.target.checked,
+                  }))
+                }
+              />
+              <span>Εμφάνιση «Παράδοση σε διαφορετικό σημείο»</span>
+            </label>
+            <label className="rent-brand-check">
+              <input
+                type="checkbox"
+                checked={Boolean(form.rent_search_show_promo)}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    rent_search_show_promo: e.target.checked,
+                  }))
+                }
+              />
+              <span>Εμφάνιση «Κωδικός προσφοράς»</span>
+            </label>
+            <label className="rent-brand-field mt-2">
+              <span className="rent-brand-field-label">Κείμενο κουμπιού αναζήτησης</span>
+              <input
+                className="rent-brand-input"
+                value={form.rent_search_submit_label}
+                placeholder={DEFAULT_RENT_APP_BRANDING.rent_search_submit_label}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, rent_search_submit_label: e.target.value }))
+                }
+              />
+            </label>
+          </fieldset>
+
+          <label className="rent-brand-field">
             <span className="rent-brand-field-label">Σημεία παραλαβής</span>
             <span className="rent-brand-field-hint">
               Διαχειρίζονται από το μενού Ενοικιάσεις → Σημεία παραλαβής (όχι εδώ).
@@ -248,13 +348,30 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
             <div className="rent-brand-phone-notch" />
             <div className="rent-brand-phone-hero">
               <p className="rent-brand-phone-name">{preview.brandLabel}</p>
-              <h4 className="rent-brand-phone-title">{preview.title}</h4>
-              <p className="rent-brand-phone-copy">{preview.copy}</p>
+              <h4 className="rent-brand-phone-title">
+                {preview.title}
+                {previewGuest && preview.titleAccent ? (
+                  <>
+                    {' '}
+                    <span className="rent-brand-phone-accent">{preview.titleAccent}</span>
+                  </>
+                ) : null}
+              </h4>
+              {preview.copy ? <p className="rent-brand-phone-copy">{preview.copy}</p> : null}
+              {previewGuest && preview.benefits?.length ? (
+                <ul className="rent-brand-phone-benefits">
+                  {preview.benefits.map((b) => (
+                    <li key={b}>✓ {b}</li>
+                  ))}
+                </ul>
+              ) : null}
               <div className="rent-brand-phone-cta">
                 <span className="material-symbols-outlined" aria-hidden>
                   search
                 </span>
-                {preview.ctaLabel}
+                {previewGuest
+                  ? preview.searchLayout?.submitLabel || preview.ctaLabel
+                  : preview.ctaLabel}
               </div>
             </div>
           </div>

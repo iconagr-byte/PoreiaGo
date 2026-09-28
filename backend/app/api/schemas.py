@@ -450,7 +450,12 @@ class TenantSiteAppearanceResponse(BaseModel):
     rent_hero_title: str = ""
     rent_hero_copy: str = ""
     rent_guest_hero_title: str = ""
+    rent_guest_hero_title_accent: str = ""
     rent_guest_hero_copy: str = ""
+    rent_guest_hero_benefits: list[str] = []
+    rent_search_show_dropoff_toggle: bool = True
+    rent_search_show_promo: bool = True
+    rent_search_submit_label: str = "Αναζήτηση"
     rent_cta_label: str = ""
     rent_coverage_options: list[dict] = []
     rent_included_defaults: list[str] = []
@@ -524,7 +529,12 @@ class TenantSiteAppearanceUpdate(BaseModel):
     rent_hero_title: str | None = None
     rent_hero_copy: str | None = None
     rent_guest_hero_title: str | None = None
+    rent_guest_hero_title_accent: str | None = None
     rent_guest_hero_copy: str | None = None
+    rent_guest_hero_benefits: list[str] | None = None
+    rent_search_show_dropoff_toggle: bool | None = None
+    rent_search_show_promo: bool | None = None
+    rent_search_submit_label: str | None = None
     rent_cta_label: str | None = None
     rent_coverage_options: list[dict] | None = None
     rent_included_defaults: list[str] | None = None

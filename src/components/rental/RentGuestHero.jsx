@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import {
   RENT_GUEST_HERO,
   RENT_GUEST_HERO_IMAGE,
-  RENT_GUEST_HERO_BENEFITS,
+  resolveRentGuestHeroBenefits,
 } from '../../lib/rental/rentGuestHero.js';
 import { readPageSlider } from '../../lib/homepage/pageSlider.js';
 import SiteHeroSlider from '../shared/SiteHeroSlider.jsx';
@@ -19,13 +19,17 @@ export default function RentGuestHero({
   title,
   titleAccent,
   copy,
+  benefits: benefitsProp,
   siteAppearance,
   children,
 } = {}) {
   const headline = String(title || '').trim() || RENT_GUEST_HERO.title;
   const accent = String(titleAccent || '').trim() || RENT_GUEST_HERO.titleAccent;
   const subtitle = String(copy || '').trim();
-  const benefits = useMemo(() => RENT_GUEST_HERO_BENEFITS, []);
+  const benefits = useMemo(
+    () => resolveRentGuestHeroBenefits(benefitsProp),
+    [benefitsProp],
+  );
   const slider = readPageSlider(siteAppearance, 'rent');
 
   return (
@@ -73,16 +77,18 @@ export default function RentGuestHero({
 
         {subtitle ? <p className="rent-hero-landing-copy rent-hero-booking-copy">{subtitle}</p> : null}
 
-        <ul className="rent-hero-benefits" aria-label="Πλεονεκτήματα">
-          {benefits.map((item) => (
-            <li key={item}>
-              <span className="material-symbols-outlined" aria-hidden>
-                check_circle
-              </span>
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
+        {benefits.length ? (
+          <ul className="rent-hero-benefits" aria-label="Πλεονεκτήματα">
+            {benefits.map((item) => (
+              <li key={item}>
+                <span className="material-symbols-outlined" aria-hidden>
+                  check_circle
+                </span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         {children ? <div className="rent-hero-search-slot">{children}</div> : null}
       </div>

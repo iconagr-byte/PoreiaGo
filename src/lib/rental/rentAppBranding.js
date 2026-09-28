@@ -4,6 +4,12 @@
  */
 
 import { isPlatformPlaceholderLogo } from '../branding/officeBrand.js';
+import {
+  RENT_GUEST_HERO_BENEFITS,
+  RENT_GUEST_SEARCH_DEFAULTS,
+  resolveRentGuestHeroBenefits,
+  resolveRentGuestSearchLayout,
+} from './rentGuestHero.js';
 
 export const DEFAULT_RENT_APP_BRANDING = {
   rent_office_name: '',
@@ -14,6 +20,10 @@ export const DEFAULT_RENT_APP_BRANDING = {
   rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
   rent_guest_hero_title_accent: '— αναζήτησε, σύγκρινε & κλείσε',
   rent_guest_hero_copy: '',
+  rent_guest_hero_benefits: [...RENT_GUEST_HERO_BENEFITS],
+  rent_search_show_dropoff_toggle: RENT_GUEST_SEARCH_DEFAULTS.show_dropoff_toggle,
+  rent_search_show_promo: RENT_GUEST_SEARCH_DEFAULTS.show_promo,
+  rent_search_submit_label: RENT_GUEST_SEARCH_DEFAULTS.submit_label,
   rent_cta_label: 'Βρες όχημα',
 };
 
@@ -70,10 +80,25 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
       DEFAULT_RENT_APP_BRANDING.rent_hero_copy;
   if (guest && copy === OBSOLETE_RENT_GUEST_HERO_COPY) copy = '';
 
+  // Explicit empty string hides accent; missing key keeps the default.
+  const rawAccent = appearance.rent_guest_hero_title_accent;
   const titleAccent = guest
-    ? String(appearance.rent_guest_hero_title_accent || '').trim() ||
-      DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent
+    ? rawAccent === undefined || rawAccent === null
+      ? DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent
+      : String(rawAccent).trim()
     : '';
+
+  const benefits = guest
+    ? resolveRentGuestHeroBenefits(appearance.rent_guest_hero_benefits)
+    : [];
+
+  const searchLayout = guest
+    ? resolveRentGuestSearchLayout(appearance)
+    : {
+        showDropoffToggle: true,
+        showPromo: true,
+        submitLabel: RENT_GUEST_SEARCH_DEFAULTS.submit_label,
+      };
 
   const cta =
     String(appearance.rent_cta_label || '').trim() ||
@@ -89,6 +114,8 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     title,
     titleAccent,
     copy,
+    benefits,
+    searchLayout,
     ctaLabel: cta,
     isCustomized: Boolean(
       String(appearance.rent_office_name || '').trim() ||
