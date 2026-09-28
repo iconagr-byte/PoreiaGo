@@ -147,8 +147,8 @@
 }
 
 .rent-hero--booking .rent-hero-media img {
-  /* Keep beach strip + cliff face in frame as hero grows downward. */
-  object-position: 50% 42%;
+  /* Bias upward so windshield shows road + sea, not only the dark dash. */
+  object-position: 50% 32%;
 }
 
 /* Soft text shadow so white copy stays readable without drowning the photo. */
