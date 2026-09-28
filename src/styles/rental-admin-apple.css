@@ -916,6 +916,34 @@
   color: #6e6e73;
 }
 
+.rent-brand-field--checks {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rent-brand-field--checks legend {
+  padding: 0;
+  margin-bottom: 0.1rem;
+}
+
+.rent-brand-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: #1d1d1f;
+  cursor: pointer;
+}
+
+.rent-brand-check input {
+  margin-top: 0.2rem;
+  accent-color: #0a7a6c;
+}
+
 .rent-brand-input {
   width: 100%;
   margin-top: 0.2rem;
@@ -1050,11 +1078,31 @@
   letter-spacing: -0.02em;
 }
 
+.rent-brand-phone-accent {
+  color: #5eead4;
+  font-weight: 700;
+}
+
 .rent-brand-phone-copy {
   margin: 0;
   font-size: 0.82rem;
   line-height: 1.4;
   opacity: 0.78;
+}
+
+.rent-brand-phone-benefits {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.28rem;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  opacity: 0.9;
+}
+
+.rent-brand-phone-benefits li {
+  margin: 0;
 }
 
 .rent-brand-phone-cta {

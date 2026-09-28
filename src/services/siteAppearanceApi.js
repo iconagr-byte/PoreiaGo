@@ -52,8 +52,17 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
-  rent_guest_hero_title: 'Δες τον στόλο πριν κλείσεις',
+  rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
+  rent_guest_hero_title_accent: '— αναζήτησε, σύγκρινε & κλείσε',
   rent_guest_hero_copy: '',
+  rent_guest_hero_benefits: [
+    'Δωρεάν ακύρωση στις περισσότερες κρατήσεις',
+    'Πολλαπλά σημεία παραλαβής',
+    'Υποστήριξη γραφείου & οδική βοήθεια',
+  ],
+  rent_search_show_dropoff_toggle: true,
+  rent_search_show_promo: true,
+  rent_search_submit_label: 'Αναζήτηση',
   rent_cta_label: 'Βρες όχημα',
   rent_pickup_locations: [],
   rent_coverage_options: [],

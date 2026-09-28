@@ -250,6 +250,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             title={branding.title}
             titleAccent={branding.titleAccent}
             copy={branding.copy}
+            benefits={branding.benefits}
             siteAppearance={siteAppearance}
           >
             <RentBookingSearchBar
@@ -258,6 +259,9 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               footerAddress={footerAddress}
               pickupLocations={pickupLocations}
               preferredPickup={heroPickup}
+              showDropoffToggle={branding.searchLayout?.showDropoffToggle !== false}
+              showPromo={branding.searchLayout?.showPromo !== false}
+              submitLabel={branding.searchLayout?.submitLabel}
               onSearch={async (prefs) => {
                 writeRentBookingPrefs({ ...(prefs || {}), wizard_step: 'vehicle' });
                 setSearchActive(true);

@@ -44,6 +44,32 @@ const guest = resolveRentAppBranding(
 console.assert(guest.title === 'Δες στόλο', 'guest title');
 console.assert(guest.copy === '', 'guest copy empty by default');
 console.assert(guest.titleAccent === DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent, 'guest accent');
+console.assert(guest.benefits.length === 3, 'default benefits');
+console.assert(guest.searchLayout.showDropoffToggle === true, 'dropoff on');
+console.assert(guest.searchLayout.showPromo === true, 'promo on');
+console.assert(guest.searchLayout.submitLabel === 'Αναζήτηση', 'submit label');
+
+const guestCustom = resolveRentAppBranding(
+  {
+    rent_guest_hero_title_accent: '— κλείσε online',
+    rent_guest_hero_benefits: ['Free cancel', 'Airport pickup'],
+    rent_search_show_dropoff_toggle: false,
+    rent_search_show_promo: false,
+    rent_search_submit_label: 'Βρες αυτοκίνητο',
+  },
+  { guest: true },
+);
+console.assert(guestCustom.titleAccent === '— κλείσε online', 'custom accent');
+console.assert(guestCustom.benefits.length === 2, 'custom benefits');
+console.assert(guestCustom.searchLayout.showDropoffToggle === false, 'dropoff off');
+console.assert(guestCustom.searchLayout.showPromo === false, 'promo off');
+console.assert(guestCustom.searchLayout.submitLabel === 'Βρες αυτοκίνητο', 'custom submit');
+
+const noAccent = resolveRentAppBranding(
+  { rent_guest_hero_title_accent: '' },
+  { guest: true },
+);
+console.assert(noAccent.titleAccent === '', 'empty accent hides');
 
 const obsolete = resolveRentAppBranding(
   {

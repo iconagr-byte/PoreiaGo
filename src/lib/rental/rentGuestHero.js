@@ -17,6 +17,55 @@ export const RENT_GUEST_HERO_BENEFITS = [
   'Υποστήριξη γραφείου & οδική βοήθεια',
 ];
 
+/** Default hero search-strip layout knobs (admin-editable). */
+export const RENT_GUEST_SEARCH_DEFAULTS = {
+  show_dropoff_toggle: true,
+  show_promo: true,
+  submit_label: 'Αναζήτηση',
+};
+
+/**
+ * Normalize admin-stored benefits (array or newline text) → clean string list.
+ * Empty / missing → default checkmarks.
+ * @param {unknown} raw
+ * @param {{ allowEmpty?: boolean }} [opts]
+ * @returns {string[]}
+ */
+export function resolveRentGuestHeroBenefits(raw, opts = {}) {
+  let items = [];
+  if (Array.isArray(raw)) {
+    items = raw.map((x) => String(x || '').trim()).filter(Boolean);
+  } else if (typeof raw === 'string') {
+    items = raw
+      .split(/\r?\n/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  if (items.length) return items.slice(0, 8);
+  if (opts.allowEmpty) return [];
+  return [...RENT_GUEST_HERO_BENEFITS];
+}
+
+/**
+ * @param {object} [appearance]
+ */
+export function resolveRentGuestSearchLayout(appearance = {}) {
+  const showDropoff =
+    appearance.rent_search_show_dropoff_toggle !== false &&
+    appearance.rent_search_show_dropoff_toggle !== 'false';
+  const showPromo =
+    appearance.rent_search_show_promo !== false &&
+    appearance.rent_search_show_promo !== 'false';
+  const submitLabel =
+    String(appearance.rent_search_submit_label || '').trim() ||
+    RENT_GUEST_SEARCH_DEFAULTS.submit_label;
+  return {
+    showDropoffToggle: showDropoff,
+    showPromo,
+    submitLabel,
+  };
+}
+
 /**
  * @param {{ carCount?: number, vanCount?: number }} [counts]
  */

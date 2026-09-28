@@ -107,8 +107,17 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_office_name": "",
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
-    "rent_guest_hero_title": "Δες τον στόλο πριν κλείσεις",
+    "rent_guest_hero_title": "Ενοικίαση αυτοκινήτου",
+    "rent_guest_hero_title_accent": "— αναζήτησε, σύγκρινε & κλείσε",
     "rent_guest_hero_copy": "",
+    "rent_guest_hero_benefits": [
+        "Δωρεάν ακύρωση στις περισσότερες κρατήσεις",
+        "Πολλαπλά σημεία παραλαβής",
+        "Υποστήριξη γραφείου & οδική βοήθεια",
+    ],
+    "rent_search_show_dropoff_toggle": True,
+    "rent_search_show_promo": True,
+    "rent_search_submit_label": "Αναζήτηση",
     "rent_cta_label": "Βρες όχημα",
     # Extra pickup/dropoff points for /rent search (office address is always included).
     "rent_pickup_locations": [],
@@ -201,8 +210,13 @@ class SiteAppearanceResponse(BaseModel):
     rent_hero_copy: str = (
         "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
     )
-    rent_guest_hero_title: str = "Δες τον στόλο πριν κλείσεις"
+    rent_guest_hero_title: str = "Ενοικίαση αυτοκινήτου"
+    rent_guest_hero_title_accent: str = "— αναζήτησε, σύγκρινε & κλείσε"
     rent_guest_hero_copy: str = ""
+    rent_guest_hero_benefits: list[str] = []
+    rent_search_show_dropoff_toggle: bool = True
+    rent_search_show_promo: bool = True
+    rent_search_submit_label: str = "Αναζήτηση"
     rent_cta_label: str = "Βρες όχημα"
     rent_pickup_locations: list[str] = []
     rent_coverage_options: list[dict] = []
@@ -299,7 +313,12 @@ class SiteAppearanceUpdate(BaseModel):
     rent_hero_title: str | None = None
     rent_hero_copy: str | None = None
     rent_guest_hero_title: str | None = None
+    rent_guest_hero_title_accent: str | None = None
     rent_guest_hero_copy: str | None = None
+    rent_guest_hero_benefits: list[str] | None = None
+    rent_search_show_dropoff_toggle: bool | None = None
+    rent_search_show_promo: bool | None = None
+    rent_search_submit_label: str | None = None
     rent_cta_label: str | None = None
     rent_pickup_locations: list[str] | None = None
     rent_coverage_options: list[dict] | None = None

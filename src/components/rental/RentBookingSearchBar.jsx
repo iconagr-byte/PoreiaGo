@@ -19,8 +19,12 @@ export default function RentBookingSearchBar({
   onSearch,
   compact = false,
   variant = 'default',
+  showDropoffToggle = true,
+  showPromo = true,
+  submitLabel = 'Αναζήτηση',
 } = {}) {
   const isHero = variant === 'hero';
+  const ctaLabel = String(submitLabel || '').trim() || 'Αναζήτηση';
   const locations = useMemo(
     () => buildRentLocationOptions({ brandLabel, footerAddress, pickupLocations }),
     [brandLabel, footerAddress, pickupLocations],
@@ -70,6 +74,19 @@ export default function RentBookingSearchBar({
     setPickupLocation(next);
     if (!differentDropoff) setDropoffLocation(next);
   }, [preferredPickup, locations, differentDropoff]);
+
+  useEffect(() => {
+    if (!showDropoffToggle && differentDropoff) {
+      setDifferentDropoff(false);
+      setDropoffLocation(pickupLocation);
+    }
+  }, [showDropoffToggle, differentDropoff, pickupLocation]);
+
+  useEffect(() => {
+    if (!showPromo && promoOpen) {
+      setPromoOpen(false);
+    }
+  }, [showPromo, promoOpen]);
 
   const splitDateTime = (value) => {
     if (!value || !value.includes('T')) return { date: '', time: '10:00' };
@@ -237,53 +254,61 @@ export default function RentBookingSearchBar({
           </div>
 
           <button type="submit" className="rent-search-submit">
-            Αναζήτηση
+            {ctaLabel}
           </button>
         </div>
 
-        <div className="rent-search-footer">
-          <label className="rent-search-check">
-            <input
-              type="checkbox"
-              checked={differentDropoff}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setDifferentDropoff(on);
-                if (!on) setDropoffLocation(pickupLocation);
-              }}
-            />
-            <span>Παράδοση σε διαφορετικό σημείο</span>
-          </label>
-          <label className="rent-search-check">
-            <input
-              type="checkbox"
-              checked={promoOpen}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setPromoOpen(on);
-                writeRentBookingPrefs({
-                  promo_code: on ? String(promoCode || '').trim() : '',
-                });
-              }}
-            />
-            <span>Κωδικός προσφοράς</span>
-          </label>
-          {promoOpen ? (
-            <input
-              className="rent-search-promo-input"
-              type="text"
-              value={promoCode}
-              onChange={(e) => {
-                const v = e.target.value;
-                setPromoCode(v);
-                writeRentBookingPrefs({ promo_code: String(v || '').trim() });
-              }}
-              placeholder="π.χ. RENT10"
-              aria-label="Κωδικός προσφοράς"
-              autoCapitalize="characters"
-            />
-          ) : null}
-        </div>
+        {showDropoffToggle || showPromo ? (
+          <div className="rent-search-footer">
+            {showDropoffToggle ? (
+              <label className="rent-search-check">
+                <input
+                  type="checkbox"
+                  checked={differentDropoff}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setDifferentDropoff(on);
+                    if (!on) setDropoffLocation(pickupLocation);
+                  }}
+                />
+                <span>Παράδοση σε διαφορετικό σημείο</span>
+              </label>
+            ) : null}
+            {showPromo ? (
+              <>
+                <label className="rent-search-check">
+                  <input
+                    type="checkbox"
+                    checked={promoOpen}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setPromoOpen(on);
+                      writeRentBookingPrefs({
+                        promo_code: on ? String(promoCode || '').trim() : '',
+                      });
+                    }}
+                  />
+                  <span>Κωδικός προσφοράς</span>
+                </label>
+                {promoOpen ? (
+                  <input
+                    className="rent-search-promo-input"
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setPromoCode(v);
+                      writeRentBookingPrefs({ promo_code: String(v || '').trim() });
+                    }}
+                    placeholder="π.χ. RENT10"
+                    aria-label="Κωδικός προσφοράς"
+                    autoCapitalize="characters"
+                  />
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        ) : null}
 
         {error ? <p className="rent-search-error">{error}</p> : null}
       </form>
