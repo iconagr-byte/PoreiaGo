@@ -4485,8 +4485,18 @@
   padding-right: max(1.5rem, calc((100% - 1120px) / 2 + 1.5rem));
 }
 
+.rent-phone-stage--desktop .rent-hero--booking {
+  min-height: min(68dvh, 640px);
+  padding-top: 5rem;
+  padding-bottom: 3.25rem;
+}
+
 .rent-phone-stage--desktop .rent-hero-landing-inner {
   max-width: 42rem;
+}
+
+.rent-phone-stage--desktop .rent-hero-booking-inner {
+  max-width: 1120px;
 }
 
 .rent-phone-stage--desktop .rent-hero-stats {
