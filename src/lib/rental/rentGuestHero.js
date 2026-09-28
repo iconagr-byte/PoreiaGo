@@ -1,8 +1,8 @@
 /** Guest /rent hero — Rentalcars-style composition (search-first). */
 
-/** Coastal highway over the sea — road + ocean hero for guest /rent. */
+/** Zakynthos cove — beach, turquoise sea, and limestone cliffs. */
 export const RENT_GUEST_HERO_IMAGE =
-  'https://images.unsplash.com/photo-1671524911691-d4a9eb70251b?auto=format&fit=crop&w=2000&q=85';
+  'https://images.unsplash.com/photo-1752746671833-5c8beb4e26b1?auto=format&fit=crop&w=2000&q=85';
 
 export const RENT_GUEST_HERO = {
   title: 'Ενοικίαση αυτοκινήτου',
