@@ -1,8 +1,7 @@
 /** Guest /rent hero — Rentalcars-style composition (search-first). */
 
-/** Myrtos (Kefalonia) — island coastal road above turquoise bay. */
-export const RENT_GUEST_HERO_IMAGE =
-  'https://images.unsplash.com/photo-1658742758836-a69cdda37f10?auto=format&fit=crop&w=2000&q=85';
+/** Island coastal road at sea level — asphalt + turquoise bay, eye-height. */
+export const RENT_GUEST_HERO_IMAGE = '/images/rent-hero-coastal-road.jpg';
 
 export const RENT_GUEST_HERO = {
   title: 'Ενοικίαση αυτοκινήτου',
