@@ -2532,7 +2532,7 @@
   color: #ffe8a3;
 }
 
-/* —— Rentalcars-style hero search strip —— */
+/* —— Rentalcars-style hero search strip (always one horizontal line) —— */
 .rent-search--hero {
   max-width: none;
 }
@@ -2543,37 +2543,77 @@
 
 .rent-search--hero .rent-search-row {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns:
+    minmax(9.5rem, 1.55fr)
+    minmax(6.5rem, 0.85fr)
+    minmax(4.75rem, 0.55fr)
+    minmax(6.5rem, 0.85fr)
+    minmax(4.75rem, 0.55fr)
+    auto;
+  align-items: stretch;
   gap: 0;
   background: #fff;
   border: 3px solid #e8b84a;
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  -webkit-overflow-scrolling: touch;
+}
+
+.rent-search--hero .rent-search-row--split {
+  grid-template-columns:
+    minmax(8rem, 1.1fr)
+    minmax(8rem, 1.1fr)
+    minmax(6rem, 0.8fr)
+    minmax(4.5rem, 0.5fr)
+    minmax(6rem, 0.8fr)
+    minmax(4.5rem, 0.5fr)
+    auto;
 }
 
 .rent-search--hero .rent-search-field {
   border-radius: 0;
   min-height: 4.35rem;
-  border-right: 0;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  min-width: 0;
+  border-right: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 0;
   box-shadow: none;
-  padding: 0.7rem 0.85rem;
+  padding: 0.55rem 0.7rem;
 }
 
 .rent-search--hero .rent-search-field:last-of-type {
-  border-bottom: 0;
+  border-right: 0;
+}
+
+.rent-search--hero .rent-search-field-body {
+  min-width: 0;
+}
+
+.rent-search--hero .rent-search-label {
+  white-space: nowrap;
+}
+
+.rent-search--hero .rent-search-field select,
+.rent-search--hero .rent-search-field input[type='date'],
+.rent-search--hero .rent-search-field input[type='time'] {
+  min-width: 0;
+  width: 100%;
+  font-size: 0.86rem;
 }
 
 .rent-search--hero .rent-search-submit {
   border-radius: 0;
-  min-height: 3.65rem;
+  min-width: 7.5rem;
+  min-height: 100%;
+  padding: 0 1.15rem;
   background: linear-gradient(180deg, #0fb39a 0%, #0a7a6c 100%);
   color: #fff;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   box-shadow: none;
+  white-space: nowrap;
 }
 
 .rent-search--hero .rent-search-submit:hover {
@@ -2584,6 +2624,7 @@
 .rent-search--hero .rent-search-footer {
   margin-top: 0.85rem;
   gap: 0.85rem 1.35rem;
+  flex-wrap: wrap;
 }
 
 .rent-search-check {
@@ -2633,7 +2674,7 @@
       minmax(7.5rem, 0.85fr)
       minmax(5.5rem, 0.55fr)
       auto;
-    align-items: stretch;
+    overflow: hidden;
   }
 
   .rent-search--hero .rent-search-row--split {
@@ -2647,18 +2688,8 @@
       auto;
   }
 
-  .rent-search--hero .rent-search-field {
-    border-bottom: 0;
-    border-right: 1px solid rgba(15, 23, 42, 0.08);
-  }
-
-  .rent-search--hero .rent-search-field:last-of-type {
-    border-right: 0;
-  }
-
   .rent-search--hero .rent-search-submit {
     min-width: 8.5rem;
-    min-height: 100%;
     padding: 0 1.35rem;
   }
 }
