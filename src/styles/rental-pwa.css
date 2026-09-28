@@ -2602,9 +2602,11 @@
 }
 
 .rent-search--hero .rent-search-submit {
+  flex: 0 0 auto;
   border-radius: 0;
   min-width: 7.5rem;
   min-height: 100%;
+  align-self: stretch;
   padding: 0 1.15rem;
   background: linear-gradient(180deg, #0fb39a 0%, #0a7a6c 100%);
   color: #fff;
