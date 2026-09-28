@@ -2052,13 +2052,13 @@
   min-height: 2.75rem;
   padding: 0 1rem 0 1.1rem;
   border-radius: 999px;
-  background: linear-gradient(145deg, #0c8a7a 0%, var(--rent-deep) 100%);
+  background: linear-gradient(145deg, #3d9bff 0%, var(--rent-blue) 52%, #0058b0 100%);
   color: #fff;
   font-size: 0.9rem;
   font-weight: 750;
   letter-spacing: -0.02em;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(11, 61, 74, 0.22);
+  box-shadow: 0 8px 18px rgba(0, 113, 227, 0.28);
   transition: transform 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
 }
 
@@ -2653,7 +2653,7 @@
   min-height: 100%;
   align-self: stretch;
   padding: 0 1.15rem;
-  background: linear-gradient(180deg, #0fb39a 0%, #0a7a6c 100%);
+  background: linear-gradient(180deg, #3d9bff 0%, var(--rent-blue) 55%, #0058b0 100%);
   color: #fff;
   font-size: 1rem;
   font-weight: 800;
@@ -2663,7 +2663,7 @@
 }
 
 .rent-search--hero .rent-search-submit:hover {
-  background: linear-gradient(180deg, #12c4a8 0%, #0b8a7a 100%);
+  background: linear-gradient(180deg, #5aadff 0%, #1a7ff0 55%, #0066cc 100%);
   filter: none;
 }
 
@@ -2687,7 +2687,7 @@
 .rent-search-check input {
   width: 1.05rem;
   height: 1.05rem;
-  accent-color: #0fb39a;
+  accent-color: var(--rent-blue);
   border-radius: 4px;
 }
 
