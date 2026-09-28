@@ -147,8 +147,8 @@
 }
 
 .rent-hero--booking .rent-hero-media img {
-  /* Bias upward so windshield shows road + sea, not only the dark dash. */
-  object-position: 50% 32%;
+  /* Keep cliff road (right) + turquoise bay in frame. */
+  object-position: 58% 40%;
 }
 
 /* Soft text shadow so white copy stays readable without drowning the photo. */
