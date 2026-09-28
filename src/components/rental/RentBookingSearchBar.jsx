@@ -28,7 +28,6 @@ export default function RentBookingSearchBar({
 
   const [differentDropoff, setDifferentDropoff] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
-  const [driverAgeOk, setDriverAgeOk] = useState(true);
   const [pickupLocation, setPickupLocation] = useState(locations[0]?.value || 'Γραφείο');
   const [dropoffLocation, setDropoffLocation] = useState(locations[0]?.value || 'Γραφείο');
   const [startTime, setStartTime] = useState(() => defaultPickupDateTime());
@@ -110,7 +109,6 @@ export default function RentBookingSearchBar({
       end_time: endTime,
       promo_code: promoOpen ? String(promoCode || '').trim() : '',
       one_way: differentDropoff,
-      driver_age_ok: driverAgeOk,
     });
     onSearch?.(prefs);
   };
@@ -255,14 +253,6 @@ export default function RentBookingSearchBar({
               }}
             />
             <span>Παράδοση σε διαφορετικό σημείο</span>
-          </label>
-          <label className="rent-search-check">
-            <input
-              type="checkbox"
-              checked={driverAgeOk}
-              onChange={(e) => setDriverAgeOk(e.target.checked)}
-            />
-            <span>Οδηγός ηλικίας 25–70;</span>
           </label>
           <label className="rent-search-check">
             <input
