@@ -11,8 +11,8 @@ export const DEFAULT_RENT_APP_BRANDING = {
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
-  rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου & van',
-  rent_guest_hero_title_accent: 'για όλο το ταξίδι σας',
+  rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
+  rent_guest_hero_title_accent: '— αναζήτησε, σύγκρινε & κλείσε',
   rent_guest_hero_copy: '',
   rent_cta_label: 'Βρες όχημα',
 };

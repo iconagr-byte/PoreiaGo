@@ -250,36 +250,10 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             title={branding.title}
             titleAccent={branding.titleAccent}
             copy={branding.copy}
-            carCount={carCount}
-            vanCount={vanCount}
             siteAppearance={siteAppearance}
-            footerAddress={footerAddress}
-            pickupLocations={pickupLocations}
-            onBrowseFleet={() => {
-              const el = document.getElementById('rent-guest-fleet');
-              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }}
-            onStartSearch={() => {
-              document
-                .getElementById('rent-guest-search')
-                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }}
-            onSelectPickup={(value) => {
-              setHeroPickup(value);
-              writeRentBookingPrefs({
-                ...readRentBookingPrefs(),
-                pickup_location: value,
-                dropoff_location: value,
-              });
-              document
-                .getElementById('rent-guest-search')
-                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }}
-            onRequireLogin={onRequireLogin}
-          />
-
-          <div id="rent-guest-search" className="rent-search-wrap rent-search-wrap--top rent-search-wrap--below-hero">
+          >
             <RentBookingSearchBar
+              variant="hero"
               brandLabel={branding.brandLabel}
               footerAddress={footerAddress}
               pickupLocations={pickupLocations}
@@ -314,7 +288,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                 }
               }}
             />
-          </div>
+          </RentGuestHero>
 
           <div className="rent-home-stack rent-home-stack--landing">
             <section id="rent-guest-fleet" className="rent-land-band rent-land-band--pick" aria-label="Στόλος ενοικίασης">
