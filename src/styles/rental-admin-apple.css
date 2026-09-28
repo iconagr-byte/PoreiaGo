@@ -1072,15 +1072,29 @@
 
 .rent-brand-phone-title {
   margin: 0.65rem 0 0.45rem;
-  font-size: 1.35rem;
-  line-height: 1.2;
+  font-size: 1.2rem;
+  line-height: 1.18;
   font-weight: 800;
   letter-spacing: -0.02em;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.08em;
+}
+
+.rent-brand-phone-title-main {
+  display: block;
+  color: #fff;
 }
 
 .rent-brand-phone-accent {
-  color: #5eead4;
+  display: block;
   font-weight: 700;
+  background: linear-gradient(90deg, #5ec8ff 0%, #7eb6ff 42%, #b8a0ff 78%, #c4b5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .rent-brand-phone-copy {
