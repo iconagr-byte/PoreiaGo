@@ -349,12 +349,9 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
             <div className="rent-brand-phone-hero">
               <p className="rent-brand-phone-name">{preview.brandLabel}</p>
               <h4 className="rent-brand-phone-title">
-                {preview.title}
+                <span className="rent-brand-phone-title-main">{preview.title}</span>
                 {previewGuest && preview.titleAccent ? (
-                  <>
-                    {' '}
-                    <span className="rent-brand-phone-accent">{preview.titleAccent}</span>
-                  </>
+                  <span className="rent-brand-phone-accent">{preview.titleAccent}</span>
                 ) : null}
               </h4>
               {preview.copy ? <p className="rent-brand-phone-copy">{preview.copy}</p> : null}

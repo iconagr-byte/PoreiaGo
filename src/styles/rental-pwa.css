@@ -152,10 +152,32 @@
 }
 
 .rent-hero-booking-title {
-  max-width: 22ch;
-  font-size: clamp(1.85rem, 5.2vw, 3rem);
+  max-width: min(100%, 38rem);
+  font-size: clamp(1.75rem, 4.6vw, 3rem);
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.08em;
   animation: rent-rise 720ms 80ms ease-out both;
+}
+
+.rent-hero-booking-title .rent-hero-title-main {
+  display: block;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.rent-hero-booking-title .rent-hero-accent {
+  display: block;
+  white-space: nowrap;
+}
+
+/* Keep exactly 2 lines on narrow phones — shrink type instead of wrapping. */
+@media (max-width: 420px) {
+  .rent-hero-booking-title {
+    font-size: clamp(1.35rem, 6.4vw, 1.75rem);
+  }
 }
 
 .rent-hero-booking-copy {
@@ -325,18 +347,20 @@
   font-size: clamp(1.65rem, 4.8vw, 2.65rem);
   font-weight: 700;
   letter-spacing: -0.035em;
-  line-height: 1.1;
+  line-height: 1.12;
   color: #fff;
-  max-width: 18ch;
+  max-width: min(100%, 38rem);
   animation: rent-rise 780ms 120ms ease-out both;
 }
 
+/* Sky-blue → soft lilac (not rent teal theme). */
 .rent-hero-accent {
   display: inline;
-  background: linear-gradient(90deg, #7dd3fc, #a5f3fc 45%, #a5b4fc);
+  background: linear-gradient(90deg, #5ec8ff 0%, #7eb6ff 42%, #b8a0ff 78%, #c4b5fd 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .rent-hero-copy {
@@ -2664,7 +2688,7 @@
   }
 
   .rent-hero-booking-title {
-    max-width: 18ch;
+    max-width: min(100%, 42rem);
   }
 
   .rent-search--hero .rent-search-row {

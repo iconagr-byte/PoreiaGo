@@ -66,13 +66,8 @@ export default function RentGuestHero({
         </div>
 
         <h1 className="rent-hero-landing-title rent-hero-booking-title">
-          {headline}
-          {accent ? (
-            <>
-              {' '}
-              <span className="rent-hero-accent">{accent}</span>
-            </>
-          ) : null}
+          <span className="rent-hero-title-main">{headline}</span>
+          {accent ? <span className="rent-hero-accent">{accent}</span> : null}
         </h1>
 
         {subtitle ? <p className="rent-hero-landing-copy rent-hero-booking-copy">{subtitle}</p> : null}
