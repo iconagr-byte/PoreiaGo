@@ -128,20 +128,33 @@
   justify-content: flex-end;
 }
 
+/* Booking hero: drop the heavy stacked x/y blacks — photo first. */
+.rent-hero--booking .rent-hero-shade--x,
+.rent-hero--booking .rent-hero-shade--y {
+  display: none;
+}
+
 .rent-hero-shade--booking {
-  /* Extra left veil — bright coastal daylight under white type. */
+  /* Light veil only where type/search sit — keep sea + road visible. */
   background:
-    linear-gradient(90deg, rgba(2, 28, 36, 0.58) 0%, rgba(2, 28, 36, 0.22) 58%, rgba(2, 28, 36, 0.12) 100%),
+    linear-gradient(90deg, rgba(2, 28, 36, 0.28) 0%, rgba(2, 28, 36, 0.08) 45%, transparent 72%),
     linear-gradient(
       180deg,
-      rgba(2, 28, 36, 0.48) 0%,
-      rgba(2, 28, 36, 0.28) 42%,
-      rgba(2, 28, 36, 0.8) 100%
+      rgba(2, 28, 36, 0.22) 0%,
+      rgba(2, 28, 36, 0.06) 38%,
+      rgba(2, 28, 36, 0.42) 100%
     );
 }
 
 .rent-hero--booking .rent-hero-media img {
   object-position: 45% 40%;
+}
+
+/* Soft text shadow so white copy stays readable without drowning the photo. */
+.rent-hero--booking .rent-hero-booking-title,
+.rent-hero--booking .rent-hero-benefits,
+.rent-hero--booking .rent-hero-booking-copy {
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.45);
 }
 
 .rent-hero-booking-inner {
