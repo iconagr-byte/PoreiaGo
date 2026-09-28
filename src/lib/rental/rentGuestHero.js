@@ -1,8 +1,8 @@
 /** Guest /rent hero — Rentalcars-style composition (search-first). */
 
-/** POV from inside the car — coastal road + sea through the windshield. */
+/** Myrtos (Kefalonia) — island coastal road above turquoise bay. */
 export const RENT_GUEST_HERO_IMAGE =
-  'https://images.unsplash.com/photo-1773680176161-b140f9019ebb?auto=format&fit=crop&w=2000&q=85';
+  'https://images.unsplash.com/photo-1658742758836-a69cdda37f10?auto=format&fit=crop&w=2000&q=85';
 
 export const RENT_GUEST_HERO = {
   title: 'Ενοικίαση αυτοκινήτου',
