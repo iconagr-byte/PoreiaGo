@@ -144,14 +144,16 @@ export default function BackOffice() {
   const mainScrollRef = useRef(null);
   const focusSettingsHub = useCallback(() => {
     setSettingsHubFocusKey((n) => n + 1);
-    // Defer until SettingsHub paints after tab switch.
-    requestAnimationFrame(() => {
+    const scrollTop = () => {
       mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       document.getElementById('settings-hub-top')?.scrollIntoView({
         block: 'start',
         behavior: 'smooth',
       });
-    });
+    };
+    // Defer until SettingsHub paints after tab switch (rAF + short fallback).
+    requestAnimationFrame(scrollTop);
+    window.setTimeout(scrollTop, 80);
   }, []);
   const [fleetRentalTab, setFleetRentalTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
