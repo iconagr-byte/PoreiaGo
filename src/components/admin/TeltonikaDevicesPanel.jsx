@@ -133,6 +133,8 @@ export default function TeltonikaDevicesPanel() {
   const [devices, setDevices] = useState([]);
   const [liveFleet, setLiveFleet] = useState([]);
   const [fleetVehicles, setFleetVehicles] = useState([]);
+  /** Pins shown only after explicit test (Δοκιμαστικό pin / Η θέση μου). */
+  const [testPins, setTestPins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState(null);
@@ -194,21 +196,15 @@ export default function TeltonikaDevicesPanel() {
     return map;
   }, [fleetVehicles]);
 
-  const mapPins = useMemo(() => {
-    const pins = [];
-    for (const d of devices) {
-      let lat = d.last_lat != null ? Number(d.last_lat) : null;
-      let lng = d.last_lng != null ? Number(d.last_lng) : null;
-      const code = String(d.vehicle_code || '').trim().toUpperCase();
+  const mapPins = testPins;
+
+  const buildTestPin = useCallback(
+    (device, lat, lng, { online = true } = {}) => {
+      const fleet = fleetByPlate.get(normalizePlate(device.vehicle_code));
+      const code = String(device.vehicle_code || '').trim().toUpperCase();
       const live = liveFleet.find(
         (v) => String(v.vehicle_code || v.bus_plate || '').trim().toUpperCase() === code,
       );
-      if (live?.lat != null && live?.lng != null) {
-        lat = Number(live.lat);
-        lng = Number(live.lng);
-      }
-      if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) continue;
-      const fleet = fleetByPlate.get(normalizePlate(d.vehicle_code));
       const imageUrl = resolveFleetMarkerImage({
         vehicle_image_url:
           live?.vehicle_image_url ||
@@ -216,23 +212,23 @@ export default function TeltonikaDevicesPanel() {
           (Array.isArray(fleet?.gallery_urls) ? fleet.gallery_urls[0] : null),
         photo_url: live?.photo_url,
       });
-      pins.push({
-        id: d.id,
-        lat,
-        lng,
-        label: d.label || fleet?.name || d.vehicle_code,
-        plate: d.vehicle_code,
-        imei: d.imei,
-        online: Boolean(live),
-        speed: live?.speed_kmh ?? d.last_speed_kmh,
-        seen: d.last_seen_at,
+      return {
+        id: device.id,
+        lat: Number(lat),
+        lng: Number(lng),
+        label: device.label || fleet?.name || device.vehicle_code,
+        plate: device.vehicle_code,
+        imei: device.imei,
+        online,
+        speed: live?.speed_kmh ?? device.last_speed_kmh ?? 0,
+        seen: device.last_seen_at || new Date().toISOString(),
         imageUrl,
-        points: d.points_accepted || 0,
+        points: device.points_accepted || 0,
         model: fleet?.model || fleet?.make || '',
-      });
-    }
-    return pins;
-  }, [devices, liveFleet, fleetByPlate]);
+      };
+    },
+    [fleetByPlate, liveFleet],
+  );
 
   const selected = devices.find((d) => d.id === selectedId) || null;
 
@@ -262,49 +258,74 @@ export default function TeltonikaDevicesPanel() {
     }
   };
 
+  const onTestPing = async (deviceId, coordsOverride = null) => {
+    if (!deviceId) {
+      toast.error('Διάλεξε συσκευή');
+      return;
+    }
+    const device = devices.find((d) => d.id === deviceId);
+    if (!device) {
+      toast.error('Η συσκευή δεν βρέθηκε');
+      return;
+    }
+    setTestingId(deviceId);
+    try {
+      const body = {};
+      const latSrc = coordsOverride?.lat ?? testCoords.lat;
+      const lngSrc = coordsOverride?.lng ?? testCoords.lng;
+      const latN = Number(latSrc);
+      const lngN = Number(lngSrc);
+      if (Number.isFinite(latN) && Number.isFinite(lngN) && latSrc !== '' && lngSrc !== '') {
+        body.latitude = latN;
+        body.longitude = lngN;
+      }
+      const res = await testPingTeltonikaDevice(deviceId, body);
+      const pin = buildTestPin(
+        { ...device, ...(res.device || {}), last_seen_at: new Date().toISOString() },
+        res.latitude,
+        res.longitude,
+        { online: true },
+      );
+      setTestPins((prev) => {
+        const rest = prev.filter((p) => p.id !== pin.id);
+        return [...rest, pin];
+      });
+      setSelectedId(deviceId);
+      toast.success(
+        `Δοκιμαστικό pin: ${res.device?.vehicle_code || device.vehicle_code} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
+      );
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία test pin');
+    } finally {
+      setTestingId(null);
+    }
+  };
+
   const useMyLocation = () => {
+    if (!selectedId) {
+      toast.error('Διάλεξε συσκευή');
+      return;
+    }
     if (!navigator.geolocation) {
       toast.error('Δεν υποστηρίζεται geolocation');
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setTestCoords({
-          lat: String(pos.coords.latitude.toFixed(6)),
-          lng: String(pos.coords.longitude.toFixed(6)),
-        });
-        toast.success('Συντεταγμένες από τη θέση σου');
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        setTestCoords({ lat: String(lat), lng: String(lng) });
+        onTestPing(selectedId, { lat: String(lat), lng: String(lng) });
       },
       () => toast.error('Αποτυχία ανάγνωσης θέσης'),
       { enableHighAccuracy: true, timeout: 12000 },
     );
   };
 
-  const onTestPing = async (deviceId) => {
-    if (!deviceId) {
-      toast.error('Διάλεξε συσκευή');
-      return;
-    }
-    setTestingId(deviceId);
-    try {
-      const body = {};
-      const latN = Number(testCoords.lat);
-      const lngN = Number(testCoords.lng);
-      if (Number.isFinite(latN) && Number.isFinite(lngN) && testCoords.lat !== '' && testCoords.lng !== '') {
-        body.latitude = latN;
-        body.longitude = lngN;
-      }
-      const res = await testPingTeltonikaDevice(deviceId, body);
-      toast.success(
-        `Pin στον χάρτη: ${res.device?.vehicle_code || 'OK'} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
-      );
-      await load();
-      openLiveMapTab();
-    } catch (err) {
-      toast.error(err.message || 'Αποτυχία test pin');
-    } finally {
-      setTestingId(null);
-    }
+  const clearTestPins = () => {
+    setTestPins([]);
+    toast.success('Καθαρίστηκαν τα δοκιμαστικά pins');
   };
 
   return (
@@ -338,7 +359,7 @@ export default function TeltonikaDevicesPanel() {
               Packets OK: {status?.packets_ok ?? 0}
             </span>
             <span className="rounded-full bg-white/10 px-3 py-1.5">
-              Live pins: {mapPins.length}/{devices.length}
+              Test pins: {mapPins.length}
             </span>
           </div>
           {status?.last_error ? (
@@ -352,24 +373,36 @@ export default function TeltonikaDevicesPanel() {
           <div>
             <h3 className="font-bold text-lg text-slate-900">Χάρτης συσκευών GPS</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Travel pin με φωτο λεωφορείου + πινακίδα/στοιχεία. Άδειο = δεν ήρθε ακόμα θέση.
+              Το pin εμφανίζεται μόνο όταν το ζητήσεις: Δοκιμαστικό pin ή Η θέση μου.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={load}
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-          >
-            <span className="material-symbols-outlined text-[16px]">refresh</span>
-            Ανανέωση
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {mapPins.length ? (
+              <button
+                type="button"
+                onClick={clearTestPins}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined text-[16px]">visibility_off</span>
+                Καθαρισμός
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={load}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              <span className="material-symbols-outlined text-[16px]">refresh</span>
+              Ανανέωση
+            </button>
+          </div>
         </div>
         <div className="relative h-[18rem] sm:h-[22rem] bg-slate-100">
           {mapPins.length === 0 ? (
             <div className="absolute inset-0 z-[2] flex items-center justify-center pointer-events-none">
               <div className="rounded-2xl bg-white/90 border border-slate-200 px-4 py-3 text-sm text-slate-600 shadow-sm max-w-sm text-center">
-                Δεν υπάρχουν pins ακόμα. Χρησιμοποίησε το <strong>Μενού τεστ</strong> για δοκιμαστικό
-                pin, ή περίμενε AVL από το FTC961.
+                Κενός χάρτης. Πάτα <strong>Δοκιμαστικό pin</strong> ή <strong>Η θέση μου</strong> για
+                να εμφανιστεί το pin δοκιμής.
               </div>
             </div>
           ) : null}
@@ -430,8 +463,8 @@ export default function TeltonikaDevicesPanel() {
         <div>
           <h3 className="font-bold text-lg text-slate-900">Μενού τεστ GPS</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Έλεγχος ότι βλέπεις τις συσκευές — δοκιμαστικό pin στον χάρτη πάνω και στον Ζωντανό
-            χάρτη.
+            Μόνο εδώ εμφανίζεται pin δοκιμής — όχι αυτόματα από last fix. Ζωντανός χάρτης ανοίγει
+            μόνο αν το πατήσεις.
           </p>
         </div>
 
@@ -473,8 +506,8 @@ export default function TeltonikaDevicesPanel() {
           </label>
         </div>
         <p className="text-[11px] text-slate-500">
-          Άδειο Lat/Lng → χρησιμοποιεί last fix της συσκευής, αλλιώς δοκιμαστικό σημείο Αθήνας. Βάλε
-          πραγματικές συντεταγμένες ή «Η θέση μου» για σωστό pin.
+          Άδειο Lat/Lng στο Δοκιμαστικό pin → last fix ή Αθήνα. «Η θέση μου» βάζει αμέσως pin στη
+          θέση σου.
         </p>
         <div className="flex flex-wrap gap-2">
           <button
