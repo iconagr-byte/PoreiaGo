@@ -242,6 +242,13 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
             scheduleNext();
             return;
           }
+          if (isFleetGatewayBlip(err)) {
+            // API restart / NPM 502 during deploy — silent retry, keep last pins.
+            setConnected(false);
+            setPollError('');
+            scheduleNext();
+            return;
+          }
           const msg =
             raw === 'Failed to fetch' || /network|load failed|fetch/i.test(raw)
               ? 'Δεν συνδέει με το API (Failed to fetch). Ανανέωσε τη σελίδα· αν συνεχίζει, το api host είναι εκτός.'
