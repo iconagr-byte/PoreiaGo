@@ -384,6 +384,187 @@
   display: none !important;
 }
 
+/* Teltonika GPS test map — travel card pin (photo + details) */
+.leaflet-div-icon.teltonika-travel-pin {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.teltonika-travel-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 228px;
+  filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.22));
+  font-family: 'Avenir Next', 'Segoe UI', 'Helvetica Neue', sans-serif;
+  pointer-events: none;
+}
+
+.teltonika-travel-marker__card {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+  backdrop-filter: blur(14px) saturate(1.35);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
+}
+
+.teltonika-travel-marker__photo {
+  width: 72px;
+  flex: 0 0 72px;
+  min-height: 72px;
+  background: #0f172a;
+  position: relative;
+}
+
+.teltonika-travel-marker__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.teltonika-travel-marker__photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 55%, rgba(15, 23, 42, 0.08));
+  pointer-events: none;
+}
+
+.teltonika-travel-marker__body {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px 8px 9px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.teltonika-travel-marker__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.teltonika-travel-marker__plate {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #0e7490;
+  text-transform: uppercase;
+}
+
+.teltonika-travel-marker__meta {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teltonika-travel-marker__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.teltonika-travel-marker__badge--live {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+}
+
+.teltonika-travel-marker__badge--idle {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
+}
+
+.teltonika-travel-marker__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.teltonika-travel-marker__tip {
+  width: 16px;
+  height: 12px;
+  margin-top: -1px;
+  background: linear-gradient(145deg, #fff, #f1f5f9);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  border-left: 1px solid rgba(255, 255, 255, 0.8);
+  border-right: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.teltonika-travel-popup {
+  display: flex;
+  gap: 10px;
+  min-width: 220px;
+  max-width: 280px;
+  font-family: 'Avenir Next', 'Segoe UI', 'Helvetica Neue', sans-serif;
+}
+
+.teltonika-travel-popup__photo {
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  overflow: hidden;
+  flex: 0 0 72px;
+  background: #0f172a;
+}
+
+.teltonika-travel-popup__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.teltonika-travel-popup__title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.teltonika-travel-popup__meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.teltonika-travel-popup__plate {
+  display: inline-block;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0e7490;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+}
+
 @media (max-width: 640px) {
   .fleet-apple-shell {
     margin: 0;

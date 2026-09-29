@@ -6,6 +6,12 @@ import 'leaflet/dist/leaflet.css';
 import TelemetrySettingsPanel from './TelemetrySettingsPanel.jsx';
 import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
 import {
+  DEFAULT_FLEET_BUS_IMAGE,
+  resolveFleetMarkerImage,
+} from '../../lib/admin/fleetVehicleDetails.js';
+import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import { fetchFleetVehicles } from '../../services/platformApi.js';
+import {
   createTeltonikaDevice,
   deleteTeltonikaDevice,
   fetchLiveFleet,
@@ -13,8 +19,10 @@ import {
   fetchTeltonikaStatus,
   testPingTeltonikaDevice,
 } from '../../services/telemetryApi.js';
+import '../../styles/fleet-live-map.css';
 
 const DEFAULT_CENTER = [37.98381, 23.727539];
+const TRAVEL_PIN_CACHE = new Map();
 
 function formatSeen(iso) {
   if (!iso) return 'Ποτέ';
@@ -23,6 +31,22 @@ function formatSeen(iso) {
   } catch {
     return iso;
   }
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizePlate(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
 }
 
 function deviceStatus(d, liveCodes) {
@@ -37,16 +61,48 @@ function deviceStatus(d, liveCodes) {
   return { key: 'WAITING', label: 'Αναμονή δεδομένων', tone: 'bg-slate-100 text-slate-600' };
 }
 
-function pinIcon(online) {
-  const color = online ? '#059669' : '#64748b';
-  const html = `<div style="width:18px;height:18px;border-radius:9999px;background:${color};border:3px solid #fff;box-shadow:0 1px 4px rgba(15,23,42,.35)"></div>`;
-  return L.divIcon({
-    className: 'teltonika-test-pin',
+function travelPinIcon(pin) {
+  const img = resolveSiteAssetUrl(pin.imageUrl || DEFAULT_FLEET_BUS_IMAGE);
+  const title = escapeHtml(pin.label || pin.plate || 'GPS');
+  const plate = escapeHtml(pin.plate || '—');
+  const speed =
+    pin.speed != null && Number.isFinite(Number(pin.speed))
+      ? `${Math.round(Number(pin.speed))} km/h`
+      : '— km/h';
+  const badgeClass = pin.online
+    ? 'teltonika-travel-marker__badge teltonika-travel-marker__badge--live'
+    : 'teltonika-travel-marker__badge teltonika-travel-marker__badge--idle';
+  const badgeLabel = pin.online ? 'Live GPS' : 'Last fix';
+  const cacheKey = `${pin.id}|${img}|${title}|${plate}|${speed}|${pin.online ? 1 : 0}`;
+  const cached = TRAVEL_PIN_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  const html = `<div class="teltonika-travel-marker">
+  <div class="teltonika-travel-marker__card">
+    <div class="teltonika-travel-marker__photo"><img src="${escapeHtml(img)}" alt="" decoding="async" loading="eager" /></div>
+    <div class="teltonika-travel-marker__body">
+      <div class="teltonika-travel-marker__title">${title}</div>
+      <div class="teltonika-travel-marker__plate">${plate}</div>
+      <div class="teltonika-travel-marker__meta">${escapeHtml(speed)} · IMEI …${escapeHtml(String(pin.imei || '').slice(-6))}</div>
+      <span class="${badgeClass}"><span class="teltonika-travel-marker__dot"></span>${badgeLabel}</span>
+    </div>
+  </div>
+  <div class="teltonika-travel-marker__tip"></div>
+</div>`;
+
+  const icon = L.divIcon({
+    className: 'teltonika-travel-pin',
     html,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-    popupAnchor: [0, -10],
+    iconSize: [228, 96],
+    iconAnchor: [114, 96],
+    popupAnchor: [0, -86],
   });
+  TRAVEL_PIN_CACHE.set(cacheKey, icon);
+  if (TRAVEL_PIN_CACHE.size > 40) {
+    const first = TRAVEL_PIN_CACHE.keys().next().value;
+    TRAVEL_PIN_CACHE.delete(first);
+  }
+  return icon;
 }
 
 function FitPins({ pins }) {
@@ -76,6 +132,7 @@ export default function TeltonikaDevicesPanel() {
   const [status, setStatus] = useState(null);
   const [devices, setDevices] = useState([]);
   const [liveFleet, setLiveFleet] = useState([]);
+  const [fleetVehicles, setFleetVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState(null);
@@ -91,15 +148,17 @@ export default function TeltonikaDevicesPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [st, rows, fleet] = await Promise.all([
+      const [st, rows, fleet, vehicles] = await Promise.all([
         fetchTeltonikaStatus(),
         fetchTeltonikaDevices(),
         fetchLiveFleet().catch(() => []),
+        fetchFleetVehicles().catch(() => []),
       ]);
       setStatus(st);
       const list = Array.isArray(rows) ? rows : [];
       setDevices(list);
       setLiveFleet(Array.isArray(fleet) ? fleet : []);
+      setFleetVehicles(Array.isArray(vehicles) ? vehicles : []);
       setSelectedId((prev) => {
         if (prev && list.some((d) => d.id === prev)) return prev;
         return list[0]?.id || '';
@@ -126,6 +185,15 @@ export default function TeltonikaDevicesPanel() {
     return set;
   }, [liveFleet]);
 
+  const fleetByPlate = useMemo(() => {
+    const map = new Map();
+    for (const v of fleetVehicles) {
+      const key = normalizePlate(v.plate_number || v.code || v.vehicle_code);
+      if (key) map.set(key, v);
+    }
+    return map;
+  }, [fleetVehicles]);
+
   const mapPins = useMemo(() => {
     const pins = [];
     for (const d of devices) {
@@ -140,20 +208,31 @@ export default function TeltonikaDevicesPanel() {
         lng = Number(live.lng);
       }
       if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) continue;
+      const fleet = fleetByPlate.get(normalizePlate(d.vehicle_code));
+      const imageUrl = resolveFleetMarkerImage({
+        vehicle_image_url:
+          live?.vehicle_image_url ||
+          fleet?.public_image_url ||
+          (Array.isArray(fleet?.gallery_urls) ? fleet.gallery_urls[0] : null),
+        photo_url: live?.photo_url,
+      });
       pins.push({
         id: d.id,
         lat,
         lng,
-        label: d.label || d.vehicle_code,
+        label: d.label || fleet?.name || d.vehicle_code,
         plate: d.vehicle_code,
         imei: d.imei,
         online: Boolean(live),
         speed: live?.speed_kmh ?? d.last_speed_kmh,
         seen: d.last_seen_at,
+        imageUrl,
+        points: d.points_accepted || 0,
+        model: fleet?.model || fleet?.make || '',
       });
     }
     return pins;
-  }, [devices, liveFleet]);
+  }, [devices, liveFleet, fleetByPlate]);
 
   const selected = devices.find((d) => d.id === selectedId) || null;
 
@@ -273,7 +352,7 @@ export default function TeltonikaDevicesPanel() {
           <div>
             <h3 className="font-bold text-lg text-slate-900">Χάρτης συσκευών GPS</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Pins από last fix / live στόλο. Άδειο = ακόμα δεν ήρθε θέση από το tracker.
+              Travel pin με φωτο λεωφορείου + πινακίδα/στοιχεία. Άδειο = δεν ήρθε ακόμα θέση.
             </p>
           </div>
           <button
@@ -311,20 +390,34 @@ export default function TeltonikaDevicesPanel() {
               <Marker
                 key={pin.id}
                 position={[pin.lat, pin.lng]}
-                icon={pinIcon(pin.online)}
+                icon={travelPinIcon(pin)}
+                eventHandlers={{ click: () => setSelectedId(pin.id) }}
               >
                 <Popup>
-                  <div className="text-sm min-w-[10rem]">
-                    <p className="font-bold text-slate-900">{pin.label}</p>
-                    <p className="text-xs text-slate-600 mt-0.5">{pin.plate}</p>
-                    <p className="text-[11px] font-mono text-slate-500 mt-1">IMEI {pin.imei}</p>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
-                      {pin.speed != null ? ` · ${Number(pin.speed).toFixed(0)} km/h` : ''}
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Last seen: {formatSeen(pin.seen)}
-                    </p>
+                  <div className="teltonika-travel-popup">
+                    <div className="teltonika-travel-popup__photo">
+                      <img
+                        src={resolveSiteAssetUrl(pin.imageUrl || DEFAULT_FLEET_BUS_IMAGE)}
+                        alt=""
+                        decoding="async"
+                      />
+                    </div>
+                    <div>
+                      <div className="teltonika-travel-popup__title">{pin.label}</div>
+                      <span className="teltonika-travel-popup__plate">{pin.plate}</span>
+                      <div className="teltonika-travel-popup__meta">
+                        {pin.model ? `${pin.model} · ` : ''}
+                        {pin.speed != null ? `${Math.round(Number(pin.speed))} km/h` : '— km/h'}
+                        {pin.online ? ' · Live' : ''}
+                      </div>
+                      <div className="teltonika-travel-popup__meta">IMEI {pin.imei}</div>
+                      <div className="teltonika-travel-popup__meta">
+                        {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
+                      </div>
+                      <div className="teltonika-travel-popup__meta">
+                        Last seen: {formatSeen(pin.seen)} · {pin.points || 0} points
+                      </div>
+                    </div>
                   </div>
                 </Popup>
               </Marker>
