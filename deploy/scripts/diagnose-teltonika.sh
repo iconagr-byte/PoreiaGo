@@ -64,12 +64,11 @@ if [[ -n "${API_CID}" ]]; then
 fi
 
 echo
-echo "=== API in-process Teltonika status ==="
+echo "=== device store (durable last_seen / points) ==="
+echo "(Note: docker-exec get_teltonika_status counters are always 0 — fresh process.)"
 "${COMPOSE[@]}" exec -T api-blue python - <<'PY'
-from travel_platform.telemetry.teltonika import get_teltonika_status, list_devices
+from travel_platform.telemetry.teltonika import list_devices
 import json
-st = get_teltonika_status()
-print(json.dumps(st, indent=2, default=str))
 rows = list_devices()
 print("device_count=", len(rows))
 for r in rows:
@@ -86,6 +85,33 @@ for r in rows:
         "points=", r.get("points_accepted"),
         "label=", r.get("label"),
     )
+PY
+
+echo
+echo "=== TCP IMEI probe (localhost :${PORT}) ==="
+"${COMPOSE[@]}" exec -T api-blue python - <<'PY'
+import json, socket, struct
+from travel_platform.telemetry.teltonika import list_devices
+
+rows = list_devices()
+imei = None
+for r in rows:
+    if r.get("enabled") and r.get("imei"):
+        imei = str(r["imei"])
+        break
+if not imei:
+    print("PROBE_SKIP no enabled IMEI")
+else:
+    payload = struct.pack(">H", len(imei)) + imei.encode("ascii")
+    try:
+        s = socket.create_connection(("127.0.0.1", 5027), timeout=5)
+        s.sendall(payload)
+        resp = s.recv(1)
+        s.close()
+        code = resp.hex() if resp else "empty"
+        print("PROBE_IMEI", imei, "reply=0x" + code, "OK" if resp == b"\x01" else "REJECT")
+    except Exception as exc:
+        print("PROBE_FAIL", type(exc).__name__, str(exc)[:200])
 PY
 
 echo

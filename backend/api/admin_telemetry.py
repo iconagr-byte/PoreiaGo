@@ -31,6 +31,8 @@ from schemas.telemetry import (
     TeltonikaDeviceResponse,
     TeltonikaDeviceUpsert,
     TeltonikaServerStatusResponse,
+    TeltonikaTestPingRequest,
+    TeltonikaTestPingResponse,
 )
 from travel_platform.telemetry.alerts import TelemetryAlertBus
 from travel_platform.telemetry.fleet_eta_service import fetch_fleet_etas
@@ -387,3 +389,67 @@ async def admin_delete_teltonika_device(
 
     if not delete_device(device_id, tenant_id=str(tenant_id)):
         raise HTTPException(status_code=404, detail="Device not found")
+
+
+@router.post(
+    "/teltonika/devices/{device_id}/test-ping",
+    response_model=TeltonikaTestPingResponse,
+)
+async def admin_teltonika_test_ping(
+    device_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    body: TeltonikaTestPingRequest | None = None,
+):
+    """Drop a test GPS fix for a bound IMEI so the live map / test map show a pin."""
+    from travel_platform.telemetry.processor import process_telemetry_payload
+    from travel_platform.telemetry.teltonika import get_device_by_imei, list_devices, touch_device
+
+    tid = str(tenant_id)
+    rows = list_devices(tid)
+    device = next((r for r in rows if str(r.get("id")) == str(device_id)), None)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    if not device.get("enabled"):
+        raise HTTPException(status_code=400, detail="Η συσκευή είναι ανενεργή")
+
+    req = body or TeltonikaTestPingRequest()
+    # Prefer last real fix; else Athens demo pin so the map always has something visible.
+    lat = req.latitude
+    lng = req.longitude
+    if lat is None or lng is None:
+        if device.get("last_lat") is not None and device.get("last_lng") is not None:
+            lat = float(device["last_lat"])
+            lng = float(device["last_lng"])
+        else:
+            lat, lng = 37.983810, 23.727539
+    speed = float(req.speed_kmh or 0)
+
+    vehicle_code = str(device.get("vehicle_code") or device.get("imei"))
+    payload = {
+        "tenant_id": tid,
+        "vehicle_code": vehicle_code,
+        "latitude": lat,
+        "longitude": lng,
+        "speed_kmh": speed,
+        "engine_status": "on",
+        "heading_deg": 0.0,
+        "bus_plate": vehicle_code,
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "raw": {"source": "teltonika_test_ping", "imei": device.get("imei")},
+    }
+    result = await process_telemetry_payload(payload)
+    touch_device(
+        str(device.get("imei")),
+        lat=lat,
+        lng=lng,
+        speed_kmh=speed,
+        points=1,
+    )
+    refreshed = get_device_by_imei(str(device.get("imei"))) or device
+    return TeltonikaTestPingResponse(
+        device=TeltonikaDeviceResponse(**refreshed),
+        vehicle_id=str(result.vehicle_id),
+        latitude=lat,
+        longitude=lng,
+        source="test_ping",
+    )

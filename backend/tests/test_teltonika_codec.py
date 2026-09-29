@@ -47,6 +47,29 @@ class Codec8Tests(unittest.TestCase):
         self.assertEqual(consumed, 0)
         self.assertIsNone(ack)
 
+    def test_codec8_extended_roundtrip(self):
+        """FTC961 defaults to Codec 8 Extended — counts/IDs are 2 bytes + NX."""
+        pkt = codec8.build_minimal_codec8e_packet(
+            latitude=37.9838,
+            longitude=23.7275,
+            speed_kmh=18,
+            ts=datetime(2026, 9, 29, 8, 0, tzinfo=timezone.utc),
+            ignition=1,
+            io_extra={253: 1},
+            io_extra_u16={385: 42},  # AVL ID > 255 only valid on 8E
+        )
+        records, consumed, ack = codec8.parse_avl_packet(pkt)
+        self.assertEqual(consumed, len(pkt))
+        self.assertEqual(struct.unpack(">I", ack)[0], 1)
+        self.assertEqual(len(records), 1)
+        fix = records[0]
+        self.assertAlmostEqual(fix.latitude, 37.9838, places=4)
+        self.assertAlmostEqual(fix.longitude, 23.7275, places=4)
+        self.assertEqual(fix.speed_kmh, 18)
+        self.assertEqual(fix.io.get(239), 1)
+        self.assertEqual(fix.io.get(253), 1)
+        self.assertEqual(fix.io.get(385), 42)
+        self.assertEqual(fix.tracker_event_id(), 102)
 
 class DeviceStoreTests(unittest.TestCase):
     def setUp(self):

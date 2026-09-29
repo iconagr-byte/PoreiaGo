@@ -91,6 +91,8 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             writer.write(b"\x01")
             await writer.drain()
             _status["accepted_imeis"] = int(_status.get("accepted_imeis") or 0) + 1
+            # Persist login so admin Last seen updates even before first AVL fix.
+            touch_device(imei)
             logger.info(
                 "Teltonika accept IMEI=%s vehicle=%s tenant=%s peer=%s",
                 imei,
@@ -112,6 +114,14 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     break
                 if consumed < 0:
                     _status["packets_bad"] = int(_status.get("packets_bad") or 0) + 1
+                    preview = bytes(buf[:64]).hex()
+                    logger.warning(
+                        "Teltonika AVL parse fail IMEI=%s peer=%s buf_len=%s hex64=%s",
+                        imei,
+                        peer,
+                        len(buf),
+                        preview,
+                    )
                     # Drop one byte and resync
                     del buf[0:1]
                     continue
@@ -121,15 +131,19 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                 writer.write(ack)
                 await writer.drain()
                 _status["packets_ok"] = int(_status.get("packets_ok") or 0) + 1
-                if not records:
-                    continue
                 # Re-read device in case binding changed
                 device = get_device_by_imei(imei) or device
                 if not device.get("enabled"):
+                    touch_device(imei)
+                    continue
+                if not records:
+                    # Valid AVL (e.g. no GPS yet) — still mark seen
+                    touch_device(imei)
                     continue
                 try:
                     tenant_id = UUID(str(device["tenant_id"]))
                 except Exception:
+                    touch_device(imei)
                     continue
                 vehicle_code = str(device.get("vehicle_code") or imei)
                 driver_raw = device.get("driver_id")

@@ -419,3 +419,19 @@ class TeltonikaServerStatusResponse(BaseModel):
     packets_ok: int = 0
     packets_bad: int = 0
     last_error: str | None = None
+
+
+class TeltonikaTestPingRequest(BaseModel):
+    """Admin test: drop a GPS pin for a bound IMEI onto the live fleet map."""
+
+    latitude: float | None = Field(None, ge=-90, le=90)
+    longitude: float | None = Field(None, ge=-180, le=180)
+    speed_kmh: float = Field(0, ge=0, le=300)
+
+
+class TeltonikaTestPingResponse(BaseModel):
+    device: TeltonikaDeviceResponse
+    vehicle_id: str
+    latitude: float
+    longitude: float
+    source: str = "test_ping"

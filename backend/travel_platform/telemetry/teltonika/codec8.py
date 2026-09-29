@@ -76,33 +76,61 @@ def parse_imei_login(data: bytes) -> tuple[str | None, int]:
     return imei, 2 + length
 
 
-def _read_io_map(buf: bytes, offset: int, *, id_width: int) -> tuple[dict[int, int], int, int]:
-    """Parse IO section. Returns (io_map, event_io_id, new_offset)."""
-    if id_width == 1:
+def _read_u16(buf: bytes, offset: int) -> tuple[int, int]:
+    return struct.unpack(">H", buf[offset : offset + 2])[0], offset + 2
+
+
+def _read_io_map(buf: bytes, offset: int, *, extended: bool) -> tuple[dict[int, int], int, int]:
+    """Parse IO section. Returns (io_map, event_io_id, new_offset).
+
+    Codec 8: event/total/N* counts and IO IDs are 1 byte.
+    Codec 8 Extended (0x8E): those fields are 2 bytes, plus an NX variable-length block.
+    """
+    if not extended:
         event_io_id = buf[offset]
         offset += 1
         total_n = buf[offset]
         offset += 1
+        count_width = 1
+        id_width = 1
     else:
-        event_io_id = struct.unpack(">H", buf[offset : offset + 2])[0]
-        offset += 2
-        total_n = buf[offset]
-        offset += 1
+        event_io_id, offset = _read_u16(buf, offset)
+        total_n, offset = _read_u16(buf, offset)
+        count_width = 2
+        id_width = 2
 
     io: dict[int, int] = {}
     for size, fmt in ((1, ">B"), (2, ">H"), (4, ">I"), (8, ">Q")):
-        count = buf[offset]
-        offset += 1
+        if count_width == 1:
+            count = buf[offset]
+            offset += 1
+        else:
+            count, offset = _read_u16(buf, offset)
         for _ in range(count):
             if id_width == 1:
                 io_id = buf[offset]
                 offset += 1
             else:
-                io_id = struct.unpack(">H", buf[offset : offset + 2])[0]
-                offset += 2
+                io_id, offset = _read_u16(buf, offset)
             value = struct.unpack(fmt, buf[offset : offset + size])[0]
             offset += size
             io[io_id] = int(value)
+
+    if extended:
+        # NX: variable-length IO elements (id + length + value)
+        nx, offset = _read_u16(buf, offset)
+        for _ in range(nx):
+            io_id, offset = _read_u16(buf, offset)
+            length, offset = _read_u16(buf, offset)
+            if length < 0 or offset + length > len(buf):
+                raise IndexError("Codec 8E NX length out of range")
+            raw = buf[offset : offset + length]
+            offset += length
+            # Prefer numeric when value fits common widths; else skip map insert
+            if length in (1, 2, 4, 8):
+                fmt = {1: ">B", 2: ">H", 4: ">I", 8: ">Q"}[length]
+                io[io_id] = int(struct.unpack(fmt, raw)[0])
+
     # total_n is informational; some firmwares leave it inconsistent — ignore mismatch
     _ = total_n
     return io, event_io_id, offset
@@ -126,8 +154,7 @@ def _parse_avl_record(buf: bytes, offset: int, *, codec_id: int) -> tuple[GpsFix
     speed = struct.unpack(">H", buf[offset : offset + 2])[0]
     offset += 2
 
-    id_width = 2 if codec_id == 0x8E else 1
-    io, event_io_id, offset = _read_io_map(buf, offset, id_width=id_width)
+    io, event_io_id, offset = _read_io_map(buf, offset, extended=(codec_id == 0x8E))
 
     recorded = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc)
     fix = GpsFix(
@@ -242,6 +269,60 @@ def build_minimal_codec8_packet(
     crc = crc16_ibm(bytes(body))
     packet = b"\x00\x00\x00\x00" + struct.pack(">I", len(body)) + bytes(body) + struct.pack(">I", crc)
     return packet
+
+
+def build_minimal_codec8e_packet(
+    *,
+    latitude: float,
+    longitude: float,
+    speed_kmh: int = 0,
+    ts: datetime | None = None,
+    ignition: int = 1,
+    io_extra: dict[int, int] | None = None,
+    io_extra_u16: dict[int, int] | None = None,
+) -> bytes:
+    """Test helper — build a 1-record Codec 8 Extended (0x8E) AVL packet."""
+    when = ts or datetime.now(timezone.utc)
+    ts_ms = int(when.timestamp() * 1000)
+    lat_i = int(round(latitude * 10_000_000))
+    lon_i = int(round(longitude * 10_000_000))
+    ones: list[tuple[int, int]] = [(239, ignition)]
+    if io_extra:
+        for k, v in io_extra.items():
+            if 0 <= int(v) <= 255:
+                ones.append((int(k), int(v)))
+    twos: list[tuple[int, int]] = []
+    if io_extra_u16:
+        for k, v in io_extra_u16.items():
+            twos.append((int(k), int(v) & 0xFFFF))
+
+    body = bytearray()
+    body.append(0x8E)  # codec extended
+    body.append(0x01)  # N1 record count
+    body += struct.pack(">Q", ts_ms)
+    body.append(0)  # priority
+    body += struct.pack(">i", lon_i)
+    body += struct.pack(">i", lat_i)
+    body += struct.pack(">h", 10)
+    body += struct.pack(">H", 90)
+    body.append(8)
+    body += struct.pack(">H", int(speed_kmh))
+    body += struct.pack(">H", 0)  # event io id
+    body += struct.pack(">H", len(ones) + len(twos))  # total IO
+    body += struct.pack(">H", len(ones))  # N1
+    for io_id, val in ones:
+        body += struct.pack(">H", io_id)
+        body.append(val & 0xFF)
+    body += struct.pack(">H", len(twos))  # N2
+    for io_id, val in twos:
+        body += struct.pack(">H", io_id)
+        body += struct.pack(">H", val)
+    body += struct.pack(">H", 0)  # N4
+    body += struct.pack(">H", 0)  # N8
+    body += struct.pack(">H", 0)  # NX
+    body.append(0x01)  # N2 trailing record count
+    crc = crc16_ibm(bytes(body))
+    return b"\x00\x00\x00\x00" + struct.pack(">I", len(body)) + bytes(body) + struct.pack(">I", crc)
 
 
 def fix_to_telemetry_fields(fix: GpsFix) -> dict[str, Any]:

@@ -19,15 +19,16 @@ flowchart LR
 2. **Domain / IP** = public VPS IP (`PLATFORM_INGRESS_IP`)
 3. **Port** = `5027`
 4. **Protocol** = TCP
-5. Codec = **Codec 8** (or Codec 8 Extended)
-6. Save & reboot device
+5. Codec / Data Protocol = **Codec 8 Extended** (recommended) or Codec 8
+6. Data Acquisition: enable periodic records (e.g. Min Period 30–60s) + Save & reboot
 7. Open firewall: `ufw allow 5027/tcp` (or cloud security group)
 
 ## Admin
 
 1. Back Office → **Ρυθμίσεις → Teltonika GPS**
 2. Add IMEI + πινακίδα (`vehicle_code`)
-3. Wait for Last seen / pin on **Ζωντανός χάρτης**
+3. Use **Χάρτης συσκευών** + **Μενού τεστ → Δοκιμαστικό pin** to verify the pin path
+4. Wait for real Last seen / pin on **Ζωντανός χάρτης** from the tracker
 
 ## Env
 
@@ -43,5 +44,7 @@ Compose maps `${TELTONIKA_TCP_PORT:-5027}:5027` on `api-blue`.
 ## Notes
 
 - Unbound / disabled IMEIs are rejected (`0x00` login reply).
+- IMEI accept updates Last seen immediately; map pin needs a GPS fix in an AVL record.
+- Codec 8 Extended (0x8E) IO counts/IDs are 2 bytes and include NX variable IOs.
 - Green Driving IO 253 maps to tracker events 101/102/103.
 - Restore / historical playback uses the existing telemetry pipeline.
