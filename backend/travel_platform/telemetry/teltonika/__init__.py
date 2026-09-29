@@ -22,5 +22,6 @@ __all__ = [
     "normalize_imei",
     "start_teltonika_tcp_server",
     "stop_teltonika_tcp_server",
+    "touch_device",
     "upsert_device",
 ]
