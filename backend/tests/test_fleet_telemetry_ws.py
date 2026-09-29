@@ -143,10 +143,12 @@ class IngestDriverLocationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(egress["type"], "fleet_location")
         self.assertEqual(egress["lat"], 37.98)
         self.assertEqual(egress["lng"], 23.73)
-        self.assertGreater(pending_count(), 0)
-        batch = drain_batch(10)
-        self.assertEqual(len(batch), 1)
-        self.assertEqual(batch[0].lat, 37.98)
+        # Coordinate history + live trail are persisted inside process_telemetry_payload
+        # (shared Teltonika/driver path). This test mocks process, so the buffer stays empty.
+        payload = process.await_args.args[0]
+        self.assertEqual(float(payload["latitude"]), 37.98)
+        self.assertEqual(float(payload["longitude"]), 23.73)
+        self.assertEqual(pending_count(), 0)
 
     async def test_remaps_legacy_demo_tenant_to_platform(self):
         platform = "11111111-2222-3333-4444-555555555555"
