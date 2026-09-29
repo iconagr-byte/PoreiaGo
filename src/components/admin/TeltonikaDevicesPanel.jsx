@@ -80,6 +80,7 @@ export default function TeltonikaDevicesPanel() {
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState(null);
   const [selectedId, setSelectedId] = useState('');
+  const [testCoords, setTestCoords] = useState({ lat: '', lng: '' });
   const [form, setForm] = useState({
     imei: '',
     vehicle_code: '',
@@ -182,6 +183,24 @@ export default function TeltonikaDevicesPanel() {
     }
   };
 
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Δεν υποστηρίζεται geolocation');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setTestCoords({
+          lat: String(pos.coords.latitude.toFixed(6)),
+          lng: String(pos.coords.longitude.toFixed(6)),
+        });
+        toast.success('Συντεταγμένες από τη θέση σου');
+      },
+      () => toast.error('Αποτυχία ανάγνωσης θέσης'),
+      { enableHighAccuracy: true, timeout: 12000 },
+    );
+  };
+
   const onTestPing = async (deviceId) => {
     if (!deviceId) {
       toast.error('Διάλεξε συσκευή');
@@ -189,11 +208,19 @@ export default function TeltonikaDevicesPanel() {
     }
     setTestingId(deviceId);
     try {
-      const res = await testPingTeltonikaDevice(deviceId, {});
+      const body = {};
+      const latN = Number(testCoords.lat);
+      const lngN = Number(testCoords.lng);
+      if (Number.isFinite(latN) && Number.isFinite(lngN) && testCoords.lat !== '' && testCoords.lng !== '') {
+        body.latitude = latN;
+        body.longitude = lngN;
+      }
+      const res = await testPingTeltonikaDevice(deviceId, body);
       toast.success(
-        `Test pin: ${res.device?.vehicle_code || 'OK'} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
+        `Pin στον χάρτη: ${res.device?.vehicle_code || 'OK'} · ${Number(res.latitude).toFixed(5)}, ${Number(res.longitude).toFixed(5)}`,
       );
       await load();
+      openLiveMapTab();
     } catch (err) {
       toast.error(err.message || 'Αποτυχία test pin');
     } finally {
@@ -315,8 +342,8 @@ export default function TeltonikaDevicesPanel() {
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
-          <label className="block text-sm">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm sm:col-span-2">
             <span className="font-bold text-slate-700">Συσκευή</span>
             <select
               value={selectedId}
@@ -331,33 +358,65 @@ export default function TeltonikaDevicesPanel() {
               ))}
             </select>
           </label>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onTestPing(selectedId)}
-              disabled={!selectedId || testingId === selectedId}
-              className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-[18px]">my_location</span>
-              {testingId === selectedId ? 'Test…' : 'Δοκιμαστικό pin'}
-            </button>
-            <button
-              type="button"
-              onClick={openLiveMapTab}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined text-[18px]">map</span>
-              Ζωντανός χάρτης
-            </button>
-            <button
-              type="button"
-              onClick={load}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined text-[18px]">sync</span>
-              Έλεγχος
-            </button>
-          </div>
+          <label className="block text-sm">
+            <span className="font-bold text-slate-700">Lat (προαιρετικό)</span>
+            <input
+              value={testCoords.lat}
+              onChange={(e) => setTestCoords((c) => ({ ...c, lat: e.target.value }))}
+              className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/10"
+              placeholder="π.χ. 36.434"
+              inputMode="decimal"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="font-bold text-slate-700">Lng (προαιρετικό)</span>
+            <input
+              value={testCoords.lng}
+              onChange={(e) => setTestCoords((c) => ({ ...c, lng: e.target.value }))}
+              className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/10"
+              placeholder="π.χ. 28.217"
+              inputMode="decimal"
+            />
+          </label>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          Άδειο Lat/Lng → χρησιμοποιεί last fix της συσκευής, αλλιώς δοκιμαστικό σημείο Αθήνας. Βάλε
+          πραγματικές συντεταγμένες ή «Η θέση μου» για σωστό pin.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={useMyLocation}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
+          >
+            <span className="material-symbols-outlined text-[18px]">near_me</span>
+            Η θέση μου
+          </button>
+          <button
+            type="button"
+            onClick={() => onTestPing(selectedId)}
+            disabled={!selectedId || testingId === selectedId}
+            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[18px]">my_location</span>
+            {testingId === selectedId ? 'Test…' : 'Δοκιμαστικό pin'}
+          </button>
+          <button
+            type="button"
+            onClick={openLiveMapTab}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
+          >
+            <span className="material-symbols-outlined text-[18px]">map</span>
+            Ζωντανός χάρτης
+          </button>
+          <button
+            type="button"
+            onClick={load}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
+          >
+            <span className="material-symbols-outlined text-[18px]">sync</span>
+            Έλεγχος
+          </button>
         </div>
 
         {selected ? (

@@ -425,6 +425,7 @@ async def admin_teltonika_test_ping(
     speed = float(req.speed_kmh or 0)
 
     vehicle_code = str(device.get("vehicle_code") or device.get("imei"))
+    driver_name = str(device.get("label") or f"GPS {vehicle_code}")
     payload = {
         "tenant_id": tid,
         "vehicle_code": vehicle_code,
@@ -434,8 +435,11 @@ async def admin_teltonika_test_ping(
         "engine_status": "on",
         "heading_deg": 0.0,
         "bus_plate": vehicle_code,
+        "driver_name": driver_name,
+        "driver_id": device.get("driver_id") or None,
+        "imei": device.get("imei"),
+        "source": "teltonika_test_ping",
         "recorded_at": datetime.now(timezone.utc).isoformat(),
-        "raw": {"source": "teltonika_test_ping", "imei": device.get("imei")},
     }
     result = await process_telemetry_payload(payload)
     touch_device(
