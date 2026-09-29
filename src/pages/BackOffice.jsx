@@ -139,9 +139,8 @@ export default function BackOffice() {
     }
     return isSaasSuperAdmin() ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
   });
-  /** Bumped when pinned hub cards are clicked — scroll that hub to top. */
+  /** Bumped when pinned «Ρυθμίσεις» is clicked — scroll hub to top + reopen rail. */
   const [settingsHubFocusKey, setSettingsHubFocusKey] = useState(0);
-  const [busesHubFocusKey, setBusesHubFocusKey] = useState(0);
   const mainScrollRef = useRef(null);
   const scrollMainHubTop = useCallback((anchorId) => {
     const scrollTop = () => {
@@ -162,7 +161,6 @@ export default function BackOffice() {
     scrollMainHubTop('settings-hub-top');
   }, [scrollMainHubTop]);
   const focusBusesHub = useCallback(() => {
-    setBusesHubFocusKey((n) => n + 1);
     scrollMainHubTop('buses-hub-top');
   }, [scrollMainHubTop]);
   const [fleetRentalTab, setFleetRentalTab] = useState(() => {
