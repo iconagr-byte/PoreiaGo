@@ -1,24 +1,33 @@
 #!/usr/bin/env bash
 # Diagnose Teltonika Codec 8 TCP ingest + Achillio Travel device bindings.
-# Run on the VPS from /opt/poreiago (or via GitHub Actions SSH).
+# Safe to run via Actions from /tmp — pass REPO_ROOT=/opt/poreiago.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="${REPO_ROOT:-}"
+if [[ -z "$ROOT" || ! -d "$ROOT/deploy" ]]; then
+  # Fallback only when script lives in-repo (…/deploy/scripts/…).
+  ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+fi
 cd "$ROOT"
-ENV_FILE="${ENV_FILE:-deploy/.env.prod}"
-COMPOSE=(docker compose --env-file "$ENV_FILE" -f deploy/docker-compose.prod.yml)
+ENV_FILE="${ENV_FILE:-$ROOT/deploy/.env.prod}"
+COMPOSE=(docker compose --env-file "$ENV_FILE" -f "$ROOT/deploy/docker-compose.prod.yml")
 
+echo "=== paths ==="
+echo "ROOT=$ROOT"
+echo "ENV_FILE=$ENV_FILE"
+echo "cwd=$(pwd)"
+
+echo
 echo "=== git ==="
-git rev-parse --short HEAD 2>/dev/null || true
-git log -1 --oneline 2>/dev/null || true
+git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true
+git -C "$ROOT" log -1 --oneline 2>/dev/null || true
 
 echo
 echo "=== env (Teltonika) ==="
-# Never `source` .env.prod — values may contain spaces / PEM lines that break bash.
+# Never `source` .env.prod — PEM / spaced values break bash.
 env_get() {
   local key="$1"
   [[ -f "$ENV_FILE" ]] || return 0
-  # Prefer last assignment; strip quotes; ignore comments.
   awk -F= -v k="$key" '
     $0 ~ "^[[:space:]]*#" { next }
     index($0, k "=") == 1 || $0 ~ "^[[:space:]]*" k "=" {
@@ -43,13 +52,16 @@ echo "=== host listen :${PORT} ==="
 ss -lnt "sport = :${PORT}" 2>/dev/null || netstat -lnt 2>/dev/null | grep ":${PORT}" || true
 if command -v ufw >/dev/null 2>&1; then
   echo "ufw:"
-  ufw status 2>/dev/null | rg -i "${PORT}|Status" || true
+  ufw status 2>/dev/null | grep -Ei "${PORT}|Status" || true
 fi
 
 echo
 echo "=== docker port map ==="
 "${COMPOSE[@]}" ps api-blue 2>/dev/null || true
-docker port "$("${COMPOSE[@]}" ps -q api-blue 2>/dev/null | head -1)" 2>/dev/null || true
+API_CID="$("${COMPOSE[@]}" ps -q api-blue 2>/dev/null | head -1 || true)"
+if [[ -n "${API_CID}" ]]; then
+  docker port "$API_CID" 2>/dev/null || true
+fi
 
 echo
 echo "=== API in-process Teltonika status ==="
@@ -83,13 +95,16 @@ import asyncio, json
 from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
 from app.models.tenant import Tenant
-from app.services.tenant_modules import is_achillio_travel_office
+from app.services.tenant_modules import is_achillio_travel_office, is_poreiago_platform_office
 from travel_platform.telemetry.teltonika import list_devices
+from travel_platform.telemetry.processor import get_live_fleet
+from uuid import UUID
 
 async def main():
     async with AsyncSessionLocal() as session:
         rows = (await session.execute(select(Tenant))).scalars().all()
     ach = [t for t in rows if is_achillio_travel_office(t)]
+    plat = [t for t in rows if is_poreiago_platform_office(t)]
     print("achillio_office_count=", len(ach))
     for t in ach:
         print(json.dumps({
@@ -99,10 +114,22 @@ async def main():
             "custom_domain": getattr(t, "custom_domain", None),
             "legal_name": getattr(t, "legal_name", None),
         }, default=str))
+    print("platform_office_count=", len(plat))
+    for t in plat[:3]:
+        print("platform", str(t.id), t.slug, getattr(t, "custom_domain", None))
+
     devices = list_devices()
     ach_ids = {str(t.id) for t in ach}
+    plat_ids = {str(t.id) for t in plat}
     bound = [d for d in devices if str(d.get("tenant_id")) in ach_ids]
+    wrong = [d for d in devices if str(d.get("tenant_id")) in plat_ids]
+    other = [
+        d for d in devices
+        if str(d.get("tenant_id")) not in ach_ids and str(d.get("tenant_id")) not in plat_ids
+    ]
     print("achillio_bound_devices=", len(bound))
+    print("platform_bound_devices=", len(wrong))
+    print("other_bound_devices=", len(other))
     for d in bound:
         seen = d.get("last_seen_at")
         has_fix = d.get("last_lat") is not None and d.get("last_lng") is not None
@@ -118,42 +145,48 @@ async def main():
             "lng=", d.get("last_lng"),
             "points=", d.get("points_accepted"),
         )
-    if not bound:
+    for d in wrong:
+        print(
+            "PLATFORM_GPS_MISBIND",
+            "imei=", d.get("imei"),
+            "plate=", d.get("vehicle_code"),
+            "tenant=", d.get("tenant_id"),
+            "last_seen=", d.get("last_seen_at"),
+            "HINT=bound under PoreiaGo platform — re-add IMEI while logged into achilliotravel.com",
+        )
+    if not bound and not wrong and not other:
+        print("ACHILLIO_GPS NONE — no IMEI in store at all")
+    elif not bound:
         print("ACHILLIO_GPS NONE — no IMEI bound to Achillio Travel office")
 
-asyncio.run(main())
-PY
-
-echo
-echo "=== live fleet memory (tracker-like) ==="
-"${COMPOSE[@]}" exec -T api-blue python - <<'PY'
-import asyncio
-from travel_platform.telemetry.processor import get_live_fleet
-
-async def main():
     live = get_live_fleet()
     vehicles = getattr(live, "_vehicles", {}) or {}
     print("memory_vehicle_count=", len(vehicles))
-    for vid, meta in list(vehicles.items())[:30]:
-        print(
-            "mem",
-            vid,
-            "tenant=", meta.get("tenant_id"),
-            "plate=", meta.get("bus_plate") or meta.get("vehicle_code"),
-            "lat=", meta.get("lat"),
-            "lng=", meta.get("lng"),
-            "updated=", meta.get("updated_at"),
-            "source=", meta.get("source") or meta.get("provider"),
-        )
+    for tid in ach_ids:
+        try:
+            rows = await live.list_active_for_admin_async(UUID(tid))
+        except Exception as exc:
+            print("achillio_live_list_error", tid, exc)
+            continue
+        print("achillio_live_active=", len(rows), "tenant=", tid)
+        for r in rows[:20]:
+            print(
+                "ACHILLIO_LIVE",
+                getattr(r, "vehicle_id", None),
+                getattr(r, "vehicle_code", None),
+                getattr(r, "lat", None),
+                getattr(r, "lng", None),
+                getattr(r, "updated_at", None),
+            )
 
 asyncio.run(main())
 PY
 
 echo
 echo "=== recent api logs (teltonika/codec/imei) ==="
-"${COMPOSE[@]}" logs --tail=300 api-blue 2>&1 \
-  | rg -i 'teltonika|codec.?8|imei|5027|gps tracker' \
-  | tail -60 || true
+"${COMPOSE[@]}" logs --tail=400 api-blue 2>&1 \
+  | grep -Ei 'teltonika|codec.?8|imei|5027|gps tracker' \
+  | tail -80 || true
 
 echo
 echo "=== done ==="
