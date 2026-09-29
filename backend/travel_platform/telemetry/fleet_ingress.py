@@ -206,6 +206,33 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
     payload = driver_payload_to_telemetry(body, session=session)
     tenant_id = str(payload["tenant_id"])
 
+    # Teltonika-bound plates: never accept smartphone GPS — only the tracker.
+    try:
+        from travel_platform.telemetry.teltonika.device_store import (
+            get_enabled_device_by_vehicle_code,
+        )
+
+        tracker = get_enabled_device_by_vehicle_code(
+            tenant_id,
+            payload.get("vehicle_code") or payload.get("bus_plate"),
+        )
+    except Exception:
+        tracker = None
+    if tracker:
+        logger.info(
+            "Rejecting phone GPS — plate=%s has Teltonika IMEI=%s tenant=%s",
+            payload.get("vehicle_code"),
+            tracker.get("imei"),
+            tenant_id,
+        )
+        return {
+            "ok": False,
+            "rejected": True,
+            "detail": "Το GPS αυτού του λεωφορείου έρχεται μόνο από το Teltonika",
+            "tenant_id": tenant_id,
+            "tracker_imei": tracker.get("imei"),
+        }
+
     preferred_title = (
         body.get("trip_title")
         or body.get("tripTitle")

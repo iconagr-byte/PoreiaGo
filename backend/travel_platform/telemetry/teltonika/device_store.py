@@ -82,6 +82,26 @@ def get_device_by_imei(imei: str) -> dict[str, Any] | None:
     return None
 
 
+def get_enabled_device_by_vehicle_code(
+    tenant_id: str,
+    vehicle_code: str | None,
+) -> dict[str, Any] | None:
+    """Return the enabled Teltonika binding for this office plate, if any."""
+    plate = str(vehicle_code or "").strip().upper()
+    if not plate or not tenant_id:
+        return None
+    tid = str(tenant_id)
+    with _LOCK:
+        for row in _read().get("devices") or []:
+            if not row.get("enabled"):
+                continue
+            if str(row.get("tenant_id") or "") != tid:
+                continue
+            if str(row.get("vehicle_code") or "").strip().upper() == plate:
+                return deepcopy(row)
+    return None
+
+
 def upsert_device(body: dict[str, Any], *, tenant_id: str) -> dict[str, Any]:
     imei = normalize_imei(body.get("imei"))
     if len(imei) < 14 or len(imei) > 16:
