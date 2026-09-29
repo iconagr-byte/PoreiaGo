@@ -1,0 +1,40 @@
+name: Diagnose Teltonika GPS (VPS)
+
+# Secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY (same as Deploy VPS).
+# Runs on demand, or automatically when the diagnose script is updated on main.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/scripts/diagnose-teltonika.sh'
+      - '.github/workflows/diagnose-teltonika.yml'
+
+concurrency:
+  group: diagnose-teltonika
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout diagnose script
+        uses: actions/checkout@v4
+
+      - name: Dump Teltonika + Achillio GPS status on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 5m
+          script: |
+            set -euo pipefail
+            cd /opt/poreiago
+            git fetch origin main || true
+            git checkout main || true
+            git pull --ff-only origin main || true
+            chmod +x deploy/scripts/diagnose-teltonika.sh
+            bash deploy/scripts/diagnose-teltonika.sh
