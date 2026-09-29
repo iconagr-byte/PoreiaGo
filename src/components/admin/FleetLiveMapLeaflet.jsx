@@ -25,6 +25,10 @@ import FleetMapFlyTo from './FleetMapFlyTo.jsx';
 import FleetLiveTrailsLeaflet from './FleetLiveTrailsLeaflet.jsx';
 import GreecePlacesLeafletLayer from './GreecePlacesLeafletLayer.jsx';
 import { APPLE_LEAFLET_TILES } from '../../lib/maps/appleMapTheme.js';
+import {
+  FLEET_BUS_PIN_ICON_ANCHOR,
+  FLEET_BUS_PIN_ICON_SIZE,
+} from '../../lib/maps/fleetBusPinLayout.js';
 
 function escapeAttr(value) {
   return String(value || '')
@@ -48,21 +52,25 @@ const busIcon = (vehicle) => {
   const cached = BUS_ICON_CACHE.get(key);
   if (cached) return cached;
 
+  // Labels float ABOVE the ring via CSS; icon box is only the 52×52 avatar so
+  // iconAnchor = ring center = GPS lat/lng (matches trail tip / Teltonika fix).
   const excursionHtml = excursion
     ? `<div class="fleet-apple-bus-excursion">${escapeAttr(excursion)}</div>`
     : '';
   const icon = L.divIcon({
     className: 'fleet-bus-marker-ws',
     html: `<div class="fleet-apple-bus-pin">
-      ${excursionHtml}
-      <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${escapeAttr(label)}</div>
+      <div class="fleet-apple-bus-pin__labels">
+        ${excursionHtml}
+        <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${escapeAttr(label)}</div>
+      </div>
       <div class="fleet-apple-bus-pin__ring">
         <div class="fleet-apple-bus-pin__avatar"><img src="${escapeAttr(img)}" alt="" decoding="async" loading="eager" /></div>
         <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
     </div>`,
-    iconSize: [52, excursion ? 96 : 72],
-    iconAnchor: [26, excursion ? 64 : 40],
+    iconSize: FLEET_BUS_PIN_ICON_SIZE,
+    iconAnchor: FLEET_BUS_PIN_ICON_ANCHOR,
   });
   BUS_ICON_CACHE.set(key, icon);
   if (BUS_ICON_CACHE.size > BUS_ICON_CACHE_MAX) {
