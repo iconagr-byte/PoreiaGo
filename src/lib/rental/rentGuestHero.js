@@ -5,7 +5,7 @@ export const RENT_GUEST_HERO_IMAGE = '/images/rent-hero-coastal-road.jpg';
 
 export const RENT_GUEST_HERO = {
   title: 'Ενοικίαση αυτοκινήτου',
-  titleAccent: '— αναζήτησε, σύγκρινε & κλείσε',
+  titleAccent: '— στόλος γραφείου · κράτηση σε λεπτά',
   subtitle: '',
   tagline: 'Ο στόλος του γραφείου σας, έτοιμος για κράτηση.',
 };
