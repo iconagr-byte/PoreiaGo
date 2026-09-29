@@ -24,6 +24,10 @@ import {
   formatFleetExcursionBadge,
   resolveVehicleTripTitle,
 } from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  fleetGpsSourceToneClass,
+  formatFleetGpsSourceBadge,
+} from '../../lib/admin/fleetGpsSourceBadge.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 function HeatmapDots({ points = [], visible = true }) {
@@ -52,6 +56,8 @@ function BusMarker({ vehicle, onVehicleHistory }) {
   const pillLabel = formatFleetBusPillLabel(vehicle);
   const tripTitle = resolveVehicleTripTitle(vehicle);
   const excursion = formatFleetExcursionBadge(vehicle);
+  const gpsSource = formatFleetGpsSourceBadge(vehicle);
+  const gpsTone = fleetGpsSourceToneClass(vehicle);
   const openHistory = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -66,6 +72,9 @@ function BusMarker({ vehicle, onVehicleHistory }) {
         onDoubleClick={openHistory}
       >
         <div className="fleet-apple-bus-pin">
+          {gpsSource ? (
+            <div className={`fleet-apple-bus-gps-source ${gpsTone}`}>{gpsSource}</div>
+          ) : null}
           {excursion ? <div className="fleet-apple-bus-excursion">{excursion}</div> : null}
           <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
             {pillLabel}
@@ -109,6 +118,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
               </div>
             </div>
             <div>Ταχύτητα: {Math.round(vehicle.speed || 0)} km/h</div>
+            <div>Πηγή GPS: {formatFleetGpsSourceBadge(vehicle) || '—'}</div>
             <div>Δρομολόγιο #{vehicle.trip_id ?? '—'}</div>
             <div>Ενημέρωση: {formatUpdatedAgo(vehicle.timestamp) || '—'}</div>
             {formatBoardingLabel(vehicle) ? <div>Επιβιβασμένοι: {formatBoardingLabel(vehicle)}</div> : null}
