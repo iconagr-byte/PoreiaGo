@@ -66,6 +66,7 @@ fi
 echo
 echo "=== device store (durable last_seen / points) ==="
 echo "(Note: docker-exec get_teltonika_status counters are always 0 — fresh process.)"
+echo "(Tracker pins without driver_id are allowed when IMEI/plate is bound here.)"
 "${COMPOSE[@]}" exec -T api-blue python - <<'PY'
 from travel_platform.telemetry.teltonika import list_devices
 import json

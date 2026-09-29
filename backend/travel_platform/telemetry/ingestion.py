@@ -26,6 +26,10 @@ class TelemetryIngestionService:
         accel_y: float | None = None,
         accel_z: float | None = None,
         tracker_event_id: int | None = None,
+        source: str | None = None,
+        imei: str | None = None,
+        bus_plate: str | None = None,
+        driver_name: str | None = None,
     ) -> str:
         payload = {
             "tenant_id": str(tenant_id),
@@ -43,5 +47,9 @@ class TelemetryIngestionService:
             "accel_y": accel_y,
             "accel_z": accel_z,
             "tracker_event_id": tracker_event_id,
+            "source": source,
+            "imei": imei,
+            "bus_plate": bus_plate or vehicle_code,
+            "driver_name": driver_name,
         }
         return await enqueue_telemetry(payload)

@@ -153,6 +153,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                         driver_id = UUID(str(driver_raw))
                     except Exception:
                         driver_id = None
+                driver_name = str(device.get("label") or vehicle_code)
                 last = records[-1]
                 accepted = 0
                 for fix in records:
@@ -169,6 +170,10 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                             heading_deg=fields["heading_deg"],
                             driver_id=driver_id,
                             tracker_event_id=fields.get("tracker_event_id"),
+                            source="teltonika",
+                            imei=imei,
+                            bus_plate=vehicle_code,
+                            driver_name=driver_name,
                         )
                         accepted += 1
                     except Exception as exc:
