@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import TelemetrySettingsPanel from './TelemetrySettingsPanel.jsx';
@@ -61,52 +61,29 @@ function deviceStatus(d, liveCodes) {
   return { key: 'WAITING', label: 'Αναμονή δεδομένων', tone: 'bg-slate-100 text-slate-600' };
 }
 
-function resolvePinThumb(pin) {
-  const raw = resolveSiteAssetUrl(pin.imageUrl || DEFAULT_FLEET_BUS_IMAGE) || DEFAULT_FLEET_BUS_IMAGE;
-  // Never use the multi-MB hero as a marker — it paints a giant empty box on the map.
-  if (!raw || /hero-bus/i.test(raw)) return DEFAULT_FLEET_BUS_IMAGE;
-  return raw;
-}
-
+/** Compact travel pin — SVG only, never an <img> (fleet photos blew up into a giant empty box). */
 function travelPinIcon(pin) {
-  const img = resolvePinThumb(pin);
-  const title = escapeHtml(pin.label || pin.plate || 'GPS');
-  const plate = escapeHtml(pin.plate || '—');
-  const speed =
-    pin.speed != null && Number.isFinite(Number(pin.speed))
-      ? `${Math.round(Number(pin.speed))} km/h`
-      : '— km/h';
-  const badgeLabel = pin.online ? 'Live GPS' : 'Δοκιμή';
-  const badgeBg = pin.online ? '#ecfdf5' : '#f1f5f9';
-  const badgeFg = pin.online ? '#047857' : '#475569';
-  const imeiTail = escapeHtml(String(pin.imei || '').slice(-6) || '—');
-  const cacheKey = `v2|${pin.id}|${img}|${title}|${plate}|${speed}|${badgeLabel}`;
+  const plate = escapeHtml(pin.plate || 'GPS');
+  const fill = pin.online ? '#0d9488' : '#0e7490';
+  const cacheKey = `v3svg|${pin.id}|${plate}|${pin.online ? 1 : 0}`;
   const cached = TRAVEL_PIN_CACHE.get(cacheKey);
   if (cached) return cached;
 
-  // Inline styles only — external CSS must not be required (otherwise a large
-  // unconstrained <img> becomes the empty blue/grey rectangle on the map).
-  const html = `<div style="width:210px;display:flex;flex-direction:column;align-items:center;font-family:Avenir Next,Segoe UI,Helvetica Neue,sans-serif;line-height:1.2;pointer-events:none;">
-  <div style="display:flex;width:100%;background:#fff;border:1px solid rgba(15,23,42,.12);border-radius:16px;overflow:hidden;box-shadow:0 10px 28px rgba(15,23,42,.22);">
-    <div style="width:64px;height:64px;flex:0 0 64px;background:#0f172a;overflow:hidden;">
-      <img src="${escapeHtml(img)}" alt="" width="64" height="64" decoding="async" style="width:64px;height:64px;object-fit:cover;display:block;" />
-    </div>
-    <div style="flex:1;min-width:0;padding:7px 9px;background:#fff;">
-      <div style="font-size:12px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
-      <div style="margin-top:2px;font-size:11px;font-weight:800;letter-spacing:.04em;color:#0e7490;text-transform:uppercase;">${plate}</div>
-      <div style="margin-top:2px;font-size:10px;font-weight:600;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(speed)} · …${imeiTail}</div>
-      <span style="display:inline-block;margin-top:4px;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:700;background:${badgeBg};color:${badgeFg};">${badgeLabel}</span>
-    </div>
-  </div>
-  <div style="width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:10px solid #fff;filter:drop-shadow(0 2px 1px rgba(15,23,42,.12));"></div>
+  const html = `<div style="display:flex;flex-direction:column;align-items:center;width:44px;filter:drop-shadow(0 6px 12px rgba(15,23,42,.28));pointer-events:none;">
+  <div style="background:#fff;color:#0f172a;font:700 10px/1 Avenir Next,Segoe UI,sans-serif;letter-spacing:.03em;padding:3px 7px;border-radius:999px;border:1px solid rgba(15,23,42,.1);margin-bottom:4px;white-space:nowrap;max-width:92px;overflow:hidden;text-overflow:ellipsis;">${plate}</div>
+  <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M18 1C9.7 1 3 7.7 3 16.1c0 10.2 12.2 24.6 14.2 26.9a1 1 0 0 0 1.6 0C20.8 40.7 33 26.3 33 16.1 33 7.7 26.3 1 18 1z" fill="${fill}"/>
+    <circle cx="18" cy="16" r="7.5" fill="#fff"/>
+    <path d="M13.2 18.2V13.5h2.1c1.4 0 2.2.7 2.2 1.7 0 .7-.4 1.3-1.1 1.5l1.4 1.5h-1.3l-1.2-1.4h-.8v1.4h-1.3zm1.3-2.4h.7c.6 0 .9-.3.9-.7s-.3-.7-.9-.7h-.7v1.4zM20.2 18.2l-2.2-4.7h1.4l1.4 3.2 1.4-3.2h1.3l-2.2 4.7h-1.1z" fill="${fill}"/>
+  </svg>
 </div>`;
 
   const icon = L.divIcon({
     className: 'teltonika-travel-pin',
     html,
-    iconSize: [210, 86],
-    iconAnchor: [105, 86],
-    popupAnchor: [0, -78],
+    iconSize: [44, 68],
+    iconAnchor: [22, 68],
+    popupAnchor: [0, -60],
   });
   TRAVEL_PIN_CACHE.set(cacheKey, icon);
   if (TRAVEL_PIN_CACHE.size > 40) {
@@ -425,6 +402,7 @@ export default function TeltonikaDevicesPanel() {
         </div>
         <div className="relative h-[18rem] sm:h-[22rem] bg-slate-100">
           <MapContainer
+            key={`teltonika-map-${mapPins.map((p) => p.id).join('-') || 'empty'}`}
             center={DEFAULT_CENTER}
             zoom={6}
             className="h-full w-full teltonika-gps-map"
@@ -443,41 +421,44 @@ export default function TeltonikaDevicesPanel() {
                 position={[pin.lat, pin.lng]}
                 icon={travelPinIcon(pin)}
                 eventHandlers={{ click: () => setSelectedId(pin.id) }}
-              >
-                <Popup autoPan closeButton>
-                  <div className="teltonika-travel-popup">
-                    <div className="teltonika-travel-popup__photo">
-                      <img
-                        src={resolveSiteAssetUrl(pin.imageUrl || DEFAULT_FLEET_BUS_IMAGE)}
-                        alt={pin.plate || 'bus'}
-                        decoding="async"
-                        onError={(e) => {
-                          e.currentTarget.src = DEFAULT_FLEET_BUS_IMAGE;
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <div className="teltonika-travel-popup__title">{pin.label || 'GPS'}</div>
-                      <span className="teltonika-travel-popup__plate">{pin.plate || '—'}</span>
-                      <div className="teltonika-travel-popup__meta">
-                        {pin.model ? `${pin.model} · ` : ''}
-                        {pin.speed != null ? `${Math.round(Number(pin.speed))} km/h` : '— km/h'}
-                        {pin.online ? ' · Live' : ''}
-                      </div>
-                      <div className="teltonika-travel-popup__meta">IMEI {pin.imei || '—'}</div>
-                      <div className="teltonika-travel-popup__meta">
-                        {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
-                      </div>
-                      <div className="teltonika-travel-popup__meta">
-                        Last seen: {formatSeen(pin.seen)} · {pin.points || 0} points
-                      </div>
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
+              />
             ))}
           </MapContainer>
         </div>
+        {mapPins.length ? (
+          <div className="border-t border-slate-100 divide-y divide-slate-100">
+            {mapPins.map((pin) => (
+              <div key={`card-${pin.id}`} className="flex gap-3 p-4 items-center">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-slate-900">
+                  <img
+                    src={resolveSiteAssetUrl(pin.imageUrl || DEFAULT_FLEET_BUS_IMAGE)}
+                    alt={pin.plate || 'bus'}
+                    width={64}
+                    height={64}
+                    className="h-16 w-16 object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_FLEET_BUS_IMAGE;
+                    }}
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-slate-900 truncate">{pin.label || 'GPS'}</div>
+                  <div className="text-xs font-bold tracking-wide text-cyan-800 uppercase mt-0.5">
+                    {pin.plate}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">
+                    {pin.model ? `${pin.model} · ` : ''}
+                    {pin.speed != null ? `${Math.round(Number(pin.speed))} km/h` : '— km/h'}
+                    {pin.online ? ' · Live' : ' · Δοκιμή'}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    IMEI {pin.imei} · {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-[24px] border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
