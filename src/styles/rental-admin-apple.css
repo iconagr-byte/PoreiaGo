@@ -1090,11 +1090,11 @@
 .rent-brand-phone-accent {
   display: block;
   font-weight: 700;
-  background: linear-gradient(90deg, #5ec8ff 0%, #7eb6ff 42%, #b8a0ff 78%, #c4b5fd 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: #fff;
+  -webkit-text-fill-color: #fff;
 }
 
 .rent-brand-phone-copy {
