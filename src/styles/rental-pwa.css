@@ -374,14 +374,14 @@
   animation: rent-rise 780ms 120ms ease-out both;
 }
 
-/* Sky-blue → soft lilac (not rent teal theme). */
+/* Match the white title line above (no sky→lilac gradient). */
 .rent-hero-accent {
   display: inline;
-  background: linear-gradient(90deg, #5ec8ff 0%, #7eb6ff 42%, #b8a0ff 78%, #c4b5fd 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: #fff;
+  -webkit-text-fill-color: #fff;
 }
 
 .rent-hero-copy {
