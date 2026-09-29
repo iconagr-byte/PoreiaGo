@@ -33,6 +33,17 @@ function isFleetAuthError(err) {
   return /έληξε|συνδεθείτε|unauthorized|forbidden|401|403/i.test(raw);
 }
 
+/** Deploy / Traefik blips — keep last pins, never show a scary banner/toast. */
+function isFleetGatewayBlip(err) {
+  const status = Number(err?.status);
+  if (status === 502 || status === 503 || status === 504) return true;
+  const raw = String(err?.message || '');
+  return (
+    /\b(502|503|504)\b/.test(raw) ||
+    /bad gateway|gateway time-?out|service unavailable|live στόλου\s*\(50[234]\)/i.test(raw)
+  );
+}
+
 const FleetTelemetryContext = createContext(null);
 
 function normalizeVehicle(msg, id, prev) {

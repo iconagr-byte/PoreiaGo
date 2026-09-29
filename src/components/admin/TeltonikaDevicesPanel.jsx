@@ -153,6 +153,7 @@ export default function TeltonikaDevicesPanel() {
       const [st, rows, fleet, vehicles] = await Promise.all([
         fetchTeltonikaStatus(),
         fetchTeltonikaDevices(),
+        // Never surface live-fleet 502 toasts on this settings page.
         fetchLiveFleet().catch(() => []),
         fetchFleetVehicles().catch(() => []),
       ]);
@@ -166,6 +167,18 @@ export default function TeltonikaDevicesPanel() {
         return list[0]?.id || '';
       });
     } catch (err) {
+      const raw = String(err?.message || '');
+      const status = Number(err?.status);
+      // Deploy blips (502/503/504) — retry quietly on next interval.
+      if (
+        status === 502 ||
+        status === 503 ||
+        status === 504 ||
+        /\b(502|503|504)\b/.test(raw) ||
+        /bad gateway|gateway time-?out/i.test(raw)
+      ) {
+        return;
+      }
       toast.error(err.message || 'Αποτυχία φόρτωσης Teltonika');
     } finally {
       setLoading(false);
