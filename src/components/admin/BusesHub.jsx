@@ -115,7 +115,7 @@ export default function BusesHub({ activeTab, onNavigate, children }) {
   };
 
   return (
-    <div className="buses-hub w-full">
+    <div id="buses-hub-top" className="buses-hub w-full scroll-mt-4">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
         <AdminResizableRail storageKey="poreiago_buses_hub_rail_w" defaultWidth={336}>
           <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-4">

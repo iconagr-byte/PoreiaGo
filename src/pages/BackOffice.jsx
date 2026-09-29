@@ -142,19 +142,27 @@ export default function BackOffice() {
   /** Bumped when pinned «Ρυθμίσεις» is clicked — scroll hub to top + reopen rail. */
   const [settingsHubFocusKey, setSettingsHubFocusKey] = useState(0);
   const mainScrollRef = useRef(null);
-  const focusSettingsHub = useCallback(() => {
-    setSettingsHubFocusKey((n) => n + 1);
+  const scrollMainHubTop = useCallback((anchorId) => {
     const scrollTop = () => {
       mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-      document.getElementById('settings-hub-top')?.scrollIntoView({
-        block: 'start',
-        behavior: 'smooth',
-      });
+      if (anchorId) {
+        document.getElementById(anchorId)?.scrollIntoView({
+          block: 'start',
+          behavior: 'smooth',
+        });
+      }
     };
-    // Defer until SettingsHub paints after tab switch (rAF + short fallback).
+    // Defer until hub paints after tab switch (rAF + short fallback).
     requestAnimationFrame(scrollTop);
     window.setTimeout(scrollTop, 80);
   }, []);
+  const focusSettingsHub = useCallback(() => {
+    setSettingsHubFocusKey((n) => n + 1);
+    scrollMainHubTop('settings-hub-top');
+  }, [scrollMainHubTop]);
+  const focusBusesHub = useCallback(() => {
+    scrollMainHubTop('buses-hub-top');
+  }, [scrollMainHubTop]);
   const [fleetRentalTab, setFleetRentalTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('rentTab') || params.get('fleetRentalTab');
@@ -2178,6 +2186,7 @@ export default function BackOffice() {
           onTabChange={handleAdminTabChange}
           onSettingsSubTabChange={setSettingsSubTab}
           onSettingsHubFocus={focusSettingsHub}
+          onBusesHubFocus={focusBusesHub}
           onFleetOpsSubTabChange={setFleetOpsSubTab}
           onFleetRentalTabChange={setFleetRentalTab}
           onEmailClick={goToEmailMailbox}
@@ -2197,6 +2206,7 @@ export default function BackOffice() {
         onTabChange={handleAdminTabChange}
         onSettingsSubTabChange={setSettingsSubTab}
         onSettingsHubFocus={focusSettingsHub}
+        onBusesHubFocus={focusBusesHub}
         onFleetOpsSubTabChange={setFleetOpsSubTab}
         onFleetRentalTabChange={setFleetRentalTab}
         onEmailClick={goToEmailMailbox}
