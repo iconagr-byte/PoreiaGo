@@ -33,8 +33,11 @@ jobs:
           script: |
             set -euo pipefail
             cd /opt/poreiago
+            # Prefer host file from git without fighting local deploy dirt.
             git fetch origin main || true
-            git checkout main || true
-            git pull --ff-only origin main || true
-            chmod +x deploy/scripts/diagnose-teltonika.sh
-            bash deploy/scripts/diagnose-teltonika.sh
+            git show origin/main:deploy/scripts/diagnose-teltonika.sh \
+              > /tmp/diagnose-teltonika.sh
+            chmod +x /tmp/diagnose-teltonika.sh
+            REPO_ROOT=/opt/poreiago \
+              ENV_FILE=/opt/poreiago/deploy/.env.prod \
+              bash /tmp/diagnose-teltonika.sh
