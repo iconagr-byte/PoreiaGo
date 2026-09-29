@@ -38,4 +38,6 @@ jobs:
             git show origin/main:deploy/scripts/diagnose-teltonika.sh \
               > /tmp/diagnose-teltonika.sh
             chmod +x /tmp/diagnose-teltonika.sh
-            ENV_FILE=/opt/poreiago/deploy/.env.prod bash /tmp/diagnose-teltonika.sh
+            REPO_ROOT=/opt/poreiago \
+              ENV_FILE=/opt/poreiago/deploy/.env.prod \
+              bash /tmp/diagnose-teltonika.sh
