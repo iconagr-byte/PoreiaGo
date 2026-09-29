@@ -116,10 +116,17 @@ async def push_unsubscribe(
     return {"ok": True}
 
 
+class AdminPushTestRequest(BaseModel):
+    """Optional email — JWT often has no email claim; client sends saas_user_email."""
+
+    email: EmailStr | None = None
+
+
 @router.post("/test")
 async def push_test(
     tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
     payload: Annotated[dict, Depends(_require_admin)],
+    body_in: AdminPushTestRequest = AdminPushTestRequest(),
 ):
     """Send an immediate test Web Push to admin devices for this tenant."""
     from travel_platform.notifications.push_subscription_store import (
@@ -137,7 +144,7 @@ async def push_test(
     if not web_push_configured():
         raise HTTPException(status_code=503, detail="Web Push δεν είναι ρυθμισμένο (VAPID)")
 
-    email = str(payload.get("email") or "").strip().lower()
+    email = str(body_in.email or payload.get("email") or "").strip().lower()
     body = {
         "title": "Δοκιμή Push — PoreiaGo",
         "body": "Οι ειδοποιήσεις βάρδιας λειτουργούν σε αυτόν τον υπολογιστή.",
@@ -150,6 +157,7 @@ async def push_test(
     seen: set[str] = set()
     attempted = 0
     sent = 0
+    errors: list[str] = []
 
     async def _try(sub: dict) -> None:
         nonlocal attempted, sent
@@ -161,6 +169,10 @@ async def push_test(
         result = await send_push_to_subscription(sub, body)
         if result.get("sent"):
             sent += 1
+        elif result.get("error"):
+            errors.append(str(result["error"])[:160])
+        elif result.get("removed"):
+            errors.append("ληγμένη εγγραφή push — ενεργοποιήστε ξανά")
 
     for sub in list_subscriptions_for_tenant(str(tenant_id), audience="admin"):
         await _try(sub)
@@ -176,4 +188,10 @@ async def push_test(
             status_code=404,
             detail="Δεν υπάρχει εγγραφή push — πατήστε «Ενεργοποίηση push» πρώτα",
         )
-    return {"ok": True, "attempted": attempted, "sent": sent}
+    return {
+        "ok": True,
+        "attempted": attempted,
+        "sent": sent,
+        "errors": errors[:5],
+        "email": email or None,
+    }

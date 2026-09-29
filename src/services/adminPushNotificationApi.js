@@ -91,9 +91,15 @@ export async function subscribeAdminFleetPush() {
 
 /** Immediate test push to this admin's registered devices. */
 export async function sendAdminPushTest() {
+  const email = getAdminEmail();
   const res = await fetch(`${API_BASE}/api/admin/push/test`, {
     method: 'POST',
-    headers: saasAuthHeaders(),
+    headers: {
+      ...saasAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    // JWT often omits email — send localStorage email so email-scoped subs match.
+    body: JSON.stringify(email ? { email } : {}),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || 'Αποτυχία δοκιμής push');
