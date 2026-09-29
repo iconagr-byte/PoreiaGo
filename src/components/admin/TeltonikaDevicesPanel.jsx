@@ -197,6 +197,8 @@ export default function TeltonikaDevicesPanel() {
   }, []);
 
   useEffect(() => {
+    // Always start with an empty test map — pins only after explicit test action.
+    setTestPins([]);
     load();
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
