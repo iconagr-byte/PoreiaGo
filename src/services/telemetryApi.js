@@ -448,3 +448,21 @@ export async function deleteTeltonikaDevice(deviceId, authHeaders = adminAuthHea
   );
   if (!res.ok && res.status !== 204) await parseAdminError(res);
 }
+
+/** Admin test: place a GPS pin for a bound Teltonika IMEI on the live fleet map. */
+export async function testPingTeltonikaDevice(
+  deviceId,
+  body = {},
+  authHeaders = adminAuthHeaders(),
+) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/teltonika/devices/${encodeURIComponent(deviceId)}/test-ping`,
+    {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    },
+  );
+  if (!res.ok) await parseAdminError(res);
+  return res.json();
+}

@@ -27,7 +27,8 @@ flowchart LR
 
 1. Back Office → **Ρυθμίσεις → Teltonika GPS**
 2. Add IMEI + πινακίδα (`vehicle_code`)
-3. Wait for Last seen / pin on **Ζωντανός χάρτης**
+3. Use **Χάρτης συσκευών** + **Μενού τεστ → Δοκιμαστικό pin** to verify the pin path
+4. Wait for real Last seen / pin on **Ζωντανός χάρτης** from the tracker
 
 ## Env
 

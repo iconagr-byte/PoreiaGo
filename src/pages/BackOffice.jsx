@@ -259,6 +259,17 @@ export default function BackOffice() {
   }, [location.key]);
 
   useEffect(() => {
+    const onOpenTab = (ev) => {
+      const tab = ev?.detail?.tab;
+      if (typeof tab === 'string' && tab.trim()) {
+        setActiveTab(tab.trim());
+      }
+    };
+    window.addEventListener('poreiago-open-admin-tab', onOpenTab);
+    return () => window.removeEventListener('poreiago-open-admin-tab', onOpenTab);
+  }, []);
+
+  useEffect(() => {
     if (!rentOnly) return;
     if (!isAdminTabAllowedForOfficeMode(activeTab, officeMode)) {
       setActiveTab(defaultAdminTabForOfficeMode(officeMode));

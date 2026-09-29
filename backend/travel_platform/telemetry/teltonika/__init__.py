@@ -5,6 +5,7 @@ from travel_platform.telemetry.teltonika.device_store import (
     get_device_by_imei,
     list_devices,
     normalize_imei,
+    touch_device,
     upsert_device,
 )
 from travel_platform.telemetry.teltonika.tcp_server import (
