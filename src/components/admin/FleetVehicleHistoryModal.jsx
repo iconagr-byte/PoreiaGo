@@ -82,12 +82,13 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
         <header className="flex items-start gap-3 border-b border-black/[0.06] px-5 py-4">
           <img src={img} alt="" className="h-14 w-14 rounded-2xl object-cover ring-2 ring-white shadow" />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Ιστορικό βάρδιας</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Ιστορικό κίνησης GPS</p>
             <h2 className="truncate text-lg font-bold tracking-tight text-slate-900">
-              {vehicle.driver_name || 'Οδηγός'}
+              {vehicle.driver_name || vehicle.bus_plate || 'Όχημα'}
             </h2>
             <p className="truncate text-sm text-slate-500">
-              {vehicle.bus_plate || '—'} · δρομολόγιο #{vehicle.trip_id ?? '—'}
+              {vehicle.bus_plate || '—'}
+              {vehicle.trip_id ? ` · δρομολόγιο #${vehicle.trip_id}` : ''}
               {data?.trip?.title ? ` · ${data.trip.title}` : ''}
             </p>
           </div>
@@ -115,6 +116,12 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
             <>
               <section className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div className="rounded-2xl bg-slate-50 border border-black/[0.04] px-3 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Έναρξη εκπομπής</p>
+                  <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">
+                    {formatClock(data.trackingStartedAt || data.fromTime)}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 border border-black/[0.04] px-3 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Χιλιόμετρα</p>
                   <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">{formatKm(data.km)}</p>
                 </div>
@@ -122,12 +129,6 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
                   <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Διάρκεια</p>
                   <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">
                     {formatDuration(data.durationMin)}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 border border-black/[0.04] px-3 py-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Μέση ταχύτητα</p>
-                  <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">
-                    {Number.isFinite(data.avgSpeed) ? `${Math.round(data.avgSpeed)} km/h` : '—'}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-slate-50 border border-black/[0.04] px-3 py-3">
@@ -143,7 +144,7 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
                   {data.pointCount
-                    ? `${formatClock(data.fromTime)} → ${formatClock(data.toTime)} · ${data.pointCount} σημεία GPS`
+                    ? `Έναρξη ${formatClock(data.trackingStartedAt || data.fromTime)} · ${formatClock(data.fromTime)} → ${formatClock(data.toTime)} · ${data.pointCount} σημεία · μέση ${Number.isFinite(data.avgSpeed) ? `${Math.round(data.avgSpeed)} km/h` : '—'}`
                     : 'Δεν υπάρχουν ακόμα καταγεγραμμένα GPS σημεία για σήμερα.'}
                 </p>
                 {data.points?.length > 1 ? (

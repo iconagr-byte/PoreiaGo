@@ -3,7 +3,11 @@
  */
 import { getTripById } from '../trips/tripStore.js';
 import { localDayRangeIso } from './fleetPlaybackNav.js';
-import { fetchPlannedVsActual, fetchTripRoute } from '../../services/telemetryApi.js';
+import {
+  fetchPlannedVsActual,
+  fetchTripRoute,
+  fetchVehicleRoute,
+} from '../../services/telemetryApi.js';
 import { fetchBoardingManifest } from '../../services/ticketingApi.js';
 import { adminAuthHeaders } from '../../services/adminApi.js';
 import { API_BASE } from '../../config/api.js';
@@ -118,27 +122,40 @@ async function fetchBoardingForAdmin(tripId) {
 
 /** @param {object} vehicle live fleet vehicle */
 export async function loadVehicleTripHistory(vehicle) {
-  const tripId = Number(vehicle?.trip_id ?? vehicle?.tripId);
-  if (!Number.isFinite(tripId)) {
-    throw new Error('Δεν υπάρχει ενεργό δρομολόγιο για αυτό το όχημα');
+  const tripIdRaw = vehicle?.trip_id ?? vehicle?.tripId;
+  const tripId = Number(tripIdRaw);
+  const hasTrip = Number.isFinite(tripId) && tripId > 0;
+  const vehicleId = String(vehicle?.id || vehicle?.vehicle_id || '').trim();
+  const vehicleCode = String(vehicle?.bus_plate || vehicle?.vehicle_code || '').trim();
+  if (!hasTrip && !vehicleId && !vehicleCode) {
+    throw new Error('Δεν υπάρχει GPS ιστορικό για αυτό το όχημα');
   }
 
   const driverId = vehicle?.driver_id ?? vehicle?.driverId ?? undefined;
   const { from, to } = localDayRangeIso();
-  const trip = getTripById(tripId);
+  const trip = hasTrip ? getTripById(tripId) : null;
   const plannedStops = trip?.stops || [];
 
+  const routePromise = hasTrip
+    ? fetchTripRoute(tripId, { from, to, driverId, limit: 5000 })
+    : fetchVehicleRoute(vehicleId || 'by-plate', {
+        from,
+        to,
+        vehicleCode: vehicleCode || undefined,
+        limit: 5000,
+      });
+
   const [routeRes, pvaRes, boardingRes] = await Promise.allSettled([
-    fetchTripRoute(tripId, { from, to, driverId, limit: 5000 }),
-    fetchPlannedVsActual(tripId, { plannedStops }),
-    fetchBoardingForAdmin(tripId),
+    routePromise,
+    hasTrip ? fetchPlannedVsActual(tripId, { plannedStops }) : Promise.resolve(null),
+    hasTrip ? fetchBoardingForAdmin(tripId) : Promise.resolve(null),
   ]);
 
   const route = routeRes.status === 'fulfilled' ? routeRes.value : { points: [], point_count: 0 };
   const points = Array.isArray(route.points) ? route.points : [];
   const pva = pvaRes.status === 'fulfilled' ? pvaRes.value : null;
   const boarding =
-    boardingRes.status === 'fulfilled'
+    boardingRes.status === 'fulfilled' && boardingRes.value
       ? boardingRes.value
       : { boarded_passengers: [], missing_passengers: [], boarded_count: 0, capacity: 0 };
 
@@ -177,13 +194,18 @@ export async function loadVehicleTripHistory(vehicle) {
   );
 
   return {
-    tripId,
+    tripId: hasTrip ? tripId : null,
     trip,
     vehicle,
     points,
     pointCount: points.length || Number(route.point_count) || 0,
     fromTime: route.from_time || points[0]?.recorded_at || null,
     toTime: route.to_time || points[points.length - 1]?.recorded_at || null,
+    trackingStartedAt:
+      route.tracking_started_at ||
+      vehicle?.tracking_started_at ||
+      points[0]?.recorded_at ||
+      null,
     km,
     durationMin,
     avgSpeed,

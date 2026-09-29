@@ -61,6 +61,8 @@ function normalizeVehicle(msg, id, prev) {
     driver_id: msg.driver_id,
     trip_id: msg.trip_id,
     trip_title: msg.trip_title || msg.tripTitle || prev?.trip_title || null,
+    tracking_started_at:
+      msg.tracking_started_at || msg.trackingStartedAt || prev?.tracking_started_at || null,
     lat: prevLat,
     lng: prevLng,
     targetLat,

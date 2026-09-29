@@ -254,6 +254,31 @@ async def admin_trip_route_playback(
     return TripRouteResponse(**payload)
 
 
+@router.get("/vehicles/{vehicle_id}/route", response_model=TripRouteResponse)
+async def admin_vehicle_route_playback(
+    vehicle_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+    session: Annotated[AsyncSession, Depends(get_tenant_db)],
+    from_time: datetime | None = Query(default=None, alias="from"),
+    to_time: datetime | None = Query(default=None, alias="to"),
+    vehicle_code: str | None = Query(default=None),
+    limit: int = Query(5000, ge=1, le=10000),
+):
+    """Πλήρες ιστορικό κίνησης οχήματος (Teltonika / οδηγός) — χωρίς απαίτηση trip_id."""
+    from travel_platform.telemetry.trip_route_service import fetch_vehicle_route
+
+    payload = await fetch_vehicle_route(
+        session,
+        tenant_id=tenant_id,
+        vehicle_id=vehicle_id,
+        vehicle_code=(vehicle_code or "").strip().upper() or None,
+        from_time=from_time,
+        to_time=to_time,
+        limit=limit,
+    )
+    return TripRouteResponse(**payload)
+
+
 @router.get("/trips/{trip_id}/route/export")
 async def admin_trip_route_export(
     trip_id: int,

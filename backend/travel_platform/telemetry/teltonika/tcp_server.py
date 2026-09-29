@@ -174,6 +174,11 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                             imei=imei,
                             bus_plate=vehicle_code,
                             driver_name=driver_name,
+                            altitude_m=fields.get("altitude_m"),
+                            satellites=fields.get("satellites"),
+                            priority=fields.get("priority"),
+                            event_io_id=fields.get("event_io_id"),
+                            io=fields.get("io"),
                         )
                         accepted += 1
                     except Exception as exc:

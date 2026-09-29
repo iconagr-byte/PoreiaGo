@@ -83,6 +83,9 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
         meta["trip_title"] = await resolve_trip_title(update.trip_id)
     if update.trip_id is not None:
         meta["trip_id"] = update.trip_id
+    # First emission clock for this live session (shown on map / history).
+    if not meta.get("tracking_started_at"):
+        meta["tracking_started_at"] = update.recorded_at.isoformat()
     if meta:
         _live._vehicles[str(vehicle_id)] = {**_live._vehicles.get(str(vehicle_id), {}), **meta}
 
@@ -117,6 +120,50 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
 
     idle_sec = _idling.trip_idle_seconds(vehicle_id)
     _live.apply_update(vehicle_id, update, idle_seconds=idle_sec)
+
+    # Durable history + live trail for every GPS source (driver PWA + Teltonika).
+    try:
+        from travel_platform.telemetry.coordinate_buffer import BufferedCoordinate, push_coordinate
+
+        push_coordinate(
+            BufferedCoordinate(
+                tenant_id=str(update.tenant_id),
+                trip_id=update.trip_id,
+                driver_id=str(raw.get("driver_id")) if raw.get("driver_id") else None,
+                vehicle_id=str(vehicle_id),
+                lat=float(update.latitude),
+                lng=float(update.longitude),
+                speed_kmh=float(update.speed_kmh or 0),
+                heading_deg=raw.get("heading_deg")
+                if raw.get("heading_deg") is not None
+                else None,
+                recorded_at=update.recorded_at,
+                raw={
+                    **{k: v for k, v in raw.items() if k not in {"accel_x", "accel_y", "accel_z"}},
+                    "vehicle_id": str(vehicle_id),
+                    "tracking_started_at": meta.get("tracking_started_at"),
+                },
+            ),
+        )
+    except Exception:
+        logger.exception("history coordinate enqueue failed vehicle=%s", vehicle_id)
+
+    try:
+        from travel_platform.telemetry.live_fleet_trail_redis import append_trail_point
+
+        await append_trail_point(
+            str(update.tenant_id),
+            str(vehicle_id),
+            lat=float(update.latitude),
+            lng=float(update.longitude),
+            speed_kmh=float(update.speed_kmh or 0),
+            heading_deg=raw.get("heading_deg"),
+            recorded_at=update.recorded_at,
+            trip_id=update.trip_id,
+            driver_id=str(raw.get("driver_id")) if raw.get("driver_id") else None,
+        )
+    except Exception:
+        logger.exception("live trail append failed vehicle=%s", vehicle_id)
 
     try:
         from travel_platform.telemetry.live_fleet_redis import save_live_vehicle

@@ -179,9 +179,13 @@ def touch_device(
         for row in data.get("devices") or []:
             if normalize_imei(row.get("imei")) != key:
                 continue
-            row["last_seen_at"] = _now()
+            now = _now()
+            row["last_seen_at"] = now
             if lat is not None:
                 row["last_lat"] = lat
+                if not row.get("first_fix_at"):
+                    row["first_fix_at"] = now
+                    row["tracking_started_at"] = now
             if lng is not None:
                 row["last_lng"] = lng
             if speed_kmh is not None:

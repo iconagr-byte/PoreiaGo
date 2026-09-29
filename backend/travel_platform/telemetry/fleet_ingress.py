@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from travel_platform.telemetry.coordinate_buffer import BufferedCoordinate, push_coordinate
 from travel_platform.telemetry.fleet_pubsub import publish_fleet_location
 from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
 from travel_platform.telemetry.processor import process_telemetry_payload
@@ -269,45 +268,8 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
 
     maybe_dispatch_fleet_location_webhook(tenant_id, egress)
 
-    recorded = payload["recorded_at"]
-    if isinstance(recorded, str):
-        recorded_dt = datetime.fromisoformat(recorded.replace("Z", "+00:00"))
-    else:
-        recorded_dt = datetime.now(timezone.utc)
-
-    push_coordinate(
-        BufferedCoordinate(
-            tenant_id=tenant_id,
-            trip_id=payload.get("trip_id"),
-            driver_id=str(payload.get("driver_id")) if payload.get("driver_id") else None,
-            vehicle_id=vehicle_id,
-            lat=float(payload["latitude"]),
-            lng=float(payload["longitude"]),
-            speed_kmh=float(payload["speed_kmh"]),
-            heading_deg=payload.get("heading_deg"),
-            recorded_at=recorded_dt,
-            raw=payload,
-        ),
-    )
-
-    # Full live path ring — admin map draws this; shift-end flushes to history.
-    if vehicle_id:
-        try:
-            from travel_platform.telemetry.live_fleet_trail_redis import append_trail_point
-
-            await append_trail_point(
-                tenant_id,
-                vehicle_id,
-                lat=float(payload["latitude"]),
-                lng=float(payload["longitude"]),
-                speed_kmh=float(payload["speed_kmh"] or 0),
-                heading_deg=payload.get("heading_deg"),
-                recorded_at=recorded_dt,
-                trip_id=payload.get("trip_id"),
-                driver_id=str(payload.get("driver_id")) if payload.get("driver_id") else None,
-            )
-        except Exception:
-            logger.exception("live trail append failed vehicle=%s", vehicle_id)
+    # History + live trail are persisted inside process_telemetry_payload
+    # (shared path for driver PWA and Teltonika hardware).
 
     from travel_platform.telemetry.fleet_metrics import record_gps_ingress
 

@@ -559,6 +559,8 @@ export default function TeltonikaDevicesPanel() {
             </div>
             <div className="font-mono">IMEI {selected.imei}</div>
             <div>
+              Έναρξη εκπομπής: {formatSeen(selected.first_fix_at || selected.tracking_started_at)}
+              {' · '}
               Last seen: {formatSeen(selected.last_seen_at)}
               {selected.last_lat != null
                 ? ` · ${Number(selected.last_lat).toFixed(5)}, ${Number(selected.last_lng).toFixed(5)}`

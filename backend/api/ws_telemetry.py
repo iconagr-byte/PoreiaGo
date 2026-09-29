@@ -390,6 +390,7 @@ async def admin_fleet_egress_ws(
                 "driver_id": meta.get("driver_id"),
                 "trip_id": trip_id,
                 "trip_title": trip_title or None,
+                "tracking_started_at": meta.get("tracking_started_at"),
                 "lat": vehicle.lat,
                 "lng": vehicle.lng,
                 "speed": vehicle.speed_kmh,
