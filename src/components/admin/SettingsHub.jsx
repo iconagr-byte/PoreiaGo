@@ -53,6 +53,7 @@ function sortOfficeTabs(tabs) {
  */
 export default function SettingsHub({
   initialTab,
+  hubFocusKey = 0,
   onSubTabChange,
   contractPrefs,
   officeMode = 'trips_only',
@@ -77,6 +78,12 @@ export default function SettingsHub({
       setRailOpen(next !== 'homepage');
     }
   }, [initialTab, superAdmin, officeMode]);
+
+  // Pinned «Ρυθμίσεις» — reopen the card rail so the general menu is visible.
+  useEffect(() => {
+    if (!hubFocusKey) return;
+    setRailOpen(true);
+  }, [hubFocusKey]);
 
   const activeTab = tabs.find((t) => t.id === tab);
   const designMode = tab === 'homepage';
@@ -114,7 +121,7 @@ export default function SettingsHub({
       : TAB_HINTS[tab] || 'Επιλέξτε ενότητα από τις κάρτες αριστερά';
 
   return (
-    <div className="settings-hub w-full">
+    <div id="settings-hub-top" className="settings-hub w-full scroll-mt-4">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
         {/* Secondary settings rail — fades out in design mode for more canvas */}
         <AdminResizableRail

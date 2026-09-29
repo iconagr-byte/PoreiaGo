@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchAllLostItems, updateLostItemStatus } from '../services/lostItemsApi.js';
 import {
@@ -139,6 +139,22 @@ export default function BackOffice() {
     }
     return isSaasSuperAdmin() ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
   });
+  /** Bumped when pinned «Ρυθμίσεις» is clicked — scroll hub to top + reopen rail. */
+  const [settingsHubFocusKey, setSettingsHubFocusKey] = useState(0);
+  const mainScrollRef = useRef(null);
+  const focusSettingsHub = useCallback(() => {
+    setSettingsHubFocusKey((n) => n + 1);
+    const scrollTop = () => {
+      mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      document.getElementById('settings-hub-top')?.scrollIntoView({
+        block: 'start',
+        behavior: 'smooth',
+      });
+    };
+    // Defer until SettingsHub paints after tab switch (rAF + short fallback).
+    requestAnimationFrame(scrollTop);
+    window.setTimeout(scrollTop, 80);
+  }, []);
   const [fleetRentalTab, setFleetRentalTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('rentTab') || params.get('fleetRentalTab');
@@ -2161,6 +2177,7 @@ export default function BackOffice() {
           fleetRentalTab={fleetRentalTab}
           onTabChange={handleAdminTabChange}
           onSettingsSubTabChange={setSettingsSubTab}
+          onSettingsHubFocus={focusSettingsHub}
           onFleetOpsSubTabChange={setFleetOpsSubTab}
           onFleetRentalTabChange={setFleetRentalTab}
           onEmailClick={goToEmailMailbox}
@@ -2179,6 +2196,7 @@ export default function BackOffice() {
         fleetRentalTab={fleetRentalTab}
         onTabChange={handleAdminTabChange}
         onSettingsSubTabChange={setSettingsSubTab}
+        onSettingsHubFocus={focusSettingsHub}
         onFleetOpsSubTabChange={setFleetOpsSubTab}
         onFleetRentalTabChange={setFleetRentalTab}
         onEmailClick={goToEmailMailbox}
@@ -2239,10 +2257,13 @@ export default function BackOffice() {
                   setActiveTab('settings');
                   setSettingsSubTab(
                     sanitizeSettingsSubTab(
-                      settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB,
+                      isSaasSuperAdmin()
+                        ? DEFAULT_PLATFORM_TAB
+                        : DEFAULT_TENANT_SETTINGS_TAB,
                       isSaasSuperAdmin(),
                     ),
                   );
+                  focusSettingsHub();
                 }}
               />
             </div>
@@ -2250,6 +2271,7 @@ export default function BackOffice() {
         </header>
 
         <div
+          ref={mainScrollRef}
           className={
             activeTab === 'email' || activeTab === 'email_templates'
               ? 'flex-1 overflow-auto p-3 md:p-4'
@@ -2291,6 +2313,7 @@ export default function BackOffice() {
                 <ImpersonationBanner />
                 <SettingsHub
                   initialTab={settingsSubTab}
+                  hubFocusKey={settingsHubFocusKey}
                   onSubTabChange={setSettingsSubTab}
                   officeMode={officeMode}
                   contractPrefs={{

@@ -9,7 +9,11 @@ import {
   resetNavLayoutToDefault,
   saveNavLayout,
 } from '../../lib/admin/sidebarNav.js';
-import { DEFAULT_TENANT_SETTINGS_TAB, sanitizeSettingsSubTab } from '../../lib/admin/settingsTabs.js';
+import {
+  DEFAULT_PLATFORM_TAB,
+  DEFAULT_TENANT_SETTINGS_TAB,
+  sanitizeSettingsSubTab,
+} from '../../lib/admin/settingsTabs.js';
 import { DEFAULT_RENT_DESK_TAB, sanitizeRentDeskTab } from '../../lib/admin/rentDeskNav.js';
 import {
   DEFAULT_FLEET_OPS_TAB,
@@ -84,6 +88,7 @@ export default function SortableSidebarNav({
   fleetRentalTab,
   onTabChange,
   onSettingsSubTabChange,
+  onSettingsHubFocus,
   onFleetOpsSubTabChange,
   onFleetRentalTabChange,
   onEmailClick,
@@ -230,6 +235,13 @@ export default function SortableSidebarNav({
   const openSettings = (subTab) => {
     onSettingsSubTabChange?.(sanitizeSettingsSubTab(subTab, superAdmin, officeMode));
     onTabChange?.('settings');
+  };
+
+  /** Pinned «Ρυθμίσεις» — always land on the top-level cards + scroll to top. */
+  const openSettingsHub = () => {
+    const hubTab = superAdmin ? DEFAULT_PLATFORM_TAB : DEFAULT_TENANT_SETTINGS_TAB;
+    openSettings(hubTab);
+    onSettingsHubFocus?.();
   };
 
   const openFleetOps = (subTab) => {
@@ -614,11 +626,11 @@ export default function SortableSidebarNav({
 
         <button
           type="button"
-          onClick={() => openSettings(settingsSubTab || DEFAULT_TENANT_SETTINGS_TAB)}
+          onClick={openSettingsHub}
           className={`admin-nav-service-card admin-nav-service-card--settings${
             settingsActive ? ' is-active' : ''
           }`}
-          title="Ρυθμίσεις · κοινό για λεωφορεία & ενοικιάσεις"
+          title="Ρυθμίσεις · πίσω στις καρτέλες (κορυφή)"
           aria-current={settingsActive ? 'page' : undefined}
         >
           <span className="admin-nav-service-card-icon" aria-hidden>
