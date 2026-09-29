@@ -392,8 +392,17 @@
 .leaflet-div-icon.teltonika-travel-pin {
   background: transparent !important;
   border: 0 !important;
-  width: 228px !important;
-  height: 96px !important;
+  width: 210px !important;
+  height: 86px !important;
+  overflow: visible !important;
+}
+
+.leaflet-div-icon.teltonika-travel-pin img {
+  width: 64px !important;
+  height: 64px !important;
+  max-width: 64px !important;
+  max-height: 64px !important;
+  object-fit: cover !important;
 }
 
 .teltonika-travel-marker {

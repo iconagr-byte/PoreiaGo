@@ -61,41 +61,52 @@ function deviceStatus(d, liveCodes) {
   return { key: 'WAITING', label: 'Αναμονή δεδομένων', tone: 'bg-slate-100 text-slate-600' };
 }
 
+function resolvePinThumb(pin) {
+  const raw = resolveSiteAssetUrl(pin.imageUrl || DEFAULT_FLEET_BUS_IMAGE) || DEFAULT_FLEET_BUS_IMAGE;
+  // Never use the multi-MB hero as a marker — it paints a giant empty box on the map.
+  if (!raw || /hero-bus/i.test(raw)) return DEFAULT_FLEET_BUS_IMAGE;
+  return raw;
+}
+
 function travelPinIcon(pin) {
-  const img = resolveSiteAssetUrl(pin.imageUrl || DEFAULT_FLEET_BUS_IMAGE);
+  const img = resolvePinThumb(pin);
   const title = escapeHtml(pin.label || pin.plate || 'GPS');
   const plate = escapeHtml(pin.plate || '—');
   const speed =
     pin.speed != null && Number.isFinite(Number(pin.speed))
       ? `${Math.round(Number(pin.speed))} km/h`
       : '— km/h';
-  const badgeClass = pin.online
-    ? 'teltonika-travel-marker__badge teltonika-travel-marker__badge--live'
-    : 'teltonika-travel-marker__badge teltonika-travel-marker__badge--idle';
-  const badgeLabel = pin.online ? 'Live GPS' : 'Last fix';
-  const cacheKey = `${pin.id}|${img}|${title}|${plate}|${speed}|${pin.online ? 1 : 0}`;
+  const badgeLabel = pin.online ? 'Live GPS' : 'Δοκιμή';
+  const badgeBg = pin.online ? '#ecfdf5' : '#f1f5f9';
+  const badgeFg = pin.online ? '#047857' : '#475569';
+  const imeiTail = escapeHtml(String(pin.imei || '').slice(-6) || '—');
+  const cacheKey = `v2|${pin.id}|${img}|${title}|${plate}|${speed}|${badgeLabel}`;
   const cached = TRAVEL_PIN_CACHE.get(cacheKey);
   if (cached) return cached;
 
-  const html = `<div class="teltonika-travel-marker">
-  <div class="teltonika-travel-marker__card">
-    <div class="teltonika-travel-marker__photo"><img src="${escapeHtml(img)}" alt="" decoding="async" loading="eager" /></div>
-    <div class="teltonika-travel-marker__body">
-      <div class="teltonika-travel-marker__title">${title}</div>
-      <div class="teltonika-travel-marker__plate">${plate}</div>
-      <div class="teltonika-travel-marker__meta">${escapeHtml(speed)} · IMEI …${escapeHtml(String(pin.imei || '').slice(-6))}</div>
-      <span class="${badgeClass}"><span class="teltonika-travel-marker__dot"></span>${badgeLabel}</span>
+  // Inline styles only — external CSS must not be required (otherwise a large
+  // unconstrained <img> becomes the empty blue/grey rectangle on the map).
+  const html = `<div style="width:210px;display:flex;flex-direction:column;align-items:center;font-family:Avenir Next,Segoe UI,Helvetica Neue,sans-serif;line-height:1.2;pointer-events:none;">
+  <div style="display:flex;width:100%;background:#fff;border:1px solid rgba(15,23,42,.12);border-radius:16px;overflow:hidden;box-shadow:0 10px 28px rgba(15,23,42,.22);">
+    <div style="width:64px;height:64px;flex:0 0 64px;background:#0f172a;overflow:hidden;">
+      <img src="${escapeHtml(img)}" alt="" width="64" height="64" decoding="async" style="width:64px;height:64px;object-fit:cover;display:block;" />
+    </div>
+    <div style="flex:1;min-width:0;padding:7px 9px;background:#fff;">
+      <div style="font-size:12px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
+      <div style="margin-top:2px;font-size:11px;font-weight:800;letter-spacing:.04em;color:#0e7490;text-transform:uppercase;">${plate}</div>
+      <div style="margin-top:2px;font-size:10px;font-weight:600;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(speed)} · …${imeiTail}</div>
+      <span style="display:inline-block;margin-top:4px;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:700;background:${badgeBg};color:${badgeFg};">${badgeLabel}</span>
     </div>
   </div>
-  <div class="teltonika-travel-marker__tip"></div>
+  <div style="width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:10px solid #fff;filter:drop-shadow(0 2px 1px rgba(15,23,42,.12));"></div>
 </div>`;
 
   const icon = L.divIcon({
     className: 'teltonika-travel-pin',
     html,
-    iconSize: [228, 96],
-    iconAnchor: [114, 96],
-    popupAnchor: [0, -86],
+    iconSize: [210, 86],
+    iconAnchor: [105, 86],
+    popupAnchor: [0, -78],
   });
   TRAVEL_PIN_CACHE.set(cacheKey, icon);
   if (TRAVEL_PIN_CACHE.size > 40) {
@@ -186,6 +197,8 @@ export default function TeltonikaDevicesPanel() {
   }, []);
 
   useEffect(() => {
+    // Always start with an empty test map — pins only after explicit test action.
+    setTestPins([]);
     load();
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
