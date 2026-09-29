@@ -4549,9 +4549,9 @@
 }
 
 .rent-phone-stage--desktop .rent-hero--booking {
-  min-height: min(68dvh, 640px);
+  min-height: min(78dvh, 720px);
   padding-top: 5rem;
-  padding-bottom: 3.25rem;
+  padding-bottom: 3.5rem;
 }
 
 .rent-phone-stage--desktop .rent-hero-landing-inner {
