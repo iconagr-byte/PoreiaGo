@@ -65,10 +65,13 @@ function BusMarker({ vehicle, onVehicleHistory }) {
         onClick={() => setOpen(true)}
         onDoubleClick={openHistory}
       >
+        {/* Ring-only flow box so Mapbox center anchor = GPS (labels float above). */}
         <div className="fleet-apple-bus-pin">
-          {excursion ? <div className="fleet-apple-bus-excursion">{excursion}</div> : null}
-          <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
-            {pillLabel}
+          <div className="fleet-apple-bus-pin__labels">
+            {excursion ? <div className="fleet-apple-bus-excursion">{excursion}</div> : null}
+            <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
+              {pillLabel}
+            </div>
           </div>
           <div className="fleet-apple-bus-pin__ring">
             <div className="fleet-apple-bus-pin__avatar">

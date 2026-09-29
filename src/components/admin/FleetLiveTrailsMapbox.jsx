@@ -5,7 +5,6 @@ import { sampleTrailBreadcrumbs } from '../../lib/maps/trailBreadcrumbs.js';
 
 function trailsToGeoJson(trails) {
   const lineFeatures = [];
-  const tipFeatures = [];
   const crumbFeatures = [];
 
   for (const trail of trails || []) {
@@ -22,14 +21,9 @@ function trailsToGeoJson(trails) {
       });
     }
 
-    const tip = coordinates[coordinates.length - 1];
-    tipFeatures.push({
-      type: 'Feature',
-      properties: { id: `${trail.id}-tip` },
-      geometry: { type: 'Point', coordinates: tip },
-    });
-
-    for (const [lng, lat] of sampleTrailBreadcrumbs(coordinates, 72)) {
+    // Skip the live tip — the bus pin is anchored on GPS.
+    const crumbs = sampleTrailBreadcrumbs(coordinates, 72).slice(0, -1);
+    for (const [lng, lat] of crumbs) {
       crumbFeatures.push({
         type: 'Feature',
         properties: { id: trail.id },
@@ -40,7 +34,6 @@ function trailsToGeoJson(trails) {
 
   return {
     lines: { type: 'FeatureCollection', features: lineFeatures },
-    tips: { type: 'FeatureCollection', features: tipFeatures },
     crumbs: { type: 'FeatureCollection', features: crumbFeatures },
   };
 }
@@ -106,27 +99,6 @@ export default function FleetLiveTrailsMapbox({ trails = [], visible = true }) {
             'circle-color': APPLE_MAP_COLORS.accent,
             'circle-opacity': 0.85,
             'circle-stroke-width': 1.25,
-            'circle-stroke-color': '#ffffff',
-          }}
-        />
-      </Source>
-      <Source id="fleet-live-trail-tips" type="geojson" data={geo.tips}>
-        <Layer
-          id="fleet-live-trail-tip-halo"
-          type="circle"
-          paint={{
-            'circle-radius': 9,
-            'circle-color': APPLE_MAP_COLORS.accent,
-            'circle-opacity': 0.22,
-          }}
-        />
-        <Layer
-          id="fleet-live-trail-tip"
-          type="circle"
-          paint={{
-            'circle-radius': 4.5,
-            'circle-color': APPLE_MAP_COLORS.accent,
-            'circle-stroke-width': 2,
             'circle-stroke-color': '#ffffff',
           }}
         />
