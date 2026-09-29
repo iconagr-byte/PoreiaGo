@@ -51,6 +51,9 @@ class LiveVehicleResponse(BaseModel):
     trip_title: str | None = None
     tracking_started_at: str | None = None
     trail: list[dict[str, Any]] = Field(default_factory=list)
+    # Live GPS provenance for the map badge (driver_pwa | teltonika | …).
+    source: str | None = None
+    imei: str | None = None
 
 
 class HeatmapPoint(BaseModel):

@@ -259,6 +259,8 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         "altitude_m": payload.get("altitude_m"),
         "boarding": payload.get("boarding_snapshot"),
         "sensors": payload.get("device_sensors"),
+        "source": payload.get("source") or "driver_pwa",
+        "imei": payload.get("imei"),
     }
 
     await publish_fleet_location(tenant_id, egress)

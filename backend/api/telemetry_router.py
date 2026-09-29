@@ -183,6 +183,8 @@ async def fleet_live(
                     trip_title=trip_title or None,
                     tracking_started_at=meta.get("tracking_started_at"),
                     trail=trail_points_for_api(raw_trail),
+                    source=str(meta.get("source") or "") or None,
+                    imei=str(meta.get("imei") or "") or None,
                 ),
             )
         except Exception:

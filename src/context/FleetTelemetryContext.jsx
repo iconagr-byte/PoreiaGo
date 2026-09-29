@@ -79,6 +79,8 @@ function normalizeVehicle(msg, id, prev) {
     photo_url: msg.photo_url ?? prev?.photo_url ?? null,
     vehicle_image_url: msg.vehicle_image_url ?? prev?.vehicle_image_url ?? null,
     trail: Array.isArray(msg.trail) && msg.trail.length ? msg.trail : prev?.trail || null,
+    source: msg.source || prev?.source || null,
+    imei: msg.imei || prev?.imei || null,
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
 }
