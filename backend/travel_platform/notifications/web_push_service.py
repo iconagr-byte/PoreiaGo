@@ -48,6 +48,27 @@ def get_public_vapid_key() -> str | None:
     return key or None
 
 
+def _vapid_private_key_for_webpush() -> Any:
+    """
+    Value accepted by pywebpush.webpush(vapid_private_key=...).
+
+    pywebpush only treats a string as PEM when it is a *filesystem path*
+    (Vapid.from_file). Inline PEM content goes through Vapid.from_string,
+    which expects raw/DER base64 — not ``-----BEGIN PRIVATE KEY-----`` —
+    and every send fails (attempted>0, sent=0 on admin push test).
+    Prefer the durable key file; otherwise load PEM via Vapid.from_pem.
+    """
+    key_file = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY_FILE", "").strip()
+    if key_file and Path(key_file).is_file():
+        return key_file
+    private = _vapid_private_key()
+    if private and "BEGIN" in private:
+        from py_vapid import Vapid
+
+        return Vapid.from_pem(private.encode("utf-8"))
+    return private
+
+
 def _data_dir() -> Path:
     raw = (os.getenv("POREIAGO_DATA_DIR") or "").strip()
     if raw:
@@ -179,7 +200,7 @@ def _send_sync(subscription: dict[str, Any], payload: dict[str, Any]) -> dict[st
     webpush(
         subscription_info=sub_info,
         data=body,
-        vapid_private_key=_vapid_private_key(),
+        vapid_private_key=_vapid_private_key_for_webpush(),
         vapid_claims={"sub": _vapid_subject()},
     )
     return {"sent": True, "endpoint": subscription.get("endpoint")}
