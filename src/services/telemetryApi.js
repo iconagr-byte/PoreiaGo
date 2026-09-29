@@ -298,6 +298,29 @@ export async function fetchTripRoute(
   return data;
 }
 
+/** Full vehicle GPS history (Teltonika / driver) — works without trip_id. */
+export async function fetchVehicleRoute(
+  vehicleId,
+  { from, to, vehicleCode, limit = 5000 } = {},
+  authHeaders = adminAuthHeaders(),
+) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (vehicleCode) params.set('vehicle_code', String(vehicleCode));
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/vehicles/${encodeURIComponent(vehicleId)}/route${qs ? `?${qs}` : ''}`,
+    { headers: authHeaders },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Αποτυχία φόρτωσης ιστορικού οχήματος');
+  }
+  return data;
+}
+
 export async function fetchPlannedVsActual(
   tripId,
   { plannedStops, bufferM, limit = 5000 } = {},

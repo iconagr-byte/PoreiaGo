@@ -30,6 +30,11 @@ class TelemetryIngestionService:
         imei: str | None = None,
         bus_plate: str | None = None,
         driver_name: str | None = None,
+        altitude_m: float | int | None = None,
+        satellites: int | None = None,
+        priority: int | None = None,
+        event_io_id: int | None = None,
+        io: dict | None = None,
     ) -> str:
         payload = {
             "tenant_id": str(tenant_id),
@@ -51,5 +56,10 @@ class TelemetryIngestionService:
             "imei": imei,
             "bus_plate": bus_plate or vehicle_code,
             "driver_name": driver_name,
+            "altitude_m": altitude_m,
+            "satellites": satellites,
+            "priority": priority,
+            "event_io_id": event_io_id,
+            "io": io or {},
         }
         return await enqueue_telemetry(payload)

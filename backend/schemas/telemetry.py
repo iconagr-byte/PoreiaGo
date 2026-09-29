@@ -49,6 +49,7 @@ class LiveVehicleResponse(BaseModel):
     photo_url: str | None = None
     vehicle_image_url: str | None = None
     trip_title: str | None = None
+    tracking_started_at: str | None = None
     trail: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -140,16 +141,23 @@ class TripRoutePointResponse(BaseModel):
     lng: float
     speed_kmh: float = 0
     heading_deg: float | None = None
+    altitude_m: float | None = None
+    satellites: int | None = None
     recorded_at: str
     source: str | None = None
+    imei: str | None = None
+    bus_plate: str | None = None
 
 
 class TripRouteResponse(BaseModel):
-    trip_id: int
+    trip_id: int | None = None
+    vehicle_id: str | None = None
+    vehicle_code: str | None = None
     tenant_id: str
     point_count: int
     from_time: str | None = None
     to_time: str | None = None
+    tracking_started_at: str | None = None
     points: list[TripRoutePointResponse]
     error: str | None = None
     summary: dict[str, Any] | None = None

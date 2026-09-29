@@ -326,12 +326,27 @@ def build_minimal_codec8e_packet(
 
 
 def fix_to_telemetry_fields(fix: GpsFix) -> dict[str, Any]:
+    """Flatten a Codec 8/8E fix into telemetry ingest fields (history + live)."""
+    # Keep a compact IO snapshot for history (avoid huge JSONB rows).
+    io_compact: dict[str, int] = {}
+    for io_id, val in (fix.io or {}).items():
+        try:
+            io_compact[str(int(io_id))] = int(val)
+        except (TypeError, ValueError):
+            continue
+        if len(io_compact) >= 40:
+            break
     return {
         "latitude": fix.latitude,
         "longitude": fix.longitude,
         "speed_kmh": fix.speed_kmh,
         "heading_deg": float(fix.angle_deg),
+        "altitude_m": int(fix.altitude_m),
+        "satellites": int(fix.satellites),
+        "priority": int(fix.priority),
+        "event_io_id": fix.event_io_id,
         "engine_status": fix.engine_status(),
         "recorded_at": fix.recorded_at.isoformat(),
         "tracker_event_id": fix.tracker_event_id(),
+        "io": io_compact,
     }

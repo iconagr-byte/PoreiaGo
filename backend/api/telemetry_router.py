@@ -181,6 +181,7 @@ async def fleet_live(
                     photo_url=media.get("photo_url"),
                     vehicle_image_url=media.get("vehicle_image_url"),
                     trip_title=trip_title or None,
+                    tracking_started_at=meta.get("tracking_started_at"),
                     trail=trail_points_for_api(raw_trail),
                 ),
             )
