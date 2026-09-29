@@ -33,7 +33,8 @@ class RejectPhoneGpsTeltonikaTests(unittest.TestCase):
         self.patcher.stop()
         self.tmp.cleanup()
 
-    def test_ingest_rejects_phone_gps_for_bound_plate(self):
+    def test_ingest_soft_acks_phone_gps_for_bound_plate(self):
+        """Driver PWA keeps sending; live map is not overwritten by phone GPS."""
         session = {
             "tenant_id": self.tenant,
             "driver_id": "drv-1",
@@ -65,14 +66,19 @@ class RejectPhoneGpsTeltonikaTests(unittest.TestCase):
                 new_callable=AsyncMock,
                 return_value=self.tenant,
             ),
+            patch(
+                "travel_platform.telemetry.driver_gps_heartbeat.touch_driver_gps",
+                return_value=False,
+            ) as touch,
         ):
             out = asyncio.run(ingest_driver_location(body, session=session))
 
-        self.assertFalse(out.get("ok"))
-        self.assertTrue(out.get("rejected"))
-        self.assertIn("Teltonika", out.get("detail") or "")
+        self.assertTrue(out.get("ok"))
+        self.assertTrue(out.get("skipped_live_map"))
+        self.assertEqual(out.get("map_source"), "teltonika")
         self.assertEqual(out.get("tracker_imei"), "861076085468260")
         process.assert_not_awaited()
+        touch.assert_called()
 
     def test_ingest_allows_phone_gps_for_unbound_plate(self):
         session = {
