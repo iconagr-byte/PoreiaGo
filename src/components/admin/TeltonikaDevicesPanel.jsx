@@ -153,6 +153,7 @@ export default function TeltonikaDevicesPanel() {
       const [st, rows, fleet, vehicles] = await Promise.all([
         fetchTeltonikaStatus(),
         fetchTeltonikaDevices(),
+        // Never surface live-fleet 502 toasts on this settings page.
         fetchLiveFleet().catch(() => []),
         fetchFleetVehicles().catch(() => []),
       ]);
@@ -166,6 +167,18 @@ export default function TeltonikaDevicesPanel() {
         return list[0]?.id || '';
       });
     } catch (err) {
+      const raw = String(err?.message || '');
+      const status = Number(err?.status);
+      // Deploy blips (502/503/504) — retry quietly on next interval.
+      if (
+        status === 502 ||
+        status === 503 ||
+        status === 504 ||
+        /\b(502|503|504)\b/.test(raw) ||
+        /bad gateway|gateway time-?out/i.test(raw)
+      ) {
+        return;
+      }
       toast.error(err.message || 'Αποτυχία φόρτωσης Teltonika');
     } finally {
       setLoading(false);
@@ -398,18 +411,10 @@ export default function TeltonikaDevicesPanel() {
           </div>
         </div>
         <div className="relative h-[18rem] sm:h-[22rem] bg-slate-100">
-          {mapPins.length === 0 ? (
-            <div className="absolute inset-0 z-[2] flex items-center justify-center pointer-events-none">
-              <div className="rounded-2xl bg-white/90 border border-slate-200 px-4 py-3 text-sm text-slate-600 shadow-sm max-w-sm text-center">
-                Κενός χάρτης. Πάτα <strong>Δοκιμαστικό pin</strong> ή <strong>Η θέση μου</strong> για
-                να εμφανιστεί το pin δοκιμής.
-              </div>
-            </div>
-          ) : null}
           <MapContainer
             center={DEFAULT_CENTER}
             zoom={6}
-            className="h-full w-full"
+            className="h-full w-full teltonika-gps-map"
             scrollWheelZoom
           >
             <TileLayer
@@ -426,24 +431,27 @@ export default function TeltonikaDevicesPanel() {
                 icon={travelPinIcon(pin)}
                 eventHandlers={{ click: () => setSelectedId(pin.id) }}
               >
-                <Popup>
+                <Popup autoPan closeButton>
                   <div className="teltonika-travel-popup">
                     <div className="teltonika-travel-popup__photo">
                       <img
                         src={resolveSiteAssetUrl(pin.imageUrl || DEFAULT_FLEET_BUS_IMAGE)}
-                        alt=""
+                        alt={pin.plate || 'bus'}
                         decoding="async"
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_FLEET_BUS_IMAGE;
+                        }}
                       />
                     </div>
                     <div>
-                      <div className="teltonika-travel-popup__title">{pin.label}</div>
-                      <span className="teltonika-travel-popup__plate">{pin.plate}</span>
+                      <div className="teltonika-travel-popup__title">{pin.label || 'GPS'}</div>
+                      <span className="teltonika-travel-popup__plate">{pin.plate || '—'}</span>
                       <div className="teltonika-travel-popup__meta">
                         {pin.model ? `${pin.model} · ` : ''}
                         {pin.speed != null ? `${Math.round(Number(pin.speed))} km/h` : '— km/h'}
                         {pin.online ? ' · Live' : ''}
                       </div>
-                      <div className="teltonika-travel-popup__meta">IMEI {pin.imei}</div>
+                      <div className="teltonika-travel-popup__meta">IMEI {pin.imei || '—'}</div>
                       <div className="teltonika-travel-popup__meta">
                         {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
                       </div>
