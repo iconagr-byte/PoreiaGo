@@ -18,7 +18,7 @@ export const DEFAULT_RENT_APP_BRANDING = {
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
   rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
-  rent_guest_hero_title_accent: '— αναζήτησε, σύγκρινε & κλείσε',
+  rent_guest_hero_title_accent: '— στόλος γραφείου · κράτηση σε λεπτά',
   rent_guest_hero_copy: '',
   rent_guest_hero_benefits: [...RENT_GUEST_HERO_BENEFITS],
   rent_search_show_dropoff_toggle: RENT_GUEST_SEARCH_DEFAULTS.show_dropoff_toggle,
@@ -34,6 +34,12 @@ const GENERIC_OFFICE_LABEL_RE =
 /** Legacy guest copy removed from /rent hero — treat as empty if still stored. */
 const OBSOLETE_RENT_GUEST_HERO_COPY =
   'Περιήγηση οχημάτων χωρίς σύνδεση — για κράτηση χρειάζεται είσοδος.';
+
+/** Previous default accent — refresh to the new platform slogan if still stored. */
+const OBSOLETE_RENT_GUEST_HERO_ACCENTS = new Set([
+  '— αναζήτησε, σύγκρινε & κλείσε',
+  '— αναζήτησε, σύγκρινε & κλείσε.',
+]);
 
 export function isGenericRentOfficeLabel(name) {
   return !String(name || '').trim() || GENERIC_OFFICE_LABEL_RE.test(String(name).trim());
@@ -80,13 +86,19 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
       DEFAULT_RENT_APP_BRANDING.rent_hero_copy;
   if (guest && copy === OBSOLETE_RENT_GUEST_HERO_COPY) copy = '';
 
-  // Explicit empty string hides accent; missing key keeps the default.
+  // Explicit empty string hides accent; missing / obsolete key keeps the default.
   const rawAccent = appearance.rent_guest_hero_title_accent;
-  const titleAccent = guest
-    ? rawAccent === undefined || rawAccent === null
-      ? DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent
-      : String(rawAccent).trim()
-    : '';
+  let titleAccent = '';
+  if (guest) {
+    if (rawAccent === undefined || rawAccent === null) {
+      titleAccent = DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent;
+    } else {
+      const trimmed = String(rawAccent).trim();
+      titleAccent = OBSOLETE_RENT_GUEST_HERO_ACCENTS.has(trimmed)
+        ? DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent
+        : trimmed;
+    }
+  }
 
   const benefits = guest
     ? resolveRentGuestHeroBenefits(appearance.rent_guest_hero_benefits)

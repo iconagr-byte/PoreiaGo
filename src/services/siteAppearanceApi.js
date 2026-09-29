@@ -53,7 +53,7 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
   rent_guest_hero_title: 'Ενοικίαση αυτοκινήτου',
-  rent_guest_hero_title_accent: '— αναζήτησε, σύγκρινε & κλείσε',
+  rent_guest_hero_title_accent: '— στόλος γραφείου · κράτηση σε λεπτά',
   rent_guest_hero_copy: '',
   rent_guest_hero_benefits: [
     'Δωρεάν ακύρωση στις περισσότερες κρατήσεις',

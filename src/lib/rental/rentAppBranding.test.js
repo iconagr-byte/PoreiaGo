@@ -71,6 +71,15 @@ const noAccent = resolveRentAppBranding(
 );
 console.assert(noAccent.titleAccent === '', 'empty accent hides');
 
+const obsoleteAccent = resolveRentAppBranding(
+  { rent_guest_hero_title_accent: '— αναζήτησε, σύγκρινε & κλείσε' },
+  { guest: true },
+);
+console.assert(
+  obsoleteAccent.titleAccent === DEFAULT_RENT_APP_BRANDING.rent_guest_hero_title_accent,
+  'obsolete accent refreshes to platform slogan',
+);
+
 const obsolete = resolveRentAppBranding(
   {
     rent_guest_hero_copy:
