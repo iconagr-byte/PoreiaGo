@@ -140,7 +140,24 @@ async def fleet_live(
                 bus_plate=meta.get("bus_plate", v.vehicle_code),
                 vehicle_code=v.vehicle_code,
             )
-            trip_title = await resolve_trip_title(v.trip_id, preferred=meta.get("trip_title"))
+            from travel_platform.telemetry.active_excursion_resolve import (
+                enrich_meta_with_active_excursion,
+            )
+
+            trip_id, trip_title_hint, meta = enrich_meta_with_active_excursion(
+                str(tenant_id),
+                meta,
+                vehicle_code=v.vehicle_code,
+                trip_id=v.trip_id,
+            )
+            try:
+                live._vehicles[str(v.vehicle_id)] = {
+                    **live._vehicles.get(str(v.vehicle_id), {}),
+                    **meta,
+                }
+            except Exception:
+                pass
+            trip_title = await resolve_trip_title(trip_id, preferred=trip_title_hint or meta.get("trip_title"))
             # Empty Redis trail → empty list. Do not fabricate a 1-point stub:
             # the client accumulates from the live pin and a stub would replace
             # that growing path on every poll.
@@ -149,7 +166,7 @@ async def fleet_live(
                 LiveVehicleResponse(
                     vehicle_id=v.vehicle_id,
                     vehicle_code=v.vehicle_code,
-                    trip_id=v.trip_id,
+                    trip_id=trip_id,
                     lat=v.lat,
                     lng=v.lng,
                     speed_kmh=v.speed_kmh,

@@ -1,5 +1,5 @@
 /**
- * Compact label for live-map bus pins: driver · excursion · speed.
+ * Compact labels for live-map bus pins: excursion badge + driver/speed pill.
  */
 
 import { getTripById } from '../trips/tripStore.js';
@@ -25,6 +25,12 @@ export function resolveVehicleTripTitle(vehicle) {
   return `Εκδρομή #${tripId}`;
 }
 
+/** Dedicated excursion tab above the bus — only when an active trip is bound. */
+export function formatFleetExcursionBadge(vehicle) {
+  if (vehicle?.is_rental || vehicle?.rental_overlay) return '';
+  return resolveVehicleTripTitle(vehicle);
+}
+
 export function formatFleetBusPillLabel(vehicle, { shortDriver = true } = {}) {
   const speed = Math.round(Number(vehicle?.speed) || Number(vehicle?.speed_kmh) || 0);
   if (vehicle?.is_rental || vehicle?.rental_overlay) {
@@ -37,7 +43,8 @@ export function formatFleetBusPillLabel(vehicle, { shortDriver = true } = {}) {
   }
   const rawName = String(vehicle?.driver_name || vehicle?.driverName || 'Οδηγός').trim() || 'Οδηγός';
   const driver = shortDriver ? rawName.split(/\s+/)[0] : rawName;
-  const trip = resolveVehicleTripTitle(vehicle);
-  if (trip) return `${driver} · ${trip} · ${speed} km/h`;
+  const plate = String(vehicle?.bus_plate || vehicle?.vehicle_code || '').trim();
+  // Excursion title lives on the separate badge above the pin — keep pill short.
+  if (plate) return `${plate} · ${speed} km/h`;
   return `${driver} · ${speed} km/h`;
 }

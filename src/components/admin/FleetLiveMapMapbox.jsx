@@ -19,7 +19,11 @@ import {
   formatUpdatedAgo,
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
-import { formatFleetBusPillLabel, resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  formatFleetBusPillLabel,
+  formatFleetExcursionBadge,
+  resolveVehicleTripTitle,
+} from '../../lib/admin/fleetBusPillLabel.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
 function HeatmapDots({ points = [], visible = true }) {
@@ -47,6 +51,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
   const pillLabel = formatFleetBusPillLabel(vehicle);
   const tripTitle = resolveVehicleTripTitle(vehicle);
+  const excursion = formatFleetExcursionBadge(vehicle);
   const openHistory = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -61,6 +66,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
         onDoubleClick={openHistory}
       >
         <div className="fleet-apple-bus-pin">
+          {excursion ? <div className="fleet-apple-bus-excursion">{excursion}</div> : null}
           <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
             {pillLabel}
           </div>
