@@ -303,6 +303,24 @@
   order: -1;
 }
 
+.fleet-apple-bus-excursion {
+  order: -2;
+  margin-bottom: 4px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 10px;
+  border: 1px solid rgba(14, 116, 144, 0.35);
+  background: linear-gradient(180deg, #0e7490 0%, #0f766e 100%);
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.22);
+}
+
 .fleet-apple-bus-pin__ring {
   position: relative;
   width: 52px;

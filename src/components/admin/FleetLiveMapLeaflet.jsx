@@ -14,7 +14,10 @@ import {
   formatUpdatedAgo,
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
-import { formatFleetBusPillLabel } from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  formatFleetBusPillLabel,
+  formatFleetExcursionBadge,
+} from '../../lib/admin/fleetBusPillLabel.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
@@ -40,21 +43,26 @@ const busIcon = (vehicle) => {
   const heading = Math.round(headingRaw / 15) * 15;
   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
   const label = formatFleetBusPillLabel(vehicle);
-  const key = `${vehicle?.id || ''}|${img}|${heading}|${label}`;
+  const excursion = formatFleetExcursionBadge(vehicle);
+  const key = `${vehicle?.id || ''}|${img}|${heading}|${label}|${excursion}`;
   const cached = BUS_ICON_CACHE.get(key);
   if (cached) return cached;
 
+  const excursionHtml = excursion
+    ? `<div class="fleet-apple-bus-excursion">${escapeAttr(excursion)}</div>`
+    : '';
   const icon = L.divIcon({
     className: 'fleet-bus-marker-ws',
     html: `<div class="fleet-apple-bus-pin">
+      ${excursionHtml}
       <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${escapeAttr(label)}</div>
       <div class="fleet-apple-bus-pin__ring">
         <div class="fleet-apple-bus-pin__avatar"><img src="${escapeAttr(img)}" alt="" decoding="async" loading="eager" /></div>
         <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
     </div>`,
-    iconSize: [52, 72],
-    iconAnchor: [26, 40],
+    iconSize: [52, excursion ? 96 : 72],
+    iconAnchor: [26, excursion ? 64 : 40],
   });
   BUS_ICON_CACHE.set(key, icon);
   if (BUS_ICON_CACHE.size > BUS_ICON_CACHE_MAX) {

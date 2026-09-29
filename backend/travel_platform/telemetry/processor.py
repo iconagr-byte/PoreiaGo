@@ -25,6 +25,40 @@ _live = LiveFleetService()
 
 async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
     update = _parse_payload(payload)
+    raw = update.raw or {}
+
+    # Bind active office excursion (plate/driver + time window) when GPS has no trip_id.
+    if update.trip_id is None:
+        try:
+            from travel_platform.telemetry.active_excursion_resolve import resolve_active_excursion
+
+            hit = resolve_active_excursion(
+                str(update.tenant_id),
+                vehicle_code=update.vehicle_code,
+                bus_plate=raw.get("bus_plate"),
+                driver_id=raw.get("driver_id"),
+            )
+            if hit:
+                raw = {
+                    **raw,
+                    "trip_title": hit["title"],
+                    "trip_id": hit["trip_id"],
+                }
+                update = TelemetryUpdate(
+                    vehicle_code=update.vehicle_code,
+                    tenant_id=update.tenant_id,
+                    trip_id=int(hit["trip_id"]),
+                    latitude=update.latitude,
+                    longitude=update.longitude,
+                    speed_kmh=update.speed_kmh,
+                    engine_on=update.engine_on,
+                    fuel_level_pct=update.fuel_level_pct,
+                    recorded_at=update.recorded_at,
+                    raw=raw,
+                )
+        except Exception:
+            logger.debug("active excursion resolve skipped", exc_info=True)
+
     vehicle_id = _live.upsert_vehicle_registry(
         update.tenant_id,
         update.vehicle_code,
@@ -32,7 +66,6 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
     )
 
     meta = _live._vehicles.get(str(vehicle_id), {})
-    raw = update.raw or {}
     if raw.get("driver_name"):
         meta["driver_name"] = raw.get("driver_name")
     if raw.get("bus_plate") or raw.get("vehicle_code"):
@@ -48,6 +81,8 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
         from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
         meta["trip_title"] = await resolve_trip_title(update.trip_id)
+    if update.trip_id is not None:
+        meta["trip_id"] = update.trip_id
     if meta:
         _live._vehicles[str(vehicle_id)] = {**_live._vehicles.get(str(vehicle_id), {}), **meta}
 

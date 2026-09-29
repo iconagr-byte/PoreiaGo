@@ -360,7 +360,26 @@ async def admin_fleet_egress_ws(
             meta = live._vehicles.get(vehicle.vehicle_id, {})
         if not office_allows_live_driver(tid, meta.get("driver_id"), meta):
             continue
-        trip_title = await resolve_trip_title(vehicle.trip_id, preferred=meta.get("trip_title"))
+        from travel_platform.telemetry.active_excursion_resolve import (
+            enrich_meta_with_active_excursion,
+        )
+
+        trip_id, trip_title_hint, meta = enrich_meta_with_active_excursion(
+            tid,
+            meta,
+            vehicle_code=vehicle.vehicle_code,
+            trip_id=vehicle.trip_id,
+        )
+        try:
+            live._vehicles[str(vehicle.vehicle_id)] = {
+                **live._vehicles.get(str(vehicle.vehicle_id), {}),
+                **meta,
+            }
+        except Exception:
+            pass
+        trip_title = await resolve_trip_title(
+            trip_id, preferred=trip_title_hint or meta.get("trip_title")
+        )
         snapshot.append(
             {
                 "type": "fleet_snapshot",
@@ -369,7 +388,7 @@ async def admin_fleet_egress_ws(
                 "bus_plate": meta.get("bus_plate", vehicle.vehicle_code),
                 "driver_name": meta.get("driver_name", "—"),
                 "driver_id": meta.get("driver_id"),
-                "trip_id": vehicle.trip_id,
+                "trip_id": trip_id,
                 "trip_title": trip_title or None,
                 "lat": vehicle.lat,
                 "lng": vehicle.lng,
