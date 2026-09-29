@@ -14,13 +14,25 @@ git log -1 --oneline 2>/dev/null || true
 
 echo
 echo "=== env (Teltonika) ==="
-if [[ -f "$ENV_FILE" ]]; then
-  # shellcheck disable=SC1090
-  set -a
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-  set +a
-fi
+# Never `source` .env.prod — values may contain spaces / PEM lines that break bash.
+env_get() {
+  local key="$1"
+  [[ -f "$ENV_FILE" ]] || return 0
+  # Prefer last assignment; strip quotes; ignore comments.
+  awk -F= -v k="$key" '
+    $0 ~ "^[[:space:]]*#" { next }
+    index($0, k "=") == 1 || $0 ~ "^[[:space:]]*" k "=" {
+      sub(/^[^=]*=/, "", $0)
+      gsub(/\r$/, "", $0)
+      gsub(/^["'\'']|["'\'']$/, "", $0)
+      val=$0
+    }
+    END { if (val != "") print val }
+  ' "$ENV_FILE"
+}
+TELTONIKA_TCP_ENABLED="$(env_get TELTONIKA_TCP_ENABLED)"
+TELTONIKA_TCP_PORT="$(env_get TELTONIKA_TCP_PORT)"
+PLATFORM_INGRESS_IP="$(env_get PLATFORM_INGRESS_IP)"
 echo "TELTONIKA_TCP_ENABLED=${TELTONIKA_TCP_ENABLED:-<unset>}"
 echo "TELTONIKA_TCP_PORT=${TELTONIKA_TCP_PORT:-5027}"
 echo "PLATFORM_INGRESS_IP=${PLATFORM_INGRESS_IP:-<unset>}"
