@@ -89,6 +89,7 @@ export default function SortableSidebarNav({
   onTabChange,
   onSettingsSubTabChange,
   onSettingsHubFocus,
+  onBusesHubFocus,
   onFleetOpsSubTabChange,
   onFleetRentalTabChange,
   onEmailClick,
@@ -256,6 +257,12 @@ export default function SortableSidebarNav({
       return;
     }
     onTabChange?.(next);
+  };
+
+  /** Pinned «Διαχείριση Λεωφορείων» — always land on top-level cards + scroll top. */
+  const openBusesHubTop = () => {
+    openBusesHub(DEFAULT_BUSES_HUB_TAB);
+    onBusesHubFocus?.();
   };
 
   const openRentDesk = (subTab) => {
@@ -575,11 +582,11 @@ export default function SortableSidebarNav({
         {showBusesPin ? (
           <button
             type="button"
-            onClick={() => openBusesHub(busesHubActive ? activeTab : DEFAULT_BUSES_HUB_TAB)}
+            onClick={openBusesHubTop}
             className={`admin-nav-service-card admin-nav-service-card--buses admin-nav-service-card--single${
               busesHubActive ? ' is-active' : ''
             }`}
-            title="Διαχείριση Λεωφορείων"
+            title="Διαχείριση Λεωφορείων · πίσω στις καρτέλες (κορυφή)"
             aria-label="Διαχείριση Λεωφορείων"
             aria-current={busesHubActive ? 'page' : undefined}
           >
