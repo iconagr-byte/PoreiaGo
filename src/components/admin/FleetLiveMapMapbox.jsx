@@ -10,6 +10,7 @@ import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import FleetGeofenceMapboxLayers from './FleetGeofenceMapboxLayers.jsx';
 import FleetSosPinsMapbox from './FleetSosPinsMapbox.jsx';
 import FleetMapFlyToMapbox from './FleetMapFlyToMapbox.jsx';
+import FleetMapFocusVehicleMapbox from './FleetMapFocusVehicleMapbox.jsx';
 import FleetLiveTrailsMapbox from './FleetLiveTrailsMapbox.jsx';
 import GreecePlacesMapboxLayer from './GreecePlacesMapboxLayer.jsx';
 import {
@@ -50,7 +51,7 @@ function HeatmapDots({ points = [], visible = true }) {
   });
 }
 
-function BusMarker({ vehicle, onVehicleHistory }) {
+function BusMarker({ vehicle, selected = false, onSelectVehicle, onVehicleHistory }) {
   const [open, setOpen] = useState(false);
   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
   const pillLabel = formatFleetBusPillLabel(vehicle);
@@ -58,20 +59,26 @@ function BusMarker({ vehicle, onVehicleHistory }) {
   const excursion = formatFleetExcursionBadge(vehicle);
   const gpsSource = formatFleetGpsSourceBadge(vehicle);
   const gpsTone = fleetGpsSourceToneClass(vehicle);
+  const selectVehicle = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    onSelectVehicle?.(vehicle);
+    setOpen(true);
+  };
   const openHistory = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
     onVehicleHistory?.(vehicle);
   };
   return (
-    <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={() => setOpen(true)}>
+    <Marker longitude={vehicle.lng} latitude={vehicle.lat} anchor="center" onClick={selectVehicle}>
       <button
         type="button"
         className="relative cursor-pointer border-0 bg-transparent p-0"
-        onClick={() => setOpen(true)}
+        onClick={selectVehicle}
         onDoubleClick={openHistory}
       >
-        <div className="fleet-apple-bus-pin">
+        <div className={`fleet-apple-bus-pin${selected ? ' is-selected' : ''}`}>
           {gpsSource ? (
             <div className={`fleet-apple-bus-gps-source ${gpsTone}`}>{gpsSource}</div>
           ) : null}
@@ -144,10 +151,16 @@ function BusMarker({ vehicle, onVehicleHistory }) {
   );
 }
 
-function MapboxAnimatedMarkers({ vehicles, onVehicleHistory }) {
+function MapboxAnimatedMarkers({ vehicles, selectedId = null, onSelectVehicle, onVehicleHistory }) {
   const display = useAnimatedFleetVehicles(vehicles);
   return display.map((v) => (
-    <BusMarker key={v.id} vehicle={v} onVehicleHistory={onVehicleHistory} />
+    <BusMarker
+      key={v.id}
+      vehicle={v}
+      selected={selectedId === v.id}
+      onSelectVehicle={onSelectVehicle}
+      onVehicleHistory={onVehicleHistory}
+    />
   ));
 }
 
@@ -215,6 +228,10 @@ export default function FleetLiveMapMapbox({
   showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
+  focusVehicle = null,
+  focusNonce = 0,
+  selectedId = null,
+  onSelectVehicle,
   onVehicleHistory,
 }) {
   const initialViewState = useMemo(() => {
@@ -249,12 +266,18 @@ export default function FleetLiveMapMapbox({
       <NavigationControl position="bottom-right" showCompass={false} />
       <GreecePlacesMapboxLayer visible={showPlaces} />
       <FitBounds vehicles={fitVehicles} fitNonce={fitNonce} />
+      <FleetMapFocusVehicleMapbox vehicle={focusVehicle} focusNonce={focusNonce} zoom={14} />
       {focusSosAlert ? <FleetMapFlyToMapbox alert={focusSosAlert} /> : null}
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetLiveTrailsMapbox trails={trails} visible={showTrails} />
       <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} />
       <HeatmapDots points={heatmap} visible={showHeat} />
-      <MapboxAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
+      <MapboxAnimatedMarkers
+        vehicles={vehicles}
+        selectedId={selectedId}
+        onSelectVehicle={onSelectVehicle}
+        onVehicleHistory={onVehicleHistory}
+      />
     </Map>
   );
 }

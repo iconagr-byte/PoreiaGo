@@ -26,6 +26,7 @@ export default function FleetLiveMapWebSocket() {
     useFleetTelemetryEgress();
   const mapbox = isMapboxEnabled();
   const [fitNonce, setFitNonce] = useState(0);
+  const [focusNonce, setFocusNonce] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   const [historyVehicle, setHistoryVehicle] = useState(null);
   const [showPlaces, setShowPlaces] = useState(true);
@@ -69,6 +70,17 @@ export default function FleetLiveMapWebSocket() {
     () => mapVehicles.find((v) => v.id === selectedId) || mapVehicles[0] || null,
     [mapVehicles, selectedId],
   );
+
+  const focusVehicle = useMemo(
+    () => (selectedId ? mapVehicles.find((v) => v.id === selectedId) || null : null),
+    [mapVehicles, selectedId],
+  );
+
+  const selectAndFocusVehicle = (vehicle) => {
+    if (!vehicle?.id) return;
+    setSelectedId(vehicle.id);
+    setFocusNonce((n) => n + 1);
+  };
 
   const rentalLiveCount = useMemo(
     () => mapVehicles.filter((v) => v.is_rental).length,
@@ -147,6 +159,10 @@ export default function FleetLiveMapWebSocket() {
               showTrails={showTrails}
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
+              focusVehicle={focusVehicle}
+              focusNonce={focusNonce}
+              selectedId={selectedId}
+              onSelectVehicle={selectAndFocusVehicle}
               onVehicleHistory={setHistoryVehicle}
             />
           ) : (
@@ -164,6 +180,10 @@ export default function FleetLiveMapWebSocket() {
               showTrails={showTrails}
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
+              focusVehicle={focusVehicle}
+              focusNonce={focusNonce}
+              selectedId={selectedId}
+              onSelectVehicle={selectAndFocusVehicle}
               onVehicleHistory={setHistoryVehicle}
             />
           )}
@@ -180,23 +200,20 @@ export default function FleetLiveMapWebSocket() {
               ) : null}
             </div>
             <p className="mb-3 text-[11px] text-[var(--fleet-secondary)]">
-              Διπλό κλικ για ιστορικό &amp; check-in
+              Κλικ για εστίαση στον χάρτη · διπλό κλικ για ιστορικό
             </p>
             {mapVehicles.length ? (
               <ul className="max-h-[min(52vh,480px)] space-y-2 overflow-y-auto pr-1">
                 {mapVehicles.map((v) => {
                   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(v));
-                  const active = (selected?.id || selectedId) === v.id;
+                  const active = selectedId === v.id;
                   return (
                     <li key={v.id}>
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedId(v.id);
-                          setFitNonce((n) => n + 1);
-                        }}
+                        onClick={() => selectAndFocusVehicle(v)}
                         onDoubleClick={() => setHistoryVehicle(v)}
-                        title="Διπλό κλικ: ιστορικό διαδρομής"
+                        title="Κλικ: εστίαση · διπλό κλικ: ιστορικό"
                         className={`fleet-apple-vehicle-btn ${active ? 'is-active' : ''}`}
                       >
                         <div className="flex items-center gap-3">

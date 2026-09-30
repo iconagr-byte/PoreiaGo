@@ -26,6 +26,7 @@ import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
 import FleetSosPins from './FleetSosPins.jsx';
 import FleetMapFlyTo from './FleetMapFlyTo.jsx';
+import FleetMapFocusVehicle from './FleetMapFocusVehicle.jsx';
 import FleetLiveTrailsLeaflet from './FleetLiveTrailsLeaflet.jsx';
 import GreecePlacesLeafletLayer from './GreecePlacesLeafletLayer.jsx';
 import { APPLE_LEAFLET_TILES } from '../../lib/maps/appleMapTheme.js';
@@ -42,7 +43,7 @@ function escapeAttr(value) {
 const BUS_ICON_CACHE = new Map();
 const BUS_ICON_CACHE_MAX = 80;
 
-const busIcon = (vehicle) => {
+const busIcon = (vehicle, selected = false) => {
   const headingRaw = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
   const heading = Math.round(headingRaw / 15) * 15;
   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
@@ -50,7 +51,7 @@ const busIcon = (vehicle) => {
   const excursion = formatFleetExcursionBadge(vehicle);
   const gpsSource = formatFleetGpsSourceBadge(vehicle);
   const gpsTone = fleetGpsSourceToneClass(vehicle);
-  const key = `${vehicle?.id || ''}|${img}|${heading}|${label}|${excursion}|${gpsSource}`;
+  const key = `${vehicle?.id || ''}|${img}|${heading}|${label}|${excursion}|${gpsSource}|${selected ? 1 : 0}`;
   const cached = BUS_ICON_CACHE.get(key);
   if (cached) return cached;
 
@@ -60,9 +61,10 @@ const busIcon = (vehicle) => {
   const gpsHtml = gpsSource
     ? `<div class="fleet-apple-bus-gps-source ${escapeAttr(gpsTone)}">${escapeAttr(gpsSource)}</div>`
     : '';
+  const selectedClass = selected ? ' is-selected' : '';
   const icon = L.divIcon({
     className: 'fleet-bus-marker-ws',
-    html: `<div class="fleet-apple-bus-pin">
+    html: `<div class="fleet-apple-bus-pin${selectedClass}">
       ${gpsHtml}
       ${excursionHtml}
       <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${escapeAttr(label)}</div>
@@ -82,15 +84,18 @@ const busIcon = (vehicle) => {
   return icon;
 };
 
-function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
+function LeafletAnimatedMarkers({ vehicles, selectedId = null, onSelectVehicle, onVehicleHistory }) {
   const display = useAnimatedFleetVehicles(vehicles);
 
   return display.map((v) => (
     <Marker
       key={v.id}
       position={[v.lat, v.lng]}
-      icon={busIcon(v)}
+      icon={busIcon(v, selectedId === v.id)}
       eventHandlers={{
+        click: () => {
+          onSelectVehicle?.(v);
+        },
         dblclick: (e) => {
           e.originalEvent?.preventDefault?.();
           e.originalEvent?.stopPropagation?.();
@@ -214,6 +219,10 @@ export default function FleetLiveMapLeaflet({
   showTrails = true,
   focusSosAlert = null,
   fitNonce = 0,
+  focusVehicle = null,
+  focusNonce = 0,
+  selectedId = null,
+  onSelectVehicle,
   onVehicleHistory,
 }) {
   const fitPoints = useMemo(() => {
@@ -245,12 +254,18 @@ export default function FleetLiveMapLeaflet({
       <ZoomControl position="bottomright" />
       <GreecePlacesLeafletLayer visible={showPlaces} />
       <FitBounds vehicles={fitPoints} fitNonce={fitNonce} />
+      <FleetMapFocusVehicle vehicle={focusVehicle} focusNonce={focusNonce} zoom={14} />
       {focusSosAlert ? <FleetMapFlyTo alert={focusSosAlert} /> : null}
       <FleetGeofenceLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetLiveTrailsLeaflet trails={trails} visible={showTrails} />
       <FleetSosPins alerts={sosAlerts} visible={showSosPins} />
       <FleetHeatmapLayer points={heatmap} visible={showHeat} />
-      <LeafletAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
+      <LeafletAnimatedMarkers
+        vehicles={vehicles}
+        selectedId={selectedId}
+        onSelectVehicle={onSelectVehicle}
+        onVehicleHistory={onVehicleHistory}
+      />
     </MapContainer>
   );
 }

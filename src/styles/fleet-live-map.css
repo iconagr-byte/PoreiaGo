@@ -278,6 +278,20 @@
   filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.22));
 }
 
+.fleet-apple-bus-pin.is-selected {
+  z-index: 5;
+  transform: translateY(-8px) scale(1.06);
+}
+
+.fleet-apple-bus-pin.is-selected .fleet-apple-bus-pin__avatar {
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.55);
+}
+
+.fleet-apple-bus-pin.is-selected .fleet-apple-bus-pill {
+  border-color: rgba(0, 113, 227, 0.45);
+  background: rgba(235, 245, 255, 0.95);
+}
+
 .fleet-apple-bus-pill {
   margin-top: 4px;
   max-width: 220px;
