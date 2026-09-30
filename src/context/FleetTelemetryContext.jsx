@@ -89,6 +89,13 @@ function vehicleIdFromRow(v) {
   return v.vehicle_id || v.driver_id || `${v.bus_plate || v.vehicle_code || 'bus'}-${v.trip_id || '0'}`;
 }
 
+function isHardwareTrackerRow(row) {
+  const src = String(row?.source || '').toLowerCase();
+  if (src.startsWith('teltonika') || src === 'tracker' || src === 'test_ping') return true;
+  if (row?.imei && src !== 'driver_pwa' && src !== 'app') return true;
+  return false;
+}
+
 function dropOfflineVehicles(prev, msg) {
   const next = { ...prev };
   let changed = false;
@@ -96,12 +103,13 @@ function dropOfflineVehicles(prev, msg) {
     ? msg.removed_vehicle_ids.map(String)
     : [];
   for (const rid of removedIds) {
-    if (next[rid]) {
+    if (next[rid] && !isHardwareTrackerRow(next[rid])) {
       delete next[rid];
       changed = true;
     }
     // Also drop rows keyed by plate/code when Redis id differs from map key.
     for (const [key, row] of Object.entries(next)) {
+      if (isHardwareTrackerRow(row)) continue;
       if (
         String(row.vehicle_id || '') === rid ||
         String(row.vehicle_code || '') === rid ||
@@ -115,6 +123,8 @@ function dropOfflineVehicles(prev, msg) {
   const did = msg.driver_id != null ? String(msg.driver_id) : '';
   if (did) {
     for (const [key, row] of Object.entries(next)) {
+      // Teltonika pins stay on the map when the driver app goes offline.
+      if (isHardwareTrackerRow(row)) continue;
       if (String(row.driver_id || '') === did) {
         delete next[key];
         changed = true;
