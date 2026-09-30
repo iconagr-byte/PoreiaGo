@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 # Avoid hammering process_telemetry on every 5s poll.
 _last_hydrate_at: dict[str, float] = {}
 _MIN_INTERVAL_SEC = 15.0
+# Parked buses may send AVL rarely — keep last known hardware pin longer.
+_HYDRATE_MAX_AGE_SEC = 6 * 60 * 60
 
 
 async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
@@ -57,7 +59,9 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
             continue
         if device.get("last_lat") is None or device.get("last_lng") is None:
             continue
-        if not is_tracker_binding_alive(device, max_age_sec=alive_sec):
+        # Prefer last_seen; if IMEI heartbeats keep last_seen fresh without
+        # new lat, still hydrate. Also accept older fixes (parked bus).
+        if not is_tracker_binding_alive(device, max_age_sec=_HYDRATE_MAX_AGE_SEC):
             continue
 
         plate = str(device.get("vehicle_code") or device.get("imei") or "").strip()
@@ -69,6 +73,8 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
         if prefer:
             continue
 
+        # Stamp "now" so list_active stale filter (driver_stale_seconds) keeps the pin.
+        recorded = datetime.now(timezone.utc).isoformat()
         payload: dict[str, Any] = {
             "tenant_id": tid,
             "vehicle_code": plate,
@@ -82,8 +88,7 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
             "driver_id": device.get("driver_id") or None,
             "imei": device.get("imei"),
             "source": "teltonika",
-            "recorded_at": device.get("last_seen_at")
-            or datetime.now(timezone.utc).isoformat(),
+            "recorded_at": recorded,
         }
         try:
             await process_telemetry_payload(payload)
