@@ -1,9 +1,9 @@
 """
 Teltonika-first live map priority with soft phone GPS fallback.
 
-When a plate has an enabled Teltonika binding and the tracker was seen recently,
-driver phone GPS must not paint the live map. If the tracker goes quiet, phone
-GPS may paint as fallback until hardware resumes.
+Soft-ack phone GPS only when a Teltonika pin is already on the live fleet
+(recent hardware fix). Device-store last_seen alone is not enough — the TCP
+path can touch last_seen without a map pin, which would blank the live map.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ TRACKER_LIVE_SOURCES = frozenset(
     {"teltonika", "teltonika_test_ping", "tracker", "test_ping"},
 )
 
-# Prefer tracker while it reports within this window (seconds).
+# Prefer tracker while a live pin reports within this window (seconds).
 DEFAULT_TRACKER_ALIVE_SECONDS = 90
 
 
@@ -79,6 +79,8 @@ def is_live_meta_tracker_fresh(
         return False
     if not is_tracker_source(meta.get("source")):
         return False
+    if meta.get("lat") is None or meta.get("lng") is None:
+        return False
     age = age_seconds(meta.get("updated_at") or meta.get("timestamp"), now=now)
     if age is None:
         return False
@@ -90,9 +92,32 @@ def resolve_tracker_alive_seconds(tenant_id: str | None = None) -> int:
         from travel_platform.telemetry.settings_store import get_telemetry_settings
 
         settings = get_telemetry_settings(tenant_id or None)
-        return max(15, int(getattr(settings, "driver_stale_seconds", DEFAULT_TRACKER_ALIVE_SECONDS) or DEFAULT_TRACKER_ALIVE_SECONDS))
+        return max(
+            15,
+            int(
+                getattr(settings, "driver_stale_seconds", DEFAULT_TRACKER_ALIVE_SECONDS)
+                or DEFAULT_TRACKER_ALIVE_SECONDS
+            ),
+        )
     except Exception:
         return DEFAULT_TRACKER_ALIVE_SECONDS
+
+
+def _live_fleet_tracker_meta(tenant_id: str, vehicle_code: str | None) -> dict[str, Any] | None:
+    plate = str(vehicle_code or "").strip()
+    if not plate:
+        return None
+    try:
+        from travel_platform.telemetry.processor import get_live_fleet
+
+        fleet = get_live_fleet()
+        vid = fleet.find_vehicle_id(str(tenant_id), plate)
+        if not vid:
+            return None
+        meta = fleet._vehicles.get(vid)  # noqa: SLF001 — shared live cache
+        return meta if isinstance(meta, dict) else None
+    except Exception:
+        return None
 
 
 def is_teltonika_preferred_for_plate(
@@ -106,8 +131,8 @@ def is_teltonika_preferred_for_plate(
     Return (prefer_teltonika, binding).
 
     prefer_teltonika=True → skip phone GPS on the live map (soft-ack only).
-    prefer_teltonika=False with a binding → phone may paint as soft fallback.
-    prefer_teltonika=False with no binding → normal phone GPS path.
+    Only when a fresh Teltonika pin exists on the live fleet — never based on
+    device last_seen alone (that can blank the map when the queue lags).
     """
     try:
         from travel_platform.telemetry.teltonika.device_store import (
@@ -121,21 +146,8 @@ def is_teltonika_preferred_for_plate(
         return False, None
 
     alive_sec = int(max_age_sec if max_age_sec is not None else resolve_tracker_alive_seconds(tenant_id))
-    if is_tracker_binding_alive(tracker, max_age_sec=alive_sec, now=now):
+    meta = _live_fleet_tracker_meta(str(tenant_id), vehicle_code)
+    if is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec, now=now):
         return True, tracker
-
-    # Secondary: in-memory live fleet may still hold a fresh Teltonika pin
-    # even if last_seen_at write lagged.
-    try:
-        from travel_platform.telemetry.processor import get_live_fleet
-
-        fleet = get_live_fleet()
-        plate = str(vehicle_code or "").strip()
-        vid = fleet.find_vehicle_id(str(tenant_id), plate) if plate else None
-        meta = fleet._vehicles.get(vid) if vid else None  # noqa: SLF001 — shared live cache
-        if is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec, now=now):
-            return True, tracker
-    except Exception:
-        pass
 
     return False, tracker

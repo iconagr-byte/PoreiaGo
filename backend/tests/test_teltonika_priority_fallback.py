@@ -49,28 +49,67 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         old = (datetime.now(timezone.utc) - timedelta(seconds=300)).isoformat()
         self.assertFalse(is_tracker_binding_alive({"last_seen_at": old}, max_age_sec=90))
 
-    def test_prefer_teltonika_when_alive(self):
-        ds.touch_device("861076085468260", lat=38.2, lng=20.6, speed_kmh=40, points=1)
+    def _seed_live_teltonika_pin(self):
+        """Put a fresh Teltonika pin on the in-memory live fleet for this plate."""
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        vid = "veh-teltonika-1"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "lat": 38.2,
+            "lng": 20.6,
+            "source": "teltonika",
+            "imei": "861076085468260",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        return vid
+
+    def test_prefer_teltonika_when_live_pin_fresh(self):
+        self._seed_live_teltonika_pin()
         prefer, tracker = is_teltonika_preferred_for_plate(self.tenant, "EEX5670", max_age_sec=90)
         self.assertTrue(prefer)
         self.assertEqual(tracker.get("imei"), "861076085468260")
 
-    def test_fallback_when_tracker_stale(self):
-        # Force an old last_seen without going through touch_device clock.
-        with ds._LOCK:  # noqa: SLF001
-            data = ds._read()  # noqa: SLF001
-            for row in data.get("devices") or []:
-                if row.get("imei") == "861076085468260":
-                    row["last_seen_at"] = (
-                        datetime.now(timezone.utc) - timedelta(seconds=400)
-                    ).isoformat()
-            ds._write(data)  # noqa: SLF001
+    def test_no_prefer_when_only_device_last_seen(self):
+        """last_seen alone must not soft-ack — that blanks the map when queue lags."""
+        ds.touch_device("861076085468260", lat=38.2, lng=20.6, speed_kmh=40, points=1)
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
         prefer, tracker = is_teltonika_preferred_for_plate(self.tenant, "EEX5670", max_age_sec=90)
         self.assertFalse(prefer)
         self.assertIsNotNone(tracker)
 
-    def test_ingest_soft_acks_when_tracker_alive(self):
-        ds.touch_device("861076085468260", lat=38.2, lng=20.6, speed_kmh=40, points=1)
+    def test_fallback_when_tracker_stale(self):
+        # Live pin exists but is stale → phone may paint.
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        vid = "veh-old"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "lat": 38.2,
+            "lng": 20.6,
+            "source": "teltonika",
+            "updated_at": (datetime.now(timezone.utc) - timedelta(seconds=400)).isoformat(),
+        }
+        prefer, tracker = is_teltonika_preferred_for_plate(self.tenant, "EEX5670", max_age_sec=90)
+        self.assertFalse(prefer)
+        self.assertIsNotNone(tracker)
+
+    def test_ingest_soft_acks_when_live_teltonika_pin(self):
+        self._seed_live_teltonika_pin()
         session = {
             "tenant_id": self.tenant,
             "driver_id": "drv-1",
