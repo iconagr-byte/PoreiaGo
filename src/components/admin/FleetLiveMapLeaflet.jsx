@@ -202,6 +202,7 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
 /** Leaflet fallback — Apple-like soft basemap + ελληνικές ετικέτες. */
 export default function FleetLiveMapLeaflet({
   vehicles,
+  trailVehicles,
   center,
   heatmap = [],
   showHeat = false,
@@ -222,7 +223,9 @@ export default function FleetLiveMapLeaflet({
     return pts;
   }, [vehicles, sosAlerts]);
 
-  const trails = useFleetVehicleTrails(vehicles, {
+  // Blue trail only for vehicles with an active excursion (parent may pass a subset).
+  const trailSource = trailVehicles ?? vehicles;
+  const trails = useFleetVehicleTrails(trailSource, {
     enabled: showTrails,
     maxPoints: 3000,
     minMoveM: 3,
