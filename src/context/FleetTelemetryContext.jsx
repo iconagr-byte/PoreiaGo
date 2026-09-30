@@ -9,6 +9,12 @@ import {
   FLEET_LIVE_POLL_MS,
   fleetPollMsForVehicleCount,
 } from '../lib/admin/fleetLivePoll.js';
+import {
+  dedupeVehiclesByPlate,
+  isHardwareTrackerRow,
+  isPhoneGpsRow,
+  normalizePlateKey,
+} from '../lib/admin/fleetPinDedupe.js';
 
 export const DEMO_TENANT = import.meta.env.VITE_DEMO_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 
@@ -87,13 +93,6 @@ function normalizeVehicle(msg, id, prev) {
 
 function vehicleIdFromRow(v) {
   return v.vehicle_id || v.driver_id || `${v.bus_plate || v.vehicle_code || 'bus'}-${v.trip_id || '0'}`;
-}
-
-function isHardwareTrackerRow(row) {
-  const src = String(row?.source || '').toLowerCase();
-  if (src.startsWith('teltonika') || src === 'tracker' || src === 'test_ping') return true;
-  if (row?.imei && src !== 'driver_pwa' && src !== 'app') return true;
-  return false;
 }
 
 function dropOfflineVehicles(prev, msg) {
@@ -197,8 +196,9 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           const normalized = normalizeVehicle(row, id, map[id] || prev[id]);
           if (normalized) map[id] = normalized;
         });
-        vehicleCountRef.current = Object.keys(map).length;
-        return map;
+        const deduped = dedupeVehiclesByPlate(map);
+        vehicleCountRef.current = Object.keys(deduped).length;
+        return deduped;
       });
     };
 
@@ -315,9 +315,17 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           if (msg.type === 'fleet_location') {
             const id = vehicleIdFromRow(msg);
             setVehicles((prev) => {
+              const plate = normalizePlateKey(msg);
+              // Teltonika owns the plate — ignore late App GPS frames.
+              if (plate && isPhoneGpsRow(msg)) {
+                const existingHw = Object.values(prev).find(
+                  (row) => normalizePlateKey(row) === plate && isHardwareTrackerRow(row),
+                );
+                if (existingHw) return prev;
+              }
               const normalized = normalizeVehicle(msg, id, prev[id]);
               if (!normalized) return prev;
-              const next = { ...prev, [id]: normalized };
+              const next = dedupeVehiclesByPlate({ ...prev, [id]: normalized });
               vehicleCountRef.current = Object.keys(next).length;
               return next;
             });

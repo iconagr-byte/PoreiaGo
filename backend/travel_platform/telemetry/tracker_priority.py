@@ -4,6 +4,9 @@ Teltonika-first live map priority with soft phone GPS fallback.
 Soft-ack phone GPS only when a Teltonika pin is already on the live fleet
 (recent hardware fix). Device-store last_seen alone is not enough — the TCP
 path can touch last_seen without a map pin, which would blank the live map.
+
+Multi-worker Redis can leave a phone pin and a Teltonika pin for the same
+plate — list/egress must collapse to one pin (hardware wins while fresh).
 """
 
 from __future__ import annotations
@@ -19,6 +22,10 @@ TRACKER_LIVE_SOURCES = frozenset(
 DEFAULT_TRACKER_ALIVE_SECONDS = 90
 
 
+def normalize_vehicle_plate(value: Any) -> str:
+    return str(value or "").strip().upper()
+
+
 def is_tracker_source(source: Any) -> bool:
     raw = str(source or "").strip().lower()
     if not raw:
@@ -26,6 +33,20 @@ def is_tracker_source(source: Any) -> bool:
     if raw in TRACKER_LIVE_SOURCES:
         return True
     return raw.startswith("teltonika")
+
+
+def is_phone_source(source: Any) -> bool:
+    raw = str(source or "").strip().lower()
+    if not raw:
+        return False
+    if is_tracker_source(raw):
+        return False
+    return (
+        "driver" in raw
+        or "pwa" in raw
+        or "phone" in raw
+        or raw in {"app", "gps", "browser"}
+    )
 
 
 def _parse_ts(value: Any) -> datetime | None:
@@ -104,20 +125,114 @@ def resolve_tracker_alive_seconds(tenant_id: str | None = None) -> int:
 
 
 def _live_fleet_tracker_meta(tenant_id: str, vehicle_code: str | None) -> dict[str, Any] | None:
-    plate = str(vehicle_code or "").strip()
+    plate = normalize_vehicle_plate(vehicle_code)
     if not plate:
         return None
     try:
         from travel_platform.telemetry.processor import get_live_fleet
 
         fleet = get_live_fleet()
-        vid = fleet.find_vehicle_id(str(tenant_id), plate)
-        if not vid:
-            return None
-        meta = fleet._vehicles.get(vid)  # noqa: SLF001 — shared live cache
-        return meta if isinstance(meta, dict) else None
+        tid = str(tenant_id)
+        candidates: list[dict[str, Any]] = []
+        vid = fleet.find_vehicle_id(tid, plate)
+        if vid:
+            meta = fleet._vehicles.get(vid)  # noqa: SLF001 — shared live cache
+            if isinstance(meta, dict):
+                candidates.append(meta)
+        # Scan all live rows for this plate — Redis duplicates may use another UUID.
+        for meta in fleet._vehicles.values():  # noqa: SLF001
+            if str(meta.get("tenant_id") or "") != tid:
+                continue
+            if meta_plate(meta) != plate:
+                continue
+            if meta not in candidates:
+                candidates.append(meta)
+        best: dict[str, Any] | None = None
+        for meta in candidates:
+            if not is_tracker_source(meta.get("source")) and not (
+                meta.get("imei") and not is_phone_source(meta.get("source"))
+            ):
+                continue
+            best = prefer_meta_for_plate(best, meta) or meta
+        return best
     except Exception:
         return None
+
+
+def meta_plate(meta: dict[str, Any] | None) -> str:
+    meta = meta or {}
+    return normalize_vehicle_plate(meta.get("vehicle_code") or meta.get("bus_plate"))
+
+
+def _meta_updated_rank(meta: dict[str, Any] | None) -> float:
+    age = age_seconds((meta or {}).get("updated_at") or (meta or {}).get("timestamp"))
+    if age is None:
+        return float("-inf")
+    return -age
+
+
+def prefer_meta_for_plate(
+    a: dict[str, Any] | None,
+    b: dict[str, Any] | None,
+    *,
+    max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    """
+    Pick the winning live pin for one plate.
+
+    Fresh Teltonika always beats phone/app. When hardware is stale, phone
+    fallback wins. Otherwise keep the newer fix.
+    """
+    if not a:
+        return b
+    if not b:
+        return a
+    a_fresh = is_live_meta_tracker_fresh(a, max_age_sec=max_age_sec, now=now)
+    b_fresh = is_live_meta_tracker_fresh(b, max_age_sec=max_age_sec, now=now)
+    if a_fresh and not b_fresh:
+        return a
+    if b_fresh and not a_fresh:
+        return b
+    a_tracker = is_tracker_source(a.get("source")) or bool(
+        a.get("imei") and not is_phone_source(a.get("source"))
+    )
+    b_tracker = is_tracker_source(b.get("source")) or bool(
+        b.get("imei") and not is_phone_source(b.get("source"))
+    )
+    a_phone = is_phone_source(a.get("source")) or (not a_tracker and not a.get("imei"))
+    b_phone = is_phone_source(b.get("source")) or (not b_tracker and not b.get("imei"))
+    # Soft fallback: stale Teltonika + live phone → phone paints the map.
+    if a_tracker and not a_fresh and b_phone:
+        return b
+    if b_tracker and not b_fresh and a_phone:
+        return a
+    if a_tracker and not b_tracker:
+        return a
+    if b_tracker and not a_tracker:
+        return b
+    return a if _meta_updated_rank(a) >= _meta_updated_rank(b) else b
+
+
+def dedupe_live_metas_by_plate(
+    metas: list[dict[str, Any]],
+    *,
+    max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Collapse duplicate pins for the same plate (Teltonika wins while fresh)."""
+    winners: dict[str, dict[str, Any]] = {}
+    orphans: list[dict[str, Any]] = []
+    for meta in metas or []:
+        if not isinstance(meta, dict):
+            continue
+        plate = meta_plate(meta)
+        if not plate:
+            orphans.append(meta)
+            continue
+        prev = winners.get(plate)
+        winners[plate] = prefer_meta_for_plate(prev, meta, max_age_sec=max_age_sec, now=now) or meta
+    return list(winners.values()) + orphans
 
 
 def is_teltonika_preferred_for_plate(

@@ -234,6 +234,14 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
             )
         except Exception:
             logger.debug("touch_driver_gps after Teltonika soft-ack failed", exc_info=True)
+        # Ensure no leftover App pin remains beside the Teltonika pin.
+        try:
+            from travel_platform.telemetry.processor import get_live_fleet
+
+            plate = payload.get("vehicle_code") or payload.get("bus_plate")
+            await get_live_fleet().purge_phone_siblings_for_plate(tenant_id, plate)
+        except Exception:
+            logger.debug("soft-ack phone-sibling purge skipped", exc_info=True)
         return {
             "ok": True,
             "skipped_live_map": True,
