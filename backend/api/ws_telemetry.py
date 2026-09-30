@@ -348,6 +348,15 @@ async def admin_fleet_egress_ws(
 
     from travel_platform.telemetry.processor import get_live_fleet
 
+    try:
+        from travel_platform.telemetry.teltonika.hydrate_live import (
+            hydrate_tenant_live_from_devices,
+        )
+
+        await hydrate_tenant_live_from_devices(tid)
+    except Exception:
+        pass
+
     live = get_live_fleet()
     snapshot = []
     from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
