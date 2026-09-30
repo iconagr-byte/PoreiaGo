@@ -8,7 +8,7 @@ import os
 from typing import Any
 from uuid import UUID
 
-from travel_platform.telemetry.ingestion import TelemetryIngestionService
+from travel_platform.telemetry.processor import process_telemetry_payload
 from travel_platform.telemetry.teltonika.codec8 import (
     fix_to_telemetry_fields,
     parse_avl_packet,
@@ -63,7 +63,6 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
     _status["active_connections"] = int(_status.get("active_connections") or 0) + 1
     imei: str | None = None
     buf = bytearray()
-    ingest = TelemetryIngestionService()
     try:
         # Phase 1: IMEI login
         while imei is None:
@@ -158,31 +157,34 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                 accepted = 0
                 for fix in records:
                     fields = fix_to_telemetry_fields(fix)
+                    # Process inline (not only Redis stream) so the live map pin
+                    # updates even when the stream consumer lags across workers.
+                    payload = {
+                        "tenant_id": str(tenant_id),
+                        "vehicle_code": vehicle_code,
+                        "latitude": fields["latitude"],
+                        "longitude": fields["longitude"],
+                        "speed_kmh": fields["speed_kmh"],
+                        "engine_status": fields["engine_status"],
+                        "recorded_at": fields["recorded_at"],
+                        "heading_deg": fields["heading_deg"],
+                        "driver_id": str(driver_id) if driver_id else None,
+                        "tracker_event_id": fields.get("tracker_event_id"),
+                        "source": "teltonika",
+                        "imei": imei,
+                        "bus_plate": vehicle_code,
+                        "driver_name": driver_name,
+                        "altitude_m": fields.get("altitude_m"),
+                        "satellites": fields.get("satellites"),
+                        "priority": fields.get("priority"),
+                        "event_io_id": fields.get("event_io_id"),
+                        "io": fields.get("io") or {},
+                    }
                     try:
-                        await ingest.accept_update(
-                            tenant_id=tenant_id,
-                            vehicle_code=vehicle_code,
-                            latitude=fields["latitude"],
-                            longitude=fields["longitude"],
-                            speed_kmh=fields["speed_kmh"],
-                            engine_status=fields["engine_status"],
-                            recorded_at=fields["recorded_at"],
-                            heading_deg=fields["heading_deg"],
-                            driver_id=driver_id,
-                            tracker_event_id=fields.get("tracker_event_id"),
-                            source="teltonika",
-                            imei=imei,
-                            bus_plate=vehicle_code,
-                            driver_name=driver_name,
-                            altitude_m=fields.get("altitude_m"),
-                            satellites=fields.get("satellites"),
-                            priority=fields.get("priority"),
-                            event_io_id=fields.get("event_io_id"),
-                            io=fields.get("io"),
-                        )
+                        await process_telemetry_payload(payload)
                         accepted += 1
                     except Exception as exc:
-                        logger.warning("Teltonika enqueue failed IMEI=%s: %s", imei, exc)
+                        logger.warning("Teltonika live ingest failed IMEI=%s: %s", imei, exc)
                 touch_device(
                     imei,
                     lat=last.latitude,
