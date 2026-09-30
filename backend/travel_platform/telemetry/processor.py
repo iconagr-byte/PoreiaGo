@@ -72,12 +72,24 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
         meta["bus_plate"] = raw.get("bus_plate") or raw.get("vehicle_code")
     if raw.get("heading_deg") is not None:
         meta["heading_deg"] = raw.get("heading_deg")
-    if raw.get("driver_id"):
-        meta["driver_id"] = raw.get("driver_id")
     if raw.get("source"):
         meta["source"] = str(raw.get("source"))
     if raw.get("imei"):
         meta["imei"] = str(raw.get("imei"))
+    # Teltonika must not inherit phone driver_id (shift-end would wipe the pin).
+    source_l = str(raw.get("source") or meta.get("source") or "").strip().lower()
+    is_tracker = source_l.startswith("teltonika") or source_l in {
+        "tracker",
+        "test_ping",
+        "teltonika_test_ping",
+    }
+    if is_tracker:
+        if raw.get("driver_id"):
+            meta["driver_id"] = raw.get("driver_id")
+        else:
+            meta.pop("driver_id", None)
+    elif raw.get("driver_id"):
+        meta["driver_id"] = raw.get("driver_id")
     preferred_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
     if preferred_title:
         meta["trip_title"] = str(preferred_title).strip()

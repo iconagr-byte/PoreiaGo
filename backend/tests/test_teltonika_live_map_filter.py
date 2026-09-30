@@ -60,6 +60,15 @@ class TeltonikaLiveMapFilterTests(unittest.TestCase):
             )
         )
 
+    def test_tracker_pin_rejects_phone_source(self):
+        """Phone GPS must use the driver path — not masquerade as tracker pin."""
+        self.assertFalse(
+            filt.office_allows_tracker_pin(
+                self.tenant,
+                {"vehicle_code": "EEX5670", "source": "driver_pwa", "driver_id": "drv-1"},
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
