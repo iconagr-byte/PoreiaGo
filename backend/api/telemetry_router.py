@@ -112,6 +112,16 @@ async def fleet_live(
 
     log = logging.getLogger(__name__)
     try:
+        # If Teltonika has a recent fix in the device store but the live fleet
+        # is empty (restart / stream lag), re-paint pins before listing.
+        from travel_platform.telemetry.teltonika.hydrate_live import (
+            hydrate_tenant_live_from_devices,
+        )
+
+        await hydrate_tenant_live_from_devices(str(tenant_id))
+    except Exception:
+        log.debug("teltonika live hydrate skipped", exc_info=True)
+    try:
         live: LiveFleetService = get_live_fleet()
         vehicles = await live.list_active_for_admin_async(tenant_id)
     except Exception as exc:
