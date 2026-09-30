@@ -3,6 +3,7 @@
 from travel_platform.telemetry.teltonika.device_store import (
     delete_device,
     get_device_by_imei,
+    get_enabled_device_by_vehicle_code,
     list_devices,
     normalize_imei,
     touch_device,
@@ -17,6 +18,7 @@ from travel_platform.telemetry.teltonika.tcp_server import (
 __all__ = [
     "delete_device",
     "get_device_by_imei",
+    "get_enabled_device_by_vehicle_code",
     "get_teltonika_status",
     "list_devices",
     "normalize_imei",

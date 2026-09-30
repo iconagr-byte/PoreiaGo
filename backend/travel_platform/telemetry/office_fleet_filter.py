@@ -5,18 +5,39 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from travel_platform.telemetry.tracker_priority import TRACKER_LIVE_SOURCES, is_tracker_source
+
 logger = logging.getLogger(__name__)
 
 
+def _meta_plate(meta: dict[str, Any]) -> str:
+    return str(meta.get("vehicle_code") or meta.get("bus_plate") or "").strip().upper()
+
+
+def office_plate_has_enabled_tracker(tenant_id: str, vehicle_code: str | None) -> bool:
+    """True when this office plate has an enabled Teltonika IMEI binding."""
+    try:
+        from travel_platform.telemetry.teltonika.device_store import (
+            get_enabled_device_by_vehicle_code,
+        )
+    except Exception:
+        return False
+    return get_enabled_device_by_vehicle_code(str(tenant_id), vehicle_code) is not None
+
+
 def office_allows_tracker_pin(tenant_id: str, meta: dict[str, Any] | None) -> bool:
-    """True when pin is a Teltonika/tracker vehicle bound to this office (IMEI store)."""
+    """True when pin is a Teltonika/tracker fix for a vehicle bound to this office."""
     meta = meta or {}
+    source = str(meta.get("source") or "").strip().lower()
+    # Empty source allowed for legacy tracker rows; phone sources must use driver path.
+    if source and not is_tracker_source(source) and source not in TRACKER_LIVE_SOURCES:
+        return False
     try:
         from travel_platform.telemetry.teltonika.device_store import list_devices, normalize_imei
     except Exception:
         return False
 
-    code = str(meta.get("vehicle_code") or meta.get("bus_plate") or "").strip().upper()
+    code = _meta_plate(meta)
     imei = normalize_imei(meta.get("imei"))
     if not code and not imei:
         return False
@@ -39,9 +60,15 @@ def office_allows_live_driver(tenant_id: str, driver_id: str | None, meta: dict[
     Seed demo drivers are never shown. Drivers must be registered on the office
     (exact tenant). Missing driver_id → hide (no orphan TRIP-1 ghosts),
     except Teltonika/tracker pins bound to this office via IMEI store.
+
+    Phone GPS on a Teltonika-bound plate is allowed only as soft fallback
+    (written by ingress when the tracker is stale) via the normal driver path.
     """
     meta = meta or {}
-    if office_allows_tracker_pin(tenant_id, meta):
+    if is_tracker_source(meta.get("source")) and office_allows_tracker_pin(tenant_id, meta):
+        return True
+    # Legacy tracker rows without source still allowed when bound.
+    if not meta.get("source") and office_allows_tracker_pin(tenant_id, meta):
         return True
 
     did = str(driver_id or meta.get("driver_id") or "").strip()

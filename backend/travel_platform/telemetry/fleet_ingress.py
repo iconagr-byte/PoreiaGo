@@ -206,6 +206,52 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
     payload = driver_payload_to_telemetry(body, session=session)
     tenant_id = str(payload["tenant_id"])
 
+    # Teltonika-first: while the tracker is alive, soft-ack the driver PWA
+    # (shift / heartbeat) but do not let phone GPS overwrite the live pin.
+    # If the tracker goes quiet, phone GPS paints as soft fallback.
+    try:
+        from travel_platform.telemetry.tracker_priority import is_teltonika_preferred_for_plate
+
+        prefer_tracker, tracker = is_teltonika_preferred_for_plate(
+            tenant_id,
+            payload.get("vehicle_code") or payload.get("bus_plate"),
+        )
+    except Exception:
+        prefer_tracker, tracker = False, None
+    if prefer_tracker and tracker:
+        logger.info(
+            "Soft-ack phone GPS (Teltonika preferred) — plate=%s IMEI=%s tenant=%s",
+            payload.get("vehicle_code"),
+            tracker.get("imei"),
+            tenant_id,
+        )
+        try:
+            from travel_platform.telemetry.driver_gps_heartbeat import touch_driver_gps
+
+            touch_driver_gps(
+                session,
+                recorded_at=payload.get("recorded_at"),
+            )
+        except Exception:
+            logger.debug("touch_driver_gps after Teltonika soft-ack failed", exc_info=True)
+        return {
+            "ok": True,
+            "skipped_live_map": True,
+            "map_source": "teltonika",
+            "detail": "Το στίγμα στον χάρτη έρχεται από το Teltonika — το κινητό επιβεβαιώθηκε",
+            "tenant_id": tenant_id,
+            "tracker_imei": tracker.get("imei"),
+        }
+    if tracker and not prefer_tracker:
+        # Soft fallback: tracker bound but silent — phone may paint the pin.
+        payload["map_fallback"] = "phone_after_tracker_stale"
+        logger.info(
+            "Phone GPS fallback (Teltonika stale) — plate=%s IMEI=%s tenant=%s",
+            payload.get("vehicle_code"),
+            tracker.get("imei"),
+            tenant_id,
+        )
+
     preferred_title = (
         body.get("trip_title")
         or body.get("tripTitle")
