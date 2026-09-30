@@ -217,3 +217,5 @@ echo "=== recent api logs (teltonika/codec/imei) ==="
 
 echo
 echo "=== done ==="
+
+# diagnose bump 20260930T113843Z
