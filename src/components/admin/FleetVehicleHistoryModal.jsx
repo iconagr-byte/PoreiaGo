@@ -7,6 +7,7 @@ import {
 } from '../../lib/admin/fleetVehicleDetails.js';
 import {
   formatFleetGpsSourceBadge,
+  formatFleetGpsSourceChipLabel,
   resolveFleetGpsSource,
 } from '../../lib/admin/fleetGpsSourceBadge.js';
 import { resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
@@ -42,7 +43,7 @@ function formatCoords(lat, lng) {
 
 function sourceLabel(source) {
   const kind = resolveFleetGpsSource({ source });
-  if (kind === 'teltonika') return 'Teltonika';
+  if (kind === 'teltonika') return formatFleetGpsSourceChipLabel('teltonika');
   if (kind === 'app') return 'App οδηγού';
   if (source) return String(source);
   return 'GPS';
