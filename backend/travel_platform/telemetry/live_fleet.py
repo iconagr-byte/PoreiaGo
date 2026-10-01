@@ -29,16 +29,20 @@ class LiveFleetService:
         vehicle_code: str,
         trip_id: int | None = None,
     ) -> UUID:
-        from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+        from travel_platform.telemetry.tracker_priority import (
+            normalize_vehicle_plate,
+            plate_display,
+        )
 
         code = normalize_vehicle_plate(vehicle_code) or "UNKNOWN"
+        display = plate_display(vehicle_code) or code
         key = f"{tenant_id}:{code}"
         existing = self._code_index.get(key)
         if existing and existing in self._vehicles:
             meta = self._vehicles[existing]
             meta["tenant_id"] = str(tenant_id)
-            meta["vehicle_code"] = code
-            meta["bus_plate"] = meta.get("bus_plate") or code
+            meta["vehicle_code"] = display
+            meta["bus_plate"] = meta.get("bus_plate") or display
             if trip_id is not None:
                 meta["trip_id"] = trip_id
             return UUID(existing)
@@ -51,8 +55,8 @@ class LiveFleetService:
             plate = normalize_vehicle_plate(meta.get("vehicle_code") or meta.get("bus_plate"))
             if plate == code:
                 self._code_index[key] = candidate
-                meta["vehicle_code"] = code
-                meta["bus_plate"] = meta.get("bus_plate") or code
+                meta["vehicle_code"] = display
+                meta["bus_plate"] = meta.get("bus_plate") or display
                 if trip_id is not None:
                     meta["trip_id"] = trip_id
                 return UUID(candidate)
@@ -62,9 +66,9 @@ class LiveFleetService:
         self._vehicles[vid] = {
             "vehicle_id": vid,
             "tenant_id": tid,
-            "vehicle_code": code,
+            "vehicle_code": display,
             "trip_id": trip_id,
-            "bus_plate": code,
+            "bus_plate": display,
         }
         return UUID(vid)
 
@@ -131,16 +135,23 @@ class LiveFleetService:
 
             merged["trip_title"] = resolve_trip_title_sync(update.trip_id)
 
-        from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+        from travel_platform.telemetry.tracker_priority import (
+            normalize_vehicle_plate,
+            plate_display,
+        )
 
-        plate = normalize_vehicle_plate(update.vehicle_code or merged.get("bus_plate"))
-        if plate:
-            merged["vehicle_code"] = plate
-            merged["bus_plate"] = normalize_vehicle_plate(merged.get("bus_plate")) or plate
+        plate_key = normalize_vehicle_plate(update.vehicle_code or merged.get("bus_plate"))
+        display = plate_display(
+            raw.get("bus_plate") or update.vehicle_code or merged.get("bus_plate")
+        )
+        if plate_key:
+            # Keep hyphens in the label; aggressive key is only for the index/dedupe.
+            merged["vehicle_code"] = display or plate_key
+            merged["bus_plate"] = display or plate_key
         self._vehicles[vid] = merged
         # Keep code index in sync (normalized plate — one pin per bus).
-        if plate:
-            self._code_index[f"{update.tenant_id}:{plate}"] = vid
+        if plate_key:
+            self._code_index[f"{update.tenant_id}:{plate_key}"] = vid
 
         tenant = str(update.tenant_id)
         self._heat_points[tenant].append((update.latitude, update.longitude))

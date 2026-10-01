@@ -79,8 +79,13 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         self.assertEqual(tracker.get("imei"), "861076085468260")
 
     def test_normalize_folds_greek_lookalike_plate(self):
+        from travel_platform.telemetry.tracker_priority import plate_display
+
         self.assertEqual(normalize_vehicle_plate("ΕΕΧ-5670"), "EEX5670")
         self.assertEqual(normalize_vehicle_plate("eex 5670"), "EEX5670")
+        # Display keeps hyphens; match key strips them.
+        self.assertEqual(plate_display("trip-1"), "TRIP-1")
+        self.assertEqual(normalize_vehicle_plate("TRIP-1"), "TRIP1")
 
     def test_prefer_teltonika_from_redis_when_memory_empty(self):
         """Multi-worker: phone ingest must soft-ack via Redis Teltonika pin."""

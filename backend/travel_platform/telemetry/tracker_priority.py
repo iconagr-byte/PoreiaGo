@@ -43,9 +43,14 @@ _GREEK_PLATE_FOLD = str.maketrans(
 )
 
 
+def plate_display(value: Any) -> str:
+    """Human-facing plate label — keep hyphens, drop only outer whitespace."""
+    return str(value or "").strip().upper()
+
+
 def normalize_vehicle_plate(value: Any) -> str:
-    """Stable plate key: uppercase, strip separators, fold Greek lookalikes."""
-    raw = str(value or "").strip().upper().translate(_GREEK_PLATE_FOLD)
+    """Stable match key: uppercase, strip separators, fold Greek lookalikes."""
+    raw = plate_display(value).translate(_GREEK_PLATE_FOLD)
     return "".join(ch for ch in raw if ch.isalnum())
 
 
