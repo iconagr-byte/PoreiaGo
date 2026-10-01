@@ -143,7 +143,7 @@ export default function TeltonikaDevicesPanel() {
   const [devices, setDevices] = useState([]);
   const [liveFleet, setLiveFleet] = useState([]);
   const [fleetVehicles, setFleetVehicles] = useState([]);
-  /** Pins shown only after explicit test (Δοκιμαστικό pin / Η θέση μου). */
+  /** Extra pins from Δοκιμαστικό pin / Η θέση μου (override live last-fix). */
   const [testPins, setTestPins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -196,7 +196,6 @@ export default function TeltonikaDevicesPanel() {
   }, []);
 
   useEffect(() => {
-    // Always start with an empty test map — pins only after explicit test action.
     setTestPins([]);
     load();
     const t = setInterval(load, 10000);
@@ -220,8 +219,6 @@ export default function TeltonikaDevicesPanel() {
     }
     return map;
   }, [fleetVehicles]);
-
-  const mapPins = testPins;
 
   const buildTestPin = useCallback(
     (device, lat, lng, { online = true } = {}) => {
@@ -254,6 +251,32 @@ export default function TeltonikaDevicesPanel() {
     },
     [fleetByPlate, liveFleet],
   );
+
+  /** Live last-fix pins from the device store + any explicit test pins. */
+  const liveDevicePins = useMemo(() => {
+    return devices
+      .filter(
+        (d) =>
+          d?.enabled !== false &&
+          d?.last_lat != null &&
+          d?.last_lng != null &&
+          Number.isFinite(Number(d.last_lat)) &&
+          Number.isFinite(Number(d.last_lng)),
+      )
+      .map((d) =>
+        buildTestPin(d, d.last_lat, d.last_lng, {
+          online: deviceSignalFresh(d),
+        }),
+      );
+  }, [devices, buildTestPin]);
+
+  const mapPins = useMemo(() => {
+    const byId = new Map();
+    for (const pin of liveDevicePins) byId.set(pin.id, pin);
+    // Explicit test / «Η θέση μου» pins win over store last-fix.
+    for (const pin of testPins) byId.set(pin.id, pin);
+    return Array.from(byId.values());
+  }, [liveDevicePins, testPins]);
 
   const selected = devices.find((d) => d.id === selectedId) || null;
 
@@ -398,7 +421,7 @@ export default function TeltonikaDevicesPanel() {
           <div>
             <h3 className="font-bold text-lg text-slate-900">Χάρτης συσκευών GPS</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Το pin εμφανίζεται μόνο όταν το ζητήσεις: Δοκιμαστικό pin ή Η θέση μου.
+              Ζωντανή τελευταία θέση από το tracker · δοκιμαστικό pin / Η θέση μου από πάνω.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -487,8 +510,8 @@ export default function TeltonikaDevicesPanel() {
         <div>
           <h3 className="font-bold text-lg text-slate-900">Μενού τεστ GPS</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Μόνο εδώ εμφανίζεται pin δοκιμής — όχι αυτόματα από last fix. Ζωντανός χάρτης ανοίγει
-            μόνο αν το πατήσεις.
+            Ο χάρτης πάνω δείχνει την τελευταία θέση του tracker. Δοκιμαστικό pin / Η θέση μου
+            αντικαθιστούν προσωρινά. Ζωντανός χάρτης στόλου → κουμπί δεξιά.
           </p>
         </div>
 

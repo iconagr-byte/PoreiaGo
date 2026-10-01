@@ -12,23 +12,39 @@ so an open Teltonika always appears on the admin map.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
+from travel_platform.telemetry.teltonika.paint_live import paint_live_pin_from_device
 from travel_platform.telemetry.tracker_priority import (
-    is_teltonika_preferred_for_plate,
+    age_seconds,
+    is_live_meta_tracker_fresh,
     is_tracker_binding_alive,
     resolve_tracker_alive_seconds,
 )
 
 logger = logging.getLogger(__name__)
 
-# Avoid hammering process_telemetry on every live poll.
+# Avoid hammering process_telemetry on every 1s live poll — still often enough
+# that list_active (90s stale) never drops an online tracker pin.
 _last_hydrate_at: dict[str, float] = {}
-_MIN_INTERVAL_SEC = 8.0
+_MIN_INTERVAL_SEC = 2.0
 # Parked buses may send AVL rarely — keep last known hardware pin longer
 # when the map is otherwise empty.
 _HYDRATE_MAX_AGE_SEC = 6 * 60 * 60
+# Re-stamp an already-preferred pin before list_active drops it.
+_REFRESH_BEFORE_STALE_SEC = 45.0
+
+
+def _pin_needs_refresh(meta: dict[str, Any] | None, *, alive_sec: int) -> bool:
+    """True when there is no fresh live pin, or updated_at is aging out."""
+    if not meta:
+        return True
+    if not is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec):
+        return True
+    age = age_seconds(meta.get("updated_at") or meta.get("timestamp"))
+    if age is None:
+        return True
+    return age >= _REFRESH_BEFORE_STALE_SEC
 
 
 async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
@@ -50,7 +66,6 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
     _last_hydrate_at[tid] = now_m
 
     try:
-        from travel_platform.telemetry.processor import process_telemetry_payload
         from travel_platform.telemetry.teltonika.device_store import list_devices
     except Exception:
         logger.debug("teltonika hydrate imports failed", exc_info=True)
@@ -75,62 +90,33 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
         if not plate:
             continue
 
-        # Already have a fresh Teltonika pin on the live fleet.
-        prefer, _ = is_teltonika_preferred_for_plate(tid, plate, max_age_sec=alive_sec)
-        if prefer:
-            continue
-
         device_online = is_tracker_binding_alive(device, max_age_sec=alive_sec)
-        existing_vid = None
+        existing_meta: dict[str, Any] = {}
         if fleet is not None:
             existing_vid = fleet.find_vehicle_id(tid, plate)
-            existing_meta = fleet._vehicles.get(existing_vid or "", {}) if existing_vid else {}  # noqa: SLF001
-        else:
-            existing_meta = {}
+            if existing_vid:
+                existing_meta = fleet._vehicles.get(existing_vid, {}) or {}  # noqa: SLF001
 
-        if existing_vid and existing_meta:
-            # Pin already on map — only take over when the tracker is truly open.
+        if existing_meta:
+            # Pin already on map — refresh online trackers; leave parked App alone.
             if not device_online:
                 continue
+            if not _pin_needs_refresh(existing_meta, alive_sec=alive_sec):
+                continue
         else:
-            # Empty map — allow longer parked hydrate window.
-            if not is_tracker_binding_alive(device, max_age_sec=_HYDRATE_MAX_AGE_SEC):
+            # Empty map — online always; parked within long hydrate window.
+            if device_online:
+                pass
+            elif not is_tracker_binding_alive(device, max_age_sec=_HYDRATE_MAX_AGE_SEC):
                 continue
 
-        recorded = datetime.now(timezone.utc).isoformat()
-        signal_at = str(device.get("last_seen_at") or recorded)
-        # Online TCP session → open channel. Parked store-only → parked hydrate.
-        payload: dict[str, Any] = {
-            "tenant_id": tid,
-            "vehicle_code": plate,
-            "latitude": float(device["last_lat"]),
-            "longitude": float(device["last_lng"]),
-            "speed_kmh": float(device.get("last_speed_kmh") or 0),
-            "engine_status": "on" if device_online else "off",
-            "heading_deg": 0.0,
-            "bus_plate": plate,
-            "driver_name": str(device.get("label") or f"GPS {plate}"),
-            "driver_id": device.get("driver_id") or None,
-            "imei": device.get("imei"),
-            "source": "teltonika",
-            "recorded_at": recorded,
-            "tracker_signal_at": signal_at if device_online else signal_at,
-            "hydrated_from_store": not device_online,
-        }
-        if device_online:
-            # Open tracker: treat last_seen as a live signal for badges/soft-ack.
-            payload["tracker_signal_at"] = signal_at
-            payload["hydrated_from_store"] = False
-        try:
-            await process_telemetry_payload(payload)
+        ok = await paint_live_pin_from_device(
+            device,
+            open_channel=device_online,
+            reason="hydrate",
+        )
+        if ok:
             written += 1
-        except Exception:
-            logger.warning(
-                "teltonika hydrate failed tenant=%s plate=%s",
-                tid,
-                plate,
-                exc_info=True,
-            )
     if written:
         logger.info("teltonika hydrate wrote %s live pin(s) tenant=%s", written, tid)
     return written

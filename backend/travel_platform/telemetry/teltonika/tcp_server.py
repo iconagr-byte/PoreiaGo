@@ -126,6 +126,25 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                 device.get("tenant_id"),
                 peer,
             )
+            # Device is online now — paint last known fix immediately so the
+            # admin live map does not wait for the next AVL GPS record.
+            try:
+                from travel_platform.telemetry.teltonika.paint_live import (
+                    paint_live_pin_from_device,
+                )
+
+                fresh = get_device_by_imei(imei) or device
+                await paint_live_pin_from_device(
+                    fresh,
+                    open_channel=True,
+                    reason="imei_accept",
+                )
+            except Exception:
+                logger.debug(
+                    "Teltonika IMEI pin paint skipped IMEI=%s",
+                    imei,
+                    exc_info=True,
+                )
 
         device = get_device_by_imei(imei) or {}
         # Phase 2: AVL packets
@@ -166,44 +185,23 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     # Valid AVL (e.g. no GPS yet) — still mark seen. If we already
                     # have a last fix, keep the live pin alive at that position.
                     touch_device(imei)
-                    if (
-                        device.get("last_lat") is not None
-                        and device.get("last_lng") is not None
-                    ):
-                        try:
-                            tenant_id = UUID(str(device["tenant_id"]))
-                            received_at = datetime.now(timezone.utc).isoformat()
-                            vehicle_code = str(device.get("vehicle_code") or imei)
-                            await process_telemetry_payload(
-                                {
-                                    "tenant_id": str(tenant_id),
-                                    "vehicle_code": vehicle_code,
-                                    "latitude": float(device["last_lat"]),
-                                    "longitude": float(device["last_lng"]),
-                                    "speed_kmh": float(device.get("last_speed_kmh") or 0),
-                                    "engine_status": "on",
-                                    "recorded_at": received_at,
-                                    "tracker_signal_at": received_at,
-                                    "heading_deg": 0.0,
-                                    "source": "teltonika",
-                                    "imei": imei,
-                                    "bus_plate": vehicle_code,
-                                    "driver_name": str(
-                                        device.get("label") or vehicle_code
-                                    ),
-                                    "driver_id": (
-                                        str(device["driver_id"])
-                                        if device.get("driver_id")
-                                        else None
-                                    ),
-                                }
-                            )
-                        except Exception:
-                            logger.debug(
-                                "Teltonika keepalive pin failed IMEI=%s",
-                                imei,
-                                exc_info=True,
-                            )
+                    try:
+                        from travel_platform.telemetry.teltonika.paint_live import (
+                            paint_live_pin_from_device,
+                        )
+
+                        fresh = get_device_by_imei(imei) or device
+                        await paint_live_pin_from_device(
+                            fresh,
+                            open_channel=True,
+                            reason="avl_keepalive",
+                        )
+                    except Exception:
+                        logger.debug(
+                            "Teltonika keepalive pin failed IMEI=%s",
+                            imei,
+                            exc_info=True,
+                        )
                     continue
                 try:
                     tenant_id = UUID(str(device["tenant_id"]))

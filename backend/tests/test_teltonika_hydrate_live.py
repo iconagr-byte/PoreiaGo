@@ -44,7 +44,7 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
 
     def test_hydrates_when_live_fleet_empty(self):
         with patch(
-            "travel_platform.telemetry.processor.process_telemetry_payload",
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
             new_callable=AsyncMock,
         ) as process:
             n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
@@ -72,13 +72,37 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
             "tracker_signal_at": datetime.now(timezone.utc).isoformat(),
         }
         with patch(
-            "travel_platform.telemetry.processor.process_telemetry_payload",
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
             new_callable=AsyncMock,
         ) as process:
             n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
 
         self.assertEqual(n, 0)
         process.assert_not_awaited()
+
+    def test_refreshes_aging_online_pin(self):
+        """Online device must re-stamp before list_active drops the pin (90s)."""
+        vid = "veh-1"
+        aged = (datetime.now(timezone.utc) - timedelta(seconds=50)).isoformat()
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "lat": 38.25,
+            "lng": 20.65,
+            "source": "teltonika",
+            "updated_at": aged,
+            "tracker_signal_at": aged,
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
+        self.assertEqual(n, 1)
+        process.assert_awaited()
 
     def test_online_tracker_takes_over_app_pin(self):
         """Open Teltonika must appear on the map even when App GPS is already there."""
@@ -94,7 +118,7 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         with patch(
-            "travel_platform.telemetry.processor.process_telemetry_payload",
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
             new_callable=AsyncMock,
         ) as process:
             n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
@@ -129,7 +153,7 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         with patch(
-            "travel_platform.telemetry.processor.process_telemetry_payload",
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
             new_callable=AsyncMock,
         ) as process:
             n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))

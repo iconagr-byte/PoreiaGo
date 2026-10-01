@@ -191,12 +191,24 @@ async def main():
     print("memory_vehicle_count=", len(vehicles))
     for tid in ach_ids:
         try:
+            from travel_platform.telemetry.teltonika.hydrate_live import (
+                hydrate_tenant_live_from_devices,
+            )
+            from travel_platform.telemetry.teltonika import hydrate_live as hl
+
+            hl._last_hydrate_at.clear()
+            n = await hydrate_tenant_live_from_devices(tid)
+            print("achillio_hydrate_wrote=", n, "tenant=", tid)
+        except Exception as exc:
+            print("achillio_hydrate_error", tid, exc)
+        try:
             rows = await live.list_active_for_admin_async(UUID(tid))
         except Exception as exc:
             print("achillio_live_list_error", tid, exc)
             continue
         print("achillio_live_active=", len(rows), "tenant=", tid)
         for r in rows[:20]:
+            meta = live._vehicles.get(str(getattr(r, "vehicle_id", "")), {}) or {}
             print(
                 "ACHILLIO_LIVE",
                 getattr(r, "vehicle_id", None),
@@ -204,7 +216,30 @@ async def main():
                 getattr(r, "lat", None),
                 getattr(r, "lng", None),
                 getattr(r, "updated_at", None),
+                "source=", meta.get("source"),
+                "imei=", meta.get("imei"),
+                "tracker_signal_at=", meta.get("tracker_signal_at"),
+                "hydrated=", meta.get("hydrated_from_store"),
             )
+        try:
+            from travel_platform.telemetry.live_fleet_redis import load_live_vehicles
+            from travel_platform.telemetry.office_fleet_filter import office_allows_live_driver
+
+            remote = await load_live_vehicles(tid)
+            print("achillio_redis_live=", len(remote or []), "tenant=", tid)
+            for meta in (remote or [])[:20]:
+                allowed = office_allows_live_driver(tid, meta.get("driver_id"), meta)
+                print(
+                    "ACHILLIO_REDIS",
+                    meta.get("vehicle_code"),
+                    meta.get("source"),
+                    meta.get("lat"),
+                    meta.get("lng"),
+                    "allowed=", allowed,
+                    "updated_at=", meta.get("updated_at"),
+                )
+        except Exception as exc:
+            print("achillio_redis_error", tid, exc)
 
 asyncio.run(main())
 PY
@@ -218,4 +253,4 @@ echo "=== recent api logs (teltonika/codec/imei) ==="
 echo
 echo "=== done ==="
 
-# diagnose bump 20260930T113843Z
+# diagnose bump 20261001T081500Z
