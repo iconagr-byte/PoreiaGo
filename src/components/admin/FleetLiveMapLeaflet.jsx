@@ -30,6 +30,7 @@ import FleetMapFlyTo from './FleetMapFlyTo.jsx';
 import FleetLiveTrailsLeaflet from './FleetLiveTrailsLeaflet.jsx';
 import GreecePlacesLeafletLayer from './GreecePlacesLeafletLayer.jsx';
 import { APPLE_LEAFLET_TILES } from '../../lib/maps/appleMapTheme.js';
+import { resolveFleetFitMaxZoom, resolveFleetFitPadding } from '../../lib/admin/fleetMapFit.js';
 
 function escapeAttr(value) {
   return String(value || '')
@@ -157,15 +158,20 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
   ));
 }
 
-/** Fit only when the vehicle *set* changes or when parent requests recenter — never on GPS ticks. */
+/** Fit when the active pin *set* changes (or recenter) — zoom by pin count, never on GPS ticks. */
 function FitBounds({ vehicles, fitNonce = 0 }) {
   const map = useMap();
   const fittedIdsRef = useRef('');
   const userMovedRef = useRef(false);
+  const programmaticRef = useRef(false);
   const lastNonceRef = useRef(fitNonce);
 
   useEffect(() => {
     const markMoved = () => {
+      if (programmaticRef.current) {
+        programmaticRef.current = false;
+        return;
+      }
       userMovedRef.current = true;
     };
     map.on('dragstart', markMoved);
@@ -178,7 +184,11 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
 
   useEffect(() => {
     if (!vehicles?.length) return;
-    const ids = vehicles
+    const pts = vehicles.filter(
+      (v) => Number.isFinite(Number(v.lat)) && Number.isFinite(Number(v.lng)),
+    );
+    if (!pts.length) return;
+    const ids = pts
       .map((v) => v.id || v.vehicle_id || `${v.lat},${v.lng}`)
       .sort()
       .join('|');
@@ -192,8 +202,16 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
       return;
     }
     fittedIdsRef.current = ids;
-    const bounds = L.latLngBounds(vehicles.map((v) => [v.lat, v.lng]));
-    map.fitBounds(bounds, { padding: [64, 64], maxZoom: 13, animate: true });
+    const count = pts.length;
+    const maxZoom = resolveFleetFitMaxZoom(count);
+    const pad = resolveFleetFitPadding(count);
+    programmaticRef.current = true;
+    if (count === 1) {
+      map.setView([pts[0].lat, pts[0].lng], maxZoom, { animate: true });
+      return;
+    }
+    const bounds = L.latLngBounds(pts.map((v) => [v.lat, v.lng]));
+    map.fitBounds(bounds, { padding: [pad, pad], maxZoom, animate: true });
   }, [vehicles, map, fitNonce]);
 
   return null;

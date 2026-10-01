@@ -30,6 +30,7 @@ import {
   resolveFleetGpsSources,
 } from '../../lib/admin/fleetGpsSourceBadge.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
+import { resolveFleetFitMaxZoom, resolveFleetFitPadding } from '../../lib/admin/fleetMapFit.js';
 
 function HeatmapDots({ points = [], visible = true }) {
   if (!visible || !points.length) return null;
@@ -169,12 +170,17 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
   const map = useMap();
   const fittedIdsRef = useRef('');
   const userMovedRef = useRef(false);
+  const programmaticRef = useRef(false);
   const lastNonceRef = useRef(fitNonce);
 
   useEffect(() => {
     const mapInstance = map?.getMap?.() || map;
     if (!mapInstance?.on) return undefined;
     const markMoved = () => {
+      if (programmaticRef.current) {
+        programmaticRef.current = false;
+        return;
+      }
       userMovedRef.current = true;
     };
     mapInstance.on('dragstart', markMoved);
@@ -188,7 +194,11 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
   useEffect(() => {
     const mapInstance = map?.getMap?.() || map;
     if (!mapInstance || !vehicles?.length) return;
-    const ids = vehicles
+    const pts = vehicles.filter(
+      (v) => Number.isFinite(Number(v.lng)) && Number.isFinite(Number(v.lat)),
+    );
+    if (!pts.length) return;
+    const ids = pts
       .map((v) => v.id || v.vehicle_id || `${v.lat},${v.lng}`)
       .sort()
       .join('|');
@@ -202,14 +212,23 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
       return;
     }
     fittedIdsRef.current = ids;
+    const count = pts.length;
+    const maxZoom = resolveFleetFitMaxZoom(count);
+    const pad = resolveFleetFitPadding(count);
+    const duration = force ? 700 : 500;
+    programmaticRef.current = true;
+    if (count === 1) {
+      mapInstance.flyTo({
+        center: [pts[0].lng, pts[0].lat],
+        zoom: maxZoom,
+        duration,
+      });
+      return;
+    }
     const bounds = new LngLatBounds();
-    vehicles.forEach((v) => {
-      if (Number.isFinite(v.lng) && Number.isFinite(v.lat)) {
-        bounds.extend([v.lng, v.lat]);
-      }
-    });
+    pts.forEach((v) => bounds.extend([v.lng, v.lat]));
     if (bounds.isEmpty()) return;
-    mapInstance.fitBounds(bounds, { padding: 64, maxZoom: 13, duration: force ? 600 : 0 });
+    mapInstance.fitBounds(bounds, { padding: pad, maxZoom, duration });
   }, [vehicles, map, fitNonce]);
 
   return null;
@@ -234,10 +253,14 @@ export default function FleetLiveMapMapbox({
 }) {
   const initialViewState = useMemo(() => {
     if (vehicles.length) {
-      return { longitude: vehicles[0].lng, latitude: vehicles[0].lat, zoom: 10 };
+      return {
+        longitude: vehicles[0].lng,
+        latitude: vehicles[0].lat,
+        zoom: resolveFleetFitMaxZoom(vehicles.length),
+      };
     }
     if (sosAlerts.length) {
-      return { longitude: sosAlerts[0].lng, latitude: sosAlerts[0].lat, zoom: 12 };
+      return { longitude: sosAlerts[0].lng, latitude: sosAlerts[0].lat, zoom: 14 };
     }
     return { longitude: 23.0, latitude: 38.5, zoom: 6.4 };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initial only
