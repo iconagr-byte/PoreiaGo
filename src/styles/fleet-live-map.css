@@ -327,7 +327,7 @@
 }
 
 .fleet-apple-bus-gps-source {
-  max-width: 140px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
