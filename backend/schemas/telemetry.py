@@ -54,6 +54,9 @@ class LiveVehicleResponse(BaseModel):
     # Live GPS provenance for the map badge (driver_pwa | teltonika | …).
     source: str | None = None
     imei: str | None = None
+    # Active channels for the dual badge (e.g. ["teltonika", "app"]).
+    gps_sources: list[str] = Field(default_factory=list)
+    app_seen_at: str | None = None
 
 
 class HeatmapPoint(BaseModel):

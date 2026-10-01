@@ -389,6 +389,18 @@ async def admin_fleet_egress_ws(
         trip_title = await resolve_trip_title(
             trip_id, preferred=trip_title_hint or meta.get("trip_title")
         )
+        try:
+            from travel_platform.telemetry.tracker_priority import (
+                resolve_live_gps_sources,
+                resolve_tracker_alive_seconds,
+            )
+
+            gps_sources = resolve_live_gps_sources(
+                meta,
+                max_age_sec=resolve_tracker_alive_seconds(tid),
+            )
+        except Exception:
+            gps_sources = []
         snapshot.append(
             {
                 "type": "fleet_snapshot",
@@ -405,6 +417,10 @@ async def admin_fleet_egress_ws(
                 "speed": vehicle.speed_kmh,
                 "heading": meta.get("heading_deg"),
                 "timestamp": vehicle.updated_at.isoformat(),
+                "source": meta.get("source"),
+                "imei": meta.get("imei"),
+                "gps_sources": gps_sources,
+                "app_seen_at": meta.get("app_seen_at"),
             },
         )
     await websocket.send_text(json.dumps({"type": "fleet_snapshot", "vehicles": snapshot}))

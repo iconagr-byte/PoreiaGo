@@ -25,8 +25,9 @@ import {
   resolveVehicleTripTitle,
 } from '../../lib/admin/fleetBusPillLabel.js';
 import {
-  fleetGpsSourceToneClass,
   formatFleetGpsSourceBadge,
+  formatFleetGpsSourceChipLabel,
+  resolveFleetGpsSources,
 } from '../../lib/admin/fleetGpsSourceBadge.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 
@@ -56,8 +57,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
   const pillLabel = formatFleetBusPillLabel(vehicle);
   const tripTitle = resolveVehicleTripTitle(vehicle);
   const excursion = formatFleetExcursionBadge(vehicle);
-  const gpsSource = formatFleetGpsSourceBadge(vehicle);
-  const gpsTone = fleetGpsSourceToneClass(vehicle);
+  const gpsSources = resolveFleetGpsSources(vehicle);
   const openHistory = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -72,8 +72,19 @@ function BusMarker({ vehicle, onVehicleHistory }) {
         onDoubleClick={openHistory}
       >
         <div className="fleet-apple-bus-pin">
-          {gpsSource ? (
-            <div className={`fleet-apple-bus-gps-source ${gpsTone}`}>{gpsSource}</div>
+          {gpsSources.length ? (
+            <div
+              className={`fleet-apple-bus-gps-sources${gpsSources.length > 1 ? ' is-dual' : ''}`}
+            >
+              {gpsSources.map((kind) => (
+                <span
+                  key={kind}
+                  className={`fleet-apple-bus-gps-source fleet-apple-bus-gps-source--${kind}`}
+                >
+                  {formatFleetGpsSourceChipLabel(kind)}
+                </span>
+              ))}
+            </div>
           ) : null}
           {excursion ? <div className="fleet-apple-bus-excursion">{excursion}</div> : null}
           <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
@@ -118,7 +129,10 @@ function BusMarker({ vehicle, onVehicleHistory }) {
               </div>
             </div>
             <div>Ταχύτητα: {Math.round(vehicle.speed || 0)} km/h</div>
-            <div>Πηγή GPS: {formatFleetGpsSourceBadge(vehicle) || '—'}</div>
+            <div>
+              Πηγή GPS: {formatFleetGpsSourceBadge(vehicle) || '—'}
+              {gpsSources.length > 1 ? ' (και τα δύο ενεργά)' : ''}
+            </div>
             <div>Δρομολόγιο #{vehicle.trip_id ?? '—'}</div>
             <div>Ενημέρωση: {formatUpdatedAgo(vehicle.timestamp) || '—'}</div>
             {formatBoardingLabel(vehicle) ? <div>Επιβιβασμένοι: {formatBoardingLabel(vehicle)}</div> : null}

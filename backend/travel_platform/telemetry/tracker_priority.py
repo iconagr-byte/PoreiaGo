@@ -49,6 +49,41 @@ def is_phone_source(source: Any) -> bool:
     )
 
 
+def resolve_live_gps_sources(
+    meta: dict[str, Any] | None,
+    *,
+    max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
+    now: datetime | None = None,
+) -> list[str]:
+    """
+    Active GPS channels for one live pin (dual badge on the map).
+
+    Stable order: ``teltonika`` then ``app`` — only channels with a fresh signal.
+    """
+    meta = meta or {}
+    now = now or datetime.now(timezone.utc)
+    alive = max(1, int(max_age_sec))
+    out: list[str] = []
+
+    pin_age = age_seconds(meta.get("updated_at") or meta.get("timestamp"), now=now)
+    if is_live_meta_tracker_fresh(meta, max_age_sec=alive, now=now):
+        out.append("teltonika")
+    elif (
+        (is_tracker_source(meta.get("source")) or (meta.get("imei") and not is_phone_source(meta.get("source"))))
+        and pin_age is not None
+        and pin_age <= alive
+    ):
+        out.append("teltonika")
+
+    app_age = age_seconds(meta.get("app_seen_at"), now=now)
+    if app_age is not None and app_age <= alive:
+        out.append("app")
+    elif is_phone_source(meta.get("source")) and pin_age is not None and pin_age <= alive:
+        out.append("app")
+
+    return out
+
+
 def _parse_ts(value: Any) -> datetime | None:
     if value is None:
         return None
