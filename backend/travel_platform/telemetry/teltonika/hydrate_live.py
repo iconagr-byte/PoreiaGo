@@ -20,7 +20,7 @@ from travel_platform.telemetry.tracker_priority import (
 
 logger = logging.getLogger(__name__)
 
-# Avoid hammering process_telemetry on every 5s poll.
+# Avoid hammering process_telemetry on every live poll.
 _last_hydrate_at: dict[str, float] = {}
 _MIN_INTERVAL_SEC = 15.0
 # Parked buses may send AVL rarely — keep last known hardware pin longer.

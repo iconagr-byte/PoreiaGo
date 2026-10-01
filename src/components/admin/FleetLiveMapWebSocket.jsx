@@ -94,7 +94,7 @@ export default function FleetLiveMapWebSocket() {
             {mapVehicles.length} ενεργά · {connected ? 'ζωντανά' : 'εκτός'}
             {rentalLiveCount ? ` · ${rentalLiveCount} ενοικιάσεις` : ''}
             {transport === 'poll'
-              ? ` · ενημέρωση ${Math.max(1, Math.round((pollIntervalMs || 5000) / 1000))}s`
+              ? ` · ενημέρωση ${Math.max(1, Math.round((pollIntervalMs || 1000) / 1000))}s`
               : ''}
           </p>
         </div>

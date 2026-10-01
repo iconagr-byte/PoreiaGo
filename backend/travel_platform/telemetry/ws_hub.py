@@ -17,7 +17,7 @@ from travel_platform.telemetry.eta_serializers import snapshot_to_payload
 
 logger = logging.getLogger(__name__)
 
-ETA_PUSH_INTERVAL_SEC = 5
+ETA_PUSH_INTERVAL_SEC = 1
 
 
 class EtaWsHub:

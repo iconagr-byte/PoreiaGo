@@ -114,9 +114,9 @@ export default function TelemetrySettingsPanel() {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-start gap-3">
           <span className="material-symbols-outlined text-slate-500 text-[22px]">lock</span>
           <div>
-            <div className="text-sm font-bold text-slate-900">Live refresh κλειδωμένο στα 5 δευτ.</div>
+            <div className="text-sm font-bold text-slate-900">Live refresh κλειδωμένο στο 1 δευτ.</div>
             <p className="text-xs text-slate-500 mt-0.5">
-              ETA, χάρτης στόλου και live panels ανανεώνονται κάθε 5 δευτερόλεπτα σε όλη την πλατφόρμα.
+              GPS οδηγού, χάρτης στόλου, ETA και live panels ανανεώνονται κάθε 1 δευτερόλεπτο σε όλη την πλατφόρμα.
             </p>
           </div>
         </div>

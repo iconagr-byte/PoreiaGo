@@ -38,10 +38,10 @@ class PlatformSettings(BaseSettings):
     geofence_radius_m: int = 50
     corridor_buffer_m: int = 75
     gforce_spike_threshold_g: float = 0.45
-    eta_refresh_seconds: int = 5
+    eta_refresh_seconds: int = 1
     driver_stale_seconds: int = 90
     gps_retention_days: int = 90
-    driver_gps_max_per_minute: int = 60
+    driver_gps_max_per_minute: int = 120
     fleet_webhook_enabled: bool = True
     fleet_webhook_min_interval_sec: int = 30
     fleet_digest_enabled: bool = True

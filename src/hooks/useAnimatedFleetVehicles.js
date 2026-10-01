@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 
-const DEFAULT_ANIM_MS = 3500;
+/** Keep pin motion snappy for 1s GPS cadence. */
+const DEFAULT_ANIM_MS = 900;
 
 /**
  * Ομαλή μετάβαση δεικτών στόλου (ease-out quad) μεταξύ GPS pings.

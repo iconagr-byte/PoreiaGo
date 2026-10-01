@@ -11,7 +11,7 @@ from typing import Any
 from core.config import get_platform_settings
 
 # Live ETA / WS / fleet push — locked platform-wide (not tenant-configurable).
-LOCKED_LIVE_REFRESH_SECONDS = 5
+LOCKED_LIVE_REFRESH_SECONDS = 1
 
 
 @dataclass
@@ -25,11 +25,12 @@ class TelemetryRuntimeSettings:
     fuel_price_eur_per_liter: float = 1.85
     gforce_spike_threshold_g: float = 0.45
     prefer_tracker_events: bool = True
-    eta_refresh_seconds: int = 5
-    eta_ws_push_seconds: int = 5
+    eta_refresh_seconds: int = 1
+    eta_ws_push_seconds: int = 1
     driver_stale_seconds: int = 90
     gps_retention_days: int = 90
-    driver_gps_max_per_minute: int = 60
+    # 1 Hz GPS needs ≥60; headroom for retries / dual transport.
+    driver_gps_max_per_minute: int = 120
     fleet_webhook_enabled: bool = True
     fleet_webhook_min_interval_sec: int = 30
     fleet_digest_enabled: bool = True
@@ -54,7 +55,7 @@ def _defaults() -> TelemetryRuntimeSettings:
         eta_refresh_seconds=s.eta_refresh_seconds,
         driver_stale_seconds=getattr(s, "driver_stale_seconds", 90),
         gps_retention_days=getattr(s, "gps_retention_days", 90),
-        driver_gps_max_per_minute=getattr(s, "driver_gps_max_per_minute", 60),
+        driver_gps_max_per_minute=getattr(s, "driver_gps_max_per_minute", 120),
         fleet_webhook_enabled=getattr(s, "fleet_webhook_enabled", True),
         fleet_webhook_min_interval_sec=getattr(s, "fleet_webhook_min_interval_sec", 30),
         fleet_digest_enabled=getattr(s, "fleet_digest_enabled", True),
