@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { loadVehicleTripHistory } from '../../lib/admin/fleetVehicleHistory.js';
 import {
@@ -155,9 +156,10 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
   const img = resolveFleetMarkerImage(vehicle);
   const plate = vehicle.bus_plate || vehicle.vehicle_code || '—';
 
-  return (
+  // Portal to body: AdminLayout overflow/transform otherwise clips the card top.
+  return createPortal(
     <div
-      className="fleet-history-modal fixed inset-0 z-[1200] flex items-end sm:items-center justify-center p-2 sm:p-6"
+      className="fleet-history-modal fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Ιστορικό διαδρομής"
@@ -168,13 +170,13 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
         aria-label="Κλείσιμο"
         onClick={onClose}
       />
-      <div className="relative z-[1] flex max-h-[min(94vh,880px)] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-white/40 bg-[#f5f7fb] shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
-        <header className="fleet-history-modal__hero relative overflow-hidden px-5 pt-5 pb-4 text-white">
+      <div className="relative z-[1] flex h-auto max-h-[min(92dvh,880px)] w-full max-w-3xl min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/40 bg-[#f5f7fb] shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
+        <header className="fleet-history-modal__hero relative shrink-0 overflow-hidden px-5 pt-5 pb-4 text-white">
           <div className="relative flex items-start gap-3">
             <img
               src={img}
               alt=""
-              className="h-16 w-16 rounded-[18px] object-cover ring-2 ring-white/30 shadow-lg"
+              className="h-14 w-14 sm:h-16 sm:w-16 rounded-[18px] object-cover ring-2 ring-white/30 shadow-lg"
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -230,7 +232,7 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
           </div>
         </header>
 
-        <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+        <div className="flex shrink-0 flex-wrap gap-1.5 px-4 pt-3">
           {TABS.map((t) => {
             const count =
               t.id === 'sessions'
@@ -267,7 +269,7 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
           })}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
           {loading ? (
             <div className="py-14 text-center">
               <span className="material-symbols-outlined animate-spin text-3xl text-slate-400">
@@ -355,7 +357,8 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

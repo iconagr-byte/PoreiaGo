@@ -666,7 +666,17 @@
   padding: 2px 8px;
 }
 
-/* GPS history modal — deep Aegean header, soft body */
+/* GPS history modal — deep Aegean header, soft body.
+   Portaled to document.body so AdminLayout overflow/transform cannot clip it. */
+.fleet-history-modal {
+  overscroll-behavior: contain;
+  padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+
 .fleet-history-modal__hero {
   background:
     radial-gradient(120% 80% at 100% 0%, rgba(56, 189, 248, 0.35), transparent 55%),
