@@ -231,6 +231,10 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
                 "timestamp": update.recorded_at.isoformat(),
                 "source": raw.get("source") or meta.get("source") or "teltonika",
                 "imei": raw.get("imei") or meta.get("imei"),
+                "tracker_signal_at": meta.get("tracker_signal_at"),
+                "hydrated_from_store": bool(meta.get("hydrated_from_store")),
+                "app_seen_at": meta.get("app_seen_at"),
+                "gps_sources": meta.get("gps_sources") or [],
             }
             await publish_fleet_location(str(update.tenant_id), egress)
             await get_fleet_egress_hub().broadcast(str(update.tenant_id), egress)
