@@ -128,6 +128,25 @@ async def fleet_live(
         log.exception("fleet_live list_active failed tenant=%s", tenant_id)
         raise HTTPException(status_code=503, detail="Live fleet temporarily unavailable") from exc
 
+    # Empty map but online IMEI in device store — force paint once (Achillio).
+    if not vehicles:
+        try:
+            from travel_platform.telemetry.teltonika.hydrate_live import (
+                hydrate_tenant_live_from_devices,
+            )
+
+            n = await hydrate_tenant_live_from_devices(str(tenant_id), force=True)
+            if n:
+                vehicles = await live.list_active_for_admin_async(tenant_id)
+                log.info(
+                    "fleet_live empty-map recovery wrote=%s tenant=%s now=%s",
+                    n,
+                    tenant_id,
+                    len(vehicles),
+                )
+        except Exception:
+            log.debug("fleet_live empty-map recovery skipped", exc_info=True)
+
     rows = []
     trails_by_vehicle: dict = {}
     try:

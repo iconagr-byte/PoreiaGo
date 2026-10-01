@@ -1010,6 +1010,18 @@ class LiveFleetService:
                 row.get("app_driver_id") or ""
             ) == did
 
+        def _teltonika_device(tid: str, meta: dict[str, Any]) -> dict[str, Any] | None:
+            try:
+                from travel_platform.telemetry.teltonika.device_store import (
+                    get_enabled_device_by_vehicle_code,
+                )
+            except Exception:
+                return None
+            plate = str(meta.get("vehicle_code") or meta.get("bus_plate") or "").strip()
+            if not plate:
+                return None
+            return get_enabled_device_by_vehicle_code(tid, plate)
+
         def _teltonika_still_online(tid: str, meta: dict[str, Any]) -> bool:
             try:
                 from travel_platform.telemetry.tracker_priority import (
@@ -1017,25 +1029,37 @@ class LiveFleetService:
                     is_tracker_binding_alive,
                     resolve_tracker_alive_seconds,
                 )
-                from travel_platform.telemetry.teltonika.device_store import (
-                    get_enabled_device_by_vehicle_code,
-                )
             except Exception:
                 return False
             alive = resolve_tracker_alive_seconds(tid)
             if is_live_meta_tracker_fresh(meta, max_age_sec=alive):
                 return True
-            plate = str(meta.get("vehicle_code") or meta.get("bus_plate") or "").strip()
-            tracker = get_enabled_device_by_vehicle_code(tid, plate) if plate else None
+            tracker = _teltonika_device(tid, meta)
             return is_tracker_binding_alive(tracker, max_age_sec=alive)
 
-        def _strip_app_channel(meta: dict[str, Any]) -> dict[str, Any]:
+        def _strip_app_channel(meta: dict[str, Any], *, tid: str) -> dict[str, Any]:
             cleaned = dict(meta)
             cleaned.pop("driver_id", None)
             cleaned.pop("app_driver_id", None)
             cleaned.pop("app_seen_at", None)
             # Keeping a hardware pin ⇒ Teltonika is the only live channel left.
             cleaned["gps_sources"] = ["teltonika"]
+            cleaned["source"] = cleaned.get("source") or "teltonika"
+            # Refresh from device store so the pin stays fresh after App logout.
+            tracker = _teltonika_device(tid, cleaned)
+            if tracker:
+                if tracker.get("imei"):
+                    cleaned["imei"] = tracker.get("imei")
+                if tracker.get("last_lat") is not None and tracker.get("last_lng") is not None:
+                    cleaned["lat"] = float(tracker["last_lat"])
+                    cleaned["lng"] = float(tracker["last_lng"])
+                if tracker.get("last_seen_at"):
+                    from datetime import datetime, timezone
+
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    cleaned["tracker_signal_at"] = now_iso
+                    cleaned["updated_at"] = now_iso
+                    cleaned.pop("hydrated_from_store", None)
             return cleaned
 
         async def _drop(tid: str, vid: str, meta: dict[str, Any] | None = None) -> None:
@@ -1047,10 +1071,11 @@ class LiveFleetService:
                 return
             row = dict(meta or self._vehicles.get(vid) or {})
             if _is_hardware_pin(row):
-                cleaned = _strip_app_channel({**self._vehicles.get(vid, {}), **row})
+                cleaned = _strip_app_channel(
+                    {**self._vehicles.get(vid, {}), **row}, tid=tid
+                )
                 cleaned["tenant_id"] = tid
                 cleaned["vehicle_id"] = vid
-                cleaned["source"] = cleaned.get("source") or "teltonika"
                 # App offline + Teltonika offline → remove pin from the map.
                 if not _teltonika_still_online(tid, cleaned):
                     seen.add(key)
@@ -1076,7 +1101,9 @@ class LiveFleetService:
 
             handed = _handoff_to_teltonika(tid, row)
             if handed:
-                cleaned = _strip_app_channel({**self._vehicles.get(vid, {}), **handed})
+                cleaned = _strip_app_channel(
+                    {**self._vehicles.get(vid, {}), **handed}, tid=tid
+                )
                 cleaned["tenant_id"] = tid
                 cleaned["vehicle_id"] = vid
                 cleaned["source"] = "teltonika"

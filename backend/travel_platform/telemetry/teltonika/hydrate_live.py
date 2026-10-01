@@ -1,9 +1,10 @@
 """
 Re-paint live-map pins from Teltonika device-store last fixes.
 
-Only *online* trackers (fresh last_seen) are hydrated onto the admin map.
-Closed / parked devices stay off the map until they come online again —
-same rule as the driver App channel.
+Online trackers (fresh last_seen) are always hydrated onto the admin map.
+Truly offline trackers are removed when the App channel is also offline —
+same rule as the driver App channel. A short grace avoids flapping when AVL
+is sparse between TCP keepalives.
 """
 
 from __future__ import annotations
@@ -30,11 +31,16 @@ _last_hydrate_at: dict[str, float] = {}
 _MIN_INTERVAL_SEC = 2.0
 # Re-stamp an already-preferred pin before list_active drops it.
 _REFRESH_BEFORE_STALE_SEC = 45.0
+# Drop offline Teltonika pins only after this grace (badge still uses alive_sec).
+_OFFLINE_DROP_GRACE_SEC = 180
 
 
 def _pin_needs_refresh(meta: dict[str, Any] | None, *, alive_sec: int) -> bool:
     """True when there is no fresh live pin, or updated_at is aging out."""
     if not meta:
+        return True
+    if not is_tracker_source(meta.get("source")):
+        # App-only pin — online Teltonika must reclaim the plate.
         return True
     if not is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec):
         return True
@@ -55,11 +61,24 @@ def _app_channel_live(meta: dict[str, Any] | None, *, alive_sec: int) -> bool:
     return False
 
 
-async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
+def clear_hydrate_throttle(tenant_id: str | None = None) -> None:
+    """Allow the next hydrate to run immediately (empty-map recovery)."""
+    tid = str(tenant_id or "").strip()
+    if tid:
+        _last_hydrate_at.pop(tid, None)
+    else:
+        _last_hydrate_at.clear()
+
+
+async def hydrate_tenant_live_from_devices(
+    tenant_id: str,
+    *,
+    force: bool = False,
+) -> int:
     """
     For each enabled Teltonika binding that is online, ensure a live pin exists.
 
-    Offline trackers are removed when the App channel is also offline.
+    Offline trackers (past grace) are removed when the App channel is also offline.
     Returns number of pins (re)written.
     """
     tid = str(tenant_id or "").strip()
@@ -70,7 +89,7 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
 
     now_m = time.monotonic()
     last = _last_hydrate_at.get(tid, 0.0)
-    if now_m - last < _MIN_INTERVAL_SEC:
+    if not force and now_m - last < _MIN_INTERVAL_SEC:
         return 0
     _last_hydrate_at[tid] = now_m
 
@@ -81,6 +100,7 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
         return 0
 
     alive_sec = resolve_tracker_alive_seconds(tid)
+    drop_after = max(alive_sec, _OFFLINE_DROP_GRACE_SEC)
     written = 0
     try:
         from travel_platform.telemetry.processor import get_live_fleet
@@ -108,9 +128,13 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
                 existing_meta = fleet._vehicles.get(existing_vid, {}) or {}  # noqa: SLF001
 
         if not device_online:
-            # Teltonika offline — drop hardware-only pins; leave live App pins.
+            # Truly offline (past grace) — drop hardware-only pins; leave live App.
+            truly_offline = not is_tracker_binding_alive(
+                device, max_age_sec=drop_after
+            )
             if (
-                fleet is not None
+                truly_offline
+                and fleet is not None
                 and existing_vid
                 and is_tracker_source(existing_meta.get("source"))
                 and not _app_channel_live(existing_meta, alive_sec=alive_sec)
@@ -134,13 +158,16 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
                     logger.debug("teltonika offline pin drop skipped", exc_info=True)
             continue
 
-        if existing_meta and not _pin_needs_refresh(existing_meta, alive_sec=alive_sec):
+        # Online device — always reclaim / refresh when missing or aging.
+        if existing_meta and not force and not _pin_needs_refresh(
+            existing_meta, alive_sec=alive_sec
+        ):
             continue
 
         ok = await paint_live_pin_from_device(
             device,
             open_channel=True,
-            reason="hydrate",
+            reason="hydrate_force" if force else "hydrate",
         )
         if ok:
             written += 1

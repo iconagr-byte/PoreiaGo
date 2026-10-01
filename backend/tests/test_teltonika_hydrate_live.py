@@ -201,6 +201,20 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         self.assertNotIn(vid, LiveFleetService._vehicles)
         delete_mock.assert_awaited()
 
+    def test_force_repaints_online_when_map_empty(self):
+        """Empty Achillio map + online IMEI → force hydrate paints immediately."""
+        from travel_platform.telemetry.teltonika import hydrate_live as hl
+
+        hl._last_hydrate_at[self.tenant] = __import__("time").monotonic()
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant, force=True))
+
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+
 
 if __name__ == "__main__":
     unittest.main()
