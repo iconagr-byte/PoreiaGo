@@ -625,6 +625,22 @@
   padding: 2px 8px;
 }
 
+/* GPS history modal — deep Aegean header, soft body */
+.fleet-history-modal__hero {
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(56, 189, 248, 0.35), transparent 55%),
+    linear-gradient(135deg, #0b1f3a 0%, #123a6b 48%, #0d4f8c 100%);
+}
+
+.fleet-history-modal__hero::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 28px;
+  background: linear-gradient(to top, #f5f7fb, transparent);
+  pointer-events: none;
+}
+
 @media (max-width: 640px) {
   .fleet-apple-shell {
     margin: 0;
