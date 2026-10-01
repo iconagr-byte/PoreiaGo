@@ -129,8 +129,8 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         self.assertEqual(payload["source"], "teltonika")
         self.assertFalse(payload.get("hydrated_from_store"))
 
-    def test_stale_tracker_still_reclaims_app_pin_for_safety(self):
-        """Enabled hardware last-known always stays on map — even over App pin."""
+    def test_stale_tracker_does_not_fight_live_app(self):
+        """Quiet hardware must not yank a live App pin (stops App↔GPS jump)."""
         with ds._LOCK:  # noqa: SLF001
             data = ds._read()  # noqa: SLF001
             for row in data.get("devices") or []:
@@ -157,11 +157,35 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         ) as process:
             n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
 
+        self.assertEqual(n, 0)
+        process.assert_not_awaited()
+        self.assertEqual(LiveFleetService._vehicles[vid].get("source"), "driver_pwa")
+
+    def test_online_tracker_reclaims_app_pin(self):
+        """Online IMEI reclaim App pin so dual-live position stays on hardware."""
+        ds.touch_device("861076085468260", lat=40.8, lng=22.05, speed_kmh=0, points=1)
+        vid = "veh-app"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "lat": 38.25,
+            "lng": 20.65,
+            "source": "driver_pwa",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
         self.assertEqual(n, 1)
         process.assert_awaited()
         payload = process.await_args.args[0]
         self.assertEqual(payload["source"], "teltonika")
-        self.assertTrue(payload.get("hydrated_from_store"))
+        self.assertFalse(payload.get("hydrated_from_store"))
 
     def test_keeps_enabled_stale_hardware_pin(self):
         """Safety watch: enabled IMEI last-known is re-stamped, never age-dropped."""

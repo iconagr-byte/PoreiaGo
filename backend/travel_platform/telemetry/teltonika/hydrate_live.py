@@ -6,6 +6,11 @@ Safety / continuous fleet watch:
 - Fresh last_seen (≤ ~90s) → open «GPS οχήματος» badge.
 - Stale last_seen → pin stays (parked / sparse AVL) without faking online.
 - App channel is independent: offline App strips its badge; hardware pin remains.
+
+Dual-source stability:
+- Never reclaim over a *live* App pin while hardware is quiet — that caused the
+  pin to jump App ↔ Teltonika last-known every few seconds.
+- When hardware is online, reclaim position (App soft-acks via ingress).
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ from travel_platform.telemetry.teltonika.paint_live import paint_live_pin_from_d
 from travel_platform.telemetry.tracker_priority import (
     age_seconds,
     is_live_meta_tracker_fresh,
+    is_phone_source,
     is_tracker_binding_alive,
     is_tracker_source,
     resolve_tracker_alive_seconds,
@@ -42,12 +48,24 @@ def map_presence_seconds(alive_sec: int | None = None) -> int:
     return max(alive, 365 * 24 * 60 * 60)
 
 
+def _app_channel_live(meta: dict[str, Any] | None, *, alive_sec: int) -> bool:
+    """True when the driver App is still actively reporting on this pin."""
+    meta = meta or {}
+    app_age = age_seconds(meta.get("app_seen_at"))
+    if app_age is not None and app_age <= alive_sec:
+        return True
+    if is_phone_source(meta.get("source")):
+        pin_age = age_seconds(meta.get("updated_at") or meta.get("timestamp"))
+        return pin_age is not None and pin_age <= alive_sec
+    return False
+
+
 def _pin_needs_refresh(meta: dict[str, Any] | None, *, alive_sec: int) -> bool:
     """True when there is no fresh live pin, or updated_at is aging out."""
     if not meta:
         return True
     if not is_tracker_source(meta.get("source")):
-        # App-only pin — hardware must reclaim the plate for continuous watch.
+        # Non-tracker pin — caller decides whether to reclaim (device online).
         return True
     age = age_seconds(meta.get("updated_at") or meta.get("timestamp"))
     if age is None:
@@ -122,6 +140,17 @@ async def hydrate_tenant_live_from_devices(
             existing_vid = fleet.find_vehicle_id(tid, plate)
             if existing_vid:
                 existing_meta = fleet._vehicles.get(existing_vid, {}) or {}  # noqa: SLF001
+
+        # Live App + quiet hardware → leave App pin alone (no jump).
+        # Online hardware → reclaim position; App soft-acks for dual badge.
+        if (
+            existing_meta
+            and not force
+            and not device_online
+            and _app_channel_live(existing_meta, alive_sec=alive_sec)
+            and not is_tracker_source(existing_meta.get("source"))
+        ):
+            continue
 
         if existing_meta and not force and not _pin_needs_refresh(
             existing_meta, alive_sec=alive_sec

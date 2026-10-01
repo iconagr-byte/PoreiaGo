@@ -120,6 +120,119 @@ class LiveFleetService:
             "test_ping",
             "teltonika_test_ping",
         }
+        # Dual live: phone must not yank lat/lng from hardware (stops pin jump).
+        # Ingress soft-acks; this hardens races / other workers that skip soft-ack.
+        if not is_tracker and prev:
+            try:
+                from datetime import datetime, timezone
+
+                from travel_platform.telemetry.tracker_priority import (
+                    is_live_meta_tracker_fresh,
+                    is_tracker_binding_alive,
+                    is_tracker_source,
+                    normalize_vehicle_plate,
+                    plate_display,
+                    resolve_live_gps_sources,
+                    resolve_tracker_alive_seconds,
+                )
+
+                tid = str(update.tenant_id)
+                alive = resolve_tracker_alive_seconds(tid)
+                plate = (
+                    raw.get("bus_plate")
+                    or update.vehicle_code
+                    or prev.get("bus_plate")
+                    or prev.get("vehicle_code")
+                )
+                tracker = None
+                try:
+                    from travel_platform.telemetry.teltonika.device_store import (
+                        get_enabled_device_by_vehicle_code,
+                    )
+
+                    tracker = get_enabled_device_by_vehicle_code(tid, plate)
+                except Exception:
+                    tracker = None
+                device_online = is_tracker_binding_alive(tracker, max_age_sec=alive)
+                keep_hw = is_live_meta_tracker_fresh(prev, max_age_sec=alive) or device_online
+                if keep_hw:
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    # Prefer existing hardware coords; else device-store last fix.
+                    lat = prev.get("lat")
+                    lng = prev.get("lng")
+                    if (
+                        (not is_tracker_source(prev.get("source")) or lat is None or lng is None)
+                        and tracker
+                        and tracker.get("last_lat") is not None
+                        and tracker.get("last_lng") is not None
+                    ):
+                        lat = tracker.get("last_lat")
+                        lng = tracker.get("last_lng")
+                        merged["source"] = "teltonika"
+                        if tracker.get("imei"):
+                            merged["imei"] = str(tracker.get("imei"))
+                        if tracker.get("last_seen_at"):
+                            merged["tracker_signal_at"] = str(tracker.get("last_seen_at"))
+                    elif lat is not None and lng is not None:
+                        merged["lat"] = lat
+                        merged["lng"] = lng
+                        if is_tracker_source(prev.get("source")):
+                            for key in (
+                                "source",
+                                "imei",
+                                "tracker_signal_at",
+                                "hydrated_from_store",
+                                "gps_recorded_at",
+                            ):
+                                if prev.get(key) is not None:
+                                    merged[key] = prev[key]
+                        else:
+                            merged["source"] = prev.get("source") or "teltonika"
+                    if lat is not None and lng is not None:
+                        merged["lat"] = lat
+                        merged["lng"] = lng
+                        try:
+                            state.lat = float(lat)
+                            state.lng = float(lng)
+                        except Exception:
+                            pass
+                        if prev.get("speed_kmh") is not None and is_tracker_source(
+                            merged.get("source")
+                        ):
+                            merged["speed_kmh"] = prev.get("speed_kmh")
+                        recorded = raw.get("app_seen_at")
+                        if not recorded and getattr(update, "recorded_at", None) is not None:
+                            ra = update.recorded_at
+                            recorded = (
+                                ra.isoformat() if hasattr(ra, "isoformat") else str(ra)
+                            )
+                        merged["app_seen_at"] = recorded or now_iso
+                        if raw.get("driver_id"):
+                            merged["app_driver_id"] = raw["driver_id"]
+                        try:
+                            merged["gps_sources"] = resolve_live_gps_sources(
+                                merged,
+                                max_age_sec=alive,
+                                tenant_id=tid,
+                            )
+                        except Exception:
+                            merged["gps_sources"] = ["teltonika", "app"]
+                        plate_key_early = normalize_vehicle_plate(
+                            update.vehicle_code or merged.get("bus_plate")
+                        )
+                        display = plate_display(
+                            raw.get("bus_plate")
+                            or update.vehicle_code
+                            or merged.get("bus_plate")
+                        )
+                        if plate_key_early:
+                            merged["vehicle_code"] = display or plate_key_early
+                            merged["bus_plate"] = display or plate_key_early
+                            self._code_index[f"{update.tenant_id}:{plate_key_early}"] = vid
+                        self._vehicles[vid] = merged
+                        return state
+            except Exception:
+                pass
         if is_tracker:
             if raw.get("driver_id"):
                 merged["driver_id"] = raw["driver_id"]
