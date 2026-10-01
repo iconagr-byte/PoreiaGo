@@ -72,17 +72,19 @@ export function resolveFleetGpsSources(vehicle) {
       ? vehicle.gpsSources
       : [];
 
-  // Server list first, then live heartbeats — Teltonika refresh must not
-  // drop a fresh App badge when gps_sources omitted "app".
+  // Trust server gps_sources for dual badge. Only drop Teltonika when the
+  // pin is an explicit parked hydrate with a stale hardware signal.
   for (const item of listed) {
     const kind = kindFromRaw(item) || (item === 'teltonika' || item === 'app' ? item : '');
     if (
       kind === 'teltonika' &&
-      !isTeltonikaSignalFresh(vehicle) &&
-      (vehicle.hydrated_from_store || vehicle.hydratedFromStore)
+      (vehicle.hydrated_from_store || vehicle.hydratedFromStore) &&
+      !isTeltonikaSignalFresh(vehicle)
     ) {
       continue;
     }
+    // Server said Teltonika is live — show it even if this row is App-sourced
+    // (device last_seen enrichment on the API).
     push(kind);
   }
 

@@ -161,6 +161,7 @@ class LiveFleetService:
                 sources = resolve_live_gps_sources(
                     merged,
                     max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+                    tenant_id=str(update.tenant_id),
                 )
                 if prev.get("app_seen_at") and "app" not in sources:
                     sources = [*sources, "app"]
@@ -558,6 +559,7 @@ class LiveFleetService:
         sources = resolve_live_gps_sources(
             keep_meta,
             max_age_sec=resolve_tracker_alive_seconds(tid),
+            tenant_id=tid,
         )
         if best_app and "app" not in sources:
             sources = [*sources, "app"]
@@ -643,7 +645,7 @@ class LiveFleetService:
             or meta.get("driver_name") in {"—", "-", "Tracker"}
         ):
             meta["driver_name"] = str(driver_name)
-        sources = resolve_live_gps_sources(meta, max_age_sec=alive)
+        sources = resolve_live_gps_sources(meta, max_age_sec=alive, tenant_id=tid)
         if "app" not in sources:
             sources = [*sources, "app"]
         src_l = str(meta.get("source") or "").strip().lower()

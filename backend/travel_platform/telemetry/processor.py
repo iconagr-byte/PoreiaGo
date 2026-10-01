@@ -216,6 +216,7 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
                 sources = resolve_live_gps_sources(
                     meta,
                     max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+                    tenant_id=str(update.tenant_id),
                 )
                 if meta.get("app_seen_at") and "app" not in sources:
                     sources = [*sources, "app"]
@@ -250,6 +251,7 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
             gps_sources = resolve_live_gps_sources(
                 meta,
                 max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+                tenant_id=str(update.tenant_id),
             )
             if meta.get("app_seen_at") and "app" not in gps_sources:
                 gps_sources = [*gps_sources, "app"]

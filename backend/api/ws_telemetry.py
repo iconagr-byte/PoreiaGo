@@ -398,6 +398,7 @@ async def admin_fleet_egress_ws(
             gps_sources = resolve_live_gps_sources(
                 meta,
                 max_age_sec=resolve_tracker_alive_seconds(tid),
+                tenant_id=tid,
             )
         except Exception:
             gps_sources = []

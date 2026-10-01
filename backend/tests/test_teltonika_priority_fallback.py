@@ -122,6 +122,24 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         self.assertEqual(plate_display("trip-1"), "TRIP-1")
         self.assertEqual(normalize_vehicle_plate("TRIP-1"), "TRIP1")
 
+    def test_device_online_enriches_app_pin_gps_sources(self):
+        """App-sourced pin still shows Teltonika badge when IMEI last_seen is fresh."""
+        from travel_platform.telemetry.tracker_priority import resolve_live_gps_sources
+
+        ds.touch_device("861076085468260", lat=40.8, lng=22.05, speed_kmh=0, points=1)
+        meta = {
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "source": "driver_pwa",
+            "lat": 40.8,
+            "lng": 22.05,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "app_seen_at": datetime.now(timezone.utc).isoformat(),
+        }
+        sources = resolve_live_gps_sources(meta, max_age_sec=90, tenant_id=self.tenant)
+        self.assertEqual(sources, ["teltonika", "app"])
+
     def test_prefer_teltonika_from_redis_when_memory_empty(self):
         """Multi-worker: phone ingest must soft-ack via Redis Teltonika pin."""
         from travel_platform.telemetry.live_fleet import LiveFleetService
@@ -253,6 +271,95 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         meta = LiveFleetService._vehicles.get("veh-teltonika-1") or {}
         self.assertTrue(meta.get("app_seen_at"))
         self.assertIn("app", meta.get("gps_sources") or [])
+
+    def test_ingress_paints_then_soft_acks_when_device_online(self):
+        """Online IMEI + stale/missing live pin → paint Teltonika then dual soft-ack."""
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        ds.touch_device("861076085468260", lat=40.8, lng=22.05, speed_kmh=0, points=1)
+        session = {
+            "tenant_id": self.tenant,
+            "driver_id": "drv-1",
+            "driver_name": "Nikos",
+            "vehicle_code": "EEX5670",
+        }
+        body = {"lat": 38.25, "lng": 20.65, "speed": 40, "bus_plate": "EEX5670"}
+
+        with (
+            patch(
+                "travel_platform.telemetry.teltonika.paint_live.paint_live_pin_from_device",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as paint,
+            patch(
+                "travel_platform.telemetry.fleet_ingress.process_telemetry_payload",
+                new_callable=AsyncMock,
+            ) as process,
+            patch("travel_platform.settings.drivers_store.get_driver", return_value=None),
+            patch("travel_platform.settings.drivers_store.is_seed_driver", return_value=False),
+            patch(
+                "travel_platform.operations.master_qr_bridge.resolve_platform_tenant_id",
+                new_callable=AsyncMock,
+                return_value=self.tenant,
+            ),
+            patch(
+                "travel_platform.telemetry.driver_gps_heartbeat.touch_driver_gps",
+                return_value=False,
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.save_live_vehicle",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.delete_live_vehicle",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "travel_platform.telemetry.fleet_pubsub.publish_fleet_location",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "travel_platform.telemetry.fleet_ws_hub.get_fleet_egress_hub",
+                return_value=type("H", (), {"broadcast": AsyncMock()})(),
+            ),
+        ):
+            # After paint, mark_app_heartbeat needs a local pin — seed it as side effect.
+            async def _paint_side_effect(*_a, **_k):
+                now = datetime.now(timezone.utc).isoformat()
+                LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = "veh-painted"
+                LiveFleetService._vehicles["veh-painted"] = {
+                    "vehicle_id": "veh-painted",
+                    "tenant_id": self.tenant,
+                    "vehicle_code": "EEX5670",
+                    "bus_plate": "EEX5670",
+                    "lat": 40.8,
+                    "lng": 22.05,
+                    "source": "teltonika",
+                    "imei": "861076085468260",
+                    "updated_at": now,
+                    "tracker_signal_at": now,
+                }
+                return True
+
+            paint.side_effect = _paint_side_effect
+            out = asyncio.run(ingest_driver_location(body, session=session))
+
+        self.assertTrue(out.get("ok"))
+        self.assertTrue(out.get("skipped_live_map"))
+        self.assertEqual(out.get("map_source"), "teltonika")
+        self.assertIn("teltonika", out.get("gps_sources") or [])
+        self.assertIn("app", out.get("gps_sources") or [])
+        paint.assert_awaited()
+        process.assert_not_awaited()
 
     def test_soft_ack_stamps_app_from_redis_only_pin(self):
         """Phone worker with empty memory must still stamp dual badge via Redis."""

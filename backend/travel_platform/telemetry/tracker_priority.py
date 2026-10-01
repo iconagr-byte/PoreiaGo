@@ -82,11 +82,15 @@ def resolve_live_gps_sources(
     *,
     max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
     now: datetime | None = None,
+    tenant_id: str | None = None,
+    check_device_store: bool = True,
 ) -> list[str]:
     """
     Active GPS channels for one live pin (dual badge on the map).
 
     Stable order: ``teltonika`` then ``app`` — only channels with a fresh signal.
+    When the IMEI binding has a fresh ``last_seen_at``, Teltonika is listed even
+    if the pin row is temporarily App-sourced (multi-worker race).
     """
     meta = meta or {}
     now = now or datetime.now(timezone.utc)
@@ -103,6 +107,22 @@ def resolve_live_gps_sources(
         out.append("app")
     elif is_phone_source(meta.get("source")) and pin_age is not None and pin_age <= alive:
         out.append("app")
+
+    # Device online (TCP last_seen) → always advertise Teltonika on the badge.
+    if check_device_store and "teltonika" not in out:
+        tid = str(tenant_id or meta.get("tenant_id") or "").strip()
+        plate = meta_plate(meta)
+        if tid and plate:
+            try:
+                from travel_platform.telemetry.teltonika.device_store import (
+                    get_enabled_device_by_vehicle_code,
+                )
+
+                device = get_enabled_device_by_vehicle_code(tid, plate)
+                if is_tracker_binding_alive(device, max_age_sec=alive, now=now):
+                    out = ["teltonika", *[s for s in out if s != "teltonika"]]
+            except Exception:
+                pass
 
     return out
 

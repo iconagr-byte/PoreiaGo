@@ -54,6 +54,17 @@ assert.deepEqual(
   ['teltonika', 'app'],
 );
 
+// App-sourced row + server says both — show Teltonika · App (device online).
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'driver_pwa',
+    app_seen_at: now,
+    timestamp: now,
+    gps_sources: ['teltonika', 'app'],
+  }),
+  ['teltonika', 'app'],
+);
+
 // Closed / hydrated Teltonika must not show as an open channel next to App.
 assert.deepEqual(
   resolveFleetGpsSources({

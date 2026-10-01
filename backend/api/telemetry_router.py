@@ -177,10 +177,34 @@ async def fleet_live(
                 resolve_tracker_alive_seconds,
             )
 
+            alive_sec = resolve_tracker_alive_seconds(str(tenant_id))
             gps_sources = resolve_live_gps_sources(
                 meta,
-                max_age_sec=resolve_tracker_alive_seconds(str(tenant_id)),
+                max_age_sec=alive_sec,
+                tenant_id=str(tenant_id),
             )
+            tracker_signal_at = str(meta.get("tracker_signal_at") or "") or None
+            # App-sourced pin + online IMEI: expose device last_seen so the
+            # client dual badge treats Teltonika as open.
+            if "teltonika" in gps_sources and not tracker_signal_at:
+                try:
+                    from travel_platform.telemetry.teltonika.device_store import (
+                        get_enabled_device_by_vehicle_code,
+                    )
+                    from travel_platform.telemetry.tracker_priority import (
+                        is_tracker_binding_alive,
+                    )
+
+                    device = get_enabled_device_by_vehicle_code(
+                        str(tenant_id),
+                        meta.get("vehicle_code") or meta.get("bus_plate") or v.vehicle_code,
+                    )
+                    if is_tracker_binding_alive(device, max_age_sec=alive_sec):
+                        tracker_signal_at = str(device.get("last_seen_at") or "") or None
+                        if not meta.get("imei") and device.get("imei"):
+                            meta["imei"] = device.get("imei")
+                except Exception:
+                    pass
             rows.append(
                 LiveVehicleResponse(
                     vehicle_id=v.vehicle_id,
@@ -206,7 +230,7 @@ async def fleet_live(
                     imei=str(meta.get("imei") or "") or None,
                     gps_sources=gps_sources,
                     app_seen_at=str(meta.get("app_seen_at") or "") or None,
-                    tracker_signal_at=str(meta.get("tracker_signal_at") or "") or None,
+                    tracker_signal_at=tracker_signal_at,
                     hydrated_from_store=bool(meta.get("hydrated_from_store")),
                 ),
             )

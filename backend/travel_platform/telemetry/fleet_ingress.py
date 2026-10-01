@@ -213,12 +213,43 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
     try:
         from travel_platform.telemetry.tracker_priority import (
             is_teltonika_preferred_for_plate_async,
+            is_tracker_binding_alive,
+            resolve_tracker_alive_seconds,
         )
 
+        plate = payload.get("vehicle_code") or payload.get("bus_plate")
         prefer_tracker, tracker = await is_teltonika_preferred_for_plate_async(
             tenant_id,
-            payload.get("vehicle_code") or payload.get("bus_plate"),
+            plate,
         )
+        # Device online (fresh last_seen) but live pin missing/stale — paint
+        # last fix first, then soft-ack App so both badges show on one pin.
+        if (
+            tracker
+            and not prefer_tracker
+            and is_tracker_binding_alive(
+                tracker,
+                max_age_sec=resolve_tracker_alive_seconds(tenant_id),
+            )
+        ):
+            try:
+                from travel_platform.telemetry.teltonika.paint_live import (
+                    paint_live_pin_from_device,
+                )
+
+                painted = await paint_live_pin_from_device(
+                    tracker,
+                    open_channel=True,
+                    reason="ingress_device_online",
+                )
+                if painted:
+                    prefer_tracker = True
+                    logger.info(
+                        "Teltonika device online — painted pin then soft-ack plate=%s",
+                        plate,
+                    )
+            except Exception:
+                logger.debug("teltonika ingress paint skipped", exc_info=True)
     except Exception:
         prefer_tracker, tracker = False, None
     if prefer_tracker and tracker:
