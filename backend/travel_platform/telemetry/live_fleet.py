@@ -147,6 +147,26 @@ class LiveFleetService:
                     state.updated_at = now_dt
                 except Exception:
                     pass
+            # Teltonika refresh must never drop a fresh App heartbeat — dual badge.
+            if prev.get("app_seen_at") and not raw.get("app_seen_at"):
+                merged["app_seen_at"] = prev["app_seen_at"]
+            if prev.get("app_driver_id") and not merged.get("app_driver_id"):
+                merged["app_driver_id"] = prev["app_driver_id"]
+            try:
+                from travel_platform.telemetry.tracker_priority import (
+                    resolve_live_gps_sources,
+                    resolve_tracker_alive_seconds,
+                )
+
+                sources = resolve_live_gps_sources(
+                    merged,
+                    max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+                )
+                if prev.get("app_seen_at") and "app" not in sources:
+                    sources = [*sources, "app"]
+                merged["gps_sources"] = sources
+            except Exception:
+                pass
         elif raw.get("driver_id"):
             merged["driver_id"] = raw["driver_id"]
         trip_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")
@@ -467,6 +487,106 @@ class LiveFleetService:
             self._code_index[f"{tid}:{plate}"] = keep
         return removed
 
+    async def absorb_plate_app_signal(
+        self,
+        tenant_id: str,
+        vehicle_code: str | None,
+        *,
+        keep_vehicle_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Pull App heartbeat / dual gps_sources from Redis siblings onto the keep pin.
+
+        Multi-worker often has two Teltonika UUIDs for one plate — App stamp on
+        one must survive when the other worker refreshes coords.
+        """
+        from travel_platform.telemetry.live_fleet_redis import (
+            delete_live_vehicle,
+            load_live_vehicles,
+            save_live_vehicle,
+        )
+        from travel_platform.telemetry.tracker_priority import (
+            is_tracker_source,
+            normalize_vehicle_plate,
+            resolve_live_gps_sources,
+            resolve_tracker_alive_seconds,
+        )
+
+        tid = str(tenant_id or "").strip()
+        plate = normalize_vehicle_plate(vehicle_code)
+        if not tid or not plate:
+            return None
+
+        keep = str(keep_vehicle_id or self.find_vehicle_id(tid, plate) or "").strip()
+        if not keep:
+            return None
+        keep_meta = dict(self._vehicles.get(keep) or {})
+        if not keep_meta:
+            return None
+
+        best_app = keep_meta.get("app_seen_at")
+        best_app_driver = keep_meta.get("app_driver_id")
+        drop_vids: list[str] = []
+        try:
+            remote_rows = await load_live_vehicles(tid)
+        except Exception:
+            remote_rows = []
+        for meta in remote_rows or []:
+            row_plate = normalize_vehicle_plate(
+                meta.get("vehicle_code") or meta.get("bus_plate")
+            )
+            if row_plate != plate:
+                continue
+            vid = str(meta.get("vehicle_id") or "")
+            other_app = meta.get("app_seen_at")
+            if other_app and (not best_app or str(other_app) > str(best_app)):
+                best_app = other_app
+            if meta.get("app_driver_id") and not best_app_driver:
+                best_app_driver = meta.get("app_driver_id")
+            # Collapse duplicate Teltonika UUIDs onto keep.
+            if (
+                vid
+                and vid != keep
+                and is_tracker_source(meta.get("source"))
+            ):
+                drop_vids.append(vid)
+
+        if best_app:
+            keep_meta["app_seen_at"] = best_app
+        if best_app_driver:
+            keep_meta["app_driver_id"] = best_app_driver
+        sources = resolve_live_gps_sources(
+            keep_meta,
+            max_age_sec=resolve_tracker_alive_seconds(tid),
+        )
+        if best_app and "app" not in sources:
+            sources = [*sources, "app"]
+        if is_tracker_source(keep_meta.get("source")) and "teltonika" not in sources:
+            # Open channel — still advertise Teltonika when signal is present.
+            if keep_meta.get("tracker_signal_at") or keep_meta.get("updated_at"):
+                sources = ["teltonika", *sources]
+        keep_meta["gps_sources"] = ["teltonika", "app"] if (
+            "teltonika" in sources and "app" in sources
+        ) else sources
+        keep_meta["vehicle_id"] = keep
+        keep_meta["tenant_id"] = tid
+        self._vehicles[keep] = keep_meta
+        self._code_index[f"{tid}:{plate}"] = keep
+        try:
+            await save_live_vehicle(keep_meta)
+        except Exception:
+            pass
+        for vid in drop_vids:
+            self._vehicles.pop(vid, None)
+            for idx_key, idx_vid in list(self._code_index.items()):
+                if idx_vid == vid:
+                    self._code_index.pop(idx_key, None)
+            try:
+                await delete_live_vehicle(tid, vid)
+            except Exception:
+                pass
+        return keep_meta
+
     async def mark_app_heartbeat_for_plate(
         self,
         tenant_id: str,
@@ -480,9 +600,11 @@ class LiveFleetService:
         Soft-ack: keep Teltonika coords, stamp that the driver app is also live.
 
         Used so the map shows one pin with both Teltonika + App badges.
+        Redis-aware — phone GPS often hits a different Gunicorn worker than TCP.
         """
         from travel_platform.telemetry.live_fleet_redis import save_live_vehicle
         from travel_platform.telemetry.tracker_priority import (
+            live_fleet_tracker_meta_async,
             normalize_vehicle_plate,
             resolve_live_gps_sources,
             resolve_tracker_alive_seconds,
@@ -493,10 +615,22 @@ class LiveFleetService:
         if not tid or not plate:
             return None
 
+        alive = resolve_tracker_alive_seconds(tid)
+        # Hydrate Teltonika pin from Redis when this worker has empty memory.
+        try:
+            remote = await live_fleet_tracker_meta_async(
+                tid, plate, max_age_sec=alive
+            )
+        except Exception:
+            remote = None
         vid = self.find_vehicle_id(tid, plate)
+        if not vid and isinstance(remote, dict):
+            vid = str(remote.get("vehicle_id") or "").strip() or None
         if not vid:
             return None
         meta = dict(self._vehicles.get(vid) or {})
+        if not meta and isinstance(remote, dict):
+            meta = dict(remote)
         if not meta:
             return None
 
@@ -504,21 +638,39 @@ class LiveFleetService:
         meta["app_seen_at"] = now_iso
         if driver_id:
             meta["app_driver_id"] = str(driver_id)
-        if driver_name and not meta.get("driver_name"):
+        if driver_name and (
+            not meta.get("driver_name")
+            or meta.get("driver_name") in {"—", "-", "Tracker"}
+        ):
             meta["driver_name"] = str(driver_name)
-        sources = resolve_live_gps_sources(
-            meta,
-            max_age_sec=resolve_tracker_alive_seconds(tid),
-        )
+        sources = resolve_live_gps_sources(meta, max_age_sec=alive)
         if "app" not in sources:
             sources = [*sources, "app"]
-        meta["gps_sources"] = sources
+        src_l = str(meta.get("source") or "").strip().lower()
+        if "teltonika" not in sources and (
+            src_l.startswith("teltonika") or meta.get("imei")
+        ):
+            sources = ["teltonika", *sources]
+        # Dual badge must list both while both channels are live.
+        meta["gps_sources"] = ["teltonika", "app"] if (
+            "teltonika" in sources and "app" in sources
+        ) else sources
         meta["tenant_id"] = tid
         meta["vehicle_id"] = vid
         self._vehicles[vid] = meta
         self._code_index[f"{tid}:{plate}"] = vid
         try:
             await save_live_vehicle(meta)
+        except Exception:
+            pass
+        # Fold duplicate Teltonika Redis UUIDs so the next hydrate cannot wipe App.
+        try:
+            absorbed = await self.absorb_plate_app_signal(
+                tid, plate, keep_vehicle_id=vid
+            )
+            if absorbed:
+                meta = absorbed
+                sources = list(meta.get("gps_sources") or sources)
         except Exception:
             pass
         # Light WS refresh so the dual badge appears without waiting for poll.
@@ -543,8 +695,9 @@ class LiveFleetService:
                 "timestamp": meta.get("updated_at") or now_iso,
                 "source": meta.get("source") or "teltonika",
                 "imei": meta.get("imei"),
+                "tracker_signal_at": meta.get("tracker_signal_at"),
                 "app_seen_at": now_iso,
-                "gps_sources": sources,
+                "gps_sources": sources if "app" in sources and "teltonika" in sources else ["teltonika", "app"],
             }
             await publish_fleet_location(tid, egress)
             await get_fleet_egress_hub().broadcast(tid, egress)

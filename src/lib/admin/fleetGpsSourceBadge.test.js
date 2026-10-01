@@ -42,6 +42,18 @@ assert.equal(
   'Teltonika · App',
 );
 
+// Server list omitted app — still dual when app_seen_at is fresh.
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'teltonika',
+    imei: '861',
+    app_seen_at: now,
+    tracker_signal_at: now,
+    gps_sources: ['teltonika'],
+  }),
+  ['teltonika', 'app'],
+);
+
 // Closed / hydrated Teltonika must not show as an open channel next to App.
 assert.deepEqual(
   resolveFleetGpsSources({

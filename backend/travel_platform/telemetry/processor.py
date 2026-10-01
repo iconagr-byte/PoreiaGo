@@ -181,11 +181,50 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
     except Exception:
         logger.exception("live trail append failed vehicle=%s", vehicle_id)
 
+    source = str(raw.get("source") or "").lower()
+    is_tracker_src = source.startswith("teltonika") or source in {"test_ping", "tracker"}
+
+    if is_tracker_src:
+        # Keep App heartbeat across Teltonika refreshes (multi-worker Redis).
+        try:
+            await _live.absorb_plate_app_signal(
+                str(update.tenant_id),
+                update.vehicle_code,
+                keep_vehicle_id=str(vehicle_id),
+            )
+        except Exception:
+            logger.debug("teltonika absorb app signal skipped", exc_info=True)
+        try:
+            await _live.purge_phone_siblings_for_plate(
+                str(update.tenant_id),
+                update.vehicle_code,
+                keep_vehicle_id=str(vehicle_id),
+            )
+        except Exception:
+            logger.debug("teltonika phone-sibling purge skipped", exc_info=True)
+
     try:
         from travel_platform.telemetry.live_fleet_redis import save_live_vehicle
+        from travel_platform.telemetry.tracker_priority import (
+            resolve_live_gps_sources,
+            resolve_tracker_alive_seconds,
+        )
 
         meta = _live._vehicles.get(str(vehicle_id), {})
         if meta:
+            if is_tracker_src:
+                sources = resolve_live_gps_sources(
+                    meta,
+                    max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+                )
+                if meta.get("app_seen_at") and "app" not in sources:
+                    sources = [*sources, "app"]
+                if "teltonika" not in sources:
+                    sources = ["teltonika", *sources]
+                meta["gps_sources"] = ["teltonika", "app"] if (
+                    "teltonika" in sources and "app" in sources
+                ) else sources
+                _live._vehicles[str(vehicle_id)] = meta
             ok = await save_live_vehicle(meta)
             if not ok:
                 logger.warning(
@@ -198,28 +237,30 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
 
     # Driver PWA already publishes fleet_location from fleet_ingress. Tracker
     # (Teltonika) path needs its own egress so the map badge updates live.
-    source = str(raw.get("source") or "").lower()
-    if source.startswith("teltonika") or source in {"test_ping", "tracker"}:
-        # Drop leftover phone pins for this plate (multi-worker Redis duplicates).
-        try:
-            await _live.purge_phone_siblings_for_plate(
-                str(update.tenant_id),
-                update.vehicle_code,
-                keep_vehicle_id=str(vehicle_id),
-            )
-        except Exception:
-            logger.debug("teltonika phone-sibling purge skipped", exc_info=True)
+    if is_tracker_src:
         try:
             from travel_platform.telemetry.fleet_pubsub import publish_fleet_location
             from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
+            from travel_platform.telemetry.tracker_priority import (
+                resolve_live_gps_sources,
+                resolve_tracker_alive_seconds,
+            )
 
             meta = _live._vehicles.get(str(vehicle_id), {}) or {}
+            gps_sources = resolve_live_gps_sources(
+                meta,
+                max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
+            )
+            if meta.get("app_seen_at") and "app" not in gps_sources:
+                gps_sources = [*gps_sources, "app"]
+            if "teltonika" not in gps_sources:
+                gps_sources = ["teltonika", *gps_sources]
             egress = {
                 "type": "fleet_location",
                 "tenant_id": str(update.tenant_id),
                 "trip_id": update.trip_id or meta.get("trip_id"),
                 "trip_title": meta.get("trip_title"),
-                "driver_id": meta.get("driver_id") or raw.get("driver_id"),
+                "driver_id": meta.get("driver_id") or raw.get("driver_id") or meta.get("app_driver_id"),
                 "driver_name": meta.get("driver_name") or raw.get("driver_name"),
                 "bus_plate": meta.get("bus_plate") or update.vehicle_code,
                 "vehicle_code": update.vehicle_code,
@@ -234,7 +275,7 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
                 "tracker_signal_at": meta.get("tracker_signal_at"),
                 "hydrated_from_store": bool(meta.get("hydrated_from_store")),
                 "app_seen_at": meta.get("app_seen_at"),
-                "gps_sources": meta.get("gps_sources") or [],
+                "gps_sources": gps_sources,
             }
             await publish_fleet_location(str(update.tenant_id), egress)
             await get_fleet_egress_hub().broadcast(str(update.tenant_id), egress)

@@ -59,6 +59,7 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         LiveFleetService._code_index = {}
         vid = "veh-teltonika-1"
         LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        now = datetime.now(timezone.utc).isoformat()
         LiveFleetService._vehicles[vid] = {
             "vehicle_id": vid,
             "tenant_id": self.tenant,
@@ -68,7 +69,8 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
             "lng": 20.6,
             "source": "teltonika",
             "imei": "861076085468260",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": now,
+            "tracker_signal_at": now,
         }
         return vid
 
@@ -126,6 +128,7 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
 
         LiveFleetService._vehicles = {}
         LiveFleetService._code_index = {}
+        now = datetime.now(timezone.utc).isoformat()
         remote = {
             "vehicle_id": "veh-redis-tel",
             "tenant_id": self.tenant,
@@ -135,7 +138,8 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
             "lng": 20.6,
             "source": "teltonika",
             "imei": "861076085468260",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": now,
+            "tracker_signal_at": now,
         }
 
         async def _run():
@@ -249,6 +253,147 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         meta = LiveFleetService._vehicles.get("veh-teltonika-1") or {}
         self.assertTrue(meta.get("app_seen_at"))
         self.assertIn("app", meta.get("gps_sources") or [])
+
+    def test_soft_ack_stamps_app_from_redis_only_pin(self):
+        """Phone worker with empty memory must still stamp dual badge via Redis."""
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        now = datetime.now(timezone.utc).isoformat()
+        remote = {
+            "vehicle_id": "veh-redis-only",
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "lat": 40.8,
+            "lng": 22.05,
+            "source": "teltonika",
+            "imei": "861076085468260",
+            "updated_at": now,
+            "tracker_signal_at": now,
+        }
+        session = {
+            "tenant_id": self.tenant,
+            "driver_id": "drv-1",
+            "driver_name": "Nikos",
+            "vehicle_code": "EEX5670",
+        }
+        body = {"lat": 38.25, "lng": 20.65, "speed": 40, "bus_plate": "EEX5670"}
+
+        with (
+            patch(
+                "travel_platform.telemetry.fleet_ingress.process_telemetry_payload",
+                new_callable=AsyncMock,
+            ) as process,
+            patch("travel_platform.settings.drivers_store.get_driver", return_value=None),
+            patch("travel_platform.settings.drivers_store.is_seed_driver", return_value=False),
+            patch(
+                "travel_platform.operations.master_qr_bridge.resolve_platform_tenant_id",
+                new_callable=AsyncMock,
+                return_value=self.tenant,
+            ),
+            patch(
+                "travel_platform.telemetry.driver_gps_heartbeat.touch_driver_gps",
+                return_value=False,
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.save_live_vehicle",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.delete_live_vehicle",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
+                new_callable=AsyncMock,
+                return_value=[remote],
+            ),
+            patch(
+                "travel_platform.telemetry.fleet_pubsub.publish_fleet_location",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "travel_platform.telemetry.fleet_ws_hub.get_fleet_egress_hub",
+                return_value=type("H", (), {"broadcast": AsyncMock()})(),
+            ),
+        ):
+            out = asyncio.run(ingest_driver_location(body, session=session))
+
+        self.assertTrue(out.get("ok"))
+        self.assertTrue(out.get("skipped_live_map"))
+        self.assertIn("teltonika", out.get("gps_sources") or [])
+        self.assertIn("app", out.get("gps_sources") or [])
+        process.assert_not_awaited()
+        meta = LiveFleetService._vehicles.get("veh-redis-only") or {}
+        self.assertTrue(meta.get("app_seen_at"))
+        self.assertEqual(meta.get("gps_sources"), ["teltonika", "app"])
+
+    def test_absorb_keeps_app_when_duplicate_teltonika_uuid(self):
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        now = datetime.now(timezone.utc).isoformat()
+        keep = "veh-keep"
+        other = "veh-other"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = keep
+        LiveFleetService._vehicles[keep] = {
+            "vehicle_id": keep,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "lat": 40.8,
+            "lng": 22.05,
+            "source": "teltonika",
+            "imei": "861076085468260",
+            "updated_at": now,
+            "tracker_signal_at": now,
+        }
+        remote_other = {
+            "vehicle_id": other,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "lat": 40.8,
+            "lng": 22.05,
+            "source": "teltonika",
+            "imei": "861076085468260",
+            "updated_at": now,
+            "tracker_signal_at": now,
+            "app_seen_at": now,
+            "gps_sources": ["teltonika", "app"],
+        }
+
+        with (
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
+                new_callable=AsyncMock,
+                return_value=[remote_other, {**LiveFleetService._vehicles[keep]}],
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.save_live_vehicle",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.delete_live_vehicle",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as delete_remote,
+        ):
+            fleet = LiveFleetService()
+            out = asyncio.run(
+                fleet.absorb_plate_app_signal(
+                    self.tenant, "EEX5670", keep_vehicle_id=keep
+                )
+            )
+
+        self.assertIsNotNone(out)
+        self.assertEqual(out.get("app_seen_at"), now)
+        self.assertEqual(out.get("gps_sources"), ["teltonika", "app"])
+        delete_remote.assert_awaited()
 
     def test_ingest_allows_phone_when_tracker_stale(self):
         with ds._LOCK:  # noqa: SLF001

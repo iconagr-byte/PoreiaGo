@@ -72,24 +72,25 @@ export function resolveFleetGpsSources(vehicle) {
       ? vehicle.gpsSources
       : [];
 
-  // Prefer server-resolved channels (already age-filtered).
-  if (listed.length) {
-    for (const item of listed) {
-      const kind = kindFromRaw(item) || (item === 'teltonika' || item === 'app' ? item : '');
-      if (kind === 'teltonika' && !isTeltonikaSignalFresh(vehicle) && vehicle.hydrated_from_store) {
-        continue;
-      }
-      push(kind);
+  // Server list first, then live heartbeats — Teltonika refresh must not
+  // drop a fresh App badge when gps_sources omitted "app".
+  for (const item of listed) {
+    const kind = kindFromRaw(item) || (item === 'teltonika' || item === 'app' ? item : '');
+    if (
+      kind === 'teltonika' &&
+      !isTeltonikaSignalFresh(vehicle) &&
+      (vehicle.hydrated_from_store || vehicle.hydratedFromStore)
+    ) {
+      continue;
     }
-    if (isAppSeenFresh(vehicle)) push('app');
-    if (isTeltonikaSignalFresh(vehicle)) push('teltonika');
-    return ['teltonika', 'app'].filter((k) => seen.has(k));
+    push(kind);
   }
 
   if (isTeltonikaSignalFresh(vehicle)) push('teltonika');
   else if (
     kindFromRaw(vehicle?.source || vehicle?.gps_source || vehicle?.gpsSource) === 'teltonika' &&
     !vehicle.hydrated_from_store &&
+    !vehicle.hydratedFromStore &&
     isFresh(vehicle.timestamp || vehicle.updated_at)
   ) {
     push('teltonika');
@@ -98,7 +99,10 @@ export function resolveFleetGpsSources(vehicle) {
   }
 
   if (isAppSeenFresh(vehicle)) push('app');
-  else if (kindFromRaw(vehicle?.source) === 'app' && isFresh(vehicle.timestamp || vehicle.updated_at)) {
+  else if (
+    kindFromRaw(vehicle?.source) === 'app' &&
+    isFresh(vehicle.timestamp || vehicle.updated_at)
+  ) {
     push('app');
   }
 
