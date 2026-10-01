@@ -54,6 +54,8 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         payload = process.await_args.args[0]
         self.assertEqual(payload["source"], "teltonika")
         self.assertEqual(payload["vehicle_code"], "EEX5670")
+        self.assertTrue(payload.get("hydrated_from_store"))
+        self.assertEqual(payload.get("engine_status"), "off")
         self.assertAlmostEqual(float(payload["latitude"]), 38.25, places=4)
 
     def test_skips_when_live_teltonika_pin_fresh(self):
@@ -66,6 +68,28 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
             "lat": 38.25,
             "lng": 20.65,
             "source": "teltonika",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        with patch(
+            "travel_platform.telemetry.processor.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
+        self.assertEqual(n, 0)
+        process.assert_not_awaited()
+
+    def test_skips_when_app_pin_already_on_map(self):
+        """Closed Teltonika must not re-hydrate over a live driver App pin."""
+        vid = "veh-app"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "lat": 38.25,
+            "lng": 20.65,
+            "source": "driver_pwa",
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         with patch(

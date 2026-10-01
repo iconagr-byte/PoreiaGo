@@ -57,6 +57,8 @@ class LiveVehicleResponse(BaseModel):
     # Active channels for the dual badge (e.g. ["teltonika", "app"]).
     gps_sources: list[str] = Field(default_factory=list)
     app_seen_at: str | None = None
+    tracker_signal_at: str | None = None
+    hydrated_from_store: bool = False
 
 
 class HeatmapPoint(BaseModel):

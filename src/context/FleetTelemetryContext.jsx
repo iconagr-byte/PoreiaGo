@@ -88,6 +88,11 @@ function normalizeVehicle(msg, id, prev) {
     source: msg.source || prev?.source || null,
     imei: msg.imei || prev?.imei || null,
     app_seen_at: msg.app_seen_at || msg.appSeenAt || prev?.app_seen_at || null,
+    tracker_signal_at:
+      msg.tracker_signal_at || msg.trackerSignalAt || prev?.tracker_signal_at || null,
+    hydrated_from_store: Boolean(
+      msg.hydrated_from_store ?? msg.hydratedFromStore ?? prev?.hydrated_from_store,
+    ),
     gps_sources: mergeGpsSources(msg.gps_sources || msg.gpsSources, prev?.gps_sources),
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };

@@ -54,6 +54,15 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
 
     alive_sec = resolve_tracker_alive_seconds(tid)
     written = 0
+    try:
+        from travel_platform.telemetry.processor import get_live_fleet
+        from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+
+        fleet = get_live_fleet()
+    except Exception:
+        fleet = None
+        normalize_vehicle_plate = None  # type: ignore
+
     for device in list_devices(tid):
         if not device.get("enabled"):
             continue
@@ -68,20 +77,29 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
         if not plate:
             continue
 
+        # Never re-animate a closed tracker over an existing live pin (App or
+        # hardware). Hydrate is only for empty-map recovery after restart/TTL.
+        if fleet is not None and normalize_vehicle_plate is not None:
+            existing_vid = fleet.find_vehicle_id(tid, plate)
+            if existing_vid and fleet._vehicles.get(existing_vid):  # noqa: SLF001
+                continue
+
         # Already have a fresh Teltonika pin on the live fleet.
         prefer, _ = is_teltonika_preferred_for_plate(tid, plate, max_age_sec=alive_sec)
         if prefer:
             continue
 
-        # Stamp "now" so list_active stale filter (driver_stale_seconds) keeps the pin.
+        # Keep pin on the map (updated_at=now) but remember the real last
+        # hardware packet so badges/soft-ack do not treat a closed device as open.
         recorded = datetime.now(timezone.utc).isoformat()
+        signal_at = str(device.get("last_seen_at") or recorded)
         payload: dict[str, Any] = {
             "tenant_id": tid,
             "vehicle_code": plate,
             "latitude": float(device["last_lat"]),
             "longitude": float(device["last_lng"]),
             "speed_kmh": float(device.get("last_speed_kmh") or 0),
-            "engine_status": "on",
+            "engine_status": "off",
             "heading_deg": 0.0,
             "bus_plate": plate,
             "driver_name": str(device.get("label") or f"GPS {plate}"),
@@ -89,6 +107,8 @@ async def hydrate_tenant_live_from_devices(tenant_id: str) -> int:
             "imei": device.get("imei"),
             "source": "teltonika",
             "recorded_at": recorded,
+            "tracker_signal_at": signal_at,
+            "hydrated_from_store": True,
         }
         try:
             await process_telemetry_payload(payload)

@@ -96,12 +96,7 @@ def resolve_live_gps_sources(
     pin_age = age_seconds(meta.get("updated_at") or meta.get("timestamp"), now=now)
     if is_live_meta_tracker_fresh(meta, max_age_sec=alive, now=now):
         out.append("teltonika")
-    elif (
-        (is_tracker_source(meta.get("source")) or (meta.get("imei") and not is_phone_source(meta.get("source"))))
-        and pin_age is not None
-        and pin_age <= alive
-    ):
-        out.append("teltonika")
+    # Do not treat hydrate-bumped updated_at as an open Teltonika channel.
 
     app_age = age_seconds(meta.get("app_seen_at"), now=now)
     if app_age is not None and app_age <= alive:
@@ -158,14 +153,32 @@ def is_live_meta_tracker_fresh(
     max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
     now: datetime | None = None,
 ) -> bool:
-    """True when live-fleet meta is a recent Teltonika fix."""
+    """
+    True when live-fleet meta carries a *real* recent Teltonika signal.
+
+    Prefer ``tracker_signal_at`` (last hardware packet). Do not treat hydrate
+    refreshes of ``updated_at`` as a live tracker — that made closed devices
+    look open forever next to the driver App.
+    """
     if not meta:
         return False
     if not is_tracker_source(meta.get("source")):
         return False
     if meta.get("lat") is None or meta.get("lng") is None:
         return False
-    age = age_seconds(meta.get("updated_at") or meta.get("timestamp"), now=now)
+    # Hydrated parked pins keep updated_at fresh for map TTL but are not "open".
+    if meta.get("hydrated_from_store") and not meta.get("tracker_signal_at"):
+        return False
+    signal = (
+        meta.get("tracker_signal_at")
+        or meta.get("last_seen_at")
+        or meta.get("updated_at")
+        or meta.get("timestamp")
+    )
+    # If the pin was hydrated, ignore the synthetic updated_at bump.
+    if meta.get("hydrated_from_store"):
+        signal = meta.get("tracker_signal_at") or meta.get("last_seen_at")
+    age = age_seconds(signal, now=now)
     if age is None:
         return False
     return age <= max(1, int(max_age_sec))

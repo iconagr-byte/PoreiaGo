@@ -125,6 +125,22 @@ class LiveFleetService:
                 merged["driver_id"] = raw["driver_id"]
             else:
                 merged.pop("driver_id", None)
+            # Real Codec packet vs parked-store hydrate.
+            if raw.get("hydrated_from_store"):
+                merged["hydrated_from_store"] = True
+                if raw.get("tracker_signal_at"):
+                    merged["tracker_signal_at"] = str(raw.get("tracker_signal_at"))
+            else:
+                merged.pop("hydrated_from_store", None)
+                signal = raw.get("tracker_signal_at") or raw.get("recorded_at")
+                if signal:
+                    merged["tracker_signal_at"] = str(signal)
+                elif update.recorded_at is not None:
+                    merged["tracker_signal_at"] = (
+                        update.recorded_at.isoformat()
+                        if hasattr(update.recorded_at, "isoformat")
+                        else str(update.recorded_at)
+                    )
         elif raw.get("driver_id"):
             merged["driver_id"] = raw["driver_id"]
         trip_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")

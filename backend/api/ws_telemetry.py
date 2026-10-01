@@ -421,6 +421,8 @@ async def admin_fleet_egress_ws(
                 "imei": meta.get("imei"),
                 "gps_sources": gps_sources,
                 "app_seen_at": meta.get("app_seen_at"),
+                "tracker_signal_at": meta.get("tracker_signal_at"),
+                "hydrated_from_store": bool(meta.get("hydrated_from_store")),
             },
         )
     await websocket.send_text(json.dumps({"type": "fleet_snapshot", "vehicles": snapshot}))

@@ -7,17 +7,27 @@ import {
   formatFleetGpsSourceChipLabel,
 } from './fleetGpsSourceBadge.js';
 
-assert.equal(resolveFleetGpsSource({ source: 'teltonika' }), 'teltonika');
-assert.equal(resolveFleetGpsSource({ source: 'driver_pwa' }), 'app');
-assert.equal(formatFleetGpsSourceBadge({ source: 'teltonika' }), 'Teltonika');
-assert.equal(formatFleetGpsSourceBadge({ source: 'driver_pwa' }), 'App οδηγού');
+const now = new Date().toISOString();
+const old = new Date(Date.now() - 10 * 60_000).toISOString();
+
+assert.equal(
+  resolveFleetGpsSource({ source: 'teltonika', timestamp: now, tracker_signal_at: now }),
+  'teltonika',
+);
+assert.equal(resolveFleetGpsSource({ source: 'driver_pwa', timestamp: now }), 'app');
+assert.equal(
+  formatFleetGpsSourceBadge({ source: 'teltonika', timestamp: now, tracker_signal_at: now }),
+  'Teltonika',
+);
+assert.equal(formatFleetGpsSourceBadge({ source: 'driver_pwa', timestamp: now }), 'App οδηγού');
 assert.equal(formatFleetGpsSourceBadge({}), '');
 
 assert.deepEqual(
   resolveFleetGpsSources({
     source: 'teltonika',
     imei: '861',
-    app_seen_at: new Date().toISOString(),
+    app_seen_at: now,
+    tracker_signal_at: now,
     gps_sources: ['teltonika', 'app'],
   }),
   ['teltonika', 'app'],
@@ -26,25 +36,41 @@ assert.deepEqual(
 assert.equal(
   formatFleetGpsSourceBadge({
     source: 'teltonika',
-    app_seen_at: new Date().toISOString(),
+    app_seen_at: now,
+    tracker_signal_at: now,
   }),
   'Teltonika · App',
+);
+
+// Closed / hydrated Teltonika must not show as an open channel next to App.
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'teltonika',
+    imei: '861',
+    hydrated_from_store: true,
+    tracker_signal_at: old,
+    updated_at: now,
+    app_seen_at: now,
+    gps_sources: ['teltonika', 'app'],
+  }),
+  ['app'],
 );
 
 assert.equal(formatFleetGpsSourceChipLabel('app'), 'App');
 assert.equal(
   fleetGpsSourceToneClass({
     source: 'teltonika',
-    app_seen_at: new Date().toISOString(),
+    app_seen_at: now,
+    tracker_signal_at: now,
   }),
   'fleet-apple-bus-gps-source--dual',
 );
 assert.equal(
-  fleetGpsSourceToneClass({ source: 'teltonika' }),
+  fleetGpsSourceToneClass({ source: 'teltonika', tracker_signal_at: now, timestamp: now }),
   'fleet-apple-bus-gps-source--teltonika',
 );
 assert.equal(
-  fleetGpsSourceToneClass({ source: 'driver_pwa' }),
+  fleetGpsSourceToneClass({ source: 'driver_pwa', timestamp: now }),
   'fleet-apple-bus-gps-source--app',
 );
 

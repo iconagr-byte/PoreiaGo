@@ -2,7 +2,7 @@
  * Live-map badge: Teltonika hardware and/or driver app — one pin, all live sources.
  */
 
-const APP_SEEN_FRESH_MS = 90_000;
+const SOURCE_FRESH_MS = 90_000;
 
 export function resolveFleetGpsSource(vehicle) {
   const sources = resolveFleetGpsSources(vehicle);
@@ -23,12 +23,35 @@ function kindFromRaw(raw) {
   return '';
 }
 
-function isAppSeenFresh(vehicle) {
-  const raw = vehicle?.app_seen_at || vehicle?.appSeenAt;
-  if (!raw) return false;
+function ageMs(raw) {
+  if (!raw) return null;
   const t = new Date(raw).getTime();
-  if (!Number.isFinite(t)) return false;
-  return Date.now() - t <= APP_SEEN_FRESH_MS;
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Date.now() - t);
+}
+
+function isFresh(raw, maxMs = SOURCE_FRESH_MS) {
+  const age = ageMs(raw);
+  return age != null && age <= maxMs;
+}
+
+function isAppSeenFresh(vehicle) {
+  return isFresh(vehicle?.app_seen_at || vehicle?.appSeenAt);
+}
+
+/** Real Teltonika packet time — ignore hydrate-bumped updated_at. */
+function isTeltonikaSignalFresh(vehicle) {
+  if (!vehicle) return false;
+  if (vehicle.hydrated_from_store || vehicle.hydratedFromStore) {
+    return isFresh(vehicle.tracker_signal_at || vehicle.trackerSignalAt);
+  }
+  const signal =
+    vehicle.tracker_signal_at ||
+    vehicle.trackerSignalAt ||
+    (kindFromRaw(vehicle.source) === 'teltonika'
+      ? vehicle.timestamp || vehicle.updated_at
+      : null);
+  return isFresh(signal);
 }
 
 /** Active GPS channels for the dual badge — order: teltonika, app. */
@@ -48,17 +71,37 @@ export function resolveFleetGpsSources(vehicle) {
     : Array.isArray(vehicle.gpsSources)
       ? vehicle.gpsSources
       : [];
-  for (const item of listed) {
-    push(kindFromRaw(item) || (item === 'teltonika' || item === 'app' ? item : ''));
+
+  // Prefer server-resolved channels (already age-filtered).
+  if (listed.length) {
+    for (const item of listed) {
+      const kind = kindFromRaw(item) || (item === 'teltonika' || item === 'app' ? item : '');
+      if (kind === 'teltonika' && !isTeltonikaSignalFresh(vehicle) && vehicle.hydrated_from_store) {
+        continue;
+      }
+      push(kind);
+    }
+    if (isAppSeenFresh(vehicle)) push('app');
+    if (isTeltonikaSignalFresh(vehicle)) push('teltonika');
+    return ['teltonika', 'app'].filter((k) => seen.has(k));
   }
 
-  const primary = kindFromRaw(vehicle?.source || vehicle?.gps_source || vehicle?.gpsSource);
-  if (primary) push(primary);
-  else if (vehicle?.imei && primary !== 'app') push('teltonika');
+  if (isTeltonikaSignalFresh(vehicle)) push('teltonika');
+  else if (
+    kindFromRaw(vehicle?.source || vehicle?.gps_source || vehicle?.gpsSource) === 'teltonika' &&
+    !vehicle.hydrated_from_store &&
+    isFresh(vehicle.timestamp || vehicle.updated_at)
+  ) {
+    push('teltonika');
+  } else if (vehicle?.imei && isTeltonikaSignalFresh(vehicle)) {
+    push('teltonika');
+  }
 
   if (isAppSeenFresh(vehicle)) push('app');
+  else if (kindFromRaw(vehicle?.source) === 'app' && isFresh(vehicle.timestamp || vehicle.updated_at)) {
+    push('app');
+  }
 
-  // Stable order for the graphic.
   return ['teltonika', 'app'].filter((k) => seen.has(k));
 }
 

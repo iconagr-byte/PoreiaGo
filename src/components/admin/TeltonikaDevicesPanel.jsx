@@ -49,14 +49,36 @@ function normalizePlate(value) {
     .replace(/\s+/g, '');
 }
 
+function deviceSignalFresh(d, maxMs = 90_000) {
+  const raw = d?.last_seen_at;
+  if (!raw) return false;
+  const t = new Date(raw).getTime();
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t <= maxMs;
+}
+
 function deviceStatus(d, liveCodes) {
-  const onMap = liveCodes.has(String(d.vehicle_code || '').trim().toUpperCase());
-  if (onMap) return { key: 'ON_MAP', label: 'Στον χάρτη', tone: 'bg-emerald-100 text-emerald-800' };
+  const plate = normalizePlate(d.vehicle_code);
+  const onMap = plate ? liveCodes.has(plate) : false;
+  const open = deviceSignalFresh(d);
+  if (onMap && open) {
+    return { key: 'OPEN', label: 'Ανοιχτό · στον χάρτη', tone: 'bg-emerald-100 text-emerald-800' };
+  }
+  if (onMap && !open) {
+    return {
+      key: 'PARKED',
+      label: 'Κλειστό · τελευταία θέση',
+      tone: 'bg-amber-100 text-amber-900',
+    };
+  }
+  if (open) {
+    return { key: 'OPEN', label: 'Ανοιχτό (σύνδεση)', tone: 'bg-emerald-100 text-emerald-800' };
+  }
   if (d.last_lat != null && d.last_lng != null) {
-    return { key: 'HAS_FIX', label: 'Έχει συντεταγμένες', tone: 'bg-sky-100 text-sky-800' };
+    return { key: 'CLOSED', label: 'Κλειστό · έχει συντεταγμένες', tone: 'bg-slate-100 text-slate-700' };
   }
   if (d.last_seen_at) {
-    return { key: 'SEEN', label: 'Σύνδεση χωρίς GPS', tone: 'bg-amber-100 text-amber-900' };
+    return { key: 'CLOSED', label: 'Κλειστό', tone: 'bg-slate-100 text-slate-600' };
   }
   return { key: 'WAITING', label: 'Αναμονή δεδομένων', tone: 'bg-slate-100 text-slate-600' };
 }
@@ -184,7 +206,7 @@ export default function TeltonikaDevicesPanel() {
   const liveCodes = useMemo(() => {
     const set = new Set();
     for (const v of liveFleet) {
-      const code = String(v.vehicle_code || v.bus_plate || '').trim().toUpperCase();
+      const code = normalizePlate(v.vehicle_code || v.bus_plate);
       if (code) set.add(code);
     }
     return set;

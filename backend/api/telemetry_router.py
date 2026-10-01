@@ -206,6 +206,8 @@ async def fleet_live(
                     imei=str(meta.get("imei") or "") or None,
                     gps_sources=gps_sources,
                     app_seen_at=str(meta.get("app_seen_at") or "") or None,
+                    tracker_signal_at=str(meta.get("tracker_signal_at") or "") or None,
+                    hydrated_from_store=bool(meta.get("hydrated_from_store")),
                 ),
             )
         except Exception:

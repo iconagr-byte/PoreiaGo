@@ -78,6 +78,39 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         self.assertTrue(prefer)
         self.assertEqual(tracker.get("imei"), "861076085468260")
 
+    def test_hydrated_closed_tracker_not_preferred(self):
+        """Parked hydrate must not soft-ack as an open Teltonika channel."""
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+        from travel_platform.telemetry.tracker_priority import (
+            is_live_meta_tracker_fresh,
+            resolve_live_gps_sources,
+        )
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        vid = "veh-hydrated"
+        old = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "lat": 38.2,
+            "lng": 20.6,
+            "source": "teltonika",
+            "imei": "861076085468260",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "tracker_signal_at": old,
+            "hydrated_from_store": True,
+            "app_seen_at": datetime.now(timezone.utc).isoformat(),
+        }
+        prefer, _ = is_teltonika_preferred_for_plate(self.tenant, "EEX5670", max_age_sec=90)
+        self.assertFalse(prefer)
+        meta = LiveFleetService._vehicles[vid]
+        self.assertFalse(is_live_meta_tracker_fresh(meta, max_age_sec=90))
+        self.assertEqual(resolve_live_gps_sources(meta, max_age_sec=90), ["app"])
+
     def test_normalize_folds_greek_lookalike_plate(self):
         from travel_platform.telemetry.tracker_priority import plate_display
 

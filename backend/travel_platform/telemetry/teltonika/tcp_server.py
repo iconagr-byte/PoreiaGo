@@ -47,10 +47,36 @@ def teltonika_bind() -> tuple[str, int]:
     return host, port
 
 
+def _port_is_bound(port: int) -> bool:
+    """True when *some* process (often another Gunicorn worker) holds the TCP port.
+
+    Probe via bind — never connect (Codec 8 would treat us as a device login).
+    """
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+        sock.bind(("127.0.0.1", int(port)))
+        return False
+    except OSError:
+        return True
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+
+
 def get_teltonika_status() -> dict[str, Any]:
     public_ip = (os.getenv("PLATFORM_INGRESS_IP") or os.getenv("TELTONIKA_PUBLIC_HOST") or "").strip()
     host, port = teltonika_bind()
     out = {**_status, "host": host, "port": port, "enabled": teltonika_enabled()}
+    # Multi-worker: only the binder sets listening=True in-process. Detect the
+    # shared TCP port so admin UI does not show a false "TCP offline".
+    if teltonika_enabled() and not out.get("listening") and _port_is_bound(port):
+        out["listening"] = True
+        out["last_error"] = None
     if public_ip:
         out["public_endpoint"] = f"{public_ip}:{port}"
     else:
