@@ -200,6 +200,15 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
     # (Teltonika) path needs its own egress so the map badge updates live.
     source = str(raw.get("source") or "").lower()
     if source.startswith("teltonika") or source in {"test_ping", "tracker"}:
+        # Drop leftover phone pins for this plate (multi-worker Redis duplicates).
+        try:
+            await _live.purge_phone_siblings_for_plate(
+                str(update.tenant_id),
+                update.vehicle_code,
+                keep_vehicle_id=str(vehicle_id),
+            )
+        except Exception:
+            logger.debug("teltonika phone-sibling purge skipped", exc_info=True)
         try:
             from travel_platform.telemetry.fleet_pubsub import publish_fleet_location
             from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub

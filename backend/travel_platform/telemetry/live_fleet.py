@@ -29,22 +29,39 @@ class LiveFleetService:
         vehicle_code: str,
         trip_id: int | None = None,
     ) -> UUID:
-        code = (vehicle_code or "UNKNOWN").strip() or "UNKNOWN"
+        from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+
+        code = normalize_vehicle_plate(vehicle_code) or "UNKNOWN"
         key = f"{tenant_id}:{code}"
         existing = self._code_index.get(key)
         if existing and existing in self._vehicles:
             meta = self._vehicles[existing]
             meta["tenant_id"] = str(tenant_id)
             meta["vehicle_code"] = code
+            meta["bus_plate"] = meta.get("bus_plate") or code
             if trip_id is not None:
                 meta["trip_id"] = trip_id
             return UUID(existing)
+
+        # Reuse an existing in-memory row for the same plate (case/spacing variants).
+        tid = str(tenant_id)
+        for candidate, meta in self._vehicles.items():
+            if str(meta.get("tenant_id") or "") != tid:
+                continue
+            plate = normalize_vehicle_plate(meta.get("vehicle_code") or meta.get("bus_plate"))
+            if plate == code:
+                self._code_index[key] = candidate
+                meta["vehicle_code"] = code
+                meta["bus_plate"] = meta.get("bus_plate") or code
+                if trip_id is not None:
+                    meta["trip_id"] = trip_id
+                return UUID(candidate)
 
         vid = str(uuid4())
         self._code_index[key] = vid
         self._vehicles[vid] = {
             "vehicle_id": vid,
-            "tenant_id": str(tenant_id),
+            "tenant_id": tid,
             "vehicle_code": code,
             "trip_id": trip_id,
             "bus_plate": code,
@@ -114,10 +131,16 @@ class LiveFleetService:
 
             merged["trip_title"] = resolve_trip_title_sync(update.trip_id)
 
+        from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+
+        plate = normalize_vehicle_plate(update.vehicle_code or merged.get("bus_plate"))
+        if plate:
+            merged["vehicle_code"] = plate
+            merged["bus_plate"] = normalize_vehicle_plate(merged.get("bus_plate")) or plate
         self._vehicles[vid] = merged
-        # Keep code index in sync
-        code_key = f"{update.tenant_id}:{update.vehicle_code}"
-        self._code_index[code_key] = vid
+        # Keep code index in sync (normalized plate — one pin per bus).
+        if plate:
+            self._code_index[f"{update.tenant_id}:{plate}"] = vid
 
         tenant = str(update.tenant_id)
         self._heat_points[tenant].append((update.latitude, update.longitude))
@@ -126,12 +149,20 @@ class LiveFleetService:
         return state
 
     def find_vehicle_id(self, tenant_id: str, vehicle_code: str) -> str | None:
-        key = f"{tenant_id}:{vehicle_code}"
+        from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+
+        plate = normalize_vehicle_plate(vehicle_code)
+        if not plate:
+            return None
+        key = f"{tenant_id}:{plate}"
         vid = self._code_index.get(key)
         if vid and vid in self._vehicles:
             return vid
         for candidate, meta in self._vehicles.items():
-            if meta.get("tenant_id") == tenant_id and meta.get("vehicle_code") == vehicle_code:
+            if str(meta.get("tenant_id") or "") != str(tenant_id):
+                continue
+            if normalize_vehicle_plate(meta.get("vehicle_code") or meta.get("bus_plate")) == plate:
+                self._code_index[key] = candidate
                 return candidate
         return None
 
@@ -156,8 +187,51 @@ class LiveFleetService:
             updated_at=updated or now,
         )
 
+    def _dedupe_states_by_plate(
+        self,
+        states: list[LiveVehicleState],
+        *,
+        tenant_id: str,
+        now: datetime,
+        max_age_sec: int,
+    ) -> list[LiveVehicleState]:
+        """One pin per plate — fresh Teltonika beats leftover phone GPS."""
+        from travel_platform.telemetry.tracker_priority import (
+            meta_plate,
+            normalize_vehicle_plate,
+            prefer_meta_for_plate,
+        )
+
+        winners: dict[str, tuple[LiveVehicleState, dict[str, Any]]] = {}
+        orphans: list[LiveVehicleState] = []
+        for state in states or []:
+            meta = dict(self._vehicles.get(str(state.vehicle_id), {}) or {})
+            meta.setdefault("vehicle_id", state.vehicle_id)
+            meta.setdefault("vehicle_code", state.vehicle_code)
+            meta.setdefault("bus_plate", state.vehicle_code)
+            meta.setdefault("source", meta.get("source"))
+            meta.setdefault("updated_at", state.updated_at.isoformat() if state.updated_at else None)
+            meta.setdefault("lat", state.lat)
+            meta.setdefault("lng", state.lng)
+            plate = meta_plate(meta) or normalize_vehicle_plate(state.vehicle_code)
+            if not plate:
+                orphans.append(state)
+                continue
+            prev = winners.get(plate)
+            if not prev:
+                winners[plate] = (state, meta)
+                continue
+            chosen = prefer_meta_for_plate(prev[1], meta, max_age_sec=max_age_sec, now=now)
+            winners[plate] = (state, meta) if chosen is meta else prev
+            # Point the plate index at the winning vehicle id.
+            keep = winners[plate][0]
+            if keep.vehicle_id:
+                self._code_index[f"{tenant_id}:{plate}"] = str(keep.vehicle_id)
+        return [pair[0] for pair in winners.values()] + orphans
+
     def list_active(self, tenant_id: UUID) -> list[LiveVehicleState]:
         from travel_platform.telemetry.settings_store import get_telemetry_settings
+        from travel_platform.telemetry.tracker_priority import resolve_tracker_alive_seconds
 
         tid = str(tenant_id)
         stale_seconds = get_telemetry_settings(tid).driver_stale_seconds
@@ -169,20 +243,33 @@ class LiveFleetService:
             state = self._meta_to_state(meta, stale_seconds=stale_seconds, now=now)
             if state:
                 out.append(state)
-        return out
+        return self._dedupe_states_by_plate(
+            out,
+            tenant_id=tid,
+            now=now,
+            max_age_sec=resolve_tracker_alive_seconds(tid),
+        )
 
     async def list_active_async(self, tenant_id: UUID) -> list[LiveVehicleState]:
         """Memory + Redis (needed when WS is down and HTTP poll hits another worker)."""
         from travel_platform.telemetry.live_fleet_redis import load_live_vehicles
         from travel_platform.telemetry.settings_store import get_telemetry_settings
+        from travel_platform.telemetry.tracker_priority import (
+            normalize_vehicle_plate,
+            resolve_tracker_alive_seconds,
+        )
 
         tid = str(tenant_id)
         stale_seconds = get_telemetry_settings(tid).driver_stale_seconds
         now = datetime.now(timezone.utc)
         by_id: dict[str, LiveVehicleState] = {}
 
-        for state in self.list_active(tenant_id):
-            if state.vehicle_id:
+        # Use raw memory scan here (pre-dedupe) so Redis merges can still win.
+        for meta in self._vehicles.values():
+            if meta.get("tenant_id") != tid:
+                continue
+            state = self._meta_to_state(meta, stale_seconds=stale_seconds, now=now)
+            if state and state.vehicle_id:
                 by_id[state.vehicle_id] = state
 
         for meta in await load_live_vehicles(tid):
@@ -190,7 +277,7 @@ class LiveFleetService:
             vid = str(meta.get("vehicle_id") or "")
             if vid:
                 self._vehicles[vid] = {**self._vehicles.get(vid, {}), **meta}
-                code = meta.get("vehicle_code")
+                code = normalize_vehicle_plate(meta.get("vehicle_code") or meta.get("bus_plate"))
                 if code:
                     self._code_index[f"{tid}:{code}"] = vid
             state = self._meta_to_state(meta, stale_seconds=stale_seconds, now=now)
@@ -199,7 +286,105 @@ class LiveFleetService:
             prev = by_id.get(state.vehicle_id)
             if not prev or state.updated_at >= prev.updated_at:
                 by_id[state.vehicle_id] = state
-        return list(by_id.values())
+        return self._dedupe_states_by_plate(
+            list(by_id.values()),
+            tenant_id=tid,
+            now=now,
+            max_age_sec=resolve_tracker_alive_seconds(tid),
+        )
+
+    async def purge_phone_siblings_for_plate(
+        self,
+        tenant_id: str,
+        vehicle_code: str | None,
+        *,
+        keep_vehicle_id: str | None = None,
+    ) -> list[str]:
+        """
+        Drop leftover phone/app pins for a plate when Teltonika owns the map.
+
+        Multi-worker Redis often leaves both UUIDs alive for the same bus.
+        """
+        from travel_platform.telemetry.live_fleet_redis import (
+            delete_live_vehicle,
+            load_live_vehicles,
+        )
+        from travel_platform.telemetry.tracker_priority import (
+            is_phone_source,
+            is_tracker_source,
+            normalize_vehicle_plate,
+        )
+
+        tid = str(tenant_id or "").strip()
+        plate = normalize_vehicle_plate(vehicle_code)
+        if not tid or not plate:
+            return []
+
+        def _is_hardware(meta: dict[str, Any] | None) -> bool:
+            src = (meta or {}).get("source")
+            if is_tracker_source(src):
+                return True
+            if (meta or {}).get("imei") and not is_phone_source(src):
+                return True
+            return False
+
+        keep = str(keep_vehicle_id or "").strip()
+        if not keep or not _is_hardware(self._vehicles.get(keep)):
+            # Prefer an existing Teltonika/hardware UUID for this plate.
+            for vid, meta in self._vehicles.items():
+                if str(meta.get("tenant_id") or "") != tid:
+                    continue
+                if normalize_vehicle_plate(meta.get("vehicle_code") or meta.get("bus_plate")) != plate:
+                    continue
+                if _is_hardware(meta):
+                    keep = str(vid)
+                    break
+        if not keep:
+            keep = str(self.find_vehicle_id(tid, plate) or "").strip()
+
+        removed: list[str] = []
+        seen: set[str] = set()
+
+        async def _drop(vid: str, meta: dict[str, Any]) -> None:
+            if not vid or vid in seen:
+                return
+            if keep and vid == keep:
+                return
+            # Never delete hardware pins; only phone/app leftovers.
+            if _is_hardware(meta):
+                return
+            seen.add(vid)
+            self._vehicles.pop(vid, None)
+            for idx_key, idx_vid in list(self._code_index.items()):
+                if idx_vid == vid:
+                    self._code_index.pop(idx_key, None)
+            try:
+                await delete_live_vehicle(tid, vid)
+            except Exception:
+                pass
+            removed.append(vid)
+
+        for vid, meta in list(self._vehicles.items()):
+            if str(meta.get("tenant_id") or "") != tid:
+                continue
+            row_plate = normalize_vehicle_plate(meta.get("vehicle_code") or meta.get("bus_plate"))
+            if row_plate != plate:
+                continue
+            await _drop(vid, meta)
+
+        try:
+            remote_rows = await load_live_vehicles(tid)
+        except Exception:
+            remote_rows = []
+        for meta in remote_rows:
+            row_plate = normalize_vehicle_plate(meta.get("vehicle_code") or meta.get("bus_plate"))
+            if row_plate != plate:
+                continue
+            await _drop(str(meta.get("vehicle_id") or ""), meta)
+
+        if keep:
+            self._code_index[f"{tid}:{plate}"] = keep
+        return removed
 
     def _merge_admin_fleets(
         self,
