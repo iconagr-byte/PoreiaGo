@@ -172,6 +172,15 @@ async def fleet_live(
             # the client accumulates from the live pin and a stub would replace
             # that growing path on every poll.
             raw_trail = trails_by_vehicle.get(str(v.vehicle_id)) or []
+            from travel_platform.telemetry.tracker_priority import (
+                resolve_live_gps_sources,
+                resolve_tracker_alive_seconds,
+            )
+
+            gps_sources = resolve_live_gps_sources(
+                meta,
+                max_age_sec=resolve_tracker_alive_seconds(str(tenant_id)),
+            )
             rows.append(
                 LiveVehicleResponse(
                     vehicle_id=v.vehicle_id,
@@ -195,6 +204,8 @@ async def fleet_live(
                     trail=trail_points_for_api(raw_trail),
                     source=str(meta.get("source") or "") or None,
                     imei=str(meta.get("imei") or "") or None,
+                    gps_sources=gps_sources,
+                    app_seen_at=str(meta.get("app_seen_at") or "") or None,
                 ),
             )
         except Exception:

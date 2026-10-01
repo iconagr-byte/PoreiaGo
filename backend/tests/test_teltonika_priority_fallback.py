@@ -134,14 +134,44 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
                 "travel_platform.telemetry.driver_gps_heartbeat.touch_driver_gps",
                 return_value=False,
             ) as touch,
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.save_live_vehicle",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.delete_live_vehicle",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "travel_platform.telemetry.fleet_pubsub.publish_fleet_location",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "travel_platform.telemetry.fleet_ws_hub.get_fleet_egress_hub",
+                return_value=type("H", (), {"broadcast": AsyncMock()})(),
+            ),
         ):
             out = asyncio.run(ingest_driver_location(body, session=session))
 
         self.assertTrue(out.get("ok"))
         self.assertTrue(out.get("skipped_live_map"))
         self.assertEqual(out.get("map_source"), "teltonika")
+        self.assertIn("teltonika", out.get("gps_sources") or [])
+        self.assertIn("app", out.get("gps_sources") or [])
         process.assert_not_awaited()
         touch.assert_called()
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        meta = LiveFleetService._vehicles.get("veh-teltonika-1") or {}
+        self.assertTrue(meta.get("app_seen_at"))
+        self.assertIn("app", meta.get("gps_sources") or [])
 
     def test_ingest_allows_phone_when_tracker_stale(self):
         with ds._LOCK:  # noqa: SLF001

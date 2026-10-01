@@ -234,19 +234,34 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
             )
         except Exception:
             logger.debug("touch_driver_gps after Teltonika soft-ack failed", exc_info=True)
-        # Ensure no leftover App pin remains beside the Teltonika pin.
+        # One pin only: purge leftover App UUID, stamp app heartbeat on Teltonika.
+        gps_sources = ["teltonika", "app"]
         try:
             from travel_platform.telemetry.processor import get_live_fleet
 
             plate = payload.get("vehicle_code") or payload.get("bus_plate")
-            await get_live_fleet().purge_phone_siblings_for_plate(tenant_id, plate)
+            fleet = get_live_fleet()
+            await fleet.purge_phone_siblings_for_plate(tenant_id, plate)
+            stamped = await fleet.mark_app_heartbeat_for_plate(
+                tenant_id,
+                plate,
+                driver_id=session.get("driver_id") if isinstance(session, dict) else None,
+                driver_name=(
+                    session.get("driver_name") if isinstance(session, dict) else None
+                )
+                or payload.get("driver_name"),
+                recorded_at=payload.get("recorded_at"),
+            )
+            if stamped and isinstance(stamped.get("gps_sources"), list):
+                gps_sources = [str(s) for s in stamped["gps_sources"]]
         except Exception:
-            logger.debug("soft-ack phone-sibling purge skipped", exc_info=True)
+            logger.debug("soft-ack dual-source stamp skipped", exc_info=True)
         return {
             "ok": True,
             "skipped_live_map": True,
             "map_source": "teltonika",
-            "detail": "Το στίγμα στον χάρτη έρχεται από το Teltonika — το κινητό επιβεβαιώθηκε",
+            "gps_sources": gps_sources,
+            "detail": "Ένα στίγμα στον χάρτη — Teltonika + App οδηγού ενεργά",
             "tenant_id": tenant_id,
             "tracker_imei": tracker.get("imei"),
         }

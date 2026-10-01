@@ -19,8 +19,9 @@ import {
   formatFleetExcursionBadge,
 } from '../../lib/admin/fleetBusPillLabel.js';
 import {
-  fleetGpsSourceToneClass,
+  fleetGpsSourceBadgeHtml,
   formatFleetGpsSourceBadge,
+  resolveFleetGpsSources,
 } from '../../lib/admin/fleetGpsSourceBadge.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import FleetGeofenceLayers from './FleetGeofenceLayers.jsx';
@@ -48,22 +49,20 @@ const busIcon = (vehicle) => {
   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
   const label = formatFleetBusPillLabel(vehicle);
   const excursion = formatFleetExcursionBadge(vehicle);
-  const gpsSource = formatFleetGpsSourceBadge(vehicle);
-  const gpsTone = fleetGpsSourceToneClass(vehicle);
-  const key = `${vehicle?.id || ''}|${img}|${heading}|${label}|${excursion}|${gpsSource}`;
+  const gpsBadge = fleetGpsSourceBadgeHtml(vehicle, { escapeAttr });
+  const gpsKey = resolveFleetGpsSources(vehicle).join('+');
+  const key = `${vehicle?.id || ''}|${img}|${heading}|${label}|${excursion}|${gpsKey}`;
   const cached = BUS_ICON_CACHE.get(key);
   if (cached) return cached;
 
   const excursionHtml = excursion
     ? `<div class="fleet-apple-bus-excursion">${escapeAttr(excursion)}</div>`
     : '';
-  const gpsHtml = gpsSource
-    ? `<div class="fleet-apple-bus-gps-source ${escapeAttr(gpsTone)}">${escapeAttr(gpsSource)}</div>`
-    : '';
+  const tall = Boolean(excursion || gpsBadge.heightBoost);
   const icon = L.divIcon({
     className: 'fleet-bus-marker-ws',
     html: `<div class="fleet-apple-bus-pin">
-      ${gpsHtml}
+      ${gpsBadge.html}
       ${excursionHtml}
       <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${escapeAttr(label)}</div>
       <div class="fleet-apple-bus-pin__ring">
@@ -71,8 +70,8 @@ const busIcon = (vehicle) => {
         <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
     </div>`,
-    iconSize: [52, excursion || gpsSource ? 110 : 72],
-    iconAnchor: [26, excursion || gpsSource ? 78 : 40],
+    iconSize: [52, tall ? (gpsBadge.dual ? 118 : 110) : 72],
+    iconAnchor: [26, tall ? (gpsBadge.dual ? 86 : 78) : 40],
   });
   BUS_ICON_CACHE.set(key, icon);
   if (BUS_ICON_CACHE.size > BUS_ICON_CACHE_MAX) {
@@ -118,6 +117,7 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
           Ταχύτητα: {Math.round(v.speed)} km/h
           <br />
           Πηγή GPS: {formatFleetGpsSourceBadge(v) || '—'}
+          {resolveFleetGpsSources(v).length > 1 ? ' (και τα δύο ενεργά)' : ''}
           <br />
           Δρομολόγιο #{v.trip_id ?? '—'}
           <br />

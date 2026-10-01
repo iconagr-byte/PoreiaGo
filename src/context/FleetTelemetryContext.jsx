@@ -87,8 +87,38 @@ function normalizeVehicle(msg, id, prev) {
     trail: Array.isArray(msg.trail) && msg.trail.length ? msg.trail : prev?.trail || null,
     source: msg.source || prev?.source || null,
     imei: msg.imei || prev?.imei || null,
+    app_seen_at: msg.app_seen_at || msg.appSeenAt || prev?.app_seen_at || null,
+    gps_sources: mergeGpsSources(msg.gps_sources || msg.gpsSources, prev?.gps_sources),
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
+}
+
+function mergeGpsSources(nextList, prevList) {
+  const out = [];
+  const seen = new Set();
+  for (const list of [nextList, prevList]) {
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      const kind = String(item || '')
+        .trim()
+        .toLowerCase();
+      let norm = '';
+      if (kind.includes('teltonika') || kind === 'tracker' || kind === 'test_ping') {
+        norm = 'teltonika';
+      } else if (
+        kind.includes('driver') ||
+        kind.includes('pwa') ||
+        kind.includes('phone') ||
+        kind === 'app'
+      ) {
+        norm = 'app';
+      }
+      if (!norm || seen.has(norm)) continue;
+      seen.add(norm);
+      out.push(norm);
+    }
+  }
+  return ['teltonika', 'app'].filter((k) => seen.has(k));
 }
 
 function vehicleIdFromRow(v) {

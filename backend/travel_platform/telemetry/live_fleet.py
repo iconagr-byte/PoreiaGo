@@ -386,6 +386,91 @@ class LiveFleetService:
             self._code_index[f"{tid}:{plate}"] = keep
         return removed
 
+    async def mark_app_heartbeat_for_plate(
+        self,
+        tenant_id: str,
+        vehicle_code: str | None,
+        *,
+        driver_id: str | None = None,
+        driver_name: str | None = None,
+        recorded_at: str | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Soft-ack: keep Teltonika coords, stamp that the driver app is also live.
+
+        Used so the map shows one pin with both Teltonika + App badges.
+        """
+        from travel_platform.telemetry.live_fleet_redis import save_live_vehicle
+        from travel_platform.telemetry.tracker_priority import (
+            normalize_vehicle_plate,
+            resolve_live_gps_sources,
+            resolve_tracker_alive_seconds,
+        )
+
+        tid = str(tenant_id or "").strip()
+        plate = normalize_vehicle_plate(vehicle_code)
+        if not tid or not plate:
+            return None
+
+        vid = self.find_vehicle_id(tid, plate)
+        if not vid:
+            return None
+        meta = dict(self._vehicles.get(vid) or {})
+        if not meta:
+            return None
+
+        now_iso = recorded_at or datetime.now(timezone.utc).isoformat()
+        meta["app_seen_at"] = now_iso
+        if driver_id:
+            meta["app_driver_id"] = str(driver_id)
+        if driver_name and not meta.get("driver_name"):
+            meta["driver_name"] = str(driver_name)
+        sources = resolve_live_gps_sources(
+            meta,
+            max_age_sec=resolve_tracker_alive_seconds(tid),
+        )
+        if "app" not in sources:
+            sources = [*sources, "app"]
+        meta["gps_sources"] = sources
+        meta["tenant_id"] = tid
+        meta["vehicle_id"] = vid
+        self._vehicles[vid] = meta
+        self._code_index[f"{tid}:{plate}"] = vid
+        try:
+            await save_live_vehicle(meta)
+        except Exception:
+            pass
+        # Light WS refresh so the dual badge appears without waiting for poll.
+        try:
+            from travel_platform.telemetry.fleet_pubsub import publish_fleet_location
+            from travel_platform.telemetry.fleet_ws_hub import get_fleet_egress_hub
+
+            egress = {
+                "type": "fleet_location",
+                "tenant_id": tid,
+                "vehicle_id": vid,
+                "vehicle_code": meta.get("vehicle_code") or plate,
+                "bus_plate": meta.get("bus_plate") or plate,
+                "driver_name": meta.get("driver_name"),
+                "driver_id": meta.get("driver_id") or meta.get("app_driver_id"),
+                "trip_id": meta.get("trip_id"),
+                "trip_title": meta.get("trip_title"),
+                "lat": meta.get("lat"),
+                "lng": meta.get("lng"),
+                "speed": meta.get("speed_kmh") or 0,
+                "heading": meta.get("heading_deg"),
+                "timestamp": meta.get("updated_at") or now_iso,
+                "source": meta.get("source") or "teltonika",
+                "imei": meta.get("imei"),
+                "app_seen_at": now_iso,
+                "gps_sources": sources,
+            }
+            await publish_fleet_location(tid, egress)
+            await get_fleet_egress_hub().broadcast(tid, egress)
+        except Exception:
+            pass
+        return meta
+
     def _merge_admin_fleets(
         self,
         primary: list[LiveVehicleState],
