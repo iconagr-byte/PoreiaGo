@@ -160,6 +160,46 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
 
         self.assertEqual(n, 0)
         process.assert_not_awaited()
+        self.assertIn(vid, LiveFleetService._vehicles)
+
+    def test_removes_offline_teltonika_only_pin(self):
+        """Closed Teltonika with no live App → pin leaves the map."""
+        with ds._LOCK:  # noqa: SLF001
+            data = ds._read()  # noqa: SLF001
+            for row in data.get("devices") or []:
+                if row.get("imei") == "861076085468260":
+                    row["last_seen_at"] = (
+                        datetime.now(timezone.utc) - timedelta(hours=2)
+                    ).isoformat()
+            ds._write(data)  # noqa: SLF001
+
+        vid = "veh-hw"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "lat": 38.25,
+            "lng": 20.65,
+            "source": "teltonika",
+            "updated_at": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+            "tracker_signal_at": (
+                datetime.now(timezone.utc) - timedelta(hours=2)
+            ).isoformat(),
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process, patch(
+            "travel_platform.telemetry.live_fleet_redis.delete_live_vehicle",
+            new_callable=AsyncMock,
+        ) as delete_mock:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
+        self.assertEqual(n, 0)
+        process.assert_not_awaited()
+        self.assertNotIn(vid, LiveFleetService._vehicles)
+        delete_mock.assert_awaited()
 
 
 if __name__ == "__main__":

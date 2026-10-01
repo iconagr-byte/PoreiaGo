@@ -54,6 +54,18 @@ assert.deepEqual(
   ['teltonika', 'app'],
 );
 
+// Cleared App after logout — Teltonika-only (no resurrect from empty stamp).
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'teltonika',
+    imei: '861',
+    app_seen_at: null,
+    tracker_signal_at: now,
+    gps_sources: ['teltonika'],
+  }),
+  ['teltonika'],
+);
+
 // App-sourced row + server says both — show Teltonika · App (device online).
 assert.deepEqual(
   resolveFleetGpsSources({
