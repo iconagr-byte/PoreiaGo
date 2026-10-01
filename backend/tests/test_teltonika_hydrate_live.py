@@ -215,6 +215,29 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         self.assertEqual(n, 1)
         process.assert_awaited()
 
+    def test_keeps_parked_pin_within_map_presence(self):
+        """Sparse AVL (e.g. 0 km/h) — last fix within 15 min stays on the map."""
+        with ds._LOCK:  # noqa: SLF001
+            data = ds._read()  # noqa: SLF001
+            for row in data.get("devices") or []:
+                if row.get("imei") == "861076085468260":
+                    row["last_seen_at"] = (
+                        datetime.now(timezone.utc) - timedelta(minutes=5)
+                    ).isoformat()
+            ds._write(data)  # noqa: SLF001
+
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+        payload = process.await_args.args[0]
+        # Not «online» badge channel — last-known parked pin.
+        self.assertTrue(payload.get("hydrated_from_store"))
+
 
 if __name__ == "__main__":
     unittest.main()

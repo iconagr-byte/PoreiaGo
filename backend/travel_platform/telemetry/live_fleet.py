@@ -1022,8 +1022,12 @@ class LiveFleetService:
                 return None
             return get_enabled_device_by_vehicle_code(tid, plate)
 
-        def _teltonika_still_online(tid: str, meta: dict[str, Any]) -> bool:
+        def _teltonika_still_on_map(tid: str, meta: dict[str, Any]) -> bool:
+            """Keep last-known hardware pin for map presence (not only 90s online)."""
             try:
+                from travel_platform.telemetry.teltonika.hydrate_live import (
+                    map_presence_seconds,
+                )
                 from travel_platform.telemetry.tracker_priority import (
                     is_live_meta_tracker_fresh,
                     is_tracker_binding_alive,
@@ -1032,10 +1036,11 @@ class LiveFleetService:
             except Exception:
                 return False
             alive = resolve_tracker_alive_seconds(tid)
-            if is_live_meta_tracker_fresh(meta, max_age_sec=alive):
+            presence = map_presence_seconds(alive)
+            if is_live_meta_tracker_fresh(meta, max_age_sec=presence):
                 return True
             tracker = _teltonika_device(tid, meta)
-            return is_tracker_binding_alive(tracker, max_age_sec=alive)
+            return is_tracker_binding_alive(tracker, max_age_sec=presence)
 
         def _strip_app_channel(meta: dict[str, Any], *, tid: str) -> dict[str, Any]:
             cleaned = dict(meta)
@@ -1076,8 +1081,8 @@ class LiveFleetService:
                 )
                 cleaned["tenant_id"] = tid
                 cleaned["vehicle_id"] = vid
-                # App offline + Teltonika offline → remove pin from the map.
-                if not _teltonika_still_online(tid, cleaned):
+                # App offline + Teltonika past map presence → remove pin.
+                if not _teltonika_still_on_map(tid, cleaned):
                     seen.add(key)
                     code = cleaned.get("vehicle_code") or cleaned.get("bus_plate")
                     self._vehicles.pop(vid, None)
@@ -1107,7 +1112,7 @@ class LiveFleetService:
                 cleaned["tenant_id"] = tid
                 cleaned["vehicle_id"] = vid
                 cleaned["source"] = "teltonika"
-                if not _teltonika_still_online(tid, cleaned):
+                if not _teltonika_still_on_map(tid, cleaned):
                     seen.add(key)
                     code = cleaned.get("vehicle_code") or cleaned.get("bus_plate")
                     self._vehicles.pop(vid, None)
