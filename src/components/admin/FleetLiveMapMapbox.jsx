@@ -204,6 +204,7 @@ function FitBounds({ vehicles, fitNonce = 0 }) {
 /** Mapbox GL — Apple light style + ελληνικές ετικέτες. */
 export default function FleetLiveMapMapbox({
   vehicles,
+  trailVehicles,
   heatmap = [],
   showHeat = false,
   geofenceLayers = null,
@@ -232,7 +233,9 @@ export default function FleetLiveMapMapbox({
     return [...vehicles, ...extra];
   }, [vehicles, sosAlerts]);
 
-  const trails = useFleetVehicleTrails(vehicles, {
+  // Blue trail only for vehicles with an active excursion (parent may pass a subset).
+  const trailSource = trailVehicles ?? vehicles;
+  const trails = useFleetVehicleTrails(trailSource, {
     enabled: showTrails,
     maxPoints: 3000,
     minMoveM: 3,

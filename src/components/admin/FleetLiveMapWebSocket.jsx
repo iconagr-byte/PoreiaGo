@@ -8,7 +8,10 @@ import {
   formatUpdatedAgo,
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
-import { resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  resolveVehicleTripTitle,
+  vehicleHasActiveExcursion,
+} from '../../lib/admin/fleetBusPillLabel.js';
 import { mergeRentalOverlays } from '../../lib/admin/mergeRentalOverlays.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { fetchRentalLiveOverlays } from '../../services/fleetRentalApi.js';
@@ -53,6 +56,12 @@ export default function FleetLiveMapWebSocket() {
   const mapVehicles = useMemo(
     () => mergeRentalOverlays(vehicles, rentalOverlays),
     [vehicles, rentalOverlays],
+  );
+
+  // Blue breadcrumb trail only while an excursion is active — not idle Teltonika pins.
+  const trailVehicles = useMemo(
+    () => mapVehicles.filter((v) => vehicleHasActiveExcursion(v)),
+    [mapVehicles],
   );
 
   // SOS pins always on (χωρίς toggle UI) — κρίσιμο για ασφάλεια.
@@ -103,6 +112,11 @@ export default function FleetLiveMapWebSocket() {
             onClick={() => setShowTrails((v) => !v)}
             className={`fleet-apple-chip ${showTrails ? 'is-on' : ''}`}
             aria-pressed={showTrails}
+            title={
+              trailVehicles.length
+                ? `Μπλε πορεία μόνο σε ενεργές εκδρομές (${trailVehicles.length})`
+                : 'Μπλε πορεία μόνο όταν υπάρχει ενεργή εκδρομή'
+            }
           >
             <span className="material-symbols-outlined text-[16px]">route</span>
             Πλήρης πορεία
@@ -136,6 +150,7 @@ export default function FleetLiveMapWebSocket() {
           {mapbox ? (
             <FleetLiveMapMapbox
               vehicles={mapVehicles}
+              trailVehicles={trailVehicles}
               heatmap={[]}
               showHeat={false}
               geofenceLayers={null}
@@ -152,6 +167,7 @@ export default function FleetLiveMapWebSocket() {
           ) : (
             <FleetLiveMapLeaflet
               vehicles={mapVehicles}
+              trailVehicles={trailVehicles}
               center={center}
               heatmap={[]}
               showHeat={false}

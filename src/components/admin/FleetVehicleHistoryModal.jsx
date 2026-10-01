@@ -154,6 +154,71 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
                 ) : null}
               </section>
 
+              {data.sessions?.length ? (
+                <section>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-bold text-slate-900">Είσοδος / έξοδος από τον χάρτη</h3>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {data.sessions.length}{' '}
+                      {data.sessions.length === 1 ? 'συνεδρία' : 'συνεδρίες'}
+                    </span>
+                  </div>
+                  <ul className="space-y-2">
+                    {data.sessions
+                      .slice()
+                      .reverse()
+                      .map((session) => (
+                        <li
+                          key={session.id}
+                          className="rounded-2xl border border-black/[0.06] bg-slate-50/80 px-4 py-3"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-bold text-slate-900 inline-flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[16px] text-[#0040df]">
+                                timeline
+                              </span>
+                              Συνεδρία {session.index}
+                            </p>
+                            {session.active ? (
+                              <span className="rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5">
+                                Ενεργό
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-semibold text-slate-500 tabular-nums">
+                                {formatKm(session.km)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                Μπήκε
+                              </p>
+                              <p className="font-bold tabular-nums text-slate-900">
+                                {formatClock(session.enteredAt)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                {session.active ? 'Τώρα' : 'Βγήκε'}
+                              </p>
+                              <p className="font-bold tabular-nums text-slate-900">
+                                {session.active ? 'στον χάρτη' : formatClock(session.exitedAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">
+                            {session.pointCount} στίγματα · {formatDuration(session.durationMin)}
+                            {Number.isFinite(session.enterLat)
+                              ? ` · ${session.enterLat.toFixed(4)}, ${session.enterLng.toFixed(4)}`
+                              : ''}
+                          </p>
+                        </li>
+                      ))}
+                  </ul>
+                </section>
+              ) : null}
+
               <section>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-sm font-bold text-slate-900">Check-in επιβατών ανά στάση</h3>
