@@ -129,9 +129,8 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         self.assertEqual(payload["source"], "teltonika")
         self.assertFalse(payload.get("hydrated_from_store"))
 
-    def test_skips_closed_tracker_over_app_pin(self):
-        """Parked/closed Teltonika must not overwrite a live App pin."""
-        # Age the device last_seen so it is closed for soft-ack window.
+    def test_stale_tracker_still_reclaims_app_pin_for_safety(self):
+        """Enabled hardware last-known always stays on map — even over App pin."""
         with ds._LOCK:  # noqa: SLF001
             data = ds._read()  # noqa: SLF001
             for row in data.get("devices") or []:
@@ -158,12 +157,14 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         ) as process:
             n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
 
-        self.assertEqual(n, 0)
-        process.assert_not_awaited()
-        self.assertIn(vid, LiveFleetService._vehicles)
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+        payload = process.await_args.args[0]
+        self.assertEqual(payload["source"], "teltonika")
+        self.assertTrue(payload.get("hydrated_from_store"))
 
-    def test_removes_offline_teltonika_only_pin(self):
-        """Closed Teltonika with no live App → pin leaves the map."""
+    def test_keeps_enabled_stale_hardware_pin(self):
+        """Safety watch: enabled IMEI last-known is re-stamped, never age-dropped."""
         with ds._LOCK:  # noqa: SLF001
             data = ds._read()  # noqa: SLF001
             for row in data.get("devices") or []:
@@ -196,10 +197,9 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         ) as delete_mock:
             n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
 
-        self.assertEqual(n, 0)
-        process.assert_not_awaited()
-        self.assertNotIn(vid, LiveFleetService._vehicles)
-        delete_mock.assert_awaited()
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+        delete_mock.assert_not_awaited()
 
     def test_force_repaints_online_when_map_empty(self):
         """Empty Achillio map + online IMEI → force hydrate paints immediately."""
@@ -215,8 +215,8 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         self.assertEqual(n, 1)
         process.assert_awaited()
 
-    def test_keeps_parked_pin_within_map_presence(self):
-        """Sparse AVL (e.g. 0 km/h) — last fix within 15 min stays on the map."""
+    def test_keeps_parked_pin_continuous_watch(self):
+        """Sparse AVL (e.g. 0 km/h) — last fix stays on the map for safety."""
         with ds._LOCK:  # noqa: SLF001
             data = ds._read()  # noqa: SLF001
             for row in data.get("devices") or []:

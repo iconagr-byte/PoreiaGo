@@ -1023,24 +1023,31 @@ class LiveFleetService:
             return get_enabled_device_by_vehicle_code(tid, plate)
 
         def _teltonika_still_on_map(tid: str, meta: dict[str, Any]) -> bool:
-            """Keep last-known hardware pin for map presence (not only 90s online)."""
+            """
+            Keep hardware pin for continuous safety watch.
+
+            Enabled IMEI with a last fix stays on the map after App logout —
+            age does not clear it. Unbound / no coords → drop.
+            """
+            tracker = _teltonika_device(tid, meta)
+            if (
+                tracker
+                and tracker.get("enabled")
+                and tracker.get("last_lat") is not None
+                and tracker.get("last_lng") is not None
+            ):
+                return True
             try:
-                from travel_platform.telemetry.teltonika.hydrate_live import (
-                    map_presence_seconds,
-                )
                 from travel_platform.telemetry.tracker_priority import (
                     is_live_meta_tracker_fresh,
-                    is_tracker_binding_alive,
                     resolve_tracker_alive_seconds,
                 )
             except Exception:
                 return False
-            alive = resolve_tracker_alive_seconds(tid)
-            presence = map_presence_seconds(alive)
-            if is_live_meta_tracker_fresh(meta, max_age_sec=presence):
-                return True
-            tracker = _teltonika_device(tid, meta)
-            return is_tracker_binding_alive(tracker, max_age_sec=presence)
+            # Fallback: fresh in-memory hardware pin without device-store hit.
+            return is_live_meta_tracker_fresh(
+                meta, max_age_sec=resolve_tracker_alive_seconds(tid)
+            )
 
         def _strip_app_channel(meta: dict[str, Any], *, tid: str) -> dict[str, Any]:
             cleaned = dict(meta)
