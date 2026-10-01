@@ -197,6 +197,7 @@ class LiveFleetService:
     ) -> list[LiveVehicleState]:
         """One pin per plate — fresh Teltonika beats leftover phone GPS."""
         from travel_platform.telemetry.tracker_priority import (
+            merge_app_signal_into_meta,
             meta_plate,
             normalize_vehicle_plate,
             prefer_meta_for_plate,
@@ -222,11 +223,25 @@ class LiveFleetService:
                 winners[plate] = (state, meta)
                 continue
             chosen = prefer_meta_for_plate(prev[1], meta, max_age_sec=max_age_sec, now=now)
-            winners[plate] = (state, meta) if chosen is meta else prev
-            # Point the plate index at the winning vehicle id.
-            keep = winners[plate][0]
-            if keep.vehicle_id:
-                self._code_index[f"{tenant_id}:{plate}"] = str(keep.vehicle_id)
+            if chosen is meta:
+                merged = merge_app_signal_into_meta(
+                    meta, prev[1], max_age_sec=max_age_sec, now=now
+                )
+                winners[plate] = (state, merged)
+            else:
+                merged = merge_app_signal_into_meta(
+                    prev[1], meta, max_age_sec=max_age_sec, now=now
+                )
+                winners[plate] = (prev[0], merged)
+            # Point the plate index at the winning vehicle id + stamp dual sources.
+            keep_state, keep_meta = winners[plate]
+            keep_vid = str(keep_state.vehicle_id or keep_meta.get("vehicle_id") or "")
+            if keep_vid:
+                self._code_index[f"{tenant_id}:{plate}"] = keep_vid
+                self._vehicles[keep_vid] = {
+                    **self._vehicles.get(keep_vid, {}),
+                    **keep_meta,
+                }
         return [pair[0] for pair in winners.values()] + orphans
 
     def list_active(self, tenant_id: UUID) -> list[LiveVehicleState]:
@@ -286,12 +301,45 @@ class LiveFleetService:
             prev = by_id.get(state.vehicle_id)
             if not prev or state.updated_at >= prev.updated_at:
                 by_id[state.vehicle_id] = state
-        return self._dedupe_states_by_plate(
+        # Detect same-plate duplicates before collapse — only then purge Redis.
+        plate_counts: dict[str, int] = {}
+        for state in by_id.values():
+            meta = self._vehicles.get(str(state.vehicle_id), {}) or {}
+            from travel_platform.telemetry.tracker_priority import meta_plate as _meta_plate
+
+            plate = _meta_plate(meta) or normalize_vehicle_plate(state.vehicle_code)
+            if plate:
+                plate_counts[plate] = plate_counts.get(plate, 0) + 1
+
+        deduped = self._dedupe_states_by_plate(
             list(by_id.values()),
             tenant_id=tid,
             now=now,
             max_age_sec=resolve_tracker_alive_seconds(tid),
         )
+        dup_plates = {p for p, n in plate_counts.items() if n > 1}
+        if dup_plates:
+            try:
+                from travel_platform.telemetry.tracker_priority import (
+                    is_tracker_source,
+                    meta_plate,
+                )
+
+                for state in deduped:
+                    meta = self._vehicles.get(str(state.vehicle_id), {}) or {}
+                    plate = meta_plate(meta) or normalize_vehicle_plate(state.vehicle_code)
+                    if plate not in dup_plates:
+                        continue
+                    if not is_tracker_source(meta.get("source")) and not meta.get("imei"):
+                        continue
+                    await self.purge_phone_siblings_for_plate(
+                        tid,
+                        plate,
+                        keep_vehicle_id=str(state.vehicle_id),
+                    )
+            except Exception:
+                pass
+        return deduped
 
     async def purge_phone_siblings_for_plate(
         self,

@@ -1,5 +1,7 @@
 import {
+  collapseVehicleListByPlate,
   dedupeVehiclesByPlate,
+  normalizePlateString,
   preferVehicleRow,
   isHardwareTrackerRow,
   isPhoneGpsRow,
@@ -41,6 +43,16 @@ console.assert(winner.source === 'teltonika', 'winner is teltonika');
 console.assert(
   winner.gps_sources.includes('teltonika') && winner.gps_sources.includes('app'),
   'dual sources on deduped pin',
+);
+
+// Greek lookalike Ε vs Latin E must collapse to one pin.
+console.assert(normalizePlateString('ΕΕΧ5670') === 'EEX5670', 'greek plate folds to latin');
+const greekApp = { ...app, id: 'app-gr', vehicle_id: 'app-gr', bus_plate: 'ΕΕΧ5670' };
+const mixed = dedupeVehiclesByPlate({ 'tel-1': tel, 'app-gr': greekApp });
+console.assert(Object.keys(mixed).length === 1, 'greek/latin plate collapse');
+console.assert(
+  collapseVehicleListByPlate([tel, app]).length === 1,
+  'array hard-collapse keeps one',
 );
 
 console.log('fleetPinDedupe.test.js: ok');

@@ -87,7 +87,9 @@ def get_enabled_device_by_vehicle_code(
     vehicle_code: str | None,
 ) -> dict[str, Any] | None:
     """Return the enabled Teltonika binding for this office plate, if any."""
-    plate = str(vehicle_code or "").strip().upper()
+    from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+
+    plate = normalize_vehicle_plate(vehicle_code)
     if not plate or not tenant_id:
         return None
     tid = str(tenant_id)
@@ -97,7 +99,7 @@ def get_enabled_device_by_vehicle_code(
                 continue
             if str(row.get("tenant_id") or "") != tid:
                 continue
-            if str(row.get("vehicle_code") or "").strip().upper() == plate:
+            if normalize_vehicle_plate(row.get("vehicle_code")) == plate:
                 return deepcopy(row)
     return None
 

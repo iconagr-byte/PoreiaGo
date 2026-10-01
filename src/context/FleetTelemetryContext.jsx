@@ -346,12 +346,49 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
             const id = vehicleIdFromRow(msg);
             setVehicles((prev) => {
               const plate = normalizePlateKey(msg);
-              // Teltonika owns the plate — ignore late App GPS frames.
+              // Teltonika owns the plate — fold App GPS into the hardware pin
+              // (dual badge) instead of painting a second marker.
               if (plate && isPhoneGpsRow(msg)) {
-                const existingHw = Object.values(prev).find(
-                  (row) => normalizePlateKey(row) === plate && isHardwareTrackerRow(row),
+                const hwEntry = Object.entries(prev).find(
+                  ([, row]) => normalizePlateKey(row) === plate && isHardwareTrackerRow(row),
                 );
-                if (existingHw) return prev;
+                if (hwEntry) {
+                  const [hwKey, existingHw] = hwEntry;
+                  const next = {
+                    ...prev,
+                    [hwKey]: {
+                      ...existingHw,
+                      app_seen_at:
+                        msg.app_seen_at ||
+                        msg.appSeenAt ||
+                        msg.timestamp ||
+                        msg.updated_at ||
+                        existingHw.app_seen_at ||
+                        new Date().toISOString(),
+                      gps_sources: mergeGpsSources(
+                        ['teltonika', 'app', ...(msg.gps_sources || msg.gpsSources || [])],
+                        existingHw.gps_sources,
+                      ),
+                      driver_name:
+                        existingHw.driver_name &&
+                        existingHw.driver_name !== '—' &&
+                        existingHw.driver_name !== 'Tracker'
+                          ? existingHw.driver_name
+                          : msg.driver_name || existingHw.driver_name,
+                      photo_url: existingHw.photo_url || msg.photo_url || null,
+                    },
+                  };
+                  // Drop any leftover App UUID for this plate.
+                  for (const [key, row] of Object.entries(next)) {
+                    if (key === hwKey) continue;
+                    if (normalizePlateKey(row) === plate && isPhoneGpsRow(row)) {
+                      delete next[key];
+                    }
+                  }
+                  const collapsed = dedupeVehiclesByPlate(next);
+                  vehicleCountRef.current = Object.keys(collapsed).length;
+                  return collapsed;
+                }
               }
               const normalized = normalizeVehicle(msg, id, prev[id]);
               if (!normalized) return prev;

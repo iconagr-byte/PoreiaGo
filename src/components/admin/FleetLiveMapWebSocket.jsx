@@ -13,6 +13,7 @@ import {
   vehicleHasActiveExcursion,
 } from '../../lib/admin/fleetBusPillLabel.js';
 import { mergeRentalOverlays } from '../../lib/admin/mergeRentalOverlays.js';
+import { collapseVehicleListByPlate } from '../../lib/admin/fleetPinDedupe.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { fetchRentalLiveOverlays } from '../../services/fleetRentalApi.js';
 import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
@@ -54,7 +55,7 @@ export default function FleetLiveMapWebSocket() {
   }, [tenantId]);
 
   const mapVehicles = useMemo(
-    () => mergeRentalOverlays(vehicles, rentalOverlays),
+    () => collapseVehicleListByPlate(mergeRentalOverlays(vehicles, rentalOverlays)),
     [vehicles, rentalOverlays],
   );
 

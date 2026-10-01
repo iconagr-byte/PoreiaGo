@@ -209,10 +209,13 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
     # Teltonika-first: while the tracker is alive, soft-ack the driver PWA
     # (shift / heartbeat) but do not let phone GPS overwrite the live pin.
     # If the tracker goes quiet, phone GPS paints as soft fallback.
+    # Redis-aware: Teltonika pin often lives on another Gunicorn worker.
     try:
-        from travel_platform.telemetry.tracker_priority import is_teltonika_preferred_for_plate
+        from travel_platform.telemetry.tracker_priority import (
+            is_teltonika_preferred_for_plate_async,
+        )
 
-        prefer_tracker, tracker = is_teltonika_preferred_for_plate(
+        prefer_tracker, tracker = await is_teltonika_preferred_for_plate_async(
             tenant_id,
             payload.get("vehicle_code") or payload.get("bus_plate"),
         )

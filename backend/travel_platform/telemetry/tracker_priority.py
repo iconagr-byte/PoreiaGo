@@ -22,8 +22,31 @@ TRACKER_LIVE_SOURCES = frozenset(
 DEFAULT_TRACKER_ALIVE_SECONDS = 90
 
 
+# Greek lookalikes → Latin so App/Teltonika plates collapse to one key.
+_GREEK_PLATE_FOLD = str.maketrans(
+    {
+        "Α": "A",
+        "Β": "B",
+        "Ε": "E",
+        "Ζ": "Z",
+        "Η": "H",
+        "Ι": "I",
+        "Κ": "K",
+        "Μ": "M",
+        "Ν": "N",
+        "Ο": "O",
+        "Ρ": "P",
+        "Τ": "T",
+        "Υ": "Y",
+        "Χ": "X",
+    }
+)
+
+
 def normalize_vehicle_plate(value: Any) -> str:
-    return str(value or "").strip().upper()
+    """Stable plate key: uppercase, strip separators, fold Greek lookalikes."""
+    raw = str(value or "").strip().upper().translate(_GREEK_PLATE_FOLD)
+    return "".join(ch for ch in raw if ch.isalnum())
 
 
 def is_tracker_source(source: Any) -> bool:
@@ -159,7 +182,26 @@ def resolve_tracker_alive_seconds(tenant_id: str | None = None) -> int:
         return DEFAULT_TRACKER_ALIVE_SECONDS
 
 
+def _pick_best_tracker_meta(
+    candidates: list[dict[str, Any]],
+    *,
+    max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    best: dict[str, Any] | None = None
+    for meta in candidates:
+        if not isinstance(meta, dict):
+            continue
+        if not is_tracker_source(meta.get("source")) and not (
+            meta.get("imei") and not is_phone_source(meta.get("source"))
+        ):
+            continue
+        best = prefer_meta_for_plate(best, meta, max_age_sec=max_age_sec, now=now) or meta
+    return best
+
+
 def _live_fleet_tracker_meta(tenant_id: str, vehicle_code: str | None) -> dict[str, Any] | None:
+    """In-memory only — may miss Teltonika on another Gunicorn worker."""
     plate = normalize_vehicle_plate(vehicle_code)
     if not plate:
         return None
@@ -182,16 +224,53 @@ def _live_fleet_tracker_meta(tenant_id: str, vehicle_code: str | None) -> dict[s
                 continue
             if meta not in candidates:
                 candidates.append(meta)
-        best: dict[str, Any] | None = None
-        for meta in candidates:
-            if not is_tracker_source(meta.get("source")) and not (
-                meta.get("imei") and not is_phone_source(meta.get("source"))
-            ):
-                continue
-            best = prefer_meta_for_plate(best, meta) or meta
-        return best
+        return _pick_best_tracker_meta(candidates)
     except Exception:
         return None
+
+
+async def live_fleet_tracker_meta_async(
+    tenant_id: str,
+    vehicle_code: str | None,
+    *,
+    max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    """
+    Fresh Teltonika meta for a plate — memory first, then Redis.
+
+    Soft-ack on the phone-ingest worker must see the tracker pin written by
+    the Teltonika TCP worker; memory alone is not enough with multi-worker.
+    """
+    plate = normalize_vehicle_plate(vehicle_code)
+    if not plate:
+        return None
+    tid = str(tenant_id)
+    local = _live_fleet_tracker_meta(tid, plate)
+    if is_live_meta_tracker_fresh(local, max_age_sec=max_age_sec, now=now):
+        return local
+
+    candidates: list[dict[str, Any]] = []
+    if isinstance(local, dict):
+        candidates.append(local)
+    try:
+        from travel_platform.telemetry.live_fleet_redis import load_live_vehicles
+        from travel_platform.telemetry.processor import get_live_fleet
+
+        remote = await load_live_vehicles(tid)
+        fleet = get_live_fleet()
+        for meta in remote or []:
+            if meta_plate(meta) != plate:
+                continue
+            candidates.append(meta)
+            vid = str(meta.get("vehicle_id") or "")
+            if vid:
+                # Hydrate local cache so purge / heartbeat find the hardware UUID.
+                fleet._vehicles[vid] = {**fleet._vehicles.get(vid, {}), **meta}  # noqa: SLF001
+                fleet._code_index[f"{tid}:{plate}"] = vid  # noqa: SLF001
+    except Exception:
+        pass
+    return _pick_best_tracker_meta(candidates, max_age_sec=max_age_sec, now=now)
 
 
 def meta_plate(meta: dict[str, Any] | None) -> str:
@@ -283,6 +362,9 @@ def is_teltonika_preferred_for_plate(
     prefer_teltonika=True → skip phone GPS on the live map (soft-ack only).
     Only when a fresh Teltonika pin exists on the live fleet — never based on
     device last_seen alone (that can blank the map when the queue lags).
+
+    Sync path uses in-memory fleet only. Prefer
+    ``is_teltonika_preferred_for_plate_async`` on ingress (Redis-aware).
     """
     try:
         from travel_platform.telemetry.teltonika.device_store import (
@@ -301,3 +383,71 @@ def is_teltonika_preferred_for_plate(
         return True, tracker
 
     return False, tracker
+
+
+async def is_teltonika_preferred_for_plate_async(
+    tenant_id: str,
+    vehicle_code: str | None,
+    *,
+    max_age_sec: int | None = None,
+    now: datetime | None = None,
+) -> tuple[bool, dict[str, Any] | None]:
+    """Redis-aware Teltonika prefer — used by driver GPS soft-ack."""
+    try:
+        from travel_platform.telemetry.teltonika.device_store import (
+            get_enabled_device_by_vehicle_code,
+        )
+    except Exception:
+        return False, None
+
+    tracker = get_enabled_device_by_vehicle_code(str(tenant_id), vehicle_code)
+    if not tracker:
+        return False, None
+
+    alive_sec = int(max_age_sec if max_age_sec is not None else resolve_tracker_alive_seconds(tenant_id))
+    meta = await live_fleet_tracker_meta_async(
+        str(tenant_id),
+        vehicle_code,
+        max_age_sec=alive_sec,
+        now=now,
+    )
+    if is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec, now=now):
+        return True, tracker
+
+    return False, tracker
+
+
+def merge_app_signal_into_meta(
+    winner: dict[str, Any],
+    other: dict[str, Any] | None,
+    *,
+    max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Copy App heartbeat / dual sources onto the winning Teltonika pin."""
+    out = dict(winner or {})
+    other = other or {}
+    app_seen = out.get("app_seen_at") or other.get("app_seen_at")
+    if is_phone_source(other.get("source")):
+        app_seen = other.get("updated_at") or other.get("timestamp") or app_seen
+    if app_seen:
+        out["app_seen_at"] = app_seen
+    if other.get("driver_name") and (
+        not out.get("driver_name") or out.get("driver_name") in {"—", "-", "Tracker"}
+    ):
+        out["driver_name"] = other.get("driver_name")
+    if other.get("driver_id") and not out.get("driver_id"):
+        out["app_driver_id"] = other.get("driver_id")
+    sources = resolve_live_gps_sources(out, max_age_sec=max_age_sec, now=now)
+    for extra in other.get("gps_sources") or []:
+        kind = str(extra or "").strip().lower()
+        if kind in {"app", "driver_pwa", "phone"} and "app" not in sources:
+            sources = [*sources, "app"]
+        if (kind.startswith("teltonika") or kind == "tracker") and "teltonika" not in sources:
+            sources = ["teltonika", *sources]
+    if is_phone_source(other.get("source")) and "app" not in sources:
+        sources = [*sources, "app"]
+    out["gps_sources"] = ["teltonika", "app"] if (
+        "teltonika" in sources and "app" in sources
+    ) else sources
+    return out

@@ -4,22 +4,60 @@
  * Both live sources are kept on the winner for the dual badge.
  */
 
-export function normalizePlateKey(v) {
-  return String(v?.bus_plate || v?.vehicle_code || '')
+/** Greek lookalikes → Latin so App/Teltonika plates share one key. */
+const GREEK_PLATE_FOLD = {
+  Α: 'A',
+  Β: 'B',
+  Ε: 'E',
+  Ζ: 'Z',
+  Η: 'H',
+  Ι: 'I',
+  Κ: 'K',
+  Μ: 'M',
+  Ν: 'N',
+  Ο: 'O',
+  Ρ: 'P',
+  Τ: 'T',
+  Υ: 'Y',
+  Χ: 'X',
+};
+
+export function normalizePlateString(value) {
+  const upper = String(value || '')
     .trim()
-    .toUpperCase();
+    .toUpperCase()
+    .replace(/[\s\-_.]/g, '');
+  let out = '';
+  for (const ch of upper) {
+    out += GREEK_PLATE_FOLD[ch] || ch;
+  }
+  return out.replace(/[^A-Z0-9]/g, '');
+}
+
+export function normalizePlateKey(v) {
+  return normalizePlateString(v?.bus_plate || v?.vehicle_code || v?.plate_number || '');
 }
 
 export function isHardwareTrackerRow(row) {
   const src = String(row?.source || '').toLowerCase();
   if (src.startsWith('teltonika') || src === 'tracker' || src === 'test_ping') return true;
   if (row?.imei && src !== 'driver_pwa' && src !== 'app') return true;
+  const sources = Array.isArray(row?.gps_sources) ? row.gps_sources : [];
+  if (sources.some((s) => String(s).toLowerCase().includes('teltonika')) && row?.imei) {
+    return true;
+  }
   return false;
 }
 
 export function isPhoneGpsRow(row) {
   const src = String(row?.source || '').toLowerCase();
-  if (!src) return false;
+  if (!src) {
+    const sources = Array.isArray(row?.gps_sources) ? row.gps_sources : [];
+    return sources.some((s) => {
+      const k = String(s || '').toLowerCase();
+      return k === 'app' || k.includes('driver') || k.includes('pwa') || k.includes('phone');
+    });
+  }
   if (isHardwareTrackerRow(row)) return false;
   return src.includes('driver') || src.includes('pwa') || src.includes('phone') || src === 'app';
 }
@@ -53,15 +91,22 @@ function mergeRowsKeepSources(winner, other) {
     .filter(Boolean)
     .sort()
     .at(-1);
+  const plate =
+    normalizePlateString(winner?.bus_plate || winner?.vehicle_code) ||
+    normalizePlateString(other?.bus_plate || other?.vehicle_code);
   return {
     ...winner,
+    bus_plate: plate || winner.bus_plate || other.bus_plate,
+    vehicle_code: plate || winner.vehicle_code || other.vehicle_code,
     gps_sources: ordered,
     app_seen_at: appSeen || winner.app_seen_at || null,
     // Prefer driver name from app when hardware label is generic.
     driver_name:
-      winner.driver_name && winner.driver_name !== '—'
+      winner.driver_name && winner.driver_name !== '—' && winner.driver_name !== 'Tracker'
         ? winner.driver_name
         : other.driver_name || winner.driver_name,
+    photo_url: winner.photo_url || other.photo_url || null,
+    vehicle_image_url: winner.vehicle_image_url || other.vehicle_image_url || null,
   };
 }
 
@@ -103,8 +148,6 @@ export function dedupeVehiclesByPlate(map) {
       continue;
     }
     const merged = preferVehicleRow(prev.row, row);
-    const keepKey = merged === prev.row || merged.vehicle_id === prev.row.vehicle_id ? prev.key : key;
-    // preferVehicleRow always returns a new object via mergeRowsKeepSources now
     const winnerKey =
       isHardwareTrackerRow(prev.row) && !isHardwareTrackerRow(row)
         ? prev.key
@@ -113,11 +156,22 @@ export function dedupeVehiclesByPlate(map) {
           : rowUpdatedMs(row) > rowUpdatedMs(prev.row)
             ? key
             : prev.key;
-    byPlate.set(plate, { key: winnerKey || keepKey, row: merged });
+    byPlate.set(plate, { key: winnerKey, row: merged });
   }
   const out = { ...orphans };
   for (const { key, row } of byPlate.values()) {
     out[key] = row;
   }
   return out;
+}
+
+/** Array form — final safety net before Leaflet/Mapbox markers. */
+export function collapseVehicleListByPlate(list) {
+  if (!Array.isArray(list) || list.length < 2) return list || [];
+  const asMap = {};
+  list.forEach((row, idx) => {
+    const id = String(row?.id || row?.vehicle_id || `idx-${idx}`);
+    asMap[id] = { ...row, id };
+  });
+  return Object.values(dedupeVehiclesByPlate(asMap));
 }

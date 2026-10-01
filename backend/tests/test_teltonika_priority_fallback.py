@@ -16,7 +16,9 @@ from travel_platform.telemetry.fleet_ingress import ingest_driver_location
 from travel_platform.telemetry.teltonika import device_store as ds
 from travel_platform.telemetry.tracker_priority import (
     is_teltonika_preferred_for_plate,
+    is_teltonika_preferred_for_plate_async,
     is_tracker_binding_alive,
+    normalize_vehicle_plate,
 )
 
 
@@ -75,6 +77,43 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         prefer, tracker = is_teltonika_preferred_for_plate(self.tenant, "EEX5670", max_age_sec=90)
         self.assertTrue(prefer)
         self.assertEqual(tracker.get("imei"), "861076085468260")
+
+    def test_normalize_folds_greek_lookalike_plate(self):
+        self.assertEqual(normalize_vehicle_plate("ΕΕΧ-5670"), "EEX5670")
+        self.assertEqual(normalize_vehicle_plate("eex 5670"), "EEX5670")
+
+    def test_prefer_teltonika_from_redis_when_memory_empty(self):
+        """Multi-worker: phone ingest must soft-ack via Redis Teltonika pin."""
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        remote = {
+            "vehicle_id": "veh-redis-tel",
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "lat": 38.2,
+            "lng": 20.6,
+            "source": "teltonika",
+            "imei": "861076085468260",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        async def _run():
+            with patch(
+                "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
+                new_callable=AsyncMock,
+                return_value=[remote],
+            ):
+                return await is_teltonika_preferred_for_plate_async(
+                    self.tenant, "EEX5670", max_age_sec=90
+                )
+
+        prefer, tracker = asyncio.run(_run())
+        self.assertTrue(prefer)
+        self.assertEqual(tracker.get("imei"), "861076085468260")
+        self.assertIn("veh-redis-tel", LiveFleetService._vehicles)
 
     def test_no_prefer_when_only_device_last_seen(self):
         """last_seen alone must not soft-ack — that blanks the map when queue lags."""
