@@ -64,7 +64,9 @@ function normalizeVehicle(msg, id, prev) {
     vehicle_code: msg.vehicle_code || msg.bus_plate || id,
     bus_plate: msg.bus_plate || msg.vehicle_code || '—',
     driver_name: msg.driver_name || '—',
-    driver_id: msg.driver_id,
+    // Teltonika pin may only carry app_driver_id (soft-ack) for office chat.
+    driver_id: msg.driver_id || msg.app_driver_id || msg.appDriverId || prev?.driver_id,
+    app_driver_id: msg.app_driver_id || msg.appDriverId || prev?.app_driver_id || null,
     trip_id: msg.trip_id,
     trip_title: msg.trip_title || msg.tripTitle || prev?.trip_title || null,
     tracking_started_at:

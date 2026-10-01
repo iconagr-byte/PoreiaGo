@@ -270,7 +270,13 @@ export default function FleetLiveMapWebSocket() {
           <div className="fleet-apple-side-card">
             <DriverOfficeChatPanel
               compact
-              driverId={selected?.driver_id || selected?.driverId || null}
+              driverId={
+                selected?.driver_id ||
+                selected?.app_driver_id ||
+                selected?.driverId ||
+                selected?.appDriverId ||
+                null
+              }
               driverName={selected?.driver_name || selected?.driverName}
               tripId={selected?.trip_id ?? selected?.tripId ?? null}
             />

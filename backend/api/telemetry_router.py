@@ -145,8 +145,11 @@ async def fleet_live(
                 meta = live._vehicles.get(v.vehicle_id, {})
             if not office_allows_live_driver(str(tenant_id), meta.get("driver_id"), meta):
                 continue
+            # Teltonika pin clears driver_id; soft-ack keeps app_driver_id for chat/photo.
+            app_driver_id = str(meta.get("app_driver_id") or "").strip() or None
+            chat_driver_id = str(meta.get("driver_id") or app_driver_id or "").strip() or None
             media = enrich_live_vehicle_media(
-                driver_id=meta.get("driver_id"),
+                driver_id=chat_driver_id,
                 bus_plate=meta.get("bus_plate", v.vehicle_code),
                 vehicle_code=v.vehicle_code,
             )
@@ -220,7 +223,8 @@ async def fleet_live(
                     driver_name=meta.get("driver_name"),
                     bus_plate=media.get("bus_plate") or meta.get("bus_plate", v.vehicle_code),
                     heading_deg=meta.get("heading_deg"),
-                    driver_id=meta.get("driver_id"),
+                    driver_id=chat_driver_id,
+                    app_driver_id=app_driver_id,
                     photo_url=media.get("photo_url"),
                     vehicle_image_url=media.get("vehicle_image_url"),
                     trip_title=trip_title or None,

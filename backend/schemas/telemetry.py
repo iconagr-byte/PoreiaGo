@@ -46,6 +46,8 @@ class LiveVehicleResponse(BaseModel):
     bus_plate: str | None = None
     heading_deg: float | None = None
     driver_id: str | None = None
+    # Soft-ack: driver PWA id when Teltonika owns the pin (chat / photo).
+    app_driver_id: str | None = None
     photo_url: str | None = None
     vehicle_image_url: str | None = None
     trip_title: str | None = None

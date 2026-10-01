@@ -402,6 +402,8 @@ async def admin_fleet_egress_ws(
             )
         except Exception:
             gps_sources = []
+        app_driver_id = str(meta.get("app_driver_id") or "").strip() or None
+        chat_driver_id = str(meta.get("driver_id") or app_driver_id or "").strip() or None
         snapshot.append(
             {
                 "type": "fleet_snapshot",
@@ -409,7 +411,8 @@ async def admin_fleet_egress_ws(
                 "vehicle_code": vehicle.vehicle_code,
                 "bus_plate": meta.get("bus_plate", vehicle.vehicle_code),
                 "driver_name": meta.get("driver_name", "—"),
-                "driver_id": meta.get("driver_id"),
+                "driver_id": chat_driver_id,
+                "app_driver_id": app_driver_id,
                 "trip_id": trip_id,
                 "trip_title": trip_title or None,
                 "tracking_started_at": meta.get("tracking_started_at"),
