@@ -250,6 +250,7 @@ export default function FleetLiveMapMapbox({
   focusSosAlert = null,
   fitNonce = 0,
   onVehicleHistory,
+  onClearSos = null,
 }) {
   const initialViewState = useMemo(() => {
     if (vehicles.length) {
@@ -292,7 +293,7 @@ export default function FleetLiveMapMapbox({
       {focusSosAlert ? <FleetMapFlyToMapbox alert={focusSosAlert} /> : null}
       <FleetGeofenceMapboxLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetLiveTrailsMapbox trails={trails} visible={showTrails} />
-      <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} />
+      <FleetSosPinsMapbox alerts={sosAlerts} visible={showSosPins} onClearSos={onClearSos} />
       <HeatmapDots points={heatmap} visible={showHeat} />
       <MapboxAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
     </Map>

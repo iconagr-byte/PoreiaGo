@@ -234,6 +234,7 @@ export default function FleetLiveMapLeaflet({
   focusSosAlert = null,
   fitNonce = 0,
   onVehicleHistory,
+  onClearSos = null,
 }) {
   const fitPoints = useMemo(() => {
     const pts = vehicles.map((v) => ({ ...v, id: v.id || v.vehicle_id }));
@@ -269,7 +270,7 @@ export default function FleetLiveMapLeaflet({
       {focusSosAlert ? <FleetMapFlyTo alert={focusSosAlert} /> : null}
       <FleetGeofenceLayers layers={geofenceLayers} mapAlerts={mapAlerts} visible={showGeofence} />
       <FleetLiveTrailsLeaflet trails={trails} visible={showTrails} />
-      <FleetSosPins alerts={sosAlerts} visible={showSosPins} />
+      <FleetSosPins alerts={sosAlerts} visible={showSosPins} onClearSos={onClearSos} />
       <FleetHeatmapLayer points={heatmap} visible={showHeat} />
       <LeafletAnimatedMarkers vehicles={vehicles} onVehicleHistory={onVehicleHistory} />
     </MapContainer>

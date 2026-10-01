@@ -67,7 +67,13 @@ const TABS = [
 ];
 
 /** Modal ιστορικού διαδρομής — sessions, στίγματα, check-in. */
-export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
+export default function FleetVehicleHistoryModal({
+  vehicle,
+  open,
+  onClose,
+  activeSos = null,
+  onClearSos = null,
+}) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -75,6 +81,7 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
   const [tab, setTab] = useState('overview');
   const [selectedPointIdx, setSelectedPointIdx] = useState(null);
   const [copied, setCopied] = useState('');
+  const [clearingSos, setClearingSos] = useState(false);
 
   useEffect(() => {
     if (!open || !vehicle) return undefined;
@@ -149,6 +156,18 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
     if (!ok) return;
     setCopied(key);
     window.setTimeout(() => setCopied((c) => (c === key ? '' : c)), 1600);
+  };
+
+  const handleClearSos = async () => {
+    if (!activeSos?.id || !onClearSos || clearingSos) return;
+    setClearingSos(true);
+    try {
+      await onClearSos(activeSos.id);
+    } catch (err) {
+      setError(err?.message || 'Αποτυχία απενεργοποίησης συναγερμού');
+    } finally {
+      setClearingSos(false);
+    }
   };
 
   if (!open || !vehicle) return null;
@@ -230,6 +249,30 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
               <span className="material-symbols-outlined text-[22px]">close</span>
             </button>
           </div>
+          {activeSos ? (
+            <div className="relative mt-3 flex flex-wrap items-center gap-2 rounded-2xl bg-red-500/20 ring-1 ring-red-300/40 px-3 py-2.5">
+              <span className="material-symbols-outlined text-[22px] text-red-100">e911_emergency</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold uppercase tracking-wide text-red-100">
+                  Ενεργός συναγερμός οδηγού
+                </p>
+                <p className="text-sm text-white/90 truncate">
+                  {activeSos.message || 'SOS από τον οδηγό'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearSos}
+                disabled={clearingSos || !onClearSos}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-xs font-bold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60 transition"
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {clearingSos ? 'progress_activity' : 'notifications_off'}
+                </span>
+                {clearingSos ? 'Απενεργοποίηση…' : 'Απενεργοποίηση συναγερμού'}
+              </button>
+            </div>
+          ) : null}
         </header>
 
         <div className="flex shrink-0 flex-wrap gap-1.5 px-4 pt-3">

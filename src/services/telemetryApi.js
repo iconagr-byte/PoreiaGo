@@ -260,6 +260,21 @@ export async function fetchTelemetryAlerts({ limit = 50 } = {}, authHeaders = ad
   return getMockAlerts();
 }
 
+/** Office dismisses driver SOS — pin leaves the live map. */
+export async function clearTelemetryAlert(alertId, authHeaders = adminAuthHeaders()) {
+  const id = String(alertId || '').trim();
+  if (!id) throw new Error('Λείπει alert id');
+  const res = await fetch(
+    `${API_BASE}/api/admin/telemetry/alerts/${encodeURIComponent(id)}/clear`,
+    { method: 'POST', headers: authHeaders },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || 'Αποτυχία απενεργοποίησης συναγερμού');
+  }
+  return data;
+}
+
 export async function compareTripRoutes(tripA, tripB, { limit = 5000 } = {}, authHeaders = adminAuthHeaders()) {
   const params = new URLSearchParams({
     trip_a: String(tripA),

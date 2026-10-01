@@ -14,6 +14,38 @@ export function isSosAlert(alert) {
   return SOS_ALERT_TYPES.has(String(alert?.alert_type || '').toUpperCase());
 }
 
+function normalizePlate(value) {
+  return String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+/** Active SOS/incident for a live vehicle (plate or driver match). */
+export function findActiveSosForVehicle(alerts, vehicle) {
+  if (!vehicle) return null;
+  const plate = normalizePlate(vehicle.bus_plate || vehicle.vehicle_code || vehicle.vehicle_id);
+  const driverId = String(
+    vehicle.driver_id || vehicle.app_driver_id || vehicle.driverId || vehicle.appDriverId || '',
+  ).trim();
+  const tripId = vehicle.trip_id ?? vehicle.tripId ?? null;
+  for (const alert of alerts || []) {
+    if (!isSosAlert(alert)) continue;
+    if (alert.cleared_at || alert.event === 'cleared') continue;
+    const meta = alert.metadata || {};
+    const alertPlate = normalizePlate(
+      meta.bus_plate || alert.bus_plate || alert.vehicle_id || meta.vehicle_code,
+    );
+    const alertDriver = String(meta.driver_id || alert.driver_id || '').trim();
+    const alertTrip = meta.trip_id ?? alert.trip_id ?? null;
+    if (plate && alertPlate && plate === alertPlate) return alert;
+    if (driverId && alertDriver && driverId === alertDriver) return alert;
+    if (tripId != null && alertTrip != null && String(tripId) === String(alertTrip) && plate && alertPlate) {
+      return alert;
+    }
+  }
+  return null;
+}
+
 export function alertCoords(alert) {
   const meta = alert?.metadata || {};
   const lat = alert?.lat ?? meta.lat ?? meta.latitude;

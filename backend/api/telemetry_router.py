@@ -289,6 +289,31 @@ async def telemetry_alerts(
     return [TelemetryAlertResponse(**r) for r in rows]
 
 
+@admin_router.post("/alerts/{alert_id}/clear")
+async def telemetry_clear_alert(
+    alert_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    """Απενεργοποίηση συναγερμού οδηγού (SOS) από το γραφείο."""
+    aid = str(alert_id or "").strip()
+    if not aid:
+        raise HTTPException(status_code=400, detail="Λείπει alert_id")
+    cleared = TelemetryAlertBus.clear_alert(
+        aid,
+        tenant_id=str(tenant_id),
+        notify=True,
+        publish_redis=True,
+    )
+    if not cleared:
+        raise HTTPException(status_code=404, detail="Ο συναγερμός δεν βρέθηκε")
+    return {
+        "ok": True,
+        "id": cleared.get("id"),
+        "cleared_at": cleared.get("cleared_at"),
+        "message": "Ο συναγερμός απενεργοποιήθηκε",
+    }
+
+
 @admin_router.get("/drivers/{driver_id}/safety", response_model=DriverSafetyResponse)
 async def driver_safety(
     driver_id: UUID,
