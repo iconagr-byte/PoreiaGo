@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -162,8 +163,47 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     touch_device(imei)
                     continue
                 if not records:
-                    # Valid AVL (e.g. no GPS yet) — still mark seen
+                    # Valid AVL (e.g. no GPS yet) — still mark seen. If we already
+                    # have a last fix, keep the live pin alive at that position.
                     touch_device(imei)
+                    if (
+                        device.get("last_lat") is not None
+                        and device.get("last_lng") is not None
+                    ):
+                        try:
+                            tenant_id = UUID(str(device["tenant_id"]))
+                            received_at = datetime.now(timezone.utc).isoformat()
+                            vehicle_code = str(device.get("vehicle_code") or imei)
+                            await process_telemetry_payload(
+                                {
+                                    "tenant_id": str(tenant_id),
+                                    "vehicle_code": vehicle_code,
+                                    "latitude": float(device["last_lat"]),
+                                    "longitude": float(device["last_lng"]),
+                                    "speed_kmh": float(device.get("last_speed_kmh") or 0),
+                                    "engine_status": "on",
+                                    "recorded_at": received_at,
+                                    "tracker_signal_at": received_at,
+                                    "heading_deg": 0.0,
+                                    "source": "teltonika",
+                                    "imei": imei,
+                                    "bus_plate": vehicle_code,
+                                    "driver_name": str(
+                                        device.get("label") or vehicle_code
+                                    ),
+                                    "driver_id": (
+                                        str(device["driver_id"])
+                                        if device.get("driver_id")
+                                        else None
+                                    ),
+                                }
+                            )
+                        except Exception:
+                            logger.debug(
+                                "Teltonika keepalive pin failed IMEI=%s",
+                                imei,
+                                exc_info=True,
+                            )
                     continue
                 try:
                     tenant_id = UUID(str(device["tenant_id"]))
@@ -181,6 +221,9 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                 driver_name = str(device.get("label") or vehicle_code)
                 last = records[-1]
                 accepted = 0
+                # Live-map freshness must use server receive time — device GPS
+                # clocks are often skewed and would drop the pin as "stale".
+                received_at = datetime.now(timezone.utc).isoformat()
                 for fix in records:
                     fields = fix_to_telemetry_fields(fix)
                     # Process inline (not only Redis stream) so the live map pin
@@ -192,7 +235,9 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                         "longitude": fields["longitude"],
                         "speed_kmh": fields["speed_kmh"],
                         "engine_status": fields["engine_status"],
-                        "recorded_at": fields["recorded_at"],
+                        "recorded_at": received_at,
+                        "gps_recorded_at": fields["recorded_at"],
+                        "tracker_signal_at": received_at,
                         "heading_deg": fields["heading_deg"],
                         "driver_id": str(driver_id) if driver_id else None,
                         "tracker_event_id": fields.get("tracker_event_id"),

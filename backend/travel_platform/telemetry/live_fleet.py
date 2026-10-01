@@ -131,16 +131,22 @@ class LiveFleetService:
                 if raw.get("tracker_signal_at"):
                     merged["tracker_signal_at"] = str(raw.get("tracker_signal_at"))
             else:
+                from datetime import datetime, timezone
+
                 merged.pop("hydrated_from_store", None)
-                signal = raw.get("tracker_signal_at") or raw.get("recorded_at")
-                if signal:
-                    merged["tracker_signal_at"] = str(signal)
-                elif update.recorded_at is not None:
-                    merged["tracker_signal_at"] = (
-                        update.recorded_at.isoformat()
-                        if hasattr(update.recorded_at, "isoformat")
-                        else str(update.recorded_at)
-                    )
+                # Server receive time keeps the pin on the map even when the
+                # device GPS clock is skewed/old (common on Teltonika).
+                now_dt = datetime.now(timezone.utc)
+                now_iso = now_dt.isoformat()
+                signal = raw.get("tracker_signal_at") or now_iso
+                merged["tracker_signal_at"] = str(signal)
+                merged["updated_at"] = now_iso
+                if raw.get("gps_recorded_at"):
+                    merged["gps_recorded_at"] = str(raw.get("gps_recorded_at"))
+                try:
+                    state.updated_at = now_dt
+                except Exception:
+                    pass
         elif raw.get("driver_id"):
             merged["driver_id"] = raw["driver_id"]
         trip_title = raw.get("trip_title") or raw.get("tripTitle") or raw.get("excursion_name")

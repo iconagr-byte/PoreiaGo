@@ -11,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 def _meta_plate(meta: dict[str, Any]) -> str:
-    return str(meta.get("vehicle_code") or meta.get("bus_plate") or "").strip().upper()
+    from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
+
+    return normalize_vehicle_plate(meta.get("vehicle_code") or meta.get("bus_plate"))
 
 
 def office_plate_has_enabled_tracker(tenant_id: str, vehicle_code: str | None) -> bool:
@@ -34,6 +36,7 @@ def office_allows_tracker_pin(tenant_id: str, meta: dict[str, Any] | None) -> bo
         return False
     try:
         from travel_platform.telemetry.teltonika.device_store import list_devices, normalize_imei
+        from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
     except Exception:
         return False
 
@@ -47,7 +50,7 @@ def office_allows_tracker_pin(tenant_id: str, meta: dict[str, Any] | None) -> bo
             continue
         if imei and normalize_imei(row.get("imei")) == imei:
             return True
-        plate = str(row.get("vehicle_code") or "").strip().upper()
+        plate = normalize_vehicle_plate(row.get("vehicle_code"))
         if code and plate and code == plate:
             return True
     return False
