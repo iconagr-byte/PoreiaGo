@@ -63,6 +63,7 @@ function collectAlertsWithCoords(alerts, types, { maxAgeMinutes = 120 } = {}) {
   const rows = [];
 
   for (const alert of alerts || []) {
+    if (alert.cleared_at || alert.event === 'cleared') continue;
     const type = String(alert.alert_type || '').toUpperCase();
     if (!types.has(type)) continue;
     const coords = alertCoords(alert);
