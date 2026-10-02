@@ -181,13 +181,24 @@ class LiveFleetService:
                                 "source",
                                 "imei",
                                 "tracker_signal_at",
-                                "hydrated_from_store",
                                 "gps_recorded_at",
                             ):
                                 if prev.get(key) is not None:
                                     merged[key] = prev[key]
                         else:
                             merged["source"] = prev.get("source") or "teltonika"
+                    # Online IMEI ⇒ open Teltonika channel (dual badge), never a
+                    # sticky parked-hydrate flag left over from sparse AVL.
+                    if device_online:
+                        merged.pop("hydrated_from_store", None)
+                        if tracker and tracker.get("last_seen_at"):
+                            merged["tracker_signal_at"] = str(tracker.get("last_seen_at"))
+                        elif not merged.get("tracker_signal_at"):
+                            merged["tracker_signal_at"] = now_iso
+                        if tracker and tracker.get("imei") and not merged.get("imei"):
+                            merged["imei"] = str(tracker.get("imei"))
+                    elif prev.get("hydrated_from_store"):
+                        merged["hydrated_from_store"] = True
                     if lat is not None and lng is not None:
                         merged["lat"] = lat
                         merged["lng"] = lng
@@ -217,6 +228,19 @@ class LiveFleetService:
                             )
                         except Exception:
                             merged["gps_sources"] = ["teltonika", "app"]
+                        # Dual badge must list both while IMEI TCP + App are live.
+                        if device_online and "teltonika" not in (
+                            merged.get("gps_sources") or []
+                        ):
+                            merged["gps_sources"] = [
+                                "teltonika",
+                                *(merged.get("gps_sources") or []),
+                            ]
+                        if "app" not in (merged.get("gps_sources") or []):
+                            merged["gps_sources"] = [
+                                *(merged.get("gps_sources") or []),
+                                "app",
+                            ]
                         plate_key_early = normalize_vehicle_plate(
                             update.vehicle_code or merged.get("bus_plate")
                         )
@@ -780,6 +804,26 @@ class LiveFleetService:
             or meta.get("driver_name") in {"—", "-", "Tracker"}
         ):
             meta["driver_name"] = str(driver_name)
+        # Online IMEI during soft-ack ⇒ clear parked hydrate so dual badge opens.
+        try:
+            from travel_platform.telemetry.teltonika.device_store import (
+                get_enabled_device_by_vehicle_code,
+            )
+            from travel_platform.telemetry.tracker_priority import (
+                is_tracker_binding_alive,
+            )
+
+            device = get_enabled_device_by_vehicle_code(
+                tid, meta.get("vehicle_code") or meta.get("bus_plate") or plate
+            )
+            if is_tracker_binding_alive(device, max_age_sec=alive):
+                meta.pop("hydrated_from_store", None)
+                if device.get("last_seen_at"):
+                    meta["tracker_signal_at"] = str(device.get("last_seen_at"))
+                if device.get("imei") and not meta.get("imei"):
+                    meta["imei"] = str(device.get("imei"))
+        except Exception:
+            pass
         sources = resolve_live_gps_sources(meta, max_age_sec=alive, tenant_id=tid)
         if "app" not in sources:
             sources = [*sources, "app"]
@@ -833,6 +877,7 @@ class LiveFleetService:
                 "source": meta.get("source") or "teltonika",
                 "imei": meta.get("imei"),
                 "tracker_signal_at": meta.get("tracker_signal_at"),
+                "hydrated_from_store": bool(meta.get("hydrated_from_store")),
                 "app_seen_at": now_iso,
                 "gps_sources": sources if "app" in sources and "teltonika" in sources else ["teltonika", "app"],
             }

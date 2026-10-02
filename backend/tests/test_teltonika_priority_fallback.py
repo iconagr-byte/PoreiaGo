@@ -619,6 +619,58 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         self.assertIn("app", after.get("gps_sources") or [])
         self.assertIn("teltonika", after.get("gps_sources") or [])
 
+    def test_apply_update_phone_clears_hydrate_when_imei_online(self):
+        """Online IMEI + App soft-ack must open dual badge (not sticky parked hydrate)."""
+        from uuid import UUID, uuid4
+
+        from travel_platform.telemetry.domain import TelemetryUpdate
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        ds.touch_device("861076085468260", lat=38.2, lng=20.6, speed_kmh=0, points=1)
+        live = LiveFleetService()
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        vid = str(uuid4())
+        old = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "lat": 38.2,
+            "lng": 20.6,
+            "source": "teltonika",
+            "imei": "861076085468260",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "tracker_signal_at": old,
+            "hydrated_from_store": True,
+        }
+        update = TelemetryUpdate(
+            tenant_id=UUID(self.tenant),
+            vehicle_code="EEX5670",
+            trip_id=None,
+            latitude=38.99,
+            longitude=20.99,
+            speed_kmh=12.0,
+            engine_on=True,
+            fuel_level_pct=None,
+            recorded_at=datetime.now(timezone.utc),
+            raw={
+                "source": "driver_pwa",
+                "driver_id": "drv-1",
+                "bus_plate": "EEX5670",
+            },
+        )
+        live.apply_update(UUID(vid), update)
+        after = live._vehicles[vid]
+        self.assertFalse(after.get("hydrated_from_store"))
+        self.assertTrue(after.get("app_seen_at"))
+        self.assertIn("app", after.get("gps_sources") or [])
+        self.assertIn("teltonika", after.get("gps_sources") or [])
+        # Signal refreshed from device last_seen (not the stale hydrate stamp).
+        self.assertNotEqual(after.get("tracker_signal_at"), old)
+
     def test_ingest_allows_phone_for_unbound_plate(self):
         session = {
             "tenant_id": self.tenant,

@@ -78,6 +78,20 @@ assert.deepEqual(
   ['teltonika', 'app'],
 );
 
+// Online IMEI enrichment: App pin + fresh tracker_signal ⇒ dual (not App-only).
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'driver_pwa',
+    imei: '861',
+    app_seen_at: now,
+    tracker_signal_at: now,
+    timestamp: now,
+    hydrated_from_store: false,
+    gps_sources: ['teltonika', 'app'],
+  }),
+  ['teltonika', 'app'],
+);
+
 // Closed / hydrated Teltonika must not show as an open channel next to App.
 assert.deepEqual(
   resolveFleetGpsSources({

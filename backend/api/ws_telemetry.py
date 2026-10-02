@@ -400,17 +400,40 @@ async def admin_fleet_egress_ws(
         trip_title = await resolve_trip_title(
             trip_id, preferred=trip_title_hint or meta.get("trip_title")
         )
+        tracker_signal_at = meta.get("tracker_signal_at")
+        hydrated_from_store = bool(meta.get("hydrated_from_store"))
         try:
             from travel_platform.telemetry.tracker_priority import (
+                is_tracker_binding_alive,
                 resolve_live_gps_sources,
                 resolve_tracker_alive_seconds,
             )
 
+            alive_sec = resolve_tracker_alive_seconds(tid)
             gps_sources = resolve_live_gps_sources(
                 meta,
-                max_age_sec=resolve_tracker_alive_seconds(tid),
+                max_age_sec=alive_sec,
                 tenant_id=tid,
             )
+            if "teltonika" in gps_sources:
+                try:
+                    from travel_platform.telemetry.teltonika.device_store import (
+                        get_enabled_device_by_vehicle_code,
+                    )
+
+                    device = get_enabled_device_by_vehicle_code(
+                        tid,
+                        meta.get("vehicle_code")
+                        or meta.get("bus_plate")
+                        or vehicle.vehicle_code,
+                    )
+                    if is_tracker_binding_alive(device, max_age_sec=alive_sec):
+                        tracker_signal_at = device.get("last_seen_at") or tracker_signal_at
+                        hydrated_from_store = False
+                        if not meta.get("imei") and device.get("imei"):
+                            meta["imei"] = device.get("imei")
+                except Exception:
+                    pass
         except Exception:
             gps_sources = []
         app_driver_id = str(meta.get("app_driver_id") or "").strip() or None
@@ -436,8 +459,8 @@ async def admin_fleet_egress_ws(
                 "imei": meta.get("imei"),
                 "gps_sources": gps_sources,
                 "app_seen_at": meta.get("app_seen_at"),
-                "tracker_signal_at": meta.get("tracker_signal_at"),
-                "hydrated_from_store": bool(meta.get("hydrated_from_store")),
+                "tracker_signal_at": tracker_signal_at,
+                "hydrated_from_store": hydrated_from_store,
             },
         )
     await websocket.send_text(json.dumps({"type": "fleet_snapshot", "vehicles": snapshot}))
