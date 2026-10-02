@@ -887,6 +887,36 @@ html.driver-route #root {
   margin-bottom: 0.35rem;
 }
 
+.driver-gate-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.driver-gate-label-row .driver-gate-label {
+  margin-bottom: 0;
+}
+
+.driver-gate-forgot {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--driver-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.driver-gate-forgot:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .driver-gate-submit {
   width: 100%;
   min-height: 3.25rem;

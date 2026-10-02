@@ -77,6 +77,39 @@ export async function loginDriver(username, password) {
   return session;
 }
 
+/** Request password-reset email for fleet driver PWA. */
+export async function forgotDriverPassword(username) {
+  const res = await fetch(`${API_BASE}/api/driver/session/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: String(username || '').trim() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Αποτυχία αιτήματος επαναφοράς');
+  }
+  return data;
+}
+
+/** Confirm new password from emailed reset link. */
+export async function resetDriverPassword(token, newPassword) {
+  const res = await fetch(`${API_BASE}/api/driver/session/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      token: String(token || '').trim(),
+      new_password: String(newPassword || ''),
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Αποτυχία επαναφοράς κωδικού');
+  }
+  return data;
+}
+
 export async function exchangeMasterQr(qrRaw) {
   let res;
   try {

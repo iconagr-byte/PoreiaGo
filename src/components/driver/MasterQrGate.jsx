@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
-import { exchangeMasterQr, loginDriver } from '../../services/driverPortalApi.js';
+import {
+  exchangeMasterQr,
+  forgotDriverPassword,
+  loginDriver,
+} from '../../services/driverPortalApi.js';
 import { clearDriverShiftLaunchState } from '../../lib/driver/useDriverShiftSession.js';
 import { useDriverDeviceForm } from '../../hooks/useDriverDeviceForm.js';
 import BusQrScanner from '../BusQrScanner.jsx';
 import '../../styles/driver-app.css';
 
 export default function MasterQrGate({ onAuthenticated }) {
-  const [mode, setMode] = useState('password'); // password | qr
+  const [mode, setMode] = useState('password'); // password | qr | forgot
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const device = useDriverDeviceForm();
   const deviceClass = [
@@ -39,6 +44,7 @@ export default function MasterQrGate({ onAuthenticated }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setInfo('');
     setLoading(true);
     try {
       const session = await loginDriver(username.trim(), password);
@@ -52,8 +58,27 @@ export default function MasterQrGate({ onAuthenticated }) {
     }
   };
 
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    setError('');
+    setInfo('');
+    setLoading(true);
+    try {
+      const result = await forgotDriverPassword(username.trim());
+      setInfo(
+        result.message ||
+          'Αν υπάρχει λογαριασμός, στάλθηκε email επαναφοράς (ελέγξτε και τα spam).',
+      );
+    } catch (err) {
+      setError(err.message || 'Αποτυχία αιτήματος επαναφοράς');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRaw = async (raw) => {
     setError('');
+    setInfo('');
     setLoading(true);
     try {
       const session = await exchangeMasterQr(raw);
@@ -90,7 +115,11 @@ export default function MasterQrGate({ onAuthenticated }) {
             PoreiaGo · Οδηγός
           </p>
           <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--driver-text)' }}>
-            {mode === 'password' ? 'Είσοδος βάρδιας' : 'Master QR'}
+            {mode === 'password'
+              ? 'Είσοδος βάρδιας'
+              : mode === 'forgot'
+                ? 'Ξέχασα τον κωδικό'
+                : 'Master QR'}
           </h1>
           <p
             className="driver-gate-brand-sub text-sm mt-2 leading-relaxed max-w-xs mx-auto"
@@ -98,6 +127,8 @@ export default function MasterQrGate({ onAuthenticated }) {
           >
             {mode === 'password' ? (
               <>Συνδεθείτε με όνομα χρήστη και κωδικό</>
+            ) : mode === 'forgot' ? (
+              <>Θα στείλουμε σύνδεσμο επαναφοράς στο email του οδηγού</>
             ) : (
               <>
                 Σκανάρετε το <span className="font-bold" style={{ color: 'var(--driver-accent)' }}>Master QR</span>{' '}
@@ -154,7 +185,21 @@ export default function MasterQrGate({ onAuthenticated }) {
                 />
               </label>
               <label className="block">
-                <span className="driver-gate-label">Κωδικός</span>
+                <div className="driver-gate-label-row">
+                  <span className="driver-gate-label">Κωδικός</span>
+                  <button
+                    type="button"
+                    className="driver-gate-forgot"
+                    disabled={loading}
+                    onClick={() => {
+                      setError('');
+                      setInfo('');
+                      setMode('forgot');
+                    }}
+                  >
+                    Ξέχασα τον κωδικό μου
+                  </button>
+                </div>
                 <div className="driver-gate-password-wrap">
                   <input
                     className="driver-gate-input driver-gate-input--with-eye"
@@ -189,10 +234,51 @@ export default function MasterQrGate({ onAuthenticated }) {
                 disabled={loading}
                 onClick={() => {
                   setError('');
+                  setInfo('');
                   setMode('qr');
                 }}
               >
                 Γρήγορη είσοδος με QR
+              </button>
+            </form>
+          ) : mode === 'forgot' ? (
+            <form onSubmit={handleForgot} className="space-y-3">
+              <label className="block">
+                <span className="driver-gate-label">Email ή όνομα χρήστη</span>
+                <input
+                  className="driver-gate-input"
+                  type="text"
+                  autoComplete="username"
+                  inputMode="email"
+                  placeholder="email λογαριασμού οδηγού"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </label>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--driver-muted)' }}>
+                Θα λάβετε σύνδεσμο στο email του λογαριασμού. Αν δεν έχετε πρόσβαση στο email,
+                ζητήστε νέο κωδικό από το γραφείο.
+              </p>
+              <button
+                type="submit"
+                className="driver-gate-submit"
+                disabled={loading || !username.trim()}
+              >
+                {loading ? 'Αποστολή…' : 'Αποστολή συνδέσμου'}
+              </button>
+              <button
+                type="button"
+                className="driver-gate-secondary"
+                disabled={loading}
+                onClick={() => {
+                  setError('');
+                  setInfo('');
+                  setMode('password');
+                }}
+              >
+                Επιστροφή στην είσοδο
               </button>
             </form>
           ) : (
@@ -210,6 +296,7 @@ export default function MasterQrGate({ onAuthenticated }) {
                 disabled={loading}
                 onClick={() => {
                   setError('');
+                  setInfo('');
                   setMode('password');
                 }}
               >
@@ -224,7 +311,13 @@ export default function MasterQrGate({ onAuthenticated }) {
               style={{ color: 'var(--driver-accent)' }}
             >
               <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
-              Σύνδεση…
+              {mode === 'forgot' ? 'Αποστολή…' : 'Σύνδεση…'}
+            </p>
+          )}
+
+          {info && (
+            <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-center font-medium">
+              {info}
             </p>
           )}
 
