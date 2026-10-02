@@ -17,7 +17,7 @@ assert.equal(
 assert.equal(resolveFleetGpsSource({ source: 'driver_pwa', timestamp: now }), 'app');
 assert.equal(
   formatFleetGpsSourceBadge({ source: 'teltonika', timestamp: now, tracker_signal_at: now }),
-  'Teltonika',
+  'GPS οχήματος',
 );
 assert.equal(formatFleetGpsSourceBadge({ source: 'driver_pwa', timestamp: now }), 'App οδηγού');
 assert.equal(formatFleetGpsSourceBadge({}), '');
@@ -39,8 +39,9 @@ assert.equal(
     app_seen_at: now,
     tracker_signal_at: now,
   }),
-  'Teltonika · App',
+  'GPS οχήματος · App',
 );
+assert.equal(formatFleetGpsSourceChipLabel('teltonika'), 'GPS οχήματος');
 
 // Server list omitted app — still dual when app_seen_at is fresh.
 assert.deepEqual(
@@ -52,6 +53,18 @@ assert.deepEqual(
     gps_sources: ['teltonika'],
   }),
   ['teltonika', 'app'],
+);
+
+// Cleared App after logout — Teltonika-only (no resurrect from empty stamp).
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'teltonika',
+    imei: '861',
+    app_seen_at: null,
+    tracker_signal_at: now,
+    gps_sources: ['teltonika'],
+  }),
+  ['teltonika'],
 );
 
 // App-sourced row + server says both — show Teltonika · App (device online).

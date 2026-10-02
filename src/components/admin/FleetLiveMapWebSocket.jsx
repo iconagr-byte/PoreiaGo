@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useFleetTelemetryEgress } from '../../context/FleetTelemetryContext.jsx';
 import { isMapboxEnabled } from '../../lib/maps/mapboxConfig.js';
 import { useTelemetryAlerts } from '../../hooks/useTelemetryAlerts.js';
-import { mapSosAlertsWithCoords } from '../../lib/admin/fleetMapAlerts.js';
+import {
+  findActiveSosForVehicle,
+  mapSosAlertsWithCoords,
+} from '../../lib/admin/fleetMapAlerts.js';
 import {
   formatBoardingLabel,
   formatUpdatedAgo,
@@ -66,9 +69,13 @@ export default function FleetLiveMapWebSocket() {
   );
 
   // SOS pins always on (χωρίς toggle UI) — κρίσιμο για ασφάλεια.
-  const { alerts } = useTelemetryAlerts({ tenantId, limit: 80, enabled: true });
+  const { alerts, clearAlert } = useTelemetryAlerts({ tenantId, limit: 80, enabled: true });
   const sosAlerts = useMemo(() => mapSosAlertsWithCoords(alerts), [alerts]);
   const focusSosAlert = sosAlerts[0] ?? null;
+  const historySos = useMemo(
+    () => findActiveSosForVehicle(sosAlerts, historyVehicle),
+    [sosAlerts, historyVehicle],
+  );
 
   const center = useMemo(() => {
     if (mapVehicles.length) return [mapVehicles[0].lat, mapVehicles[0].lng];
@@ -164,6 +171,7 @@ export default function FleetLiveMapWebSocket() {
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
               onVehicleHistory={setHistoryVehicle}
+              onClearSos={clearAlert}
             />
           ) : (
             <FleetLiveMapLeaflet
@@ -182,6 +190,7 @@ export default function FleetLiveMapWebSocket() {
               focusSosAlert={focusSosAlert}
               fitNonce={fitNonce}
               onVehicleHistory={setHistoryVehicle}
+              onClearSos={clearAlert}
             />
           )}
         </div>
@@ -292,6 +301,8 @@ export default function FleetLiveMapWebSocket() {
         open={Boolean(historyVehicle)}
         vehicle={historyVehicle}
         onClose={() => setHistoryVehicle(null)}
+        activeSos={historySos}
+        onClearSos={clearAlert}
       />
     </div>
   );

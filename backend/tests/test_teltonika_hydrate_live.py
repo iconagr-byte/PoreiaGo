@@ -129,9 +129,8 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         self.assertEqual(payload["source"], "teltonika")
         self.assertFalse(payload.get("hydrated_from_store"))
 
-    def test_skips_closed_tracker_over_app_pin(self):
-        """Parked/closed Teltonika must not overwrite a live App pin."""
-        # Age the device last_seen so it is closed for soft-ack window.
+    def test_stale_tracker_does_not_fight_live_app(self):
+        """Quiet hardware must not yank a live App pin (stops App↔GPS jump)."""
         with ds._LOCK:  # noqa: SLF001
             data = ds._read()  # noqa: SLF001
             for row in data.get("devices") or []:
@@ -160,6 +159,108 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
 
         self.assertEqual(n, 0)
         process.assert_not_awaited()
+        self.assertEqual(LiveFleetService._vehicles[vid].get("source"), "driver_pwa")
+
+    def test_online_tracker_reclaims_app_pin(self):
+        """Online IMEI reclaim App pin so dual-live position stays on hardware."""
+        ds.touch_device("861076085468260", lat=40.8, lng=22.05, speed_kmh=0, points=1)
+        vid = "veh-app"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "lat": 38.25,
+            "lng": 20.65,
+            "source": "driver_pwa",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+        payload = process.await_args.args[0]
+        self.assertEqual(payload["source"], "teltonika")
+        self.assertFalse(payload.get("hydrated_from_store"))
+
+    def test_keeps_enabled_stale_hardware_pin(self):
+        """Safety watch: enabled IMEI last-known is re-stamped, never age-dropped."""
+        with ds._LOCK:  # noqa: SLF001
+            data = ds._read()  # noqa: SLF001
+            for row in data.get("devices") or []:
+                if row.get("imei") == "861076085468260":
+                    row["last_seen_at"] = (
+                        datetime.now(timezone.utc) - timedelta(hours=2)
+                    ).isoformat()
+            ds._write(data)  # noqa: SLF001
+
+        vid = "veh-hw"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "lat": 38.25,
+            "lng": 20.65,
+            "source": "teltonika",
+            "updated_at": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+            "tracker_signal_at": (
+                datetime.now(timezone.utc) - timedelta(hours=2)
+            ).isoformat(),
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process, patch(
+            "travel_platform.telemetry.live_fleet_redis.delete_live_vehicle",
+            new_callable=AsyncMock,
+        ) as delete_mock:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+        delete_mock.assert_not_awaited()
+
+    def test_force_repaints_online_when_map_empty(self):
+        """Empty Achillio map + online IMEI → force hydrate paints immediately."""
+        from travel_platform.telemetry.teltonika import hydrate_live as hl
+
+        hl._last_hydrate_at[self.tenant] = __import__("time").monotonic()
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant, force=True))
+
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+
+    def test_keeps_parked_pin_continuous_watch(self):
+        """Sparse AVL (e.g. 0 km/h) — last fix stays on the map for safety."""
+        with ds._LOCK:  # noqa: SLF001
+            data = ds._read()  # noqa: SLF001
+            for row in data.get("devices") or []:
+                if row.get("imei") == "861076085468260":
+                    row["last_seen_at"] = (
+                        datetime.now(timezone.utc) - timedelta(minutes=5)
+                    ).isoformat()
+            ds._write(data)  # noqa: SLF001
+
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
+
+        self.assertEqual(n, 1)
+        process.assert_awaited()
+        payload = process.await_args.args[0]
+        # Not «online» badge channel — last-known parked pin.
+        self.assertTrue(payload.get("hydrated_from_store"))
 
 
 if __name__ == "__main__":

@@ -126,6 +126,26 @@ class AlertsWsHub:
         for ws in dead:
             self.disconnect(tenant_id, ws)
 
+    async def broadcast_alert_cleared(self, tenant_id: str, alert: dict[str, Any]) -> None:
+        payload = {
+            "type": "telemetry_alert_cleared",
+            "id": alert.get("id"),
+            "tenant_id": alert.get("tenant_id") or tenant_id,
+            "alert_type": alert.get("alert_type"),
+            "cleared_at": alert.get("cleared_at"),
+            "message": alert.get("message"),
+        }
+        room = list(self._rooms.get(tenant_id, set()))
+        text = json.dumps(payload)
+        dead: list[WebSocket] = []
+        for ws in room:
+            try:
+                await ws.send_text(text)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(tenant_id, ws)
+
 
 _eta_hub = EtaWsHub()
 _alerts_hub = AlertsWsHub()
@@ -157,3 +177,17 @@ async def push_telemetry_alert(alert: dict[str, Any]) -> None:
     hub = get_alerts_ws_hub()
     for tid in rooms:
         await hub.broadcast_alert(tid, alert)
+
+
+async def push_telemetry_alert_cleared(alert: dict[str, Any]) -> None:
+    """Tell admin clients to drop an SOS pin after office dismiss."""
+    from travel_platform.operations.master_qr_local import DEFAULT_TENANT
+
+    primary = str(alert.get("tenant_id") or "").strip()
+    rooms = []
+    for tid in (primary, DEFAULT_TENANT):
+        if tid and tid not in rooms:
+            rooms.append(tid)
+    hub = get_alerts_ws_hub()
+    for tid in rooms:
+        await hub.broadcast_alert_cleared(tid, alert)

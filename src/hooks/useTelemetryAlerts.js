@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { fetchTelemetryAlerts } from '../services/telemetryApi.js';
+import { clearTelemetryAlert, fetchTelemetryAlerts } from '../services/telemetryApi.js';
 import { buildWsUrl } from '../lib/wsUrl.js';
 import { getSaasToken } from '../services/saasApi.js';
 import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
@@ -12,6 +12,27 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
   const [loading, setLoading] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef(null);
+
+  const dropAlert = useCallback((alertId) => {
+    const id = String(alertId || '').trim();
+    if (!id) return;
+    setAlerts((prev) => prev.filter((a) => String(a.id) !== id));
+  }, []);
+
+  const clearAlert = useCallback(
+    async (alertId) => {
+      const id = String(alertId || '').trim();
+      if (!id) throw new Error('Λείπει alert id');
+      const data = await clearTelemetryAlert(id);
+      dropAlert(id);
+      toast.success(data.message || 'Ο συναγερμός απενεργοποιήθηκε', {
+        id: `sos-cleared-${id}`,
+        duration: 4000,
+      });
+      return data;
+    },
+    [dropAlert],
+  );
 
   const mergeAlert = useCallback((row) => {
     setAlerts((prev) => {
@@ -103,8 +124,14 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
             if (data.type === 'alerts_snapshot' && Array.isArray(data.alerts)) {
               setAlerts(data.alerts.slice(0, limit));
               setLoading(false);
+            } else if (data.type === 'telemetry_alert_cleared') {
+              dropAlert(data.id);
             } else if (data.type === 'telemetry_alert') {
-              mergeAlert(data);
+              if (data.event === 'cleared' || data.cleared_at) {
+                dropAlert(data.id);
+              } else {
+                mergeAlert(data);
+              }
             }
           } catch {
             /* ignore */
@@ -131,7 +158,7 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (wsRef.current) wsRef.current.close();
     };
-  }, [enabled, tenantId, limit, load, mergeAlert]);
+  }, [enabled, tenantId, limit, load, mergeAlert, dropAlert]);
 
-  return { alerts, loading, wsConnected, refresh: load };
+  return { alerts, loading, wsConnected, refresh: load, clearAlert, dropAlert };
 }

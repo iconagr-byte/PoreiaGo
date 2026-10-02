@@ -114,14 +114,15 @@ export function resolveFleetGpsSources(vehicle) {
 /** Short Greek label for a single chip, or '' when unknown. */
 export function formatFleetGpsSourceBadge(vehicle) {
   const sources = resolveFleetGpsSources(vehicle);
-  if (sources.length === 2) return 'Teltonika · App';
-  if (sources[0] === 'teltonika') return 'Teltonika';
+  if (sources.length === 2) return 'GPS οχήματος · App';
+  if (sources[0] === 'teltonika') return 'GPS οχήματος';
   if (sources[0] === 'app') return 'App οδηγού';
   return '';
 }
 
 export function formatFleetGpsSourceChipLabel(kind) {
-  if (kind === 'teltonika') return 'Teltonika';
+  // User-facing: describe the channel (vehicle hardware vs driver app), not the vendor.
+  if (kind === 'teltonika') return 'GPS οχήματος';
   if (kind === 'app') return 'App';
   return '';
 }

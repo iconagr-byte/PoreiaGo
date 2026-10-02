@@ -120,6 +120,119 @@ class LiveFleetService:
             "test_ping",
             "teltonika_test_ping",
         }
+        # Dual live: phone must not yank lat/lng from hardware (stops pin jump).
+        # Ingress soft-acks; this hardens races / other workers that skip soft-ack.
+        if not is_tracker and prev:
+            try:
+                from datetime import datetime, timezone
+
+                from travel_platform.telemetry.tracker_priority import (
+                    is_live_meta_tracker_fresh,
+                    is_tracker_binding_alive,
+                    is_tracker_source,
+                    normalize_vehicle_plate,
+                    plate_display,
+                    resolve_live_gps_sources,
+                    resolve_tracker_alive_seconds,
+                )
+
+                tid = str(update.tenant_id)
+                alive = resolve_tracker_alive_seconds(tid)
+                plate = (
+                    raw.get("bus_plate")
+                    or update.vehicle_code
+                    or prev.get("bus_plate")
+                    or prev.get("vehicle_code")
+                )
+                tracker = None
+                try:
+                    from travel_platform.telemetry.teltonika.device_store import (
+                        get_enabled_device_by_vehicle_code,
+                    )
+
+                    tracker = get_enabled_device_by_vehicle_code(tid, plate)
+                except Exception:
+                    tracker = None
+                device_online = is_tracker_binding_alive(tracker, max_age_sec=alive)
+                keep_hw = is_live_meta_tracker_fresh(prev, max_age_sec=alive) or device_online
+                if keep_hw:
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    # Prefer existing hardware coords; else device-store last fix.
+                    lat = prev.get("lat")
+                    lng = prev.get("lng")
+                    if (
+                        (not is_tracker_source(prev.get("source")) or lat is None or lng is None)
+                        and tracker
+                        and tracker.get("last_lat") is not None
+                        and tracker.get("last_lng") is not None
+                    ):
+                        lat = tracker.get("last_lat")
+                        lng = tracker.get("last_lng")
+                        merged["source"] = "teltonika"
+                        if tracker.get("imei"):
+                            merged["imei"] = str(tracker.get("imei"))
+                        if tracker.get("last_seen_at"):
+                            merged["tracker_signal_at"] = str(tracker.get("last_seen_at"))
+                    elif lat is not None and lng is not None:
+                        merged["lat"] = lat
+                        merged["lng"] = lng
+                        if is_tracker_source(prev.get("source")):
+                            for key in (
+                                "source",
+                                "imei",
+                                "tracker_signal_at",
+                                "hydrated_from_store",
+                                "gps_recorded_at",
+                            ):
+                                if prev.get(key) is not None:
+                                    merged[key] = prev[key]
+                        else:
+                            merged["source"] = prev.get("source") or "teltonika"
+                    if lat is not None and lng is not None:
+                        merged["lat"] = lat
+                        merged["lng"] = lng
+                        try:
+                            state.lat = float(lat)
+                            state.lng = float(lng)
+                        except Exception:
+                            pass
+                        if prev.get("speed_kmh") is not None and is_tracker_source(
+                            merged.get("source")
+                        ):
+                            merged["speed_kmh"] = prev.get("speed_kmh")
+                        recorded = raw.get("app_seen_at")
+                        if not recorded and getattr(update, "recorded_at", None) is not None:
+                            ra = update.recorded_at
+                            recorded = (
+                                ra.isoformat() if hasattr(ra, "isoformat") else str(ra)
+                            )
+                        merged["app_seen_at"] = recorded or now_iso
+                        if raw.get("driver_id"):
+                            merged["app_driver_id"] = raw["driver_id"]
+                        try:
+                            merged["gps_sources"] = resolve_live_gps_sources(
+                                merged,
+                                max_age_sec=alive,
+                                tenant_id=tid,
+                            )
+                        except Exception:
+                            merged["gps_sources"] = ["teltonika", "app"]
+                        plate_key_early = normalize_vehicle_plate(
+                            update.vehicle_code or merged.get("bus_plate")
+                        )
+                        display = plate_display(
+                            raw.get("bus_plate")
+                            or update.vehicle_code
+                            or merged.get("bus_plate")
+                        )
+                        if plate_key_early:
+                            merged["vehicle_code"] = display or plate_key_early
+                            merged["bus_plate"] = display or plate_key_early
+                            self._code_index[f"{update.tenant_id}:{plate_key_early}"] = vid
+                        self._vehicles[vid] = merged
+                        return state
+            except Exception:
+                pass
         if is_tracker:
             if raw.get("driver_id"):
                 merged["driver_id"] = raw["driver_id"]
@@ -147,10 +260,26 @@ class LiveFleetService:
                     state.updated_at = now_dt
                 except Exception:
                     pass
-            # Teltonika refresh must never drop a fresh App heartbeat — dual badge.
+            # Teltonika refresh must never drop a *fresh* App heartbeat — dual badge.
+            # Do not resurrect App after shift-end / stale clear (offline = off map).
             if prev.get("app_seen_at") and not raw.get("app_seen_at"):
-                merged["app_seen_at"] = prev["app_seen_at"]
-            if prev.get("app_driver_id") and not merged.get("app_driver_id"):
+                try:
+                    from travel_platform.telemetry.tracker_priority import (
+                        age_seconds,
+                        resolve_tracker_alive_seconds,
+                    )
+
+                    alive = resolve_tracker_alive_seconds(str(update.tenant_id))
+                    app_age = age_seconds(prev.get("app_seen_at"))
+                    if app_age is not None and app_age <= alive:
+                        merged["app_seen_at"] = prev["app_seen_at"]
+                except Exception:
+                    merged["app_seen_at"] = prev["app_seen_at"]
+            if (
+                prev.get("app_driver_id")
+                and not merged.get("app_driver_id")
+                and merged.get("app_seen_at")
+            ):
                 merged["app_driver_id"] = prev["app_driver_id"]
             try:
                 from travel_platform.telemetry.tracker_priority import (
@@ -158,14 +287,12 @@ class LiveFleetService:
                     resolve_tracker_alive_seconds,
                 )
 
-                sources = resolve_live_gps_sources(
+                # Age window already decides App — never force a stale soft-ack back.
+                merged["gps_sources"] = resolve_live_gps_sources(
                     merged,
                     max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
                     tenant_id=str(update.tenant_id),
                 )
-                if prev.get("app_seen_at") and "app" not in sources:
-                    sources = [*sources, "app"]
-                merged["gps_sources"] = sources
             except Exception:
                 pass
         elif raw.get("driver_id"):
@@ -552,17 +679,25 @@ class LiveFleetService:
             ):
                 drop_vids.append(vid)
 
+        alive = resolve_tracker_alive_seconds(tid)
         if best_app:
-            keep_meta["app_seen_at"] = best_app
-        if best_app_driver:
+            from travel_platform.telemetry.tracker_priority import age_seconds
+
+            app_age = age_seconds(best_app)
+            if app_age is not None and app_age <= alive:
+                keep_meta["app_seen_at"] = best_app
+            else:
+                keep_meta.pop("app_seen_at", None)
+                best_app = None
+        if best_app_driver and best_app:
             keep_meta["app_driver_id"] = best_app_driver
+        elif not best_app:
+            keep_meta.pop("app_driver_id", None)
         sources = resolve_live_gps_sources(
             keep_meta,
-            max_age_sec=resolve_tracker_alive_seconds(tid),
+            max_age_sec=alive,
             tenant_id=tid,
         )
-        if best_app and "app" not in sources:
-            sources = [*sources, "app"]
         if is_tracker_source(keep_meta.get("source")) and "teltonika" not in sources:
             # Open channel — still advertise Teltonika when signal is present.
             if keep_meta.get("tracker_signal_at") or keep_meta.get("updated_at"):
@@ -867,6 +1002,7 @@ class LiveFleetService:
             "trip_id": meta.get("trip_id"),
             "trip_title": meta.get("trip_title"),
             "driver_id": None,
+            "app_driver_id": None,
             "driver_name": meta.get("driver_name"),
             "bus_plate": meta.get("bus_plate") or meta.get("vehicle_code"),
             "vehicle_code": meta.get("vehicle_code"),
@@ -878,6 +1014,9 @@ class LiveFleetService:
             "timestamp": meta.get("updated_at") or datetime.now(timezone.utc).isoformat(),
             "source": "teltonika",
             "imei": meta.get("imei"),
+            "app_seen_at": None,
+            "tracker_signal_at": meta.get("tracker_signal_at"),
+            "gps_sources": meta.get("gps_sources") or ["teltonika"],
         }
         await publish_fleet_location(str(tenant_id), egress)
         await get_fleet_egress_hub().broadcast(str(tenant_id), egress)
@@ -896,7 +1035,9 @@ class LiveFleetService:
         obsolete seed slug). GPS briefly landed on the wrong Achillio tenant;
         end-shift must wipe every mirror or the admin map keeps showing the pin.
 
-        Teltonika / alive-tracker pins are kept (or handed off from phone GPS).
+        Alive Teltonika pins are kept (App channel stripped). Offline App and
+        offline Teltonika both leave the map; either channel coming back online
+        re-paints the pin.
         """
         from travel_platform.telemetry.live_fleet_redis import (
             delete_live_vehicle,
@@ -976,20 +1117,101 @@ class LiveFleetService:
                 handed["updated_at"] = tracker["last_seen_at"]
             return handed
 
+        def _row_belongs_to_driver(meta: dict[str, Any] | None) -> bool:
+            row = meta or {}
+            return str(row.get("driver_id") or "") == did or str(
+                row.get("app_driver_id") or ""
+            ) == did
+
+        def _teltonika_device(tid: str, meta: dict[str, Any]) -> dict[str, Any] | None:
+            try:
+                from travel_platform.telemetry.teltonika.device_store import (
+                    get_enabled_device_by_vehicle_code,
+                )
+            except Exception:
+                return None
+            plate = str(meta.get("vehicle_code") or meta.get("bus_plate") or "").strip()
+            if not plate:
+                return None
+            return get_enabled_device_by_vehicle_code(tid, plate)
+
+        def _teltonika_still_on_map(tid: str, meta: dict[str, Any]) -> bool:
+            """
+            Keep hardware pin for continuous safety watch.
+
+            Enabled IMEI with a last fix stays on the map after App logout —
+            age does not clear it. Unbound / no coords → drop.
+            """
+            tracker = _teltonika_device(tid, meta)
+            if (
+                tracker
+                and tracker.get("enabled")
+                and tracker.get("last_lat") is not None
+                and tracker.get("last_lng") is not None
+            ):
+                return True
+            try:
+                from travel_platform.telemetry.tracker_priority import (
+                    is_live_meta_tracker_fresh,
+                    resolve_tracker_alive_seconds,
+                )
+            except Exception:
+                return False
+            # Fallback: fresh in-memory hardware pin without device-store hit.
+            return is_live_meta_tracker_fresh(
+                meta, max_age_sec=resolve_tracker_alive_seconds(tid)
+            )
+
+        def _strip_app_channel(meta: dict[str, Any], *, tid: str) -> dict[str, Any]:
+            cleaned = dict(meta)
+            cleaned.pop("driver_id", None)
+            cleaned.pop("app_driver_id", None)
+            cleaned.pop("app_seen_at", None)
+            # Keeping a hardware pin ⇒ Teltonika is the only live channel left.
+            cleaned["gps_sources"] = ["teltonika"]
+            cleaned["source"] = cleaned.get("source") or "teltonika"
+            # Refresh from device store so the pin stays fresh after App logout.
+            tracker = _teltonika_device(tid, cleaned)
+            if tracker:
+                if tracker.get("imei"):
+                    cleaned["imei"] = tracker.get("imei")
+                if tracker.get("last_lat") is not None and tracker.get("last_lng") is not None:
+                    cleaned["lat"] = float(tracker["last_lat"])
+                    cleaned["lng"] = float(tracker["last_lng"])
+                if tracker.get("last_seen_at"):
+                    from datetime import datetime, timezone
+
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    cleaned["tracker_signal_at"] = now_iso
+                    cleaned["updated_at"] = now_iso
+                    cleaned.pop("hydrated_from_store", None)
+            return cleaned
+
         async def _drop(tid: str, vid: str, meta: dict[str, Any] | None = None) -> None:
             from travel_platform.telemetry.live_fleet_redis import save_live_vehicle
+            from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
 
             key = (tid, vid)
             if not vid or key in seen:
                 return
             row = dict(meta or self._vehicles.get(vid) or {})
             if _is_hardware_pin(row):
-                # Still strip phone driver_id so future sweeps ignore this pin.
-                cleaned = {**self._vehicles.get(vid, {}), **row}
-                cleaned.pop("driver_id", None)
+                cleaned = _strip_app_channel(
+                    {**self._vehicles.get(vid, {}), **row}, tid=tid
+                )
                 cleaned["tenant_id"] = tid
                 cleaned["vehicle_id"] = vid
-                cleaned["source"] = cleaned.get("source") or "teltonika"
+                # App offline + Teltonika past map presence → remove pin.
+                if not _teltonika_still_on_map(tid, cleaned):
+                    seen.add(key)
+                    code = cleaned.get("vehicle_code") or cleaned.get("bus_plate")
+                    self._vehicles.pop(vid, None)
+                    plate = normalize_vehicle_plate(code)
+                    if plate:
+                        self._code_index.pop(f"{tid}:{plate}", None)
+                    await delete_live_vehicle(tid, vid)
+                    removed.append(vid)
+                    return
                 self._vehicles[vid] = cleaned
                 try:
                     await save_live_vehicle(cleaned)
@@ -1004,15 +1226,27 @@ class LiveFleetService:
 
             handed = _handoff_to_teltonika(tid, row)
             if handed:
-                cleaned = {**self._vehicles.get(vid, {}), **handed}
-                cleaned.pop("driver_id", None)
+                cleaned = _strip_app_channel(
+                    {**self._vehicles.get(vid, {}), **handed}, tid=tid
+                )
                 cleaned["tenant_id"] = tid
                 cleaned["vehicle_id"] = vid
                 cleaned["source"] = "teltonika"
+                if not _teltonika_still_on_map(tid, cleaned):
+                    seen.add(key)
+                    code = cleaned.get("vehicle_code") or cleaned.get("bus_plate")
+                    self._vehicles.pop(vid, None)
+                    plate = normalize_vehicle_plate(code)
+                    if plate:
+                        self._code_index.pop(f"{tid}:{plate}", None)
+                    await delete_live_vehicle(tid, vid)
+                    removed.append(vid)
+                    return
                 self._vehicles[vid] = cleaned
                 code = cleaned.get("vehicle_code")
-                if code:
-                    self._code_index[f"{tid}:{code}"] = vid
+                plate = normalize_vehicle_plate(code)
+                if plate:
+                    self._code_index[f"{tid}:{plate}"] = vid
                 try:
                     await save_live_vehicle(cleaned)
                 except Exception:
@@ -1028,8 +1262,9 @@ class LiveFleetService:
             seen.add(key)
             code = row.get("vehicle_code") or self._vehicles.get(vid, {}).get("vehicle_code")
             self._vehicles.pop(vid, None)
-            if code:
-                self._code_index.pop(f"{tid}:{code}", None)
+            plate = normalize_vehicle_plate(code)
+            if plate:
+                self._code_index.pop(f"{tid}:{plate}", None)
             await delete_live_vehicle(tid, vid)
             removed.append(vid)
 
@@ -1037,7 +1272,7 @@ class LiveFleetService:
             for vid, meta in list(self._vehicles.items()):
                 if str(meta.get("tenant_id") or "") != tid:
                     continue
-                if str(meta.get("driver_id") or "") != did:
+                if not _row_belongs_to_driver(meta):
                     continue
                 await _drop(tid, vid, meta)
 
@@ -1046,7 +1281,7 @@ class LiveFleetService:
             except Exception:
                 remote_rows = []
             for meta in remote_rows:
-                if str(meta.get("driver_id") or "") != did:
+                if not _row_belongs_to_driver(meta):
                     continue
                 vid = str(meta.get("vehicle_id") or "")
                 await _drop(tid, vid, meta)

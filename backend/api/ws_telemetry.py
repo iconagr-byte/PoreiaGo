@@ -358,12 +358,23 @@ async def admin_fleet_egress_ws(
         pass
 
     live = get_live_fleet()
+    active_rows = await live.list_active_for_admin_async(tenant_uuid)
+    if not active_rows:
+        try:
+            from travel_platform.telemetry.teltonika.hydrate_live import (
+                hydrate_tenant_live_from_devices,
+            )
+
+            await hydrate_tenant_live_from_devices(tid, force=True)
+            active_rows = await live.list_active_for_admin_async(tenant_uuid)
+        except Exception:
+            pass
     snapshot = []
     from travel_platform.telemetry.trip_title_resolve import resolve_trip_title
 
     from travel_platform.telemetry.office_fleet_filter import office_allows_live_driver
 
-    for vehicle in await live.list_active_for_admin_async(tenant_uuid):
+    for vehicle in active_rows:
         meta = await live.vehicle_meta_async(tenant_uuid, vehicle.vehicle_id)
         if not meta:
             meta = live._vehicles.get(vehicle.vehicle_id, {})

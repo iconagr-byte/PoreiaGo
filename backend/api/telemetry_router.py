@@ -128,6 +128,25 @@ async def fleet_live(
         log.exception("fleet_live list_active failed tenant=%s", tenant_id)
         raise HTTPException(status_code=503, detail="Live fleet temporarily unavailable") from exc
 
+    # Empty map but online IMEI in device store — force paint once (Achillio).
+    if not vehicles:
+        try:
+            from travel_platform.telemetry.teltonika.hydrate_live import (
+                hydrate_tenant_live_from_devices,
+            )
+
+            n = await hydrate_tenant_live_from_devices(str(tenant_id), force=True)
+            if n:
+                vehicles = await live.list_active_for_admin_async(tenant_id)
+                log.info(
+                    "fleet_live empty-map recovery wrote=%s tenant=%s now=%s",
+                    n,
+                    tenant_id,
+                    len(vehicles),
+                )
+        except Exception:
+            log.debug("fleet_live empty-map recovery skipped", exc_info=True)
+
     rows = []
     trails_by_vehicle: dict = {}
     try:
@@ -268,6 +287,31 @@ async def telemetry_alerts(
 ):
     rows = TelemetryAlertBus.list_recent(str(tenant_id), limit=limit)
     return [TelemetryAlertResponse(**r) for r in rows]
+
+
+@admin_router.post("/alerts/{alert_id}/clear")
+async def telemetry_clear_alert(
+    alert_id: str,
+    tenant_id: Annotated[UUID, Depends(get_tenant_id)],
+):
+    """Απενεργοποίηση συναγερμού οδηγού (SOS) από το γραφείο."""
+    aid = str(alert_id or "").strip()
+    if not aid:
+        raise HTTPException(status_code=400, detail="Λείπει alert_id")
+    cleared = TelemetryAlertBus.clear_alert(
+        aid,
+        tenant_id=str(tenant_id),
+        notify=True,
+        publish_redis=True,
+    )
+    if not cleared:
+        raise HTTPException(status_code=404, detail="Ο συναγερμός δεν βρέθηκε")
+    return {
+        "ok": True,
+        "id": cleared.get("id"),
+        "cleared_at": cleared.get("cleared_at"),
+        "message": "Ο συναγερμός απενεργοποιήθηκε",
+    }
 
 
 @admin_router.get("/drivers/{driver_id}/safety", response_model=DriverSafetyResponse)

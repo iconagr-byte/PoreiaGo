@@ -218,8 +218,7 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
                     max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
                     tenant_id=str(update.tenant_id),
                 )
-                if meta.get("app_seen_at") and "app" not in sources:
-                    sources = [*sources, "app"]
+                # Do not force stale app_seen_at back into the dual badge.
                 if "teltonika" not in sources:
                     sources = ["teltonika", *sources]
                 meta["gps_sources"] = ["teltonika", "app"] if (
@@ -253,8 +252,6 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
                 max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
                 tenant_id=str(update.tenant_id),
             )
-            if meta.get("app_seen_at") and "app" not in gps_sources:
-                gps_sources = [*gps_sources, "app"]
             if "teltonika" not in gps_sources:
                 gps_sources = ["teltonika", *gps_sources]
             egress = {

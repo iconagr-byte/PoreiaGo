@@ -47,7 +47,32 @@ async def main():
             "driver=", meta.get("driver_name"),
         )
     platform = await resolve_platform_tenant_id()
-    for label, tid in [("platform", platform), ("demo", DEFAULT_TENANT)]:
+    targets = [("platform", platform), ("demo", DEFAULT_TENANT)]
+    try:
+        from sqlalchemy import select
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.services.tenant_modules import is_achillio_travel_office
+
+        async with AsyncSessionLocal() as session:
+            offices = (await session.execute(select(Tenant))).scalars().all()
+        for t in offices:
+            if is_achillio_travel_office(t):
+                targets.append(("achillio", str(t.id)))
+    except Exception as exc:
+        print("achillio_resolve_error", exc)
+    for label, tid in targets:
+        if not tid:
+            continue
+        try:
+            from travel_platform.telemetry.teltonika.hydrate_live import (
+                hydrate_tenant_live_from_devices,
+            )
+
+            n = await hydrate_tenant_live_from_devices(str(tid), force=True)
+            print(label, "hydrate_wrote=", n, "tenant=", tid)
+        except Exception as exc:
+            print(label, "hydrate_error", exc)
         try:
             rows = await live.list_active_for_admin_async(UUID(str(tid)))
         except Exception as exc:

@@ -568,6 +568,57 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         payload = process.await_args.args[0]
         self.assertEqual(payload.get("map_fallback"), "phone_after_tracker_stale")
 
+    def test_apply_update_phone_keeps_fresh_teltonika_coords(self):
+        """Phone apply_update must not move a fresh Teltonika pin (no jump)."""
+        from uuid import UUID, uuid4
+
+        from travel_platform.telemetry.domain import TelemetryUpdate
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        live = LiveFleetService()
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        vid = str(uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "lat": 38.2,
+            "lng": 20.6,
+            "source": "teltonika",
+            "imei": "861076085468260",
+            "updated_at": now,
+            "tracker_signal_at": now,
+        }
+        before = dict(live._vehicles[vid])
+        update = TelemetryUpdate(
+            tenant_id=UUID(self.tenant),
+            vehicle_code="EEX5670",
+            trip_id=None,
+            latitude=38.99,
+            longitude=20.99,
+            speed_kmh=55.0,
+            engine_on=True,
+            fuel_level_pct=None,
+            recorded_at=datetime.now(timezone.utc),
+            raw={
+                "source": "driver_pwa",
+                "driver_id": "drv-1",
+                "bus_plate": "EEX5670",
+            },
+        )
+        live.apply_update(UUID(vid), update)
+        after = live._vehicles[vid]
+        self.assertEqual(after.get("lat"), before.get("lat"))
+        self.assertEqual(after.get("lng"), before.get("lng"))
+        self.assertEqual(after.get("source"), "teltonika")
+        self.assertTrue(after.get("app_seen_at"))
+        self.assertIn("app", after.get("gps_sources") or [])
+        self.assertIn("teltonika", after.get("gps_sources") or [])
+
     def test_ingest_allows_phone_for_unbound_plate(self):
         session = {
             "tenant_id": self.tenant,

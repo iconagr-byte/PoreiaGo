@@ -48,6 +48,18 @@ async def _bridge_loop() -> None:
 
     try:
         async for payload in subscribe_fleet_alerts():
+            event = str(payload.get("event") or "").lower()
+            if event in {"cleared", "alert_cleared", "resolved"}:
+                aid = str(payload.get("id") or "").strip()
+                if not aid:
+                    continue
+                TelemetryAlertBus.clear_alert(
+                    aid,
+                    tenant_id=str(payload.get("tenant_id") or "") or None,
+                    notify=True,
+                    publish_redis=False,
+                )
+                continue
             row = _normalize_redis_alert(payload)
             if not row["id"]:
                 continue

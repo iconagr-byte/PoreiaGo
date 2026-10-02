@@ -12,6 +12,8 @@ from travel_platform.telemetry.domain import DrivingBehaviorEvent, RouteDeviatio
 
 class TelemetryAlertBus:
     _recent: deque[dict[str, Any]] = deque(maxlen=500)
+    # Cleared SOS / incident ids — keep so Redis re-ingest / poll does not revive them.
+    _cleared_ids: set[str] = set()
 
     @classmethod
     def push_driver_shift(
@@ -93,6 +95,15 @@ class TelemetryAlertBus:
     def ingest_redis_alert(cls, row: dict[str, Any]) -> dict[str, Any] | None:
         """Idempotent ingest from Redis fleet_alerts (multi-instance fan-in)."""
         alert_id = str(row.get("id") or "")
+        if alert_id and alert_id in cls._cleared_ids:
+            return None
+        if str(row.get("event") or "").lower() in {"cleared", "alert_cleared", "resolved"}:
+            return cls.clear_alert(
+                alert_id,
+                tenant_id=str(row.get("tenant_id") or "") or None,
+                notify=True,
+                publish_redis=False,
+            )
         if alert_id and any(a.get("id") == alert_id for a in cls._recent):
             return None
         if not row.get("created_at"):
@@ -100,6 +111,63 @@ class TelemetryAlertBus:
         cls._recent.appendleft(row)
         cls._notify_ws(row)
         return row
+
+    @classmethod
+    def clear_alert(
+        cls,
+        alert_id: str,
+        *,
+        tenant_id: str | None = None,
+        notify: bool = True,
+        publish_redis: bool = False,
+    ) -> dict[str, Any] | None:
+        """Office dismisses driver SOS / incident — remove from live map pins."""
+        aid = str(alert_id or "").strip()
+        if not aid:
+            return None
+        found: dict[str, Any] | None = None
+        kept: deque[dict[str, Any]] = deque(maxlen=cls._recent.maxlen)
+        for row in cls._recent:
+            if str(row.get("id") or "") == aid and (
+                not tenant_id or str(row.get("tenant_id") or "") == str(tenant_id)
+            ):
+                found = row
+                continue
+            kept.append(row)
+        if found is not None:
+            cls._recent = kept
+        cls._cleared_ids.add(aid)
+        if len(cls._cleared_ids) > 2000:
+            # Bound memory — drop oldest arbitrary slice.
+            cls._cleared_ids = set(list(cls._cleared_ids)[-1000:])
+        cleared = {
+            "id": aid,
+            "event": "cleared",
+            "alert_type": (found or {}).get("alert_type") or "SOS",
+            "tenant_id": str(tenant_id or (found or {}).get("tenant_id") or ""),
+            "vehicle_id": (found or {}).get("vehicle_id"),
+            "trip_id": (found or {}).get("trip_id"),
+            "message": (found or {}).get("message") or "Συναγερμός απενεργοποιήθηκε",
+            "metadata": (found or {}).get("metadata") or {},
+            "created_at": (found or {}).get("created_at")
+            or datetime.now(timezone.utc).isoformat(),
+            "cleared_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if notify:
+            cls._notify_ws_cleared(cleared)
+        if publish_redis:
+            try:
+                import asyncio
+
+                from travel_platform.telemetry.fleet_pubsub import publish_fleet_alert
+
+                loop = asyncio.get_running_loop()
+                loop.create_task(publish_fleet_alert(cleared))
+            except RuntimeError:
+                pass
+            except Exception:
+                pass
+        return cleared if found is not None else cleared
 
     @classmethod
     def _notify_ws(cls, row: dict[str, Any]) -> None:
@@ -122,8 +190,29 @@ class TelemetryAlertBus:
             pass
 
     @classmethod
-    def list_recent(cls, tenant_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    def _notify_ws_cleared(cls, row: dict[str, Any]) -> None:
+        try:
+            import asyncio
+            from travel_platform.telemetry.ws_hub import push_telemetry_alert_cleared
+
+            loop = asyncio.get_running_loop()
+            loop.create_task(push_telemetry_alert_cleared(row))
+        except RuntimeError:
+            pass
+        except Exception:
+            pass
+
+    @classmethod
+    def list_recent(
+        cls,
+        tenant_id: str | None = None,
+        limit: int = 50,
+        *,
+        include_cleared: bool = False,
+    ) -> list[dict[str, Any]]:
         items = list(cls._recent)
         if tenant_id:
             items = [a for a in items if a.get("tenant_id") == tenant_id]
+        if not include_cleared and cls._cleared_ids:
+            items = [a for a in items if str(a.get("id") or "") not in cls._cleared_ids]
         return items[:limit]

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { loadVehicleTripHistory } from '../../lib/admin/fleetVehicleHistory.js';
 import {
@@ -7,6 +8,7 @@ import {
 } from '../../lib/admin/fleetVehicleDetails.js';
 import {
   formatFleetGpsSourceBadge,
+  formatFleetGpsSourceChipLabel,
   resolveFleetGpsSource,
 } from '../../lib/admin/fleetGpsSourceBadge.js';
 import { resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
@@ -42,7 +44,7 @@ function formatCoords(lat, lng) {
 
 function sourceLabel(source) {
   const kind = resolveFleetGpsSource({ source });
-  if (kind === 'teltonika') return 'Teltonika';
+  if (kind === 'teltonika') return formatFleetGpsSourceChipLabel('teltonika');
   if (kind === 'app') return 'App οδηγού';
   if (source) return String(source);
   return 'GPS';
@@ -65,7 +67,13 @@ const TABS = [
 ];
 
 /** Modal ιστορικού διαδρομής — sessions, στίγματα, check-in. */
-export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
+export default function FleetVehicleHistoryModal({
+  vehicle,
+  open,
+  onClose,
+  activeSos = null,
+  onClearSos = null,
+}) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -73,6 +81,7 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
   const [tab, setTab] = useState('overview');
   const [selectedPointIdx, setSelectedPointIdx] = useState(null);
   const [copied, setCopied] = useState('');
+  const [clearingSos, setClearingSos] = useState(false);
 
   useEffect(() => {
     if (!open || !vehicle) return undefined;
@@ -149,14 +158,27 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
     window.setTimeout(() => setCopied((c) => (c === key ? '' : c)), 1600);
   };
 
+  const handleClearSos = async () => {
+    if (!activeSos?.id || !onClearSos || clearingSos) return;
+    setClearingSos(true);
+    try {
+      await onClearSos(activeSos.id);
+    } catch (err) {
+      setError(err?.message || 'Αποτυχία απενεργοποίησης συναγερμού');
+    } finally {
+      setClearingSos(false);
+    }
+  };
+
   if (!open || !vehicle) return null;
 
   const img = resolveFleetMarkerImage(vehicle);
   const plate = vehicle.bus_plate || vehicle.vehicle_code || '—';
 
-  return (
+  // Portal to body: AdminLayout overflow/transform otherwise clips the card top.
+  return createPortal(
     <div
-      className="fleet-history-modal fixed inset-0 z-[1200] flex items-end sm:items-center justify-center p-2 sm:p-6"
+      className="fleet-history-modal fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Ιστορικό διαδρομής"
@@ -167,13 +189,13 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
         aria-label="Κλείσιμο"
         onClick={onClose}
       />
-      <div className="relative z-[1] flex max-h-[min(94vh,880px)] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-white/40 bg-[#f5f7fb] shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
-        <header className="fleet-history-modal__hero relative overflow-hidden px-5 pt-5 pb-4 text-white">
+      <div className="relative z-[1] flex h-auto max-h-[min(92dvh,880px)] w-full max-w-3xl min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/40 bg-[#f5f7fb] shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
+        <header className="fleet-history-modal__hero relative shrink-0 overflow-hidden px-5 pt-5 pb-4 text-white">
           <div className="relative flex items-start gap-3">
             <img
               src={img}
               alt=""
-              className="h-16 w-16 rounded-[18px] object-cover ring-2 ring-white/30 shadow-lg"
+              className="h-14 w-14 sm:h-16 sm:w-16 rounded-[18px] object-cover ring-2 ring-white/30 shadow-lg"
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -227,9 +249,33 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
               <span className="material-symbols-outlined text-[22px]">close</span>
             </button>
           </div>
+          {activeSos ? (
+            <div className="relative mt-3 flex flex-wrap items-center gap-2 rounded-2xl bg-red-500/20 ring-1 ring-red-300/40 px-3 py-2.5">
+              <span className="material-symbols-outlined text-[22px] text-red-100">e911_emergency</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold uppercase tracking-wide text-red-100">
+                  Ενεργός συναγερμός οδηγού
+                </p>
+                <p className="text-sm text-white/90 truncate">
+                  {activeSos.message || 'SOS από τον οδηγό'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearSos}
+                disabled={clearingSos || !onClearSos}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-xs font-bold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60 transition"
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {clearingSos ? 'progress_activity' : 'notifications_off'}
+                </span>
+                {clearingSos ? 'Απενεργοποίηση…' : 'Απενεργοποίηση συναγερμού'}
+              </button>
+            </div>
+          ) : null}
         </header>
 
-        <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+        <div className="flex shrink-0 flex-wrap gap-1.5 px-4 pt-3">
           {TABS.map((t) => {
             const count =
               t.id === 'sessions'
@@ -266,7 +312,7 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
           })}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
           {loading ? (
             <div className="py-14 text-center">
               <span className="material-symbols-outlined animate-spin text-3xl text-slate-400">
@@ -354,7 +400,8 @@ export default function FleetVehicleHistoryModal({ vehicle, open, onClose }) {
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

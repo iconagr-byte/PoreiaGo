@@ -52,12 +52,64 @@ function isFleetGatewayBlip(err) {
 
 const FleetTelemetryContext = createContext(null);
 
+function gpsSourceKind(item) {
+  const kind = String(item || '')
+    .trim()
+    .toLowerCase();
+  if (!kind) return '';
+  if (kind.includes('teltonika') || kind === 'tracker' || kind === 'test_ping') return 'teltonika';
+  if (kind.includes('driver') || kind.includes('pwa') || kind.includes('phone') || kind === 'app') {
+    return 'app';
+  }
+  return '';
+}
+
+function listedGpsSources(msg) {
+  if (Array.isArray(msg?.gps_sources)) return msg.gps_sources;
+  if (Array.isArray(msg?.gpsSources)) return msg.gpsSources;
+  return null;
+}
+
+/** Trust server App stamp — never resurrect a cleared/offline App channel. */
+function pickAppSeenAt(msg, prev) {
+  if (
+    Object.prototype.hasOwnProperty.call(msg, 'app_seen_at') ||
+    Object.prototype.hasOwnProperty.call(msg, 'appSeenAt')
+  ) {
+    return msg.app_seen_at ?? msg.appSeenAt ?? null;
+  }
+  const listed = listedGpsSources(msg);
+  if (Array.isArray(listed) && !listed.some((s) => gpsSourceKind(s) === 'app')) {
+    return null;
+  }
+  return prev?.app_seen_at || null;
+}
+
+function pickAppDriverId(msg, prev) {
+  if (
+    Object.prototype.hasOwnProperty.call(msg, 'app_driver_id') ||
+    Object.prototype.hasOwnProperty.call(msg, 'appDriverId')
+  ) {
+    return msg.app_driver_id ?? msg.appDriverId ?? null;
+  }
+  const listed = listedGpsSources(msg);
+  if (Array.isArray(listed) && !listed.some((s) => gpsSourceKind(s) === 'app')) {
+    return null;
+  }
+  // Cleared / missing App heartbeat ⇒ drop soft-ack chat id too.
+  if (!pickAppSeenAt(msg, prev)) return null;
+  return msg.app_driver_id || msg.appDriverId || prev?.app_driver_id || null;
+}
+
 function normalizeVehicle(msg, id, prev) {
   const targetLat = Number(msg.lat ?? msg.latitude);
   const targetLng = Number(msg.lng ?? msg.longitude);
   if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng)) return null;
   const prevLat = Number.isFinite(prev?.lat) ? prev.lat : targetLat;
   const prevLng = Number.isFinite(prev?.lng) ? prev.lng : targetLng;
+  const appSeenAt = pickAppSeenAt(msg, prev);
+  const listed = listedGpsSources(msg);
+  const appDriverId = pickAppDriverId(msg, prev);
   return {
     id,
     vehicle_id: msg.vehicle_id || id,
@@ -65,8 +117,8 @@ function normalizeVehicle(msg, id, prev) {
     bus_plate: msg.bus_plate || msg.vehicle_code || '—',
     driver_name: msg.driver_name || '—',
     // Teltonika pin may only carry app_driver_id (soft-ack) for office chat.
-    driver_id: msg.driver_id || msg.app_driver_id || msg.appDriverId || prev?.driver_id,
-    app_driver_id: msg.app_driver_id || msg.appDriverId || prev?.app_driver_id || null,
+    driver_id: msg.driver_id || appDriverId || (appSeenAt ? prev?.driver_id : null) || null,
+    app_driver_id: appDriverId,
     trip_id: msg.trip_id,
     trip_title: msg.trip_title || msg.tripTitle || prev?.trip_title || null,
     tracking_started_at:
@@ -89,13 +141,14 @@ function normalizeVehicle(msg, id, prev) {
     trail: Array.isArray(msg.trail) && msg.trail.length ? msg.trail : prev?.trail || null,
     source: msg.source || prev?.source || null,
     imei: msg.imei || prev?.imei || null,
-    app_seen_at: msg.app_seen_at || msg.appSeenAt || prev?.app_seen_at || null,
+    app_seen_at: appSeenAt,
     tracker_signal_at:
       msg.tracker_signal_at || msg.trackerSignalAt || prev?.tracker_signal_at || null,
     hydrated_from_store: Boolean(
       msg.hydrated_from_store ?? msg.hydratedFromStore ?? prev?.hydrated_from_store,
     ),
-    gps_sources: mergeGpsSources(msg.gps_sources || msg.gpsSources, prev?.gps_sources),
+    // Explicit server list wins — do not merge prev (that kept App after logout).
+    gps_sources: mergeGpsSources(listed, Array.isArray(listed) ? null : prev?.gps_sources),
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
 }
@@ -103,23 +156,12 @@ function normalizeVehicle(msg, id, prev) {
 function mergeGpsSources(nextList, prevList) {
   const out = [];
   const seen = new Set();
-  for (const list of [nextList, prevList]) {
+  // When the server sends gps_sources, trust that list alone.
+  const lists = Array.isArray(nextList) ? [nextList] : [nextList, prevList];
+  for (const list of lists) {
     if (!Array.isArray(list)) continue;
     for (const item of list) {
-      const kind = String(item || '')
-        .trim()
-        .toLowerCase();
-      let norm = '';
-      if (kind.includes('teltonika') || kind === 'tracker' || kind === 'test_ping') {
-        norm = 'teltonika';
-      } else if (
-        kind.includes('driver') ||
-        kind.includes('pwa') ||
-        kind.includes('phone') ||
-        kind === 'app'
-      ) {
-        norm = 'app';
-      }
+      const norm = gpsSourceKind(item);
       if (!norm || seen.has(norm)) continue;
       seen.add(norm);
       out.push(norm);
@@ -132,6 +174,38 @@ function vehicleIdFromRow(v) {
   return v.vehicle_id || v.driver_id || `${v.bus_plate || v.vehicle_code || 'bus'}-${v.trip_id || '0'}`;
 }
 
+const SOURCE_FRESH_MS = 90_000;
+
+function isChannelFresh(raw, maxMs = SOURCE_FRESH_MS) {
+  if (!raw) return false;
+  const t = new Date(raw).getTime();
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t <= maxMs;
+}
+
+function isTeltonikaRowOnline(row) {
+  if (!row || !isHardwareTrackerRow(row)) return false;
+  if (row.hydrated_from_store || row.hydratedFromStore) {
+    return isChannelFresh(row.tracker_signal_at || row.trackerSignalAt);
+  }
+  return isChannelFresh(
+    row.tracker_signal_at || row.trackerSignalAt || row.timestamp || row.updated_at,
+  );
+}
+
+function stripAppChannelFromRow(row) {
+  const sources = (Array.isArray(row.gps_sources) ? row.gps_sources : [])
+    .map((s) => gpsSourceKind(s))
+    .filter((k) => k === 'teltonika');
+  return {
+    ...row,
+    driver_id: null,
+    app_driver_id: null,
+    app_seen_at: null,
+    gps_sources: sources.length ? sources : ['teltonika'],
+  };
+}
+
 function dropOfflineVehicles(prev, msg) {
   const next = { ...prev };
   let changed = false;
@@ -139,13 +213,12 @@ function dropOfflineVehicles(prev, msg) {
     ? msg.removed_vehicle_ids.map(String)
     : [];
   for (const rid of removedIds) {
-    if (next[rid] && !isHardwareTrackerRow(next[rid])) {
+    if (next[rid]) {
       delete next[rid];
       changed = true;
     }
     // Also drop rows keyed by plate/code when Redis id differs from map key.
     for (const [key, row] of Object.entries(next)) {
-      if (isHardwareTrackerRow(row)) continue;
       if (
         String(row.vehicle_id || '') === rid ||
         String(row.vehicle_code || '') === rid ||
@@ -159,12 +232,22 @@ function dropOfflineVehicles(prev, msg) {
   const did = msg.driver_id != null ? String(msg.driver_id) : '';
   if (did) {
     for (const [key, row] of Object.entries(next)) {
-      // Teltonika pins stay on the map when the driver app goes offline.
-      if (isHardwareTrackerRow(row)) continue;
-      if (String(row.driver_id || '') === did) {
-        delete next[key];
-        changed = true;
+      const belongs =
+        String(row.driver_id || '') === did || String(row.app_driver_id || '') === did;
+      if (!belongs) continue;
+      if (isHardwareTrackerRow(row)) {
+        // App offline — strip App badge. Drop pin only when Teltonika is also offline.
+        if (!isTeltonikaRowOnline(row)) {
+          delete next[key];
+          changed = true;
+        } else {
+          next[key] = stripAppChannelFromRow(row);
+          changed = true;
+        }
+        continue;
       }
+      delete next[key];
+      changed = true;
     }
   }
   if (!changed) {
