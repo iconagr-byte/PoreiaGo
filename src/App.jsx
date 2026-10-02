@@ -24,6 +24,7 @@ import PassengerTrackPage from './pages/PassengerTrackPage.jsx';
 import DriverScan from './pages/DriverScan';
 import DriverCommandCenter from './pages/driver/DriverCommandCenter';
 import DriverAuthPage from './pages/driver/DriverAuthPage.jsx';
+import DriverResetPasswordPage from './pages/driver/DriverResetPasswordPage.jsx';
 import FleetVehicleDetail from './pages/FleetVehicleDetail';
 import TripEditorPage from './pages/admin/TripEditorPage';
 import DriverDetailPage from './pages/admin/DriverDetailPage';
@@ -160,6 +161,7 @@ function App() {
             <Route path="/admin/drivers/:driverId/edit" element={<DriverFormPage />} />
             <Route path="/admin/drivers/:driverId" element={<DriverDetailPage />} />
             <Route path="/driver/auth" element={<DriverAuthPage />} />
+            <Route path="/driver/reset-password" element={<DriverResetPasswordPage />} />
             {/* Alias only — login UI lives in-place on /driver. */}
             <Route path="/driver/login" element={<Navigate to="/driver" replace />} />
             <Route path="/driver/dashboard" element={<Navigate to="/driver" replace />} />
