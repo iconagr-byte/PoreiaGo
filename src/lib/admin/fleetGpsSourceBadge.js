@@ -73,7 +73,8 @@ export function resolveFleetGpsSources(vehicle) {
       : [];
 
   // Trust server gps_sources for dual badge. Only drop Teltonika when the
-  // pin is an explicit parked hydrate with a stale hardware signal.
+  // pin is an explicit parked hydrate with a stale hardware signal and the
+  // server did not also stamp a fresh tracker_signal / open IMEI channel.
   for (const item of listed) {
     const kind = kindFromRaw(item) || (item === 'teltonika' || item === 'app' ? item : '');
     if (
@@ -96,7 +97,12 @@ export function resolveFleetGpsSources(vehicle) {
     isFresh(vehicle.timestamp || vehicle.updated_at)
   ) {
     push('teltonika');
-  } else if (vehicle?.imei && isTeltonikaSignalFresh(vehicle)) {
+  } else if (
+    vehicle?.imei &&
+    !vehicle.hydrated_from_store &&
+    !vehicle.hydratedFromStore &&
+    isFresh(vehicle.tracker_signal_at || vehicle.trackerSignalAt || vehicle.timestamp)
+  ) {
     push('teltonika');
   }
 

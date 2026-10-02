@@ -206,9 +206,10 @@ async def fleet_live(
                 tenant_id=str(tenant_id),
             )
             tracker_signal_at = str(meta.get("tracker_signal_at") or "") or None
-            # App-sourced pin + online IMEI: expose device last_seen so the
-            # client dual badge treats Teltonika as open.
-            if "teltonika" in gps_sources and not tracker_signal_at:
+            hydrated_from_store = bool(meta.get("hydrated_from_store"))
+            # Online IMEI: refresh signal + clear parked-hydrate so the dual
+            # badge shows «GPS οχήματος» next to App (not App-only).
+            if "teltonika" in gps_sources:
                 try:
                     from travel_platform.telemetry.teltonika.device_store import (
                         get_enabled_device_by_vehicle_code,
@@ -222,7 +223,10 @@ async def fleet_live(
                         meta.get("vehicle_code") or meta.get("bus_plate") or v.vehicle_code,
                     )
                     if is_tracker_binding_alive(device, max_age_sec=alive_sec):
-                        tracker_signal_at = str(device.get("last_seen_at") or "") or None
+                        tracker_signal_at = (
+                            str(device.get("last_seen_at") or "") or tracker_signal_at
+                        )
+                        hydrated_from_store = False
                         if not meta.get("imei") and device.get("imei"):
                             meta["imei"] = device.get("imei")
                 except Exception:
@@ -254,7 +258,7 @@ async def fleet_live(
                     gps_sources=gps_sources,
                     app_seen_at=str(meta.get("app_seen_at") or "") or None,
                     tracker_signal_at=tracker_signal_at,
-                    hydrated_from_store=bool(meta.get("hydrated_from_store")),
+                    hydrated_from_store=hydrated_from_store,
                 ),
             )
         except Exception:

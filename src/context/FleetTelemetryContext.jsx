@@ -101,6 +101,27 @@ function pickAppDriverId(msg, prev) {
   return msg.app_driver_id || msg.appDriverId || prev?.app_driver_id || null;
 }
 
+/**
+ * Parked-hydrate must not stick after the server opens Teltonika again.
+ * Explicit false/true wins; a fresh tracker_signal without the flag ⇒ open.
+ */
+function pickHydratedFromStore(msg, prev) {
+  if (
+    Object.prototype.hasOwnProperty.call(msg, 'hydrated_from_store') ||
+    Object.prototype.hasOwnProperty.call(msg, 'hydratedFromStore')
+  ) {
+    return Boolean(msg.hydrated_from_store ?? msg.hydratedFromStore);
+  }
+  const signal = msg.tracker_signal_at || msg.trackerSignalAt;
+  if (signal) {
+    const t = new Date(signal).getTime();
+    if (Number.isFinite(t) && Date.now() - t <= 90_000) {
+      return false;
+    }
+  }
+  return Boolean(prev?.hydrated_from_store);
+}
+
 function normalizeVehicle(msg, id, prev) {
   const targetLat = Number(msg.lat ?? msg.latitude);
   const targetLng = Number(msg.lng ?? msg.longitude);
@@ -144,9 +165,7 @@ function normalizeVehicle(msg, id, prev) {
     app_seen_at: appSeenAt,
     tracker_signal_at:
       msg.tracker_signal_at || msg.trackerSignalAt || prev?.tracker_signal_at || null,
-    hydrated_from_store: Boolean(
-      msg.hydrated_from_store ?? msg.hydratedFromStore ?? prev?.hydrated_from_store,
-    ),
+    hydrated_from_store: pickHydratedFromStore(msg, prev),
     // Explicit server list wins — do not merge prev (that kept App after logout).
     gps_sources: mergeGpsSources(listed, Array.isArray(listed) ? null : prev?.gps_sources),
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
