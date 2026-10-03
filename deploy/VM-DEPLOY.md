@@ -144,6 +144,12 @@ cd /opt/poreiago && RUN_SEED=1 bash deploy/scripts/vm-deploy-all.sh
 2. Ή Proxy Host για το apex με SSL Let’s Encrypt (το nginx κάνει 301 → www όταν
    περνάει `Host` / `X-Forwarded-Host`).
 
+Στα Proxy Hosts (poreiago + achillio) κράτα **`X-Forwarded-Host` = `$host`** (NPM
+Advanced → custom nginx). Το frontend διαλέγει shell από Host/XFH:
+`index.html` = PoreiaGo, `index.achillio.html` = Achillio Travel. Αν λείπει το
+XFH, το Contabo σερβίρει το default PoreiaGo και το Google δεν πρέπει να βλέπει
+Achillio meta στο `poreiago.com/grafeia`.
+
 Στο Postgres το `tenants.custom_domain` πρέπει να είναι `achilliotravel.com` **μόνο**
 στο γραφείο Achillio Travel (`admin-achillio-gr`) — τρέξε `repair-achillio-office.sh`
 αν λείπει.

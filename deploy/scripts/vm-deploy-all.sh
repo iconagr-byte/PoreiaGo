@@ -101,7 +101,7 @@ refresh_external_frontend_dist() {
 
 # Contabo poreiago-frontend often only serves static files — POST /api → 405.
 # Install repo frontend.conf so /api + /ws + /health proxy to api-blue,
-# and so achilliotravel.com serves index.achillio.html (static SERP title).
+# default index.html stays PoreiaGo, and Achillio Host/XFH → index.achillio.html.
 repair_external_frontend_nginx() {
   local cid="$1"
   local conf="$DEPLOY_DIR/nginx/frontend.conf"
@@ -159,20 +159,24 @@ repair_external_frontend_nginx() {
     docker exec "$cid" nginx -t 2>/dev/null && docker exec "$cid" nginx -s reload 2>/dev/null || true
   fi
 
-  # Prove default shell (no Host) is Achillio — Contabo often ignores server_name.
+  # Prove default shell (no Host) is PoreiaGo — Contabo often ignores server_name
+  # and previously leaked Achillio Travel meta onto poreiago.com SERP.
   local default_title=""
   local local_title=""
   if docker exec "$cid" sh -c 'command -v curl >/dev/null' 2>/dev/null; then
     default_title="$(docker exec "$cid" curl -sS --max-time 5 http://127.0.0.1/ 2>/dev/null \
       | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
     local_title="$(docker exec "$cid" curl -sS --max-time 5 \
-      -H 'Host: www.achilliotravel.com' http://127.0.0.1/ 2>/dev/null \
+      -H 'Host: www.achilliotravel.com' -H 'X-Forwarded-Host: www.achilliotravel.com' \
+      http://127.0.0.1/ 2>/dev/null \
       | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
   else
     default_title="$(docker exec "$cid" wget -qO- --timeout=5 http://127.0.0.1/ 2>/dev/null \
       | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
     local_title="$(docker exec "$cid" wget -qO- --timeout=5 \
-      --header='Host: www.achilliotravel.com' http://127.0.0.1/ 2>/dev/null \
+      --header='Host: www.achilliotravel.com' \
+      --header='X-Forwarded-Host: www.achilliotravel.com' \
+      http://127.0.0.1/ 2>/dev/null \
       | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
   fi
   echo "  localhost default <title> → ${default_title:-<empty>}"
@@ -185,10 +189,17 @@ repair_external_frontend_nginx() {
       | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)"
   fi
   echo "  localhost Host+XFH=poreiago.com <title> → ${pg_title:-<empty>}"
-  if ! echo "$default_title" | grep -qi 'achillio'; then
-    echo "  WARN: default index.html is not Achillio Travel — check ensure_achillio_spa_shell"
+  if echo "$default_title" | grep -qi 'achillio'; then
+    echo "  ERROR: default shell still Achillio Travel — poreiago.com SERP will leak"
+    docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; rg -n "<title>" /usr/share/nginx/html/index.html /usr/share/nginx/html/index.achillio.html 2>/dev/null | head -6' \
+      2>/dev/null | sed 's/^/  /' || true
+  elif ! echo "$default_title" | grep -qi 'poreiago'; then
+    echo "  WARN: default index.html is not PoreiaGo — check ensure_achillio_spa_shell"
     docker exec "$cid" sh -c 'ls -la /usr/share/nginx/html/index*.html 2>/dev/null; rg -n "<title>" /usr/share/nginx/html/index.html | head -3' \
       2>/dev/null | sed 's/^/  /' || true
+  fi
+  if ! echo "$local_title" | grep -qi 'achillio'; then
+    echo "  WARN: Achillio Host/XFH did not select Achillio shell — check index.achillio.html + maps"
   fi
 
   if docker exec "$cid" wget -qO- --timeout=5 http://127.0.0.1/health 2>/dev/null | grep -q '"status"'; then
@@ -198,9 +209,10 @@ repair_external_frontend_nginx() {
   fi
 }
 
-# Googlebot reads static <title>. Contabo Host routing is unreliable, so:
-# - index.poreiago.html = PoreiaGo marketing
-# - index.html + index.achillio.html = Achillio Travel (default SERP-safe)
+# Googlebot reads static <title>. Contabo often serves index.html for every
+# Proxy Host, so the shared default MUST be PoreiaGo:
+# - index.html + index.poreiago.html = PoreiaGo marketing (default SERP-safe)
+# - index.achillio.html = Achillio Travel (Host/XFH / seo-shell only)
 ensure_achillio_spa_shell() {
   local index="$REPO_ROOT/dist/index.html"
   local achillio="$REPO_ROOT/dist/index.achillio.html"
@@ -209,41 +221,59 @@ ensure_achillio_spa_shell() {
   local poreiago="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία"
   [[ -f "$index" ]] || { echo "  ERROR: missing $index"; return 1; }
 
-  if grep -q "<title>${title}</title>" "$index" \
-    && [[ -f "$achillio" ]] && [[ -f "$poreiago_out" ]]; then
-    echo "  dist shells ready (index.html=Achillio, index.poreiago.html=PoreiaGo)"
+  if grep -q "<title>${poreiago}</title>" "$index" \
+    && [[ -f "$achillio" ]] && grep -q "<title>${title}</title>" "$achillio" \
+    && [[ -f "$poreiago_out" ]]; then
+    echo "  dist shells ready (index.html=PoreiaGo, index.achillio.html=Achillio)"
     return 0
   fi
 
-  echo "  writing Achillio default index + PoreiaGo shell"
+  echo "  writing PoreiaGo default index + Achillio host shell"
   if command -v python3 >/dev/null 2>&1; then
     python3 - "$index" "$achillio" "$poreiago_out" "$poreiago" "$title" <<'PY'
 import sys
 src, ach_path, por_path, old, new = sys.argv[1:6]
 html = open(src, encoding="utf-8").read()
-# Preserve PoreiaGo marketing shell first (before rewriting src).
-if old in html:
-    open(por_path, "w", encoding="utf-8").write(html)
-elif not __import__("os").path.isfile(por_path):
-    open(por_path, "w", encoding="utf-8").write(html)
+# If a previous deploy left Achillio in index.html, restore PoreiaGo first.
+if f"<title>{new}</title>" in html and f"<title>{old}</title>" not in html:
+    html = html.replace(new, old).replace(
+        'name="application-name" content="Achillio Travel"',
+        'name="application-name" content="PoreiaGo"',
+    ).replace(
+        'property="og:site_name" content="Achillio Travel"',
+        'property="og:site_name" content="PoreiaGo"',
+    )
+    open(src, "w", encoding="utf-8").write(html)
+open(por_path, "w", encoding="utf-8").write(html)
 ach = html.replace(old, new).replace(
     'name="application-name" content="PoreiaGo"',
     'name="application-name" content="Achillio Travel"',
+).replace(
+    'property="og:site_name" content="PoreiaGo"',
+    'property="og:site_name" content="Achillio Travel"',
 )
 if f"<title>{new}</title>" not in ach:
     raise SystemExit("failed to rewrite Achillio document title")
 open(ach_path, "w", encoding="utf-8").write(ach)
-open(src, "w", encoding="utf-8").write(ach)
+# Never overwrite src (index.html) with Achillio.
 PY
   else
+    # Restore PoreiaGo default if a prior build left Achillio in index.html.
+    if grep -q "<title>${title}</title>" "$index" && ! grep -q "<title>${poreiago}</title>" "$index"; then
+      sed -i "s/${title}/${poreiago}/g" "$index"
+      sed -i 's/name="application-name" content="Achillio Travel"/name="application-name" content="PoreiaGo"/g' "$index"
+      sed -i 's/property="og:site_name" content="Achillio Travel"/property="og:site_name" content="PoreiaGo"/g' "$index"
+    fi
     cp "$index" "$poreiago_out"
     cp "$index" "$achillio"
     sed -i "s/${poreiago}/${title}/g" "$achillio"
     sed -i 's/name="application-name" content="PoreiaGo"/name="application-name" content="Achillio Travel"/g' "$achillio"
-    cp "$achillio" "$index"
+    sed -i 's/property="og:site_name" content="PoreiaGo"/property="og:site_name" content="Achillio Travel"/g' "$achillio"
   fi
-  grep -q "<title>${title}</title>" "$index" \
-    || { echo "  ERROR: index.html Achillio title rewrite failed"; return 1; }
+  grep -q "<title>${poreiago}</title>" "$index" \
+    || { echo "  ERROR: index.html must keep PoreiaGo title"; return 1; }
+  grep -q "<title>${title}</title>" "$achillio" \
+    || { echo "  ERROR: index.achillio.html Achillio title rewrite failed"; return 1; }
 }
 
 configure_compose_for_edge() {
@@ -340,7 +370,7 @@ VITE_OLYMPUS_INGRESS_CNAME="$INGRESS_CNAME" \
 VITE_GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID_VAL" \
 npm run build
 
-echo "==> Ensure Achillio Travel SPA shell (static SERP title)"
+echo "==> Ensure SPA shells (PoreiaGo default + Achillio host shell)"
 ensure_achillio_spa_shell
 
 echo "==> API Docker image"
@@ -653,7 +683,7 @@ rm -f "$ACH_HDR"
 if echo "$ACH_TITLE" | grep -qi 'achillio'; then
   echo "  OK: Achillio Travel static title"
 elif echo "$ACH_TITLE" | grep -qi 'poreiago'; then
-  echo "  ERROR: Achillio still serves PoreiaGo in <title> — check seo-shell / index.html"
+  echo "  ERROR: Achillio still serves PoreiaGo in <title> — check seo-shell / index.achillio.html + Host/XFH"
   exit 1
 else
   echo "  ERROR: unexpected Achillio title (${ACH_TITLE:-empty})"
@@ -670,7 +700,18 @@ fi
 echo "==> PoreiaGo SERP title (static HTML — Googlebot)"
 PG_TITLE=$(curl -sS -A 'Googlebot' --max-time 15 "https://www.poreiago.com/" \
   | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)
+PG_GRAFEIA=$(curl -sS -A 'Googlebot' --max-time 15 "https://www.poreiago.com/grafeia" \
+  | tr '\n' ' ' | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' || true)
 echo "  www.poreiago.com <title> → ${PG_TITLE:-<empty>}"
+echo "  www.poreiago.com/grafeia <title> → ${PG_GRAFEIA:-<empty>}"
+if echo "$PG_TITLE" | grep -qi 'achillio'; then
+  echo "  ERROR: poreiago.com still serves Achillio Travel in <title> (SERP parent leak)"
+  exit 1
+fi
+if echo "$PG_GRAFEIA" | grep -qi 'achillio'; then
+  echo "  ERROR: /grafeia still serves Achillio Travel — Google indexes it as Achillio parent"
+  exit 1
+fi
 if echo "$PG_TITLE" | grep -qi 'poreiago'; then
   echo "  OK: PoreiaGo marketing static title"
 else
