@@ -99,12 +99,31 @@ export async function subscribeAdminFleetPush() {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || 'Αποτυχία εγγραφής push');
-  return data;
+  return { ...data, endpoint: json.endpoint, registration };
+}
+
+/** Show a local notification on THIS device (does not rely on FCM round-trip). */
+export async function showAdminLocalTestNotification() {
+  const registration = await registerAdminServiceWorker();
+  const title = 'Δοκιμή Push — PoreiaGo';
+  const options = {
+    body: 'Οι ειδοποιήσεις γραφείου λειτουργούν σε αυτή τη συσκευή.',
+    tag: `admin-local-test-${Date.now()}`,
+    renotify: true,
+    requireInteraction: true,
+    icon: '/icons/driver-pwa-192.png',
+    badge: '/icons/driver-pwa-192.png',
+    data: { url: '/admin?tab=fleet_live_map', type: 'driver_shift', event: 'test' },
+  };
+  await registration.showNotification(title, options);
+  return true;
 }
 
 /** Immediate test push to this admin's registered devices. */
 export async function sendAdminPushTest() {
   const email = getAdminEmail();
+  const localSub = await getPushSubscriptionForScript(ADMIN_SW);
+  const endpoint = localSub?.endpoint || '';
   const res = await fetch(`${API_BASE}/api/admin/push/test`, {
     method: 'POST',
     headers: {
@@ -112,7 +131,10 @@ export async function sendAdminPushTest() {
       'Content-Type': 'application/json',
     },
     // JWT often omits email — send localStorage email so email-scoped subs match.
-    body: JSON.stringify(email ? { email } : {}),
+    body: JSON.stringify({
+      ...(email ? { email } : {}),
+      ...(endpoint ? { endpoint } : {}),
+    }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || 'Αποτυχία δοκιμής push');

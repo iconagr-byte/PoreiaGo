@@ -106,3 +106,30 @@ export async function unsubscribeDriverPush() {
   await subscription.unsubscribe();
   return { ok: true };
 }
+
+export async function showDriverLocalTestNotification() {
+  const registration = await registerDriverServiceWorker();
+  await registration.showNotification('Δοκιμή Push — Οδηγός', {
+    body: 'Οι ειδοποιήσεις βάρδιας λειτουργούν σε αυτή τη συσκευή.',
+    tag: `driver-local-test-${Date.now()}`,
+    renotify: true,
+    requireInteraction: true,
+    icon: '/icons/driver-pwa-192.png',
+    badge: '/icons/driver-pwa-192.png',
+    data: { url: '/driver', type: 'driver_shift', event: 'test' },
+  });
+  return true;
+}
+
+export async function sendDriverPushTest() {
+  const localSub = await getPushSubscriptionForScript(DRIVER_SW);
+  const endpoint = localSub?.endpoint || '';
+  const res = await fetch(`${API_BASE}/api/driver/push/test`, {
+    method: 'POST',
+    headers: { ...driverSessionHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(endpoint ? { endpoint } : {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || 'Αποτυχία δοκιμής push');
+  return data;
+}

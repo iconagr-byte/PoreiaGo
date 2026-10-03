@@ -5,6 +5,7 @@ import {
   isAdminPushSupported,
   isThisBrowserAdminPushSubscribed,
   sendAdminPushTest,
+  showAdminLocalTestNotification,
   subscribeAdminFleetPush,
   unsubscribeAdminFleetPush,
 } from '../../services/adminPushNotificationApi.js';
@@ -41,7 +42,11 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
       setEnabled(Boolean(status.enabled));
       setSubscribed(Boolean(localSub));
       if (status.enabled && !localSub) {
-        setHint('Πατήστε «Ενεργοποίηση push» σε αυτόν τον υπολογιστή.');
+        setHint(
+          'Το push εμφανίζεται μόνο στη συσκευή όπου το ενεργοποιείτε. Ανοίξτε το γραφείο στο κινητό και πατήστε «Ενεργοποίηση push» εκεί.',
+        );
+      } else if (status.enabled && localSub) {
+        setHint('Ενεργό σε αυτή τη συσκευή — η «Δοκιμή push» πρέπει να εμφανίσει ειδοποίηση εδώ.');
       } else {
         setHint('');
       }
@@ -137,14 +142,22 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
     try {
       await subscribeAdminFleetPush();
       setSubscribed(true);
+      // Immediate banner on THIS device (phone/desktop where you clicked).
+      try {
+        await showAdminLocalTestNotification();
+      } catch {
+        /* OS may still show the remote push below */
+      }
       const result = await sendAdminPushTest();
-      if (result.sent > 0) {
-        toast.success(`Δοκιμή push OK (${result.sent} συσκευή)`);
+      if (result.this_device_sent === false && result.this_device_error) {
+        toast.error(`Αυτή η συσκευή απέτυχε: ${String(result.this_device_error).slice(0, 100)}`);
+      } else if (result.sent > 0 || result.this_device_sent) {
+        toast.success('Δοκιμή OK — κοιτάξτε την ειδοποίηση σε ΑΥΤΗ τη συσκευή');
       } else {
         const detail =
           Array.isArray(result.errors) && result.errors[0]
             ? String(result.errors[0]).slice(0, 120)
-            : 'ελέγξτε άδεια ειδοποιήσεων ή ξαναπατήστε Ενεργοποίηση';
+            : 'ελέγξτε άδεια ειδοποιήσεων ή ξαναπατήστε Ενεργοποίηση σε αυτή τη συσκευή';
         toast.error(`Δοκιμή: καμία συσκευή δεν έλαβε — ${detail}`);
       }
     } catch (err) {

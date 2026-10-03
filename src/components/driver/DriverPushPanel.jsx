@@ -5,6 +5,8 @@ import {
   fetchDriverPushStatus,
   isDriverPushSupported,
   isThisBrowserDriverPushSubscribed,
+  sendDriverPushTest,
+  showDriverLocalTestNotification,
   subscribeDriverPush,
   unsubscribeDriverPush,
 } from '../../services/driverPushNotificationApi.js';
@@ -85,6 +87,33 @@ export default function DriverPushPanel() {
     }
   };
 
+  const onTest = async () => {
+    setBusy(true);
+    try {
+      await subscribeDriverPush();
+      setSubscribed(true);
+      try {
+        await showDriverLocalTestNotification();
+      } catch {
+        /* remote push may still arrive */
+      }
+      const result = await sendDriverPushTest();
+      if (result.sent > 0 || result.this_device_sent) {
+        toast.success('Δοκιμή OK — κοιτάξτε την ειδοποίηση σε ΑΥΤΗ τη συσκευή');
+      } else {
+        const detail =
+          Array.isArray(result.errors) && result.errors[0]
+            ? String(result.errors[0]).slice(0, 100)
+            : 'ελέγξτε άδεια ειδοποιήσεων';
+        toast.error(`Δοκιμή απέτυχε — ${detail}`);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Αποτυχία δοκιμής');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!supported) return null;
 
   return (
@@ -96,7 +125,7 @@ export default function DriverPushPanel() {
             Ειδοποιήσεις βάρδιας
           </h3>
           <p className="text-xs text-[var(--driver-muted)] mt-1 leading-relaxed">
-            Το γραφείο μπορεί να σας στείλει «Άνοιξε βάρδια» με ένα πάτημα.
+            Ενεργοποιήστε push σε ΑΥΤΟ το κινητό. Το γραφείο θα σας στείλει «Άνοιξε βάρδια».
           </p>
         </div>
       </div>
@@ -107,14 +136,24 @@ export default function DriverPushPanel() {
           {loadError || 'Οι ειδοποιήσεις δεν είναι διαθέσιμες ακόμα — δοκιμάστε ξανά σε λίγο.'}
         </p>
       ) : subscribed ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onUnsubscribe}
-          className="w-full py-3 rounded-xl border border-white/15 text-sm font-bold text-[var(--driver-muted)]"
-        >
-          Απενεργοποίηση push
-        </button>
+        <div className="grid gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onTest}
+            className="driver-btn-primary w-full py-3 text-sm"
+          >
+            {busy ? '…' : 'Δοκιμή push'}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onUnsubscribe}
+            className="w-full py-3 rounded-xl border border-white/15 text-sm font-bold text-[var(--driver-muted)]"
+          >
+            Απενεργοποίηση push
+          </button>
+        </div>
       ) : (
         <button
           type="button"
