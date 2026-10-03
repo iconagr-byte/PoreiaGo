@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useAdminNotifications } from '../../hooks/useAdminNotifications.js';
-import { unlockNotificationAudio } from '../../lib/admin/notificationClickSound.js';
+import {
+  armNotificationAudioUnlock,
+  unlockNotificationAudio,
+} from '../../lib/admin/notificationClickSound.js';
 import { getSaasTenantId } from '../../services/saasApi.js';
 
 function formatWhen(iso) {
@@ -36,6 +39,10 @@ export default function AdminNotificationBell({ onNavigate } = {}) {
   const { items, unreadCount, open, setOpen, markAllRead, markRead, clearAll } =
     useAdminNotifications({ tenantId: officeTenantId, enabled: true });
   const rootRef = useRef(null);
+
+  useEffect(() => {
+    armNotificationAudioUnlock();
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
