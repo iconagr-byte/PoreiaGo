@@ -5,6 +5,11 @@
 const SOURCE_FRESH_MS = 90_000;
 /** Match Teltonika Codec TCP idle timeout — parked AVL is often rarer than 90s. */
 const TELTONIKA_BADGE_FRESH_MS = 300_000;
+/** Keep «GPS οχήματος» after a brief server/App-only poll gap. */
+const TELTONIKA_STICKY_MS = 300_000;
+
+/** plate → sticky-until epoch ms — survives intermittent App-only polls. */
+const stickyTeltonikaUntil = new Map();
 
 export function resolveFleetGpsSource(vehicle) {
   const sources = resolveFleetGpsSources(vehicle);
@@ -41,6 +46,23 @@ function isAppSeenFresh(vehicle) {
   return isFresh(vehicle?.app_seen_at || vehicle?.appSeenAt);
 }
 
+function plateKey(vehicle) {
+  const raw = String(
+    vehicle?.bus_plate || vehicle?.vehicle_code || vehicle?.vehicleCode || vehicle?.imei || '',
+  )
+    .trim()
+    .toUpperCase()
+    .replace(/[\s\-_.]/g, '');
+  return raw.replace(/[^A-Z0-9]/g, '');
+}
+
+/** Clear sticky hardware chip (shift end / device unbound). */
+export function clearStickyTeltonika(vehicleOrPlate) {
+  const key =
+    typeof vehicleOrPlate === 'string' ? plateKey({ bus_plate: vehicleOrPlate }) : plateKey(vehicleOrPlate);
+  if (key) stickyTeltonikaUntil.delete(key);
+}
+
 /** Real Teltonika packet time — ignore hydrate-bumped updated_at. */
 function isTeltonikaSignalFresh(vehicle) {
   if (!vehicle) return false;
@@ -59,11 +81,27 @@ function isTeltonikaSignalFresh(vehicle) {
   return isFresh(signal, TELTONIKA_BADGE_FRESH_MS);
 }
 
+function noteStickyTeltonika(plate) {
+  if (!plate) return;
+  stickyTeltonikaUntil.set(plate, Date.now() + TELTONIKA_STICKY_MS);
+}
+
+function isStickyTeltonika(plate) {
+  if (!plate) return false;
+  const until = stickyTeltonikaUntil.get(plate) || 0;
+  if (Date.now() >= until) {
+    stickyTeltonikaUntil.delete(plate);
+    return false;
+  }
+  return true;
+}
+
 /** Active GPS channels for the dual badge — order: teltonika, app. */
 export function resolveFleetGpsSources(vehicle) {
   if (!vehicle) return [];
   const out = [];
   const seen = new Set();
+  const plate = plateKey(vehicle);
 
   const push = (kind) => {
     if (!kind || seen.has(kind)) return;
@@ -110,6 +148,23 @@ export function resolveFleetGpsSources(vehicle) {
     isFresh(vehicle.timestamp || vehicle.updated_at)
   ) {
     push('app');
+  }
+
+  // Sticky: once Teltonika was live for this plate, keep the chip through
+  // intermittent App-only polls (multi-worker / sparse AVL races).
+  if (seen.has('teltonika')) {
+    noteStickyTeltonika(plate);
+  } else if (isStickyTeltonika(plate) && (seen.has('app') || isAppSeenFresh(vehicle))) {
+    push('teltonika');
+  } else if (
+    Array.isArray(listed) &&
+    listed.length > 0 &&
+    !listed.some((s) => kindFromRaw(s) === 'teltonika') &&
+    !isTeltonikaSignalFresh(vehicle) &&
+    (vehicle.hydrated_from_store || vehicle.hydratedFromStore)
+  ) {
+    // Explicit parked-offline from server — drop sticky.
+    clearStickyTeltonika(plate);
   }
 
   return ['teltonika', 'app'].filter((k) => seen.has(k));

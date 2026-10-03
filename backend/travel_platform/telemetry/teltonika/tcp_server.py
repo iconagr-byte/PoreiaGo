@@ -26,8 +26,8 @@ logger = logging.getLogger("poreiago.teltonika")
 _server: asyncio.AbstractServer | None = None
 # IMEIs with an open Codec TCP session on this worker (sparse AVL when parked).
 _open_imeis: set[str] = set()
-# Keep last_seen fresh while TCP is up — badge window is ~90s, AVL can be rarer.
-_TCP_KEEPALIVE_SEC = 45
+# Keep last_seen fresh while TCP is up — badge window is minutes, AVL can be rarer.
+_TCP_KEEPALIVE_SEC = 30
 _status: dict[str, Any] = {
     "enabled": False,
     "listening": False,

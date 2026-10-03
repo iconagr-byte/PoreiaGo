@@ -20,9 +20,9 @@ TRACKER_LIVE_SOURCES = frozenset(
 
 # Prefer tracker while a live pin reports within this window (seconds).
 DEFAULT_TRACKER_ALIVE_SECONDS = 90
-# Codec TCP read timeout is 300s — parked AVL is sparse; badge/device-online
-# must not drop «GPS οχήματος» between packets while the socket is still up.
-DEVICE_ONLINE_BADGE_SECONDS = 300
+# Codec TCP read timeout is 300s; reconnect gaps are longer when parked.
+# Badge/device-online must not drop «GPS οχήματος» between sparse AVL / TCP flaps.
+DEVICE_ONLINE_BADGE_SECONDS = 900
 
 
 # Greek lookalikes → Latin so App/Teltonika plates collapse to one key.

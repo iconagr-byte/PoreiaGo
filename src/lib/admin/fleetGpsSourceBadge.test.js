@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  clearStickyTeltonika,
   formatFleetGpsSourceBadge,
   fleetGpsSourceToneClass,
   resolveFleetGpsSource,
@@ -93,10 +94,12 @@ assert.deepEqual(
 );
 
 // Server omitted Teltonika (device offline) — App-only even with hydrate pin.
+clearStickyTeltonika('OFFLINE1');
 assert.deepEqual(
   resolveFleetGpsSources({
     source: 'teltonika',
-    imei: '861',
+    bus_plate: 'OFFLINE1',
+    imei: '999000111222333',
     hydrated_from_store: true,
     tracker_signal_at: old,
     updated_at: now,
@@ -126,9 +129,37 @@ assert.deepEqual(
   resolveFleetGpsSources({
     source: 'teltonika',
     imei: '861',
+    bus_plate: 'EEX5670',
     hydrated_from_store: true,
     tracker_signal_at: recentParked,
     app_seen_at: now,
+  }),
+  ['teltonika', 'app'],
+);
+
+// Sticky dual: after Teltonika was seen, App-only poll still shows both briefly.
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'driver_pwa',
+    bus_plate: 'EEX5670',
+    imei: '861',
+    app_seen_at: now,
+    timestamp: now,
+    gps_sources: ['teltonika', 'app'],
+    tracker_signal_at: now,
+  }),
+  ['teltonika', 'app'],
+);
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'driver_pwa',
+    bus_plate: 'EEX5670',
+    imei: '861',
+    app_seen_at: now,
+    timestamp: now,
+    gps_sources: ['app'],
+    tracker_signal_at: old,
+    hydrated_from_store: false,
   }),
   ['teltonika', 'app'],
 );
