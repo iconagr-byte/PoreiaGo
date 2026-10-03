@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAdminNotifications } from '../../hooks/useAdminNotifications.js';
 import { unlockNotificationAudio } from '../../lib/admin/notificationClickSound.js';
+import { getSaasTenantId } from '../../services/saasApi.js';
 
 function formatWhen(iso) {
   if (!iso) return '';
@@ -30,8 +31,10 @@ function iconFor(type) {
  * Top-right admin bell — inbox + classic click sound on new events.
  */
 export default function AdminNotificationBell({ onNavigate } = {}) {
+  // Must use the logged-in office tenant — DEMO default broke Achillio alerts WS.
+  const officeTenantId = getSaasTenantId();
   const { items, unreadCount, open, setOpen, markAllRead, markRead, clearAll } =
-    useAdminNotifications({ enabled: true });
+    useAdminNotifications({ tenantId: officeTenantId, enabled: true });
   const rootRef = useRef(null);
 
   useEffect(() => {
