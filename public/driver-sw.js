@@ -1,7 +1,7 @@
 /**
  * Driver Command Center — cache manifest, offline σελίδα, PWA assets.
  */
-const CACHE = 'aerostride-driver-v8';
+const CACHE = 'aerostride-driver-v9';
 const MANIFEST_PREFIX = '/driver-cache/manifest/';
 const OFFLINE_URL = '/driver-offline.html';
 const APP_SHELL = '/index.html';
@@ -37,6 +37,8 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  // Do NOT clearAllNotifications here — a Contabo deploy / SW update was wiping
+  // fresh «Άνοιξε βάρδια» pushes before the driver could see them.
   event.waitUntil(
     caches
       .keys()
@@ -47,7 +49,6 @@ self.addEventListener('activate', (event) => {
             .map((key) => caches.delete(key)),
         ),
       )
-      .then(() => clearAllNotifications())
       .then(() => self.clients.claim()),
   );
 });
@@ -93,11 +94,14 @@ self.addEventListener('push', (event) => {
 
   const createdAt = Date.now();
   const isChat = payload.data?.type === 'driver_office_chat';
+  const isInvite =
+    payload.data?.type === 'driver_shift_invite' || payload.data?.type === 'driver_shift';
   const options = {
     body: payload.body,
     tag: payload.tag || 'driver-pwa',
-    renotify: Boolean(isChat || payload.renotify),
-    requireInteraction: payload.requireInteraction === true || Boolean(isChat),
+    renotify: Boolean(isChat || isInvite || payload.renotify),
+    requireInteraction:
+      payload.requireInteraction === true || Boolean(isChat || isInvite),
     silent: false,
     data: {
       url: payload.url || (isChat ? '/driver?tab=chat' : '/driver'),

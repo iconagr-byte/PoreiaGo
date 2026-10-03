@@ -18,6 +18,7 @@ import TachographStrip from '../../components/driver/enterprise/TachographStrip.
 import DaySummary from '../../components/driver/DaySummary.jsx';
 import DriverShiftTelemetry from '../../components/driver/DriverShiftTelemetry.jsx';
 import DriverOfficeChat from '../../components/driver/DriverOfficeChat.jsx';
+import DriverPushPanel from '../../components/driver/DriverPushPanel.jsx';
 import useTachograph from '../../hooks/useTachograph.js';
 import { useDriverDeviceForm } from '../../hooks/useDriverDeviceForm.js';
 import {
@@ -302,14 +303,14 @@ export default function DriverCommandCenter() {
     };
   }, [authenticated]);
 
-  // Drop leftover OS / SW tray notifications when opening or returning to the driver app.
+  // Only clear *stale* tray noise on open — never wipe a fresh «Άνοιξε βάρδια» push
+  // the moment the driver brings the app to the foreground.
   useEffect(() => {
-    // OS notifications only — avoid toast.dismiss racing the login success toast.
-    clearDriverNotifications({ onlyStale: false }).catch(() => {});
+    clearDriverNotifications({ onlyStale: true }).catch(() => {});
 
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        clearDriverNotifications({ onlyStale: false }).catch(() => {});
+        clearDriverNotifications({ onlyStale: true }).catch(() => {});
       }
     };
     const onSwMessage = (event) => {
@@ -507,6 +508,8 @@ export default function DriverCommandCenter() {
                   </span>
                   <span className="material-symbols-outlined text-slate-400">chevron_right</span>
                 </button>
+                {/* Must be mounted — without this the phone never registers for Web Push. */}
+                <DriverPushPanel />
                 <DailyManifest />
               </>
             )}
