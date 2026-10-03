@@ -136,30 +136,35 @@
 
 .rent-hero-shade--booking {
   /*
-   * Cool «fade blue» wash (matches product reference): soft cyan–navy veil
-   * left→right for copy, plus a light overall blue grade so the photo reads
-   * crisp on large screens without going muddy black.
+   * Stronger «fade blue» (reference wash): cyan–navy veil for copy legibility
+   * while the photo stays cool-blue on large screens.
    */
   background:
     linear-gradient(
       105deg,
-      rgba(6, 48, 92, 0.55) 0%,
-      rgba(12, 78, 128, 0.32) 38%,
-      rgba(18, 110, 160, 0.16) 62%,
-      rgba(28, 130, 180, 0.1) 100%
+      rgba(4, 42, 88, 0.62) 0%,
+      rgba(10, 72, 128, 0.4) 36%,
+      rgba(16, 105, 158, 0.22) 58%,
+      rgba(22, 120, 170, 0.12) 100%
     ),
     linear-gradient(
       180deg,
-      rgba(8, 52, 98, 0.38) 0%,
-      rgba(14, 88, 140, 0.1) 42%,
-      rgba(6, 40, 78, 0.48) 100%
+      rgba(6, 48, 96, 0.45) 0%,
+      rgba(12, 82, 138, 0.14) 40%,
+      rgba(4, 36, 72, 0.55) 100%
     );
 }
 
-/* Extra blue color grade — same spirit as the fade-blue reference still. */
+/* Blue color grade — matches the fade-blue reference still. */
 .rent-hero-shade--bluefade {
   z-index: 1;
-  background: rgba(32, 110, 168, 0.28);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(20, 90, 150, 0.42) 0%,
+      rgba(28, 115, 175, 0.28) 45%,
+      rgba(18, 80, 140, 0.38) 100%
+    );
   mix-blend-mode: color;
   pointer-events: none;
 }
