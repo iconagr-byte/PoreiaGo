@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { buildWsUrl } from '../lib/wsUrl.js';
 import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
 import {
+  armNotificationAudioUnlock,
   playDriverConnectChime,
   playNotificationClick,
   unlockNotificationAudio,
@@ -137,40 +138,73 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
   const seenRef = useRef(new Set(loadStored().map((i) => i.id)));
   const wsRef = useRef(null);
 
+  // Keep WebAudio unlockable for the whole admin session (browsers re-suspend).
+  useEffect(() => {
+    if (!enabled) return undefined;
+    armNotificationAudioUnlock();
+    return undefined;
+  }, [enabled]);
+
+  // Audible chimes are tracked separately from inbox ids — silent snapshot
+  // ingest must not block the live DRIVER_ONLINE chime for the same alert.
+  const chimedRef = useRef(new Set());
+  const lastConnectChimeRef = useRef({ at: 0, key: '' });
+
   const pushItem = useCallback((raw, { silent = false, upsert = false } = {}) => {
     const item = normalizeItem(raw);
     // Chat rows always upsert on a stable id — never stack duplicates.
     const forceUpsert =
       upsert || String(item.type || '') === 'driver_office_chat' || String(item.id).startsWith('chat-');
-    if (!forceUpsert && seenRef.current.has(item.id)) return;
-    const isNew = !seenRef.current.has(item.id);
+    const alreadySeen = seenRef.current.has(item.id);
+    const connect = isDriverConnectAlert(item);
+    // Silent snapshot may seed inbox ids — still allow a later live chime.
+    if (!forceUpsert && alreadySeen && (silent || !connect || chimedRef.current.has(item.id))) {
+      return;
+    }
+    const isNew = !alreadySeen;
     seenRef.current.add(item.id);
-    setItems((prev) => {
-      const next = dedupeStoredItems([item, ...prev.filter((x) => x.id !== item.id)]).slice(
-        0,
-        MAX_ITEMS,
-      );
-      persist(next);
-      return next;
-    });
-    if (!silent && isNew) {
-      unlockNotificationAudio();
-      if (isDriverConnectAlert(item)) {
-        playDriverConnectChime();
-        toast(item.body || item.title, {
-          duration: 6000,
-          id: `driver-connect-${item.id}`,
-          style: {
-            background: '#0f172a',
-            color: '#f8fafc',
-            fontWeight: 600,
-            borderRadius: '12px',
-            padding: '12px 16px',
-          },
-        });
-      } else {
-        playNotificationClick();
+    if (isNew || forceUpsert) {
+      setItems((prev) => {
+        const next = dedupeStoredItems([item, ...prev.filter((x) => x.id !== item.id)]).slice(
+          0,
+          MAX_ITEMS,
+        );
+        persist(next);
+        return next;
+      });
+    }
+    if (silent) return;
+
+    if (connect) {
+      if (chimedRef.current.has(item.id)) return;
+      const debounceKey = String(item.driverId || item.body || item.id);
+      const now = Date.now();
+      const prev = lastConnectChimeRef.current;
+      if (debounceKey && debounceKey === prev.key && now - prev.at < 4000) {
+        chimedRef.current.add(item.id);
+        return;
       }
+      chimedRef.current.add(item.id);
+      lastConnectChimeRef.current = { at: now, key: debounceKey };
+      unlockNotificationAudio();
+      void playDriverConnectChime();
+      toast(item.body || item.title, {
+        duration: 6000,
+        id: `driver-connect-${item.id}`,
+        style: {
+          background: '#0f172a',
+          color: '#f8fafc',
+          fontWeight: 600,
+          borderRadius: '12px',
+          padding: '12px 16px',
+        },
+      });
+      return;
+    }
+
+    if (isNew) {
+      unlockNotificationAudio();
+      void playNotificationClick();
     }
   }, []);
 
