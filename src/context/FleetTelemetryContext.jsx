@@ -15,6 +15,7 @@ import {
   isPhoneGpsRow,
   normalizePlateKey,
 } from '../lib/admin/fleetPinDedupe.js';
+import { clearStickyTeltonika } from '../lib/admin/fleetGpsSourceBadge.js';
 
 export const DEMO_TENANT = import.meta.env.VITE_DEMO_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 
@@ -129,6 +130,16 @@ function normalizeVehicle(msg, id, prev) {
   const listed = listedGpsSources(msg);
   const appDriverId = pickAppDriverId(msg, prev);
   const appStillLive = Boolean(appSeenAt && isChannelFresh(appSeenAt));
+  const trackerSignal =
+    msg.tracker_signal_at || msg.trackerSignalAt || prev?.tracker_signal_at || null;
+  const listedTeltonika =
+    Array.isArray(listed) && listed.some((s) => gpsSourceKind(s) === 'teltonika');
+  const keepTeltonika = Boolean(
+    listedTeltonika ||
+      isChannelFresh(trackerSignal, 300_000) ||
+      ((prev?.gps_sources || []).includes('teltonika') &&
+        isChannelFresh(prev?.tracker_signal_at, 300_000)),
+  );
   return {
     id,
     vehicle_id: msg.vehicle_id || id,
@@ -161,22 +172,25 @@ function normalizeVehicle(msg, id, prev) {
     source: msg.source || prev?.source || null,
     imei: msg.imei || prev?.imei || null,
     app_seen_at: appSeenAt,
-    tracker_signal_at:
-      msg.tracker_signal_at || msg.trackerSignalAt || prev?.tracker_signal_at || null,
+    tracker_signal_at: trackerSignal,
     hydrated_from_store: pickHydratedFromStore(msg, prev),
-    // Server list wins on logout (app_seen_at:null). While App heartbeat is
-    // still fresh, keep App on the dual list even if this Teltonika frame omitted it.
-    gps_sources: mergeGpsSources(listed, prev?.gps_sources, { keepApp: appStillLive }),
+    // Keep both chips across App-only / Teltonika-only frames while each
+    // channel is still fresh (multi-worker poll races).
+    gps_sources: mergeGpsSources(listed, prev?.gps_sources, {
+      keepApp: appStillLive,
+      keepTeltonika,
+    }),
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
 }
 
-function mergeGpsSources(nextList, prevList, { keepApp = false } = {}) {
+function mergeGpsSources(nextList, prevList, { keepApp = false, keepTeltonika = false } = {}) {
   const out = [];
   const seen = new Set();
-  // Explicit server list alone — unless App is still soft-acked fresh.
   const lists =
-    Array.isArray(nextList) && !keepApp ? [nextList] : [nextList, prevList];
+    Array.isArray(nextList) && !keepApp && !keepTeltonika
+      ? [nextList]
+      : [nextList, prevList];
   for (const list of lists) {
     if (!Array.isArray(list)) continue;
     for (const item of list) {
@@ -187,6 +201,7 @@ function mergeGpsSources(nextList, prevList, { keepApp = false } = {}) {
     }
   }
   if (keepApp) seen.add('app');
+  if (keepTeltonika) seen.add('teltonika');
   return ['teltonika', 'app'].filter((k) => seen.has(k));
 }
 
@@ -229,6 +244,11 @@ function stripAppChannelFromRow(row) {
 function dropOfflineVehicles(prev, msg) {
   const next = { ...prev };
   let changed = false;
+  try {
+    if (msg?.bus_plate || msg?.vehicle_code) clearStickyTeltonika(msg);
+  } catch {
+    /* ignore */
+  }
   const removedIds = Array.isArray(msg.removed_vehicle_ids)
     ? msg.removed_vehicle_ids.map(String)
     : [];
