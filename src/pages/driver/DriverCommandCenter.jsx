@@ -7,6 +7,7 @@ import {
   getDriverSession,
   resolveDriverAuthOnLaunch,
 } from '../../lib/driver/driverSession.js';
+import { applyDriverShiftInvite } from '../../lib/driver/applyDriverShiftInvite.js';
 import { flushOfflineScanQueue } from '../../services/ticketingApi.js';
 import { fetchDriverMe } from '../../services/driverPortalApi.js';
 import MasterQrGate from '../../components/driver/MasterQrGate.jsx';
@@ -303,8 +304,8 @@ export default function DriverCommandCenter() {
   }, [authenticated]);
 
   // Drop leftover OS / SW tray notifications when opening or returning to the driver app.
+  // Also apply office «Push» invites so the excursion binds without a second tap.
   useEffect(() => {
-    // OS notifications only — avoid toast.dismiss racing the login success toast.
     clearDriverNotifications({ onlyStale: false }).catch(() => {});
 
     const onVisible = () => {
@@ -312,10 +313,51 @@ export default function DriverCommandCenter() {
         clearDriverNotifications({ onlyStale: false }).catch(() => {});
       }
     };
+
+    let inviteBusy = false;
     const onSwMessage = (event) => {
-      if (event?.data?.type === 'DRIVER_NOTIFICATION_OPENED') {
+      const data = event?.data;
+      if (!data || typeof data !== 'object') return;
+
+      if (data.type === 'DRIVER_NOTIFICATION_OPENED') {
         clearDriverNotifications({ onlyStale: false }).catch(() => {});
       }
+
+      if (data.type !== 'DRIVER_SHIFT_INVITE') return;
+      if (inviteBusy) return;
+      inviteBusy = true;
+      clearDriverNotifications({ onlyStale: false }).catch(() => {});
+      applyDriverShiftInvite(data)
+        .then((session) => {
+          resetDriverEntryAlerts().catch(() => {});
+          clearDriverShiftLaunchState();
+          setAuthenticated(true);
+          setProfileTick((n) => n + 1);
+          setParams({ tab: 'home' });
+          if (session?.tripId) {
+            window.dispatchEvent(
+              new CustomEvent('driver-manifest-updated', {
+                detail: { tripId: session.tripId },
+              }),
+            );
+          }
+          const label =
+            session?.tripTitle ||
+            (session?.tripId ? `Εκδρομή #${session.tripId}` : 'Εκδρομή');
+          toast.success(`${label} φορτώθηκε — πατήστε Έναρξη βάρδιας`, {
+            id: 'driver-shift-invite',
+            duration: 4200,
+          });
+        })
+        .catch((err) => {
+          toast.error(err?.message || 'Αποτυχία φόρτωσης εκδρομής από Push', {
+            id: 'driver-shift-invite-err',
+            duration: 5000,
+          });
+        })
+        .finally(() => {
+          inviteBusy = false;
+        });
     };
 
     document.addEventListener('visibilitychange', onVisible);
@@ -328,7 +370,7 @@ export default function DriverCommandCenter() {
         navigator.serviceWorker.removeEventListener('message', onSwMessage);
       }
     };
-  }, [authenticated]);
+  }, [setParams]);
 
   useEffect(() => {
     if (tachograph.limitReached && telemetryOnline) {
