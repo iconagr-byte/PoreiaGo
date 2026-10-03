@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 import { buildWsUrl } from '../lib/wsUrl.js';
 import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
-import { playNotificationClick, unlockNotificationAudio } from '../lib/admin/notificationClickSound.js';
+import {
+  playDriverConnectChime,
+  playNotificationClick,
+  unlockNotificationAudio,
+} from '../lib/admin/notificationClickSound.js';
 import { fetchDriverChatUnread, fetchDriverChatThreads } from '../services/platformApi.js';
 import { fetchTelemetryAlerts } from '../services/telemetryApi.js';
-import { getSaasToken } from '../services/saasApi.js';
+import { getSaasTenantId, getSaasToken } from '../services/saasApi.js';
 
 const STORAGE_KEY = 'admin_notif_inbox_v1';
 const CHAT_BASELINE_KEY = 'admin_notif_chat_baseline_v1';
@@ -86,12 +91,13 @@ function persist(items) {
 
 function alertToItem(row) {
   const type = String(row.alert_type || '').toUpperCase();
+  const reason = String(row.reason || row.metadata?.reason || '').toLowerCase();
   let title = 'Ειδοποίηση στόλου';
   let tab = 'fleet_live_map';
   if (type === 'SOS') {
     title = 'SOS οδηγού';
   } else if (type === 'DRIVER_ONLINE') {
-    title = 'Έναρξη βάρδιας';
+    title = reason === 'login' ? 'Σύνδεση οδηγού' : 'Έναρξη βάρδιας';
   } else if (type === 'DRIVER_OFFLINE') {
     title = 'Τέλος βάρδιας';
   }
@@ -101,13 +107,26 @@ function alertToItem(row) {
     body: row.message || '',
     type: type.toLowerCase(),
     tab,
-    driverId: row.driver_id || null,
+    driverId: row.driver_id || row.metadata?.driver_id || null,
     at: row.created_at || new Date().toISOString(),
     read: false,
   });
 }
 
-export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true } = {}) {
+function isDriverConnectAlert(itemOrType) {
+  const t = String(
+    typeof itemOrType === 'string' ? itemOrType : itemOrType?.type || '',
+  ).toLowerCase();
+  return (
+    t === 'driver_online' ||
+    t.includes('driver_shift') ||
+    t.includes('driver_online') ||
+    t.includes('shift')
+  );
+}
+
+export function useAdminNotifications({ tenantId, enabled = true } = {}) {
+  const resolvedTenantId = tenantId || getSaasTenantId() || DEMO_TENANT;
   const [items, setItems] = useState(() => {
     const cleaned = loadStored();
     // Rewrite session inbox so legacy chat-${Date.now()} spam collapses immediately.
@@ -124,6 +143,7 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
     const forceUpsert =
       upsert || String(item.type || '') === 'driver_office_chat' || String(item.id).startsWith('chat-');
     if (!forceUpsert && seenRef.current.has(item.id)) return;
+    const isNew = !seenRef.current.has(item.id);
     seenRef.current.add(item.id);
     setItems((prev) => {
       const next = dedupeStoredItems([item, ...prev.filter((x) => x.id !== item.id)]).slice(
@@ -133,9 +153,24 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
       persist(next);
       return next;
     });
-    if (!silent) {
+    if (!silent && isNew) {
       unlockNotificationAudio();
-      playNotificationClick();
+      if (isDriverConnectAlert(item)) {
+        playDriverConnectChime();
+        toast(item.body || item.title, {
+          duration: 6000,
+          id: `driver-connect-${item.id}`,
+          style: {
+            background: '#0f172a',
+            color: '#f8fafc',
+            fontWeight: 600,
+            borderRadius: '12px',
+            padding: '12px 16px',
+          },
+        });
+      } else {
+        playNotificationClick();
+      }
     }
   }, []);
 
@@ -184,12 +219,15 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
     };
   }, [enabled, pushItem]);
 
-  // Live alerts WebSocket.
+  // Live alerts WebSocket — tenant from JWT only (query must match office or be omitted).
   useEffect(() => {
     if (!enabled) return undefined;
+    const token = getSaasToken() || '';
+    if (!token) return undefined;
     const url = buildWsUrl('/ws/admin/telemetry/alerts', {
-      tenant_id: tenantId,
-      token: getSaasToken() || '',
+      // Prefer office tenant; server rejects mismatches vs JWT.
+      tenant_id: resolvedTenantId,
+      token,
     });
     let closed = false;
     let reconnectTimer;
@@ -204,6 +242,11 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
             const data = JSON.parse(ev.data);
             if (data.type === 'telemetry_alert') {
               pushItem(alertToItem(data));
+            } else if (data.type === 'alerts_snapshot' && Array.isArray(data.alerts)) {
+              data.alerts
+                .slice()
+                .reverse()
+                .forEach((row) => pushItem(alertToItem(row), { silent: true }));
             }
           } catch {
             /* ignore */
@@ -222,7 +265,7 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
       if (reconnectTimer) clearTimeout(reconnectTimer);
       wsRef.current?.close();
     };
-  }, [enabled, tenantId, pushItem]);
+  }, [enabled, resolvedTenantId, pushItem]);
 
   // Chat unread → one bell item when count rises after login baseline.
   // null = not baselined yet (office connect must NOT re-fire existing unread).
@@ -306,6 +349,11 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
         pushType.includes('chat') || /μήνυμα οδηγού/i.test(String(payload.title || ''))
           ? `chat-${driverId || 'office'}`
           : null;
+      const isShift =
+        pushType.includes('driver_shift') ||
+        /βάρδια|συνδέθηκε|online|οδηγός/i.test(
+          `${payload.title || ''} ${payload.body || ''}`,
+        );
       pushItem(
         {
           id: stableChatId || payload.tag || payload.data?.message_id || `push-${Date.now()}`,
@@ -317,8 +365,8 @@ export function useAdminNotifications({ tenantId = DEMO_TENANT, enabled = true }
           url: payload.url || payload.data?.url || null,
           read: false,
         },
-        // OS/Web Push already alerted — update the bell row without stacking or click noise.
-        { upsert: true, silent: true },
+        // Chat OS push already dinged; driver connect still plays in-tab chime + toast.
+        { upsert: true, silent: !isShift },
       );
     };
     navigator.serviceWorker.addEventListener('message', onMessage);

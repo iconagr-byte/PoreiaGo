@@ -50,12 +50,14 @@ def _session_fields(session: dict, body: dict[str, Any] | None = None) -> dict[s
         or "—",
     )
     trip_id = body.get("trip_id") or session.get("trip_id")
+    reason = str(body.get("reason") or "").strip()
     return {
         "tenant_id": tenant_id,
         "driver_id": driver_id,
         "driver_name": driver_name,
         "bus_plate": bus_plate,
         "trip_id": trip_id,
+        "reason": reason or None,
         "connection_key": driver_connection_key(session),
     }
 
@@ -101,9 +103,11 @@ async def notify_driver_shift(
         return {"skipped": True, "reason": "no_tenant"}
 
     alert_type = "DRIVER_ONLINE" if event == "online" else "DRIVER_OFFLINE"
-    reason = str((body or {}).get("reason") or "")
+    reason = str(meta.get("reason") or (body or {}).get("reason") or "")
     if event == "online":
-        if reason == "shift_start":
+        if reason == "login":
+            message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) συνδέθηκε"
+        elif reason == "shift_start":
             message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) ξεκίνησε τη βάρδια"
         else:
             message = f"Ο οδηγός {meta['driver_name']} ({meta['bus_plate']}) είναι online"
@@ -132,8 +136,10 @@ async def notify_driver_shift(
                 "trip_id": meta.get("trip_id"),
                 "driver_id": meta.get("driver_id"),
                 "message": message,
+                "reason": reason or None,
                 "created_at": alert.get("created_at"),
                 "severity": "info" if event == "online" else "warning",
+                "metadata": meta,
                 **{k: v for k, v in meta.items() if k not in {"tenant_id", "trip_id", "driver_id"}},
             },
         )
@@ -182,7 +188,15 @@ async def _send_driver_shift_push(
     if not web_push_configured():
         return {"skipped": True, "reason": "vapid_not_configured"}
 
-    title = "Έναρξη βάρδιας" if event == "online" else "Τέλος βάρδιας"
+    if event == "online":
+        if reason == "login":
+            title = "Σύνδεση οδηγού"
+        elif reason == "shift_start":
+            title = "Έναρξη βάρδιας"
+        else:
+            title = "Οδηγός online"
+    else:
+        title = "Τέλος βάρδιας" if reason == "shift_end" else "Οδηγός offline"
     reason_key = (reason or "default").replace(" ", "_")[:40]
     payload = {
         "title": title,

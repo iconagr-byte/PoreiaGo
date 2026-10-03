@@ -182,6 +182,42 @@ def _trip_context(trip_id: int | None) -> dict:
     }
 
 
+async def _notify_admin_driver_login(session_like: dict) -> None:
+    """Office bell + push as soon as a driver authenticates (not only on shift start)."""
+    from travel_platform.telemetry.driver_shift_notifications import notify_driver_shift
+    from travel_platform.telemetry.driver_shift_tracker import on_driver_connected
+
+    # Reserve connection so the first GPS ping does not send a second "online".
+    connection_id = hash(
+        f"login:{session_like.get('sub') or session_like.get('driver_id')}:{session_like.get('trip_id')}",
+    )
+    try:
+        on_driver_connected(session_like, connection_id)
+    except Exception:
+        pass
+    try:
+        await notify_driver_shift(
+            "online",
+            session_like,
+            body={"reason": "login"},
+        )
+    except Exception:
+        logger.warning("driver login admin notify failed", exc_info=True)
+
+
+def _session_like_from_response(resp: DriverSessionResponse) -> dict:
+    plate = resp.vehicle_plate or resp.vehicle_code or "—"
+    return {
+        "tenant_id": str(resp.tenant_id or ""),
+        "sub": resp.driver_id,
+        "driver_id": resp.driver_id,
+        "trip_id": resp.trip_id,
+        "driver_name": resp.driver_name or "Οδηγός",
+        "vehicle_code": plate,
+        "bus_plate": plate,
+    }
+
+
 def _issue_driver_session(
     *,
     driver_id: str | None,
@@ -476,12 +512,19 @@ async def login_with_password(request: Request, body: DriverLoginBody):
         tenant_id=str(tenant_id) if tenant_id else None,
         detail=driver.license_plate or driver.vehicle_code,
     )
-    return _issue_driver_session(
+    resp = _issue_driver_session(
         driver_id=driver.id,
         tenant_id=tenant_id,
         trip_id=trip_id,
         trip_source="live_fleet" if trip_id else None,
     )
+    try:
+        import asyncio
+
+        asyncio.create_task(_notify_admin_driver_login(_session_like_from_response(resp)))
+    except Exception:
+        pass
+    return resp
 
 
 def _request_public_base(request: Request) -> str:
@@ -649,13 +692,20 @@ async def exchange_master_qr(request: Request, body: MasterQrExchangeBody):
             tenant_id=str(tenant_id) if tenant_id else None,
             detail=f"trip:{trip_id}",
         )
-        return _issue_driver_session(
+        resp = _issue_driver_session(
             driver_id=driver_id,
             tenant_id=tenant_id,
             trip_id=trip_id,
             trip_source="master_qr",
             expires_at=int(hybrid["expires_at"]) if hybrid.get("expires_at") else None,
         )
+        try:
+            import asyncio
+
+            asyncio.create_task(_notify_admin_driver_login(_session_like_from_response(resp)))
+        except Exception:
+            pass
+        return resp
 
     preview = preview_master_qr_payload(body.qr_raw)
     if not preview or preview.get("typ") != "master_qr":
