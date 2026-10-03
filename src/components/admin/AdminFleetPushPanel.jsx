@@ -113,7 +113,10 @@ export default function AdminFleetPushPanel({ autoPrompt = true } = {}) {
       if (result.sent > 0) {
         toast.success(`Δοκιμή push OK (${result.sent} συσκευή)`);
       } else {
-        toast.error('Δοκιμή: καμία συσκευή δεν έλαβε — ελέγξτε άδεια ειδοποιήσεων');
+        const detail = Array.isArray(result.errors) && result.errors[0]
+          ? String(result.errors[0]).slice(0, 120)
+          : 'ελέγξτε άδεια ειδοποιήσεων ή ξαναπατήστε Ενεργοποίηση';
+        toast.error(`Δοκιμή: καμία συσκευή δεν έλαβε — ${detail}`);
       }
     } catch (err) {
       toast.error(err.message || 'Αποτυχία δοκιμής push');
