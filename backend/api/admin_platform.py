@@ -1721,8 +1721,21 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest, request: Reques
     _spawn_passenger_sync(body.trip_id, str(result.get("tenant_id") or tenant_id))
     auth_url = result.get("auth_url") or result.get("qr_content")
     qr_token = result.get("qr_token")
+    # Achillio drivers live on achilliotravel.com — never rewrite their magic link to poreiago.
+    driver_base = driver_app_public_base()
+    brand_label = "PoreiaGo"
+    try:
+        if await _tenant_is_achillio_office(str(result.get("tenant_id") or tenant_id)) or _host_looks_like_achillio(
+            request
+        ):
+            driver_base = "https://www.achilliotravel.com"
+            brand_label = "Achillio Travel"
+    except Exception:
+        if _host_looks_like_achillio(request):
+            driver_base = "https://www.achilliotravel.com"
+            brand_label = "Achillio Travel"
     if qr_token:
-        auth_url = build_driver_auth_url(qr_token, base_url=driver_app_public_base())
+        auth_url = build_driver_auth_url(qr_token, base_url=driver_base)
 
     push_result = await send_driver_shift_invite_push(
         tenant_id=str(result["tenant_id"]),
@@ -1732,6 +1745,7 @@ async def notify_driver_shift_push(body: DriverShiftPushRequest, request: Reques
         trip_title=body.trip_title,
         auth_url=auth_url,
         qr_token=qr_token,
+        brand_label=brand_label,
     )
 
     return DriverShiftPushResponse(

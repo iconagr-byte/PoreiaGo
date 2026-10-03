@@ -48,6 +48,48 @@ export default function DriverPushPanel() {
         } catch {
           // Session may be cold; still show enable if VAPID is ready.
         }
+
+        // Auto-prompt once per session on Achillio / driver phone so push is not skipped.
+        if (
+          !cancelled &&
+          config.enabled &&
+          config.public_key &&
+          !localSub &&
+          sessionStorage.getItem('driver_push_autoprompt_v1') !== '1'
+        ) {
+          sessionStorage.setItem('driver_push_autoprompt_v1', '1');
+          window.setTimeout(() => {
+            if (cancelled) return;
+            toast(
+              (tId) => (
+                <span className="text-sm">
+                  Ενεργοποιήστε ειδοποιήσεις βάρδιας.{' '}
+                  <button
+                    type="button"
+                    className="font-bold underline"
+                    onClick={async () => {
+                      toast.dismiss(tId);
+                      setBusy(true);
+                      try {
+                        await subscribeDriverPush();
+                        setSubscribed(true);
+                        setEnabled(true);
+                        toast.success('Push ενεργό σε αυτή τη συσκευή');
+                      } catch (err) {
+                        toast.error(err.message || 'Αποτυχία');
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Ενεργοποίηση
+                  </button>
+                </span>
+              ),
+              { duration: 14000, id: 'driver-push-prompt' },
+            );
+          }, 900);
+        }
       } catch (err) {
         if (cancelled) return;
         setEnabled(false);
