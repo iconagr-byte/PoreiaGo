@@ -1,0 +1,58 @@
+name: Diagnose Compliance Audit (VPS)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: diagnose-compliance-audit
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dump audit_logs schema on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 5m
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/poreiago
+            docker compose -f deploy/docker-compose.prod.yml exec -T api python - <<'PY'
+            import asyncio
+            import traceback
+            from sqlalchemy import text
+
+            async def main():
+                from app.core.database import AsyncSessionLocal
+                async with AsyncSessionLocal() as s:
+                    for name, q in [
+                        ("regclass", "SELECT to_regclass('public.audit_logs')"),
+                        ("columns", "SELECT column_name FROM information_schema.columns WHERE table_name='audit_logs' ORDER BY 1"),
+                        ("count", "SELECT count(*) FROM audit_logs"),
+                    ]:
+                        try:
+                            r = await s.execute(text(q))
+                            print(name, [tuple(x) for x in r.fetchall()][:40])
+                        except Exception as e:
+                            print(name, "ERR", type(e).__name__, e)
+                    try:
+                        from uuid import UUID
+                        from app.services.audit_service import AuditService
+                        tid = (await s.execute(text("SELECT id FROM tenants LIMIT 1"))).scalar()
+                        if tid:
+                            entries, total = await AuditService(s).list_logs(UUID(str(tid)), limit=3)
+                            print("list_logs", total, len(entries))
+                    except Exception:
+                        traceback.print_exc()
+
+            asyncio.run(main())
+            PY
