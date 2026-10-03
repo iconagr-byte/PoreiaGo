@@ -3,6 +3,8 @@
  */
 
 const SOURCE_FRESH_MS = 90_000;
+/** Match Teltonika Codec TCP idle timeout — parked AVL is often rarer than 90s. */
+const TELTONIKA_BADGE_FRESH_MS = 300_000;
 
 export function resolveFleetGpsSource(vehicle) {
   const sources = resolveFleetGpsSources(vehicle);
@@ -43,7 +45,10 @@ function isAppSeenFresh(vehicle) {
 function isTeltonikaSignalFresh(vehicle) {
   if (!vehicle) return false;
   if (vehicle.hydrated_from_store || vehicle.hydratedFromStore) {
-    return isFresh(vehicle.tracker_signal_at || vehicle.trackerSignalAt);
+    return isFresh(
+      vehicle.tracker_signal_at || vehicle.trackerSignalAt,
+      TELTONIKA_BADGE_FRESH_MS,
+    );
   }
   const signal =
     vehicle.tracker_signal_at ||
@@ -51,7 +56,7 @@ function isTeltonikaSignalFresh(vehicle) {
     (kindFromRaw(vehicle.source) === 'teltonika'
       ? vehicle.timestamp || vehicle.updated_at
       : null);
-  return isFresh(signal);
+  return isFresh(signal, TELTONIKA_BADGE_FRESH_MS);
 }
 
 /** Active GPS channels for the dual badge — order: teltonika, app. */
@@ -72,20 +77,10 @@ export function resolveFleetGpsSources(vehicle) {
       ? vehicle.gpsSources
       : [];
 
-  // Trust server gps_sources for dual badge. Only drop Teltonika when the
-  // pin is an explicit parked hydrate with a stale hardware signal and the
-  // server did not also stamp a fresh tracker_signal / open IMEI channel.
+  // Trust server gps_sources for the dual badge. Offline devices omit
+  // teltonika server-side; do not second-guess a listed open channel.
   for (const item of listed) {
     const kind = kindFromRaw(item) || (item === 'teltonika' || item === 'app' ? item : '');
-    if (
-      kind === 'teltonika' &&
-      (vehicle.hydrated_from_store || vehicle.hydratedFromStore) &&
-      !isTeltonikaSignalFresh(vehicle)
-    ) {
-      continue;
-    }
-    // Server said Teltonika is live — show it even if this row is App-sourced
-    // (device last_seen enrichment on the API).
     push(kind);
   }
 
@@ -94,14 +89,17 @@ export function resolveFleetGpsSources(vehicle) {
     kindFromRaw(vehicle?.source || vehicle?.gps_source || vehicle?.gpsSource) === 'teltonika' &&
     !vehicle.hydrated_from_store &&
     !vehicle.hydratedFromStore &&
-    isFresh(vehicle.timestamp || vehicle.updated_at)
+    isFresh(vehicle.timestamp || vehicle.updated_at, TELTONIKA_BADGE_FRESH_MS)
   ) {
     push('teltonika');
   } else if (
     vehicle?.imei &&
     !vehicle.hydrated_from_store &&
     !vehicle.hydratedFromStore &&
-    isFresh(vehicle.tracker_signal_at || vehicle.trackerSignalAt || vehicle.timestamp)
+    isFresh(
+      vehicle.tracker_signal_at || vehicle.trackerSignalAt || vehicle.timestamp,
+      TELTONIKA_BADGE_FRESH_MS,
+    )
   ) {
     push('teltonika');
   }

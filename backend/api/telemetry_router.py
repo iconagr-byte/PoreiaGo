@@ -221,7 +221,12 @@ async def fleet_live(
                     str(tenant_id),
                     meta.get("vehicle_code") or meta.get("bus_plate") or v.vehicle_code,
                 )
-                if is_tracker_binding_alive(device, max_age_sec=alive_sec):
+                from travel_platform.telemetry.tracker_priority import (
+                    DEVICE_ONLINE_BADGE_SECONDS,
+                )
+
+                badge_alive = max(alive_sec, DEVICE_ONLINE_BADGE_SECONDS)
+                if is_tracker_binding_alive(device, max_age_sec=badge_alive):
                     if "teltonika" not in (gps_sources or []):
                         gps_sources = ["teltonika", *(gps_sources or [])]
                     tracker_signal_at = (
