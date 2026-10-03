@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { getDriverSession } from '../../lib/driver/driverSession.js';
 import IosPwaGpsGuidance from './IosPwaGpsGuidance.jsx';
 
@@ -10,6 +9,7 @@ export default function DriverShiftTelemetry({ shift }) {
   const {
     online,
     starting,
+    ending,
     lastPing,
     gpsError,
     manifestSummary,
@@ -18,20 +18,11 @@ export default function DriverShiftTelemetry({ shift }) {
     goOffline,
     wakeLockSupported,
   } = shift;
-  const [confirmEnd, setConfirmEnd] = useState(false);
 
-  useEffect(() => {
-    if (!online) setConfirmEnd(false);
-  }, [online]);
-
-  useEffect(() => {
-    if (!confirmEnd) return undefined;
-    const id = window.setTimeout(() => setConfirmEnd(false), 4000);
-    return () => window.clearTimeout(id);
-  }, [confirmEnd]);
-
-  const busy = Boolean(starting) && !lastPing;
-  const live = Boolean(online && lastPing);
+  const busyStart = Boolean(starting) && !lastPing;
+  const busyEnd = Boolean(ending);
+  const busy = busyStart || busyEnd;
+  const live = Boolean(online && lastPing && !ending);
 
   const onPrimary = () => {
     if (busy) return;
@@ -39,23 +30,19 @@ export default function DriverShiftTelemetry({ shift }) {
       void goOnline({ resume: false });
       return;
     }
-    // Two-tap confirm so Θέση tab never ends a shift by accident.
-    if (!confirmEnd) {
-      setConfirmEnd(true);
-      return;
-    }
-    setConfirmEnd(false);
+    // One tap ends the shift (Θέση tab no longer auto-starts — two-tap
+    // confirm was vestigial and made «Τέλος βάρδιας» look like a no-op).
     void goOffline();
   };
 
   let primaryLabel = 'ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ';
   let primaryClass = 'driver-btn-primary';
-  if (busy) {
+  if (busyEnd) {
+    primaryLabel = 'ΤΕΡΜΑΤΙΣΜΟΣ…';
+    primaryClass = 'bg-rose-600 text-white shadow-lg shadow-rose-900/40 opacity-90';
+  } else if (busyStart) {
     primaryLabel = 'ΣΥΝΔΕΣΗ GPS…';
     primaryClass = 'driver-shift-btn--busy';
-  } else if (online && confirmEnd) {
-    primaryLabel = 'ΕΠΙΒΕΒΑΙΩΣΗ ΤΕΛΟΥΣ';
-    primaryClass = 'bg-rose-600 text-white shadow-lg shadow-rose-900/40';
   } else if (online) {
     primaryLabel = 'ΤΕΛΟΣ ΒΑΡΔΙΑΣ';
     primaryClass = 'bg-rose-600 text-white shadow-lg shadow-rose-900/40';
@@ -102,13 +89,13 @@ export default function DriverShiftTelemetry({ shift }) {
           Ένα πάτημα ενεργοποιεί GPS και ενημερώνει τον live χάρτη του γραφείου. Επιτρέψτε την
           τοποθεσία αν σας το ζητήσει το τηλέφωνο.
         </p>
-      ) : busy || !lastPing ? (
+      ) : busyEnd ? (
+        <p className="text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-xl p-3 leading-relaxed font-semibold">
+          Κλείσιμο βάρδιας — ενημέρωση γραφείου…
+        </p>
+      ) : busyStart || !lastPing ? (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed font-semibold">
           Βάρδια ξεκίνησε — αναμονή πρώτης θέσης GPS…
-        </p>
-      ) : confirmEnd ? (
-        <p className="text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-xl p-3 leading-relaxed font-semibold">
-          Πατήστε ξανά «Επιβεβαίωση τέλους» για να σταματήσει το GPS.
         </p>
       ) : (
         <p className="text-xs text-emerald-700 leading-relaxed font-semibold">
