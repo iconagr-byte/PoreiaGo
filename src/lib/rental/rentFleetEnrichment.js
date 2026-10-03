@@ -193,9 +193,9 @@ function sizeAndGroup(category, seats, model) {
 
 function transmissionLabel(raw) {
   const t = String(raw || '').trim();
-  if (!t) return 'Με ταχύτητες';
+  if (!t) return 'Χειροκίνητο';
   if (/αυτόματο|automatic/i.test(t)) return 'Αυτόματο';
-  return 'Με ταχύτητες';
+  return 'Χειροκίνητο';
 }
 
 /**
@@ -229,7 +229,8 @@ export function enrichRentVehicle(vehicle) {
 
   const luggage = known?.luggage || '';
   const bags = luggageCount(luggage);
-  const transmission = transmissionLabel(known?.transmission);
+  const transmission = transmissionLabel(known?.transmission || v.transmission);
+  const transmissionKey = /αυτόματο/i.test(transmission) ? 'automatic' : 'manual';
 
   return {
     ...v,
@@ -240,9 +241,11 @@ export function enrichRentVehicle(vehicle) {
     display_headline: known?.headline || category || 'Όχημα',
     display_blurb: description,
     transmission,
+    transmission_key: transmissionKey,
     fuel: known?.fuel || '',
     doors: known?.doors || null,
     luggage,
+    luggage_bags: bags || 0,
     luggage_label: bags ? `x${bags}` : luggage || 'Αποσκευές',
     highlights: known?.highlights || [],
     seats_label: seats ? `${seats} επιβάτες` : '',
