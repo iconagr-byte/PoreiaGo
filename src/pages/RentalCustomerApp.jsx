@@ -308,116 +308,115 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
           </RentGuestHero>
 
           <div className="rent-home-stack rent-home-stack--landing">
-            <section id="rent-guest-fleet" className="rent-land-band rent-land-band--pick" aria-label="Στόλος ενοικίασης">
-              <div className="rent-land-inner rent-land-inner--pick">
-                <header className="rent-pick-head">
-                  <div className="rent-pick-head-main">
-                    <p className="rent-pick-eyebrow">Στόλος</p>
-                    <h2 className="rent-pick-head-title">
-                      Επίλεξε όχημα
-                      <span className="rent-pick-count">{filteredHomeFleet.length}</span>
-                    </h2>
-                    <p className="rent-pick-head-sub">{fleetSubtitle}</p>
-                  </div>
+            {/* Filters sit in a left page column — outside the car-results frame. */}
+            <div id="rent-guest-fleet" className="rent-fleet-shell">
+              <RentFleetFilterSidebar
+                vehicles={categoryScopedFleet}
+                filters={fleetFilters}
+                onChange={setFleetFilters}
+              />
 
-                  <div className="rent-pick-toolbar">
-                    <div className="rent-pick-cats" role="tablist" aria-label="Κατηγορία">
-                      {homeCategories.map((c) => (
-                        <button
-                          key={c || 'all'}
-                          type="button"
-                          role="tab"
-                          aria-selected={homeCategory === c}
-                          className={`rent-pick-cat${homeCategory === c ? ' is-active' : ''}`}
-                          onClick={() => setHomeCategory(c)}
-                        >
-                          {homeCategoryLabel(c)}
-                        </button>
-                      ))}
+              <section className="rent-land-band rent-land-band--pick" aria-label="Στόλος ενοικίασης">
+                <div className="rent-land-inner rent-land-inner--pick">
+                  <header className="rent-pick-head">
+                    <div className="rent-pick-head-main">
+                      <p className="rent-pick-eyebrow">Στόλος</p>
+                      <h2 className="rent-pick-head-title">
+                        Επίλεξε όχημα
+                        <span className="rent-pick-count">{filteredHomeFleet.length}</span>
+                      </h2>
+                      <p className="rent-pick-head-sub">{fleetSubtitle}</p>
                     </div>
 
-                    <div className="rent-pick-filters">
-                      <label className="rent-pick-filter rent-pick-filter--search">
-                        <span className="material-symbols-outlined" aria-hidden>
-                          search
-                        </span>
-                        <input
-                          type="search"
-                          value={homeQuery}
-                          onChange={(e) => setHomeQuery(e.target.value)}
-                          placeholder="Μοντέλο ή κατηγορία…"
-                          aria-label="Αναζήτηση οχήματος"
-                        />
-                      </label>
-                      <label className="rent-pick-filter rent-pick-filter--sort">
-                        <span className="visually-hidden">Ταξινόμηση</span>
-                        <select
-                          value={fleetSort}
-                          onChange={(e) => setFleetSort(e.target.value)}
-                          aria-label="Ταξινόμηση"
-                        >
-                          <option value="default">Προεπιλογή</option>
-                          <option value="price_asc">Τιμή ↑</option>
-                          <option value="price_desc">Τιμή ↓</option>
-                        </select>
-                      </label>
-                    </div>
-                  </div>
-                </header>
-
-                <div className="rent-pick-layout">
-                  <RentFleetFilterSidebar
-                    vehicles={categoryScopedFleet}
-                    filters={fleetFilters}
-                    onChange={setFleetFilters}
-                  />
-
-                  <div className="rent-pick-main">
-                    {fleetLoading ? (
-                      <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
-                    ) : filteredHomeFleet.length ? (
-                      <div className="rent-pick-grid">
-                        {filteredHomeFleet.map((v) => (
-                          <RentHomeFleetCard
-                            key={v.id}
-                            vehicle={v}
-                            favorite={favorites.includes(v.id)}
-                            onToggleFavorite={() => toggleFavorite(v.id)}
-                            onSelect={() => goToServicesStep(v)}
-                            onOpenDetails={() => setDetailVehicle(v)}
-                          />
+                    <div className="rent-pick-toolbar">
+                      <div className="rent-pick-cats" role="tablist" aria-label="Κατηγορία">
+                        {homeCategories.map((c) => (
+                          <button
+                            key={c || 'all'}
+                            type="button"
+                            role="tab"
+                            aria-selected={homeCategory === c}
+                            className={`rent-pick-cat${homeCategory === c ? ' is-active' : ''}`}
+                            onClick={() => setHomeCategory(c)}
+                          >
+                            {homeCategoryLabel(c)}
+                          </button>
                         ))}
                       </div>
-                    ) : (
-                      <div className="rent-pick-empty">
-                        <span className="material-symbols-outlined" aria-hidden>
-                          directions_car
-                        </span>
-                        <p>
-                          {searchActive
-                            ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες.'
-                            : 'Δεν βρέθηκαν οχήματα με αυτά τα φίλτρα.'}
-                        </p>
-                        {homeCategory || homeQuery || rentFleetFiltersActive(fleetFilters) ? (
-                          <button
-                            type="button"
-                            className="rent-pick-empty-reset"
-                            onClick={() => {
-                              setHomeCategory('');
-                              setHomeQuery('');
-                              setFleetSort('default');
-                              setFleetFilters({ ...EMPTY_RENT_FLEET_FILTERS });
-                            }}
+
+                      <div className="rent-pick-filters">
+                        <label className="rent-pick-filter rent-pick-filter--search">
+                          <span className="material-symbols-outlined" aria-hidden>
+                            search
+                          </span>
+                          <input
+                            type="search"
+                            value={homeQuery}
+                            onChange={(e) => setHomeQuery(e.target.value)}
+                            placeholder="Μοντέλο ή κατηγορία…"
+                            aria-label="Αναζήτηση οχήματος"
+                          />
+                        </label>
+                        <label className="rent-pick-filter rent-pick-filter--sort">
+                          <span className="visually-hidden">Ταξινόμηση</span>
+                          <select
+                            value={fleetSort}
+                            onChange={(e) => setFleetSort(e.target.value)}
+                            aria-label="Ταξινόμηση"
                           >
-                            Καθαρισμός φίλτρων
-                          </button>
-                        ) : null}
+                            <option value="default">Προεπιλογή</option>
+                            <option value="price_asc">Τιμή ↑</option>
+                            <option value="price_desc">Τιμή ↓</option>
+                          </select>
+                        </label>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  </header>
+
+                  {fleetLoading ? (
+                    <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
+                  ) : filteredHomeFleet.length ? (
+                    <div className="rent-pick-grid">
+                      {filteredHomeFleet.map((v) => (
+                        <RentHomeFleetCard
+                          key={v.id}
+                          vehicle={v}
+                          favorite={favorites.includes(v.id)}
+                          onToggleFavorite={() => toggleFavorite(v.id)}
+                          onSelect={() => goToServicesStep(v)}
+                          onOpenDetails={() => setDetailVehicle(v)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rent-pick-empty">
+                      <span className="material-symbols-outlined" aria-hidden>
+                        directions_car
+                      </span>
+                      <p>
+                        {searchActive
+                          ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες.'
+                          : 'Δεν βρέθηκαν οχήματα με αυτά τα φίλτρα.'}
+                      </p>
+                      {homeCategory || homeQuery || rentFleetFiltersActive(fleetFilters) ? (
+                        <button
+                          type="button"
+                          className="rent-pick-empty-reset"
+                          onClick={() => {
+                            setHomeCategory('');
+                            setHomeQuery('');
+                            setFleetSort('default');
+                            setFleetFilters({ ...EMPTY_RENT_FLEET_FILTERS });
+                          }}
+                        >
+                          Καθαρισμός φίλτρων
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
-              </div>
-            </section>
+              </section>
+            </div>
 
             <RentGuestLandingExtras
               brandLabel={branding.brandLabel}

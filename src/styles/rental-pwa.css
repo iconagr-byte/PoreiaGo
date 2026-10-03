@@ -1554,14 +1554,31 @@
 }
 
 .rent-land-inner--pick {
-  max-width: 1180px;
+  max-width: none;
 }
 
-/* —— Left filter sidebar (guest fleet pick) —— */
-.rent-pick-layout {
+/*
+ * Fleet shell: filters in a left page column (outside the mint car frame).
+ * Mobile: filters stack above results. Desktop: sticky left rail.
+ */
+.rent-fleet-shell {
   display: grid;
-  gap: 1.25rem;
+  gap: 0;
   align-items: start;
+  width: 100%;
+  background: #f5f5f7;
+}
+
+.rent-fleet-shell > .rent-side-filters {
+  width: 100%;
+  padding: 1rem 1.15rem 0.85rem;
+  background: #f5f5f7;
+  border-bottom: 0;
+}
+
+.rent-fleet-shell > .rent-land-band--pick {
+  /* Car results keep their mint frame — filters stay outside it. */
+  margin: 0;
 }
 
 .rent-side-filters {
@@ -1701,10 +1718,6 @@
 
 .rent-side-filters-more:hover {
   text-decoration: underline;
-}
-
-.rent-pick-main {
-  min-width: 0;
 }
 
 .rent-land-head {
@@ -4820,6 +4833,8 @@
 
 .rent-phone-stage--desktop .rent-home-stack--landing {
   gap: 0;
+  max-width: none;
+  width: 100%;
 }
 
 .rent-phone-stage--desktop .rent-land-band {
@@ -4868,19 +4883,35 @@
   justify-content: end;
 }
 
-.rent-phone-stage--desktop .rent-land-inner--pick {
-  max-width: 1180px;
+.rent-phone-stage--desktop .rent-fleet-shell {
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  align-items: stretch;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 2rem;
+  gap: 0 1.5rem;
+  background: transparent;
 }
 
-.rent-phone-stage--desktop .rent-pick-layout {
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-  gap: 1.75rem;
-  align-items: start;
-}
-
-.rent-phone-stage--desktop .rent-side-filters {
+.rent-phone-stage--desktop .rent-fleet-shell > .rent-side-filters {
   position: sticky;
   top: 1rem;
+  align-self: start;
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
+  z-index: 2;
+}
+
+.rent-phone-stage--desktop .rent-fleet-shell > .rent-land-band--pick {
+  border-radius: 18px;
+  min-height: 100%;
+  padding: 1.75rem 1.5rem 2rem;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+}
+
+.rent-phone-stage--desktop .rent-land-inner--pick {
+  max-width: none;
 }
 
 .rent-phone-stage--desktop .rent-pick-grid {

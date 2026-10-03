@@ -1,6 +1,6 @@
 /**
  * Guest /rent fleet sidebar filters (Rentalcars-style).
- * Location · Transmission · Extras · Luggage capacity.
+ * Location · Transmission · Fuel type · Extras · Luggage capacity.
  */
 
 export const RENT_FILTER_LOCATIONS = [
@@ -12,6 +12,13 @@ export const RENT_FILTER_LOCATIONS = [
 export const RENT_FILTER_TRANSMISSIONS = [
   { id: 'automatic', label: 'Αυτόματο' },
   { id: 'manual', label: 'Χειροκίνητο' },
+];
+
+export const RENT_FILTER_FUEL_TYPES = [
+  { id: 'electric', label: 'Πλήρως ηλεκτρικό' },
+  { id: 'hybrid', label: 'Υβριδικό' },
+  { id: 'plug_in_hybrid', label: 'Plug-in υβριδικό' },
+  { id: 'petrol_diesel', label: 'Βενζίνη ή ντίζελ' },
 ];
 
 export const RENT_FILTER_EXTRAS = [
@@ -37,6 +44,7 @@ export const RENT_FILTER_LUGGAGE = [
 export const EMPTY_RENT_FLEET_FILTERS = {
   locations: [],
   transmissions: [],
+  fuelTypes: [],
   extras: [],
   luggage: [],
 };
@@ -47,6 +55,19 @@ export function normalizeTransmissionKey(raw) {
   if (!t) return '';
   if (/αυτόματο|automatic|auto\b/.test(t)) return 'automatic';
   if (/χειροκίνητο|manual|με ταχύτητες/.test(t)) return 'manual';
+  return '';
+}
+
+/** @param {unknown} raw */
+export function normalizeFuelTypeKey(raw) {
+  const t = String(raw || '').trim().toLowerCase();
+  if (!t) return '';
+  if (/plug[-\s]?in|plugin|phev|plug.?in.?hybrid/.test(t)) return 'plug_in_hybrid';
+  if (/fully\s*electric|ηλεκτρ|electric|\bev\b|bev\b/.test(t)) return 'electric';
+  if (/υβριδ|hybrid|hev\b/.test(t)) return 'hybrid';
+  if (/βενζίν|ντίζελ|πετρέλ|petrol|diesel|gasoline|gas\b|ice\b/.test(t)) {
+    return 'petrol_diesel';
+  }
   return '';
 }
 
@@ -75,6 +96,10 @@ export function vehicleFilterTags(vehicle) {
   const highlights = (Array.isArray(v.highlights) ? v.highlights : [])
     .map((x) => String(x || '').toLowerCase())
     .join(' ');
+  const fuelBlob = `${v.fuel || ''} ${v.fuel_type || ''} ${highlights}`;
+  const fuelType =
+    normalizeFuelTypeKey(fuelBlob) ||
+    (/electric|ηλεκτρ/i.test(`${cat} ${v.model || ''}`) ? 'electric' : 'petrol_diesel');
 
   const locations = [];
   if (/van|transfer|airport/i.test(`${cat} ${highlights} ${v.model || ''}`)) {
@@ -99,6 +124,7 @@ export function vehicleFilterTags(vehicle) {
 
   return {
     transmission,
+    fuelType,
     luggage_bags: bags,
     locations: [...new Set(locations)],
     extras: [...extras],
@@ -114,6 +140,7 @@ export function applyRentFleetFilters(vehicles, filters) {
   const f = filters || EMPTY_RENT_FLEET_FILTERS;
   const locs = new Set(f.locations || []);
   const trans = new Set(f.transmissions || []);
+  const fuels = new Set(f.fuelTypes || []);
   const extras = new Set(f.extras || []);
   const bags = new Set((f.luggage || []).map(Number));
 
@@ -121,6 +148,7 @@ export function applyRentFleetFilters(vehicles, filters) {
     const tags = vehicleFilterTags(vehicle);
     if (locs.size && ![...locs].some((id) => tags.locations.includes(id))) return false;
     if (trans.size && !trans.has(tags.transmission)) return false;
+    if (fuels.size && !fuels.has(tags.fuelType)) return false;
     if (extras.size && ![...extras].every((id) => tags.extras.includes(id))) return false;
     if (bags.size) {
       const n = tags.luggage_bags;
@@ -153,6 +181,13 @@ export function countRentFleetFilterFacets(vehicles, filters) {
       transmissions: [opt.id],
     }).length;
   }
+  const fuelTypes = {};
+  for (const opt of RENT_FILTER_FUEL_TYPES) {
+    fuelTypes[opt.id] = applyRentFleetFilters(vehicles, {
+      ...base,
+      fuelTypes: [opt.id],
+    }).length;
+  }
   const extras = {};
   for (const opt of RENT_FILTER_EXTRAS) {
     extras[opt.id] = applyRentFleetFilters(vehicles, {
@@ -167,7 +202,7 @@ export function countRentFleetFilterFacets(vehicles, filters) {
       luggage: [opt.id],
     }).length;
   }
-  return { locations, transmissions, extras, luggage };
+  return { locations, transmissions, fuelTypes, extras, luggage };
 }
 
 export function rentFleetFiltersActive(filters) {
@@ -175,6 +210,7 @@ export function rentFleetFiltersActive(filters) {
   return Boolean(
     (f.locations && f.locations.length) ||
       (f.transmissions && f.transmissions.length) ||
+      (f.fuelTypes && f.fuelTypes.length) ||
       (f.extras && f.extras.length) ||
       (f.luggage && f.luggage.length),
   );

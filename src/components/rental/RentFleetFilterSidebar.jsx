@@ -3,6 +3,7 @@ import {
   EMPTY_RENT_FLEET_FILTERS,
   RENT_FILTER_EXTRAS,
   RENT_FILTER_EXTRAS_VISIBLE,
+  RENT_FILTER_FUEL_TYPES,
   RENT_FILTER_LOCATIONS,
   RENT_FILTER_LUGGAGE,
   RENT_FILTER_TRANSMISSIONS,
@@ -100,6 +101,24 @@ export default function RentFleetFilterSidebar({
                     'transmissions',
                     toggleRentFilterValue(filters.transmissions, opt.id),
                   )
+                }
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="rent-side-filters-section">
+          <h4>Τύπος καυσίμου</h4>
+          <div className="rent-side-filters-list">
+            {RENT_FILTER_FUEL_TYPES.map((opt) => (
+              <FilterCheck
+                key={opt.id}
+                id={`rent-fuel-${opt.id}`}
+                label={opt.label}
+                count={facets.fuelTypes?.[opt.id]}
+                checked={(filters.fuelTypes || []).includes(opt.id)}
+                onChange={() =>
+                  patch('fuelTypes', toggleRentFilterValue(filters.fuelTypes, opt.id))
                 }
               />
             ))}
