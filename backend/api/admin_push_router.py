@@ -56,10 +56,12 @@ async def _require_admin(payload: Annotated[dict, Depends(get_token_payload)]) -
 
 @router.get("/config")
 async def push_config(_: Annotated[dict, Depends(_require_admin)]):
-    ensure_web_push_keys()
+    ensured = ensure_web_push_keys()
+    enabled = web_push_configured()
     return {
-        "enabled": web_push_configured(),
+        "enabled": enabled,
         "public_key": get_public_vapid_key(),
+        "reason": None if enabled else ("ensure_failed" if not ensured else "vapid_not_configured"),
     }
 
 
@@ -68,12 +70,14 @@ async def push_status(
     tenant_id: Annotated[UUID, Depends(get_current_tenant_id)],
     _: Annotated[dict, Depends(_require_admin)],
 ):
-    ensure_web_push_keys()
+    ensured = ensure_web_push_keys()
+    enabled = web_push_configured()
     subs = list_subscriptions_for_tenant(str(tenant_id), audience="admin")
     return {
-        "enabled": web_push_configured(),
+        "enabled": enabled,
         "subscribed": len(subs) > 0,
         "devices": len(subs),
+        "reason": None if enabled else ("ensure_failed" if not ensured else "vapid_not_configured"),
     }
 
 

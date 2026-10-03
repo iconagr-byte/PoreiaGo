@@ -120,6 +120,14 @@ def ensure_web_push_keys() -> bool:
         logger.warning("Cannot create VAPID data dir %s: %s", data, exc)
         return web_push_configured()
 
+    # Contabo host bootstrap sometimes created a ghost directory named like the PEM file.
+    for ghost in (public_path, private_path):
+        if ghost.is_dir():
+            try:
+                ghost.rmdir()
+            except OSError:
+                logger.warning("VAPID path is a non-empty directory: %s", ghost)
+
     if public_path.is_file() and private_path.is_file():
         public_key = public_path.read_text(encoding="utf-8").strip()
         private_pem = private_path.read_text(encoding="utf-8").strip()
@@ -138,6 +146,13 @@ def ensure_web_push_keys() -> bool:
         except OSError as exc:
             logger.warning("Could not persist VAPID keys into %s: %s", data, exc)
         return True
+
+    # Stale public-only env (missing private file) blocks nothing — regenerate a matching pair.
+    if _vapid_public_key() and not _vapid_private_key():
+        logger.warning(
+            "WEB_PUSH_VAPID_PUBLIC_KEY set without readable private key — regenerating pair in %s",
+            data,
+        )
 
     try:
         from cryptography.hazmat.primitives import serialization

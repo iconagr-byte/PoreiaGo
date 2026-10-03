@@ -406,9 +406,13 @@ fi
 # Sync host VAPID keys into the durable api_data volume (env often pointed here without a copy).
 if [[ -n "$API_CID" && -f "$DEPLOY_DIR/.vapid_private.pem" && -f "$DEPLOY_DIR/.vapid_public.key" ]]; then
   echo "==> Syncing Web Push VAPID keys into api-blue:/app/data"
+  # Remove ghost directories that block writing PEM files.
+  docker exec "$API_CID" sh -c 'rm -rf /app/data/vapid_private.pem /app/data/vapid_public.key' 2>/dev/null || true
   docker cp "$DEPLOY_DIR/.vapid_private.pem" "$API_CID:/app/data/vapid_private.pem" || true
   docker cp "$DEPLOY_DIR/.vapid_public.key" "$API_CID:/app/data/vapid_public.key" || true
   docker exec "$API_CID" chmod 600 /app/data/vapid_private.pem 2>/dev/null || true
+  echo "==> Restarting api-blue so Web Push picks up VAPID keys"
+  docker restart "$API_CID" >/dev/null || true
 fi
 # Fiscal MARK pipeline — worker + beat (stuck recovery / auto-retry).
 echo "==> Starting Celery worker + beat"
