@@ -1,7 +1,7 @@
 /** Guest /rent hero — Rentalcars-style composition (search-first). */
 
-/** Island coastal road at sea level — 4K asphalt + turquoise bay, eye-height. */
-export const RENT_GUEST_HERO_IMAGE = '/images/rent-hero-coastal-road-4k.jpg';
+/** Island coastal road — 4K + cool blue grade (cache-busted path). */
+export const RENT_GUEST_HERO_IMAGE = '/images/rent-hero-coastal-v2.jpg';
 
 export const RENT_GUEST_HERO = {
   title: 'Ενοικίαση αυτοκινήτου',
