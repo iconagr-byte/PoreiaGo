@@ -70,17 +70,18 @@ function listedGpsSources(msg) {
   return null;
 }
 
-/** Trust server App stamp — never resurrect a cleared/offline App channel. */
+/**
+ * Trust explicit server App stamp. Teltonika WS/poll frames often publish
+ * gps_sources:['teltonika'] without app_seen_at — do NOT wipe a fresh App
+ * heartbeat from that omission (dual badge would collapse to hardware-only).
+ * Logout / end-shift always send app_seen_at: null or fleet_driver_offline.
+ */
 function pickAppSeenAt(msg, prev) {
   if (
     Object.prototype.hasOwnProperty.call(msg, 'app_seen_at') ||
     Object.prototype.hasOwnProperty.call(msg, 'appSeenAt')
   ) {
     return msg.app_seen_at ?? msg.appSeenAt ?? null;
-  }
-  const listed = listedGpsSources(msg);
-  if (Array.isArray(listed) && !listed.some((s) => gpsSourceKind(s) === 'app')) {
-    return null;
   }
   return prev?.app_seen_at || null;
 }
@@ -91,10 +92,6 @@ function pickAppDriverId(msg, prev) {
     Object.prototype.hasOwnProperty.call(msg, 'appDriverId')
   ) {
     return msg.app_driver_id ?? msg.appDriverId ?? null;
-  }
-  const listed = listedGpsSources(msg);
-  if (Array.isArray(listed) && !listed.some((s) => gpsSourceKind(s) === 'app')) {
-    return null;
   }
   // Cleared / missing App heartbeat ⇒ drop soft-ack chat id too.
   if (!pickAppSeenAt(msg, prev)) return null;
@@ -131,6 +128,7 @@ function normalizeVehicle(msg, id, prev) {
   const appSeenAt = pickAppSeenAt(msg, prev);
   const listed = listedGpsSources(msg);
   const appDriverId = pickAppDriverId(msg, prev);
+  const appStillLive = Boolean(appSeenAt && isChannelFresh(appSeenAt));
   return {
     id,
     vehicle_id: msg.vehicle_id || id,
@@ -166,17 +164,19 @@ function normalizeVehicle(msg, id, prev) {
     tracker_signal_at:
       msg.tracker_signal_at || msg.trackerSignalAt || prev?.tracker_signal_at || null,
     hydrated_from_store: pickHydratedFromStore(msg, prev),
-    // Explicit server list wins — do not merge prev (that kept App after logout).
-    gps_sources: mergeGpsSources(listed, Array.isArray(listed) ? null : prev?.gps_sources),
+    // Server list wins on logout (app_seen_at:null). While App heartbeat is
+    // still fresh, keep App on the dual list even if this Teltonika frame omitted it.
+    gps_sources: mergeGpsSources(listed, prev?.gps_sources, { keepApp: appStillLive }),
     animStart: typeof performance !== 'undefined' ? performance.now() : 0,
   };
 }
 
-function mergeGpsSources(nextList, prevList) {
+function mergeGpsSources(nextList, prevList, { keepApp = false } = {}) {
   const out = [];
   const seen = new Set();
-  // When the server sends gps_sources, trust that list alone.
-  const lists = Array.isArray(nextList) ? [nextList] : [nextList, prevList];
+  // Explicit server list alone — unless App is still soft-acked fresh.
+  const lists =
+    Array.isArray(nextList) && !keepApp ? [nextList] : [nextList, prevList];
   for (const list of lists) {
     if (!Array.isArray(list)) continue;
     for (const item of list) {
@@ -186,6 +186,7 @@ function mergeGpsSources(nextList, prevList) {
       out.push(norm);
     }
   }
+  if (keepApp) seen.add('app');
   return ['teltonika', 'app'].filter((k) => seen.has(k));
 }
 
