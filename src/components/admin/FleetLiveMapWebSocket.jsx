@@ -21,7 +21,6 @@ import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
 import { fetchRentalLiveOverlays } from '../../services/fleetRentalApi.js';
 import FleetLiveMapLeaflet from './FleetLiveMapLeaflet.jsx';
 import FleetLiveMapMapbox from './FleetLiveMapMapbox.jsx';
-import AdminFleetPushPanel from './AdminFleetPushPanel.jsx';
 import FleetEtaPanel from './FleetEtaPanel.jsx';
 import FleetVehicleHistoryModal from './FleetVehicleHistoryModal.jsx';
 import DriverOfficeChatPanel from './DriverOfficeChatPanel.jsx';
@@ -270,10 +269,6 @@ export default function FleetLiveMapWebSocket() {
             ) : (
               <p className="text-xs text-[var(--fleet-secondary)]">Κανένα ενεργό όχημα αυτή τη στιγμή.</p>
             )}
-          </div>
-
-          <div className="fleet-apple-side-card">
-            <AdminFleetPushPanel />
           </div>
 
           <div className="fleet-apple-side-card">
