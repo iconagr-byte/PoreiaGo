@@ -92,7 +92,7 @@ assert.deepEqual(
   ['teltonika', 'app'],
 );
 
-// Closed / hydrated Teltonika must not show as an open channel next to App.
+// Server omitted Teltonika (device offline) — App-only even with hydrate pin.
 assert.deepEqual(
   resolveFleetGpsSources({
     source: 'teltonika',
@@ -101,9 +101,36 @@ assert.deepEqual(
     tracker_signal_at: old,
     updated_at: now,
     app_seen_at: now,
-    gps_sources: ['teltonika', 'app'],
+    gps_sources: ['app'],
   }),
   ['app'],
+);
+
+// Server listed both — trust the list (egress already verified IMEI online).
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'driver_pwa',
+    imei: '861',
+    hydrated_from_store: true,
+    tracker_signal_at: old,
+    updated_at: now,
+    app_seen_at: now,
+    gps_sources: ['teltonika', 'app'],
+  }),
+  ['teltonika', 'app'],
+);
+
+// Hydrated + signal within Codec window (≤5 min) → still show hardware chip.
+const recentParked = new Date(Date.now() - 2 * 60_000).toISOString();
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'teltonika',
+    imei: '861',
+    hydrated_from_store: true,
+    tracker_signal_at: recentParked,
+    app_seen_at: now,
+  }),
+  ['teltonika', 'app'],
 );
 
 assert.equal(formatFleetGpsSourceChipLabel('app'), 'App');
