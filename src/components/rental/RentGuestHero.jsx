@@ -47,10 +47,18 @@ export default function RentGuestHero({
             className="rent-hero-slider"
           />
         ) : (
-          <img src={RENT_GUEST_HERO_IMAGE} alt="" />
+          <img
+            src={RENT_GUEST_HERO_IMAGE}
+            alt=""
+            width={3840}
+            height={2160}
+            decoding="async"
+            fetchPriority="high"
+          />
         )}
         <div className="rent-hero-shade rent-hero-shade--x" />
         <div className="rent-hero-shade rent-hero-shade--y" />
+        <div className="rent-hero-shade rent-hero-shade--bluefade" aria-hidden />
         <div className="rent-hero-shade rent-hero-shade--booking" />
       </div>
 
