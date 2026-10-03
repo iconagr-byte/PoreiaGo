@@ -24,6 +24,11 @@ import {
   countRentFleetByBody,
   rentHomeCategoryFilters,
 } from '../lib/rental/rentVehicleCategories.js';
+import {
+  EMPTY_RENT_FLEET_FILTERS,
+  applyRentFleetFilters,
+  rentFleetFiltersActive,
+} from '../lib/rental/rentFleetFilters.js';
 import { rememberRentVehicle } from '../lib/rental/rentBookingExtras.js';
 import { readRentBookingPrefs, writeRentBookingPrefs } from '../lib/rental/rentBookingSearch.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
@@ -36,6 +41,7 @@ import RentGuestHero from '../components/rental/RentGuestHero.jsx';
 import RentBookingSearchBar from '../components/rental/RentBookingSearchBar.jsx';
 import RentGuestTopActions from '../components/rental/RentGuestTopActions.jsx';
 import RentHomeFleetCard from '../components/rental/RentHomeFleetCard.jsx';
+import RentFleetFilterSidebar from '../components/rental/RentFleetFilterSidebar.jsx';
 import RentVehicleDetailSheet from '../components/rental/RentVehicleDetailSheet.jsx';
 import RentBrandMark from '../components/rental/RentBrandMark.jsx';
 import { RentProductSection } from '../components/marketing/PlatformLandingSections.jsx';
@@ -103,6 +109,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const [homeCategory, setHomeCategory] = useState('');
   const [homeQuery, setHomeQuery] = useState('');
   const [fleetSort, setFleetSort] = useState('default');
+  const [fleetFilters, setFleetFilters] = useState(() => ({ ...EMPTY_RENT_FLEET_FILTERS }));
   const [searchActive, setSearchActive] = useState(false);
   const [detailVehicle, setDetailVehicle] = useState(null);
   const { favorites, toggleFavorite } = useRentFavorites();
@@ -177,16 +184,22 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const showingDemoFleet = useMemo(() => isClientDemoFleet(homeFleet), [homeFleet]);
   const homeCategories = useMemo(() => rentHomeCategoryFilters(homeFleet), [homeFleet]);
 
+  const categoryScopedFleet = useMemo(
+    () =>
+      homeFleet
+        .filter((v) => (homeCategory ? v.category === homeCategory : true))
+        .filter((v) => {
+          const q = homeQuery.trim().toLowerCase();
+          if (!q) return true;
+          return `${v.model || ''} ${v.category || ''} ${v.category_label || ''} ${v.display_blurb || v.description || ''}`
+            .toLowerCase()
+            .includes(q);
+        }),
+    [homeFleet, homeCategory, homeQuery],
+  );
+
   const filteredHomeFleet = useMemo(() => {
-    const rows = homeFleet
-      .filter((v) => (homeCategory ? v.category === homeCategory : true))
-      .filter((v) => {
-        const q = homeQuery.trim().toLowerCase();
-        if (!q) return true;
-        return `${v.model || ''} ${v.category || ''} ${v.category_label || ''} ${v.display_blurb || v.description || ''}`
-          .toLowerCase()
-          .includes(q);
-      });
+    const rows = applyRentFleetFilters(categoryScopedFleet, fleetFilters);
 
     if (fleetSort === 'price_asc' || fleetSort === 'price_desc') {
       const dir = fleetSort === 'price_asc' ? 1 : -1;
@@ -202,7 +215,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       });
     }
     return rows;
-  }, [homeFleet, homeCategory, homeQuery, fleetSort]);
+  }, [categoryScopedFleet, fleetFilters, fleetSort]);
 
   const fleetSubtitle = searchActive
     ? `${filteredHomeFleet.length} διαθέσιμα για τις ημερομηνίες σου`
@@ -296,7 +309,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
 
           <div className="rent-home-stack rent-home-stack--landing">
             <section id="rent-guest-fleet" className="rent-land-band rent-land-band--pick" aria-label="Στόλος ενοικίασης">
-              <div className="rent-land-inner">
+              <div className="rent-land-inner rent-land-inner--pick">
                 <header className="rent-pick-head">
                   <div className="rent-pick-head-main">
                     <p className="rent-pick-eyebrow">Στόλος</p>
@@ -352,46 +365,57 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   </div>
                 </header>
 
-                {fleetLoading ? (
-                  <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
-                ) : filteredHomeFleet.length ? (
-                  <div className="rent-pick-grid">
-                    {filteredHomeFleet.map((v) => (
-                      <RentHomeFleetCard
-                        key={v.id}
-                        vehicle={v}
-                        favorite={favorites.includes(v.id)}
-                        onToggleFavorite={() => toggleFavorite(v.id)}
-                        onSelect={() => goToServicesStep(v)}
-                        onOpenDetails={() => setDetailVehicle(v)}
-                      />
-                    ))}
+                <div className="rent-pick-layout">
+                  <RentFleetFilterSidebar
+                    vehicles={categoryScopedFleet}
+                    filters={fleetFilters}
+                    onChange={setFleetFilters}
+                  />
+
+                  <div className="rent-pick-main">
+                    {fleetLoading ? (
+                      <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
+                    ) : filteredHomeFleet.length ? (
+                      <div className="rent-pick-grid">
+                        {filteredHomeFleet.map((v) => (
+                          <RentHomeFleetCard
+                            key={v.id}
+                            vehicle={v}
+                            favorite={favorites.includes(v.id)}
+                            onToggleFavorite={() => toggleFavorite(v.id)}
+                            onSelect={() => goToServicesStep(v)}
+                            onOpenDetails={() => setDetailVehicle(v)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rent-pick-empty">
+                        <span className="material-symbols-outlined" aria-hidden>
+                          directions_car
+                        </span>
+                        <p>
+                          {searchActive
+                            ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες.'
+                            : 'Δεν βρέθηκαν οχήματα με αυτά τα φίλτρα.'}
+                        </p>
+                        {homeCategory || homeQuery || rentFleetFiltersActive(fleetFilters) ? (
+                          <button
+                            type="button"
+                            className="rent-pick-empty-reset"
+                            onClick={() => {
+                              setHomeCategory('');
+                              setHomeQuery('');
+                              setFleetSort('default');
+                              setFleetFilters({ ...EMPTY_RENT_FLEET_FILTERS });
+                            }}
+                          >
+                            Καθαρισμός φίλτρων
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="rent-pick-empty">
-                    <span className="material-symbols-outlined" aria-hidden>
-                      directions_car
-                    </span>
-                    <p>
-                      {searchActive
-                        ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες.'
-                        : 'Δεν βρέθηκαν οχήματα με αυτά τα φίλτρα.'}
-                    </p>
-                    {homeCategory || homeQuery ? (
-                      <button
-                        type="button"
-                        className="rent-pick-empty-reset"
-                        onClick={() => {
-                          setHomeCategory('');
-                          setHomeQuery('');
-                          setFleetSort('default');
-                        }}
-                      >
-                        Καθαρισμός φίλτρων
-                      </button>
-                    ) : null}
-                  </div>
-                )}
+                </div>
               </div>
             </section>
 
