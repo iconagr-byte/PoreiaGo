@@ -158,13 +158,22 @@ def is_tracker_binding_alive(
     max_age_sec: int = DEFAULT_TRACKER_ALIVE_SECONDS,
     now: datetime | None = None,
 ) -> bool:
-    """True when the IMEI binding saw a recent Teltonika packet (last_seen_at)."""
+    """True when the IMEI binding is online (fresh last_seen or open Codec TCP)."""
     if not tracker:
         return False
     age = age_seconds(tracker.get("last_seen_at"), now=now)
-    if age is None:
-        return False
-    return age <= max(1, int(max_age_sec))
+    if age is not None and age <= max(1, int(max_age_sec)):
+        return True
+    # Same-worker TCP session — durable last_seen is refreshed by keepalive,
+    # but treat an open socket as online immediately.
+    try:
+        from travel_platform.telemetry.teltonika.tcp_server import is_imei_tcp_connected
+
+        if is_imei_tcp_connected(tracker.get("imei")):
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def is_live_meta_tracker_fresh(

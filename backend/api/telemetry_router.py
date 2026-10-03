@@ -207,30 +207,31 @@ async def fleet_live(
             )
             tracker_signal_at = str(meta.get("tracker_signal_at") or "") or None
             hydrated_from_store = bool(meta.get("hydrated_from_store"))
-            # Online IMEI: refresh signal + clear parked-hydrate so the dual
-            # badge shows «GPS οχήματος» next to App (not App-only).
-            if "teltonika" in gps_sources:
-                try:
-                    from travel_platform.telemetry.teltonika.device_store import (
-                        get_enabled_device_by_vehicle_code,
-                    )
-                    from travel_platform.telemetry.tracker_priority import (
-                        is_tracker_binding_alive,
-                    )
+            # Online IMEI: force Teltonika onto the dual badge + clear parked hydrate
+            # (App-only pin when TCP is up but AVL is sparse / last_seen briefly stale).
+            try:
+                from travel_platform.telemetry.teltonika.device_store import (
+                    get_enabled_device_by_vehicle_code,
+                )
+                from travel_platform.telemetry.tracker_priority import (
+                    is_tracker_binding_alive,
+                )
 
-                    device = get_enabled_device_by_vehicle_code(
-                        str(tenant_id),
-                        meta.get("vehicle_code") or meta.get("bus_plate") or v.vehicle_code,
+                device = get_enabled_device_by_vehicle_code(
+                    str(tenant_id),
+                    meta.get("vehicle_code") or meta.get("bus_plate") or v.vehicle_code,
+                )
+                if is_tracker_binding_alive(device, max_age_sec=alive_sec):
+                    if "teltonika" not in (gps_sources or []):
+                        gps_sources = ["teltonika", *(gps_sources or [])]
+                    tracker_signal_at = (
+                        str(device.get("last_seen_at") or "") or tracker_signal_at
                     )
-                    if is_tracker_binding_alive(device, max_age_sec=alive_sec):
-                        tracker_signal_at = (
-                            str(device.get("last_seen_at") or "") or tracker_signal_at
-                        )
-                        hydrated_from_store = False
-                        if not meta.get("imei") and device.get("imei"):
-                            meta["imei"] = device.get("imei")
-                except Exception:
-                    pass
+                    hydrated_from_store = False
+                    if not meta.get("imei") and device.get("imei"):
+                        meta["imei"] = device.get("imei")
+            except Exception:
+                pass
             rows.append(
                 LiveVehicleResponse(
                     vehicle_id=v.vehicle_id,

@@ -15,11 +15,19 @@ from travel_platform.telemetry.teltonika.codec8 import (
     parse_avl_packet,
     parse_imei_login,
 )
-from travel_platform.telemetry.teltonika.device_store import get_device_by_imei, touch_device
+from travel_platform.telemetry.teltonika.device_store import (
+    get_device_by_imei,
+    normalize_imei,
+    touch_device,
+)
 
 logger = logging.getLogger("poreiago.teltonika")
 
 _server: asyncio.AbstractServer | None = None
+# IMEIs with an open Codec TCP session on this worker (sparse AVL when parked).
+_open_imeis: set[str] = set()
+# Keep last_seen fresh while TCP is up — badge window is ~90s, AVL can be rarer.
+_TCP_KEEPALIVE_SEC = 45
 _status: dict[str, Any] = {
     "enabled": False,
     "listening": False,
@@ -32,6 +40,39 @@ _status: dict[str, Any] = {
     "packets_bad": 0,
     "last_error": None,
 }
+
+
+def is_imei_tcp_connected(imei: str | None) -> bool:
+    """True when this worker holds an open Codec session for the IMEI."""
+    key = normalize_imei(imei or "")
+    return bool(key) and key in _open_imeis
+
+
+async def _tcp_session_keepalive(imei: str) -> None:
+    """Touch device + refresh open pin while TCP stays up (parked / sparse AVL)."""
+    key = normalize_imei(imei)
+    try:
+        while key in _open_imeis:
+            await asyncio.sleep(_TCP_KEEPALIVE_SEC)
+            if key not in _open_imeis:
+                break
+            touch_device(imei)
+            try:
+                from travel_platform.telemetry.teltonika.paint_live import (
+                    paint_live_pin_from_device,
+                )
+
+                device = get_device_by_imei(imei)
+                if device:
+                    await paint_live_pin_from_device(
+                        device,
+                        open_channel=True,
+                        reason="tcp_keepalive",
+                    )
+            except Exception:
+                logger.debug("Teltonika TCP keepalive paint skipped IMEI=%s", imei, exc_info=True)
+    except asyncio.CancelledError:
+        raise
 
 
 def teltonika_enabled() -> bool:
@@ -72,7 +113,13 @@ def _port_is_bound(port: int) -> bool:
 def get_teltonika_status() -> dict[str, Any]:
     public_ip = (os.getenv("PLATFORM_INGRESS_IP") or os.getenv("TELTONIKA_PUBLIC_HOST") or "").strip()
     host, port = teltonika_bind()
-    out = {**_status, "host": host, "port": port, "enabled": teltonika_enabled()}
+    out = {
+        **_status,
+        "host": host,
+        "port": port,
+        "enabled": teltonika_enabled(),
+        "open_imeis": len(_open_imeis),
+    }
     # Multi-worker: only the binder sets listening=True in-process. Detect the
     # shared TCP port so admin UI does not show a false "TCP offline".
     if teltonika_enabled() and not out.get("listening") and _port_is_bound(port):
@@ -89,6 +136,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
     peer = writer.get_extra_info("peername")
     _status["active_connections"] = int(_status.get("active_connections") or 0) + 1
     imei: str | None = None
+    keepalive_task: asyncio.Task | None = None
     buf = bytearray()
     try:
         # Phase 1: IMEI login
@@ -119,6 +167,11 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             _status["accepted_imeis"] = int(_status.get("accepted_imeis") or 0) + 1
             # Persist login so admin Last seen updates even before first AVL fix.
             touch_device(imei)
+            _open_imeis.add(normalize_imei(imei))
+            keepalive_task = asyncio.create_task(
+                _tcp_session_keepalive(imei),
+                name=f"teltonika-keepalive-{normalize_imei(imei)[-6:]}",
+            )
             logger.info(
                 "Teltonika accept IMEI=%s vehicle=%s tenant=%s peer=%s",
                 imei,
@@ -267,6 +320,14 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
         _status["last_error"] = str(exc)[:240]
         logger.exception("Teltonika client error peer=%s imei=%s", peer, imei)
     finally:
+        if imei:
+            _open_imeis.discard(normalize_imei(imei))
+        if keepalive_task is not None:
+            keepalive_task.cancel()
+            try:
+                await keepalive_task
+            except (asyncio.CancelledError, Exception):
+                pass
         _status["active_connections"] = max(0, int(_status.get("active_connections") or 1) - 1)
         try:
             writer.close()

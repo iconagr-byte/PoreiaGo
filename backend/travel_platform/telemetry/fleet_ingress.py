@@ -343,6 +343,46 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         payload.get("driver_id"),
     )
 
+    # Enrich dual badge when Teltonika IMEI is online but this frame is App-sourced.
+    gps_sources: list[str] = ["app"]
+    app_seen_at = payload.get("recorded_at")
+    tracker_signal_at = None
+    imei = payload.get("imei")
+    hydrated_from_store = False
+    try:
+        from travel_platform.telemetry.processor import get_live_fleet
+        from travel_platform.telemetry.tracker_priority import (
+            is_tracker_binding_alive,
+            resolve_live_gps_sources,
+            resolve_tracker_alive_seconds,
+        )
+
+        meta = {}
+        if vehicle_id:
+            meta = dict(get_live_fleet()._vehicles.get(str(vehicle_id)) or {})
+        meta.setdefault("tenant_id", tenant_id)
+        meta.setdefault("vehicle_code", payload.get("vehicle_code"))
+        meta.setdefault("bus_plate", payload.get("bus_plate"))
+        meta.setdefault("source", payload.get("source") or "driver_pwa")
+        meta["app_seen_at"] = app_seen_at or meta.get("app_seen_at")
+        alive = resolve_tracker_alive_seconds(tenant_id)
+        gps_sources = resolve_live_gps_sources(
+            meta, max_age_sec=alive, tenant_id=tenant_id
+        ) or ["app"]
+        if "app" not in gps_sources:
+            gps_sources = [*gps_sources, "app"]
+        tracker_signal_at = meta.get("tracker_signal_at")
+        imei = imei or meta.get("imei")
+        bound = tracker if isinstance(tracker, dict) else None
+        if bound and is_tracker_binding_alive(bound, max_age_sec=alive):
+            if "teltonika" not in gps_sources:
+                gps_sources = ["teltonika", *gps_sources]
+            tracker_signal_at = bound.get("last_seen_at") or tracker_signal_at
+            imei = imei or bound.get("imei")
+            hydrated_from_store = False
+    except Exception:
+        logger.debug("phone GPS dual-source enrich skipped", exc_info=True)
+
     egress = {
         "type": "fleet_location",
         "tenant_id": tenant_id,
@@ -363,7 +403,11 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
         "boarding": payload.get("boarding_snapshot"),
         "sensors": payload.get("device_sensors"),
         "source": payload.get("source") or "driver_pwa",
-        "imei": payload.get("imei"),
+        "imei": imei,
+        "gps_sources": gps_sources,
+        "app_seen_at": app_seen_at,
+        "tracker_signal_at": tracker_signal_at,
+        "hydrated_from_store": hydrated_from_store,
     }
 
     await publish_fleet_location(tenant_id, egress)
