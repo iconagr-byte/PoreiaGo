@@ -48,6 +48,27 @@ def get_public_vapid_key() -> str | None:
     return key or None
 
 
+def _vapid_private_key_for_webpush() -> Any:
+    """
+    Value accepted by pywebpush.webpush(vapid_private_key=...).
+
+    pywebpush only treats a string as PEM when it is a *filesystem path*
+    (Vapid.from_file). Inline PEM content goes through Vapid.from_string,
+    which expects raw/DER base64 — not ``-----BEGIN PRIVATE KEY-----`` —
+    and every send fails (attempted>0, sent=0 on admin push test).
+    Prefer the durable key file; otherwise load PEM via Vapid.from_pem.
+    """
+    key_file = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY_FILE", "").strip()
+    if key_file and Path(key_file).is_file():
+        return key_file
+    private = _vapid_private_key()
+    if private and "BEGIN" in private:
+        from py_vapid import Vapid
+
+        return Vapid.from_pem(private.encode("utf-8"))
+    return private
+
+
 def _data_dir() -> Path:
     raw = (os.getenv("POREIAGO_DATA_DIR") or "").strip()
     if raw:
@@ -99,6 +120,14 @@ def ensure_web_push_keys() -> bool:
         logger.warning("Cannot create VAPID data dir %s: %s", data, exc)
         return web_push_configured()
 
+    # Contabo host bootstrap sometimes created a ghost directory named like the PEM file.
+    for ghost in (public_path, private_path):
+        if ghost.is_dir():
+            try:
+                ghost.rmdir()
+            except OSError:
+                logger.warning("VAPID path is a non-empty directory: %s", ghost)
+
     if public_path.is_file() and private_path.is_file():
         public_key = public_path.read_text(encoding="utf-8").strip()
         private_pem = private_path.read_text(encoding="utf-8").strip()
@@ -117,6 +146,13 @@ def ensure_web_push_keys() -> bool:
         except OSError as exc:
             logger.warning("Could not persist VAPID keys into %s: %s", data, exc)
         return True
+
+    # Stale public-only env (missing private file) blocks nothing — regenerate a matching pair.
+    if _vapid_public_key() and not _vapid_private_key():
+        logger.warning(
+            "WEB_PUSH_VAPID_PUBLIC_KEY set without readable private key — regenerating pair in %s",
+            data,
+        )
 
     try:
         from cryptography.hazmat.primitives import serialization
@@ -179,7 +215,7 @@ def _send_sync(subscription: dict[str, Any], payload: dict[str, Any]) -> dict[st
     webpush(
         subscription_info=sub_info,
         data=body,
-        vapid_private_key=_vapid_private_key(),
+        vapid_private_key=_vapid_private_key_for_webpush(),
         vapid_claims={"sub": _vapid_subject()},
     )
     return {"sent": True, "endpoint": subscription.get("endpoint")}

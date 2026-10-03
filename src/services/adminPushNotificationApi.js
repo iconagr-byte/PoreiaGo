@@ -22,17 +22,30 @@ export function isAdminPushSupported() {
   );
 }
 
+function pushApiError(res, data, fallback) {
+  const detail = data?.detail;
+  const msg =
+    typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail)
+        ? detail.map((d) => d?.msg || d).filter(Boolean).join(' ')
+        : fallback;
+  const err = new Error(msg || fallback);
+  err.status = res.status;
+  return err;
+}
+
 export async function fetchAdminPushConfig() {
   const res = await fetch(`${API_BASE}/api/admin/push/config`, { headers: saasAuthHeaders() });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || 'Push config unavailable');
+  if (!res.ok) throw pushApiError(res, data, 'Push config unavailable');
   return data;
 }
 
 export async function fetchAdminPushStatus() {
   const res = await fetch(`${API_BASE}/api/admin/push/status`, { headers: saasAuthHeaders() });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || 'Push status unavailable');
+  if (!res.ok) throw pushApiError(res, data, 'Push status unavailable');
   return data;
 }
 
@@ -91,9 +104,15 @@ export async function subscribeAdminFleetPush() {
 
 /** Immediate test push to this admin's registered devices. */
 export async function sendAdminPushTest() {
+  const email = getAdminEmail();
   const res = await fetch(`${API_BASE}/api/admin/push/test`, {
     method: 'POST',
-    headers: saasAuthHeaders(),
+    headers: {
+      ...saasAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    // JWT often omits email — send localStorage email so email-scoped subs match.
+    body: JSON.stringify(email ? { email } : {}),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || 'Αποτυχία δοκιμής push');
