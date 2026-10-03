@@ -415,25 +415,26 @@ async def admin_fleet_egress_ws(
                 max_age_sec=alive_sec,
                 tenant_id=tid,
             )
-            if "teltonika" in gps_sources:
-                try:
-                    from travel_platform.telemetry.teltonika.device_store import (
-                        get_enabled_device_by_vehicle_code,
-                    )
+            try:
+                from travel_platform.telemetry.teltonika.device_store import (
+                    get_enabled_device_by_vehicle_code,
+                )
 
-                    device = get_enabled_device_by_vehicle_code(
-                        tid,
-                        meta.get("vehicle_code")
-                        or meta.get("bus_plate")
-                        or vehicle.vehicle_code,
-                    )
-                    if is_tracker_binding_alive(device, max_age_sec=alive_sec):
-                        tracker_signal_at = device.get("last_seen_at") or tracker_signal_at
-                        hydrated_from_store = False
-                        if not meta.get("imei") and device.get("imei"):
-                            meta["imei"] = device.get("imei")
-                except Exception:
-                    pass
+                device = get_enabled_device_by_vehicle_code(
+                    tid,
+                    meta.get("vehicle_code")
+                    or meta.get("bus_plate")
+                    or vehicle.vehicle_code,
+                )
+                if is_tracker_binding_alive(device, max_age_sec=alive_sec):
+                    if "teltonika" not in (gps_sources or []):
+                        gps_sources = ["teltonika", *(gps_sources or [])]
+                    tracker_signal_at = device.get("last_seen_at") or tracker_signal_at
+                    hydrated_from_store = False
+                    if not meta.get("imei") and device.get("imei"):
+                        meta["imei"] = device.get("imei")
+            except Exception:
+                pass
         except Exception:
             gps_sources = []
         app_driver_id = str(meta.get("app_driver_id") or "").strip() or None
