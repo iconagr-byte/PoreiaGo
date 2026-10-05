@@ -51,6 +51,9 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_office_name: '',
   rent_logo_url: '',
   rent_logo_show_name: true,
+  rent_logo_height_px: 40,
+  rent_logo_max_width_px: 160,
+  rent_header_compact: false,
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',

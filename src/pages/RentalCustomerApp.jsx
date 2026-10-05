@@ -260,7 +260,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   return (
     <div className={`rent-phone-stage${isMobile ? '' : ' rent-phone-stage--desktop'}`}>
       <div className="rent-app rent-app--guest">
-        <header className="rent-topbar rent-topbar--guest">
+        <header
+          className={`rent-topbar rent-topbar--guest${
+            branding.headerCompact ? ' rent-topbar--compact' : ''
+          }`}
+        >
           <div className="rent-topbar-row">
             <RentGuestTopActions
               brand={
@@ -277,6 +281,9 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                     logoUrl={branding.logoUrl}
                     showName={branding.showName}
                     subtitle={branding.brandSubtitle}
+                    logoHeightPx={branding.logoHeightPx}
+                    logoMaxWidthPx={branding.logoMaxWidthPx}
+                    compact={branding.headerCompact}
                   />
                 </button>
               }
@@ -742,7 +749,9 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
       }`}
     >
       <div className="rent-app rent-app--inline">
-        <header className="rent-topbar">
+        <header
+          className={`rent-topbar${branding.headerCompact ? ' rent-topbar--compact' : ''}`}
+        >
           <button
             type="button"
             className="rent-topbar-brand"
@@ -754,6 +763,9 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
               logoUrl={branding.logoUrl}
               showName={branding.showName}
               subtitle={branding.brandSubtitle}
+              logoHeightPx={branding.logoHeightPx}
+              logoMaxWidthPx={branding.logoMaxWidthPx}
+              compact={branding.headerCompact}
             />
           </button>
           <button type="button" className="rent-btn rent-btn-wallet" onClick={openWallet}>
@@ -774,6 +786,8 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
                     logoUrl={branding.logoUrl}
                     showName={branding.showName}
                     subtitle={branding.brandSubtitle}
+                    logoHeightPx={branding.logoHeightPx}
+                    logoMaxWidthPx={branding.logoMaxWidthPx}
                   />
                 </div>
                 <h1 className="rent-hero-title">{branding.title}</h1>
