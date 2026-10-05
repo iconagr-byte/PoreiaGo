@@ -153,10 +153,7 @@ export default function RentAppBrandingEditor({ embedded = false, onSaved } = {}
           form.rent_search_submit_label.trim() ||
           DEFAULT_RENT_APP_BRANDING.rent_search_submit_label,
       };
-      // Keep storefront brand in sync when rent office name is set.
-      if (payload.rent_office_name) {
-        payload.footer_brand_name = payload.rent_office_name;
-      }
+      // Rent brand stays independent from buses/storefront footer name.
       const result = await updateSiteAppearance(payload);
       const merged = { ...form, ...(result?.data || payload) };
       const next = formFromAppearance(merged);
