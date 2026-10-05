@@ -49,6 +49,23 @@ console.assert(
 console.assert(rentLogoWins.showName === false, 'rent_logo_show_name honored');
 console.assert(rentLogoWins.isCustomized === true, 'rent logo counts as customized');
 
+const sized = resolveRentAppBranding({
+  rent_logo_height_px: 56,
+  rent_logo_max_width_px: 200,
+  rent_logo_radius_px: 16,
+  rent_logo_padding_px: 4,
+  rent_logo_bg_mode: 'white',
+  rent_logo_shadow: true,
+  rent_header_compact: true,
+});
+console.assert(sized.logoHeightPx === 56, 'rent logo height');
+console.assert(sized.logoMaxWidthPx === 200, 'rent logo max width');
+console.assert(sized.logoRadiusPx === 16, 'rent logo radius');
+console.assert(sized.logoPaddingPx === 4, 'rent logo padding');
+console.assert(sized.logoBgMode === 'white', 'rent logo bg');
+console.assert(sized.logoShadow === true, 'rent logo shadow');
+console.assert(sized.headerCompact === true, 'compact header');
+
 const guest = resolveRentAppBranding(
   { rent_guest_hero_title: 'Δες στόλο' },
   { guest: true },

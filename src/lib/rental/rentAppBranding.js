@@ -3,7 +3,14 @@
  * Stored on site_appearance; empty fields fall back to office legal name / defaults.
  */
 
-import { isPlatformPlaceholderLogo } from '../branding/officeBrand.js';
+import {
+  clampLogoHeight,
+  clampLogoMaxWidth,
+  clampLogoPadding,
+  clampLogoRadius,
+  isPlatformPlaceholderLogo,
+  normalizeLogoBgMode,
+} from '../branding/officeBrand.js';
 import {
   RENT_GUEST_HERO_BENEFITS,
   RENT_GUEST_SEARCH_DEFAULTS,
@@ -122,11 +129,28 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
       ? appearance.rent_logo_show_name !== false
       : appearance.logo_show_name !== false;
 
+  const logoHeightPx = clampLogoHeight(
+    appearance.rent_logo_height_px ?? appearance.logo_height_px ?? 40,
+  );
+  const logoMaxWidthPx = clampLogoMaxWidth(appearance.rent_logo_max_width_px ?? 160);
+  const logoRadiusPx = clampLogoRadius(appearance.rent_logo_radius_px ?? 0);
+  const logoPaddingPx = clampLogoPadding(appearance.rent_logo_padding_px ?? 0);
+  const logoBgMode = normalizeLogoBgMode(appearance.rent_logo_bg_mode ?? 'none');
+  const logoShadow = appearance.rent_logo_shadow === true;
+  const headerCompact = appearance.rent_header_compact === true;
+
   return {
     officeName: office,
     brandLabel: office,
     logoUrl,
     showName,
+    logoHeightPx,
+    logoMaxWidthPx,
+    logoRadiusPx,
+    logoPaddingPx,
+    logoBgMode,
+    logoShadow,
+    headerCompact,
     /** No subtitle under the wordmark — keeps the header clean. */
     brandSubtitle: '',
     title,
@@ -141,5 +165,45 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
         String(appearance.rent_hero_title || '').trim() ||
         String(appearance.rent_hero_copy || '').trim(),
     ),
+  };
+}
+
+function rentLogoBgColor(mode) {
+  switch (normalizeLogoBgMode(mode)) {
+    case 'white':
+      return '#ffffff';
+    case 'soft':
+      return 'rgba(15, 23, 42, 0.06)';
+    case 'dark':
+      return 'rgba(15, 23, 42, 0.92)';
+    default:
+      return 'transparent';
+  }
+}
+
+/**
+ * CSS custom properties for RentBrandMark logo wrap (size + style).
+ * @param {ReturnType<typeof resolveRentAppBranding> | object} branding
+ */
+export function rentBrandMarkStyleVars(branding = {}) {
+  const height = clampLogoHeight(branding.logoHeightPx ?? branding.rent_logo_height_px ?? 40);
+  const maxWidth = clampLogoMaxWidth(
+    branding.logoMaxWidthPx ?? branding.rent_logo_max_width_px ?? 160,
+  );
+  const radius = clampLogoRadius(branding.logoRadiusPx ?? branding.rent_logo_radius_px ?? 0);
+  const padding = clampLogoPadding(
+    branding.logoPaddingPx ?? branding.rent_logo_padding_px ?? 0,
+  );
+  const bgMode = normalizeLogoBgMode(branding.logoBgMode ?? branding.rent_logo_bg_mode ?? 'none');
+  const shadow =
+    branding.logoShadow === true || branding.rent_logo_shadow === true;
+  return {
+    ['--rent-logo-h']: `${height}px`,
+    ['--rent-logo-max-w']: `${maxWidth}px`,
+    ['--rent-logo-radius']: `${radius}px`,
+    ['--rent-logo-pad']: `${padding}px`,
+    ['--rent-logo-bg']: rentLogoBgColor(bgMode),
+    ['--rent-logo-shadow']: shadow ? '0 4px 14px rgba(15, 23, 42, 0.14)' : 'none',
+    ['--rent-logo-bg-mode']: bgMode,
   };
 }

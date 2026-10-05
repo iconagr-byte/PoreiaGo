@@ -376,8 +376,11 @@
 }
 
 .rent-hero-brand--landing .rent-brand-mark-logo-wrap {
-  height: 3.35rem;
-  max-width: 10.5rem;
+  max-width: min(var(--rent-logo-max-w, 10.5rem), 10.5rem);
+}
+
+.rent-hero-brand--landing .rent-brand-mark-logo {
+  height: var(--rent-logo-h, 3.35rem);
 }
 
 .rent-hero-title {
@@ -704,21 +707,34 @@
 
 .rent-brand-mark-logo-wrap {
   flex-shrink: 0;
-  height: 2.55rem;
-  max-width: 8.5rem;
+  max-width: var(--rent-logo-max-w, 8.5rem);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.15rem 0.35rem;
-  border-radius: 0.7rem;
-  background: transparent;
+  padding: var(--rent-logo-pad, 0px);
+  border-radius: var(--rent-logo-radius, 0px);
+  background: var(--rent-logo-bg, transparent);
   border: 0;
-  box-shadow: none;
+  box-shadow: var(--rent-logo-shadow, none);
+  box-sizing: content-box;
+}
+
+.rent-topbar--compact .rent-topbar-row {
+  min-height: 2.75rem;
+  padding-block: 0.35rem;
+}
+
+.rent-topbar--compact .rent-brand-mark-badge {
+  height: calc(var(--rent-logo-h, 2.55rem) * 0.88);
+}
+
+.rent-topbar--compact .rent-brand-mark-logo {
+  height: calc(var(--rent-logo-h, 2.55rem) * 0.88);
 }
 
 .rent-brand-mark-logo {
   display: block;
-  height: 100%;
+  height: var(--rent-logo-h, 2.55rem);
   width: auto;
   max-width: 100%;
   object-fit: contain;
@@ -768,11 +784,14 @@
   opacity: 1;
 }
 
-.rent-brand-mark--compact .rent-brand-mark-badge,
-.rent-brand-mark--compact .rent-brand-mark-logo-wrap {
+.rent-brand-mark--compact .rent-brand-mark-badge {
   width: 2.15rem;
   height: 2.15rem;
   border-radius: 0.65rem;
+}
+
+.rent-brand-mark--compact .rent-brand-mark-logo {
+  height: calc(var(--rent-logo-h, 2.55rem) * 0.88);
 }
 
 .rent-brand-mark--compact .rent-brand-mark-icon {
@@ -806,8 +825,18 @@
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
 }
 
-.rent-brand-mark--on-dark .rent-brand-mark-logo-wrap {
-  background: rgba(255, 255, 255, 0.96);
+/* Soft white plate on dark headers only when no custom logo background is set. */
+.rent-brand-mark--on-dark:not(.rent-brand-mark--bg-white):not(.rent-brand-mark--bg-soft):not(
+    .rent-brand-mark--bg-dark
+  )
+  .rent-brand-mark-logo-wrap {
+  background: var(--rent-logo-bg, rgba(255, 255, 255, 0.96));
+}
+
+.rent-brand-mark--on-dark.rent-brand-mark--bg-white .rent-brand-mark-logo-wrap,
+.rent-brand-mark--on-dark.rent-brand-mark--bg-soft .rent-brand-mark-logo-wrap,
+.rent-brand-mark--on-dark.rent-brand-mark--bg-dark .rent-brand-mark-logo-wrap {
+  background: var(--rent-logo-bg, transparent);
 }
 
 .rent-hero-brand {

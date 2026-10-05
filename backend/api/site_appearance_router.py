@@ -115,6 +115,13 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_office_name": "",
     "rent_logo_url": "",
     "rent_logo_show_name": True,
+    "rent_logo_height_px": 40,
+    "rent_logo_max_width_px": 160,
+    "rent_logo_radius_px": 0,
+    "rent_logo_padding_px": 0,
+    "rent_logo_bg_mode": "none",
+    "rent_logo_shadow": False,
+    "rent_header_compact": False,
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
     "rent_guest_hero_title": "Ενοικίαση αυτοκινήτου",
@@ -218,6 +225,13 @@ class SiteAppearanceResponse(BaseModel):
     rent_office_name: str = ""
     rent_logo_url: str = ""
     rent_logo_show_name: bool = True
+    rent_logo_height_px: int = 40
+    rent_logo_max_width_px: int = 160
+    rent_logo_radius_px: int = 0
+    rent_logo_padding_px: int = 0
+    rent_logo_bg_mode: str = "none"
+    rent_logo_shadow: bool = False
+    rent_header_compact: bool = False
     rent_hero_title: str = "Το όχημά σας, σε λίγα βήματα"
     rent_hero_copy: str = (
         "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
@@ -324,6 +338,13 @@ class SiteAppearanceUpdate(BaseModel):
     rent_office_name: str | None = None
     rent_logo_url: str | None = None
     rent_logo_show_name: bool | None = None
+    rent_logo_height_px: int | None = None
+    rent_logo_max_width_px: int | None = None
+    rent_logo_radius_px: int | None = None
+    rent_logo_padding_px: int | None = None
+    rent_logo_bg_mode: str | None = None
+    rent_logo_shadow: bool | None = None
+    rent_header_compact: bool | None = None
     rent_hero_title: str | None = None
     rent_hero_copy: str | None = None
     rent_guest_hero_title: str | None = None
@@ -409,6 +430,35 @@ def _clamp_logo_fields(data: dict) -> dict:
         out["logo_shadow"] = bool(out["logo_shadow"])
     if "logo_show_name" in out and out["logo_show_name"] is not None:
         out["logo_show_name"] = bool(out["logo_show_name"])
+    if "rent_logo_height_px" in out and out["rent_logo_height_px"] is not None:
+        try:
+            out["rent_logo_height_px"] = max(20, min(96, int(out["rent_logo_height_px"])))
+        except (TypeError, ValueError):
+            out["rent_logo_height_px"] = 40
+    if "rent_logo_max_width_px" in out and out["rent_logo_max_width_px"] is not None:
+        try:
+            out["rent_logo_max_width_px"] = max(60, min(400, int(out["rent_logo_max_width_px"])))
+        except (TypeError, ValueError):
+            out["rent_logo_max_width_px"] = 160
+    if "rent_logo_radius_px" in out and out["rent_logo_radius_px"] is not None:
+        try:
+            out["rent_logo_radius_px"] = max(0, min(48, int(out["rent_logo_radius_px"])))
+        except (TypeError, ValueError):
+            out["rent_logo_radius_px"] = 0
+    if "rent_logo_padding_px" in out and out["rent_logo_padding_px"] is not None:
+        try:
+            out["rent_logo_padding_px"] = max(0, min(24, int(out["rent_logo_padding_px"])))
+        except (TypeError, ValueError):
+            out["rent_logo_padding_px"] = 0
+    if "rent_logo_bg_mode" in out and out["rent_logo_bg_mode"] is not None:
+        mode = str(out.get("rent_logo_bg_mode") or "none").strip().lower()
+        out["rent_logo_bg_mode"] = mode if mode in ("none", "white", "soft", "dark") else "none"
+    if "rent_logo_shadow" in out and out["rent_logo_shadow"] is not None:
+        out["rent_logo_shadow"] = bool(out["rent_logo_shadow"])
+    if "rent_logo_show_name" in out and out["rent_logo_show_name"] is not None:
+        out["rent_logo_show_name"] = bool(out["rent_logo_show_name"])
+    if "rent_header_compact" in out and out["rent_header_compact"] is not None:
+        out["rent_header_compact"] = bool(out["rent_header_compact"])
     return out
 
 

@@ -92,6 +92,13 @@ _BRAND_LOGO_PATCH_KEYS = frozenset(
         "logo_url",
         "rent_logo_url",
         "rent_logo_show_name",
+        "rent_logo_height_px",
+        "rent_logo_max_width_px",
+        "rent_logo_radius_px",
+        "rent_logo_padding_px",
+        "rent_logo_bg_mode",
+        "rent_logo_shadow",
+        "rent_header_compact",
         "hero_image_url",
         "logo_height_px",
         "logo_max_width_px",
@@ -151,6 +158,13 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_office_name": "",
     "rent_logo_url": "",
     "rent_logo_show_name": True,
+    "rent_logo_height_px": 40,
+    "rent_logo_max_width_px": 160,
+    "rent_logo_radius_px": 0,
+    "rent_logo_padding_px": 0,
+    "rent_logo_bg_mode": "none",
+    "rent_logo_shadow": False,
+    "rent_header_compact": False,
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
     "rent_guest_hero_title": "Ενοικίαση αυτοκινήτου",
@@ -493,6 +507,43 @@ class TenantSiteAppearanceService:
                 updated["rent_logo_url"] = ""
         if "rent_logo_show_name" in patch:
             updated["rent_logo_show_name"] = bool(patch.get("rent_logo_show_name"))
+        if "rent_header_compact" in patch:
+            updated["rent_header_compact"] = bool(patch.get("rent_header_compact"))
+        try:
+            if "rent_logo_height_px" in updated:
+                updated["rent_logo_height_px"] = max(
+                    20, min(96, int(updated["rent_logo_height_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_height_px"] = 40
+        try:
+            if "rent_logo_max_width_px" in updated:
+                updated["rent_logo_max_width_px"] = max(
+                    60, min(400, int(updated["rent_logo_max_width_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_max_width_px"] = 160
+        try:
+            if "rent_logo_radius_px" in updated:
+                updated["rent_logo_radius_px"] = max(
+                    0, min(48, int(updated["rent_logo_radius_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_radius_px"] = 0
+        try:
+            if "rent_logo_padding_px" in updated:
+                updated["rent_logo_padding_px"] = max(
+                    0, min(24, int(updated["rent_logo_padding_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_padding_px"] = 0
+        if "rent_logo_bg_mode" in updated:
+            mode = str(updated.get("rent_logo_bg_mode") or "none").strip().lower()
+            updated["rent_logo_bg_mode"] = (
+                mode if mode in ("none", "white", "soft", "dark") else "none"
+            )
+        if "rent_logo_shadow" in updated:
+            updated["rent_logo_shadow"] = bool(updated["rent_logo_shadow"])
         if "hero_image_url" in patch:
             explicit_hero = str(patch.get("hero_image_url") or "").strip()
             if explicit_hero and (
@@ -552,6 +603,14 @@ class TenantSiteAppearanceService:
                 "logo_bg_mode",
                 "logo_shadow",
                 "logo_show_name",
+                "rent_logo_height_px",
+                "rent_logo_max_width_px",
+                "rent_logo_radius_px",
+                "rent_logo_padding_px",
+                "rent_logo_bg_mode",
+                "rent_logo_shadow",
+                "rent_logo_show_name",
+                "rent_header_compact",
             ):
                 if size_key in updated:
                     settings["site_appearance"][size_key] = updated[size_key]
