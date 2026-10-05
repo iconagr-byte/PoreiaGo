@@ -28,7 +28,7 @@ function scrollToSection(id) {
 
 /**
  * Guest header — Menu (left, beside brand) + quick links / lang / Sign in / My Wallet.
- * Pass `brand` to place the logo immediately after the menu control.
+ * Pass `brand` to place the logo immediately before the menu control.
  * My Wallet always opens /rent/wallet — never bus /my-booking.
  */
 export default function RentGuestTopActions({
@@ -215,8 +215,8 @@ export default function RentGuestTopActions({
   return (
     <>
       <div className="rent-topbar-start">
-        {menu}
         {brand}
+        {menu}
       </div>
 
       <div className="rent-top-actions">
