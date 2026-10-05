@@ -29,8 +29,16 @@ import {
   applyRentFleetFilters,
   rentFleetFiltersActive,
 } from '../lib/rental/rentFleetFilters.js';
-import { rememberRentVehicle } from '../lib/rental/rentBookingExtras.js';
-import { readRentBookingPrefs, writeRentBookingPrefs } from '../lib/rental/rentBookingSearch.js';
+import {
+  readRentVehicleSnapshot,
+  rememberRentVehicle,
+} from '../lib/rental/rentBookingExtras.js';
+import {
+  navigateToRentDateSearch,
+  readRentBookingPrefs,
+  rentTripSearchReady,
+  writeRentBookingPrefs,
+} from '../lib/rental/rentBookingSearch.js';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import RentalInstallPrompt from '../components/rental/RentalInstallPrompt.jsx';
 import RentalCustomerCalendar from '../components/rental/RentalCustomerCalendar.jsx';
@@ -122,6 +130,13 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       wizard_step: 'services',
     });
     onPickVehicle?.(vehicle);
+    if (!rentTripSearchReady()) {
+      navigateToRentDateSearch(navigate, {
+        message:
+          'Σχεδόν έτοιμο — επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις με αυτό το όχημα.',
+      });
+      return;
+    }
     navigate('/rent/book/services');
   };
 
@@ -297,7 +312,14 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
               showPromo={branding.searchLayout?.showPromo !== false}
               submitLabel={branding.searchLayout?.submitLabel}
               onSearch={async (prefs) => {
-                writeRentBookingPrefs({ ...(prefs || {}), wizard_step: 'vehicle' });
+                const prior = readRentBookingPrefs();
+                const resumeServices =
+                  prior.wizard_step === 'services' &&
+                  Boolean(prior.vehicle_id || readRentVehicleSnapshot()?.id);
+                writeRentBookingPrefs({
+                  ...(prefs || {}),
+                  wizard_step: resumeServices ? 'services' : 'vehicle',
+                });
                 setSearchActive(true);
                 setFleetLoading(true);
                 try {
@@ -320,6 +342,10 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   /* keep current catalog if availability fails */
                 } finally {
                   setFleetLoading(false);
+                  if (resumeServices) {
+                    navigate('/rent/book/services');
+                    return;
+                  }
                   document
                     .getElementById('rent-guest-fleet')
                     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });

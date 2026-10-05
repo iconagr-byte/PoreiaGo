@@ -17,7 +17,12 @@ import {
   rentalDayCount,
   selectedExtrasLabels,
 } from '../../lib/rental/rentBookingExtras.js';
-import { readRentBookingPrefs, writeRentBookingPrefs } from '../../lib/rental/rentBookingSearch.js';
+import {
+  navigateToRentDateSearch,
+  readRentBookingPrefs,
+  rentTripSearchReady,
+  writeRentBookingPrefs,
+} from '../../lib/rental/rentBookingSearch.js';
 import { priceRentTotalsWithPromo } from '../../lib/rental/rentPromoCodes.js';
 import {
   PAYMENT_PLAN_DEPOSIT,
@@ -218,9 +223,10 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
       navigate('/rent#rent-guest-fleet');
       return;
     }
-    if (!prefs.start_time || !prefs.end_time || !prefs.pickup_location) {
-      toast.error('Συμπλήρωσε παραλαβή και ημερομηνίες.');
-      navigate('/rent#rent-guest-search');
+    if (!rentTripSearchReady(prefs)) {
+      navigateToRentDateSearch(navigate, {
+        message: 'Επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις.',
+      });
       return;
     }
     if (!prefs.client_first_name || !prefs.client_email || !prefs.client_phone) {
@@ -371,7 +377,14 @@ export default function RentBookingPaymentStep({ brandLabel = 'Γραφείο' }
         <RentBookingStepper activeId="payment" />
       </header>
 
-      <RentBookingTripSummary prefs={prefs} onEdit={() => navigate('/rent#rent-guest-search')} />
+      <RentBookingTripSummary
+        prefs={prefs}
+        onEdit={() =>
+          navigateToRentDateSearch(navigate, {
+            message: 'Μπορείς να αλλάξεις ημερομηνίες παραλαβής και επιστροφής εδώ.',
+          })
+        }
+      />
 
       {bookingDone ? (
         <div className="rent-wiz-layout">

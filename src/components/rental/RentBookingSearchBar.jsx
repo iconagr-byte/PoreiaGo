@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildRentLocationOptions,
+  consumeNeedRentDates,
   defaultPickupDateTime,
   defaultReturnDateTime,
   readRentBookingPrefs,
@@ -38,6 +39,9 @@ export default function RentBookingSearchBar({
   const [endTime, setEndTime] = useState(() => defaultReturnDateTime(defaultPickupDateTime()));
   const [promoCode, setPromoCode] = useState('');
   const [error, setError] = useState('');
+  const [datesPrompt, setDatesPrompt] = useState('');
+  const [datesFocus, setDatesFocus] = useState(false);
+  const pickupDateRef = useRef(null);
 
   useEffect(() => {
     const prefs = readRentBookingPrefs();
@@ -57,6 +61,37 @@ export default function RentBookingSearchBar({
     ) {
       setDifferentDropoff(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const pending = consumeNeedRentDates();
+    const hashWantsDates =
+      typeof window !== 'undefined' &&
+      (window.location.hash === '#rent-pickup-date' ||
+        window.location.hash === '#rent-guest-search');
+    if (!pending && !hashWantsDates) return undefined;
+
+    if (pending?.message) setDatesPrompt(pending.message);
+    else if (hashWantsDates) {
+      setDatesPrompt('Επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις.');
+    }
+    setDatesFocus(true);
+
+    const t = window.setTimeout(() => {
+      document.getElementById('rent-guest-search')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+      const input = pickupDateRef.current || document.getElementById('rent-pickup-date');
+      try {
+        input?.focus?.({ preventScroll: true });
+        input?.showPicker?.();
+      } catch {
+        input?.focus?.();
+      }
+    }, 80);
+
+    return () => window.clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -127,6 +162,8 @@ export default function RentBookingSearchBar({
       promo_code: promoOpen ? String(promoCode || '').trim() : '',
       one_way: differentDropoff,
     });
+    setDatesPrompt('');
+    setDatesFocus(false);
     onSearch?.(prefs);
   };
 
@@ -134,6 +171,7 @@ export default function RentBookingSearchBar({
     'rent-search',
     compact ? 'rent-search--compact' : '',
     isHero ? 'rent-search--hero' : '',
+    datesFocus ? 'rent-search--need-dates' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -141,7 +179,34 @@ export default function RentBookingSearchBar({
   return (
     <section className={rootClass} aria-label="Αναζήτηση ενοικίασης" id="rent-guest-search">
       <form className="rent-search-panel" onSubmit={handleSubmit}>
-        <div className={`rent-search-row${differentDropoff ? ' rent-search-row--split' : ''}`}>
+        {datesPrompt ? (
+          <div className="rent-search-dates-prompt" role="status" aria-live="polite">
+            <span className="material-symbols-outlined" aria-hidden>
+              calendar_month
+            </span>
+            <div className="rent-search-dates-prompt-copy">
+              <strong>Επίλεξε ημερομηνίες</strong>
+              <p>{datesPrompt}</p>
+            </div>
+            <button
+              type="button"
+              className="rent-search-dates-prompt-dismiss"
+              aria-label="Κλείσιμο"
+              onClick={() => {
+                setDatesPrompt('');
+                setDatesFocus(false);
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                close
+              </span>
+            </button>
+          </div>
+        ) : null}
+        <div
+          id="rent-search-dates"
+          className={`rent-search-row${differentDropoff ? ' rent-search-row--split' : ''}${datesFocus ? ' is-dates-focus' : ''}`}
+        >
           <div className="rent-search-field rent-search-field--place">
             <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
               search
@@ -187,13 +252,15 @@ export default function RentBookingSearchBar({
             </div>
           ) : null}
 
-          <div className="rent-search-field rent-search-field--date">
+          <div className={`rent-search-field rent-search-field--date${datesFocus ? ' is-prompt' : ''}`}>
             <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
               calendar_month
             </span>
             <div className="rent-search-field-body">
               <span className="rent-search-label">Παραλαβή</span>
               <input
+                ref={pickupDateRef}
+                id="rent-pickup-date"
                 type="date"
                 value={pickupParts.date}
                 onChange={(e) => {
@@ -223,13 +290,14 @@ export default function RentBookingSearchBar({
             </div>
           </div>
 
-          <div className="rent-search-field rent-search-field--date">
+          <div className={`rent-search-field rent-search-field--date${datesFocus ? ' is-prompt' : ''}`}>
             <span className="rent-search-field-icon material-symbols-outlined" aria-hidden>
               event_available
             </span>
             <div className="rent-search-field-body">
               <span className="rent-search-label">Επιστροφή</span>
               <input
+                id="rent-return-date"
                 type="date"
                 value={returnParts.date}
                 onChange={(e) => setEndTime(mergeDateTime(e.target.value, returnParts.time))}

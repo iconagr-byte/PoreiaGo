@@ -101,3 +101,73 @@ export function writeRentBookingPrefs(patch = {}) {
   }
   return next;
 }
+
+/** Session flag: land on search dates with a friendly prompt. */
+export const RENT_NEED_DATES_KEY = 'rent_need_dates_v1';
+
+export const RENT_NEED_DATES_DEFAULT_MESSAGE =
+  'Επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις.';
+
+/** @param {ReturnType<typeof readRentBookingPrefs>} [prefs] */
+export function rentTripSearchReady(prefs = readRentBookingPrefs()) {
+  const p = prefs && typeof prefs === 'object' ? prefs : {};
+  return Boolean(
+    String(p.start_time || '').trim() &&
+      String(p.end_time || '').trim() &&
+      String(p.pickup_location || '').trim(),
+  );
+}
+
+/** @param {string} [message] */
+export function markNeedRentDates(message = RENT_NEED_DATES_DEFAULT_MESSAGE) {
+  try {
+    sessionStorage.setItem(
+      RENT_NEED_DATES_KEY,
+      JSON.stringify({
+        message: String(message || RENT_NEED_DATES_DEFAULT_MESSAGE).trim(),
+        at: Date.now(),
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+/** @returns {{ message: string, at?: number } | null} */
+export function consumeNeedRentDates() {
+  try {
+    const raw = sessionStorage.getItem(RENT_NEED_DATES_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(RENT_NEED_DATES_KEY);
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      message: String(parsed.message || RENT_NEED_DATES_DEFAULT_MESSAGE).trim(),
+      at: Number(parsed.at) || Date.now(),
+    };
+  } catch {
+    try {
+      sessionStorage.removeItem(RENT_NEED_DATES_KEY);
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+}
+
+/**
+ * Redirect to guest search focused on pickup date.
+ * @param {(to: string, opts?: object) => void} navigate
+ * @param {{ message?: string, replace?: boolean }} [opts]
+ */
+export function navigateToRentDateSearch(navigate, opts = {}) {
+  const message = opts.message || RENT_NEED_DATES_DEFAULT_MESSAGE;
+  markNeedRentDates(message);
+  if (typeof navigate !== 'function') {
+    if (typeof window !== 'undefined') {
+      window.location.assign('/rent#rent-pickup-date');
+    }
+    return;
+  }
+  navigate('/rent#rent-pickup-date', { replace: Boolean(opts.replace) });
+}
