@@ -54,7 +54,7 @@ class DriverNoShiftAutostartTests(unittest.TestCase):
 
     def test_driver_sw_cache_bumped_for_client_update(self) -> None:
         sw = (ROOT / "public" / "driver-sw.js").read_text(encoding="utf-8")
-        self.assertIn("aerostride-driver-v9", sw)
+        self.assertIn("aerostride-driver-v10", sw)
         self.assertNotIn("aerostride-driver-v8", sw)
 
 
