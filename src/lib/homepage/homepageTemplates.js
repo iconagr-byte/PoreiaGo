@@ -404,6 +404,11 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   footer_template: 'classic_columns',
   rent_fleet_layout_template: 'rent_grid_three',
   rent_fleet_card_template: 'rent_premium',
+  rent_theme_id: 'aegean_coast',
+  rent_hero_style: 'coastal',
+  rent_accent_color: '#0a7a6c',
+  rent_secondary_color: '#0b3d4a',
+  rent_surface_color: '#f0fdfa',
   /** Kept in sync with trips_* — one card style for Greece + abroad. */
   intl_trips_layout_template: 'grid_three',
   intl_trip_card_template: 'premium',

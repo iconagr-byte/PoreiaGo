@@ -171,6 +171,13 @@ DEFAULT_SITE_APPEARANCE = {
     "accent_color": "#0ea5e9",
     "secondary_color": "#1e3a5f",
     "surface_color": "#f8fafc",
+    "rent_fleet_layout_template": "rent_grid_three",
+    "rent_fleet_card_template": "rent_premium",
+    "rent_theme_id": "aegean_coast",
+    "rent_hero_style": "coastal",
+    "rent_accent_color": "#0a7a6c",
+    "rent_secondary_color": "#0b3d4a",
+    "rent_surface_color": "#f0fdfa",
     "show_fleet_section": True,
     "show_why_us_section": True,
     "header_template": "glass_dark",
@@ -273,6 +280,13 @@ class SiteAppearanceResponse(BaseModel):
     accent_color: str = "#0ea5e9"
     secondary_color: str = "#1e3a5f"
     surface_color: str = "#f8fafc"
+    rent_fleet_layout_template: str = "rent_grid_three"
+    rent_fleet_card_template: str = "rent_premium"
+    rent_theme_id: str = "aegean_coast"
+    rent_hero_style: str = "coastal"
+    rent_accent_color: str = "#0a7a6c"
+    rent_secondary_color: str = "#0b3d4a"
+    rent_surface_color: str = "#f0fdfa"
     show_fleet_section: bool = True
     show_why_us_section: bool = True
     header_template: str = "glass_dark"
@@ -384,6 +398,13 @@ class SiteAppearanceUpdate(BaseModel):
     accent_color: str | None = None
     secondary_color: str | None = None
     surface_color: str | None = None
+    rent_fleet_layout_template: str | None = None
+    rent_fleet_card_template: str | None = None
+    rent_theme_id: str | None = None
+    rent_hero_style: str | None = None
+    rent_accent_color: str | None = None
+    rent_secondary_color: str | None = None
+    rent_surface_color: str | None = None
     show_fleet_section: bool | None = None
     show_why_us_section: bool | None = None
     header_template: str | None = None

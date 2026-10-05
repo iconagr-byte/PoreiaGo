@@ -6865,3 +6865,243 @@
   font-weight: 650;
   text-decoration: none;
 }
+
+/* ——— Full-page /rent themes (data-rent-theme / hero / fleet / card) ——— */
+
+.rent-app[data-rent-theme] {
+  background:
+    radial-gradient(900px 380px at 10% -8%, color-mix(in srgb, var(--rent-teal) 14%, transparent), transparent 55%),
+    radial-gradient(700px 320px at 95% 0%, color-mix(in srgb, var(--rent-deep) 10%, transparent), transparent 50%),
+    linear-gradient(180deg, var(--rent-foam, #fbfbfd) 0%, var(--rent-fill, #f5f5f7) 100%);
+}
+
+/* Hero modes — structurally distinct full-bleed treatments */
+.rent-hero--cinematic .rent-hero-media img,
+.rent-hero--night .rent-hero-media img,
+.rent-hero--yacht .rent-hero-media img,
+.rent-hero--editorial .rent-hero-media img {
+  filter: brightness(0.72) saturate(1.05);
+}
+
+.rent-hero--cinematic .rent-hero-shade--booking,
+.rent-hero--night .rent-hero-shade--booking,
+.rent-hero--yacht .rent-hero-shade--booking {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.72) 70%, #050507 100%);
+}
+
+.rent-hero--compare,
+.rent-hero--airport {
+  min-height: clamp(22rem, 58vh, 34rem);
+}
+
+.rent-hero--compare .rent-hero-media img,
+.rent-hero--airport .rent-hero-media img {
+  object-position: center 35%;
+  filter: brightness(0.85);
+}
+
+.rent-hero--peer .rent-hero-shade--booking {
+  background: linear-gradient(135deg, rgba(15, 15, 18, 0.55) 0%, rgba(89, 59, 251, 0.35) 100%);
+}
+
+.rent-hero--soft_luxe .rent-hero-shade--booking,
+.rent-hero--family .rent-hero-shade--booking,
+.rent-hero--alpine .rent-hero-shade--booking {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(15, 23, 42, 0.45) 100%);
+}
+
+.rent-hero--island .rent-hero-shade--booking,
+.rent-hero--desert .rent-hero-shade--booking,
+.rent-hero--sport .rent-hero-shade--booking {
+  background: linear-gradient(120deg, rgba(124, 45, 18, 0.35) 0%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.rent-hero--glass .rent-hero-booking-inner {
+  backdrop-filter: blur(8px);
+}
+
+.rent-hero--metro .rent-hero-shade--booking,
+.rent-hero--deal .rent-hero-shade--booking {
+  background: linear-gradient(100deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.35) 100%);
+}
+
+.rent-hero--ev .rent-hero-shade--booking {
+  background: linear-gradient(160deg, rgba(2, 44, 34, 0.35) 0%, rgba(16, 185, 129, 0.25) 100%);
+}
+
+.rent-hero--corporate .rent-hero-shade--booking {
+  background: linear-gradient(180deg, rgba(20, 83, 45, 0.2) 0%, rgba(15, 23, 42, 0.55) 100%);
+}
+
+.rent-hero--classic .rent-hero-shade--booking,
+.rent-hero--coastal .rent-hero-shade--booking {
+  background: linear-gradient(180deg, rgba(11, 61, 74, 0.15) 0%, rgba(10, 122, 108, 0.35) 55%, rgba(5, 8, 10, 0.65) 100%);
+}
+
+/* Fleet grid layouts */
+.rent-pick-grid--rent-grid-two {
+  grid-template-columns: 1fr;
+}
+
+.rent-pick-grid--rent-grid-three {
+  grid-template-columns: 1fr;
+}
+
+.rent-pick-grid--rent-list {
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.rent-pick-grid--rent-scroll {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.35rem;
+  grid-template-columns: none;
+}
+
+.rent-pick-grid--rent-scroll > .rent-pick {
+  flex: 0 0 min(86%, 300px);
+  scroll-snap-align: start;
+}
+
+.rent-pick-grid--rent-featured > .rent-pick--featured {
+  grid-column: 1 / -1;
+}
+
+.rent-pick-grid--rent-featured > .rent-pick--featured .rent-pick-media {
+  min-height: 12.5rem;
+}
+
+@media (min-width: 720px) {
+  .rent-phone-stage--desktop .rent-pick-grid--rent-grid-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+
+  .rent-phone-stage--desktop .rent-pick-grid--rent-grid-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rent-phone-stage--desktop .rent-pick-grid--rent-featured {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rent-phone-stage--desktop .rent-pick-grid--rent-featured > .rent-pick--featured {
+    grid-column: 1 / -1;
+  }
+
+  .rent-phone-stage--desktop .rent-pick-grid--rent-list {
+    max-width: 46rem;
+  }
+}
+
+/* Card style variants */
+.rent-pick--soft {
+  border-radius: 24px;
+  border-color: rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  background: color-mix(in srgb, var(--rent-fill, #f5f5f7) 55%, #fff);
+}
+
+.rent-pick--overlay {
+  background: #0b0b0d;
+  border-color: transparent;
+}
+
+.rent-pick--overlay .rent-pick-media {
+  min-height: 14rem;
+}
+
+.rent-pick--overlay .rent-pick-body,
+.rent-pick--overlay .rent-pick-title,
+.rent-pick--overlay .rent-pick-price,
+.rent-pick--overlay .rent-pick-price-kicker,
+.rent-pick--overlay .rent-pick-price-unit,
+.rent-pick--overlay .rent-pick-specs {
+  color: #f5f5f7;
+}
+
+.rent-pick--overlay .rent-pick-body {
+  position: relative;
+  margin-top: -4.5rem;
+  padding-top: 3.5rem;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.82) 42%, #0b0b0d 100%);
+  z-index: 1;
+}
+
+.rent-pick--compact,
+.rent-pick--spec {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  align-items: stretch;
+}
+
+.rent-pick--compact .rent-pick-media,
+.rent-pick--spec .rent-pick-media {
+  min-height: 100%;
+  border-radius: 0;
+}
+
+.rent-pick--compact .rent-pick-body,
+.rent-pick--spec .rent-pick-body {
+  padding: 0.85rem 1rem;
+}
+
+.rent-pick--spec .rent-pick-specs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.rent-pick--premium .rent-pick-cta,
+.rent-pick .rent-pick-cta {
+  background: var(--rent-teal, #0a7a6c);
+}
+
+.rent-pick-cat.is-active,
+.rent-btn-wallet,
+.rent-hero-cta {
+  background: var(--rent-teal, #0a7a6c);
+}
+
+.rent-pick-eyebrow,
+.rent-brand-mark-rent {
+  color: var(--rent-teal, #0a7a6c);
+}
+
+.rent-land-band--teal {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--rent-deep, #0b3d4a) 92%, #000) 0%,
+    color-mix(in srgb, var(--rent-teal, #0a7a6c) 85%, #0b3d4a) 100%
+  );
+}
+
+/* Dark page surfaces for noir themes */
+.rent-app[data-rent-theme='sixt_cinematic'],
+.rent-app[data-rent-theme='night_asphalt'],
+.rent-app[data-rent-theme='yacht_navy'],
+.rent-app[data-rent-theme='deal_flash'] {
+  color: #f5f5f7;
+}
+
+.rent-app[data-rent-theme='sixt_cinematic'] .rent-land-band--pick,
+.rent-app[data-rent-theme='night_asphalt'] .rent-land-band--pick,
+.rent-app[data-rent-theme='yacht_navy'] .rent-land-band--pick,
+.rent-app[data-rent-theme='deal_flash'] .rent-land-band--pick {
+  background: color-mix(in srgb, var(--rent-deep, #111827) 88%, #000);
+  color: #f5f5f7;
+}
+
+.rent-app[data-rent-theme='sixt_cinematic'] .rent-pick-head-title,
+.rent-app[data-rent-theme='night_asphalt'] .rent-pick-head-title,
+.rent-app[data-rent-theme='yacht_navy'] .rent-pick-head-title,
+.rent-app[data-rent-theme='deal_flash'] .rent-pick-head-title,
+.rent-app[data-rent-theme='sixt_cinematic'] .rent-pick-head-sub,
+.rent-app[data-rent-theme='night_asphalt'] .rent-pick-head-sub,
+.rent-app[data-rent-theme='yacht_navy'] .rent-pick-head-sub,
+.rent-app[data-rent-theme='deal_flash'] .rent-pick-head-sub {
+  color: #f5f5f7;
+}

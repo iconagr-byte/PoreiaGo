@@ -493,6 +493,11 @@ class TenantSiteAppearanceResponse(BaseModel):
     footer_template: str = "classic_columns"
     rent_fleet_layout_template: str = "rent_grid_three"
     rent_fleet_card_template: str = "rent_premium"
+    rent_theme_id: str = "aegean_coast"
+    rent_hero_style: str = "coastal"
+    rent_accent_color: str = "#0a7a6c"
+    rent_secondary_color: str = "#0b3d4a"
+    rent_surface_color: str = "#f0fdfa"
     intl_trips_layout_template: str = "editorial_stack"
     intl_trip_card_template: str = "abroad_horizontal"
     trips_section_eyebrow: str = "Ανακαλύψτε"
@@ -572,6 +577,11 @@ class TenantSiteAppearanceUpdate(BaseModel):
     footer_template: str | None = None
     rent_fleet_layout_template: str | None = None
     rent_fleet_card_template: str | None = None
+    rent_theme_id: str | None = None
+    rent_hero_style: str | None = None
+    rent_accent_color: str | None = None
+    rent_secondary_color: str | None = None
+    rent_surface_color: str | None = None
     intl_trips_layout_template: str | None = None
     intl_trip_card_template: str | None = None
     trips_section_eyebrow: str | None = None
