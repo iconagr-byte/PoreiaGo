@@ -304,6 +304,27 @@ export const RENT_FLEET_LAYOUT_TEMPLATES = [
     icon: 'table_rows',
     tags: ['Σύγκριση'],
   },
+  {
+    id: 'rent_bento',
+    label: 'Bento garage',
+    description: 'Ασύμμετρο Apple bento — ένα μεγάλο + δύο μικρά σε πρώτο πλάνο.',
+    icon: 'dashboard',
+    tags: ['Apple', 'Bento'],
+  },
+  {
+    id: 'rent_magazine',
+    label: 'Magazine stack',
+    description: 'Ψηλές editorial κάρτες σε μία στήλη — storytelling στόλου.',
+    icon: 'menu_book',
+    tags: ['Editorial'],
+  },
+  {
+    id: 'rent_dense',
+    label: 'Dense catalog',
+    description: 'Πυκνό 4στήλο κατάλογο — γρήγορη σάρωση μεγάλου στόλου.',
+    icon: 'grid_on',
+    tags: ['Catalog'],
+  },
 ];
 
 /** Rent vehicle card visual style. */
@@ -342,6 +363,34 @@ export const RENT_FLEET_CARD_TEMPLATES = [
     description: 'Έμφαση σε θέσεις, κιβώτιο, καύσιμο και ημερήσια τιμή.',
     icon: 'fact_check',
     tags: ['Λειτουργικό'],
+  },
+  {
+    id: 'rent_glass',
+    label: 'Glass Pavilion',
+    description: 'Ημιδιαφανές κάρτα με blur — Cupertino glass.',
+    icon: 'blur_on',
+    tags: ['Apple', 'Glass'],
+  },
+  {
+    id: 'rent_editorial',
+    label: 'Editorial type',
+    description: 'Μεγάλη τυπογραφία SF, λίγο UI — σαν Apple marketing page.',
+    icon: 'title',
+    tags: ['Apple', 'Type'],
+  },
+  {
+    id: 'rent_price_first',
+    label: 'Price first',
+    description: 'Μεγάλη τιμή πρώτα, μικρή φωτό — decision-first catalog.',
+    icon: 'sell',
+    tags: ['Conversion'],
+  },
+  {
+    id: 'rent_pill',
+    label: 'Pill chrome',
+    description: 'Στρογγυλεμένα pills & CTA — Maps / Wallet vibe.',
+    icon: 'pill',
+    tags: ['Apple', 'CTA'],
   },
 ];
 
@@ -402,6 +451,7 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   trips_layout_template: 'grid_three',
   trip_card_template: 'premium',
   footer_template: 'classic_columns',
+  rent_theme_id: 'cupertino_soft',
   rent_fleet_layout_template: 'rent_grid_three',
   rent_fleet_card_template: 'rent_premium',
   /** Kept in sync with trips_* — one card style for Greece + abroad. */
@@ -525,6 +575,12 @@ export function rentFleetGridClass(layoutId) {
       return 'flex gap-5 overflow-x-auto pb-3 snap-x snap-mandatory list-none p-0 m-0';
     case 'rent_list':
       return 'flex flex-col gap-3 max-w-3xl list-none p-0 m-0';
+    case 'rent_bento':
+      return 'grid grid-cols-1 md:grid-cols-6 gap-4 md:gap-5 list-none p-0 m-0';
+    case 'rent_magazine':
+      return 'flex flex-col gap-8 max-w-3xl mx-auto list-none p-0 m-0';
+    case 'rent_dense':
+      return 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 list-none p-0 m-0';
     case 'rent_grid_three':
     default:
       return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0';
@@ -538,8 +594,14 @@ export function rentFleetCardWrapperClass(layoutId, index = 0) {
   if (layoutId === 'rent_featured' && index === 0) {
     return 'md:col-span-2';
   }
-  if (layoutId === 'rent_list') {
+  if (layoutId === 'rent_bento') {
+    if (index === 0) return 'md:col-span-4 md:row-span-2 min-h-[280px]';
+    if (index === 1 || index === 2) return 'md:col-span-2';
+    return 'md:col-span-2';
+  }
+  if (layoutId === 'rent_list' || layoutId === 'rent_magazine') {
     return 'w-full';
   }
   return '';
 }
+
