@@ -725,6 +725,13 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
       vehicle_id: v?.id || '',
       wizard_step: 'services',
     });
+    if (!rentTripSearchReady()) {
+      navigateToRentDateSearch(navigate, {
+        message:
+          'Σχεδόν έτοιμο — επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις με αυτό το όχημα.',
+      });
+      return;
+    }
     navigate('/rent/book/services');
   };
 
