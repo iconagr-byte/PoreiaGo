@@ -2309,7 +2309,10 @@ export default function BackOffice() {
                 ? 'flex-1 overflow-auto p-4 md:p-5 lg:p-6'
                 : activeTab === 'fleet_live_map'
                   ? 'flex-1 overflow-auto p-2 sm:p-3 md:p-4'
-                : showBusesHub || activeTab === 'fleet_rental' || activeTab === 'settings'
+                : showBusesHub ||
+                    activeTab === 'fleet_rental' ||
+                    activeTab === 'settings' ||
+                    isRentCustomersView
                   ? 'flex-1 overflow-auto p-3 sm:p-4 md:pl-2 md:pr-5 md:py-5'
                 : 'flex-1 overflow-auto p-margin-mobile md:p-margin-desktop'
           }
@@ -2332,7 +2335,22 @@ export default function BackOffice() {
               <AdminMenuFade panelKey="dashboard">{renderDashboard()}</AdminMenuFade>
             )}
             {isRentCustomersView && (
-              <AdminMenuFade panelKey="customers-rent">{renderCustomers()}</AdminMenuFade>
+              <AdminMenuFade panelKey="customers-rent" className="pb-stack-lg w-full">
+                {/* Keep Γραφείο rail (Πελάτες / Κρατήσεις / Χαρτούρα / Νέα κράτηση) while CRM is open. */}
+                <RentDeskHub
+                  activeTab="clients"
+                  hideChromeHeader
+                  onTabChange={(id) => {
+                    const next = sanitizeRentDeskTab(id || DEFAULT_RENT_DESK_TAB);
+                    setSelectedCustomer(null);
+                    setFleetRentalTab(next);
+                    setActiveTab('fleet_rental');
+                  }}
+                  onOpenLiveMap={() => setActiveTab('fleet_live_map')}
+                >
+                  {renderCustomers()}
+                </RentDeskHub>
+              </AdminMenuFade>
             )}
             {LOYALTY_UI_ENABLED && activeTab === 'loyalty' && (
               <AdminMenuFade panelKey="loyalty">
@@ -2425,6 +2443,7 @@ export default function BackOffice() {
                     setCustomerServiceScope(CUSTOMER_SERVICE_RENT);
                     setCustomers(loadCustomersByService(CUSTOMER_SERVICE_RENT));
                     setSelectedCustomer({ ...person, serviceScope: CUSTOMER_SERVICE_RENT });
+                    setFleetRentalTab('clients');
                     setActiveTab('customers');
                   }}
                 />

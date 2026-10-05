@@ -58,6 +58,9 @@ export default function RentDeskHub({
   onOpenLiveMap,
   onOpenCustomer,
   initialTab,
+  /** When set (e.g. rent CRM card), replace the desk panel but keep Γραφείο rail. */
+  children = null,
+  hideChromeHeader = false,
 }) {
   const [tab, setTab] = useState(() =>
     sanitizeRentDeskTab(controlledTab || initialTab || DEFAULT_RENT_DESK_TAB),
@@ -138,7 +141,7 @@ export default function RentDeskHub({
                           <button
                             type="button"
                             onClick={() => selectTab(t.id)}
-                            className={`w-full text-left flex items-center gap-2.5 rounded-2xl border px-2.5 py-2 transition ${
+                            className={`w-full text-left flex items-center gap-2.5 rounded-2xl border px-2.5 py-2 transition outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 ${
                               isActive
                                 ? RAIL_ACTIVE[accent] || RAIL_ACTIVE.teal
                                 : 'border-transparent bg-black/[0.02] hover:bg-black/[0.04] hover:border-black/[0.06]'
@@ -182,31 +185,37 @@ export default function RentDeskHub({
         </AdminResizableRail>
 
         <AdminMenuFade panelKey={tab || DEFAULT_RENT_DESK_TAB} className="min-w-0 flex-1 space-y-4 w-full">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
-                {active.label}
-              </h2>
-              <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
-                {active.description}
-              </p>
+          {!hideChromeHeader ? (
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-headline-md font-bold text-on-surface tracking-tight">
+                  {active.label}
+                </h2>
+                <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
+                  {active.description}
+                </p>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border bg-teal-500/[0.08] border-teal-500/15">
+                <span className="material-symbols-outlined text-[20px] text-teal-700">
+                  {active.icon}
+                </span>
+                <span className="text-sm font-bold text-teal-800">{active.label}</span>
+              </div>
             </div>
-            <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border bg-teal-500/[0.08] border-teal-500/15">
-              <span className="material-symbols-outlined text-[20px] text-teal-700">
-                {active.icon}
-              </span>
-              <span className="text-sm font-bold text-teal-800">{active.label}</span>
-            </div>
-          </div>
+          ) : null}
 
-          <FleetRentalPanel
-            hideSideNav
-            activeTab={tab || DEFAULT_RENT_DESK_TAB}
-            onTabChange={selectTab}
-            initialTab={tab || DEFAULT_RENT_DESK_TAB}
-            onOpenLiveMap={onOpenLiveMap}
-            onOpenCustomer={onOpenCustomer}
-          />
+          {children != null ? (
+            children
+          ) : (
+            <FleetRentalPanel
+              hideSideNav
+              activeTab={tab || DEFAULT_RENT_DESK_TAB}
+              onTabChange={selectTab}
+              initialTab={tab || DEFAULT_RENT_DESK_TAB}
+              onOpenLiveMap={onOpenLiveMap}
+              onOpenCustomer={onOpenCustomer}
+            />
+          )}
         </AdminMenuFade>
       </div>
     </div>
