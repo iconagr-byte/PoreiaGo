@@ -142,6 +142,19 @@ export function isBusesHubTab(tab) {
   return isFleetOpsSubTab(id);
 }
 
+/**
+ * Rent CRM renders outside BusesHub. Never mount the hub chrome under it
+ * (empty «Εκδρομές / Πελάτες» rail below rental customer detail).
+ */
+export function shouldRenderBusesHub(tab, { rentOnly = false, customerServiceScope } = {}) {
+  if (!isBusesHubTab(tab)) return false;
+  const id = String(tab || '').trim();
+  const rentScope =
+    rentOnly || String(customerServiceScope || '').trim().toLowerCase() === 'rent';
+  if (id === 'customers' && rentScope) return false;
+  return true;
+}
+
 export function sanitizeBusesHubTab(tab) {
   const id = String(tab || '').trim();
   if (BUSES_HUB_ID_SET.has(id)) return id;

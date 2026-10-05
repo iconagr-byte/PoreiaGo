@@ -64,8 +64,8 @@ import {
 } from '../lib/admin/fleetOpsHub.js';
 import {
   DEFAULT_BUSES_HUB_TAB,
-  isBusesHubTab,
   sanitizeBusesHubTab,
+  shouldRenderBusesHub,
 } from '../lib/admin/busesHub.js';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import OfficeLogoChangeModal from '../components/admin/OfficeLogoChangeModal.jsx';
@@ -2153,6 +2153,13 @@ export default function BackOffice() {
     );
   };
 
+  const isRentCustomersView =
+    activeTab === 'customers' && (rentOnly || customerServiceScope === CUSTOMER_SERVICE_RENT);
+  const showBusesHub = shouldRenderBusesHub(activeTab, {
+    rentOnly,
+    customerServiceScope,
+  });
+
   return (
     <FleetTelemetryProvider>
       {showOfficeSetup && (
@@ -2194,6 +2201,7 @@ export default function BackOffice() {
           settingsSubTab={settingsSubTab}
           fleetOpsSubTab={fleetOpsSubTab}
           fleetRentalTab={fleetRentalTab}
+          customerServiceScope={customerServiceScope}
           onTabChange={handleAdminTabChange}
           onSettingsSubTabChange={setSettingsSubTab}
           onSettingsHubFocus={focusSettingsHub}
@@ -2214,6 +2222,7 @@ export default function BackOffice() {
         settingsSubTab={settingsSubTab}
         fleetOpsSubTab={fleetOpsSubTab}
         fleetRentalTab={fleetRentalTab}
+        customerServiceScope={customerServiceScope}
         onTabChange={handleAdminTabChange}
         onSettingsSubTabChange={setSettingsSubTab}
         onSettingsHubFocus={focusSettingsHub}
@@ -2300,7 +2309,7 @@ export default function BackOffice() {
                 ? 'flex-1 overflow-auto p-4 md:p-5 lg:p-6'
                 : activeTab === 'fleet_live_map'
                   ? 'flex-1 overflow-auto p-2 sm:p-3 md:p-4'
-                : isBusesHubTab(activeTab) || activeTab === 'fleet_rental' || activeTab === 'settings'
+                : showBusesHub || activeTab === 'fleet_rental' || activeTab === 'settings'
                   ? 'flex-1 overflow-auto p-3 sm:p-4 md:pl-2 md:pr-5 md:py-5'
                 : 'flex-1 overflow-auto p-margin-mobile md:p-margin-desktop'
           }
@@ -2311,9 +2320,10 @@ export default function BackOffice() {
               activeTab === 'email_templates' ||
               activeTab === 'dashboard' ||
               activeTab === 'fleet_live_map' ||
-              isBusesHubTab(activeTab) ||
+              showBusesHub ||
               activeTab === 'fleet_rental' ||
-              activeTab === 'settings'
+              activeTab === 'settings' ||
+              isRentCustomersView
                 ? 'w-full min-w-0'
                 : 'max-w-container-max mx-auto'
             }
@@ -2321,7 +2331,7 @@ export default function BackOffice() {
             {activeTab === 'dashboard' && (
               <AdminMenuFade panelKey="dashboard">{renderDashboard()}</AdminMenuFade>
             )}
-            {activeTab === 'customers' && (rentOnly || customerServiceScope === CUSTOMER_SERVICE_RENT) && (
+            {isRentCustomersView && (
               <AdminMenuFade panelKey="customers-rent">{renderCustomers()}</AdminMenuFade>
             )}
             {LOYALTY_UI_ENABLED && activeTab === 'loyalty' && (
@@ -2350,7 +2360,7 @@ export default function BackOffice() {
                 <FleetLiveMapWebSocket />
               </AdminMenuFade>
             )}
-            {isBusesHubTab(activeTab) && (
+            {showBusesHub && (
               <AdminMenuFade panelKey="buses-hub" className="pb-stack-lg w-full">
                 <BusesHub
                   activeTab={sanitizeBusesHubTab(activeTab)}

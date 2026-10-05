@@ -22,8 +22,8 @@ import {
 } from '../../lib/admin/fleetOpsHub.js';
 import {
   DEFAULT_BUSES_HUB_TAB,
-  isBusesHubTab,
   sanitizeBusesHubTab,
+  shouldRenderBusesHub,
 } from '../../lib/admin/busesHub.js';
 import {
   isSharedNavItem,
@@ -86,6 +86,7 @@ export default function SortableSidebarNav({
   settingsSubTab,
   fleetOpsSubTab,
   fleetRentalTab,
+  customerServiceScope,
   onTabChange,
   onSettingsSubTabChange,
   onSettingsHubFocus,
@@ -299,7 +300,10 @@ export default function SortableSidebarNav({
     onTabChange?.(tabId);
   };
 
-  const busesHubActive = !rentOnly && isBusesHubTab(activeTab);
+  const busesHubActive = shouldRenderBusesHub(activeTab, {
+    rentOnly,
+    customerServiceScope,
+  });
 
   const buttonClass = (item, { cardStyle = false } = {}) => {
     const isRentSubActive =
@@ -318,7 +322,12 @@ export default function SortableSidebarNav({
   };
 
   const settingsActive = activeTab === 'settings';
-  const rentDeskActive = activeTab === 'fleet_rental';
+  // Keep Rent pin lit when opening a rental customer from the desk.
+  const rentDeskActive =
+    activeTab === 'fleet_rental' ||
+    (activeTab === 'customers' &&
+      !rentOnly &&
+      String(customerServiceScope || '').toLowerCase() === 'rent');
   const showSharedZone = sharedItems.length > 0;
   const showBusesPin = !rentOnly && serviceMode !== 'rent';
   const showRentPin = rentEnabled && (rentOnly || serviceMode !== 'buses');
