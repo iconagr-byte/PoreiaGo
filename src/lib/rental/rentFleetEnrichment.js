@@ -41,20 +41,20 @@ const BY_MODEL = {
     blurb:
       'Μοντέλο 2026 — compact hatchback για καθημερινές διαδρομές και κοντινές αποδράσεις. Άνετη καμπίνα, κλιματισμός και χαμηλή κατανάλωση.',
     transmission: 'Χειροκίνητο',
-    fuel: 'Βενζίνη',
+    fuel: 'Πλήρως ηλεκτρικό',
     doors: 5,
     luggage: '2 βαλίτσες',
-    highlights: ['A/C', 'Bluetooth', 'Οικονομικό'],
+    highlights: ['A/C', 'Bluetooth', 'Πλήρως ηλεκτρικό'],
   },
   'renault clio': {
     headline: 'Ιδανικό για πόλη 2026',
     blurb:
       'Μοντέλο 2026 — compact και οικονομικό επιβατικό για καθημερινές διαδρομές, πάρκινγκ και κοντινές αποδράσεις. Εύκολο στην οδήγηση, με χαμηλή κατανάλωση και άνεση για έως 5 επιβάτες.',
     transmission: 'Χειροκίνητο',
-    fuel: 'Βενζίνη',
+    fuel: 'Υβριδικό',
     doors: 5,
     luggage: '2 βαλίτσες',
-    highlights: ['Χαμηλή κατανάλωση', 'Εύκολο πάρκινγκ', 'A/C'],
+    highlights: ['Υβριδική οικονομία', 'Εύκολο πάρκινγκ', 'A/C'],
   },
   'hyundai i10': {
     headline: 'City car',
@@ -227,10 +227,16 @@ export function enrichRentVehicle(vehicle) {
       ? [photoUrl]
       : [];
 
-  const luggage = known?.luggage || '';
+  const luggage = known?.luggage || v.luggage || v.luggage_label || '';
   const bags = luggageCount(luggage);
   const transmission = transmissionLabel(known?.transmission || v.transmission);
   const transmissionKey = /αυτόματο/i.test(transmission) ? 'automatic' : 'manual';
+  const fuel = known?.fuel || v.fuel || v.fuel_type || '';
+  const highlights =
+    (Array.isArray(known?.highlights) && known.highlights.length
+      ? known.highlights
+      : null) ||
+    (Array.isArray(v.highlights) ? v.highlights : []);
 
   return {
     ...v,
@@ -242,12 +248,13 @@ export function enrichRentVehicle(vehicle) {
     display_blurb: description,
     transmission,
     transmission_key: transmissionKey,
-    fuel: known?.fuel || '',
-    doors: known?.doors || null,
+    fuel,
+    fuel_type: v.fuel_type || fuel,
+    doors: known?.doors || v.doors || null,
     luggage,
-    luggage_bags: bags || 0,
+    luggage_bags: bags || Number(v.luggage_bags) || 0,
     luggage_label: bags ? `x${bags}` : luggage || 'Αποσκευές',
-    highlights: known?.highlights || [],
+    highlights,
     seats_label: seats ? `${seats} επιβάτες` : '',
     group_code,
     size_label,
