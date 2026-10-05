@@ -635,6 +635,14 @@
   min-width: 0;
 }
 
+.rent-topbar-start {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .rent-topbar-brand {
   appearance: none;
   border: 0;
@@ -877,6 +885,15 @@
 
 .rent-top-chip-wrap {
   position: relative;
+}
+
+.rent-top-chip-wrap--left {
+  flex-shrink: 0;
+}
+
+.rent-top-menu--left {
+  left: 0;
+  right: auto;
 }
 
 .rent-top-chip {

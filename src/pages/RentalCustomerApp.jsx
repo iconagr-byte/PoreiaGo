@@ -247,22 +247,24 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       <div className="rent-app rent-app--guest">
         <header className="rent-topbar rent-topbar--guest">
           <div className="rent-topbar-row">
-            <button
-              type="button"
-              className="rent-topbar-brand"
-              aria-label={branding.brandLabel}
-              onClick={() => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            >
-              <RentBrandMark
-                label={branding.brandLabel}
-                logoUrl={branding.logoUrl}
-                showName={branding.showName}
-                subtitle={branding.brandSubtitle}
-              />
-            </button>
             <RentGuestTopActions
+              brand={
+                <button
+                  type="button"
+                  className="rent-topbar-brand"
+                  aria-label={branding.brandLabel}
+                  onClick={() => {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  <RentBrandMark
+                    label={branding.brandLabel}
+                    logoUrl={branding.logoUrl}
+                    showName={branding.showName}
+                    subtitle={branding.brandSubtitle}
+                  />
+                </button>
+              }
               onAccount={onRequireLogin}
               phone={String(siteAppearance?.footer_contact_phone || '').trim()}
               onFindVehicle={() => {
