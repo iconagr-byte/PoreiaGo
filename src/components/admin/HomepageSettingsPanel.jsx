@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TemplatePicker from './homepage/TemplatePicker.jsx';
 import ThemeGallery from './homepage/ThemeGallery.jsx';
+import RentThemeGallery from './homepage/RentThemeGallery.jsx';
 import PageDesignWizardShell from './homepage/PageDesignWizardShell.jsx';
 import '../../styles/page-design-wizard.css';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
@@ -24,6 +25,10 @@ import {
   getHomepageThemeById,
   themeToAppearancePatch,
 } from '../../lib/homepage/homepageThemes.js';
+import {
+  getRentThemeById,
+  rentThemeToAppearancePatch,
+} from '../../lib/rental/rentThemes.js';
 import { pushHomepagePreviewDraft } from '../../lib/homepage/homepagePreview.js';
 import { pageSliderPatch } from '../../lib/homepage/pageSlider.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
@@ -101,6 +106,7 @@ const HOME_SECTIONS = [
 
 const RENT_SECTIONS = [
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-teal-600' },
+  { id: 'themes', label: 'Θέματα', icon: 'palette', accent: 'bg-fuchsia-500' },
   { id: 'branding', label: 'Μάρκα & λογότυπο', icon: 'image', accent: 'bg-amber-500' },
   { id: 'copy', label: 'Όνομα & κείμενα', icon: 'edit_note', accent: 'bg-cyan-600' },
   { id: 'fleet', label: 'Καρτέλες στόλου', icon: 'directions_car', accent: 'bg-sky-600' },
@@ -860,6 +866,35 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     }
   };
 
+  const handleRentThemePreview = (theme, { includeColors = false } = {}) => {
+    const patch = rentThemeToAppearancePatch(theme, { includeColors });
+    setForm((p) => ({ ...p, ...patch }));
+    toast.success(`Προεπισκόπηση /rent: ${theme.nameEl}`, { id: 'rent-theme-preview' });
+  };
+
+  const handleRentThemeApply = async (theme, { includeColors = false } = {}) => {
+    const patch = rentThemeToAppearancePatch(theme, { includeColors });
+    setForm((p) => ({ ...p, ...patch }));
+    setSaving(true);
+    try {
+      const result = await updateSiteAppearance(patch);
+      setForm((p) => ({ ...p, ...result.data, ...patch }));
+      toast.success(
+        includeColors
+          ? `Εφαρμόστηκε θέμα /rent «${theme.nameEl}» + χρώματα`
+          : `Εφαρμόστηκε θέμα /rent «${theme.nameEl}» — ρύθμισε χρώματα από κάτω`,
+        { id: 'rent-theme-apply' },
+      );
+    } catch (err) {
+      if (err.message === 'AUTH_EXPIRED') return;
+      toast.error(err.message || 'Αποτυχία εφαρμογής θέματος /rent', {
+        id: 'rent-theme-apply-err',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const patchForm = (patch, successMsg) => async (e) => {
     e?.preventDefault?.();
     setSaving(true);
@@ -1025,6 +1060,10 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 >
                   <div className="grid sm:grid-cols-2 gap-3">
                     {[
+                      {
+                        label: 'Θέμα σελίδας',
+                        value: getRentThemeById(form.rent_theme_id || 'aegean_coast').nameEl,
+                      },
                       { label: 'Όνομα γραφείου', value: rentPreview.brandLabel },
                       {
                         label: 'Λογότυπο /rent',
@@ -1074,6 +1113,23 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   description="Πλήρης παραμετροποίηση /rent — χωρίς να χρειάζεστε ρυθμίσεις λεωφορείων."
                 >
                   <div className="grid sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => selectSection('themes')}
+                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
+                    >
+                      <span className="w-11 h-11 rounded-xl bg-fuchsia-500 text-white flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined">palette</span>
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-bold text-slate-900 group-hover:text-teal-800">
+                          Θέματα
+                        </span>
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          20 πλήρεις σελίδες · μετά χρώματα
+                        </span>
+                      </span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => selectSection('branding')}
@@ -1136,6 +1192,71 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                     </button>
                   </div>
                 </PanelCard>
+              </>
+            )}
+            {section === 'themes' && (
+              <>
+                <PanelCard
+                  title="Θέματα σελίδας /rent"
+                  description="20 διαφορετικές πλήρεις σελίδες — επίλεξε διάταξη, μετά ρύθμισε τα χρώματα."
+                >
+                  <RentThemeGallery
+                    activeThemeId={form.rent_theme_id || 'aegean_coast'}
+                    onPreview={handleRentThemePreview}
+                    onApply={handleRentThemeApply}
+                    applying={saving}
+                  />
+                </PanelCard>
+                <form
+                  onSubmit={patchForm(
+                    {
+                      rent_accent_color: form.rent_accent_color,
+                      rent_secondary_color: form.rent_secondary_color,
+                      rent_surface_color: form.rent_surface_color,
+                    },
+                    'Τα χρώματα /rent αποθηκεύτηκαν',
+                  )}
+                >
+                  <PanelCard
+                    title="2. Χρώματα μετά το θέμα"
+                    description="Άλλαξε accent, secondary και surface χωρίς να χαλάσει η διάταξη που επέλεξες."
+                    action={<SaveButton saving={saving} label="Αποθήκευση χρωμάτων" />}
+                  >
+                    <BrandColorEditor
+                      accent={
+                        form.rent_accent_color ||
+                        getRentThemeById(form.rent_theme_id || 'aegean_coast').palette.primary
+                      }
+                      secondary={
+                        form.rent_secondary_color ||
+                        getRentThemeById(form.rent_theme_id || 'aegean_coast').palette.secondary
+                      }
+                      surface={
+                        form.rent_surface_color ||
+                        getRentThemeById(form.rent_theme_id || 'aegean_coast').palette.surface
+                      }
+                      themeName={getRentThemeById(form.rent_theme_id || 'aegean_coast').nameEl}
+                      onChange={(patch) =>
+                        setForm((p) => ({
+                          ...p,
+                          rent_accent_color: patch.accent_color ?? p.rent_accent_color,
+                          rent_secondary_color: patch.secondary_color ?? p.rent_secondary_color,
+                          rent_surface_color: patch.surface_color ?? p.rent_surface_color,
+                        }))
+                      }
+                      onResetTheme={() => {
+                        const theme = getRentThemeById(form.rent_theme_id || 'aegean_coast');
+                        setForm((p) => ({
+                          ...p,
+                          rent_accent_color: theme.palette.primary,
+                          rent_secondary_color: theme.palette.secondary,
+                          rent_surface_color: theme.palette.surface,
+                        }));
+                        toast.success('Χρώματα από το ενεργό θέμα /rent');
+                      }}
+                    />
+                  </PanelCard>
+                </form>
               </>
             )}
             {section === 'branding' && (

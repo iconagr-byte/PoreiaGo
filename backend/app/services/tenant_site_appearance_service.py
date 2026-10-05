@@ -224,6 +224,11 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "intl_trip_card_template": "abroad_horizontal",
     "rent_fleet_layout_template": "rent_grid_three",
     "rent_fleet_card_template": "rent_premium",
+    "rent_theme_id": "aegean_coast",
+    "rent_hero_style": "coastal",
+    "rent_accent_color": "#0a7a6c",
+    "rent_secondary_color": "#0b3d4a",
+    "rent_surface_color": "#f0fdfa",
     "trips_section_eyebrow": "Ανακαλύψτε",
     "trips_section_title": "Εκδρομές στην Ελλάδα",
     "trips_section_subtitle": (

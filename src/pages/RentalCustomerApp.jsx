@@ -12,6 +12,7 @@ import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
 import { useRentMobile } from '../lib/rental/rentDevice.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { resolveRentAppBranding } from '../lib/rental/rentAppBranding.js';
+import { resolveRentTheme, rentThemeStyleVars } from '../lib/rental/rentThemes.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import {
   fetchCustomerRentalCatalog,
@@ -257,12 +258,25 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       ? `${carCount} επιβατικά · ${vanCount} van · demo προεπισκόπηση`
       : `${carCount} επιβατικά · ${vanCount} van`;
 
+  const rentTheme = useMemo(() => resolveRentTheme(siteAppearance || {}), [siteAppearance]);
+  const rentThemeVars = useMemo(
+    () => rentThemeStyleVars(siteAppearance || {}),
+    [siteAppearance],
+  );
+
   return (
     <div className={`rent-phone-stage${isMobile ? '' : ' rent-phone-stage--desktop'}`}>
-      <div className="rent-app rent-app--guest">
+      <div
+        className="rent-app rent-app--guest"
+        data-rent-theme={rentTheme.themeId}
+        data-rent-hero={rentTheme.heroStyle}
+        data-rent-fleet={rentTheme.fleetLayout}
+        data-rent-card={rentTheme.fleetCard}
+        style={rentThemeVars}
+      >
         <header
           className={`rent-topbar rent-topbar--guest${
-            branding.headerCompact ? ' rent-topbar--compact' : ''
+            branding.headerCompact || rentTheme.headerCompact ? ' rent-topbar--compact' : ''
           }`}
         >
           <div className="rent-topbar-row">
@@ -313,6 +327,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             logoPaddingPx={branding.logoPaddingPx}
             logoBgMode={branding.logoBgMode}
             logoShadow={branding.logoShadow}
+            heroStyle={rentTheme.heroStyle}
             title={branding.title}
             titleAccent={branding.titleAccent}
             copy={branding.copy}
@@ -470,8 +485,10 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                   {fleetLoading ? (
                     <p className="rent-home-fleet-empty">Φόρτωση στόλου…</p>
                   ) : filteredHomeFleet.length ? (
-                    <div className="rent-pick-grid">
-                      {filteredHomeFleet.map((v) => (
+                    <div
+                      className={`rent-pick-grid rent-pick-grid--${String(rentTheme.fleetLayout || 'rent_grid_three').replace(/_/g, '-')}`}
+                    >
+                      {filteredHomeFleet.map((v, index) => (
                         <RentHomeFleetCard
                           key={v.id}
                           vehicle={v}
@@ -479,6 +496,8 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                           onToggleFavorite={() => toggleFavorite(v.id)}
                           onSelect={() => goToServicesStep(v)}
                           onOpenDetails={() => setDetailVehicle(v)}
+                          templateId={rentTheme.fleetCard}
+                          featured={rentTheme.fleetLayout === 'rent_featured' && index === 0}
                         />
                       ))}
                     </div>

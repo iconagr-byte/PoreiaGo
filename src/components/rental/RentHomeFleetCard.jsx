@@ -11,6 +11,8 @@ export default function RentHomeFleetCard({
   onSelect,
   onOpenDetails,
   ctaLabel = 'Επιλογή',
+  templateId = 'rent_premium',
+  featured = false,
 }) {
   const v = enrichRentVehicle(vehicle);
   const cover = v.photo_urls?.[0] || v.photo_url || '';
@@ -44,9 +46,18 @@ export default function RentHomeFleetCard({
     onOpenDetails?.(vehicle);
   };
 
+  const cardMod = String(templateId || 'rent_premium').replace(/^rent_/, '');
+  const cardClass = [
+    'rent-pick',
+    `rent-pick--${cardMod}`,
+    featured ? 'rent-pick--featured' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <article
-      className="rent-pick"
+      className={cardClass}
       onDoubleClick={openDetails}
       title="Διπλό κλικ για περισσότερες φωτογραφίες & στοιχεία μίσθωσης"
     >

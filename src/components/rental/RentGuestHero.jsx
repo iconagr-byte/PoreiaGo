@@ -22,6 +22,7 @@ export default function RentGuestHero({
   logoPaddingPx,
   logoBgMode,
   logoShadow,
+  heroStyle = 'coastal',
   title,
   titleAccent,
   copy,
@@ -38,8 +39,14 @@ export default function RentGuestHero({
   );
   const slider = readPageSlider(siteAppearance, 'rent');
 
+  const heroMode = String(heroStyle || 'coastal').trim().toLowerCase() || 'coastal';
+
   return (
-    <section className="rent-hero rent-hero--landing rent-hero--booking" aria-label="Ενοικίαση">
+    <section
+      className={`rent-hero rent-hero--landing rent-hero--booking rent-hero--${heroMode}`}
+      data-rent-hero={heroMode}
+      aria-label="Ενοικίαση"
+    >
       <div className="rent-hero-media" aria-hidden={!slider.enabled}>
         {slider.enabled ? (
           <SiteHeroSlider
