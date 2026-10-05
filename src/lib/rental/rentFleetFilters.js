@@ -78,8 +78,23 @@ export function parseLuggageBags(luggage) {
   return Math.max(0, Math.min(8, Number(m[1]) || 0));
 }
 
+/** @param {unknown} raw */
+export function normalizeExtraKey(raw) {
+  const t = String(raw || '').trim().toLowerCase();
+  if (!t) return '';
+  if (/extra[_\s-]?driver|επιπλέον\s*οδηγ/.test(t)) return 'extra_driver';
+  if (/baby[_\s-]?seat|infant|βρέφ/.test(t)) return 'baby_seat';
+  if (/booster/.test(t)) return 'booster_seat';
+  if (/child[_\s-]?seat|παιδικό\s*κάθισμα|παιδικό/.test(t)) return 'child_seat';
+  if (/\bgps\b|navigation|navi|πλοήγ/.test(t)) return 'gps';
+  if (/wifi|wi-?fi|hotspot/.test(t)) return 'wifi';
+  if (/snow[_\s-]?chain|αλυσίδ/.test(t)) return 'snow_chains';
+  return '';
+}
+
 /**
  * Soft tags used by the sidebar — derived from enriched vehicle fields.
+ * Tags must be discriminative so checked filters actually shrink the list.
  * @param {object} vehicle
  */
 export function vehicleFilterTags(vehicle) {
@@ -101,26 +116,51 @@ export function vehicleFilterTags(vehicle) {
     normalizeFuelTypeKey(fuelBlob) ||
     (/electric|ηλεκτρ/i.test(`${cat} ${v.model || ''}`) ? 'electric' : 'petrol_diesel');
 
+  const locBlob = `${cat} ${highlights} ${v.model || ''} ${v.pickup_hint || ''}`;
   const locations = [];
-  if (/van|transfer|airport/i.test(`${cat} ${highlights} ${v.model || ''}`)) {
+  if (/van|minibus|transfer|airport|τερματικ/i.test(locBlob)) {
     locations.push('airport_terminal');
   }
-  if (/suv|van|airport|shuttle/i.test(`${cat} ${highlights}`)) {
+  if (/suv|van|minibus|airport|shuttle/i.test(`${cat} ${highlights} ${v.pickup_hint || ''}`)) {
     locations.push('airport_shuttle');
   }
-  locations.push('other');
+  // Exclusive "other" — only cars without airport tags, so the checkbox filters.
+  if (!locations.length) {
+    locations.push('other');
+  }
 
-  const extras = new Set(['extra_driver', 'gps']);
-  if (seats >= 4 || /compact|intermediate|suv|fullsize|van/.test(cat)) {
+  const extras = new Set();
+  const listed = [
+    ...(Array.isArray(v.extras) ? v.extras : []),
+    ...(Array.isArray(v.available_extras) ? v.available_extras : []),
+    ...(Array.isArray(v.filter_extras) ? v.filter_extras : []),
+  ];
+  for (const e of listed) {
+    const key = normalizeExtraKey(e);
+    if (key) extras.add(key);
+  }
+  if (/gps|navigation|navi|πλοήγ/i.test(highlights)) extras.add('gps');
+  if (/wifi|wi-?fi|hotspot/i.test(highlights)) extras.add('wifi');
+  if (/αλυσίδ|snow[_\s-]?chain/i.test(highlights)) extras.add('snow_chains');
+  if (/βρέφ|infant|baby[_\s-]?seat/i.test(highlights)) extras.add('baby_seat');
+  if (/booster/i.test(highlights)) extras.add('booster_seat');
+  if (/παιδικό|child[_\s-]?seat/i.test(highlights)) extras.add('child_seat');
+  if (/επιπλέον\s*οδηγ|extra[_\s-]?driver/i.test(highlights)) extras.add('extra_driver');
+
+  // Soft office offers by class — never tag every vehicle the same way.
+  if (seats >= 5) extras.add('extra_driver');
+  if (seats >= 5 || /intermediate|suv|fullsize|van|minibus/.test(cat)) {
     extras.add('child_seat');
-    extras.add('baby_seat');
     extras.add('booster_seat');
   }
-  if (/suv|van/.test(cat) || seats >= 7) {
+  if (seats >= 7 || /van|suv|minibus/.test(cat)) {
+    extras.add('baby_seat');
+    extras.add('gps');
+  }
+  if (/van|minibus/.test(cat) || seats >= 8) {
     extras.add('wifi');
     extras.add('snow_chains');
   }
-  if (/gps/i.test(highlights)) extras.add('gps');
 
   return {
     transmission,
