@@ -7,6 +7,7 @@ import PageDesignWizardShell from './homepage/PageDesignWizardShell.jsx';
 import '../../styles/page-design-wizard.css';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
+import RentBrandDesigner from './RentBrandDesigner.jsx';
 import PageSliderEditor from './homepage/PageSliderEditor.jsx';
 import HeroImageBlock from './homepage/HeroImageBlock.jsx';
 import {
@@ -1143,148 +1144,72 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               </>
             )}
             {section === 'branding' && (
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const brandName = String(form.rent_office_name || '').trim();
-                  const patch = {
-                    rent_office_name: brandName,
-                    rent_logo_show_name: form.rent_logo_show_name !== false,
-                  };
-                  let logo = String(form.rent_logo_url || '');
-                  setSaving(true);
-                  try {
-                    if (logo.startsWith('data:')) {
-                      setUploadingLogo(true);
-                      const file = await dataUrlToFile(logo, 'rent-logo');
-                      const result = await uploadSiteAsset('rent_logo', file);
-                      if (!result?.url) throw new Error('Αποτυχία ανεβάσματος λογοτύπου');
-                      logo = result.url;
+              <PanelCard
+                title="Μάρκα & header /rent"
+                description="Ξεχωριστό branding για ενοικιάσεις — live preview, μεγέθη logo και επιλογές header."
+              >
+                <RentBrandDesigner
+                  form={form}
+                  setForm={setForm}
+                  uploading={uploadingLogo}
+                  saving={saving}
+                  hasCustomLogo={hasCustomRentLogo}
+                  onUpload={(e) => handleImageUpload('rent_logo', e)}
+                  onClear={() => handleClearAsset('rent_logo')}
+                  onSave={async () => {
+                    const brandName = String(form.rent_office_name || '').trim();
+                    const patch = {
+                      rent_office_name: brandName,
+                      rent_logo_show_name: form.rent_logo_show_name !== false,
+                      rent_logo_height_px: clampLogoHeight(
+                        form.rent_logo_height_px ?? 40,
+                      ),
+                      rent_logo_max_width_px: clampLogoMaxWidth(
+                        form.rent_logo_max_width_px ?? 160,
+                      ),
+                      rent_header_compact: form.rent_header_compact === true,
+                    };
+                    let logo = String(form.rent_logo_url || '');
+                    setSaving(true);
+                    try {
+                      if (logo.startsWith('data:')) {
+                        setUploadingLogo(true);
+                        const file = await dataUrlToFile(logo, 'rent-logo');
+                        const result = await uploadSiteAsset('rent_logo', file);
+                        if (!result?.url) throw new Error('Αποτυχία ανεβάσματος λογοτύπου');
+                        logo = result.url;
+                        setForm((p) => ({
+                          ...p,
+                          ...(result.appearance || {}),
+                          rent_logo_url: logo,
+                        }));
+                      }
+                      if (logo && !logo.startsWith('data:')) patch.rent_logo_url = logo;
+                      const result = await updateSiteAppearance(patch);
                       setForm((p) => ({
                         ...p,
-                        ...(result.appearance || {}),
-                        rent_logo_url: logo,
+                        ...result.data,
+                        ...patch,
+                        rent_logo_url: logo || p.rent_logo_url,
                       }));
+                      toast.success('Η μάρκα /rent αποθηκεύτηκε', { id: 'rent-brand-save-ok' });
+                    } catch (err) {
+                      if (err.message === 'AUTH_EXPIRED') {
+                        toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά', {
+                          id: 'rent-brand-save-err',
+                        });
+                      } else {
+                        toast.error(err.message || 'Αποτυχία αποθήκευσης', {
+                          id: 'rent-brand-save-err',
+                        });
+                      }
+                    } finally {
+                      setUploadingLogo(false);
+                      setSaving(false);
                     }
-                    if (logo && !logo.startsWith('data:')) patch.rent_logo_url = logo;
-                    const result = await updateSiteAppearance(patch);
-                    setForm((p) => ({
-                      ...p,
-                      ...result.data,
-                      ...patch,
-                      rent_logo_url: logo || p.rent_logo_url,
-                    }));
-                    toast.success('Η μάρκα /rent αποθηκεύτηκε', { id: 'rent-brand-save-ok' });
-                  } catch (err) {
-                    if (err.message === 'AUTH_EXPIRED') {
-                      toast.error('Η συνεδρία έληξε — συνδεθείτε ξανά', {
-                        id: 'rent-brand-save-err',
-                      });
-                    } else {
-                      toast.error(err.message || 'Αποτυχία αποθήκευσης', {
-                        id: 'rent-brand-save-err',
-                      });
-                    }
-                  } finally {
-                    setUploadingLogo(false);
-                    setSaving(false);
-                  }
-                }}
-              >
-                <PanelCard
-                  title="Μάρκα & λογότυπο /rent"
-                  description="Ξεχωριστό από λεωφορεία — για γραφεία που πουλάνε μόνο ενοικίαση ή θέλουν άλλο logo στο /rent."
-                  action={<SaveButton saving={saving} label="Αποθήκευση μάρκας" />}
-                >
-                  <div className="space-y-5">
-                    <label className="block">
-                      <span className="text-xs font-bold text-slate-500">Όνομα στο header /rent</span>
-                      <input
-                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[15px] font-semibold text-slate-900 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
-                        placeholder="π.χ. Achillio Rent"
-                        value={form.rent_office_name || ''}
-                        onChange={(e) =>
-                          setForm((p) => ({ ...p, rent_office_name: e.target.value }))
-                        }
-                        maxLength={80}
-                        autoComplete="organization"
-                      />
-                    </label>
-
-                    <div className="rounded-2xl border border-black/[0.06] bg-white overflow-hidden">
-                      <div className="px-5 py-4 border-b border-black/[0.04] bg-slate-50/80">
-                        <h5 className="font-bold text-slate-900">Λογότυπο /rent</h5>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          PNG, JPG ή WebP · μόνο στην εφαρμογή ενοικίασης
-                          {!hasCustomRentLogo && form.logo_url
-                            ? ' · χωρίς ανέβασμα χρησιμοποιείται το logo γραφείου'
-                            : ''}
-                        </p>
-                      </div>
-                      <div className="p-5 grid sm:grid-cols-[160px_1fr] gap-5 items-start">
-                        <div
-                          className={`flex h-28 items-center justify-center rounded-2xl border border-dashed ${
-                            rentLogoPreview
-                              ? 'border-teal-200 bg-white'
-                              : 'border-slate-200 bg-slate-50'
-                          }`}
-                        >
-                          {rentLogoPreview ? (
-                            <img
-                              src={rentLogoPreview}
-                              alt="Λογότυπο rent"
-                              className="max-h-20 max-w-[140px] object-contain"
-                            />
-                          ) : (
-                            <span className="material-symbols-outlined text-slate-300 text-[36px]">
-                              directions_car
-                            </span>
-                          )}
-                        </div>
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap gap-2">
-                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-teal-800">
-                              <span className="material-symbols-outlined text-[18px]">upload</span>
-                              {uploadingLogo ? 'Ανέβασμα…' : 'Ανέβασμα λογοτύπου'}
-                              <input
-                                type="file"
-                                accept="image/png,image/jpeg,image/webp,image/gif"
-                                className="hidden"
-                                disabled={uploadingLogo || saving}
-                                onChange={(e) => handleImageUpload('rent_logo', e)}
-                              />
-                            </label>
-                            {hasCustomRentLogo ? (
-                              <button
-                                type="button"
-                                disabled={uploadingLogo || saving}
-                                onClick={() => handleClearAsset('rent_logo')}
-                                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                              >
-                                Καθαρισμός
-                              </button>
-                            ) : null}
-                          </div>
-                          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                            <input
-                              type="checkbox"
-                              className="rounded border-slate-300"
-                              checked={form.rent_logo_show_name !== false}
-                              onChange={(e) =>
-                                setForm((p) => ({
-                                  ...p,
-                                  rent_logo_show_name: e.target.checked,
-                                }))
-                              }
-                            />
-                            Εμφάνιση ονόματος δίπλα στο λογότυπο
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </PanelCard>
-              </form>
+                  }}
+                />
+              </PanelCard>
             )}
             {section === 'copy' && (
               <PanelCard

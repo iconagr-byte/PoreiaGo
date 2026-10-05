@@ -704,8 +704,8 @@
 
 .rent-brand-mark-logo-wrap {
   flex-shrink: 0;
-  height: 2.55rem;
-  max-width: 8.5rem;
+  height: var(--rent-logo-h, 2.55rem);
+  max-width: var(--rent-logo-max-w, 8.5rem);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -714,6 +714,16 @@
   background: transparent;
   border: 0;
   box-shadow: none;
+}
+
+.rent-topbar--compact .rent-topbar-row {
+  min-height: 2.75rem;
+  padding-block: 0.35rem;
+}
+
+.rent-topbar--compact .rent-brand-mark-logo-wrap,
+.rent-topbar--compact .rent-brand-mark-badge {
+  height: calc(var(--rent-logo-h, 2.55rem) * 0.88);
 }
 
 .rent-brand-mark-logo {

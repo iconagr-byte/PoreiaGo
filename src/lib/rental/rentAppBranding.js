@@ -3,7 +3,11 @@
  * Stored on site_appearance; empty fields fall back to office legal name / defaults.
  */
 
-import { isPlatformPlaceholderLogo } from '../branding/officeBrand.js';
+import {
+  clampLogoHeight,
+  clampLogoMaxWidth,
+  isPlatformPlaceholderLogo,
+} from '../branding/officeBrand.js';
 import {
   RENT_GUEST_HERO_BENEFITS,
   RENT_GUEST_SEARCH_DEFAULTS,
@@ -122,11 +126,20 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
       ? appearance.rent_logo_show_name !== false
       : appearance.logo_show_name !== false;
 
+  const logoHeightPx = clampLogoHeight(
+    appearance.rent_logo_height_px ?? appearance.logo_height_px ?? 40,
+  );
+  const logoMaxWidthPx = clampLogoMaxWidth(appearance.rent_logo_max_width_px ?? 160);
+  const headerCompact = appearance.rent_header_compact === true;
+
   return {
     officeName: office,
     brandLabel: office,
     logoUrl,
     showName,
+    logoHeightPx,
+    logoMaxWidthPx,
+    headerCompact,
     /** No subtitle under the wordmark — keeps the header clean. */
     brandSubtitle: '',
     title,

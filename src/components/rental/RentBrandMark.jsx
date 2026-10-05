@@ -19,6 +19,8 @@ export default function RentBrandMark({
   subtitle = '',
   compact = false,
   variant = 'default',
+  logoHeightPx,
+  logoMaxWidthPx,
 } = {}) {
   const [imgBroken, setImgBroken] = useState(false);
   const name = String(label || '').trim() || DEFAULT_LABEL;
@@ -35,6 +37,14 @@ export default function RentBrandMark({
     .filter(Boolean)
     .join(' ');
 
+  const sizeStyle = {};
+  if (logoHeightPx != null && Number.isFinite(Number(logoHeightPx))) {
+    sizeStyle['--rent-logo-h'] = `${Number(logoHeightPx)}px`;
+  }
+  if (logoMaxWidthPx != null && Number.isFinite(Number(logoMaxWidthPx))) {
+    sizeStyle['--rent-logo-max-w'] = `${Number(logoMaxWidthPx)}px`;
+  }
+
   const wordmark = (
     <span className="rent-brand-mark-copy">
       <span className="rent-brand-mark-name">
@@ -47,7 +57,7 @@ export default function RentBrandMark({
 
   if (src) {
     return (
-      <span className={rootClass}>
+      <span className={rootClass} style={sizeStyle}>
         <span className="rent-brand-mark-logo-wrap">
           <img
             src={src}
@@ -62,7 +72,7 @@ export default function RentBrandMark({
   }
 
   return (
-    <span className={rootClass}>
+    <span className={rootClass} style={sizeStyle}>
       <span className="rent-brand-mark-badge" aria-hidden>
         <span className="material-symbols-outlined rent-brand-mark-icon">directions_car</span>
       </span>

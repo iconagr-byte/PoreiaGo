@@ -115,6 +115,9 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_office_name": "",
     "rent_logo_url": "",
     "rent_logo_show_name": True,
+    "rent_logo_height_px": 40,
+    "rent_logo_max_width_px": 160,
+    "rent_header_compact": False,
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
     "rent_guest_hero_title": "Ενοικίαση αυτοκινήτου",
@@ -218,6 +221,9 @@ class SiteAppearanceResponse(BaseModel):
     rent_office_name: str = ""
     rent_logo_url: str = ""
     rent_logo_show_name: bool = True
+    rent_logo_height_px: int = 40
+    rent_logo_max_width_px: int = 160
+    rent_header_compact: bool = False
     rent_hero_title: str = "Το όχημά σας, σε λίγα βήματα"
     rent_hero_copy: str = (
         "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
@@ -324,6 +330,9 @@ class SiteAppearanceUpdate(BaseModel):
     rent_office_name: str | None = None
     rent_logo_url: str | None = None
     rent_logo_show_name: bool | None = None
+    rent_logo_height_px: int | None = None
+    rent_logo_max_width_px: int | None = None
+    rent_header_compact: bool | None = None
     rent_hero_title: str | None = None
     rent_hero_copy: str | None = None
     rent_guest_hero_title: str | None = None
