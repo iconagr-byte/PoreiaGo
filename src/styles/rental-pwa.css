@@ -3014,6 +3014,126 @@
   color: #ffe8a3;
 }
 
+.rent-search-dates-prompt {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin: 0 0 0.85rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  background: rgba(0, 113, 227, 0.1);
+  border: 1px solid rgba(0, 113, 227, 0.22);
+  color: #1d1d1f;
+  animation: rent-dates-prompt-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes rent-dates-prompt-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rent-search-dates-prompt .material-symbols-outlined {
+  font-size: 1.35rem;
+  color: #0071e3;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.rent-search-dates-prompt-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.rent-search-dates-prompt-copy strong {
+  display: block;
+  font-family: var(--wallet-display);
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+}
+
+.rent-search-dates-prompt-copy p {
+  margin: 0.2rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 450;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: #424245;
+}
+
+.rent-search-dates-prompt-dismiss {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #6e6e73;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.rent-search-dates-prompt-dismiss:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1d1d1f;
+}
+
+.rent-search-dates-prompt-dismiss .material-symbols-outlined {
+  font-size: 1.1rem;
+  color: inherit;
+  margin: 0;
+}
+
+.rent-search-row.is-dates-focus .rent-search-field--date.is-prompt {
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.28);
+  border-radius: 12px;
+}
+
+.rent-search--hero .rent-search-dates-prompt {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.rent-search--hero .rent-search-dates-prompt .material-symbols-outlined {
+  color: #fff;
+}
+
+.rent-search--hero .rent-search-dates-prompt-copy strong,
+.rent-search--hero .rent-search-dates-prompt-copy p {
+  color: #fff;
+}
+
+.rent-search--hero .rent-search-dates-prompt-copy p {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.rent-search--hero .rent-search-dates-prompt-dismiss {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.rent-search--hero .rent-search-dates-prompt-dismiss:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.rent-search--hero .rent-search-row.is-dates-focus .rent-search-field--date.is-prompt {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.45);
+}
+
 /* —— Rentalcars-style hero search strip (always one horizontal line) —— */
 .rent-search--hero {
   max-width: none;
