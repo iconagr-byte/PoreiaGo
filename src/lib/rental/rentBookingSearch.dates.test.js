@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import {
   RENT_NEED_DATES_DEFAULT_MESSAGE,
+  RENT_NEED_DATES_EVENT,
   RENT_NEED_DATES_KEY,
   consumeNeedRentDates,
   markNeedRentDates,
+  navigateToRentDateSearch,
   rentTripSearchReady,
 } from './rentBookingSearch.js';
 
