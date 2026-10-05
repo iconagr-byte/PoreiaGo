@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
+  RENT_NEED_DATES_DEFAULT_MESSAGE,
+  RENT_NEED_DATES_EVENT,
   buildRentLocationOptions,
   consumeNeedRentDates,
   defaultPickupDateTime,
   defaultReturnDateTime,
+  focusRentPickupDateField,
   readRentBookingPrefs,
   writeRentBookingPrefs,
 } from '../../lib/rental/rentBookingSearch.js';
@@ -42,6 +46,14 @@ export default function RentBookingSearchBar({
   const [datesPrompt, setDatesPrompt] = useState('');
   const [datesFocus, setDatesFocus] = useState(false);
   const pickupDateRef = useRef(null);
+  const location = useLocation();
+
+  const showDatesPrompt = (message) => {
+    const text = String(message || RENT_NEED_DATES_DEFAULT_MESSAGE).trim();
+    setDatesPrompt(text || RENT_NEED_DATES_DEFAULT_MESSAGE);
+    setDatesFocus(true);
+    focusRentPickupDateField();
+  };
 
   useEffect(() => {
     const prefs = readRentBookingPrefs();
@@ -63,36 +75,29 @@ export default function RentBookingSearchBar({
     }
   }, []);
 
+  // Mount + SPA re-entry (Επιλογή while already on /rent).
   useEffect(() => {
-    const pending = consumeNeedRentDates();
-    const hashWantsDates =
-      typeof window !== 'undefined' &&
-      (window.location.hash === '#rent-pickup-date' ||
-        window.location.hash === '#rent-guest-search');
-    if (!pending && !hashWantsDates) return undefined;
+    const applyPending = () => {
+      const pending = consumeNeedRentDates();
+      const params = new URLSearchParams(location.search || '');
+      const wantsDates =
+        Boolean(pending) ||
+        params.get('need_dates') === '1' ||
+        location.hash === '#rent-pickup-date' ||
+        location.hash === '#rent-guest-search';
+      if (!wantsDates) return;
+      showDatesPrompt(pending?.message || RENT_NEED_DATES_DEFAULT_MESSAGE);
+    };
 
-    if (pending?.message) setDatesPrompt(pending.message);
-    else if (hashWantsDates) {
-      setDatesPrompt('Επίλεξε ημερομηνίες παραλαβής και επιστροφής για να συνεχίσεις.');
-    }
-    setDatesFocus(true);
+    applyPending();
 
-    const t = window.setTimeout(() => {
-      document.getElementById('rent-guest-search')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
-      const input = pickupDateRef.current || document.getElementById('rent-pickup-date');
-      try {
-        input?.focus?.({ preventScroll: true });
-        input?.showPicker?.();
-      } catch {
-        input?.focus?.();
-      }
-    }, 80);
-
-    return () => window.clearTimeout(t);
-  }, []);
+    const onNeed = (e) => {
+      const msg = e?.detail?.message || consumeNeedRentDates()?.message;
+      showDatesPrompt(msg || RENT_NEED_DATES_DEFAULT_MESSAGE);
+    };
+    window.addEventListener(RENT_NEED_DATES_EVENT, onNeed);
+    return () => window.removeEventListener(RENT_NEED_DATES_EVENT, onNeed);
+  }, [location.search, location.hash]);
 
   useEffect(() => {
     if (!locations.length) return;
