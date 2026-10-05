@@ -20,7 +20,15 @@ router = APIRouter(tags=["site-appearance"])
 logger = logging.getLogger(__name__)
 
 _LEGACY_DATA = Path(__file__).resolve().parents[1] / "data"
-_ALLOWED_KINDS = frozenset({"logo", "hero"})
+_ALLOWED_KINDS = frozenset({"logo", "hero", "rent_logo"})
+
+
+def _url_key_for_kind(kind: str) -> str:
+    if kind == "logo":
+        return "logo_url"
+    if kind == "rent_logo":
+        return "rent_logo_url"
+    return "hero_image_url"
 _MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 # Only legacy PoreiaGo/AeroStride brand marks — not /api/site/assets/logo
 # (that path is the real uploaded office logo from the upload API).
@@ -105,6 +113,8 @@ DEFAULT_SITE_APPEARANCE = {
     "footer_contact_phone": "",
     "footer_address": "",
     "rent_office_name": "",
+    "rent_logo_url": "",
+    "rent_logo_show_name": True,
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
     "rent_guest_hero_title": "Ενοικίαση αυτοκινήτου",
@@ -206,6 +216,8 @@ class SiteAppearanceResponse(BaseModel):
     footer_contact_phone: str = ""
     footer_address: str = ""
     rent_office_name: str = ""
+    rent_logo_url: str = ""
+    rent_logo_show_name: bool = True
     rent_hero_title: str = "Το όχημά σας, σε λίγα βήματα"
     rent_hero_copy: str = (
         "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα."
@@ -310,6 +322,8 @@ class SiteAppearanceUpdate(BaseModel):
     footer_contact_phone: str | None = None
     footer_address: str | None = None
     rent_office_name: str | None = None
+    rent_logo_url: str | None = None
+    rent_logo_show_name: bool | None = None
     rent_hero_title: str | None = None
     rent_hero_copy: str | None = None
     rent_guest_hero_title: str | None = None
@@ -829,7 +843,7 @@ async def upload_site_asset(kind: str, request: Request, file: UploadFile = File
     out_path = _upload_dir() / f"{kind}{ext}"
     out_path.write_bytes(content)
     current = _read_appearance()
-    url_key = "logo_url" if kind == "logo" else "hero_image_url"
+    url_key = _url_key_for_kind(kind)
     current[url_key] = _asset_api_url(kind)
     saved = _write_appearance(current)
     return {
@@ -848,10 +862,11 @@ async def clear_site_asset(kind: str, request: Request):
     for old in _upload_dir().glob(f"{kind}.*"):
         old.unlink(missing_ok=True)
     current = _read_appearance()
-    if kind == "logo":
-        current["logo_url"] = ""
+    url_key = _url_key_for_kind(kind)
+    if kind == "hero":
+        current[url_key] = DEFAULT_SITE_APPEARANCE["hero_image_url"]
     else:
-        current["hero_image_url"] = DEFAULT_SITE_APPEARANCE["hero_image_url"]
+        current[url_key] = ""
     saved = _write_appearance(current)
     return {"ok": True, "appearance": SiteAppearanceResponse(**saved)}
 

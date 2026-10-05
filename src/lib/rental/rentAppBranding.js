@@ -71,7 +71,8 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
 
   const office = candidates[0] || DEFAULT_RENT_APP_BRANDING.rent_brand_label;
 
-  const rawLogo = appearance.logo_url || '';
+  // Prefer rent-specific logo so dual offices (buses + rent) can brand /rent alone.
+  const rawLogo = appearance.rent_logo_url || appearance.logo_url || '';
   const logoUrl = isPlatformPlaceholderLogo(rawLogo) ? '' : String(rawLogo).trim();
 
   const title = guest
@@ -116,11 +117,16 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     String(appearance.rent_cta_label || '').trim() ||
     DEFAULT_RENT_APP_BRANDING.rent_cta_label;
 
+  const showName =
+    appearance.rent_logo_show_name !== undefined && appearance.rent_logo_show_name !== null
+      ? appearance.rent_logo_show_name !== false
+      : appearance.logo_show_name !== false;
+
   return {
     officeName: office,
     brandLabel: office,
     logoUrl,
-    showName: appearance.logo_show_name !== false,
+    showName,
     /** No subtitle under the wordmark — keeps the header clean. */
     brandSubtitle: '',
     title,
@@ -131,6 +137,7 @@ export function resolveRentAppBranding(appearance = {}, opts = {}) {
     ctaLabel: cta,
     isCustomized: Boolean(
       String(appearance.rent_office_name || '').trim() ||
+        String(appearance.rent_logo_url || '').trim() ||
         String(appearance.rent_hero_title || '').trim() ||
         String(appearance.rent_hero_copy || '').trim(),
     ),

@@ -35,7 +35,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/branding", tags=["Tenant Branding"])
 
-_ASSET_KINDS = frozenset({"logo", "hero"})
+_ASSET_KINDS = frozenset({"logo", "hero", "rent_logo"})
+
+
+def _appearance_key_for_kind(kind: str) -> str:
+    if kind == "logo":
+        return "logo_url"
+    if kind == "rent_logo":
+        return "rent_logo_url"
+    return "hero_image_url"
 
 
 def _dev_fallback_enabled() -> bool:
@@ -245,7 +253,7 @@ async def upload_site_appearance_asset(
             detail="Αποτυχία επεξεργασίας εικόνας",
         ) from exc
 
-    key = "logo_url" if kind_norm == "logo" else "hero_image_url"
+    key = _appearance_key_for_kind(kind_norm)
     persist_warning = None
     appearance: dict = {}
     svc = TenantSiteAppearanceService(db)
@@ -255,6 +263,8 @@ async def upload_site_appearance_asset(
         # Prefer minimal writer — full update_appearance can choke on legacy bags.
         if kind_norm == "logo":
             return await svc.force_set_media_url(tenant_id, logo_url=saved["url"])
+        if kind_norm == "rent_logo":
+            return await svc.force_set_media_url(tenant_id, rent_logo_url=saved["url"])
         return await svc.force_set_media_url(tenant_id, hero_image_url=saved["url"])
 
     try:
@@ -294,7 +304,7 @@ async def upload_site_appearance_asset(
             appearance = {key: saved["url"]}
 
     if isinstance(appearance, dict):
-        for heavy in ("logo_url", "hero_image_url"):
+        for heavy in ("logo_url", "rent_logo_url", "hero_image_url"):
             val = str(appearance.get(heavy) or "")
             if val.startswith("data:") and len(val) > 8000:
                 appearance[heavy] = saved["url"] if heavy == key else ""
@@ -329,8 +339,12 @@ async def clear_site_appearance_asset(
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    key = "logo_url" if kind_norm == "logo" else "hero_image_url"
-    value = "" if kind_norm == "logo" else DEFAULT_SITE_APPEARANCE.get("hero_image_url", "")
+    key = _appearance_key_for_kind(kind_norm)
+    value = (
+        DEFAULT_SITE_APPEARANCE.get("hero_image_url", "")
+        if kind_norm == "hero"
+        else ""
+    )
     appearance = await TenantSiteAppearanceService(db).update_appearance(
         tenant_id,
         {key: value},

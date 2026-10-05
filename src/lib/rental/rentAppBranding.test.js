@@ -37,6 +37,18 @@ console.assert(office.isCustomized === true, 'customized flag');
 console.assert(office.logoUrl === '/api/site/assets/logo', 'logo kept');
 console.assert(office.brandSubtitle === '', 'no subtitle under wordmark');
 
+const rentLogoWins = resolveRentAppBranding({
+  logo_url: '/api/site/assets/logo',
+  rent_logo_url: '/api/site/office-assets/t/rent_logo/rent_logo.jpg',
+  rent_logo_show_name: false,
+});
+console.assert(
+  rentLogoWins.logoUrl === '/api/site/office-assets/t/rent_logo/rent_logo.jpg',
+  'rent_logo_url preferred over office logo',
+);
+console.assert(rentLogoWins.showName === false, 'rent_logo_show_name honored');
+console.assert(rentLogoWins.isCustomized === true, 'rent logo counts as customized');
+
 const guest = resolveRentAppBranding(
   { rent_guest_hero_title: 'Δες στόλο' },
   { guest: true },

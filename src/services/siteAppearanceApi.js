@@ -49,6 +49,8 @@ export const DEFAULT_SITE_APPEARANCE = {
   footer_contact_phone: '',
   footer_address: '',
   rent_office_name: '',
+  rent_logo_url: '',
+  rent_logo_show_name: true,
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
   rent_hero_copy:
     'Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.',
@@ -275,7 +277,12 @@ export async function uploadSiteAsset(kind, file) {
     if (!res.ok) await parseError(res);
     const data = await res.json();
     if (data.appearance || data.url) {
-      const key = kind === 'logo' ? 'logo_url' : 'hero_image_url';
+      const key =
+        kind === 'logo'
+          ? 'logo_url'
+          : kind === 'rent_logo'
+            ? 'rent_logo_url'
+            : 'hero_image_url';
       const merged = finalizeAppearance({
         ...(data.appearance || {}),
         [key]: data.url || data.appearance?.[key] || '',

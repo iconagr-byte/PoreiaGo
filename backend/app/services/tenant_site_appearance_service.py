@@ -27,7 +27,7 @@ def _is_oversized_data_url(value: Any) -> bool:
 def _prune_oversized_media(data: dict[str, Any]) -> dict[str, Any]:
     """Drop multi-hundred-KB data: URLs so Postgres appearance writes stay healthy."""
     out = {**data}
-    for key in ("logo_url", "hero_image_url"):
+    for key in ("logo_url", "rent_logo_url", "hero_image_url"):
         if _is_oversized_data_url(out.get(key)):
             out[key] = ""
     for slides_key in ("home_slider_slides", "rent_slider_slides"):
@@ -90,6 +90,8 @@ _BRAND_LOGO_PATCH_KEYS = frozenset(
         "footer_brand_name",
         "rent_office_name",
         "logo_url",
+        "rent_logo_url",
+        "rent_logo_show_name",
         "hero_image_url",
         "logo_height_px",
         "logo_max_width_px",
@@ -147,6 +149,8 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "footer_contact_phone": "",
     "footer_address": "",
     "rent_office_name": "",
+    "rent_logo_url": "",
+    "rent_logo_show_name": True,
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
     "rent_guest_hero_title": "Ενοικίαση αυτοκινήτου",
@@ -476,6 +480,19 @@ class TenantSiteAppearanceService:
                 or explicit.startswith("/api/site/assets/")
             ):
                 updated["logo_url"] = explicit
+        if "rent_logo_url" in patch:
+            explicit_rent = str(patch.get("rent_logo_url") or "").strip()
+            if explicit_rent and (
+                is_achillio_travel_office(tenant)
+                or not _looks_like_achillio_brand(explicit_rent)
+                or explicit_rent.startswith("/api/site/office-assets/")
+                or explicit_rent.startswith("/api/site/assets/")
+            ):
+                updated["rent_logo_url"] = explicit_rent
+            elif "rent_logo_url" in patch and not explicit_rent:
+                updated["rent_logo_url"] = ""
+        if "rent_logo_show_name" in patch:
+            updated["rent_logo_show_name"] = bool(patch.get("rent_logo_show_name"))
         if "hero_image_url" in patch:
             explicit_hero = str(patch.get("hero_image_url") or "").strip()
             if explicit_hero and (
@@ -524,6 +541,7 @@ class TenantSiteAppearanceService:
         settings = _prune_huge_strings(_prune_oversized_data_urls_deep(settings))
         if isinstance(settings.get("site_appearance"), dict):
             settings["site_appearance"]["logo_url"] = updated.get("logo_url", "")
+            settings["site_appearance"]["rent_logo_url"] = updated.get("rent_logo_url", "")
             settings["site_appearance"]["hero_image_url"] = updated.get("hero_image_url", "")
             # Re-apply size toggles after deep prune (they are never huge).
             for size_key in (
@@ -636,6 +654,7 @@ class TenantSiteAppearanceService:
         tenant_id: UUID,
         *,
         logo_url: str | None = None,
+        rent_logo_url: str | None = None,
         hero_image_url: str | None = None,
     ) -> dict[str, Any]:
         """
@@ -652,6 +671,8 @@ class TenantSiteAppearanceService:
         )
         if logo_url is not None:
             appearance["logo_url"] = str(logo_url).strip()
+        if rent_logo_url is not None:
+            appearance["rent_logo_url"] = str(rent_logo_url).strip()
         if hero_image_url is not None:
             appearance["hero_image_url"] = str(hero_image_url).strip()
         # Do not run platform Achillio scrub here — upload already scoped to JWT tenant.
