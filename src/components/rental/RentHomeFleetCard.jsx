@@ -1,7 +1,7 @@
 import { enrichRentVehicle } from '../../lib/rental/rentFleetEnrichment.js';
 
 /**
- * Vehicle pick card — photo-first, rent teal, clear price + CTA.
+ * Vehicle pick card — Apple Store product style, photo-first, clear price + CTA.
  * Double-click / photo tap opens vehicle detail sheet.
  */
 export default function RentHomeFleetCard({
@@ -20,11 +20,22 @@ export default function RentHomeFleetCard({
       ? Number(v.daily_rate_eur)
       : null;
 
+  const seatsLabel =
+    Number(v.seating_capacity) > 0
+      ? `${v.seating_capacity}`
+      : String(v.seats_label || '').replace(/[^\d]/g, '') || '—';
+  const bagsLabel =
+    Number(v.luggage_bags) > 0
+      ? `${v.luggage_bags}`
+      : String(v.luggage_label || '').replace(/^x/i, '') || '—';
+  const fuelLabel = String(v.fuel || v.fuel_type || '').trim() || 'A/C';
+  const gearLabel = String(v.transmission || '').trim() || 'Με ταχύτητες';
+
   const specs = [
-    { icon: 'group', label: v.seats_label || 'Επιβάτες' },
-    { icon: 'luggage', label: v.luggage_label || 'Αποσκευές' },
-    { icon: 'ac_unit', label: v.ac_label || 'A/C' },
-    { icon: 'settings', label: v.transmission || 'Με ταχύτητες' },
+    { icon: 'person', label: seatsLabel, title: 'Επιβάτες' },
+    { icon: 'luggage', label: bagsLabel, title: 'Αποσκευές' },
+    { icon: 'local_gas_station', label: fuelLabel, title: 'Καύσιμο' },
+    { icon: 'settings', label: gearLabel, title: 'Κιβώτιο' },
   ];
 
   const openDetails = (e) => {
@@ -85,7 +96,7 @@ export default function RentHomeFleetCard({
 
         <ul className="rent-pick-specs" aria-label="Χαρακτηριστικά">
           {specs.map((s) => (
-            <li key={s.icon}>
+            <li key={s.icon} title={s.title}>
               <span className="material-symbols-outlined" aria-hidden>
                 {s.icon}
               </span>
