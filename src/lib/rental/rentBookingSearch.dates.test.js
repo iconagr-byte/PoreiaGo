@@ -45,4 +45,20 @@ assert.equal(consumeNeedRentDates(), null);
 markNeedRentDates();
 assert.equal(consumeNeedRentDates()?.message, RENT_NEED_DATES_DEFAULT_MESSAGE);
 
+assert.equal(RENT_NEED_DATES_EVENT, 'rent-need-dates');
+
+let navigatedTo = '';
+let eventMessage = '';
+const onNeed = (e) => {
+  eventMessage = e.detail?.message || '';
+};
+globalThis.window = globalThis;
+globalThis.addEventListener(RENT_NEED_DATES_EVENT, onNeed);
+navigateToRentDateSearch((to) => {
+  navigatedTo = to;
+}, { message: 'Πάτα ημερομηνίες.' });
+assert.match(navigatedTo, /\/rent\?need_dates=1&t=\d+#rent-pickup-date/);
+assert.equal(eventMessage, 'Πάτα ημερομηνίες.');
+globalThis.removeEventListener(RENT_NEED_DATES_EVENT, onNeed);
+
 console.log('rentBookingSearch.dates.test.js: ok');
