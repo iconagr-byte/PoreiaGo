@@ -215,8 +215,8 @@ export default function RentGuestTopActions({
   return (
     <>
       <div className="rent-topbar-start">
-        {menu}
         {brand}
+        {menu}
       </div>
 
       <div className="rent-top-actions">
