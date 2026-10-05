@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   getCustomerEmail,
@@ -108,6 +108,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const [fleetLoading, setFleetLoading] = useState(true);
   const [homeCategory, setHomeCategory] = useState('');
   const [homeQuery, setHomeQuery] = useState('');
+  const deferredHomeQuery = useDeferredValue(homeQuery);
   const [fleetSort, setFleetSort] = useState('default');
   const [fleetFilters, setFleetFilters] = useState(() => ({ ...EMPTY_RENT_FLEET_FILTERS }));
   const [searchActive, setSearchActive] = useState(false);
@@ -184,19 +185,37 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
   const showingDemoFleet = useMemo(() => isClientDemoFleet(homeFleet), [homeFleet]);
   const homeCategories = useMemo(() => rentHomeCategoryFilters(homeFleet), [homeFleet]);
 
+  const categoryCounts = useMemo(() => {
+    const counts = { '': homeFleet.length };
+    for (const v of homeFleet) {
+      const id = String(v.category || '');
+      if (!id) continue;
+      counts[id] = (counts[id] || 0) + 1;
+    }
+    return counts;
+  }, [homeFleet]);
+
   const categoryScopedFleet = useMemo(
     () =>
       homeFleet
         .filter((v) => (homeCategory ? v.category === homeCategory : true))
         .filter((v) => {
-          const q = homeQuery.trim().toLowerCase();
+          const q = deferredHomeQuery.trim().toLowerCase();
           if (!q) return true;
           return `${v.model || ''} ${v.category || ''} ${v.category_label || ''} ${v.display_blurb || v.description || ''}`
             .toLowerCase()
             .includes(q);
         }),
-    [homeFleet, homeCategory, homeQuery],
+    [homeFleet, homeCategory, deferredHomeQuery],
   );
+
+  const sidebarFiltersActive = rentFleetFiltersActive(fleetFilters);
+  const clearAllFleetFilters = () => {
+    setHomeCategory('');
+    setHomeQuery('');
+    setFleetSort('default');
+    setFleetFilters({ ...EMPTY_RENT_FLEET_FILTERS });
+  };
 
   const filteredHomeFleet = useMemo(() => {
     const rows = applyRentFleetFilters(categoryScopedFleet, fleetFilters);
@@ -326,6 +345,20 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                         <span className="rent-pick-count">{filteredHomeFleet.length}</span>
                       </h2>
                       <p className="rent-pick-head-sub">{fleetSubtitle}</p>
+                      {homeCategory || homeQuery || sidebarFiltersActive ? (
+                        <div className="rent-pick-head-meta">
+                          <button
+                            type="button"
+                            className="rent-pick-active-chip"
+                            onClick={clearAllFleetFilters}
+                          >
+                            <span className="material-symbols-outlined" aria-hidden>
+                              filter_alt_off
+                            </span>
+                            Καθαρισμός φίλτρων
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="rent-pick-toolbar">
@@ -339,7 +372,8 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                             className={`rent-pick-cat${homeCategory === c ? ' is-active' : ''}`}
                             onClick={() => setHomeCategory(c)}
                           >
-                            {homeCategoryLabel(c)}
+                            <span>{homeCategoryLabel(c)}</span>
+                            <span className="rent-pick-cat-count">{categoryCounts[c] ?? 0}</span>
                           </button>
                         ))}
                       </div>
@@ -353,9 +387,24 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                             type="search"
                             value={homeQuery}
                             onChange={(e) => setHomeQuery(e.target.value)}
-                            placeholder="Μοντέλο ή κατηγορία…"
+                            placeholder="Αναζήτηση μοντέλου…"
                             aria-label="Αναζήτηση οχήματος"
                           />
+                          {homeQuery ? (
+                            <button
+                              type="button"
+                              className="rent-pick-search-clear"
+                              aria-label="Καθαρισμός αναζήτησης"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setHomeQuery('');
+                              }}
+                            >
+                              <span className="material-symbols-outlined" aria-hidden>
+                                close
+                              </span>
+                            </button>
+                          ) : null}
                         </label>
                         <label className="rent-pick-filter rent-pick-filter--sort">
                           <span className="visually-hidden">Ταξινόμηση</span>
@@ -398,16 +447,11 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                           ? 'Δεν υπάρχει διαθέσιμο όχημα για αυτές τις ημερομηνίες.'
                           : 'Δεν βρέθηκαν οχήματα με αυτά τα φίλτρα.'}
                       </p>
-                      {homeCategory || homeQuery || rentFleetFiltersActive(fleetFilters) ? (
+                      {homeCategory || homeQuery || sidebarFiltersActive ? (
                         <button
                           type="button"
                           className="rent-pick-empty-reset"
-                          onClick={() => {
-                            setHomeCategory('');
-                            setHomeQuery('');
-                            setFleetSort('default');
-                            setFleetFilters({ ...EMPTY_RENT_FLEET_FILTERS });
-                          }}
+                          onClick={clearAllFleetFilters}
                         >
                           Καθαρισμός φίλτρων
                         </button>
