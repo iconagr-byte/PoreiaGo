@@ -49,16 +49,49 @@ assert.equal(RENT_NEED_DATES_EVENT, 'rent-need-dates');
 
 let navigatedTo = '';
 let eventMessage = '';
+const listeners = new Map();
+const fakeWindow = {
+  dispatchEvent(evt) {
+    const type = evt?.type;
+    for (const fn of listeners.get(type) || []) fn(evt);
+    return true;
+  },
+  addEventListener(type, fn) {
+    const list = listeners.get(type) || [];
+    list.push(fn);
+    listeners.set(type, list);
+  },
+  removeEventListener(type, fn) {
+    listeners.set(
+      type,
+      (listeners.get(type) || []).filter((x) => x !== fn),
+    );
+  },
+  requestAnimationFrame(cb) {
+    cb();
+    return 1;
+  },
+  setTimeout(cb) {
+    cb();
+    return 1;
+  },
+};
+globalThis.window = fakeWindow;
+globalThis.CustomEvent = class CustomEvent {
+  constructor(type, init = {}) {
+    this.type = type;
+    this.detail = init.detail;
+  }
+};
 const onNeed = (e) => {
   eventMessage = e.detail?.message || '';
 };
-globalThis.window = globalThis;
-globalThis.addEventListener(RENT_NEED_DATES_EVENT, onNeed);
+fakeWindow.addEventListener(RENT_NEED_DATES_EVENT, onNeed);
 navigateToRentDateSearch((to) => {
   navigatedTo = to;
 }, { message: 'Πάτα ημερομηνίες.' });
 assert.match(navigatedTo, /\/rent\?need_dates=1&t=\d+#rent-pickup-date/);
 assert.equal(eventMessage, 'Πάτα ημερομηνίες.');
-globalThis.removeEventListener(RENT_NEED_DATES_EVENT, onNeed);
+fakeWindow.removeEventListener(RENT_NEED_DATES_EVENT, onNeed);
 
 console.log('rentBookingSearch.dates.test.js: ok');
