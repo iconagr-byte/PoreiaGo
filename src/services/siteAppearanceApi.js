@@ -53,6 +53,10 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_logo_show_name: true,
   rent_logo_height_px: 40,
   rent_logo_max_width_px: 160,
+  rent_logo_radius_px: 0,
+  rent_logo_padding_px: 0,
+  rent_logo_bg_mode: 'none',
+  rent_logo_shadow: false,
   rent_header_compact: false,
   rent_hero_title: 'Το όχημά σας, σε λίγα βήματα',
   rent_hero_copy:

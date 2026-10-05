@@ -4,6 +4,9 @@ import RentBrandMark from '../rental/RentBrandMark.jsx';
 import {
   clampLogoHeight,
   clampLogoMaxWidth,
+  clampLogoPadding,
+  clampLogoRadius,
+  normalizeLogoBgMode,
 } from '../../lib/branding/officeBrand.js';
 import { resolveRentAppBranding } from '../../lib/rental/rentAppBranding.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
@@ -28,6 +31,10 @@ export default function RentBrandDesigner({
 
   const height = clampLogoHeight(form.rent_logo_height_px ?? form.logo_height_px ?? 40);
   const maxWidth = clampLogoMaxWidth(form.rent_logo_max_width_px ?? 160);
+  const radius = clampLogoRadius(form.rent_logo_radius_px ?? 0);
+  const padding = clampLogoPadding(form.rent_logo_padding_px ?? 0);
+  const bgMode = normalizeLogoBgMode(form.rent_logo_bg_mode ?? 'none');
+  const shadowOn = form.rent_logo_shadow === true;
   const compact = form.rent_header_compact === true;
   const showName = form.rent_logo_show_name !== false;
 
@@ -37,10 +44,14 @@ export default function RentBrandDesigner({
         ...form,
         rent_logo_height_px: height,
         rent_logo_max_width_px: maxWidth,
+        rent_logo_radius_px: radius,
+        rent_logo_padding_px: padding,
+        rent_logo_bg_mode: bgMode,
+        rent_logo_shadow: shadowOn,
         rent_logo_show_name: showName,
         rent_header_compact: compact,
       }),
-    [form, height, maxWidth, showName, compact],
+    [form, height, maxWidth, radius, padding, bgMode, shadowOn, showName, compact],
   );
 
   const logoSrc = preview.logoUrl ? resolveSiteAssetUrl(preview.logoUrl) : '';
@@ -129,19 +140,19 @@ export default function RentBrandDesigner({
                 compact ? 'py-2' : 'py-3'
               }`}
             >
-              <div
-                className="min-w-0"
-                style={{
-                  ['--rent-logo-h']: `${height}px`,
-                  ['--rent-logo-max-w']: `${maxWidth}px`,
-                }}
-              >
+              <div className="min-w-0">
                 <RentBrandMark
                   label={preview.brandLabel}
                   logoUrl={preview.logoUrl}
                   showName={preview.showName}
                   compact={compact}
                   variant={previewTone === 'dark' ? 'onDark' : 'default'}
+                  logoHeightPx={preview.logoHeightPx}
+                  logoMaxWidthPx={preview.logoMaxWidthPx}
+                  logoRadiusPx={preview.logoRadiusPx}
+                  logoPaddingPx={preview.logoPaddingPx}
+                  logoBgMode={preview.logoBgMode}
+                  logoShadow={preview.logoShadow}
                 />
               </div>
               <div className="hidden items-center gap-2 sm:flex">
@@ -340,6 +351,137 @@ export default function RentBrandDesigner({
               />
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Logo design */}
+      <section className="rounded-[22px] border border-black/[0.06] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
+        <h5 className="font-bold text-slate-900">Σχεδιασμός λογοτύπου</h5>
+        <p className="mt-0.5 mb-4 text-xs text-slate-500">
+          Στρογγύλεμα, φόντο και σκιά — μόνο στο header /rent
+        </p>
+
+        <div className="space-y-5">
+          <div>
+            <div className="mb-1.5 flex items-center justify-between text-xs font-bold text-slate-500">
+              <span>Στρογγύλεμα</span>
+              <span className="tabular-nums text-slate-800">{radius}px</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={48}
+              step={2}
+              value={radius}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  rent_logo_radius_px: clampLogoRadius(e.target.value),
+                }))
+              }
+              className="w-full accent-teal-700"
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {[
+                { label: 'Ορθό', value: 0 },
+                { label: 'Ήπιο', value: 8 },
+                { label: 'Στρογγυλό', value: 16 },
+                { label: 'Κύκλος', value: 48 },
+              ].map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() =>
+                    setForm((p) => ({ ...p, rent_logo_radius_px: preset.value }))
+                  }
+                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold transition ${
+                    radius === preset.value
+                      ? 'border-teal-700 bg-teal-700 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-teal-300'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between text-xs font-bold text-slate-500">
+              <span>Εσωτερικό κενό</span>
+              <span className="tabular-nums text-slate-800">{padding}px</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={24}
+              step={2}
+              value={padding}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  rent_logo_padding_px: clampLogoPadding(e.target.value),
+                }))
+              }
+              className="w-full accent-teal-700"
+            />
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-bold text-slate-500">Φόντο</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { id: 'none', label: 'Κανένα' },
+                { id: 'white', label: 'Λευκό' },
+                { id: 'soft', label: 'Απαλό' },
+                { id: 'dark', label: 'Σκούρο' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, rent_logo_bg_mode: opt.id }))}
+                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold transition ${
+                    bgMode === opt.id
+                      ? 'border-teal-700 bg-teal-700 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-teal-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={shadowOn}
+            onClick={() =>
+              setForm((p) => ({ ...p, rent_logo_shadow: !p.rent_logo_shadow }))
+            }
+            className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+              shadowOn
+                ? 'border-teal-300 bg-teal-50'
+                : 'border-black/[0.06] bg-slate-50/80 hover:bg-slate-50'
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-slate-900">Ήπια σκιά</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">Δίνει βάθος στο λογότυπο</p>
+            </div>
+            <span
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                shadowOn ? 'bg-teal-700' : 'bg-slate-300'
+              }`}
+              aria-hidden
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  shadowOn ? 'translate-x-5' : ''
+                }`}
+              />
+            </span>
+          </button>
         </div>
       </section>
 

@@ -999,11 +999,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   };
 
   const logoPreview = form.logo_url ? resolveSiteAssetUrl(form.logo_url) : '';
-  const rentLogoPreview = form.rent_logo_url
-    ? resolveSiteAssetUrl(form.rent_logo_url)
-    : form.logo_url
-      ? resolveSiteAssetUrl(form.logo_url)
-      : '';
   const hasCustomRentLogo = Boolean(form.rent_logo_url);
   const heroPreview = resolveSiteAssetUrl(form.hero_image_url);
   const hasCustomLogo = Boolean(form.logo_url);
@@ -1146,7 +1141,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             {section === 'branding' && (
               <PanelCard
                 title="Μάρκα & header /rent"
-                description="Ξεχωριστό branding για ενοικιάσεις — live preview, μεγέθη logo και επιλογές header."
+                description="Ξεχωριστό branding για ενοικιάσεις — live preview, μεγέθη, στυλ logo και επιλογές header."
               >
                 <RentBrandDesigner
                   form={form}
@@ -1167,6 +1162,16 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                       rent_logo_max_width_px: clampLogoMaxWidth(
                         form.rent_logo_max_width_px ?? 160,
                       ),
+                      rent_logo_radius_px: clampLogoRadius(
+                        form.rent_logo_radius_px ?? 0,
+                      ),
+                      rent_logo_padding_px: clampLogoPadding(
+                        form.rent_logo_padding_px ?? 0,
+                      ),
+                      rent_logo_bg_mode: normalizeLogoBgMode(
+                        form.rent_logo_bg_mode ?? 'none',
+                      ),
+                      rent_logo_shadow: form.rent_logo_shadow === true,
                       rent_header_compact: form.rent_header_compact === true,
                     };
                     let logo = String(form.rent_logo_url || '');

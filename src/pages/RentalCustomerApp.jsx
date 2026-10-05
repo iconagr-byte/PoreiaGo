@@ -283,6 +283,10 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
                     subtitle={branding.brandSubtitle}
                     logoHeightPx={branding.logoHeightPx}
                     logoMaxWidthPx={branding.logoMaxWidthPx}
+                    logoRadiusPx={branding.logoRadiusPx}
+                    logoPaddingPx={branding.logoPaddingPx}
+                    logoBgMode={branding.logoBgMode}
+                    logoShadow={branding.logoShadow}
                     compact={branding.headerCompact}
                   />
                 </button>
@@ -303,6 +307,12 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             brandLabel={branding.brandLabel}
             logoUrl={branding.logoUrl}
             brandSubtitle={branding.brandSubtitle}
+            logoHeightPx={branding.logoHeightPx}
+            logoMaxWidthPx={branding.logoMaxWidthPx}
+            logoRadiusPx={branding.logoRadiusPx}
+            logoPaddingPx={branding.logoPaddingPx}
+            logoBgMode={branding.logoBgMode}
+            logoShadow={branding.logoShadow}
             title={branding.title}
             titleAccent={branding.titleAccent}
             copy={branding.copy}
@@ -765,6 +775,10 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
               subtitle={branding.brandSubtitle}
               logoHeightPx={branding.logoHeightPx}
               logoMaxWidthPx={branding.logoMaxWidthPx}
+              logoRadiusPx={branding.logoRadiusPx}
+              logoPaddingPx={branding.logoPaddingPx}
+              logoBgMode={branding.logoBgMode}
+              logoShadow={branding.logoShadow}
               compact={branding.headerCompact}
             />
           </button>
@@ -788,6 +802,10 @@ function RentalAuthenticatedApp({ walletFocus = false } = {}) {
                     subtitle={branding.brandSubtitle}
                     logoHeightPx={branding.logoHeightPx}
                     logoMaxWidthPx={branding.logoMaxWidthPx}
+                    logoRadiusPx={branding.logoRadiusPx}
+                    logoPaddingPx={branding.logoPaddingPx}
+                    logoBgMode={branding.logoBgMode}
+                    logoShadow={branding.logoShadow}
                   />
                 </div>
                 <h1 className="rent-hero-title">{branding.title}</h1>

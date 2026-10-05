@@ -16,6 +16,12 @@ export default function RentGuestHero({
   brandLabel = 'Poreiago Rent',
   logoUrl = '',
   brandSubtitle = '',
+  logoHeightPx,
+  logoMaxWidthPx,
+  logoRadiusPx,
+  logoPaddingPx,
+  logoBgMode,
+  logoShadow,
   title,
   titleAccent,
   copy,
@@ -70,6 +76,12 @@ export default function RentGuestHero({
             showName
             subtitle={brandSubtitle}
             variant="onDark"
+            logoHeightPx={logoHeightPx}
+            logoMaxWidthPx={logoMaxWidthPx}
+            logoRadiusPx={logoRadiusPx}
+            logoPaddingPx={logoPaddingPx}
+            logoBgMode={logoBgMode}
+            logoShadow={logoShadow}
           />
         </div>
 

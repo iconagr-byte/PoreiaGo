@@ -94,6 +94,10 @@ _BRAND_LOGO_PATCH_KEYS = frozenset(
         "rent_logo_show_name",
         "rent_logo_height_px",
         "rent_logo_max_width_px",
+        "rent_logo_radius_px",
+        "rent_logo_padding_px",
+        "rent_logo_bg_mode",
+        "rent_logo_shadow",
         "rent_header_compact",
         "hero_image_url",
         "logo_height_px",
@@ -156,6 +160,10 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "rent_logo_show_name": True,
     "rent_logo_height_px": 40,
     "rent_logo_max_width_px": 160,
+    "rent_logo_radius_px": 0,
+    "rent_logo_padding_px": 0,
+    "rent_logo_bg_mode": "none",
+    "rent_logo_shadow": False,
     "rent_header_compact": False,
     "rent_hero_title": "Το όχημά σας, σε λίγα βήματα",
     "rent_hero_copy": "Κράτηση, ημερολόγιο και χάρτης παραλαβής — όλα σε μία σελίδα.",
@@ -515,6 +523,27 @@ class TenantSiteAppearanceService:
                 )
         except (TypeError, ValueError):
             updated["rent_logo_max_width_px"] = 160
+        try:
+            if "rent_logo_radius_px" in updated:
+                updated["rent_logo_radius_px"] = max(
+                    0, min(48, int(updated["rent_logo_radius_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_radius_px"] = 0
+        try:
+            if "rent_logo_padding_px" in updated:
+                updated["rent_logo_padding_px"] = max(
+                    0, min(24, int(updated["rent_logo_padding_px"]))
+                )
+        except (TypeError, ValueError):
+            updated["rent_logo_padding_px"] = 0
+        if "rent_logo_bg_mode" in updated:
+            mode = str(updated.get("rent_logo_bg_mode") or "none").strip().lower()
+            updated["rent_logo_bg_mode"] = (
+                mode if mode in ("none", "white", "soft", "dark") else "none"
+            )
+        if "rent_logo_shadow" in updated:
+            updated["rent_logo_shadow"] = bool(updated["rent_logo_shadow"])
         if "hero_image_url" in patch:
             explicit_hero = str(patch.get("hero_image_url") or "").strip()
             if explicit_hero and (
@@ -574,6 +603,14 @@ class TenantSiteAppearanceService:
                 "logo_bg_mode",
                 "logo_shadow",
                 "logo_show_name",
+                "rent_logo_height_px",
+                "rent_logo_max_width_px",
+                "rent_logo_radius_px",
+                "rent_logo_padding_px",
+                "rent_logo_bg_mode",
+                "rent_logo_shadow",
+                "rent_logo_show_name",
+                "rent_header_compact",
             ):
                 if size_key in updated:
                     settings["site_appearance"][size_key] = updated[size_key]
