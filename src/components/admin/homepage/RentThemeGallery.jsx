@@ -15,10 +15,10 @@ const VIEWPORTS = [
 ];
 
 /**
- * ThemeForest-style full-window live preview of /rent.
+ * Full-window live preview of /rent.
  * Top chrome + iframe — click inside the page navigates the real storefront.
  */
-function RentThemeForestPreview({
+function RentThemeLivePreview({
   theme,
   themes = [],
   activeThemeId,
@@ -66,9 +66,8 @@ function RentThemeForestPreview({
       className="fixed inset-0 z-[2000] flex flex-col bg-[#0b0b0f]"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="rent-tf-preview-title"
+      aria-labelledby="rent-live-preview-title"
     >
-      {/* ThemeForest-style top bar */}
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10 bg-[#14141a] px-2 py-2 text-white sm:gap-3 sm:px-4 sm:py-2.5">
         <button
           type="button"
@@ -104,9 +103,9 @@ function RentThemeForestPreview({
 
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-bold uppercase tracking-wider text-teal-300/80">
-            Live preview /rent · ThemeForest
+            Ζωντανή προεπισκόπηση /rent
           </p>
-          <h2 id="rent-tf-preview-title" className="truncate text-sm font-bold sm:text-base">
+          <h2 id="rent-live-preview-title" className="truncate text-sm font-bold sm:text-base">
             {theme.nameEl}
             <span className="ml-2 font-normal text-white/45">
               {idx + 1}/{themes.length || 1}
@@ -210,7 +209,7 @@ function RentThemeForestPreview({
 }
 
 /**
- * Rent full-page theme gallery — ThemeForest-style live preview on click.
+ * Rent full-page theme gallery — live preview on click.
  */
 export default function RentThemeGallery({
   activeThemeId,
@@ -242,7 +241,7 @@ export default function RentThemeGallery({
         </p>
         <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-teal-800">
           <span className="material-symbols-outlined text-[15px]">open_in_full</span>
-          Κλικ στο θέμα → ανοίγει πλήρες παράθυρο όπως ThemeForest (ζωντανό /rent)
+          Κλικ στο θέμα → ανοίγει πλήρες παράθυρο με ζωντανό /rent
         </p>
       </div>
 
@@ -391,7 +390,7 @@ export default function RentThemeGallery({
       ) : null}
 
       {previewTheme ? (
-        <RentThemeForestPreview
+        <RentThemeLivePreview
           theme={previewTheme}
           themes={themes.length ? themes : RENT_THEMES}
           activeThemeId={activeThemeId}

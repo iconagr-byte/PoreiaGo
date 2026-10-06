@@ -867,7 +867,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   };
 
   const handleRentThemePreview = (theme, { includeColors = false } = {}) => {
-    // Sync draft to localStorage BEFORE the ThemeForest iframe mounts.
+    // Sync draft to localStorage BEFORE the live preview iframe mounts.
     // Do not mutate form selection — only Apply saves / marks Ενεργό.
     const patch = rentThemeToAppearancePatch(theme, { includeColors });
     const draft = { ...form, ...patch };
