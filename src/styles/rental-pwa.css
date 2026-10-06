@@ -2246,10 +2246,12 @@
   gap: 0;
   padding: 0;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 22px;
   background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 10px 28px rgba(15, 23, 42, 0.05);
   transition:
     transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.28s ease,
@@ -2257,9 +2259,11 @@
 }
 
 .rent-pick:hover {
-  transform: translateY(-3px);
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  transform: translateY(-4px);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.04),
+    0 18px 44px rgba(15, 23, 42, 0.1);
 }
 
 .rent-pick-fav {
@@ -7106,68 +7110,247 @@
   }
 }
 
-/* Card style variants */
-.rent-pick--soft {
-  border-radius: 24px;
-  border-color: rgba(0, 0, 0, 0.04);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  background: color-mix(in srgb, var(--rent-fill, #f5f5f7) 55%, #fff);
+/* ——— Card visual templates (structure + chrome, not just color) ——— */
+
+/* Premium showroom — generous photo, soft gallery stage, pill specs */
+.rent-pick--premium {
+  border-radius: 22px;
+  background: #fff;
 }
 
+.rent-pick--premium .rent-pick-media {
+  aspect-ratio: 16 / 10;
+  background:
+    radial-gradient(120% 80% at 50% 100%, color-mix(in srgb, var(--rent-teal, #0a7a6c) 8%, transparent), transparent 55%),
+    linear-gradient(180deg, #f7f7f9 0%, #ececf1 100%);
+}
+
+.rent-pick--premium .rent-pick-body {
+  padding: 1.15rem 1.2rem 1.25rem;
+  gap: 0.95rem;
+}
+
+.rent-pick--premium .rent-pick-title {
+  font-size: 1.25rem;
+  letter-spacing: -0.04em;
+}
+
+.rent-pick--premium .rent-pick-specs {
+  gap: 0.4rem 0.45rem;
+  border-top-color: rgba(15, 23, 42, 0.05);
+}
+
+.rent-pick--premium .rent-pick-specs li {
+  padding: 0.28rem 0.6rem;
+  border-radius: 980px;
+  background: color-mix(in srgb, var(--rent-fill, #f5f5f7) 72%, #fff);
+  color: #3a3a3c;
+  font-weight: 500;
+}
+
+.rent-pick--premium .rent-pick-specs .material-symbols-outlined {
+  color: var(--rent-teal, #0a7a6c);
+  font-variation-settings: 'wght' 400, 'opsz' 20;
+}
+
+.rent-pick--premium .rent-pick-price-amount {
+  font-size: 1.65rem;
+}
+
+/* Soft boutique — airy surface, whisper border, calm chips */
+.rent-pick--soft {
+  border-radius: 26px;
+  border-color: color-mix(in srgb, var(--rent-teal, #0a7a6c) 10%, transparent);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  background: color-mix(in srgb, var(--rent-fill, #f5f5f7) 62%, #fff);
+}
+
+.rent-pick--soft .rent-pick-media {
+  aspect-ratio: 5 / 3;
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--rent-fill, #f5f5f7) 40%, #fff) 0%,
+    color-mix(in srgb, var(--rent-teal, #0a7a6c) 8%, #f0f0f2) 100%
+  );
+}
+
+.rent-pick--soft .rent-pick-body {
+  padding: 1.05rem 1.15rem 1.2rem;
+}
+
+.rent-pick--soft .rent-pick-title {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.rent-pick--soft .rent-pick-specs {
+  border-top: 0;
+  padding-top: 0.15rem;
+}
+
+.rent-pick--soft .rent-pick-specs li {
+  padding: 0.22rem 0.5rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.rent-pick--soft .rent-pick-cta {
+  background: color-mix(in srgb, var(--rent-teal, #0a7a6c) 88%, #000);
+  border-radius: 14px;
+}
+
+/* Editorial overlay — floating light glass panel on photo (NO black slab) */
 .rent-pick--overlay {
-  background: #0b0b0d;
+  background: #f4f4f6;
   border-color: transparent;
+  box-shadow:
+    0 2px 6px rgba(15, 23, 42, 0.04),
+    0 16px 40px rgba(15, 23, 42, 0.09);
 }
 
 .rent-pick--overlay .rent-pick-media {
-  min-height: 14rem;
+  aspect-ratio: 4 / 3;
+  min-height: 0;
+  background: #e8e8ed;
 }
 
-.rent-pick--overlay .rent-pick-body,
-.rent-pick--overlay .rent-pick-title,
-.rent-pick--overlay .rent-pick-price,
-.rent-pick--overlay .rent-pick-price-kicker,
-.rent-pick--overlay .rent-pick-price-unit,
-.rent-pick--overlay .rent-pick-specs {
-  color: #f5f5f7;
+.rent-pick--overlay .rent-pick-media img {
+  object-fit: cover;
+  padding: 0;
+  transform: scale(1.01);
+}
+
+.rent-pick--overlay:hover .rent-pick-media img {
+  transform: scale(1.05);
+}
+
+.rent-pick--overlay .rent-pick-badge {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
 }
 
 .rent-pick--overlay .rent-pick-body {
   position: relative;
-  margin-top: -4.5rem;
-  padding-top: 3.5rem;
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.82) 42%, #0b0b0d 100%);
   z-index: 1;
+  margin: -3.25rem 0.85rem 0.9rem;
+  padding: 1.05rem 1.1rem 1.15rem;
+  gap: 0.8rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 12px 32px rgba(15, 23, 42, 0.12);
+  color: #1d1d1f;
 }
 
-/* Compact / spec — vertical by default (photo on top) so 2/3-col grids stay clean. */
-.rent-pick--compact .rent-pick-body,
+.rent-pick--overlay .rent-pick-title,
+.rent-pick--overlay .rent-pick-price,
+.rent-pick--overlay .rent-pick-price-amount {
+  color: #111113;
+}
+
+.rent-pick--overlay .rent-pick-title em,
+.rent-pick--overlay .rent-pick-price-kicker,
+.rent-pick--overlay .rent-pick-price-unit,
+.rent-pick--overlay .rent-pick-specs {
+  color: #6e6e73;
+}
+
+.rent-pick--overlay .rent-pick-specs {
+  border-top-color: rgba(15, 23, 42, 0.06);
+}
+
+.rent-pick--overlay .rent-pick-specs .material-symbols-outlined {
+  color: var(--rent-deep, #0b3d4a);
+}
+
+.rent-pick--overlay .rent-pick-cta {
+  border-radius: 12px;
+  min-height: 2.45rem;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--rent-teal, #0a7a6c) 35%, transparent);
+}
+
+/* Compact catalog — denser, sharp, still photo-on-top in grids */
+.rent-pick--compact {
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.rent-pick--compact .rent-pick-body {
+  padding: 0.85rem 0.95rem 1rem;
+  gap: 0.65rem;
+}
+
+.rent-pick--compact .rent-pick-media {
+  aspect-ratio: 16 / 9;
+  background: #f2f2f5;
+}
+
+.rent-pick--compact .rent-pick-title {
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.rent-pick--compact .rent-pick-specs {
+  gap: 0.35rem 0.75rem;
+  padding-top: 0.45rem;
+}
+
+.rent-pick--compact .rent-pick-cta {
+  min-height: 2.3rem;
+  padding: 0 0.85rem 0 0.95rem;
+  font-size: 0.8125rem;
+  border-radius: 10px;
+}
+
+/* Spec sheet — structured 2×2 tech grid */
+.rent-pick--spec {
+  border-radius: 18px;
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
 .rent-pick--spec .rent-pick-body {
   padding: 0.9rem 1rem 1.05rem;
   gap: 0.7rem;
 }
 
-.rent-pick--compact .rent-pick-media,
 .rent-pick--spec .rent-pick-media {
   aspect-ratio: 16 / 9;
+  background: linear-gradient(180deg, #f8fafc, #eef2f7);
 }
 
-.rent-pick--compact .rent-pick-title,
 .rent-pick--spec .rent-pick-title {
-  font-size: 1.0625rem;
-}
-
-.rent-pick--compact .rent-pick-cta,
-.rent-pick--spec .rent-pick-cta {
-  min-height: 2.35rem;
-  padding: 0 0.9rem 0 1rem;
-  font-size: 0.875rem;
+  font-size: 1.05rem;
+  font-family: var(--wallet-font);
+  letter-spacing: -0.025em;
 }
 
 .rent-pick--spec .rent-pick-specs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.35rem 0.65rem;
+  gap: 0.4rem;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.rent-pick--spec .rent-pick-specs li {
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: color-mix(in srgb, var(--rent-fill, #f8fafc) 50%, #fff);
+  font-size: 0.75rem;
+  font-weight: 550;
+  color: #3a3a3c;
+}
+
+.rent-pick--spec .rent-pick-cta {
+  min-height: 2.35rem;
+  padding: 0 0.9rem 0 1rem;
+  font-size: 0.875rem;
+  border-radius: 10px;
 }
 
 /* Horizontal compact/spec ONLY in list layout (DiscoverCars-style rows). */
