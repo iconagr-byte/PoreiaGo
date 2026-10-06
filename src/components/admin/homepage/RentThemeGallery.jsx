@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   RENT_THEMES,
   RENT_THEME_CATEGORIES,
@@ -7,9 +8,209 @@ import {
 } from '../../../lib/rental/rentThemes.js';
 import RentThemeMiniPreview from './RentThemeMiniPreview.jsx';
 
+const VIEWPORTS = [
+  { id: 'desktop', label: 'Desktop', icon: 'desktop_windows', width: '100%' },
+  { id: 'tablet', label: 'Tablet', icon: 'tablet_mac', width: '768px' },
+  { id: 'phone', label: 'Mobile', icon: 'smartphone', width: '390px' },
+];
+
 /**
- * Rent full-page theme gallery — pick layout first, then tune colors below.
- * Double-click a card to open a full preview modal.
+ * ThemeForest-style full-window live preview of /rent.
+ * Top chrome + iframe — click inside the page navigates the real storefront.
+ */
+function RentThemeForestPreview({
+  theme,
+  themes = [],
+  activeThemeId,
+  includeColors,
+  applying,
+  onClose,
+  onApply,
+  onPreview,
+  onSelectTheme,
+}) {
+  const [viewport, setViewport] = useState('desktop');
+  const [frameKey, setFrameKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const vp = VIEWPORTS.find((v) => v.id === viewport) || VIEWPORTS[0];
+  const isActive = theme.id === activeThemeId;
+  const idx = Math.max(0, themes.findIndex((t) => t.id === theme.id));
+  const hasPrev = idx > 0;
+  const hasNext = idx >= 0 && idx < themes.length - 1;
+
+  useEffect(() => {
+    onPreview?.(theme, { includeColors });
+    setLoading(true);
+    setFrameKey((k) => k + 1);
+  }, [theme.id, includeColors]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'ArrowLeft' && hasPrev) onSelectTheme?.(themes[idx - 1]);
+      if (e.key === 'ArrowRight' && hasNext) onSelectTheme?.(themes[idx + 1]);
+    };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose, onSelectTheme, themes, idx, hasPrev, hasNext]);
+
+  const liveHref = `/rent?preview=1&theme=${encodeURIComponent(theme.id)}`;
+
+  const ui = (
+    <div
+      className="fixed inset-0 z-[2000] flex flex-col bg-[#0b0b0f]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rent-tf-preview-title"
+    >
+      {/* ThemeForest-style top bar */}
+      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10 bg-[#14141a] px-2 py-2 text-white sm:gap-3 sm:px-4 sm:py-2.5">
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white"
+        >
+          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+          <span className="hidden sm:inline">Πίσω στη λίστα</span>
+        </button>
+
+        <div className="inline-flex items-center gap-0.5 rounded-lg bg-white/10 p-0.5">
+          <button
+            type="button"
+            disabled={!hasPrev}
+            onClick={() => hasPrev && onSelectTheme?.(themes[idx - 1])}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-white/80 hover:bg-white/10 disabled:opacity-30"
+            aria-label="Προηγούμενο θέμα"
+            title="← Προηγούμενο"
+          >
+            <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+          </button>
+          <button
+            type="button"
+            disabled={!hasNext}
+            onClick={() => hasNext && onSelectTheme?.(themes[idx + 1])}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-white/80 hover:bg-white/10 disabled:opacity-30"
+            aria-label="Επόμενο θέμα"
+            title="Επόμενο →"
+          >
+            <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          </button>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-teal-300/80">
+            Live preview /rent · ThemeForest
+          </p>
+          <h2 id="rent-tf-preview-title" className="truncate text-sm font-bold sm:text-base">
+            {theme.nameEl}
+            <span className="ml-2 font-normal text-white/45">
+              {idx + 1}/{themes.length || 1}
+            </span>
+          </h2>
+        </div>
+
+        <div className="inline-flex rounded-xl bg-white/10 p-0.5">
+          {VIEWPORTS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => setViewport(v.id)}
+              title={v.label}
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${
+                viewport === v.id
+                  ? 'bg-white text-slate-900 shadow'
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">{v.icon}</span>
+              <span className="hidden md:inline">{v.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <a
+          href={liveHref}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-2 text-xs font-bold text-white/90 hover:bg-white/10"
+          title="Άνοιγμα σε νέο παράθυρο"
+        >
+          <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+          <span className="hidden sm:inline">Νέο παράθυρο</span>
+        </a>
+
+        <button
+          type="button"
+          disabled={applying || isActive}
+          onClick={async () => {
+            await onApply?.(theme, { includeColors });
+            onClose?.();
+          }}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-teal-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-teal-400 disabled:opacity-50 sm:text-sm"
+        >
+          <span className="material-symbols-outlined text-[18px]">check</span>
+          {isActive ? 'Ενεργό' : includeColors ? 'Εφαρμογή' : 'Εφαρμογή διάταξης'}
+        </button>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
+          aria-label="Κλείσιμο"
+        >
+          <span className="material-symbols-outlined text-[22px]">close</span>
+        </button>
+      </header>
+
+      {/* Full-page iframe stage — real /rent, clickable */}
+      <div className="relative flex min-h-0 flex-1 items-stretch justify-center bg-[#0b0b0f]">
+        {loading ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[#0b0b0f]/70">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white">
+              <span className="material-symbols-outlined animate-spin text-[20px]">
+                progress_activity
+              </span>
+              Φόρτωση πλήρους σελίδας…
+            </span>
+          </div>
+        ) : null}
+        <div
+          className="relative h-full overflow-hidden bg-white transition-[width] duration-300 ease-out"
+          style={{
+            width: vp.width,
+            maxWidth: '100%',
+            borderRadius: viewport === 'desktop' ? 0 : 16,
+            boxShadow:
+              viewport === 'desktop'
+                ? 'none'
+                : '0 0 0 1px rgba(255,255,255,0.08), 0 24px 80px rgba(0,0,0,0.55)',
+            margin: viewport === 'desktop' ? 0 : '12px auto',
+            height: viewport === 'desktop' ? '100%' : 'calc(100% - 24px)',
+          }}
+        >
+          <iframe
+            key={`${theme.id}-${frameKey}`}
+            title={`Preview ${theme.nameEl}`}
+            src={`/rent?preview=1&theme=${encodeURIComponent(theme.id)}&t=${frameKey}`}
+            className="h-full w-full border-0 bg-white"
+            onLoad={() => setLoading(false)}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(ui, document.body);
+}
+
+/**
+ * Rent full-page theme gallery — ThemeForest-style live preview on click.
  */
 export default function RentThemeGallery({
   activeThemeId,
@@ -26,23 +227,10 @@ export default function RentThemeGallery({
   const active = getRentThemeById(activeThemeId);
 
   const openPreview = (theme) => {
-    setPreviewTheme(theme);
+    // Push draft first (parent handler), then unfold full window.
     onPreview?.(theme, { includeColors });
+    setPreviewTheme(theme);
   };
-
-  useEffect(() => {
-    if (!previewTheme) return undefined;
-    const onKey = (e) => {
-      if (e.key === 'Escape') setPreviewTheme(null);
-    };
-    window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [previewTheme]);
 
   return (
     <div className="space-y-5">
@@ -53,8 +241,8 @@ export default function RentThemeGallery({
           ρυθμίσεις τα χρώματα από κάτω.
         </p>
         <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-teal-800">
-          <span className="material-symbols-outlined text-[15px]">ads_click</span>
-          Διπλό κλικ σε κάρτα → πλήρες preview μέσα στο θέμα
+          <span className="material-symbols-outlined text-[15px]">open_in_full</span>
+          Κλικ στο θέμα → ανοίγει πλήρες παράθυρο όπως ThemeForest (ζωντανό /rent)
         </p>
       </div>
 
@@ -111,8 +299,8 @@ export default function RentThemeGallery({
           <button
             type="button"
             className="pdw-theme-active__preview text-left"
-            onDoubleClick={() => openPreview(active)}
-            title="Διπλό κλικ για πλήρες preview"
+            onClick={() => openPreview(active)}
+            title="Άνοιγμα πλήρους preview"
           >
             <RentThemeMiniPreview theme={active} selected />
           </button>
@@ -127,7 +315,7 @@ export default function RentThemeGallery({
               onClick={() => openPreview(active)}
               className="mt-2 text-xs font-bold text-teal-700 hover:underline"
             >
-              Άνοιγμα preview →
+              Άνοιγμα πλήρους σελίδας →
             </button>
           </div>
         </div>
@@ -140,19 +328,14 @@ export default function RentThemeGallery({
             <article
               key={theme.id}
               className={`pdw-theme-card group${selected ? ' is-selected' : ''}`}
-              onDoubleClick={(e) => {
-                e.preventDefault();
-                openPreview(theme);
-              }}
-              title="Διπλό κλικ για πλήρες preview"
+              title="Κλικ για πλήρες preview σελίδας"
             >
               <button
                 type="button"
                 className="w-full text-left"
-                onClick={() => onPreview?.(theme, { includeColors })}
+                onClick={() => openPreview(theme)}
                 onDoubleClick={(e) => {
                   e.preventDefault();
-                  e.stopPropagation();
                   openPreview(theme);
                 }}
               >
@@ -208,113 +391,17 @@ export default function RentThemeGallery({
       ) : null}
 
       {previewTheme ? (
-        <div
-          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-3 backdrop-blur-[2px] sm:items-center sm:p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="rent-theme-preview-title"
-          onClick={() => setPreviewTheme(null)}
-        >
-          <div
-            className="flex max-h-[min(92dvh,920px)] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-[0_30px_80px_rgba(0,0,0,0.35)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/[0.06] bg-slate-50/90 px-5 py-4">
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80">
-                  Preview θέματος /rent
-                </p>
-                <h3
-                  id="rent-theme-preview-title"
-                  className="mt-0.5 truncate text-lg font-bold text-slate-900"
-                >
-                  {previewTheme.nameEl}
-                </h3>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  {previewTheme.description || previewTheme.layoutLabel}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewTheme(null)}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/[0.06] bg-white text-slate-600 hover:bg-slate-100"
-                aria-label="Κλείσιμο preview"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-slate-100 to-slate-50 px-4 py-5 sm:px-8">
-              <div className="mx-auto max-w-md">
-                <RentThemeMiniPreview theme={previewTheme} selected size="lg" />
-              </div>
-              <div className="mx-auto mt-4 grid max-w-md grid-cols-2 gap-2 text-[11px] text-slate-600 sm:grid-cols-4">
-                {[
-                  { label: 'Hero', value: previewTheme.rent_hero_style },
-                  { label: 'Στόλος', value: previewTheme.rent_fleet_layout_template?.replace('rent_', '') },
-                  { label: 'Κάρτα', value: previewTheme.rent_fleet_card_template?.replace('rent_', '') },
-                  {
-                    label: 'Header',
-                    value: previewTheme.rent_header_compact ? 'Compact' : 'Άνετο',
-                  },
-                ].map((row) => (
-                  <div
-                    key={row.label}
-                    className="rounded-xl border border-black/[0.05] bg-white px-2.5 py-2"
-                  >
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      {row.label}
-                    </p>
-                    <p className="mt-0.5 truncate font-semibold capitalize text-slate-800">
-                      {row.value}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.06] bg-white px-5 py-4">
-              <a
-                href="/rent?preview=1"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2.5 text-sm font-bold text-teal-900 hover:bg-teal-100"
-                onClick={() => {
-                  // Ensure draft is pushed with this theme before opening live /rent.
-                  onPreview?.(previewTheme, { includeColors });
-                }}
-              >
-                <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                Ζωντανό /rent
-              </a>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPreviewTheme(null)}
-                  className="rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                >
-                  Κλείσιμο
-                </button>
-                <button
-                  type="button"
-                  disabled={applying || previewTheme.id === activeThemeId}
-                  onClick={async () => {
-                    await onApply?.(previewTheme, { includeColors });
-                    setPreviewTheme(null);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-[18px]">check</span>
-                  {previewTheme.id === activeThemeId
-                    ? 'Ήδη ενεργό'
-                    : includeColors
-                      ? 'Εφαρμογή + χρώματα'
-                      : 'Εφαρμογή διάταξης'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <RentThemeForestPreview
+          theme={previewTheme}
+          themes={themes.length ? themes : RENT_THEMES}
+          activeThemeId={activeThemeId}
+          includeColors={includeColors}
+          applying={applying}
+          onClose={() => setPreviewTheme(null)}
+          onApply={onApply}
+          onPreview={onPreview}
+          onSelectTheme={setPreviewTheme}
+        />
       ) : null}
     </div>
   );

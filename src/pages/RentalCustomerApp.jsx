@@ -12,7 +12,12 @@ import { setupRentalPwa } from '../lib/rental/registerRentalPwa.js';
 import { useRentMobile } from '../lib/rental/rentDevice.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { resolveRentAppBranding } from '../lib/rental/rentAppBranding.js';
-import { resolveRentTheme, rentThemeStyleVars } from '../lib/rental/rentThemes.js';
+import {
+  getRentThemeById,
+  resolveRentTheme,
+  rentThemeStyleVars,
+  rentThemeToAppearancePatch,
+} from '../lib/rental/rentThemes.js';
 import {
   isStorefrontPreviewMode,
   readHomepagePreviewDraft,
@@ -172,8 +177,17 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       .then((data) => {
         if (cancelled) return;
         // Design studio draft (?preview=1) overlays live appearance for theme preview.
+        // URL ?theme=<id> wins so ThemeForest iframe always shows the clicked theme.
         const draft = isStorefrontPreviewMode() ? readHomepagePreviewDraft() : null;
-        const appearance = { ...(data || {}), ...(draft || {}) };
+        const themeParam = isStorefrontPreviewMode()
+          ? new URLSearchParams(window.location.search).get('theme')
+          : null;
+        const themeFromUrl = themeParam ? getRentThemeById(themeParam) : null;
+        const themePatch =
+          themeFromUrl && themeFromUrl.id === themeParam
+            ? rentThemeToAppearancePatch(themeFromUrl, { includeColors: true })
+            : null;
+        const appearance = { ...(data || {}), ...(draft || {}), ...(themePatch || {}) };
         const brand = resolveOfficeBrand(appearance);
         setFooterAddress(String(appearance?.footer_address || '').trim());
         setSiteAppearance(appearance);
