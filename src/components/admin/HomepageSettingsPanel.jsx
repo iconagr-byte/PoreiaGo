@@ -867,13 +867,11 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   };
 
   const handleRentThemePreview = (theme, { includeColors = false } = {}) => {
+    // Sync draft to localStorage BEFORE the ThemeForest iframe mounts.
+    // Do not mutate form selection — only Apply saves / marks Ενεργό.
     const patch = rentThemeToAppearancePatch(theme, { includeColors });
-    setForm((p) => {
-      const next = { ...p, ...patch };
-      pushHomepagePreviewDraft(next);
-      return next;
-    });
-    toast.success(`Προεπισκόπηση /rent: ${theme.nameEl}`, { id: 'rent-theme-preview' });
+    const draft = { ...form, ...patch };
+    pushHomepagePreviewDraft(draft);
   };
 
   const handleRentThemeApply = async (theme, { includeColors = false } = {}) => {
