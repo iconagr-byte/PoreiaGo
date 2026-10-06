@@ -194,15 +194,18 @@ function FleetMock({ theme, ink }) {
   );
 }
 
-export default function RentThemeMiniPreview({ theme, selected = false }) {
+export default function RentThemeMiniPreview({ theme, selected = false, size = 'sm' }) {
   const ink = inkOf(theme);
   const darkHero = ['cinematic', 'night', 'yacht', 'editorial', 'peer', 'deal', 'metro'].includes(
     theme.rent_hero_style,
   );
+  const large = size === 'lg';
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border transition ${
+      className={`relative overflow-hidden border transition ${
+        large ? 'rounded-2xl' : 'rounded-xl'
+      } ${
         selected
           ? 'border-teal-500/50 ring-2 ring-teal-500/20 shadow-md'
           : 'border-black/[0.06] shadow-sm group-hover:border-black/10'
@@ -210,49 +213,64 @@ export default function RentThemeMiniPreview({ theme, selected = false }) {
       style={{ background: ink.surface }}
     >
       {/* Phone chrome */}
-      <div className="px-1.5 pt-1.5">
+      <div className={large ? 'px-3 pt-3' : 'px-1.5 pt-1.5'}>
         <div
-          className="overflow-hidden rounded-lg border border-black/5 shadow-sm"
+          className={`overflow-hidden border border-black/5 shadow-sm ${
+            large ? 'rounded-2xl' : 'rounded-lg'
+          }`}
           style={{ background: darkHero ? ink.hero : '#fff' }}
         >
           {/* Topbar */}
           <div
-            className="flex items-center justify-between gap-1 px-1.5 py-1"
+            className={`flex items-center justify-between gap-1 ${
+              large ? 'px-3 py-2.5' : 'px-1.5 py-1'
+            }`}
             style={{
               background: darkHero ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.92)',
             }}
           >
-            <div className="flex items-center gap-1 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
               <span
-                className="h-2.5 w-2.5 shrink-0 rounded"
+                className={`shrink-0 rounded ${large ? 'h-4 w-4' : 'h-2.5 w-2.5'}`}
                 style={{ background: ink.primary }}
               />
               <span
-                className="h-0.5 w-8 rounded"
+                className={`rounded ${large ? 'h-1.5 w-20' : 'h-0.5 w-8'}`}
                 style={{ background: darkHero ? 'rgba(255,255,255,0.7)' : ink.secondary }}
               />
             </div>
             <span
-              className="h-2 w-6 shrink-0 rounded-full"
+              className={`shrink-0 rounded-full ${large ? 'h-3.5 w-14' : 'h-2 w-6'}`}
               style={{ background: ink.primary }}
             />
           </div>
 
           {/* Hero */}
-          <div className="relative h-14 px-1.5 py-1.5" style={{ background: heroGradient(theme, ink) }}>
-            <div className="space-y-1 max-w-[70%]">
+          <div
+            className={`relative ${large ? 'h-36 px-3 py-3' : 'h-14 px-1.5 py-1.5'}`}
+            style={{ background: heroGradient(theme, ink) }}
+          >
+            <div className={`space-y-1 max-w-[70%] ${large ? 'space-y-2' : ''}`}>
               <div
-                className="h-1.5 w-16 rounded"
+                className={`rounded ${large ? 'h-3 w-40' : 'h-1.5 w-16'}`}
                 style={{ background: darkHero ? '#fff' : ink.secondary }}
               />
               <div
-                className="h-1 w-12 rounded opacity-70"
+                className={`rounded opacity-70 ${large ? 'h-2 w-28' : 'h-1 w-12'}`}
                 style={{ background: darkHero ? 'rgba(255,255,255,0.75)' : ink.primary }}
               />
+              {large ? (
+                <div
+                  className="h-1.5 w-36 rounded opacity-50"
+                  style={{ background: darkHero ? 'rgba(255,255,255,0.55)' : ink.secondary }}
+                />
+              ) : null}
             </div>
             {/* Search pill */}
             <div
-              className="absolute left-1.5 right-1.5 bottom-1.5 h-3.5 rounded-md border border-black/5"
+              className={`absolute left-1.5 right-1.5 bottom-1.5 rounded-md border border-black/5 ${
+                large ? 'left-3 right-3 bottom-3 h-9 rounded-xl' : 'h-3.5'
+              }`}
               style={{
                 background:
                   theme.rent_hero_style === 'compare' || theme.rent_hero_style === 'airport'
@@ -263,9 +281,12 @@ export default function RentThemeMiniPreview({ theme, selected = false }) {
           </div>
 
           {/* Fleet */}
-          <div className="bg-white/40 pt-1">
-            <div className="px-1.5 mb-1">
-              <div className="h-0.5 w-10 rounded bg-slate-300" />
+          <div className={`bg-white/40 ${large ? 'pt-2 pb-1' : 'pt-1'}`}>
+            <div className={`mb-1 ${large ? 'px-3' : 'px-1.5'}`}>
+              <div className={`rounded bg-slate-300 ${large ? 'h-1.5 w-24' : 'h-0.5 w-10'}`} />
+              {large ? (
+                <div className="mt-1.5 h-1 w-40 rounded bg-slate-200" />
+              ) : null}
             </div>
             <FleetMock theme={theme} ink={ink} />
           </div>
@@ -273,11 +294,11 @@ export default function RentThemeMiniPreview({ theme, selected = false }) {
       </div>
 
       {/* Palette strip */}
-      <div className="flex gap-0.5 px-2 py-1.5">
+      <div className={`flex gap-0.5 ${large ? 'px-3 py-2.5 gap-1' : 'px-2 py-1.5'}`}>
         {[ink.primary, ink.secondary, ink.hero, ink.surface].map((c, i) => (
           <span
             key={`${c}-${i}`}
-            className="h-2 flex-1 rounded-sm border border-black/5"
+            className={`flex-1 rounded-sm border border-black/5 ${large ? 'h-3 rounded' : 'h-2'}`}
             style={{ background: c }}
           />
         ))}

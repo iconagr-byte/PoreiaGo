@@ -13,6 +13,10 @@ import { useRentMobile } from '../lib/rental/rentDevice.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { resolveRentAppBranding } from '../lib/rental/rentAppBranding.js';
 import { resolveRentTheme, rentThemeStyleVars } from '../lib/rental/rentThemes.js';
+import {
+  isStorefrontPreviewMode,
+  readHomepagePreviewDraft,
+} from '../lib/homepage/homepagePreview.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import {
   fetchCustomerRentalCatalog,
@@ -167,28 +171,38 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
     fetchSiteAppearance()
       .then((data) => {
         if (cancelled) return;
-        const brand = resolveOfficeBrand(data || {});
-        setFooterAddress(String(data?.footer_address || '').trim());
-        setSiteAppearance(data || null);
+        // Design studio draft (?preview=1) overlays live appearance for theme preview.
+        const draft = isStorefrontPreviewMode() ? readHomepagePreviewDraft() : null;
+        const appearance = { ...(data || {}), ...(draft || {}) };
+        const brand = resolveOfficeBrand(appearance);
+        setFooterAddress(String(appearance?.footer_address || '').trim());
+        setSiteAppearance(appearance);
         setPickupLocations(
-          Array.isArray(data?.rent_pickup_locations)
-            ? data.rent_pickup_locations.map((x) => String(x || '').trim()).filter(Boolean)
+          Array.isArray(appearance?.rent_pickup_locations)
+            ? appearance.rent_pickup_locations.map((x) => String(x || '').trim()).filter(Boolean)
             : [],
         );
         setBranding(
           resolveRentAppBranding(
             {
-              ...(data || {}),
-              footer_brand_name: data?.footer_brand_name || brand.displayName || '',
+              ...appearance,
+              footer_brand_name: appearance?.footer_brand_name || brand.displayName || '',
               display_name: brand.displayName || '',
-              logo_url: data?.logo_url || brand.logoUrl || '',
+              logo_url: appearance?.logo_url || brand.logoUrl || '',
               logo_show_name: brand.showName,
             },
             { guest: true },
           ),
         );
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) return;
+        if (!isStorefrontPreviewMode()) return;
+        const draft = readHomepagePreviewDraft();
+        if (!draft) return;
+        setSiteAppearance(draft);
+        setBranding(resolveRentAppBranding(draft, { guest: true }));
+      });
     return () => {
       cancelled = true;
     };
