@@ -240,8 +240,8 @@ export default function RentThemeGallery({
           (premium / soft / editorial) — όχι μόνο χρώμα. Μετά ρυθμίζεις τα χρώματα από κάτω.
         </p>
         <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-teal-800">
-          <span className="material-symbols-outlined text-[15px]">open_in_full</span>
-          Κλικ στο θέμα → ανοίγει πλήρες παράθυρο με ζωντανό /rent
+          <span className="material-symbols-outlined text-[15px]">visibility</span>
+          Επισκόπηση = ζωντανό /rent · Ενεργοποίηση = αποθήκευση θέματος
         </p>
       </div>
 
@@ -326,17 +326,13 @@ export default function RentThemeGallery({
           return (
             <article
               key={theme.id}
-              className={`pdw-theme-card group${selected ? ' is-selected' : ''}`}
-              title="Κλικ για πλήρες preview σελίδας"
+              className={`pdw-theme-card pdw-theme-card--rent group${selected ? ' is-selected' : ''}`}
             >
               <button
                 type="button"
                 className="w-full text-left"
                 onClick={() => openPreview(theme)}
-                onDoubleClick={(e) => {
-                  e.preventDefault();
-                  openPreview(theme);
-                }}
+                title="Επισκόπηση πλήρους σελίδας"
               >
                 <RentThemeMiniPreview theme={theme} selected={selected} />
                 <div className="mt-2.5 px-0.5">
@@ -354,20 +350,29 @@ export default function RentThemeGallery({
                 </div>
               </button>
 
-              <button
-                type="button"
-                disabled={applying || selected}
-                onClick={() => onApply?.(theme, { includeColors })}
-                className={`pdw-theme-apply${selected ? ' is-active' : ''}`}
-              >
-                {selected
-                  ? 'Ενεργό'
-                  : applying
-                    ? '…'
-                    : includeColors
-                      ? 'Διάταξη + χρώματα'
-                      : 'Εφαρμογή διάταξης'}
-              </button>
+              <div className="pdw-theme-actions">
+                <button
+                  type="button"
+                  onClick={() => openPreview(theme)}
+                  className="pdw-theme-btn pdw-theme-btn--preview"
+                >
+                  <span className="material-symbols-outlined" aria-hidden>
+                    visibility
+                  </span>
+                  Επισκόπηση
+                </button>
+                <button
+                  type="button"
+                  disabled={applying || selected}
+                  onClick={() => onApply?.(theme, { includeColors })}
+                  className={`pdw-theme-btn pdw-theme-btn--activate${selected ? ' is-active' : ''}`}
+                >
+                  <span className="material-symbols-outlined" aria-hidden>
+                    {selected ? 'check_circle' : 'bolt'}
+                  </span>
+                  {selected ? 'Ενεργό' : applying ? '…' : 'Ενεργοποίηση'}
+                </button>
+              </div>
             </article>
           );
         })}

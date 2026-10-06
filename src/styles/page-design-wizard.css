@@ -445,6 +445,73 @@
   color: #fff;
 }
 
+/* Rent theme cards — preview + activate */
+.pdw-theme-card--rent.is-selected {
+  border-color: rgba(13, 148, 136, 0.45);
+  box-shadow: 0 0 0 1px rgba(13, 148, 136, 0.35), 0 12px 28px rgba(13, 148, 136, 0.1);
+}
+
+.pdw-theme-actions {
+  margin-top: 0.55rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.pdw-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  min-height: 2.15rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pdw-theme-btn .material-symbols-outlined {
+  font-size: 1rem;
+  font-variation-settings: 'wght' 500, 'opsz' 20;
+}
+
+.pdw-theme-btn--preview {
+  background: #fff;
+  border-color: rgba(15, 23, 42, 0.1);
+  color: #0f172a;
+}
+
+.pdw-theme-btn--preview:hover {
+  background: #f8fafc;
+  border-color: rgba(13, 148, 136, 0.35);
+  color: #0f766e;
+}
+
+.pdw-theme-btn--activate {
+  background: #0d9488;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.22);
+}
+
+.pdw-theme-btn--activate:hover:not(:disabled) {
+  background: #0f766e;
+}
+
+.pdw-theme-btn--activate:disabled {
+  opacity: 0.55;
+  cursor: default;
+  box-shadow: none;
+}
+
+.pdw-theme-btn--activate.is-active {
+  background: #134e4a;
+  box-shadow: none;
+}
+
 /* Quick start tiles */
 .pdw-quick-tile {
   display: flex;
