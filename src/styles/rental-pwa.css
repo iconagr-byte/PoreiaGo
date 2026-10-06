@@ -1698,7 +1698,7 @@
   gap: 0;
   align-items: start;
   width: 100%;
-  background: #f5f5f7;
+  background: transparent;
   font-family: var(--wallet-font);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -1707,7 +1707,7 @@
 .rent-fleet-shell > .rent-side-filters {
   width: 100%;
   padding: 1rem 1.15rem 0.85rem;
-  background: #f5f5f7;
+  background: transparent;
   border-bottom: 0;
 }
 
@@ -1950,8 +1950,7 @@
 
 /* —— Vehicle pick (Apple Store product grid) —— */
 .rent-land-band--pick {
-  background:
-    linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+  background: transparent;
 }
 
 .rent-pick-head {
@@ -5302,12 +5301,12 @@
 }
 
 .rent-phone-stage--desktop .rent-fleet-shell > .rent-land-band--pick {
-  border-radius: 22px;
+  border-radius: 0;
   min-height: 100%;
   padding: 2rem 1.75rem 2.25rem;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.03);
-  background: #fff;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .rent-phone-stage--desktop .rent-land-inner--pick {
@@ -6984,9 +6983,9 @@
 
 .rent-app[data-rent-theme] {
   background:
-    radial-gradient(900px 380px at 10% -8%, color-mix(in srgb, var(--rent-teal) 14%, transparent), transparent 55%),
-    radial-gradient(700px 320px at 95% 0%, color-mix(in srgb, var(--rent-deep) 10%, transparent), transparent 50%),
-    linear-gradient(180deg, var(--rent-foam, #fbfbfd) 0%, var(--rent-fill, #f5f5f7) 100%);
+    radial-gradient(900px 380px at 10% -8%, color-mix(in srgb, var(--rent-teal) 10%, transparent), transparent 55%),
+    radial-gradient(700px 320px at 95% 0%, color-mix(in srgb, var(--rent-deep) 6%, transparent), transparent 50%),
+    #fbfbfd;
 }
 
 /* Hero modes — structurally distinct full-bleed treatments */
@@ -8185,18 +8184,24 @@
   );
 }
 
-/* Fleet pick panel is always a light surface — never a black fill. */
+/* Fleet panel fill is transparent on every theme — cards carry the surface. */
+.rent-app[data-rent-theme] .rent-fleet-shell,
+.rent-app[data-rent-theme] .rent-fleet-shell > .rent-side-filters,
 .rent-app[data-rent-theme] .rent-land-band--pick,
-.rent-fleet-shell > .rent-land-band--pick {
-  background: linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+.rent-fleet-shell,
+.rent-fleet-shell > .rent-side-filters,
+.rent-fleet-shell > .rent-land-band--pick,
+.rent-land-band--pick,
+.rent-phone-stage--desktop .rent-fleet-shell > .rent-land-band--pick {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent;
   color: #1d1d1f;
 }
 
-.rent-phone-stage--desktop .rent-fleet-shell > .rent-land-band--pick {
-  background: #fff;
-}
-
 .rent-app[data-rent-theme] .rent-pick-head-title,
-.rent-app[data-rent-theme] .rent-pick-head-sub {
+.rent-app[data-rent-theme] .rent-pick-head-sub,
+.rent-app[data-rent-theme='deal_flash'] .rent-pick-head-title,
+.rent-app[data-rent-theme='deal_flash'] .rent-pick-head-sub {
   color: #1d1d1f;
 }
