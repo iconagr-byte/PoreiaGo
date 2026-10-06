@@ -385,9 +385,9 @@ function LayoutThumb({ id }) {
   }
   if (id === 'horizontal_scroll' || id === 'rent_scroll') {
     return (
-      <ThumbFrame className="bg-white p-2 flex gap-1 overflow-hidden">
+      <ThumbFrame className="bg-white p-2 grid grid-cols-3 gap-1">
         {[1, 2, 3].map((n) => (
-          <div key={n} className="shrink-0 w-[38%] h-full bg-slate-200 rounded" />
+          <div key={n} className="h-full min-h-[2.5rem] bg-slate-200 rounded" />
         ))}
       </ThumbFrame>
     );

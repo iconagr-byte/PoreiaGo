@@ -40,6 +40,11 @@ console.assert(
   `each theme needs a unique hero layout, got ${heroLayouts.size}`,
 );
 
+console.assert(
+  RENT_THEMES.every((t) => t.rent_fleet_layout_template !== 'rent_scroll'),
+  'no theme may use horizontal scroll fleet layout',
+);
+
 const photos = new Set(RENT_THEMES.map((t) => t.hero_image_url));
 console.assert(photos.size === 20, `each theme needs a unique hero photo, got ${photos.size}`);
 console.assert(
