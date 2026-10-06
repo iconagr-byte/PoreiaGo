@@ -55,6 +55,53 @@ export function normalizeRentHeaderStyle(value) {
 }
 
 /**
+ * Distinct hero compositions — original Poreia layouts inspired by
+ * common rental UX patterns (not copies of any brand).
+ * split_card · stacked_panel · cinematic · strip · glass_center ·
+ * side_search · deal_banner · compact_bar · editorial · island_float
+ */
+export const RENT_HERO_LAYOUTS = [
+  'split_card',
+  'stacked_panel',
+  'cinematic',
+  'strip',
+  'glass_center',
+  'side_search',
+  'deal_banner',
+  'compact_bar',
+  'editorial',
+  'island_float',
+];
+
+export function normalizeRentHeroLayout(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return RENT_HERO_LAYOUTS.includes(mode) ? mode : 'strip';
+}
+
+const HERO_LAYOUT_BY_STYLE = {
+  coastal: 'strip',
+  cinematic: 'cinematic',
+  compare: 'split_card',
+  peer: 'side_search',
+  corporate: 'stacked_panel',
+  soft_luxe: 'editorial',
+  metro: 'compact_bar',
+  island: 'island_float',
+  night: 'cinematic',
+  glass: 'glass_center',
+  sport: 'cinematic',
+  family: 'stacked_panel',
+  editorial: 'editorial',
+  airport: 'split_card',
+  ev: 'glass_center',
+  desert: 'island_float',
+  alpine: 'stacked_panel',
+  yacht: 'editorial',
+  deal: 'deal_banner',
+  classic: 'strip',
+};
+
+/**
  * 20 full-page rent themes — unique hero × fleet × card × mood combinations.
  */
 export const RENT_THEMES = [
@@ -440,6 +487,10 @@ export function rentThemeToAppearancePatch(theme, { includeColors = false } = {}
   const patch = {
     rent_theme_id: t.id,
     rent_hero_style: normalizeRentHeroStyle(t.rent_hero_style),
+    rent_hero_layout:
+      t.hero_layout ||
+      HERO_LAYOUT_BY_STYLE[normalizeRentHeroStyle(t.rent_hero_style)] ||
+      'strip',
     rent_fleet_layout_template: t.rent_fleet_layout_template || 'rent_grid_three',
     rent_fleet_card_template: t.rent_fleet_card_template || 'rent_premium',
     rent_header_compact: t.rent_header_compact === true,
@@ -506,6 +557,11 @@ export function resolveRentTheme(appearance = {}) {
     theme,
     themeId: theme.id,
     heroStyle: normalizeRentHeroStyle(appearance.rent_hero_style || theme.rent_hero_style),
+    heroLayout: normalizeRentHeroLayout(
+      appearance.rent_hero_layout ||
+        theme.hero_layout ||
+        HERO_LAYOUT_BY_STYLE[normalizeRentHeroStyle(appearance.rent_hero_style || theme.rent_hero_style)],
+    ),
     heroImageUrl,
     headerStyle,
     fleetLayout: appearance.rent_fleet_layout_template || theme.rent_fleet_layout_template,

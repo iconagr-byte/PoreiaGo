@@ -7073,6 +7073,301 @@
   background: linear-gradient(180deg, rgba(11, 61, 74, 0.15) 0%, rgba(10, 122, 108, 0.35) 55%, rgba(5, 8, 10, 0.65) 100%);
 }
 
+/* ——— Distinct original hero compositions (inspired by rental UX, not copies) ——— */
+.rent-hero-layout--split_card .rent-hero-booking-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(18rem, 26rem);
+  gap: 1.75rem 2.25rem;
+  align-items: center;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 3.5rem 1.5rem 3.75rem;
+  text-align: left;
+}
+
+.rent-hero-layout--split_card .rent-hero-booking-brand,
+.rent-hero-layout--split_card .rent-hero-booking-title,
+.rent-hero-layout--split_card .rent-hero-booking-copy,
+.rent-hero-layout--split_card .rent-hero-benefits {
+  grid-column: 1;
+}
+
+.rent-hero-layout--split_card .rent-hero-search-slot {
+  grid-column: 2;
+  grid-row: 1 / span 8;
+  align-self: center;
+}
+
+.rent-hero-layout--split_card .rent-hero-booking-title {
+  font-size: clamp(2.1rem, 4.2vw, 3.35rem);
+  line-height: 1.08;
+  max-width: 16ch;
+}
+
+.rent-hero-layout--split_card .rent-search--hero .rent-search-row {
+  flex-direction: column;
+  border: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 56px rgba(8, 16, 32, 0.28);
+}
+
+.rent-hero-layout--split_card .rent-search--hero .rent-search-field,
+.rent-hero-layout--split_card .rent-search--hero .rent-search-field--place,
+.rent-hero-layout--split_card .rent-search--hero .rent-search-field--date,
+.rent-hero-layout--split_card .rent-search--hero .rent-search-field--time {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  border-right: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.rent-hero-layout--split_card .rent-search--hero .rent-search-submit {
+  width: 100%;
+  min-height: 3.35rem;
+  border-radius: 0 0 18px 18px;
+  background: var(--rent-teal, #0a7a6c);
+}
+
+.rent-hero-layout--split_card .rent-search--hero .rent-search-footer {
+  color: #fff;
+}
+
+.rent-hero-layout--stacked_panel .rent-hero-booking-inner {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 3.25rem 1.25rem 3.5rem;
+  text-align: left;
+}
+
+.rent-hero-layout--stacked_panel .rent-hero-search-slot {
+  margin-top: 1.35rem;
+}
+
+.rent-hero-layout--stacked_panel .rent-search--hero .rent-search-row {
+  flex-wrap: wrap;
+  border: 0;
+  border-radius: 20px;
+  padding: 0.35rem;
+  background: #fff;
+}
+
+.rent-hero-layout--stacked_panel .rent-search--hero .rent-search-field {
+  flex: 1 1 46%;
+  border-right: 0;
+  border-radius: 14px;
+}
+
+.rent-hero-layout--stacked_panel .rent-search--hero .rent-search-submit {
+  flex: 1 1 100%;
+  min-height: 3.1rem;
+  border-radius: 14px;
+  background: var(--rent-teal, #0a7a6c);
+}
+
+.rent-hero-layout--cinematic {
+  min-height: clamp(28rem, 72vh, 42rem);
+}
+
+.rent-hero-layout--cinematic .rent-hero-booking-inner {
+  max-width: 40rem;
+  margin-left: 8%;
+  margin-right: auto;
+  text-align: left;
+  padding-top: 5rem;
+}
+
+.rent-hero-layout--cinematic .rent-hero-search-slot {
+  max-width: 36rem;
+}
+
+.rent-hero-layout--cinematic .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 980px;
+  overflow: hidden;
+}
+
+.rent-hero-layout--cinematic .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #0a7a6c);
+  border-radius: 0;
+}
+
+.rent-hero-layout--glass_center .rent-hero-booking-inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 3.5rem 1.25rem;
+  text-align: center;
+}
+
+.rent-hero-layout--glass_center .rent-hero-benefits {
+  justify-content: center;
+}
+
+.rent-hero-layout--glass_center .rent-search--hero .rent-search-row {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  border-radius: 18px;
+}
+
+.rent-hero-layout--side_search .rent-hero-booking-inner {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  padding: 2.75rem 1.5rem 3rem;
+}
+
+.rent-hero-layout--side_search .rent-hero-search-slot {
+  grid-column: 1;
+  grid-row: 1 / span 6;
+}
+
+.rent-hero-layout--side_search .rent-hero-booking-brand,
+.rent-hero-layout--side_search .rent-hero-booking-title,
+.rent-hero-layout--side_search .rent-hero-booking-copy,
+.rent-hero-layout--side_search .rent-hero-benefits {
+  grid-column: 2;
+}
+
+.rent-hero-layout--side_search .rent-search--hero .rent-search-row {
+  flex-direction: column;
+  border: 0;
+  border-radius: 16px;
+}
+
+.rent-hero-layout--side_search .rent-search--hero .rent-search-field,
+.rent-hero-layout--side_search .rent-search--hero .rent-search-submit {
+  width: 100%;
+  flex: none;
+  min-width: 0;
+  border-right: 0;
+}
+
+.rent-hero-layout--side_search .rent-search--hero .rent-search-submit {
+  min-height: 3.1rem;
+  background: var(--rent-teal, #0a7a6c);
+}
+
+.rent-hero-layout--deal_banner .rent-hero-booking-inner::before {
+  content: 'Προσφορά γραφείου · κράτηση online';
+  display: inline-flex;
+  margin-bottom: 0.85rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rent-teal, #0a7a6c) 88%, #000);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rent-hero-layout--deal_banner .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 14px;
+}
+
+.rent-hero-layout--deal_banner .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #0a7a6c);
+  border-radius: 0 14px 14px 0;
+}
+
+.rent-hero-layout--compact_bar .rent-hero-booking-inner {
+  padding-top: 2.25rem;
+  padding-bottom: 2.4rem;
+}
+
+.rent-hero-layout--compact_bar .rent-hero-booking-title {
+  font-size: clamp(1.65rem, 3vw, 2.2rem);
+}
+
+.rent-hero-layout--compact_bar .rent-search--hero .rent-search-row {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.rent-hero-layout--compact_bar .rent-search--hero .rent-search-field {
+  min-height: 3.5rem;
+}
+
+.rent-hero-layout--compact_bar .rent-search--hero .rent-search-submit {
+  background: var(--rent-deep, #0b3d4a);
+}
+
+.rent-hero-layout--editorial .rent-hero-booking-inner {
+  max-width: 38rem;
+  margin-left: auto;
+  margin-right: 8%;
+  text-align: left;
+  padding-top: 4.5rem;
+}
+
+.rent-hero-layout--editorial .rent-hero-booking-title {
+  font-weight: 600;
+  letter-spacing: -0.05em;
+}
+
+.rent-hero-layout--editorial .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 4px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+}
+
+.rent-hero-layout--editorial .rent-search--hero .rent-search-submit {
+  background: var(--rent-deep, #1c1917);
+}
+
+.rent-hero-layout--island_float .rent-hero-booking-inner {
+  text-align: center;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 4.25rem;
+}
+
+.rent-hero-layout--island_float .rent-hero-benefits {
+  justify-content: center;
+}
+
+.rent-hero-layout--island_float .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 22px;
+  box-shadow: 0 20px 50px rgba(8, 30, 40, 0.28);
+}
+
+.rent-hero-layout--island_float .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #0a7a6c);
+  border-radius: 0 22px 22px 0;
+}
+
+.rent-hero-layout--strip .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #0a7a6c);
+}
+
+@media (max-width: 860px) {
+  .rent-hero-layout--split_card .rent-hero-booking-inner,
+  .rent-hero-layout--side_search .rent-hero-booking-inner {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+  }
+
+  .rent-hero-layout--split_card .rent-hero-search-slot,
+  .rent-hero-layout--side_search .rent-hero-search-slot {
+    grid-column: auto;
+    grid-row: auto;
+    width: 100%;
+  }
+
+  .rent-hero-layout--cinematic .rent-hero-booking-inner,
+  .rent-hero-layout--editorial .rent-hero-booking-inner {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
 /* Fleet grid layouts */
 .rent-pick-grid--rent-grid-two {
   grid-template-columns: 1fr;

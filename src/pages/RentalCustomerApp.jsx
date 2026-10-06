@@ -357,6 +357,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             logoBgMode={branding.logoBgMode}
             logoShadow={branding.logoShadow}
             heroStyle={rentTheme.heroStyle}
+            heroLayout={rentTheme.heroLayout}
             heroImageUrl={rentTheme.heroImageUrl}
             title={branding.title}
             titleAccent={branding.titleAccent}

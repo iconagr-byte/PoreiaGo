@@ -406,6 +406,7 @@ export const HOMEPAGE_LAYOUT_DEFAULTS = {
   rent_fleet_card_template: 'rent_premium',
   rent_theme_id: 'aegean_coast',
   rent_hero_style: 'coastal',
+  rent_hero_layout: 'strip',
   rent_hero_image_url: '/images/rent-hero-coastal-v2.jpg',
   rent_header_style: 'glass',
   rent_accent_color: '#0a7a6c',
