@@ -46,7 +46,7 @@ function FleetMock({ theme, ink }) {
   const overlay = card === 'rent_overlay';
   const soft = card === 'rent_soft';
   const compact = card === 'rent_compact' || card === 'rent_spec';
-  const radius = soft ? 'rounded-xl' : compact ? 'rounded-md' : 'rounded-lg';
+  const radius = soft ? 'rounded-xl' : overlay ? 'rounded-xl' : compact ? 'rounded-md' : 'rounded-lg';
 
   if (layout === 'rent_list' || compact) {
     return (
@@ -170,24 +170,32 @@ function FleetMock({ theme, ink }) {
       {[0, 1, 2].map((n) => (
         <div
           key={n}
-          className={`overflow-hidden border border-black/5 ${radius} ${
-            soft ? 'bg-white/85' : 'bg-white'
+          className={`relative overflow-hidden border border-black/5 ${radius} ${
+            soft || overlay ? 'bg-white/90' : 'bg-white'
           }`}
         >
           <div
-            className="h-6"
+            className={overlay ? 'h-7' : 'h-6'}
             style={{
               background: overlay
-                ? `linear-gradient(to top, ${ink.secondary}aa, ${ink.primary}55)`
+                ? `linear-gradient(160deg, ${ink.primary}55, ${ink.secondary}33)`
                 : `${ink.primary}${40 + n * 10}`,
             }}
           />
-          {!overlay ? (
+          {overlay ? (
+            <div
+              className="mx-0.5 -mt-2 mb-0.5 rounded-md bg-white px-0.5 py-0.5 shadow-sm space-y-0.5"
+              style={{ boxShadow: '0 1px 4px rgba(15,23,42,0.12)' }}
+            >
+              <div className="h-0.5 w-full rounded bg-slate-200" />
+              <div className="h-1 w-2/3 rounded-full" style={{ background: ink.primary }} />
+            </div>
+          ) : (
             <div className="p-0.5 space-y-0.5">
               <div className="h-0.5 w-full rounded bg-slate-200" />
               <div className="h-1 w-2/3 rounded-full" style={{ background: ink.primary }} />
             </div>
-          ) : null}
+          )}
         </div>
       ))}
     </div>
