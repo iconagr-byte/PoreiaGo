@@ -75,7 +75,7 @@ export default function DriverOfficeChatPanel({
         }
       }
     },
-    [driverId, driverName],
+    [driverId],
   );
 
   useEffect(() => {

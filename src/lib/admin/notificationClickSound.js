@@ -3,7 +3,6 @@
 let sharedCtx = null;
 let unlockArmed = false;
 let htmlUnlocked = false;
-let primedAudio = null;
 let lastChimeAt = 0;
 
 function getAudioContextCtor() {
@@ -82,84 +81,85 @@ const CHIME_B_WAV = (() => {
   }
 })();
 
+/**
+ * Always create a fresh Audio element.
+ * Reusing one element + swapping src hangs Chromium after the first play().
+ * Never wait forever — race play() against a short timeout.
+ */
 function playHtmlUrl(url, volume = 0.85) {
   if (!url || typeof window === 'undefined') return Promise.resolve(false);
   return new Promise((resolve) => {
+    let settled = false;
+    const done = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+    const timer = window.setTimeout(() => done(false), 700);
     try {
       const audio = new Audio(url);
       audio.volume = Math.max(0, Math.min(1, volume));
-      // Reuse primed element when possible (stays unlocked after first gesture).
-      if (primedAudio && htmlUnlocked) {
-        try {
-          primedAudio.pause();
-          primedAudio.currentTime = 0;
-          primedAudio.src = url;
-          primedAudio.volume = audio.volume;
-          const p = primedAudio.play();
-          if (p && typeof p.then === 'function') {
-            p.then(() => resolve(true)).catch(() => {
-              audio
-                .play()
-                .then(() => resolve(true))
-                .catch(() => resolve(false));
-            });
-            return;
-          }
-          resolve(true);
-          return;
-        } catch {
-          /* fall through */
-        }
-      }
       const p = audio.play();
       if (p && typeof p.then === 'function') {
-        p.then(() => resolve(true)).catch(() => resolve(false));
+        p.then(() => {
+          window.clearTimeout(timer);
+          done(true);
+          // Release element after the clip ends so GC can collect it.
+          window.setTimeout(() => {
+            try {
+              audio.removeAttribute('src');
+              audio.load();
+            } catch {
+              /* ignore */
+            }
+          }, 1200);
+        }).catch(() => {
+          window.clearTimeout(timer);
+          done(false);
+        });
       } else {
-        resolve(true);
+        window.clearTimeout(timer);
+        done(true);
       }
     } catch {
-      resolve(false);
+      window.clearTimeout(timer);
+      done(false);
     }
   });
 }
 
-/** Prime HTML Audio + WebAudio during a user gesture so later alerts can ding. */
+/** Prime WebAudio during a user gesture so later alerts can ding. */
 export function unlockNotificationAudio() {
   const ctx = getCtx();
   if (ctx && ctx.state === 'suspended') {
     ctx.resume().catch(() => {});
   }
   if (typeof window === 'undefined') return;
-  try {
-    if (!primedAudio) {
-      primedAudio = new Audio();
-      primedAudio.preload = 'auto';
-    }
-    // Silent tick unlocks autoplay for this element in Chromium/Safari.
-    if (!htmlUnlocked && CLICK_WAV) {
-      primedAudio.src = CLICK_WAV;
-      primedAudio.volume = 0.01;
-      const p = primedAudio.play();
+  // One silent HTML play unlocks autoplay for subsequent fresh Audio() calls.
+  if (!htmlUnlocked && CLICK_WAV) {
+    try {
+      const warm = new Audio(CLICK_WAV);
+      warm.volume = 0.01;
+      const p = warm.play();
       if (p && typeof p.then === 'function') {
         p.then(() => {
           htmlUnlocked = true;
           try {
-            primedAudio.pause();
-            primedAudio.currentTime = 0;
+            warm.pause();
+            warm.removeAttribute('src');
+            warm.load();
           } catch {
             /* ignore */
           }
         }).catch(() => {
-          /* still blocked — next gesture retries */
+          /* next gesture retries */
         });
       } else {
         htmlUnlocked = true;
       }
-    } else {
-      htmlUnlocked = true;
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
   }
 }
 
@@ -185,12 +185,18 @@ async function ensureRunningCtx() {
   if (!ctx) return null;
   if (ctx.state === 'suspended') {
     try {
-      await ctx.resume();
+      await Promise.race([
+        ctx.resume(),
+        new Promise((r) => {
+          window.setTimeout(r, 400);
+        }),
+      ]);
     } catch {
       /* ignore */
     }
   }
   if (ctx.state === 'running') return ctx;
+  // Recreate — suspended contexts sometimes never resume after long idle.
   try {
     await ctx.close();
   } catch {
@@ -199,7 +205,12 @@ async function ensureRunningCtx() {
   sharedCtx = new AC();
   ctx = sharedCtx;
   try {
-    await ctx.resume();
+    await Promise.race([
+      ctx.resume(),
+      new Promise((r) => {
+        window.setTimeout(r, 400);
+      }),
+    ]);
   } catch {
     /* ignore */
   }
@@ -218,33 +229,38 @@ function tone(ctx, { freq, start, dur, peak = 0.16, type = 'sine' }) {
   gain.connect(ctx.destination);
   osc.start(start);
   osc.stop(start + dur + 0.02);
+  // Disconnect after stop so nodes don't pile up and mute the graph.
+  osc.onended = () => {
+    try {
+      osc.disconnect();
+      gain.disconnect();
+    } catch {
+      /* ignore */
+    }
+  };
 }
 
 /** Soft click for generic inbox rows. */
 export async function playNotificationClick() {
   unlockNotificationAudio();
-  let played = false;
   try {
     const ctx = await ensureRunningCtx();
     if (ctx) {
       const t0 = ctx.currentTime;
       tone(ctx, { freq: 1400, start: t0, dur: 0.1, peak: 0.22, type: 'square' });
-      played = true;
+      return;
     }
   } catch {
     /* ignore */
   }
-  const htmlOk = await playHtmlUrl(CLICK_WAV, 0.7);
-  if (!played && !htmlOk) {
-    /* browser still blocking — needs a click first */
-  }
+  await playHtmlUrl(CLICK_WAV, 0.7);
 }
 
 /** Louder two-note chime when a driver connects / starts shift. */
 export async function playDriverConnectChime() {
   const now = Date.now();
-  // Global debounce — toast can fire from bell + telemetry hooks together.
-  if (now - lastChimeAt < 1200) return;
+  // Only collapse double-fire from bell + telemetry in the same tick.
+  if (now - lastChimeAt < 700) return;
   lastChimeAt = now;
 
   unlockNotificationAudio();
@@ -262,19 +278,21 @@ export async function playDriverConnectChime() {
     /* ignore */
   }
 
-  // Always also fire HTMLAudio — WebAudio can report "running" yet stay silent
-  // after tab backgrounding on some Chromium builds.
-  const a = await playHtmlUrl(CHIME_A_WAV, 0.9);
-  window.setTimeout(() => {
-    void playHtmlUrl(CHIME_B_WAV, 0.85);
-  }, 150);
-
-  if (!webOk && !a) {
-    // Last resort: second attempt after a tick (sometimes unlock lands late).
+  // HTML path is backup — never block on it (timeout inside playHtmlUrl).
+  if (!webOk) {
+    const a = await playHtmlUrl(CHIME_A_WAV, 0.9);
     window.setTimeout(() => {
-      unlockNotificationAudio();
-      void playHtmlUrl(CHIME_A_WAV, 0.9);
-      window.setTimeout(() => void playHtmlUrl(CHIME_B_WAV, 0.85), 150);
-    }, 80);
+      void playHtmlUrl(CHIME_B_WAV, 0.85);
+    }, 150);
+    if (!a) {
+      window.setTimeout(() => {
+        unlockNotificationAudio();
+        void playHtmlUrl(CHIME_A_WAV, 0.9);
+        window.setTimeout(() => void playHtmlUrl(CHIME_B_WAV, 0.85), 150);
+      }, 100);
+    }
+  } else {
+    // Soft HTML reinforcement without awaiting — avoids freeze if play() stalls.
+    void playHtmlUrl(CHIME_A_WAV, 0.55);
   }
 }

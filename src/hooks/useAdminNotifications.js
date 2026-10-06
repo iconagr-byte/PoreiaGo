@@ -206,7 +206,8 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
       const debounceKey = `${offline ? 'out' : 'in'}:${String(item.driverId || item.body || item.id)}`;
       const now = Date.now();
       const prev = lastConnectChimeRef.current;
-      if (debounceKey && debounceKey === prev.key && now - prev.at < 4000) {
+      // Only collapse duplicate WS/push for the same enter/exit burst.
+      if (debounceKey && debounceKey === prev.key && now - prev.at < 1500) {
         chimedRef.current.add(item.id);
         return;
       }
