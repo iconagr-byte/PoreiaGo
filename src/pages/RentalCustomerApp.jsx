@@ -298,12 +298,13 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
         className="rent-app rent-app--guest"
         data-rent-theme={rentTheme.themeId}
         data-rent-hero={rentTheme.heroStyle}
+        data-rent-header={rentTheme.headerStyle}
         data-rent-fleet={rentTheme.fleetLayout}
         data-rent-card={rentTheme.fleetCard}
         style={rentThemeVars}
       >
         <header
-          className={`rent-topbar rent-topbar--guest${
+          className={`rent-topbar rent-topbar--guest rent-topbar--hdr-${rentTheme.headerStyle || 'glass'}${
             branding.headerCompact || rentTheme.headerCompact ? ' rent-topbar--compact' : ''
           }`}
         >
@@ -356,6 +357,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
             logoBgMode={branding.logoBgMode}
             logoShadow={branding.logoShadow}
             heroStyle={rentTheme.heroStyle}
+            heroImageUrl={rentTheme.heroImageUrl}
             title={branding.title}
             titleAccent={branding.titleAccent}
             copy={branding.copy}

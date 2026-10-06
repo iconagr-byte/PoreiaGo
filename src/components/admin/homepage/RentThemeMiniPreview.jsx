@@ -220,35 +220,70 @@ export default function RentThemeMiniPreview({ theme, selected = false, size = '
           }`}
           style={{ background: darkHero ? ink.hero : '#fff' }}
         >
-          {/* Topbar */}
+          {/* Topbar — mirrors theme header_style */}
           <div
             className={`flex items-center justify-between gap-1 ${
               large ? 'px-3 py-2.5' : 'px-1.5 py-1'
             }`}
             style={{
-              background: darkHero ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.92)',
+              background: (() => {
+                switch (theme.header_style) {
+                  case 'dark':
+                  case 'ink':
+                    return ink.secondary;
+                  case 'brand':
+                    return ink.primary;
+                  case 'soft':
+                    return ink.surface;
+                  case 'solid':
+                    return '#ffffff';
+                  default:
+                    return darkHero ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.92)';
+                }
+              })(),
             }}
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <span
                 className={`shrink-0 rounded ${large ? 'h-4 w-4' : 'h-2.5 w-2.5'}`}
-                style={{ background: ink.primary }}
+                style={{
+                  background:
+                    theme.header_style === 'brand' || theme.header_style === 'dark'
+                      ? 'rgba(255,255,255,0.85)'
+                      : ink.primary,
+                }}
               />
               <span
                 className={`rounded ${large ? 'h-1.5 w-20' : 'h-0.5 w-8'}`}
-                style={{ background: darkHero ? 'rgba(255,255,255,0.7)' : ink.secondary }}
+                style={{
+                  background:
+                    theme.header_style === 'dark' ||
+                    theme.header_style === 'ink' ||
+                    theme.header_style === 'brand'
+                      ? 'rgba(255,255,255,0.75)'
+                      : ink.secondary,
+                }}
               />
             </div>
             <span
               className={`shrink-0 rounded-full ${large ? 'h-3.5 w-14' : 'h-2 w-6'}`}
-              style={{ background: ink.primary }}
+              style={{
+                background:
+                  theme.header_style === 'brand' ? 'rgba(255,255,255,0.9)' : ink.primary,
+              }}
             />
           </div>
 
-          {/* Hero */}
+          {/* Hero — real theme photo + shade */}
           <div
-            className={`relative ${large ? 'h-36 px-3 py-3' : 'h-14 px-1.5 py-1.5'}`}
-            style={{ background: heroGradient(theme, ink) }}
+            className={`relative overflow-hidden ${large ? 'h-36 px-3 py-3' : 'h-14 px-1.5 py-1.5'}`}
+            style={{
+              backgroundImage: theme.hero_image_url
+                ? `linear-gradient(165deg, ${ink.hero}99 0%, ${ink.secondary}66 55%, transparent 100%), url(${theme.hero_image_url})`
+                : heroGradient(theme, ink),
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
           >
             <div className={`space-y-1 max-w-[70%] ${large ? 'space-y-2' : ''}`}>
               <div

@@ -23,6 +23,7 @@ export default function RentGuestHero({
   logoBgMode,
   logoShadow,
   heroStyle = 'coastal',
+  heroImageUrl = '',
   title,
   titleAccent,
   copy,
@@ -40,6 +41,7 @@ export default function RentGuestHero({
   const slider = readPageSlider(siteAppearance, 'rent');
 
   const heroMode = String(heroStyle || 'coastal').trim().toLowerCase() || 'coastal';
+  const photoSrc = String(heroImageUrl || '').trim() || RENT_GUEST_HERO_IMAGE;
 
   return (
     <section
@@ -61,7 +63,8 @@ export default function RentGuestHero({
           />
         ) : (
           <img
-            src={RENT_GUEST_HERO_IMAGE}
+            key={photoSrc}
+            src={photoSrc}
             alt=""
             width={3840}
             height={2160}
