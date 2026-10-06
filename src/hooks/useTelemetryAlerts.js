@@ -4,6 +4,10 @@ import { clearTelemetryAlert, fetchTelemetryAlerts } from '../services/telemetry
 import { buildWsUrl } from '../lib/wsUrl.js';
 import { getSaasToken } from '../services/saasApi.js';
 import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
+import {
+  playDriverConnectChime,
+  unlockNotificationAudio,
+} from '../lib/admin/notificationClickSound.js';
 
 const DEMO_TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -54,6 +58,9 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
         });
       }
     } else if (type === 'DRIVER_ONLINE') {
+      // Backup chime — bell inbox also dings; sound module debounces doubles.
+      unlockNotificationAudio();
+      void playDriverConnectChime();
       toast.success(row.message || 'Οδηγός ξεκίνησε βάρδια', {
         duration: 5000,
         id: `driver-online-${row.id}`,
