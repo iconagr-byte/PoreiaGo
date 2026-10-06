@@ -177,7 +177,7 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
       .then((data) => {
         if (cancelled) return;
         // Design studio draft (?preview=1) overlays live appearance for theme preview.
-        // URL ?theme=<id> wins so ThemeForest iframe always shows the clicked theme.
+        // URL ?theme=<id> wins so the live preview iframe always shows the clicked theme.
         const draft = isStorefrontPreviewMode() ? readHomepagePreviewDraft() : null;
         const themeParam = isStorefrontPreviewMode()
           ? new URLSearchParams(window.location.search).get('theme')
