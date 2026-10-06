@@ -4,10 +4,6 @@ import { clearTelemetryAlert, fetchTelemetryAlerts } from '../services/telemetry
 import { buildWsUrl } from '../lib/wsUrl.js';
 import { getSaasToken } from '../services/saasApi.js';
 import { LIVE_REFRESH_MS } from '../lib/liveRefresh.js';
-import {
-  playDriverConnectChime,
-  unlockNotificationAudio,
-} from '../lib/admin/notificationClickSound.js';
 
 const DEMO_TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -57,38 +53,22 @@ export function useTelemetryAlerts({ tenantId = DEMO_TENANT, limit = 50, enabled
           requireInteraction: true,
         });
       }
-    } else if (type === 'DRIVER_ONLINE') {
-      // Backup chime — bell inbox also dings; sound module debounces doubles.
-      unlockNotificationAudio();
-      void playDriverConnectChime();
-      toast.success(row.message || 'Οδηγός ξεκίνησε βάρδια', {
-        duration: 5000,
-        id: `driver-online-${row.id}`,
-      });
+    } else if (type === 'DRIVER_ONLINE' || type === 'DRIVER_OFFLINE') {
+      // Floating banner + chime: AdminNotificationBell only (one nice label).
+      // Keep OS notification if the user granted permission.
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         try {
-          new Notification('Έναρξη βάρδιας — PoreiaGo', {
-            body: row.message || 'Οδηγός ξεκίνησε βάρδια',
-            tag: `driver-online-${row.id}`,
-            requireInteraction: true,
-          });
-        } catch {
-          /* ignore */
-        }
-      }
-    } else if (type === 'DRIVER_OFFLINE') {
-      toast(row.message || 'Οδηγός έκλεισε βάρδια', {
-        duration: 5000,
-        icon: '🛑',
-        id: `driver-offline-${row.id}`,
-      });
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        try {
-          new Notification('Τέλος βάρδιας — PoreiaGo', {
-            body: row.message || 'Οδηγός έκλεισε βάρδια',
-            tag: `driver-offline-${row.id}`,
-            requireInteraction: true,
-          });
+          const online = type === 'DRIVER_ONLINE';
+          new Notification(
+            online ? 'Έναρξη βάρδιας — PoreiaGo' : 'Τέλος βάρδιας — PoreiaGo',
+            {
+              body:
+                row.message ||
+                (online ? 'Οδηγός ξεκίνησε βάρδια' : 'Οδηγός έκλεισε βάρδια'),
+              tag: `${online ? 'driver-online' : 'driver-offline'}-${row.id}`,
+              requireInteraction: true,
+            },
+          );
         } catch {
           /* ignore */
         }

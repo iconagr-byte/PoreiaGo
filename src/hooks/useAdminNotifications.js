@@ -114,16 +114,31 @@ function alertToItem(row) {
   });
 }
 
-function isDriverConnectAlert(itemOrType) {
+function isDriverPresenceAlert(itemOrType) {
   const t = String(
     typeof itemOrType === 'string' ? itemOrType : itemOrType?.type || '',
   ).toLowerCase();
   return (
     t === 'driver_online' ||
+    t === 'driver_offline' ||
     t.includes('driver_shift') ||
     t.includes('driver_online') ||
-    t.includes('shift')
+    t.includes('driver_offline') ||
+    (t.includes('shift') && !t.includes('chat'))
   );
+}
+
+function isDriverOfflineAlert(itemOrType) {
+  const t = String(
+    typeof itemOrType === 'string' ? itemOrType : itemOrType?.type || '',
+  ).toLowerCase();
+  return t === 'driver_offline' || t.includes('driver_offline') || t.includes('shift_end');
+}
+
+function isChatInboxItem(item) {
+  const t = String(item?.type || '').toLowerCase();
+  const id = String(item?.id || '');
+  return t === 'driver_office_chat' || t.includes('chat') || id.startsWith('chat-');
 }
 
 export function useAdminNotifications({ tenantId, enabled = true } = {}) {
@@ -156,9 +171,11 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
     const forceUpsert =
       upsert || String(item.type || '') === 'driver_office_chat' || String(item.id).startsWith('chat-');
     const alreadySeen = seenRef.current.has(item.id);
-    const connect = isDriverConnectAlert(item);
+    const presence = isDriverPresenceAlert(item);
+    const offline = isDriverOfflineAlert(item);
+    const chat = isChatInboxItem(item);
     // Silent snapshot may seed inbox ids — still allow a later live chime.
-    if (!forceUpsert && alreadySeen && (silent || !connect || chimedRef.current.has(item.id))) {
+    if (!forceUpsert && alreadySeen && (silent || !presence || chimedRef.current.has(item.id))) {
       return;
     }
     const isNew = !alreadySeen;
@@ -175,9 +192,18 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
     }
     if (silent) return;
 
-    if (connect) {
+    // Chat / other inbox rows: bell only — no floating toast on the map.
+    if (chat) {
+      if (isNew || forceUpsert) {
+        unlockNotificationAudio();
+        void playNotificationClick();
+      }
+      return;
+    }
+
+    if (presence) {
       if (chimedRef.current.has(item.id)) return;
-      const debounceKey = String(item.driverId || item.body || item.id);
+      const debounceKey = `${offline ? 'out' : 'in'}:${String(item.driverId || item.body || item.id)}`;
       const now = Date.now();
       const prev = lastConnectChimeRef.current;
       if (debounceKey && debounceKey === prev.key && now - prev.at < 4000) {
@@ -189,14 +215,17 @@ export function useAdminNotifications({ tenantId, enabled = true } = {}) {
       unlockNotificationAudio();
       void playDriverConnectChime();
       toast(item.body || item.title, {
-        duration: 6000,
-        id: `driver-connect-${item.id}`,
+        duration: 5500,
+        id: `driver-presence-${item.id}`,
+        icon: offline ? '🛑' : '🚌',
         style: {
-          background: '#0f172a',
+          background: offline ? '#1e293b' : '#0f172a',
           color: '#f8fafc',
-          fontWeight: 600,
-          borderRadius: '12px',
-          padding: '12px 16px',
+          fontWeight: 650,
+          borderRadius: '14px',
+          padding: '14px 18px',
+          boxShadow: '0 12px 40px rgba(15, 23, 42, 0.28)',
+          maxWidth: '26rem',
         },
       });
       return;
