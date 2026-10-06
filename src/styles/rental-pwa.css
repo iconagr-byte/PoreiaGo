@@ -6932,7 +6932,10 @@
 .rent-topbar--hdr-brand .rent-brand-mark-word,
 .rent-topbar--hdr-dark .rent-brand-mark-sub,
 .rent-topbar--hdr-ink .rent-brand-mark-sub,
-.rent-topbar--hdr-brand .rent-brand-mark-sub {
+.rent-topbar--hdr-brand .rent-brand-mark-sub,
+.rent-topbar--hdr-dark .rent-brand-mark-rent,
+.rent-topbar--hdr-ink .rent-brand-mark-rent,
+.rent-topbar--hdr-brand .rent-brand-mark-rent {
   color: #f8fafc;
 }
 
