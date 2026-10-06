@@ -3,6 +3,7 @@
  */
 import {
   DEFAULT_RENT_THEME_ID,
+  RENT_HERO_LAYOUTS,
   RENT_THEMES,
   filterRentThemes,
   getRentThemeById,
@@ -12,6 +13,8 @@ import {
 } from './rentThemes.js';
 
 console.assert(RENT_THEMES.length === 20, `expected 20 themes, got ${RENT_THEMES.length}`);
+console.assert(RENT_HERO_LAYOUTS.length === 20, `expected 20 hero layouts, got ${RENT_HERO_LAYOUTS.length}`);
+console.assert(new Set(RENT_HERO_LAYOUTS).size === 20, 'hero layout ids must be unique');
 
 const ids = new Set(RENT_THEMES.map((t) => t.id));
 console.assert(ids.size === 20, 'theme ids must be unique');
@@ -28,6 +31,14 @@ console.assert(layouts.size >= 4, 'should use multiple fleet layouts');
 
 const heroes = new Set(RENT_THEMES.map((t) => t.rent_hero_style));
 console.assert(heroes.size >= 12, 'should use many hero styles');
+
+const heroLayouts = new Set(
+  RENT_THEMES.map((t) => rentThemeToAppearancePatch(t).rent_hero_layout),
+);
+console.assert(
+  heroLayouts.size === 20,
+  `each theme needs a unique hero layout, got ${heroLayouts.size}`,
+);
 
 const photos = new Set(RENT_THEMES.map((t) => t.hero_image_url));
 console.assert(photos.size === 20, `each theme needs a unique hero photo, got ${photos.size}`);

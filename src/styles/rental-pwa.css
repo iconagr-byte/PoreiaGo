@@ -7073,99 +7073,14 @@
   background: linear-gradient(180deg, rgba(11, 61, 74, 0.15) 0%, rgba(10, 122, 108, 0.35) 55%, rgba(5, 8, 10, 0.65) 100%);
 }
 
-/* ——— Distinct original hero compositions (inspired by rental UX, not copies) ——— */
-.rent-hero-layout--split_card .rent-hero-booking-inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(18rem, 26rem);
-  gap: 1.75rem 2.25rem;
-  align-items: center;
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 3.5rem 1.5rem 3.75rem;
-  text-align: left;
-}
+/* ——— 20 distinct original hero compositions (rental UX patterns, not brand copies) ——— */
 
-.rent-hero-layout--split_card .rent-hero-booking-brand,
-.rent-hero-layout--split_card .rent-hero-booking-title,
-.rent-hero-layout--split_card .rent-hero-booking-copy,
-.rent-hero-layout--split_card .rent-hero-benefits {
-  grid-column: 1;
-}
-
-.rent-hero-layout--split_card .rent-hero-search-slot {
-  grid-column: 2;
-  grid-row: 1 / span 8;
-  align-self: center;
-}
-
-.rent-hero-layout--split_card .rent-hero-booking-title {
-  font-size: clamp(2.1rem, 4.2vw, 3.35rem);
-  line-height: 1.08;
-  max-width: 16ch;
-}
-
-.rent-hero-layout--split_card .rent-search--hero .rent-search-row {
-  flex-direction: column;
-  border: 0;
-  border-radius: 18px;
-  overflow: hidden;
-  box-shadow: 0 24px 56px rgba(8, 16, 32, 0.28);
-}
-
-.rent-hero-layout--split_card .rent-search--hero .rent-search-field,
-.rent-hero-layout--split_card .rent-search--hero .rent-search-field--place,
-.rent-hero-layout--split_card .rent-search--hero .rent-search-field--date,
-.rent-hero-layout--split_card .rent-search--hero .rent-search-field--time {
-  flex: none;
-  width: 100%;
-  min-width: 0;
-  border-right: 0;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-.rent-hero-layout--split_card .rent-search--hero .rent-search-submit {
-  width: 100%;
-  min-height: 3.35rem;
-  border-radius: 0 0 18px 18px;
+/* 1 strip — classic full-width search bar */
+.rent-hero-layout--strip .rent-search--hero .rent-search-submit {
   background: var(--rent-teal, #0a7a6c);
 }
 
-.rent-hero-layout--split_card .rent-search--hero .rent-search-footer {
-  color: #fff;
-}
-
-.rent-hero-layout--stacked_panel .rent-hero-booking-inner {
-  max-width: 44rem;
-  margin: 0 auto;
-  padding: 3.25rem 1.25rem 3.5rem;
-  text-align: left;
-}
-
-.rent-hero-layout--stacked_panel .rent-hero-search-slot {
-  margin-top: 1.35rem;
-}
-
-.rent-hero-layout--stacked_panel .rent-search--hero .rent-search-row {
-  flex-wrap: wrap;
-  border: 0;
-  border-radius: 20px;
-  padding: 0.35rem;
-  background: #fff;
-}
-
-.rent-hero-layout--stacked_panel .rent-search--hero .rent-search-field {
-  flex: 1 1 46%;
-  border-right: 0;
-  border-radius: 14px;
-}
-
-.rent-hero-layout--stacked_panel .rent-search--hero .rent-search-submit {
-  flex: 1 1 100%;
-  min-height: 3.1rem;
-  border-radius: 14px;
-  background: var(--rent-teal, #0a7a6c);
-}
-
+/* 2 cinematic — film title left, pill search */
 .rent-hero-layout--cinematic {
   min-height: clamp(28rem, 72vh, 42rem);
 }
@@ -7193,24 +7108,98 @@
   border-radius: 0;
 }
 
-.rent-hero-layout--glass_center .rent-hero-booking-inner {
-  max-width: 48rem;
+/* 3 split_card — promo left + booking card right (inspired by major desk brands) */
+.rent-hero-layout--split_card .rent-hero-shade--booking {
+  background:
+    linear-gradient(
+      105deg,
+      color-mix(in srgb, var(--rent-deep, #0b3d4a) 92%, #000) 0%,
+      color-mix(in srgb, var(--rent-teal, #0a7a6c) 78%, #0b3d4a) 48%,
+      color-mix(in srgb, var(--rent-teal, #0a7a6c) 55%, transparent) 100%
+    );
+}
+
+.rent-hero-layout--split_card .rent-hero-booking-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 26rem);
+  gap: 1.75rem 2.5rem;
+  align-items: center;
+  max-width: 74rem;
   margin: 0 auto;
-  padding: 3.5rem 1.25rem;
-  text-align: center;
+  padding: 3.75rem 1.5rem 4rem;
+  text-align: left;
 }
 
-.rent-hero-layout--glass_center .rent-hero-benefits {
-  justify-content: center;
+.rent-hero-layout--split_card .rent-hero-booking-brand,
+.rent-hero-layout--split_card .rent-hero-booking-title,
+.rent-hero-layout--split_card .rent-hero-booking-copy,
+.rent-hero-layout--split_card .rent-hero-benefits {
+  grid-column: 1;
 }
 
-.rent-hero-layout--glass_center .rent-search--hero .rent-search-row {
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px);
-  border-radius: 18px;
+.rent-hero-layout--split_card .rent-hero-search-slot {
+  grid-column: 2;
+  grid-row: 1 / span 8;
+  align-self: center;
 }
 
+.rent-hero-layout--split_card .rent-hero-booking-title {
+  font-size: clamp(2.15rem, 4.4vw, 3.4rem);
+  line-height: 1.06;
+  max-width: 15ch;
+  font-weight: 800;
+}
+
+.rent-hero-layout--split_card .rent-hero-benefits {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.rent-hero-layout--split_card .rent-hero-benefits li {
+  font-size: 0.98rem;
+}
+
+.rent-hero-layout--split_card .rent-search--hero .rent-search-row {
+  flex-direction: column;
+  border: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 28px 64px rgba(8, 16, 32, 0.32);
+  padding: 0.65rem 0.65rem 0.75rem;
+}
+
+.rent-hero-layout--split_card .rent-search--hero .rent-search-field,
+.rent-hero-layout--split_card .rent-search--hero .rent-search-field--place,
+.rent-hero-layout--split_card .rent-search--hero .rent-search-field--date,
+.rent-hero-layout--split_card .rent-search--hero .rent-search-field--time {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  border-right: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  background: #f8fafc;
+  margin-bottom: 0.4rem;
+}
+
+.rent-hero-layout--split_card .rent-search--hero .rent-search-submit {
+  width: 100%;
+  min-height: 3.4rem;
+  margin-top: 0.25rem;
+  border-radius: 12px;
+  background: var(--rent-teal, #0a7a6c);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.rent-hero-layout--split_card .rent-search--hero .rent-search-footer {
+  color: #fff;
+}
+
+/* 4 side_search — search rail left, story right */
 .rent-hero-layout--side_search .rent-hero-booking-inner {
   display: grid;
   grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
@@ -7250,6 +7239,473 @@
   background: var(--rent-teal, #0a7a6c);
 }
 
+/* 5 stacked_panel — trust form, wrapped fields */
+.rent-hero-layout--stacked_panel .rent-hero-booking-inner {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 3.25rem 1.25rem 3.5rem;
+  text-align: left;
+}
+
+.rent-hero-layout--stacked_panel .rent-hero-search-slot {
+  margin-top: 1.35rem;
+}
+
+.rent-hero-layout--stacked_panel .rent-search--hero .rent-search-row {
+  flex-wrap: wrap;
+  border: 0;
+  border-radius: 20px;
+  padding: 0.35rem;
+  background: #fff;
+}
+
+.rent-hero-layout--stacked_panel .rent-search--hero .rent-search-field {
+  flex: 1 1 46%;
+  border-right: 0;
+  border-radius: 14px;
+}
+
+.rent-hero-layout--stacked_panel .rent-search--hero .rent-search-submit {
+  flex: 1 1 100%;
+  min-height: 3.1rem;
+  border-radius: 14px;
+  background: var(--rent-teal, #0a7a6c);
+}
+
+/* 6 luxe_veil — soft champagne veil + thin bar */
+.rent-hero-layout--luxe_veil .rent-hero-shade--booking {
+  background: linear-gradient(180deg, rgba(41, 37, 36, 0.2) 0%, rgba(68, 64, 60, 0.45) 55%, rgba(28, 25, 23, 0.72) 100%);
+}
+
+.rent-hero-layout--luxe_veil .rent-hero-booking-inner {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 4.25rem;
+  text-align: center;
+}
+
+.rent-hero-layout--luxe_veil .rent-hero-booking-title {
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.rent-hero-layout--luxe_veil .rent-hero-benefits {
+  justify-content: center;
+}
+
+.rent-hero-layout--luxe_veil .rent-search--hero .rent-search-row {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 2px;
+  background: rgba(255, 252, 248, 0.94);
+  box-shadow: 0 12px 36px rgba(28, 25, 23, 0.18);
+}
+
+.rent-hero-layout--luxe_veil .rent-search--hero .rent-search-submit {
+  background: var(--rent-deep, #44403c);
+  border-radius: 0;
+}
+
+/* 7 compact_bar — dense city booking */
+.rent-hero-layout--compact_bar .rent-hero-booking-inner {
+  padding-top: 2.25rem;
+  padding-bottom: 2.4rem;
+}
+
+.rent-hero-layout--compact_bar .rent-hero-booking-title {
+  font-size: clamp(1.65rem, 3vw, 2.2rem);
+}
+
+.rent-hero-layout--compact_bar .rent-search--hero .rent-search-row {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.rent-hero-layout--compact_bar .rent-search--hero .rent-search-field {
+  min-height: 3.5rem;
+}
+
+.rent-hero-layout--compact_bar .rent-search--hero .rent-search-submit {
+  background: var(--rent-deep, #0b3d4a);
+}
+
+/* 8 island_float — warm centered float */
+.rent-hero-layout--island_float .rent-hero-booking-inner {
+  text-align: center;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 4.25rem;
+}
+
+.rent-hero-layout--island_float .rent-hero-benefits {
+  justify-content: center;
+}
+
+.rent-hero-layout--island_float .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 22px;
+  box-shadow: 0 20px 50px rgba(8, 30, 40, 0.28);
+}
+
+.rent-hero-layout--island_float .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #0a7a6c);
+  border-radius: 0 22px 22px 0;
+}
+
+/* 9 bottom_dock — story up top, search docked low */
+.rent-hero-layout--bottom_dock {
+  min-height: clamp(30rem, 78vh, 46rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.rent-hero-layout--bottom_dock .rent-hero-booking-inner {
+  margin-top: auto;
+  padding-top: 6rem;
+  padding-bottom: 2rem;
+  text-align: left;
+  max-width: 64rem;
+}
+
+.rent-hero-layout--bottom_dock .rent-hero-search-slot {
+  margin-top: 1.75rem;
+}
+
+.rent-hero-layout--bottom_dock .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 0;
+  background: rgba(2, 6, 23, 0.88);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.35);
+}
+
+.rent-hero-layout--bottom_dock .rent-search--hero .rent-search-field {
+  color: #e2e8f0;
+}
+
+.rent-hero-layout--bottom_dock .rent-search--hero .rent-search-field input,
+.rent-hero-layout--bottom_dock .rent-search--hero .rent-search-field select {
+  color: #f8fafc;
+}
+
+.rent-hero-layout--bottom_dock .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #38bdf8);
+  border-radius: 0;
+}
+
+/* 10 glass_center — frosted center stage */
+.rent-hero-layout--glass_center .rent-hero-booking-inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 3.5rem 1.25rem;
+  text-align: center;
+}
+
+.rent-hero-layout--glass_center .rent-hero-benefits {
+  justify-content: center;
+}
+
+.rent-hero-layout--glass_center .rent-search--hero .rent-search-row {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  border-radius: 18px;
+}
+
+/* 11 asymmetric — bold left title, offset search right */
+.rent-hero-layout--asymmetric .rent-hero-booking-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 1rem 2rem;
+  align-items: end;
+  max-width: 70rem;
+  margin: 0 auto;
+  padding: 3.5rem 1.5rem 3.75rem;
+  text-align: left;
+}
+
+.rent-hero-layout--asymmetric .rent-hero-booking-brand,
+.rent-hero-layout--asymmetric .rent-hero-booking-title,
+.rent-hero-layout--asymmetric .rent-hero-booking-copy,
+.rent-hero-layout--asymmetric .rent-hero-benefits {
+  grid-column: 1;
+}
+
+.rent-hero-layout--asymmetric .rent-hero-search-slot {
+  grid-column: 2;
+  grid-row: 2 / span 4;
+  transform: translateY(0.5rem);
+}
+
+.rent-hero-layout--asymmetric .rent-hero-booking-title {
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  line-height: 0.98;
+  text-transform: uppercase;
+  letter-spacing: -0.04em;
+}
+
+.rent-hero-layout--asymmetric .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(124, 45, 18, 0.35);
+}
+
+.rent-hero-layout--asymmetric .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #ea580c);
+  border-radius: 0 8px 8px 0;
+  font-weight: 800;
+}
+
+/* 12 trust_stack — vertical benefits + 2-row form */
+.rent-hero-layout--trust_stack .rent-hero-booking-inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 3.25rem 1.25rem 3.5rem;
+  text-align: left;
+}
+
+.rent-hero-layout--trust_stack .rent-hero-benefits {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-bottom: 0.25rem;
+}
+
+.rent-hero-layout--trust_stack .rent-search--hero .rent-search-row {
+  flex-wrap: wrap;
+  border: 0;
+  border-radius: 24px;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.rent-hero-layout--trust_stack .rent-search--hero .rent-search-field--place {
+  flex: 1 1 100%;
+  border-right: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.rent-hero-layout--trust_stack .rent-search--hero .rent-search-field {
+  flex: 1 1 22%;
+  border-right: 0;
+}
+
+.rent-hero-layout--trust_stack .rent-search--hero .rent-search-submit {
+  flex: 1 1 100%;
+  min-height: 3.15rem;
+  border-radius: 16px;
+  background: var(--rent-teal, #0ea5e9);
+}
+
+/* 13 editorial — right-aligned cognac frame */
+.rent-hero-layout--editorial .rent-hero-booking-inner {
+  max-width: 38rem;
+  margin-left: auto;
+  margin-right: 8%;
+  text-align: left;
+  padding-top: 4.5rem;
+}
+
+.rent-hero-layout--editorial .rent-hero-booking-title {
+  font-weight: 600;
+  letter-spacing: -0.05em;
+}
+
+.rent-hero-layout--editorial .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 4px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+}
+
+.rent-hero-layout--editorial .rent-search--hero .rent-search-submit {
+  background: var(--rent-deep, #1c1917);
+}
+
+/* 14 ticket_board — departure-board field labels */
+.rent-hero-layout--ticket_board .rent-hero-shade--booking {
+  background: linear-gradient(180deg, rgba(51, 65, 85, 0.35) 0%, rgba(15, 23, 42, 0.78) 100%);
+}
+
+.rent-hero-layout--ticket_board .rent-hero-booking-inner {
+  max-width: 58rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 3.25rem;
+  text-align: left;
+}
+
+.rent-hero-layout--ticket_board .rent-hero-booking-title {
+  font-size: clamp(1.75rem, 3.2vw, 2.4rem);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rent-hero-layout--ticket_board .rent-search--hero .rent-search-row {
+  border: 2px solid rgba(148, 163, 184, 0.45);
+  border-radius: 6px;
+  background: #f1f5f9;
+}
+
+.rent-hero-layout--ticket_board .rent-search--hero .rent-search-field {
+  border-right: 1px solid rgba(100, 116, 139, 0.35);
+}
+
+.rent-hero-layout--ticket_board .rent-search--hero .rent-search-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.rent-hero-layout--ticket_board .rent-search--hero .rent-search-submit {
+  background: var(--rent-deep, #0f172a);
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+}
+
+/* 15 soft_orb — mint soft panel */
+.rent-hero-layout--soft_orb .rent-hero-booking-inner {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 3.5rem 1.25rem;
+  text-align: center;
+}
+
+.rent-hero-layout--soft_orb .rent-hero-benefits {
+  justify-content: center;
+}
+
+.rent-hero-layout--soft_orb .rent-hero-search-slot {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border-radius: 28px;
+  background: rgba(236, 253, 245, 0.22);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+
+.rent-hero-layout--soft_orb .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 980px;
+  background: #fff;
+}
+
+.rent-hero-layout--soft_orb .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #10b981);
+  border-radius: 980px;
+}
+
+/* 16 wide_horizon — short title, ultra-wide shallow bar */
+.rent-hero-layout--wide_horizon .rent-hero-booking-inner {
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 2.75rem 1.25rem 3rem;
+  text-align: center;
+}
+
+.rent-hero-layout--wide_horizon .rent-hero-booking-title {
+  font-size: clamp(1.55rem, 2.8vw, 2.15rem);
+  max-width: 36ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.rent-hero-layout--wide_horizon .rent-hero-benefits {
+  justify-content: center;
+}
+
+.rent-hero-layout--wide_horizon .rent-search--hero .rent-search-row {
+  border: 0;
+  border-radius: 10px;
+  min-height: 3.4rem;
+  box-shadow: 0 10px 28px rgba(120, 53, 15, 0.22);
+}
+
+.rent-hero-layout--wide_horizon .rent-search--hero .rent-search-field {
+  min-height: 3.25rem;
+}
+
+.rent-hero-layout--wide_horizon .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #c2410c);
+  border-radius: 0 10px 10px 0;
+}
+
+/* 17 frost_panel — left frosted slab */
+.rent-hero-layout--frost_panel .rent-hero-booking-inner {
+  max-width: 36rem;
+  margin-left: 6%;
+  margin-right: auto;
+  padding: 2.5rem 1.75rem 2.75rem;
+  text-align: left;
+  border-radius: 20px;
+  background: rgba(248, 250, 252, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+}
+
+.rent-hero-layout--frost_panel .rent-search--hero .rent-search-row {
+  flex-direction: column;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.rent-hero-layout--frost_panel .rent-search--hero .rent-search-field,
+.rent-hero-layout--frost_panel .rent-search--hero .rent-search-submit {
+  width: 100%;
+  flex: none;
+  min-width: 0;
+  border-right: 0;
+}
+
+.rent-hero-layout--frost_panel .rent-search--hero .rent-search-submit {
+  min-height: 3rem;
+  border-radius: 0 0 14px 14px;
+  background: var(--rent-deep, #1e293b);
+}
+
+/* 18 deck_tiers — marina title then gold-trimmed search */
+.rent-hero-layout--deck_tiers .rent-hero-booking-inner {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 3.75rem 1.25rem 4rem;
+  text-align: center;
+}
+
+.rent-hero-layout--deck_tiers .rent-hero-booking-title {
+  color: #f8fafc;
+}
+
+.rent-hero-layout--deck_tiers .rent-hero-accent {
+  color: var(--rent-teal, #c9a227);
+}
+
+.rent-hero-layout--deck_tiers .rent-hero-benefits {
+  justify-content: center;
+}
+
+.rent-hero-layout--deck_tiers .rent-search--hero .rent-search-row {
+  border: 1px solid color-mix(in srgb, var(--rent-teal, #c9a227) 70%, #fff);
+  border-radius: 2px;
+  background: rgba(12, 26, 58, 0.55);
+  backdrop-filter: blur(8px);
+}
+
+.rent-hero-layout--deck_tiers .rent-search--hero .rent-search-field {
+  color: #e2e8f0;
+}
+
+.rent-hero-layout--deck_tiers .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #c9a227);
+  color: #0c1a3a;
+  border-radius: 0;
+  font-weight: 800;
+}
+
+/* 19 deal_banner — office offer ribbon */
 .rent-hero-layout--deal_banner .rent-hero-booking-inner::before {
   content: 'Προσφορά γραφείου · κράτηση online';
   display: inline-flex;
@@ -7274,97 +7730,72 @@
   border-radius: 0 14px 14px 0;
 }
 
-.rent-hero-layout--compact_bar .rent-hero-booking-inner {
-  padding-top: 2.25rem;
-  padding-bottom: 2.4rem;
-}
-
-.rent-hero-layout--compact_bar .rent-hero-booking-title {
-  font-size: clamp(1.65rem, 3vw, 2.2rem);
-}
-
-.rent-hero-layout--compact_bar .rent-search--hero .rent-search-row {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-}
-
-.rent-hero-layout--compact_bar .rent-search--hero .rent-search-field {
-  min-height: 3.5rem;
-}
-
-.rent-hero-layout--compact_bar .rent-search--hero .rent-search-submit {
-  background: var(--rent-deep, #0b3d4a);
-}
-
-.rent-hero-layout--editorial .rent-hero-booking-inner {
-  max-width: 38rem;
-  margin-left: auto;
-  margin-right: 8%;
-  text-align: left;
-  padding-top: 4.5rem;
-}
-
-.rent-hero-layout--editorial .rent-hero-booking-title {
-  font-weight: 600;
-  letter-spacing: -0.05em;
-}
-
-.rent-hero-layout--editorial .rent-search--hero .rent-search-row {
-  border: 0;
-  border-radius: 4px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
-}
-
-.rent-hero-layout--editorial .rent-search--hero .rent-search-submit {
-  background: var(--rent-deep, #1c1917);
-}
-
-.rent-hero-layout--island_float .rent-hero-booking-inner {
-  text-align: center;
-  max-width: 52rem;
+/* 20 showroom — brand underline + classic strip */
+.rent-hero-layout--showroom .rent-hero-booking-inner {
+  max-width: 64rem;
   margin: 0 auto;
-  padding: 4rem 1.25rem 4.25rem;
+  padding: 3.5rem 1.25rem 3.75rem;
+  text-align: center;
 }
 
-.rent-hero-layout--island_float .rent-hero-benefits {
+.rent-hero-layout--showroom .rent-hero-booking-title {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.65rem;
+}
+
+.rent-hero-layout--showroom .rent-hero-booking-title::after {
+  content: '';
+  display: block;
+  width: 4.5rem;
+  height: 3px;
+  margin: 0.75rem auto 0;
+  border-radius: 2px;
+  background: var(--rent-teal, #0d9488);
+}
+
+.rent-hero-layout--showroom .rent-hero-benefits {
   justify-content: center;
 }
 
-.rent-hero-layout--island_float .rent-search--hero .rent-search-row {
+.rent-hero-layout--showroom .rent-search--hero .rent-search-row {
   border: 0;
-  border-radius: 22px;
-  box-shadow: 0 20px 50px rgba(8, 30, 40, 0.28);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(13, 148, 136, 0.22);
 }
 
-.rent-hero-layout--island_float .rent-search--hero .rent-search-submit {
-  background: var(--rent-teal, #0a7a6c);
-  border-radius: 0 22px 22px 0;
-}
-
-.rent-hero-layout--strip .rent-search--hero .rent-search-submit {
-  background: var(--rent-teal, #0a7a6c);
+.rent-hero-layout--showroom .rent-search--hero .rent-search-submit {
+  background: var(--rent-teal, #0d9488);
+  border-radius: 0 16px 16px 0;
 }
 
 @media (max-width: 860px) {
   .rent-hero-layout--split_card .rent-hero-booking-inner,
-  .rent-hero-layout--side_search .rent-hero-booking-inner {
+  .rent-hero-layout--side_search .rent-hero-booking-inner,
+  .rent-hero-layout--asymmetric .rent-hero-booking-inner {
     display: flex;
     flex-direction: column;
     text-align: left;
   }
 
   .rent-hero-layout--split_card .rent-hero-search-slot,
-  .rent-hero-layout--side_search .rent-hero-search-slot {
+  .rent-hero-layout--side_search .rent-hero-search-slot,
+  .rent-hero-layout--asymmetric .rent-hero-search-slot {
     grid-column: auto;
     grid-row: auto;
     width: 100%;
+    transform: none;
   }
 
   .rent-hero-layout--cinematic .rent-hero-booking-inner,
-  .rent-hero-layout--editorial .rent-hero-booking-inner {
+  .rent-hero-layout--editorial .rent-hero-booking-inner,
+  .rent-hero-layout--frost_panel .rent-hero-booking-inner {
     margin-left: auto;
     margin-right: auto;
+  }
+
+  .rent-hero-layout--frost_panel .rent-hero-booking-inner {
+    max-width: 100%;
   }
 }
 

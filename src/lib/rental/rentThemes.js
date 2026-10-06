@@ -55,22 +55,31 @@ export function normalizeRentHeaderStyle(value) {
 }
 
 /**
- * Distinct hero compositions — original Poreia layouts inspired by
- * common rental UX patterns (not copies of any brand).
- * split_card · stacked_panel · cinematic · strip · glass_center ·
- * side_search · deal_banner · compact_bar · editorial · island_float
+ * Distinct hero compositions — one original Poreia layout per theme.
+ * Inspired by common rental UX patterns (promo+card, strip, dock, etc.)
+ * without copying any brand’s assets, copy, or exact chrome.
  */
 export const RENT_HERO_LAYOUTS = [
-  'split_card',
-  'stacked_panel',
-  'cinematic',
   'strip',
-  'glass_center',
+  'cinematic',
+  'split_card',
   'side_search',
-  'deal_banner',
+  'stacked_panel',
+  'luxe_veil',
   'compact_bar',
-  'editorial',
   'island_float',
+  'bottom_dock',
+  'glass_center',
+  'asymmetric',
+  'trust_stack',
+  'editorial',
+  'ticket_board',
+  'soft_orb',
+  'wide_horizon',
+  'frost_panel',
+  'deck_tiers',
+  'deal_banner',
+  'showroom',
 ];
 
 export function normalizeRentHeroLayout(value) {
@@ -78,27 +87,28 @@ export function normalizeRentHeroLayout(value) {
   return RENT_HERO_LAYOUTS.includes(mode) ? mode : 'strip';
 }
 
+/** Exactly one unique layout per hero style / theme. */
 const HERO_LAYOUT_BY_STYLE = {
   coastal: 'strip',
   cinematic: 'cinematic',
   compare: 'split_card',
   peer: 'side_search',
   corporate: 'stacked_panel',
-  soft_luxe: 'editorial',
+  soft_luxe: 'luxe_veil',
   metro: 'compact_bar',
   island: 'island_float',
-  night: 'cinematic',
+  night: 'bottom_dock',
   glass: 'glass_center',
-  sport: 'cinematic',
-  family: 'stacked_panel',
+  sport: 'asymmetric',
+  family: 'trust_stack',
   editorial: 'editorial',
-  airport: 'split_card',
-  ev: 'glass_center',
-  desert: 'island_float',
-  alpine: 'stacked_panel',
-  yacht: 'editorial',
+  airport: 'ticket_board',
+  ev: 'soft_orb',
+  desert: 'wide_horizon',
+  alpine: 'frost_panel',
+  yacht: 'deck_tiers',
   deal: 'deal_banner',
-  classic: 'strip',
+  classic: 'showroom',
 };
 
 /**
@@ -127,9 +137,9 @@ export const RENT_THEMES = [
     id: 'sixt_cinematic',
     name: 'Cinematic Prestige',
     nameEl: 'Cinematic Prestige',
-    description: 'Σκούρο fullscreen hero, featured showroom — premium brand όπως SIXT.',
+    description: 'Σκούρο fullscreen hero, featured showroom — premium night booking.',
     mood: 'VIP · νύχτα',
-    badge: 'SIXT-like',
+    badge: 'Prestige',
     category: 'premium',
     tags: ['Dark', 'Featured', 'Overlay'],
     layoutLabel: 'Cinematic · Featured',
@@ -163,9 +173,9 @@ export const RENT_THEMES = [
     id: 'turo_peer',
     name: 'Peer Marketplace',
     nameEl: 'Peer Marketplace',
-    description: 'Photo-first marketplace, οριζόντιο scroll — Turo vibe.',
+    description: 'Photo-first marketplace, οριζόντιο scroll — peer fleet vibe.',
     mood: 'Photo · community',
-    badge: 'Turo-like',
+    badge: 'Marketplace',
     category: 'bold',
     tags: ['Purple', 'Scroll', 'Photo'],
     layoutLabel: 'Peer · Scroll',
