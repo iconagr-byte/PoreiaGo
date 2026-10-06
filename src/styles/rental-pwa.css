@@ -2419,13 +2419,14 @@
   color: #1d1d1f;
   line-height: 1.18;
   min-width: 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
 .rent-pick-title > span {
   display: block;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rent-pick-title em {
@@ -5340,9 +5341,30 @@
   gap: 1.35rem;
 }
 
+/* List themes must stay one column — never crush horizontal cards into 3-col. */
+.rent-phone-stage--desktop .rent-pick-grid--rent-list {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 44rem;
+  gap: 0.9rem;
+}
+
+.rent-phone-stage--desktop .rent-pick-grid--rent-scroll {
+  grid-template-columns: none;
+}
+
 @media (min-width: 1180px) {
-  .rent-phone-stage--desktop .rent-pick-grid {
+  .rent-phone-stage--desktop .rent-pick-grid--rent-grid-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rent-phone-stage--desktop .rent-pick-grid--rent-grid-three,
+  .rent-phone-stage--desktop .rent-pick-grid--rent-featured,
+  .rent-phone-stage--desktop .rent-pick-grid:not([class*='rent-pick-grid--rent-']) {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rent-phone-stage--desktop .rent-pick-grid--rent-list {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -7353,18 +7375,23 @@
   border-radius: 10px;
 }
 
-/* Horizontal compact/spec ONLY in list layout (DiscoverCars-style rows). */
+/* Horizontal compact/spec ONLY in single-column list rows. */
+.rent-pick-grid--rent-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .rent-pick-grid--rent-list .rent-pick--compact,
 .rent-pick-grid--rent-list .rent-pick--spec {
   display: grid;
-  grid-template-columns: minmax(7.5rem, 34%) minmax(0, 1fr);
+  grid-template-columns: minmax(9.5rem, 38%) minmax(0, 1fr);
   align-items: stretch;
+  min-width: 0;
 }
 
 .rent-pick-grid--rent-list .rent-pick--compact .rent-pick-media,
 .rent-pick-grid--rent-list .rent-pick--spec .rent-pick-media {
   aspect-ratio: auto;
-  min-height: 100%;
+  min-height: 9.5rem;
   border-radius: 0;
   align-self: stretch;
 }
@@ -7378,16 +7405,44 @@
 
 .rent-pick-grid--rent-list .rent-pick--compact .rent-pick-body,
 .rent-pick-grid--rent-list .rent-pick--spec .rent-pick-body {
-  padding: 0.85rem 1rem;
-  padding-right: 2.75rem; /* room for favorite heart */
+  padding: 0.95rem 1.1rem;
+  padding-right: 2.85rem; /* room for favorite heart */
+  min-width: 0;
+  gap: 0.65rem;
+}
+
+.rent-pick-grid--rent-list .rent-pick--compact .rent-pick-title > span,
+.rent-pick-grid--rent-list .rent-pick--spec .rent-pick-title > span {
+  white-space: nowrap;
+}
+
+.rent-pick-grid--rent-list .rent-pick--compact .rent-pick-specs,
+.rent-pick-grid--rent-list .rent-pick--spec .rent-pick-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  grid-template-columns: none;
+}
+
+.rent-pick-grid--rent-list .rent-pick--spec .rent-pick-specs li {
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .rent-pick-grid--rent-list .rent-pick--compact .rent-pick-foot,
 .rent-pick-grid--rent-list .rent-pick--spec .rent-pick-foot {
   flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-@media (max-width: 520px) {
+.rent-pick-grid--rent-list .rent-pick--compact .rent-pick-cta,
+.rent-pick-grid--rent-list .rent-pick--spec .rent-pick-cta {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
   .rent-pick-grid--rent-list .rent-pick--compact,
   .rent-pick-grid--rent-list .rent-pick--spec {
     grid-template-columns: 1fr;
