@@ -868,7 +868,11 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
 
   const handleRentThemePreview = (theme, { includeColors = false } = {}) => {
     const patch = rentThemeToAppearancePatch(theme, { includeColors });
-    setForm((p) => ({ ...p, ...patch }));
+    setForm((p) => {
+      const next = { ...p, ...patch };
+      pushHomepagePreviewDraft(next);
+      return next;
+    });
     toast.success(`Προεπισκόπηση /rent: ${theme.nameEl}`, { id: 'rent-theme-preview' });
   };
 
