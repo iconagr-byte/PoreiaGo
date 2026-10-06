@@ -23,6 +23,7 @@ export default function RentGuestHero({
   logoBgMode,
   logoShadow,
   heroStyle = 'coastal',
+  heroLayout: heroLayoutProp = 'strip',
   heroImageUrl = '',
   title,
   titleAccent,
@@ -41,12 +42,14 @@ export default function RentGuestHero({
   const slider = readPageSlider(siteAppearance, 'rent');
 
   const heroMode = String(heroStyle || 'coastal').trim().toLowerCase() || 'coastal';
+  const heroLayout = String(heroLayoutProp || 'strip').trim().toLowerCase() || 'strip';
   const photoSrc = String(heroImageUrl || '').trim() || RENT_GUEST_HERO_IMAGE;
 
   return (
     <section
-      className={`rent-hero rent-hero--landing rent-hero--booking rent-hero--${heroMode}`}
+      className={`rent-hero rent-hero--landing rent-hero--booking rent-hero--${heroMode} rent-hero-layout--${heroLayout}`}
       data-rent-hero={heroMode}
+      data-rent-hero-layout={heroLayout}
       aria-label="Ενοικίαση"
     >
       <div className="rent-hero-media" aria-hidden={!slider.enabled}>

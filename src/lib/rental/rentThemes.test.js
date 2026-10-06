@@ -61,6 +61,7 @@ const resolved = resolveRentTheme({
 console.assert(resolved.themeId === 'turo_peer', 'resolve theme');
 console.assert(resolved.accent === '#593bfb', 'resolve accent');
 console.assert(resolved.heroStyle === 'peer', 'resolve hero');
+console.assert(resolved.heroLayout === 'side_search', 'resolve hero layout');
 console.assert(resolved.heroImageUrl.includes('unsplash') || resolved.heroImageUrl.startsWith('/'), 'resolve photo');
 console.assert(resolved.headerStyle === 'brand', 'resolve header style');
 
