@@ -841,9 +841,11 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   }, [form, loading]);
 
   const handleThemePreview = (theme, { includeColors = false } = {}) => {
+    // Sync draft to localStorage BEFORE the live preview iframe mounts
+    // (same flow as /rent themes). Do not mutate form — only Apply saves.
     const patch = themeToAppearancePatch(theme, { includeColors });
-    setForm((p) => ({ ...p, ...patch }));
-    toast.success(`Προεπισκόπηση: ${theme.nameEl}`, { id: 'theme-preview' });
+    const draft = { ...form, ...patch };
+    pushHomepagePreviewDraft(draft);
   };
 
   const handleThemeApply = async (theme, { includeColors = false } = {}) => {
@@ -1477,7 +1479,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         {designPage === 'home' && section === 'themes' && (
           <PanelCard
             title="Θέματα αρχικής σελίδας"
-            description="Επίλεξε διάταξη (header, hero, κάρτες, footer). Τα χρώματα ρυθμίζονται χωριστά στα Γενικά — ή τσεκάρισε «προτεινόμενα χρώματα»."
+            description="Ζωντανή προεπισκόπηση όπως στο /rent — Επισκόπηση ανοίγει την πλήρη αρχική. Ενεργοποίηση αποθηκεύει. Χρώματα στα Γενικά ή με το checkbox προτεινόμενων."
           >
             <ThemeGallery
               activeThemeId={form.homepage_theme_id || 'aegean_classic'}

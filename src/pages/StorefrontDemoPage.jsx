@@ -24,6 +24,10 @@ import {
   isStorefrontPreviewMode,
   readHomepagePreviewDraft,
 } from '../lib/homepage/homepagePreview.js';
+import {
+  getHomepageThemeById,
+  themeToAppearancePatch,
+} from '../lib/homepage/homepageThemes.js';
 import { isPlatformMarketingHost, isTenantStorefrontHost } from '../lib/platform/tenantHost.js';
 import { fetchPublicFleet } from '../services/fleetPublicApi.js';
 import {
@@ -142,8 +146,19 @@ export default function StorefrontDemoPage() {
 
     const applyPreviewAppearance = () => {
       const draft = readHomepagePreviewDraft();
-      if (draft) {
-        setSiteAppearance({ ...DEFAULT_SITE_APPEARANCE, ...draft });
+      // URL ?theme=<id> wins so the live preview iframe always shows the clicked theme.
+      const themeParam = new URLSearchParams(window.location.search).get('theme');
+      const themeFromUrl = themeParam ? getHomepageThemeById(themeParam) : null;
+      const themePatch =
+        themeFromUrl && themeFromUrl.id === themeParam
+          ? themeToAppearancePatch(themeFromUrl, { includeColors: true })
+          : null;
+      if (draft || themePatch) {
+        setSiteAppearance({
+          ...DEFAULT_SITE_APPEARANCE,
+          ...(draft || {}),
+          ...(themePatch || {}),
+        });
         return true;
       }
       return false;
