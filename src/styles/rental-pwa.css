@@ -689,7 +689,12 @@
   display: grid;
   place-items: center;
   position: relative;
-  background: linear-gradient(160deg, #14b8a6 0%, #0a7a6c 55%, #0b3d4a 100%);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--rent-teal, #14b8a6) 85%, #fff) 0%,
+    var(--rent-teal, #0a7a6c) 55%,
+    var(--rent-deep, #0b3d4a) 100%
+  );
   color: #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
@@ -6864,6 +6869,95 @@
   color: #fff;
   font-weight: 650;
   text-decoration: none;
+}
+
+/* ——— Theme header chrome (data-rent-header / rent-topbar--hdr-*) ——— */
+.rent-topbar--hdr-glass {
+  background: rgba(251, 251, 253, 0.78);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  color: #1d1d1f;
+}
+
+.rent-topbar--hdr-solid {
+  background: #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  color: #0f172a;
+}
+
+.rent-topbar--hdr-soft {
+  background: color-mix(in srgb, var(--rent-fill, #f0fdfa) 92%, #fff);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--rent-teal, #0a7a6c) 18%, transparent);
+  color: #0f172a;
+}
+
+.rent-topbar--hdr-dark {
+  background: #0b0b0f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+}
+
+.rent-topbar--hdr-ink {
+  background: var(--rent-deep, #0b3d4a);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+}
+
+.rent-topbar--hdr-brand {
+  background: var(--rent-teal, #0a7a6c);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--rent-deep, #0b3d4a) 35%, transparent);
+  color: #fff;
+}
+
+.rent-topbar--hdr-dark .rent-top-quick-link,
+.rent-topbar--hdr-ink .rent-top-quick-link,
+.rent-topbar--hdr-brand .rent-top-quick-link,
+.rent-topbar--hdr-dark .rent-brand-mark-name,
+.rent-topbar--hdr-ink .rent-brand-mark-name,
+.rent-topbar--hdr-brand .rent-brand-mark-name,
+.rent-topbar--hdr-dark .rent-brand-mark-word,
+.rent-topbar--hdr-ink .rent-brand-mark-word,
+.rent-topbar--hdr-brand .rent-brand-mark-word,
+.rent-topbar--hdr-dark .rent-brand-mark-sub,
+.rent-topbar--hdr-ink .rent-brand-mark-sub,
+.rent-topbar--hdr-brand .rent-brand-mark-sub {
+  color: #f8fafc;
+}
+
+.rent-topbar--hdr-dark .rent-top-quick-link:hover,
+.rent-topbar--hdr-ink .rent-top-quick-link:hover,
+.rent-topbar--hdr-brand .rent-top-quick-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.rent-topbar--hdr-dark .rent-guest-menu-btn,
+.rent-topbar--hdr-ink .rent-guest-menu-btn,
+.rent-topbar--hdr-brand .rent-guest-menu-btn,
+.rent-topbar--hdr-dark .rent-top-actions button,
+.rent-topbar--hdr-ink .rent-top-actions button,
+.rent-topbar--hdr-brand .rent-top-actions button,
+.rent-topbar--hdr-dark .rent-top-actions a,
+.rent-topbar--hdr-ink .rent-top-actions a,
+.rent-topbar--hdr-brand .rent-top-actions a {
+  color: #f8fafc;
+}
+
+.rent-topbar--hdr-brand .rent-brand-mark-badge {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: none;
 }
 
 /* ——— Full-page /rent themes (data-rent-theme / hero / fleet / card) ——— */

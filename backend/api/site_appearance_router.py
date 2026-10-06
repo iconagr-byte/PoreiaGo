@@ -175,6 +175,8 @@ DEFAULT_SITE_APPEARANCE = {
     "rent_fleet_card_template": "rent_premium",
     "rent_theme_id": "aegean_coast",
     "rent_hero_style": "coastal",
+    "rent_hero_image_url": "/images/rent-hero-coastal-v2.jpg",
+    "rent_header_style": "glass",
     "rent_accent_color": "#0a7a6c",
     "rent_secondary_color": "#0b3d4a",
     "rent_surface_color": "#f0fdfa",
@@ -284,6 +286,8 @@ class SiteAppearanceResponse(BaseModel):
     rent_fleet_card_template: str = "rent_premium"
     rent_theme_id: str = "aegean_coast"
     rent_hero_style: str = "coastal"
+    rent_hero_image_url: str = "/images/rent-hero-coastal-v2.jpg"
+    rent_header_style: str = "glass"
     rent_accent_color: str = "#0a7a6c"
     rent_secondary_color: str = "#0b3d4a"
     rent_surface_color: str = "#f0fdfa"
@@ -402,6 +406,8 @@ class SiteAppearanceUpdate(BaseModel):
     rent_fleet_card_template: str | None = None
     rent_theme_id: str | None = None
     rent_hero_style: str | None = None
+    rent_hero_image_url: str | None = None
+    rent_header_style: str | None = None
     rent_accent_color: str | None = None
     rent_secondary_color: str | None = None
     rent_surface_color: str | None = None

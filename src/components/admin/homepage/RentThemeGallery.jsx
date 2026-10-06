@@ -237,8 +237,8 @@ export default function RentThemeGallery({
       <div className="rounded-2xl border border-teal-600/15 bg-teal-50/80 px-4 py-3 text-sm text-slate-900">
         <p className="font-bold">1. Επίλεξε πλήρη σελίδα /rent</p>
         <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
-          Κάθε θέμα αλλάζει hero, διάταξη στόλου και στυλ καρτών — όχι μόνο χρώμα. Μετά μπορείς να
-          ρυθμίσεις τα χρώματα από κάτω.
+          Κάθε θέμα αλλάζει header, φωτογραφία hero, διάταξη στόλου και στυλ καρτών — όχι μόνο χρώμα.
+          Μετά μπορείς να ρυθμίσεις τα χρώματα από κάτω.
         </p>
         <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-teal-800">
           <span className="material-symbols-outlined text-[15px]">open_in_full</span>

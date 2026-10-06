@@ -37,6 +37,23 @@ export const RENT_HERO_STYLES = [
   'classic',
 ];
 
+
+/** Header chrome modes for .rent-topbar (data-rent-header). */
+export const RENT_HEADER_STYLES = ['glass', 'solid', 'dark', 'brand', 'ink', 'soft'];
+
+/** Curated hero photos — Unsplash or local path. */
+export function rentHeroPhoto(idOrPath) {
+  const raw = String(idOrPath || '').trim();
+  if (!raw) return '/images/rent-hero-coastal-v2.jpg';
+  if (raw.startsWith('/') || raw.startsWith('http')) return raw;
+  return `https://images.unsplash.com/photo-${raw}?auto=format&fit=crop&w=2000&q=85`;
+}
+
+export function normalizeRentHeaderStyle(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return RENT_HEADER_STYLES.includes(mode) ? mode : 'glass';
+}
+
 /**
  * 20 full-page rent themes — unique hero × fleet × card × mood combinations.
  */
@@ -56,6 +73,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_grid_three',
     rent_fleet_card_template: 'rent_premium',
     rent_header_compact: false,
+    hero_image_url: '/images/rent-hero-coastal-v2.jpg',
+    header_style: 'glass',
   },
   {
     id: 'sixt_cinematic',
@@ -72,6 +91,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_featured',
     rent_fleet_card_template: 'rent_overlay',
     rent_header_compact: true,
+    hero_image_url: rentHeroPhoto('1503376789611-9aa2e607e2ae'),
+    header_style: 'dark',
   },
   {
     id: 'discover_compare',
@@ -88,6 +109,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_list',
     rent_fleet_card_template: 'rent_spec',
     rent_header_compact: true,
+    hero_image_url: rentHeroPhoto('1449965408859-eae163525971'),
+    header_style: 'solid',
   },
   {
     id: 'turo_peer',
@@ -104,6 +127,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_scroll',
     rent_fleet_card_template: 'rent_overlay',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1511910849305-0df4eda133e7'),
+    header_style: 'brand',
   },
   {
     id: 'enterprise_trust',
@@ -120,6 +145,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_grid_two',
     rent_fleet_card_template: 'rent_soft',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1485291571150-772bff949ba0'),
+    header_style: 'solid',
   },
   {
     id: 'quiet_luxe',
@@ -136,6 +163,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_grid_three',
     rent_fleet_card_template: 'rent_soft',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1600596542815-ffad4c1539a9'),
+    header_style: 'soft',
   },
   {
     id: 'metro_express',
@@ -152,6 +181,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_list',
     rent_fleet_card_template: 'rent_compact',
     rent_header_compact: true,
+    hero_image_url: rentHeroPhoto('1477959858617-67f85cf4f1df'),
+    header_style: 'ink',
   },
   {
     id: 'santorini_sunset',
@@ -168,6 +199,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_grid_two',
     rent_fleet_card_template: 'rent_overlay',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1613395877344-13d4a8e0d49e'),
+    header_style: 'glass',
   },
   {
     id: 'night_asphalt',
@@ -184,6 +217,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_featured',
     rent_fleet_card_template: 'rent_spec',
     rent_header_compact: true,
+    hero_image_url: rentHeroPhoto('1493238792150-16ad17bd7908'),
+    header_style: 'dark',
   },
   {
     id: 'glass_atlas_rent',
@@ -200,6 +235,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_scroll',
     rent_fleet_card_template: 'rent_soft',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1486406146926-c627a92ad1ab'),
+    header_style: 'glass',
   },
   {
     id: 'sport_orange',
@@ -216,6 +253,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_featured',
     rent_fleet_card_template: 'rent_premium',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1542362567-b07e54358753'),
+    header_style: 'brand',
   },
   {
     id: 'family_sky',
@@ -232,6 +271,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_grid_three',
     rent_fleet_card_template: 'rent_soft',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1469854523086-cc02afe5c88c'),
+    header_style: 'soft',
   },
   {
     id: 'autoluxe_editorial',
@@ -248,6 +289,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_grid_two',
     rent_fleet_card_template: 'rent_overlay',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1555215695-3004980ad54e'),
+    header_style: 'ink',
   },
   {
     id: 'airport_hub',
@@ -264,6 +307,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_list',
     rent_fleet_card_template: 'rent_compact',
     rent_header_compact: true,
+    hero_image_url: rentHeroPhoto('1529070538774-1843cb3265df'),
+    header_style: 'solid',
   },
   {
     id: 'ev_mint',
@@ -280,6 +325,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_scroll',
     rent_fleet_card_template: 'rent_spec',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1593941707882-a5bba14938c7'),
+    header_style: 'soft',
   },
   {
     id: 'cyclades_sand',
@@ -296,6 +343,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_grid_three',
     rent_fleet_card_template: 'rent_premium',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1507525428034-b723cf961d3e'),
+    header_style: 'glass',
   },
   {
     id: 'alpine_ice',
@@ -312,6 +361,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_grid_two',
     rent_fleet_card_template: 'rent_soft',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1464822759023-fed69284c2e2'),
+    header_style: 'solid',
   },
   {
     id: 'yacht_navy',
@@ -328,6 +379,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_featured',
     rent_fleet_card_template: 'rent_premium',
     rent_header_compact: false,
+    hero_image_url: rentHeroPhoto('1544551763-46a013bb70d5'),
+    header_style: 'dark',
   },
   {
     id: 'deal_flash',
@@ -344,6 +397,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_list',
     rent_fleet_card_template: 'rent_compact',
     rent_header_compact: true,
+    hero_image_url: rentHeroPhoto('1552519507-da3b142c6e3d'),
+    header_style: 'brand',
   },
   {
     id: 'classic_teal',
@@ -360,6 +415,8 @@ export const RENT_THEMES = [
     rent_fleet_layout_template: 'rent_grid_three',
     rent_fleet_card_template: 'rent_premium',
     rent_header_compact: false,
+    hero_image_url: '/images/rent-hero-coastal-road-4k.jpg',
+    header_style: 'glass',
   },
 ];
 
@@ -386,6 +443,8 @@ export function rentThemeToAppearancePatch(theme, { includeColors = false } = {}
     rent_fleet_layout_template: t.rent_fleet_layout_template || 'rent_grid_three',
     rent_fleet_card_template: t.rent_fleet_card_template || 'rent_premium',
     rent_header_compact: t.rent_header_compact === true,
+    rent_hero_image_url: rentHeroPhoto(t.hero_image_url),
+    rent_header_style: normalizeRentHeaderStyle(t.header_style),
   };
   if (includeColors && t.palette) {
     patch.rent_accent_color = t.palette.primary;
@@ -437,10 +496,18 @@ export function resolveRentTheme(appearance = {}) {
     appearance.rent_surface_color || theme.palette.surface,
     theme.palette.surface,
   );
+  const heroImageUrl = rentHeroPhoto(
+    appearance.rent_hero_image_url || theme.hero_image_url || '/images/rent-hero-coastal-v2.jpg',
+  );
+  const headerStyle = normalizeRentHeaderStyle(
+    appearance.rent_header_style || theme.header_style || 'glass',
+  );
   return {
     theme,
     themeId: theme.id,
     heroStyle: normalizeRentHeroStyle(appearance.rent_hero_style || theme.rent_hero_style),
+    heroImageUrl,
+    headerStyle,
     fleetLayout: appearance.rent_fleet_layout_template || theme.rent_fleet_layout_template,
     fleetCard: appearance.rent_fleet_card_template || theme.rent_fleet_card_template,
     headerCompact:
