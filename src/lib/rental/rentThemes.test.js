@@ -45,6 +45,24 @@ console.assert(
   'no theme may use horizontal scroll fleet layout',
 );
 
+function hexLuma(hex) {
+  const h = String(hex || '').replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+console.assert(
+  RENT_THEMES.every((t) => hexLuma(t.palette.surface) >= 180),
+  'theme surfaces must be light (no black fills)',
+);
+
+const noirFill = resolveRentTheme({
+  rent_theme_id: 'night_asphalt',
+  rent_surface_color: '#0f172a',
+});
+console.assert(hexLuma(noirFill.surface) >= 180, 'saved dark surface must lift to a light fill');
+
 const photos = new Set(RENT_THEMES.map((t) => t.hero_image_url));
 console.assert(photos.size === 20, `each theme needs a unique hero photo, got ${photos.size}`);
 console.assert(

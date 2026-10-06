@@ -8180,34 +8180,23 @@
 .rent-land-band--teal {
   background: linear-gradient(
     160deg,
-    color-mix(in srgb, var(--rent-deep, #0b3d4a) 92%, #000) 0%,
-    color-mix(in srgb, var(--rent-teal, #0a7a6c) 85%, #0b3d4a) 100%
+    color-mix(in srgb, var(--rent-teal, #0a7a6c) 22%, #f5f5f7) 0%,
+    color-mix(in srgb, var(--rent-deep, #0b3d4a) 18%, #fff) 100%
   );
 }
 
-/* Dark page surfaces for noir themes */
-.rent-app[data-rent-theme='sixt_cinematic'],
-.rent-app[data-rent-theme='night_asphalt'],
-.rent-app[data-rent-theme='yacht_navy'],
-.rent-app[data-rent-theme='deal_flash'] {
-  color: #f5f5f7;
+/* Fleet pick panel is always a light surface — never a black fill. */
+.rent-app[data-rent-theme] .rent-land-band--pick,
+.rent-fleet-shell > .rent-land-band--pick {
+  background: linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+  color: #1d1d1f;
 }
 
-.rent-app[data-rent-theme='sixt_cinematic'] .rent-land-band--pick,
-.rent-app[data-rent-theme='night_asphalt'] .rent-land-band--pick,
-.rent-app[data-rent-theme='yacht_navy'] .rent-land-band--pick,
-.rent-app[data-rent-theme='deal_flash'] .rent-land-band--pick {
-  background: color-mix(in srgb, var(--rent-deep, #111827) 88%, #000);
-  color: #f5f5f7;
+.rent-phone-stage--desktop .rent-fleet-shell > .rent-land-band--pick {
+  background: #fff;
 }
 
-.rent-app[data-rent-theme='sixt_cinematic'] .rent-pick-head-title,
-.rent-app[data-rent-theme='night_asphalt'] .rent-pick-head-title,
-.rent-app[data-rent-theme='yacht_navy'] .rent-pick-head-title,
-.rent-app[data-rent-theme='deal_flash'] .rent-pick-head-title,
-.rent-app[data-rent-theme='sixt_cinematic'] .rent-pick-head-sub,
-.rent-app[data-rent-theme='night_asphalt'] .rent-pick-head-sub,
-.rent-app[data-rent-theme='yacht_navy'] .rent-pick-head-sub,
-.rent-app[data-rent-theme='deal_flash'] .rent-pick-head-sub {
-  color: #f5f5f7;
+.rent-app[data-rent-theme] .rent-pick-head-title,
+.rent-app[data-rent-theme] .rent-pick-head-sub {
+  color: #1d1d1f;
 }

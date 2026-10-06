@@ -143,7 +143,7 @@ export const RENT_THEMES = [
     category: 'premium',
     tags: ['Dark', 'Featured', 'Overlay'],
     layoutLabel: 'Cinematic · Featured',
-    palette: { primary: '#f97316', secondary: '#111827', hero: '#0a0a0a', surface: '#111827' },
+    palette: { primary: '#f97316', secondary: '#111827', hero: '#0a0a0a', surface: '#fff7ed' },
     rent_hero_style: 'cinematic',
     rent_fleet_layout_template: 'rent_featured',
     rent_fleet_card_template: 'rent_overlay',
@@ -269,7 +269,7 @@ export const RENT_THEMES = [
     category: 'premium',
     tags: ['Black', 'Featured', 'Overlay'],
     layoutLabel: 'Night · Featured',
-    palette: { primary: '#38bdf8', secondary: '#e2e8f0', hero: '#020617', surface: '#0f172a' },
+    palette: { primary: '#38bdf8', secondary: '#0f172a', hero: '#020617', surface: '#f1f5f9' },
     rent_hero_style: 'night',
     rent_fleet_layout_template: 'rent_featured',
     rent_fleet_card_template: 'rent_overlay',
@@ -542,6 +542,21 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/** Page/fleet fills must stay light — never a black slab. */
+function ensureLightSurface(hex, fallback = '#f5f5f7') {
+  const color = normalizeHex(hex, fallback);
+  const lumaOf = (value) => {
+    const h = value.slice(1);
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return 0.299 * r + 0.587 * g + 0.114 * b;
+  };
+  if (lumaOf(color) >= 180) return color;
+  const fb = normalizeHex(fallback, '#f5f5f7');
+  return lumaOf(fb) >= 180 ? fb : '#f5f5f7';
+}
+
 /** Resolve active rent theme + colors from site appearance. */
 export function resolveRentTheme(appearance = {}) {
   const theme = getRentThemeById(appearance.rent_theme_id || DEFAULT_RENT_THEME_ID);
@@ -553,7 +568,7 @@ export function resolveRentTheme(appearance = {}) {
     appearance.rent_secondary_color || theme.palette.secondary,
     theme.palette.secondary,
   );
-  const surface = normalizeHex(
+  const surface = ensureLightSurface(
     appearance.rent_surface_color || theme.palette.surface,
     theme.palette.surface,
   );
