@@ -223,6 +223,14 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             # paint immediately so reconnect shows on the map before the next AVL.
             touch_device(imei)
             _retain_open_imei(imei)
+            try:
+                from travel_platform.telemetry.teltonika.shift_suppress import (
+                    clear_shift_suppress,
+                )
+
+                clear_shift_suppress(device.get("tenant_id"), device.get("vehicle_code"))
+            except Exception:
+                pass
             keepalive_task = asyncio.create_task(
                 _tcp_session_keepalive(imei),
                 name=f"teltonika-keepalive-{normalize_imei(imei)[-6:]}",
@@ -286,6 +294,16 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                 _status["packets_ok"] = int(_status.get("packets_ok") or 0) + 1
                 # Re-read device in case binding changed
                 device = get_device_by_imei(imei) or device
+                try:
+                    from travel_platform.telemetry.teltonika.shift_suppress import (
+                        clear_shift_suppress,
+                    )
+
+                    clear_shift_suppress(
+                        device.get("tenant_id"), device.get("vehicle_code")
+                    )
+                except Exception:
+                    pass
                 if not device.get("enabled"):
                     touch_device(imei)
                     continue

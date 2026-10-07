@@ -40,6 +40,19 @@ async def paint_live_pin_from_device(
     if not tid or not plate:
         return False
 
+    # After «Τέλος βάρδιας», hydrate/keepalive must not resurrect the pin.
+    # Real IMEI accept / AVL clears suppress first.
+    if reason in {"hydrate", "hydrate_force", "tcp_keepalive", "ingress_device_online"}:
+        try:
+            from travel_platform.telemetry.teltonika.shift_suppress import (
+                is_shift_suppressed,
+            )
+
+            if is_shift_suppressed(tid, plate):
+                return False
+        except Exception:
+            pass
+
     lat = float(device["last_lat"])
     lng = float(device["last_lng"])
     speed = float(device.get("last_speed_kmh") or 0)
