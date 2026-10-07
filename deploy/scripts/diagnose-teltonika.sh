@@ -286,4 +286,4 @@ echo "=== recent api logs (teltonika/codec/imei) ==="
 echo
 echo "=== done ==="
 
-# diagnose bump 20261007T072300Z — safe probe + DEVICE_LIVE_CHECK ages
+# diagnose bump 20261007T091100Z — reconnect pin + live check

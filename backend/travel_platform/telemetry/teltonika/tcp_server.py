@@ -168,9 +168,10 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             writer.write(b"\x01")
             await writer.drain()
             _status["accepted_imeis"] = int(_status.get("accepted_imeis") or 0) + 1
-            # Do NOT touch_device / open-channel paint on bare IMEI login.
-            # Login-only (or health probes) was faking «GPS οχήματος» after power cut.
-            # Real AVL packets below refresh last_seen + open the live badge.
+            # Real device Codec login (not a bogus health probe) — mark online and
+            # paint immediately so reconnect shows on the map before the next AVL.
+            # Keepalive must NOT touch_device (half-open after power cut).
+            touch_device(imei)
             _open_imeis.add(normalize_imei(imei))
             keepalive_task = asyncio.create_task(
                 _tcp_session_keepalive(imei),
@@ -183,7 +184,6 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                 device.get("tenant_id"),
                 peer,
             )
-            # Show last-known pin as parked until the first AVL fix arrives.
             try:
                 from travel_platform.telemetry.teltonika.paint_live import (
                     paint_live_pin_from_device,
@@ -192,7 +192,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                 fresh = get_device_by_imei(imei) or device
                 await paint_live_pin_from_device(
                     fresh,
-                    open_channel=False,
+                    open_channel=True,
                     reason="imei_accept",
                 )
             except Exception:
