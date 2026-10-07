@@ -109,7 +109,7 @@ assert.deepEqual(
   ['app'],
 );
 
-// Server listed both — trust the list (egress already verified IMEI online).
+// Server listed both but hydrate+stale → App only (power-cut ghost).
 assert.deepEqual(
   resolveFleetGpsSources({
     source: 'driver_pwa',
@@ -120,7 +120,7 @@ assert.deepEqual(
     app_seen_at: now,
     gps_sources: ['teltonika', 'app'],
   }),
-  ['teltonika', 'app'],
+  ['app'],
 );
 
 // Hydrated + signal within alive window (≤90s) → still show hardware chip.
