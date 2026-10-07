@@ -414,8 +414,9 @@ def is_teltonika_preferred_for_plate(
     Return (prefer_teltonika, binding).
 
     prefer_teltonika=True → skip phone GPS on the live map (soft-ack only).
-    Only when a fresh Teltonika pin exists on the live fleet — never based on
-    device last_seen alone (that can blank the map when the queue lags).
+    True when a fresh Teltonika live pin exists *or* the IMEI binding is alive
+    (last_seen / open TCP). Ingress paints the hardware pin before soft-ack
+    so the map is never blanked when only last_seen is fresh.
 
     Sync path uses in-memory fleet only. Prefer
     ``is_teltonika_preferred_for_plate_async`` on ingress (Redis-aware).
