@@ -435,6 +435,10 @@ def is_teltonika_preferred_for_plate(
     meta = _live_fleet_tracker_meta(str(tenant_id), vehicle_code)
     if is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec, now=now):
         return True, tracker
+    # Fresh IMEI last_seen / open TCP — soft-ack App so dual badge stays up
+    # even before the live-fleet meta row is refreshed on this worker.
+    if is_tracker_binding_alive(tracker, max_age_sec=alive_sec, now=now):
+        return True, tracker
 
     return False, tracker
 
@@ -466,6 +470,8 @@ async def is_teltonika_preferred_for_plate_async(
         now=now,
     )
     if is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec, now=now):
+        return True, tracker
+    if is_tracker_binding_alive(tracker, max_age_sec=alive_sec, now=now):
         return True, tracker
 
     return False, tracker
