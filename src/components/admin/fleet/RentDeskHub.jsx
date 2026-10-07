@@ -95,6 +95,7 @@ export default function RentDeskHub({
           defaultWidth={256}
           minWidth={200}
           maxWidth={420}
+          expandLabel="Μενού rent"
         >
           <div className="rounded-[24px] border border-black/[0.06] bg-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-2.5 sm:p-3 space-y-3">
             <div className="px-1.5 pt-0.5">
