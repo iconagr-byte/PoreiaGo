@@ -286,4 +286,4 @@ echo "=== recent api logs (teltonika/codec/imei) ==="
 echo
 echo "=== done ==="
 
-# diagnose bump 20261007T095015Z — idle TCP keep + SO_KEEPALIVE
+# diagnose bump 20261007T100712Z — user sees App only no hardware
