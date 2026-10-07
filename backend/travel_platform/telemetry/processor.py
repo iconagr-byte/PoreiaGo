@@ -218,9 +218,7 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
                     max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
                     tenant_id=str(update.tenant_id),
                 )
-                # Do not force stale app_seen_at back into the dual badge.
-                if "teltonika" not in sources:
-                    sources = ["teltonika", *sources]
+                # Trust resolve only — do not force teltonika when signal is stale.
                 meta["gps_sources"] = ["teltonika", "app"] if (
                     "teltonika" in sources and "app" in sources
                 ) else sources
@@ -252,8 +250,6 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
                 max_age_sec=resolve_tracker_alive_seconds(str(update.tenant_id)),
                 tenant_id=str(update.tenant_id),
             )
-            if "teltonika" not in gps_sources:
-                gps_sources = ["teltonika", *gps_sources]
             egress = {
                 "type": "fleet_location",
                 "tenant_id": str(update.tenant_id),

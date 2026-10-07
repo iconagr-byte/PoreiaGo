@@ -51,15 +51,15 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         old = (datetime.now(timezone.utc) - timedelta(seconds=300)).isoformat()
         self.assertFalse(is_tracker_binding_alive({"last_seen_at": old}, max_age_sec=90))
 
-    def test_binding_alive_when_tcp_session_open(self):
-        """Open Codec TCP counts as online even if last_seen aged past 90s."""
+    def test_binding_not_alive_on_stale_last_seen_even_if_tcp_open(self):
+        """Half-open TCP after power cut must not fake online without fresh AVL."""
         from travel_platform.telemetry.teltonika import tcp_server as tcp
 
         old = (datetime.now(timezone.utc) - timedelta(seconds=180)).isoformat()
         imei = "861076085468260"
         tcp._open_imeis.add(imei)
         try:
-            self.assertTrue(
+            self.assertFalse(
                 is_tracker_binding_alive(
                     {"imei": imei, "last_seen_at": old},
                     max_age_sec=90,

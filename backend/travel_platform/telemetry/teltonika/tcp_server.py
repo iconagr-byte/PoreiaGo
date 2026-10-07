@@ -26,8 +26,10 @@ logger = logging.getLogger("poreiago.teltonika")
 _server: asyncio.AbstractServer | None = None
 # IMEIs with an open Codec TCP session on this worker (sparse AVL when parked).
 _open_imeis: set[str] = set()
-# Keep last_seen fresh while TCP is up — badge window is minutes, AVL can be rarer.
+# Refresh map pin while TCP is up — do NOT bump last_seen (that faked online after unplug).
 _TCP_KEEPALIVE_SEC = 30
+# Half-open sockets after power cut — fail faster than the old 300s idle.
+_TCP_AVL_READ_TIMEOUT_SEC = 90
 _status: dict[str, Any] = {
     "enabled": False,
     "listening": False,
@@ -49,14 +51,15 @@ def is_imei_tcp_connected(imei: str | None) -> bool:
 
 
 async def _tcp_session_keepalive(imei: str) -> None:
-    """Touch device + refresh open pin while TCP stays up (parked / sparse AVL)."""
+    """Refresh last-known pin while TCP stays up — without faking a live signal."""
     key = normalize_imei(imei)
     try:
         while key in _open_imeis:
             await asyncio.sleep(_TCP_KEEPALIVE_SEC)
             if key not in _open_imeis:
                 break
-            touch_device(imei)
+            # Do not touch_device() here — keepalive must not refresh last_seen_at
+            # or tracker_signal_at after GPS power cut (half-open TCP).
             try:
                 from travel_platform.telemetry.teltonika.paint_live import (
                     paint_live_pin_from_device,
@@ -66,7 +69,7 @@ async def _tcp_session_keepalive(imei: str) -> None:
                 if device:
                     await paint_live_pin_from_device(
                         device,
-                        open_channel=True,
+                        open_channel=False,
                         reason="tcp_keepalive",
                     )
             except Exception:
@@ -202,7 +205,9 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
         device = get_device_by_imei(imei) or {}
         # Phase 2: AVL packets
         while True:
-            chunk = await asyncio.wait_for(reader.read(4096), timeout=300)
+            chunk = await asyncio.wait_for(
+                reader.read(4096), timeout=_TCP_AVL_READ_TIMEOUT_SEC
+            )
             if not chunk:
                 break
             buf.extend(chunk)
