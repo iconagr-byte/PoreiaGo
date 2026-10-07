@@ -123,14 +123,14 @@ export default function SettingsHub({
   return (
     <div id="settings-hub-top" className="settings-hub w-full scroll-mt-4">
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-start justify-start">
-        {/* Secondary settings rail — fades out in design mode for more canvas */}
+        {/* Secondary settings rail — sticky + collapse (top-right) for more canvas */}
         <AdminResizableRail
           storageKey="poreiago_settings_hub_rail_w"
           defaultWidth={336}
-          collapsed={designMode && !railOpen}
-          className={`overflow-hidden transition-[opacity,transform,max-height] duration-150 ease-out ${
-            designMode && !railOpen ? 'max-h-0' : 'max-h-[2000px]'
-          }`}
+          collapsed={!railOpen}
+          expandLabel="Μενού ρυθμίσεων"
+          onExpand={() => setRailOpen(true)}
+          onCollapse={() => setRailOpen(false)}
         >
           <div className="rounded-[24px] lg:rounded-l-none border border-black/[0.06] lg:border-l-0 bg-white/95 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.05)] p-3.5 sm:p-4 space-y-3.5">
             <div className="px-1.5 pt-0.5">
@@ -345,28 +345,6 @@ export default function SettingsHub({
                 </h2>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {designMode && !railOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setRailOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-black/[0.08] bg-white text-slate-700 text-xs font-bold hover:bg-[#f5f5f7] transition"
-                    title="Εμφάνιση μενού ρυθμίσεων"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">menu_open</span>
-                    Μενού ρυθμίσεων
-                  </button>
-                ) : null}
-                {designMode && railOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setRailOpen(false)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-black/[0.08] bg-white text-slate-700 text-xs font-bold hover:bg-[#f5f5f7] transition"
-                    title="Απόκρυψη μενού για περισσότερο χώρο"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">menu</span>
-                    Περισσότερος χώρος
-                  </button>
-                ) : null}
                 <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-[#5e5ce6]/10 border border-[#5e5ce6]/20">
                   <span className="material-symbols-outlined text-[20px] text-[#5e5ce6]">palette</span>
                   <span className="text-sm font-bold text-[#5e5ce6]">Σχεδιασμός σελίδων</span>
