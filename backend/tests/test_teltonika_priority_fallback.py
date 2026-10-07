@@ -57,7 +57,7 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
 
         old = (datetime.now(timezone.utc) - timedelta(seconds=180)).isoformat()
         imei = "861076085468260"
-        tcp._open_imeis.add(imei)
+        tcp._retain_open_imei(imei)
         try:
             self.assertTrue(
                 is_tracker_binding_alive(
@@ -66,7 +66,21 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
                 )
             )
         finally:
-            tcp._open_imeis.discard(imei)
+            tcp._release_open_imei(imei)
+
+    def test_tcp_imei_refcount_survives_stale_session_close(self):
+        """Reconnect session B must stay 'connected' when old session A closes."""
+        from travel_platform.telemetry.teltonika import tcp_server as tcp
+
+        imei = "861076085468260"
+        tcp._open_imeis.discard(imei)
+        tcp._open_imei_refs.pop(imei, None)
+        tcp._retain_open_imei(imei)  # session A
+        tcp._retain_open_imei(imei)  # session B (reconnect)
+        self.assertFalse(tcp._release_open_imei(imei))  # A closes
+        self.assertTrue(tcp.is_imei_tcp_connected(imei))
+        self.assertTrue(tcp._release_open_imei(imei))  # B closes
+        self.assertFalse(tcp.is_imei_tcp_connected(imei))
 
     def test_binding_not_alive_when_tcp_closed_and_last_seen_stale(self):
         old = (datetime.now(timezone.utc) - timedelta(seconds=180)).isoformat()
@@ -201,23 +215,29 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         self.assertEqual(tracker.get("imei"), "861076085468260")
         self.assertIn("veh-redis-tel", LiveFleetService._vehicles)
 
-    def test_no_prefer_when_only_device_last_seen(self):
-        """last_seen alone must not soft-ack — that blanks the map when queue lags."""
+    def test_prefer_when_device_last_seen_fresh(self):
+        """Fresh IMEI last_seen ⇒ soft-ack App (ingress paints pin if missing)."""
         ds.touch_device("861076085468260", lat=38.2, lng=20.6, speed_kmh=40, points=1)
         from travel_platform.telemetry.live_fleet import LiveFleetService
 
         LiveFleetService._vehicles = {}
         LiveFleetService._code_index = {}
         prefer, tracker = is_teltonika_preferred_for_plate(self.tenant, "EEX5670", max_age_sec=90)
-        self.assertFalse(prefer)
+        self.assertTrue(prefer)
         self.assertIsNotNone(tracker)
 
     def test_fallback_when_tracker_stale(self):
-        # Live pin exists but is stale → phone may paint.
+        # Live pin + device both stale → phone may paint.
         from travel_platform.telemetry.live_fleet import LiveFleetService
 
         LiveFleetService._vehicles = {}
         LiveFleetService._code_index = {}
+        stale = (datetime.now(timezone.utc) - timedelta(seconds=400)).isoformat()
+        data = ds._read()  # noqa: SLF001
+        for r in data.get("devices") or []:
+            if ds.normalize_imei(r.get("imei")) == "861076085468260":
+                r["last_seen_at"] = stale
+        ds._write(data)  # noqa: SLF001
         vid = "veh-old"
         LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
         LiveFleetService._vehicles[vid] = {
@@ -227,7 +247,8 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
             "lat": 38.2,
             "lng": 20.6,
             "source": "teltonika",
-            "updated_at": (datetime.now(timezone.utc) - timedelta(seconds=400)).isoformat(),
+            "updated_at": stale,
+            "tracker_signal_at": stale,
         }
         prefer, tracker = is_teltonika_preferred_for_plate(self.tenant, "EEX5670", max_age_sec=90)
         self.assertFalse(prefer)

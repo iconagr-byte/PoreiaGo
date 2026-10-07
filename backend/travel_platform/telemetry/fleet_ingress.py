@@ -222,15 +222,11 @@ async def ingest_driver_location(body: dict[str, Any], *, session: dict[str, Any
             tenant_id,
             plate,
         )
-        # Device online (fresh last_seen) but live pin missing/stale — paint
-        # last fix first, then soft-ack App so both badges show on one pin.
-        if (
-            tracker
-            and not prefer_tracker
-            and is_tracker_binding_alive(
-                tracker,
-                max_age_sec=resolve_tracker_alive_seconds(tenant_id),
-            )
+        # Device online but live pin missing/stale — paint last fix first, then
+        # soft-ack App so both badges show on one pin (never soft-ack with no pin).
+        if tracker and is_tracker_binding_alive(
+            tracker,
+            max_age_sec=resolve_tracker_alive_seconds(tenant_id),
         ):
             try:
                 from travel_platform.telemetry.teltonika.paint_live import (

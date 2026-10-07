@@ -414,8 +414,9 @@ def is_teltonika_preferred_for_plate(
     Return (prefer_teltonika, binding).
 
     prefer_teltonika=True → skip phone GPS on the live map (soft-ack only).
-    Only when a fresh Teltonika pin exists on the live fleet — never based on
-    device last_seen alone (that can blank the map when the queue lags).
+    True when a fresh Teltonika live pin exists *or* the IMEI binding is alive
+    (last_seen / open TCP). Ingress paints the hardware pin before soft-ack
+    so the map is never blanked when only last_seen is fresh.
 
     Sync path uses in-memory fleet only. Prefer
     ``is_teltonika_preferred_for_plate_async`` on ingress (Redis-aware).
@@ -434,6 +435,10 @@ def is_teltonika_preferred_for_plate(
     alive_sec = int(max_age_sec if max_age_sec is not None else resolve_tracker_alive_seconds(tenant_id))
     meta = _live_fleet_tracker_meta(str(tenant_id), vehicle_code)
     if is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec, now=now):
+        return True, tracker
+    # Fresh IMEI last_seen / open TCP — soft-ack App so dual badge stays up
+    # even before the live-fleet meta row is refreshed on this worker.
+    if is_tracker_binding_alive(tracker, max_age_sec=alive_sec, now=now):
         return True, tracker
 
     return False, tracker
@@ -466,6 +471,8 @@ async def is_teltonika_preferred_for_plate_async(
         now=now,
     )
     if is_live_meta_tracker_fresh(meta, max_age_sec=alive_sec, now=now):
+        return True, tracker
+    if is_tracker_binding_alive(tracker, max_age_sec=alive_sec, now=now):
         return True, tracker
 
     return False, tracker
