@@ -187,8 +187,8 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         self.assertEqual(payload["source"], "teltonika")
         self.assertFalse(payload.get("hydrated_from_store"))
 
-    def test_keeps_enabled_stale_hardware_pin(self):
-        """Safety watch: enabled IMEI last-known is re-stamped, never age-dropped."""
+    def test_removes_enabled_stale_hardware_pin(self):
+        """Offline IMEI (power cut) must leave the live map — no last-known ghost."""
         with ds._LOCK:  # noqa: SLF001
             data = ds._read()  # noqa: SLF001
             for row in data.get("devices") or []:
@@ -221,9 +221,10 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         ) as delete_mock:
             n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
 
-        self.assertEqual(n, 1)
-        process.assert_awaited()
-        delete_mock.assert_not_awaited()
+        self.assertEqual(n, 0)
+        process.assert_not_awaited()
+        delete_mock.assert_awaited()
+        self.assertNotIn(vid, LiveFleetService._vehicles)
 
     def test_force_repaints_online_when_map_empty(self):
         """Empty Achillio map + online IMEI → force hydrate paints immediately."""
@@ -239,8 +240,8 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         self.assertEqual(n, 1)
         process.assert_awaited()
 
-    def test_keeps_parked_pin_continuous_watch(self):
-        """Sparse AVL (e.g. 0 km/h) — last fix stays on the map for safety."""
+    def test_drops_parked_offline_pin(self):
+        """Power cut / sparse silent AVL — offline pin is removed, not re-hydrated."""
         with ds._LOCK:  # noqa: SLF001
             data = ds._read()  # noqa: SLF001
             for row in data.get("devices") or []:
@@ -256,11 +257,8 @@ class TeltonikaHydrateLiveTests(unittest.TestCase):
         ) as process:
             n = asyncio.run(hydrate_tenant_live_from_devices(self.tenant))
 
-        self.assertEqual(n, 1)
-        process.assert_awaited()
-        payload = process.await_args.args[0]
-        # Not «online» badge channel — last-known parked pin.
-        self.assertTrue(payload.get("hydrated_from_store"))
+        self.assertEqual(n, 0)
+        process.assert_not_awaited()
 
 
 if __name__ == "__main__":

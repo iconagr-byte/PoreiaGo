@@ -1,15 +1,13 @@
 """
 Re-paint live-map pins from Teltonika device-store last fixes.
 
-Safety / continuous fleet watch:
-- Enabled IMEI with a last fix always has a pin on the admin map (last known).
-- Fresh last_seen (≤ ~90s) → open «GPS οχήματος» badge.
-- Stale last_seen → pin stays (parked / sparse AVL) without faking online.
-- App channel is independent: offline App strips its badge; hardware pin remains.
+Live map policy:
+- Online IMEI (fresh last_seen ≤ ~90s) → open «GPS οχήματος» pin.
+- Offline IMEI → pin is removed (no last-known ghost after power cut).
+- Live App GPS is independent: quiet hardware must not yank a live App pin.
 
 Dual-source stability:
-- Never reclaim over a *live* App pin while hardware is quiet — that caused the
-  pin to jump App ↔ Teltonika last-known every few seconds.
+- Never reclaim over a *live* App pin while hardware is quiet.
 - When hardware is online, reclaim position (App soft-acks via ingress).
 """
 
@@ -31,7 +29,7 @@ from travel_platform.telemetry.tracker_priority import (
 logger = logging.getLogger(__name__)
 
 # Avoid hammering process_telemetry on every 1s live poll — still often enough
-# that list_active (90s stale) never drops a safety pin.
+# that list_active (90s stale) never drops an online pin.
 _last_hydrate_at: dict[str, float] = {}
 _MIN_INTERVAL_SEC = 2.0
 # Re-stamp before list_active drops the pin (~90s driver_stale_seconds).
@@ -40,12 +38,10 @@ _REFRESH_BEFORE_STALE_SEC = 45.0
 
 def map_presence_seconds(alive_sec: int | None = None) -> int:
     """
-    Compatibility helper — hardware pins for enabled devices are kept
-    continuously (no age cut-off). Callers that still pass a window get a
-    large value so they never treat an enabled tracker as «expired».
+    How long an offline hardware pin may linger — aligned with alive window.
+    (Previously 365 days for continuous safety watch; that left ghosts after unplug.)
     """
-    alive = max(15, int(alive_sec or 90))
-    return max(alive, 365 * 24 * 60 * 60)
+    return max(15, int(alive_sec or 90))
 
 
 def _app_channel_live(meta: dict[str, Any] | None, *, alive_sec: int) -> bool:
@@ -86,16 +82,64 @@ def clear_hydrate_throttle(tenant_id: str | None = None) -> None:
         _last_hydrate_at.clear()
 
 
+async def _drop_offline_hardware_pin(
+    fleet: Any,
+    *,
+    tenant_id: str,
+    plate: str,
+    meta: dict[str, Any],
+) -> bool:
+    """Remove a Teltonika-only / hydrated pin when the IMEI is offline."""
+    if not fleet or not meta:
+        return False
+    # Live App channel keeps the pin (hardware badge drops via resolve).
+    if _app_channel_live(meta, alive_sec=resolve_tracker_alive_seconds(tenant_id)):
+        return False
+    src = str(meta.get("source") or "").strip().lower()
+    is_hw = is_tracker_source(src) or bool(meta.get("hydrated_from_store")) or bool(meta.get("imei"))
+    if not is_hw and is_phone_source(src):
+        return False
+
+    vid = str(meta.get("vehicle_id") or fleet.find_vehicle_id(tenant_id, plate) or "").strip()
+    if not vid:
+        return False
+
+    try:
+        from travel_platform.telemetry.live_fleet_redis import delete_live_vehicle
+    except Exception:
+        delete_live_vehicle = None  # type: ignore
+
+    fleet._vehicles.pop(vid, None)  # noqa: SLF001
+    for idx_key, idx_vid in list(getattr(fleet, "_code_index", {}).items()):
+        if idx_vid == vid:
+            fleet._code_index.pop(idx_key, None)  # noqa: SLF001
+    if delete_live_vehicle is not None:
+        try:
+            await delete_live_vehicle(tenant_id, vid)
+        except Exception:
+            logger.debug(
+                "teltonika offline pin redis delete failed plate=%s",
+                plate,
+                exc_info=True,
+            )
+    logger.info(
+        "teltonika offline pin removed plate=%s tenant=%s vehicle=%s",
+        plate,
+        tenant_id,
+        vid,
+    )
+    return True
+
+
 async def hydrate_tenant_live_from_devices(
     tenant_id: str,
     *,
     force: bool = False,
 ) -> int:
     """
-    Ensure a live pin for every enabled Teltonika binding with a last fix.
+    Paint live pins for online Teltonika bindings; drop offline hardware pins.
 
-    Continuous safety watch: pins are not removed for age. Disabled / unbound
-    devices are simply skipped (no pin paint).
+    Offline IMEIs no longer leave a last-known ghost on the admin map.
     """
     tid = str(tenant_id or "").strip()
     if not tid:
@@ -117,6 +161,7 @@ async def hydrate_tenant_live_from_devices(
 
     alive_sec = resolve_tracker_alive_seconds(tid)
     written = 0
+    dropped = 0
     try:
         from travel_platform.telemetry.processor import get_live_fleet
 
@@ -141,29 +186,43 @@ async def hydrate_tenant_live_from_devices(
             if existing_vid:
                 existing_meta = fleet._vehicles.get(existing_vid, {}) or {}  # noqa: SLF001
 
-        # Live App + quiet hardware → leave App pin alone (no jump).
-        # Online hardware → reclaim position; App soft-acks for dual badge.
+        # Offline hardware → remove ghost pin (unless App is still live).
+        if not device_online:
+            if (
+                existing_meta
+                and not force
+                and _app_channel_live(existing_meta, alive_sec=alive_sec)
+                and not is_tracker_source(existing_meta.get("source"))
+            ):
+                continue
+            if existing_meta and await _drop_offline_hardware_pin(
+                fleet, tenant_id=tid, plate=plate, meta=existing_meta
+            ):
+                dropped += 1
+            continue
+
+        # Live App + quiet hardware was handled above (offline branch).
+        # Online hardware → reclaim / refresh.
         if (
             existing_meta
             and not force
-            and not device_online
-            and _app_channel_live(existing_meta, alive_sec=alive_sec)
-            and not is_tracker_source(existing_meta.get("source"))
-        ):
-            continue
-
-        if existing_meta and not force and not _pin_needs_refresh(
-            existing_meta, alive_sec=alive_sec
+            and not _pin_needs_refresh(existing_meta, alive_sec=alive_sec)
+            and is_live_meta_tracker_fresh(existing_meta, max_age_sec=alive_sec)
         ):
             continue
 
         ok = await paint_live_pin_from_device(
             device,
-            open_channel=device_online,
+            open_channel=True,
             reason="hydrate_force" if force else "hydrate",
         )
         if ok:
             written += 1
-    if written:
-        logger.info("teltonika hydrate wrote %s live pin(s) tenant=%s", written, tid)
+    if written or dropped:
+        logger.info(
+            "teltonika hydrate tenant=%s wrote=%s dropped_offline=%s",
+            tid,
+            written,
+            dropped,
+        )
     return written

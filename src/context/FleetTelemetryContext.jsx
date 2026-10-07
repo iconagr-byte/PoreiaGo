@@ -132,12 +132,16 @@ function normalizeVehicle(msg, id, prev) {
   const appStillLive = Boolean(appSeenAt && isChannelFresh(appSeenAt));
   const trackerSignal =
     msg.tracker_signal_at || msg.trackerSignalAt || prev?.tracker_signal_at || null;
+  const hydrated = pickHydratedFromStore(msg, prev);
   const listedTeltonika =
     Array.isArray(listed) && listed.some((s) => gpsSourceKind(s) === 'teltonika');
+  const signalFresh = isChannelFresh(trackerSignal, SOURCE_FRESH_MS);
+  // Parked/hydrated + stale signal must not keep «GPS οχήματος» on the map.
   const keepTeltonika = Boolean(
-    listedTeltonika ||
-      isChannelFresh(trackerSignal, SOURCE_FRESH_MS) ||
-      ((prev?.gps_sources || []).includes('teltonika') &&
+    signalFresh ||
+      (listedTeltonika && !hydrated) ||
+      (!hydrated &&
+        (prev?.gps_sources || []).includes('teltonika') &&
         isChannelFresh(prev?.tracker_signal_at, SOURCE_FRESH_MS)),
   );
   return {
