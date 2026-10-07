@@ -286,4 +286,4 @@ echo "=== recent api logs (teltonika/codec/imei) ==="
 echo
 echo "=== done ==="
 
-# diagnose bump 20261007T091100Z — reconnect pin + live check
+# diagnose bump 20261007T092200Z — reconnect pin + live check
