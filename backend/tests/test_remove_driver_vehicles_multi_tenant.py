@@ -10,6 +10,7 @@ from uuid import UUID
 from travel_platform.operations.master_qr_local import DEFAULT_TENANT
 from travel_platform.telemetry.domain import TelemetryUpdate
 from travel_platform.telemetry.live_fleet import LiveFleetService
+from travel_platform.telemetry.teltonika import shift_suppress as ss
 
 OFFICE = "81ce186d-40fd-4f51-8e62-1353a9e68f33"
 SEED = "c8208a59-bb2b-4299-a4d5-6fbadbb9b089"
@@ -39,6 +40,7 @@ class RemoveDriverVehiclesTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         LiveFleetService._vehicles = {}
         LiveFleetService._code_index = {}
+        ss._suppress_until.clear()
 
     async def test_clears_seed_mirror_and_office(self):
         live = LiveFleetService()
@@ -97,65 +99,10 @@ class RemoveDriverVehiclesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(removed, ["remote-1"])
         delete_mock.assert_any_await(SEED, "remote-1")
 
-    async def test_keeps_teltonika_pin_on_shift_end(self):
-        """Hardware pin must survive when driver app ends shift."""
+    async def test_shift_end_removes_teltonika_pin_and_suppresses_hydrate(self):
+        """«Τέλος βάρδιας» clears hardware pin; hydrate must not resurrect it."""
         live = LiveFleetService()
         now = datetime.now(timezone.utc).isoformat()
-        update = TelemetryUpdate(
-            vehicle_code="EEX5670",
-            tenant_id=UUID(OFFICE),
-            trip_id=1,
-            latitude=38.25,
-            longitude=20.65,
-            speed_kmh=50,
-            engine_on=True,
-            fuel_level_pct=None,
-            recorded_at=datetime.now(timezone.utc),
-            raw={
-                "source": "teltonika",
-                "imei": "861076085468260",
-                "bus_plate": "EEX5670",
-                "driver_name": "Bus GPS",
-                # Simulate leftover phone driver_id before clear logic.
-                "driver_id": DRIVER,
-            },
-        )
-        vid = str(live.upsert_vehicle_registry(UUID(OFFICE), "EEX5670", 1))
-        live.apply_update(UUID(vid), update, idle_seconds=0)
-        # apply_update with teltonika + driver_id in raw keeps device driver_id;
-        # force the bug shape: phone driver_id stuck on teltonika source.
-        live._vehicles[vid]["driver_id"] = DRIVER
-        live._vehicles[vid]["app_driver_id"] = DRIVER
-        live._vehicles[vid]["app_seen_at"] = now
-        live._vehicles[vid]["gps_sources"] = ["teltonika", "app"]
-        live._vehicles[vid]["source"] = "teltonika"
-        live._vehicles[vid]["tracker_signal_at"] = now
-
-        with patch(
-            "travel_platform.telemetry.live_fleet_redis.delete_live_vehicle",
-            new=AsyncMock(return_value=True),
-        ) as delete_mock, patch(
-            "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "travel_platform.telemetry.live_fleet_redis.save_live_vehicle",
-            new=AsyncMock(return_value=True),
-        ):
-            removed = await live.remove_driver_vehicles(OFFICE, DRIVER)
-
-        self.assertEqual(removed, [])
-        self.assertIn(vid, live._vehicles)
-        self.assertEqual(live._vehicles[vid].get("source"), "teltonika")
-        self.assertFalse(live._vehicles[vid].get("driver_id"))
-        self.assertFalse(live._vehicles[vid].get("app_driver_id"))
-        self.assertFalse(live._vehicles[vid].get("app_seen_at"))
-        self.assertEqual(live._vehicles[vid].get("gps_sources"), ["teltonika"])
-        delete_mock.assert_not_awaited()
-
-    async def test_drops_unbound_teltonika_pin_on_shift_end(self):
-        """App offline + no enabled IMEI binding → pin leaves the map."""
-        live = LiveFleetService()
-        old = datetime(2020, 1, 1, tzinfo=timezone.utc).isoformat()
         vid = str(live.upsert_vehicle_registry(UUID(OFFICE), "EEX5670", 1))
         live._vehicles[vid] = {
             "vehicle_id": vid,
@@ -168,9 +115,9 @@ class RemoveDriverVehiclesTests(unittest.IsolatedAsyncioTestCase):
             "imei": "861076085468260",
             "driver_id": DRIVER,
             "app_driver_id": DRIVER,
-            "app_seen_at": old,
-            "tracker_signal_at": old,
-            "updated_at": old,
+            "app_seen_at": now,
+            "tracker_signal_at": now,
+            "updated_at": now,
             "gps_sources": ["teltonika", "app"],
         }
         live._code_index[f"{OFFICE}:EEX5670"] = vid
@@ -181,18 +128,15 @@ class RemoveDriverVehiclesTests(unittest.IsolatedAsyncioTestCase):
         ) as delete_mock, patch(
             "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
             new=AsyncMock(return_value=[]),
-        ), patch(
-            "travel_platform.telemetry.teltonika.device_store.get_enabled_device_by_vehicle_code",
-            return_value=None,
         ):
             removed = await live.remove_driver_vehicles(OFFICE, DRIVER)
 
         self.assertEqual(removed, [vid])
         self.assertNotIn(vid, live._vehicles)
         delete_mock.assert_awaited()
+        self.assertTrue(ss.is_shift_suppressed(OFFICE, "EEX5670"))
 
-    async def test_keeps_enabled_stale_teltonika_on_shift_end(self):
-        """Safety: enabled IMEI last-known stays after App logout even if quiet."""
+    async def test_shift_end_removes_stale_enabled_teltonika(self):
         live = LiveFleetService()
         old = datetime(2020, 1, 1, tzinfo=timezone.utc).isoformat()
         vid = str(live.upsert_vehicle_registry(UUID(OFFICE), "EEX5670", 1))
@@ -229,26 +173,19 @@ class RemoveDriverVehiclesTests(unittest.IsolatedAsyncioTestCase):
             "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
             new=AsyncMock(return_value=[]),
         ), patch(
-            "travel_platform.telemetry.live_fleet_redis.save_live_vehicle",
-            new=AsyncMock(return_value=True),
-        ), patch(
             "travel_platform.telemetry.teltonika.device_store.get_enabled_device_by_vehicle_code",
             return_value=tracker,
         ):
             removed = await live.remove_driver_vehicles(OFFICE, DRIVER)
 
-        self.assertEqual(removed, [])
-        self.assertIn(vid, live._vehicles)
-        self.assertFalse(live._vehicles[vid].get("app_seen_at"))
-        self.assertEqual(live._vehicles[vid].get("gps_sources"), ["teltonika"])
-        delete_mock.assert_not_awaited()
+        self.assertEqual(removed, [vid])
+        self.assertNotIn(vid, live._vehicles)
+        delete_mock.assert_awaited()
 
-    async def test_handoff_phone_pin_to_alive_teltonika(self):
-        """Phone last-write pin becomes Teltonika when tracker is still alive."""
+    async def test_shift_end_removes_phone_even_if_tracker_alive(self):
         live = LiveFleetService()
         vid = _ping(live, tenant_id=OFFICE, driver_id=DRIVER, code="EEX5670")
         live._vehicles[vid]["source"] = "driver_pwa"
-
         tracker = {
             "imei": "861076085468260",
             "vehicle_code": "EEX5670",
@@ -267,20 +204,15 @@ class RemoveDriverVehiclesTests(unittest.IsolatedAsyncioTestCase):
             "travel_platform.telemetry.live_fleet_redis.load_live_vehicles",
             new=AsyncMock(return_value=[]),
         ), patch(
-            "travel_platform.telemetry.live_fleet_redis.save_live_vehicle",
-            new=AsyncMock(return_value=True),
-        ), patch(
             "travel_platform.telemetry.teltonika.device_store.get_enabled_device_by_vehicle_code",
             return_value=tracker,
         ):
             removed = await live.remove_driver_vehicles(OFFICE, DRIVER)
 
-        self.assertEqual(removed, [])
-        self.assertIn(vid, live._vehicles)
-        self.assertEqual(live._vehicles[vid].get("source"), "teltonika")
-        self.assertFalse(live._vehicles[vid].get("driver_id"))
-        self.assertAlmostEqual(float(live._vehicles[vid]["lat"]), 38.3, places=4)
-        delete_mock.assert_not_awaited()
+        self.assertEqual(removed, [vid])
+        self.assertNotIn(vid, live._vehicles)
+        delete_mock.assert_awaited()
+        self.assertTrue(ss.is_shift_suppressed(OFFICE, "EEX5670"))
 
 
 if __name__ == "__main__":

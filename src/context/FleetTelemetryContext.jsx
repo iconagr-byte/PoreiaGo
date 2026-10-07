@@ -579,8 +579,26 @@ export function FleetTelemetryProvider({ tenantId: tenantIdProp, children }) {
           }
           if (msg.type === 'fleet_driver_offline') {
             // Instant pin drop — do not wait for the next HTTP poll.
+            // «Τέλος βάρδιας» hard-clears every pin for that driver (App + GPS).
             setVehicles((prev) => {
-              const next = dropOfflineVehicles(prev, msg);
+              let next = dropOfflineVehicles(prev, msg);
+              if (String(msg.reason || '') === 'shift_end' && msg.driver_id != null) {
+                const did = String(msg.driver_id);
+                const cleared = { ...next };
+                for (const [key, row] of Object.entries(cleared)) {
+                  const belongs =
+                    String(row.driver_id || '') === did ||
+                    String(row.app_driver_id || '') === did;
+                  if (!belongs) continue;
+                  try {
+                    clearStickyTeltonika(row);
+                  } catch {
+                    /* ignore */
+                  }
+                  delete cleared[key];
+                }
+                next = cleared;
+              }
               vehicleCountRef.current = Object.keys(next).length;
               return next;
             });

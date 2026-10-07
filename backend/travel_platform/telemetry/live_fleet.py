@@ -1071,9 +1071,8 @@ class LiveFleetService:
         obsolete seed slug). GPS briefly landed on the wrong Achillio tenant;
         end-shift must wipe every mirror or the admin map keeps showing the pin.
 
-        Alive Teltonika pins are kept (App channel stripped). Offline App and
-        offline Teltonika both leave the map; either channel coming back online
-        re-paints the pin.
+        Always deletes App + hardware pins for the driver. Live Teltonika may
+        return only after a real Codec AVL / IMEI accept (not hydrate ghosts).
         """
         from travel_platform.telemetry.live_fleet_redis import (
             delete_live_vehicle,
@@ -1093,65 +1092,7 @@ class LiveFleetService:
             return []
 
         removed: list[str] = []
-        handed_off: list[str] = []
         seen: set[tuple[str, str]] = set()
-
-        def _is_hardware_pin(meta: dict[str, Any] | None) -> bool:
-            """Teltonika / tracker pins survive driver shift-end and stale wipe."""
-            src = str((meta or {}).get("source") or "").strip().lower()
-            if src.startswith("teltonika") or src in {
-                "tracker",
-                "test_ping",
-                "teltonika_test_ping",
-            }:
-                return True
-            # Bound IMEI with no phone source → treat as hardware.
-            if (meta or {}).get("imei") and src not in {"driver_pwa", "app"}:
-                return True
-            return False
-
-        def _handoff_to_teltonika(tid: str, meta: dict[str, Any]) -> dict[str, Any] | None:
-            """
-            If this plate has a live Teltonika binding, keep the pin and retag
-            it as hardware instead of deleting when the driver app ends.
-            """
-            try:
-                from travel_platform.telemetry.tracker_priority import (
-                    is_tracker_binding_alive,
-                    resolve_tracker_alive_seconds,
-                )
-                from travel_platform.telemetry.teltonika.device_store import (
-                    get_enabled_device_by_vehicle_code,
-                )
-            except Exception:
-                return None
-
-            plate = str(meta.get("vehicle_code") or meta.get("bus_plate") or "").strip()
-            if not plate:
-                return None
-            tracker = get_enabled_device_by_vehicle_code(tid, plate)
-            if not tracker or not is_tracker_binding_alive(
-                tracker,
-                max_age_sec=resolve_tracker_alive_seconds(tid),
-            ):
-                return None
-
-            handed = {**meta}
-            handed.pop("driver_id", None)
-            handed["source"] = "teltonika"
-            handed["imei"] = tracker.get("imei") or handed.get("imei")
-            handed["driver_name"] = tracker.get("label") or handed.get("driver_name") or plate
-            handed["bus_plate"] = handed.get("bus_plate") or plate
-            handed["vehicle_code"] = handed.get("vehicle_code") or plate
-            # Prefer last hardware fix when phone had overwritten coords.
-            if tracker.get("last_lat") is not None and tracker.get("last_lng") is not None:
-                handed["lat"] = float(tracker["last_lat"])
-                handed["lng"] = float(tracker["last_lng"])
-            if tracker.get("last_speed_kmh") is not None:
-                handed["speed_kmh"] = float(tracker["last_speed_kmh"])
-            if tracker.get("last_seen_at"):
-                handed["updated_at"] = tracker["last_seen_at"]
-            return handed
 
         def _row_belongs_to_driver(meta: dict[str, Any] | None) -> bool:
             row = meta or {}
@@ -1159,148 +1100,35 @@ class LiveFleetService:
                 row.get("app_driver_id") or ""
             ) == did
 
-        def _teltonika_device(tid: str, meta: dict[str, Any]) -> dict[str, Any] | None:
-            try:
-                from travel_platform.telemetry.teltonika.device_store import (
-                    get_enabled_device_by_vehicle_code,
-                )
-            except Exception:
-                return None
-            plate = str(meta.get("vehicle_code") or meta.get("bus_plate") or "").strip()
-            if not plate:
-                return None
-            return get_enabled_device_by_vehicle_code(tid, plate)
-
-        def _teltonika_still_on_map(tid: str, meta: dict[str, Any]) -> bool:
-            """
-            Keep hardware pin for continuous safety watch.
-
-            Enabled IMEI with a last fix stays on the map after App logout —
-            age does not clear it. Unbound / no coords → drop.
-            """
-            tracker = _teltonika_device(tid, meta)
-            if (
-                tracker
-                and tracker.get("enabled")
-                and tracker.get("last_lat") is not None
-                and tracker.get("last_lng") is not None
-            ):
-                return True
-            try:
-                from travel_platform.telemetry.tracker_priority import (
-                    is_live_meta_tracker_fresh,
-                    resolve_tracker_alive_seconds,
-                )
-            except Exception:
-                return False
-            # Fallback: fresh in-memory hardware pin without device-store hit.
-            return is_live_meta_tracker_fresh(
-                meta, max_age_sec=resolve_tracker_alive_seconds(tid)
-            )
-
-        def _strip_app_channel(meta: dict[str, Any], *, tid: str) -> dict[str, Any]:
-            cleaned = dict(meta)
-            cleaned.pop("driver_id", None)
-            cleaned.pop("app_driver_id", None)
-            cleaned.pop("app_seen_at", None)
-            # Keeping a hardware pin ⇒ Teltonika is the only live channel left.
-            cleaned["gps_sources"] = ["teltonika"]
-            cleaned["source"] = cleaned.get("source") or "teltonika"
-            # Refresh from device store so the pin stays fresh after App logout.
-            tracker = _teltonika_device(tid, cleaned)
-            if tracker:
-                if tracker.get("imei"):
-                    cleaned["imei"] = tracker.get("imei")
-                if tracker.get("last_lat") is not None and tracker.get("last_lng") is not None:
-                    cleaned["lat"] = float(tracker["last_lat"])
-                    cleaned["lng"] = float(tracker["last_lng"])
-                if tracker.get("last_seen_at"):
-                    from datetime import datetime, timezone
-
-                    now_iso = datetime.now(timezone.utc).isoformat()
-                    cleaned["tracker_signal_at"] = now_iso
-                    cleaned["updated_at"] = now_iso
-                    cleaned.pop("hydrated_from_store", None)
-            return cleaned
-
         async def _drop(tid: str, vid: str, meta: dict[str, Any] | None = None) -> None:
-            from travel_platform.telemetry.live_fleet_redis import save_live_vehicle
             from travel_platform.telemetry.tracker_priority import normalize_vehicle_plate
 
             key = (tid, vid)
             if not vid or key in seen:
                 return
             row = dict(meta or self._vehicles.get(vid) or {})
-            if _is_hardware_pin(row):
-                cleaned = _strip_app_channel(
-                    {**self._vehicles.get(vid, {}), **row}, tid=tid
-                )
-                cleaned["tenant_id"] = tid
-                cleaned["vehicle_id"] = vid
-                # App offline + Teltonika past map presence → remove pin.
-                if not _teltonika_still_on_map(tid, cleaned):
-                    seen.add(key)
-                    code = cleaned.get("vehicle_code") or cleaned.get("bus_plate")
-                    self._vehicles.pop(vid, None)
-                    plate = normalize_vehicle_plate(code)
-                    if plate:
-                        self._code_index.pop(f"{tid}:{plate}", None)
-                    await delete_live_vehicle(tid, vid)
-                    removed.append(vid)
-                    return
-                self._vehicles[vid] = cleaned
-                try:
-                    await save_live_vehicle(cleaned)
-                except Exception:
-                    pass
-                try:
-                    await self._broadcast_tracker_pin(tid, cleaned)
-                except Exception:
-                    pass
-                seen.add(key)
-                return
-
-            handed = _handoff_to_teltonika(tid, row)
-            if handed:
-                cleaned = _strip_app_channel(
-                    {**self._vehicles.get(vid, {}), **handed}, tid=tid
-                )
-                cleaned["tenant_id"] = tid
-                cleaned["vehicle_id"] = vid
-                cleaned["source"] = "teltonika"
-                if not _teltonika_still_on_map(tid, cleaned):
-                    seen.add(key)
-                    code = cleaned.get("vehicle_code") or cleaned.get("bus_plate")
-                    self._vehicles.pop(vid, None)
-                    plate = normalize_vehicle_plate(code)
-                    if plate:
-                        self._code_index.pop(f"{tid}:{plate}", None)
-                    await delete_live_vehicle(tid, vid)
-                    removed.append(vid)
-                    return
-                self._vehicles[vid] = cleaned
-                code = cleaned.get("vehicle_code")
-                plate = normalize_vehicle_plate(code)
-                if plate:
-                    self._code_index[f"{tid}:{plate}"] = vid
-                try:
-                    await save_live_vehicle(cleaned)
-                except Exception:
-                    pass
-                try:
-                    await self._broadcast_tracker_pin(tid, cleaned)
-                except Exception:
-                    pass
-                handed_off.append(vid)
-                seen.add(key)
-                return
-
+            # «Τέλος βάρδιας» always clears the map pin (App + hardware).
+            # Keeping Teltonika ghosts / handoff left buses on the map after
+            # logout. Live GPS reappears only after a real Codec AVL / IMEI
+            # accept (hydrate/keepalive respect shift suppress).
             seen.add(key)
-            code = row.get("vehicle_code") or self._vehicles.get(vid, {}).get("vehicle_code")
+            code = (
+                row.get("vehicle_code")
+                or row.get("bus_plate")
+                or self._vehicles.get(vid, {}).get("vehicle_code")
+            )
             self._vehicles.pop(vid, None)
             plate = normalize_vehicle_plate(code)
             if plate:
                 self._code_index.pop(f"{tid}:{plate}", None)
+                try:
+                    from travel_platform.telemetry.teltonika.shift_suppress import (
+                        suppress_plate_after_shift,
+                    )
+
+                    suppress_plate_after_shift(tid, plate)
+                except Exception:
+                    pass
             await delete_live_vehicle(tid, vid)
             removed.append(vid)
 
