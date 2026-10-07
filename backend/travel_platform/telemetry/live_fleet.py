@@ -722,10 +722,6 @@ class LiveFleetService:
             max_age_sec=alive,
             tenant_id=tid,
         )
-        if is_tracker_source(keep_meta.get("source")) and "teltonika" not in sources:
-            # Open channel — still advertise Teltonika when signal is present.
-            if keep_meta.get("tracker_signal_at") or keep_meta.get("updated_at"):
-                sources = ["teltonika", *sources]
         keep_meta["gps_sources"] = ["teltonika", "app"] if (
             "teltonika" in sources and "app" in sources
         ) else sources
@@ -827,12 +823,7 @@ class LiveFleetService:
         sources = resolve_live_gps_sources(meta, max_age_sec=alive, tenant_id=tid)
         if "app" not in sources:
             sources = [*sources, "app"]
-        src_l = str(meta.get("source") or "").strip().lower()
-        if "teltonika" not in sources and (
-            src_l.startswith("teltonika") or meta.get("imei")
-        ):
-            sources = ["teltonika", *sources]
-        # Dual badge must list both while both channels are live.
+        # Dual badge only while resolve says both channels are live.
         meta["gps_sources"] = ["teltonika", "app"] if (
             "teltonika" in sources and "app" in sources
         ) else sources

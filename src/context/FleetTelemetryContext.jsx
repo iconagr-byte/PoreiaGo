@@ -136,9 +136,9 @@ function normalizeVehicle(msg, id, prev) {
     Array.isArray(listed) && listed.some((s) => gpsSourceKind(s) === 'teltonika');
   const keepTeltonika = Boolean(
     listedTeltonika ||
-      isChannelFresh(trackerSignal, 300_000) ||
+      isChannelFresh(trackerSignal, SOURCE_FRESH_MS) ||
       ((prev?.gps_sources || []).includes('teltonika') &&
-        isChannelFresh(prev?.tracker_signal_at, 300_000)),
+        isChannelFresh(prev?.tracker_signal_at, SOURCE_FRESH_MS)),
   );
   return {
     id,

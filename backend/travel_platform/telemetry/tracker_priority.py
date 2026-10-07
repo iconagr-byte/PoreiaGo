@@ -170,15 +170,8 @@ def is_tracker_binding_alive(
     age = age_seconds(tracker.get("last_seen_at"), now=now)
     if age is not None and age <= max(1, int(max_age_sec)):
         return True
-    # Same-worker TCP session — durable last_seen is refreshed by keepalive,
-    # but treat an open socket as online immediately.
-    try:
-        from travel_platform.telemetry.teltonika.tcp_server import is_imei_tcp_connected
-
-        if is_imei_tcp_connected(tracker.get("imei")):
-            return True
-    except Exception:
-        pass
+    # Open TCP alone is not enough — keepalive used to keep sockets half-open
+    # after power cut and fake «online». Require a fresh last_seen / AVL.
     return False
 
 
