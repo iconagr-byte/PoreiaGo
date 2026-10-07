@@ -51,15 +51,15 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
         old = (datetime.now(timezone.utc) - timedelta(seconds=300)).isoformat()
         self.assertFalse(is_tracker_binding_alive({"last_seen_at": old}, max_age_sec=90))
 
-    def test_binding_not_alive_on_stale_last_seen_even_if_tcp_open(self):
-        """Half-open TCP after power cut must not fake online without fresh AVL."""
+    def test_binding_alive_when_tcp_session_open(self):
+        """Open Codec TCP counts as online so reconnect paints before first AVL."""
         from travel_platform.telemetry.teltonika import tcp_server as tcp
 
         old = (datetime.now(timezone.utc) - timedelta(seconds=180)).isoformat()
         imei = "861076085468260"
         tcp._open_imeis.add(imei)
         try:
-            self.assertFalse(
+            self.assertTrue(
                 is_tracker_binding_alive(
                     {"imei": imei, "last_seen_at": old},
                     max_age_sec=90,
@@ -67,6 +67,15 @@ class TeltonikaPriorityFallbackTests(unittest.TestCase):
             )
         finally:
             tcp._open_imeis.discard(imei)
+
+    def test_binding_not_alive_when_tcp_closed_and_last_seen_stale(self):
+        old = (datetime.now(timezone.utc) - timedelta(seconds=180)).isoformat()
+        self.assertFalse(
+            is_tracker_binding_alive(
+                {"imei": "861076085468260", "last_seen_at": old},
+                max_age_sec=90,
+            )
+        )
 
     def _seed_live_teltonika_pin(self):
         """Put a fresh Teltonika pin on the in-memory live fleet for this plate."""
