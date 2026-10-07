@@ -8,9 +8,12 @@ import { useFleetVehicleTrails } from '../../hooks/useFleetVehicleTrails.js';
 import FleetHeatmapLayer from './FleetHeatmapLayer.jsx';
 import FleetDriverPlaybackButton from './FleetDriverPlaybackButton.jsx';
 import {
+  fleetPinTelemetryHudHtml,
   formatBoardingLabel,
+  formatHeadingLabel,
   formatPassengerNames,
   formatSensorSummary,
+  formatSpeedKmh,
   formatUpdatedAgo,
   resolveFleetMarkerImage,
 } from '../../lib/admin/fleetVehicleDetails.js';
@@ -45,34 +48,40 @@ const BUS_ICON_CACHE = new Map();
 const BUS_ICON_CACHE_MAX = 80;
 
 const busIcon = (vehicle) => {
-  const headingRaw = Number.isFinite(vehicle?.heading) ? vehicle.heading : 0;
+  const headingRaw = Number.isFinite(Number(vehicle?.heading)) ? Number(vehicle.heading) : 0;
   const heading = Math.round(headingRaw / 15) * 15;
+  const speed = formatSpeedKmh(vehicle);
   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(vehicle));
   const label = formatFleetBusPillLabel(vehicle);
   const excursion = formatFleetExcursionBadge(vehicle);
   const gpsBadge = fleetGpsSourceBadgeHtml(vehicle, { escapeAttr });
   const gpsKey = resolveFleetGpsSources(vehicle).join('+');
-  const key = `${vehicle?.id || ''}|${img}|${heading}|${label}|${excursion}|${gpsKey}`;
+  const key = `${vehicle?.id || ''}|${img}|${heading}|${speed}|${label}|${excursion}|${gpsKey}`;
   const cached = BUS_ICON_CACHE.get(key);
   if (cached) return cached;
 
   const excursionHtml = excursion
     ? `<div class="fleet-apple-bus-excursion">${escapeAttr(excursion)}</div>`
     : '';
+  const hudHtml = fleetPinTelemetryHudHtml(vehicle, { escapeAttr });
   const tall = Boolean(excursion || gpsBadge.heightBoost);
+  // HUD (~34px) sits between plate pill and avatar — bump Leaflet hit box.
+  const iconH = tall ? (gpsBadge.dual ? 156 : 148) : 110;
+  const anchorY = tall ? (gpsBadge.dual ? 120 : 112) : 74;
   const icon = L.divIcon({
     className: 'fleet-bus-marker-ws',
     html: `<div class="fleet-apple-bus-pin">
       ${gpsBadge.html}
       ${excursionHtml}
       <div class="fleet-apple-bus-pill fleet-apple-bus-pill--above">${escapeAttr(label)}</div>
+      ${hudHtml}
       <div class="fleet-apple-bus-pin__ring">
         <div class="fleet-apple-bus-pin__avatar"><img src="${escapeAttr(img)}" alt="" decoding="async" loading="eager" /></div>
         <div class="fleet-apple-bus-pin__heading" style="transform:translateX(-50%) rotate(${heading}deg)"></div>
       </div>
     </div>`,
-    iconSize: [52, tall ? (gpsBadge.dual ? 118 : 110) : 72],
-    iconAnchor: [26, tall ? (gpsBadge.dual ? 86 : 78) : 40],
+    iconSize: [52, iconH],
+    iconAnchor: [26, anchorY],
   });
   BUS_ICON_CACHE.set(key, icon);
   if (BUS_ICON_CACHE.size > BUS_ICON_CACHE_MAX) {
@@ -115,7 +124,9 @@ function LeafletAnimatedMarkers({ vehicles, onVehicleHistory }) {
               </div>
             </div>
           </div>
-          Ταχύτητα: {Math.round(v.speed)} km/h
+          Ταχύτητα: {formatSpeedKmh(v)} km/h
+          <br />
+          Κατεύθυνση: {formatHeadingLabel(v) || '—'}
           <br />
           Πηγή GPS: {formatFleetGpsSourceBadge(v) || '—'}
           {resolveFleetGpsSources(v).length > 1 ? ' (και τα δύο ενεργά)' : ''}

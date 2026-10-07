@@ -212,7 +212,12 @@ function normalizeVehicle(msg, id, prev) {
     heading: msg.heading ?? msg.heading_deg,
     timestamp: msg.timestamp || msg.updated_at,
     accuracy_m: msg.accuracy_m ?? null,
-    altitude_m: msg.altitude_m ?? null,
+    altitude_m: msg.altitude_m ?? prev?.altitude_m ?? null,
+    satellites: msg.satellites ?? prev?.satellites ?? null,
+    engine_on:
+      msg.engine_on ?? msg.engineOn ?? msg.engine_status ?? prev?.engine_on ?? null,
+    idle_seconds_trip:
+      msg.idle_seconds_trip ?? msg.idleSecondsTrip ?? prev?.idle_seconds_trip ?? null,
     boarding: msg.boarding ?? null,
     sensors: msg.sensors ?? null,
     photo_url: msg.photo_url ?? prev?.photo_url ?? null,

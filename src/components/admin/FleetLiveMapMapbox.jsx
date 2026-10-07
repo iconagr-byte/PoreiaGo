@@ -14,10 +14,13 @@ import FleetLiveTrailsMapbox from './FleetLiveTrailsMapbox.jsx';
 import GreecePlacesMapboxLayer from './GreecePlacesMapboxLayer.jsx';
 import {
   formatBoardingLabel,
+  formatHeadingLabel,
   formatPassengerNames,
   formatSensorSummary,
+  formatSpeedKmh,
   formatUpdatedAgo,
   resolveFleetMarkerImage,
+  resolveVehicleHeadingDeg,
 } from '../../lib/admin/fleetVehicleDetails.js';
 import {
   formatFleetBusPillLabel,
@@ -59,6 +62,9 @@ function BusMarker({ vehicle, onVehicleHistory }) {
   const tripTitle = resolveVehicleTripTitle(vehicle);
   const excursion = formatFleetExcursionBadge(vehicle);
   const gpsSources = resolveFleetGpsSources(vehicle);
+  const speed = formatSpeedKmh(vehicle);
+  const headingLabel = formatHeadingLabel(vehicle);
+  const headingDeg = resolveVehicleHeadingDeg(vehicle);
   const openHistory = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -91,6 +97,27 @@ function BusMarker({ vehicle, onVehicleHistory }) {
           <div className="fleet-apple-bus-pill fleet-apple-bus-pill--above">
             {pillLabel}
           </div>
+          <div
+            className="fleet-apple-bus-hud"
+            role="status"
+            aria-label={`Ταχύτητα ${speed} χιλιόμετρα ανά ώρα${headingLabel ? `, κατεύθυνση ${headingLabel}` : ''}`}
+          >
+            <span className="fleet-apple-bus-hud__speed">
+              <strong>{speed}</strong>
+              <small>km/h</small>
+            </span>
+            <span className="fleet-apple-bus-hud__sep" aria-hidden="true" />
+            <span className={`fleet-apple-bus-hud__heading${headingLabel ? '' : ' is-empty'}`}>
+              {headingDeg != null ? (
+                <span
+                  className="fleet-apple-bus-hud__arrow"
+                  style={{ transform: `rotate(${Math.round(headingDeg)}deg)` }}
+                  aria-hidden="true"
+                />
+              ) : null}
+              {headingLabel || '—'}
+            </span>
+          </div>
           <div className="fleet-apple-bus-pin__ring">
             <div className="fleet-apple-bus-pin__avatar">
               <img src={img} alt="" decoding="async" width={40} height={40} />
@@ -98,7 +125,7 @@ function BusMarker({ vehicle, onVehicleHistory }) {
             <div
               className="fleet-apple-bus-pin__heading"
               style={{
-                transform: `translateX(-50%) rotate(${vehicle.heading ?? 0}deg)`,
+                transform: `translateX(-50%) rotate(${headingDeg ?? 0}deg)`,
               }}
             />
           </div>
@@ -129,7 +156,8 @@ function BusMarker({ vehicle, onVehicleHistory }) {
                 </div>
               </div>
             </div>
-            <div>Ταχύτητα: {Math.round(vehicle.speed || 0)} km/h</div>
+            <div>Ταχύτητα: {speed} km/h</div>
+            <div>Κατεύθυνση: {headingLabel || '—'}</div>
             <div>
               Πηγή GPS: {formatFleetGpsSourceBadge(vehicle) || '—'}
               {gpsSources.length > 1 ? ' (και τα δύο ενεργά)' : ''}

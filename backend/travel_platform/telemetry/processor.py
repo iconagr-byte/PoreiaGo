@@ -72,6 +72,16 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
         meta["bus_plate"] = raw.get("bus_plate") or raw.get("vehicle_code")
     if raw.get("heading_deg") is not None:
         meta["heading_deg"] = raw.get("heading_deg")
+    if raw.get("altitude_m") is not None:
+        try:
+            meta["altitude_m"] = float(raw.get("altitude_m"))
+        except (TypeError, ValueError):
+            pass
+    if raw.get("satellites") is not None:
+        try:
+            meta["satellites"] = int(raw.get("satellites"))
+        except (TypeError, ValueError):
+            pass
     if raw.get("source"):
         meta["source"] = str(raw.get("source"))
     if raw.get("imei"):
@@ -264,6 +274,9 @@ async def process_telemetry_payload(payload: dict) -> NormalizedTelemetry:
                 "lng": float(update.longitude),
                 "speed": float(update.speed_kmh or 0),
                 "heading": raw.get("heading_deg") if raw.get("heading_deg") is not None else meta.get("heading_deg"),
+                "altitude_m": meta.get("altitude_m"),
+                "satellites": meta.get("satellites"),
+                "engine_on": bool(update.engine_on),
                 "timestamp": update.recorded_at.isoformat(),
                 "source": raw.get("source") or meta.get("source") or "teltonika",
                 "imei": raw.get("imei") or meta.get("imei"),
