@@ -286,4 +286,4 @@ echo "=== recent api logs (teltonika/codec/imei) ==="
 echo
 echo "=== done ==="
 
-# diagnose bump 20261007T101426Z — dual badge TCP refcount
+# diagnose bump 20261007T102356Z — pin no jump

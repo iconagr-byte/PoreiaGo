@@ -362,6 +362,11 @@ def prefer_meta_for_plate(
         return a
     if b_fresh and not a_fresh:
         return b
+    # Both hardware-fresh → newer tracker_signal owns lat/lng (not App updated_at).
+    if a_fresh and b_fresh:
+        a_sig = _meta_updated_rank({"updated_at": a.get("tracker_signal_at")})
+        b_sig = _meta_updated_rank({"updated_at": b.get("tracker_signal_at")})
+        return a if a_sig >= b_sig else b
     a_tracker = is_tracker_source(a.get("source")) or bool(
         a.get("imei") and not is_phone_source(a.get("source"))
     )

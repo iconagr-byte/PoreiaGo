@@ -110,9 +110,29 @@ function mergeRowsKeepSources(winner, other) {
   };
 }
 
+function trackerSignalMs(row) {
+  const t = new Date(row?.tracker_signal_at || row?.trackerSignalAt || 0).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+function hasFreshTrackerSignal(row, maxMs = 90_000) {
+  const t = trackerSignalMs(row);
+  return Boolean(t && Date.now() - t <= maxMs);
+}
+
 export function preferVehicleRow(a, b) {
   if (!a) return b;
   if (!b) return a;
+  // Fresh hardware signal owns lat/lng — stops App/Teltonika pin jump.
+  const aFresh = hasFreshTrackerSignal(a);
+  const bFresh = hasFreshTrackerSignal(b);
+  if (aFresh && !bFresh) return mergeRowsKeepSources(a, b);
+  if (bFresh && !aFresh) return mergeRowsKeepSources(b, a);
+  if (aFresh && bFresh) {
+    const winner = trackerSignalMs(a) >= trackerSignalMs(b) ? a : b;
+    const other = winner === a ? b : a;
+    return mergeRowsKeepSources(winner, other);
+  }
   const aHw = isHardwareTrackerRow(a);
   const bHw = isHardwareTrackerRow(b);
   let winner;
