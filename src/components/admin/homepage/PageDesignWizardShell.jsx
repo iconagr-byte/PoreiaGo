@@ -1,4 +1,15 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+
+const COLLAPSE_KEY = 'poreiago_page_design_nav_collapsed';
+
+function readCollapsed() {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 export default function PageDesignWizardShell({
   designPage,
@@ -15,21 +26,62 @@ export default function PageDesignWizardShell({
   previewLabel,
   children,
 }) {
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [collapsed]);
+
   const heroClass =
     designPage === 'rent'
       ? 'page-design-wizard__hero is-rent'
       : 'page-design-wizard__hero';
 
   return (
-    <div className="page-design-wizard__layout">
-      <nav className="page-design-wizard__sidebar" aria-label="Βήματα σχεδιασμού">
+    <div
+      className={`page-design-wizard__layout${collapsed ? ' is-nav-collapsed' : ''}`}
+    >
+      {/* Expand control when nav is collapsed — frees canvas space */}
+      {collapsed ? (
+        <button
+          type="button"
+          className="page-design-wizard__nav-expand"
+          onClick={() => setCollapsed(false)}
+          title="Εμφάνιση μενού"
+          aria-label="Εμφάνιση μενού σχεδιασμού"
+        >
+          <span className="material-symbols-outlined text-[20px]">menu_open</span>
+          <span className="page-design-wizard__nav-expand-label">Μενού</span>
+        </button>
+      ) : null}
+
+      <nav
+        className={`page-design-wizard__sidebar${collapsed ? ' is-collapsed' : ''}`}
+        aria-label="Βήματα σχεδιασμού"
+        aria-hidden={collapsed || undefined}
+      >
         <div className={heroClass}>
           <div className="flex items-start justify-between gap-2">
-            <p className="page-design-wizard__hero-kicker">Διαμόρφωση</p>
-            <span className="page-design-wizard__hero-badge">
-              <span className="material-symbols-outlined text-[12px]">layers</span>
-              {officeMode === 'both' ? '2 σελίδες' : '1 σελίδα'}
-            </span>
+            <div className="min-w-0">
+              <p className="page-design-wizard__hero-kicker">Διαμόρφωση</p>
+              <span className="page-design-wizard__hero-badge">
+                <span className="material-symbols-outlined text-[12px]">layers</span>
+                {officeMode === 'both' ? '2 σελίδες' : '1 σελίδα'}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="page-design-wizard__nav-collapse"
+              onClick={() => setCollapsed(true)}
+              title="Μάζεμα μενού — περισσότερος χώρος"
+              aria-label="Μάζεμα μενού σχεδιασμού"
+            >
+              <span className="material-symbols-outlined text-[18px]">left_panel_close</span>
+            </button>
           </div>
           <p className="page-design-wizard__hero-title">{activePageMeta.title}</p>
           <p className="page-design-wizard__hero-blurb">{activePageMeta.blurb}</p>
