@@ -106,9 +106,8 @@ async def _tcp_session_keepalive(imei: str) -> None:
             await asyncio.sleep(_TCP_KEEPALIVE_SEC)
             if key not in _open_imeis:
                 break
-            # TCP still open ⇒ device is powered. Touch + open paint so hydrate
-            # and the map keep the pin between sparse parked AVL packets.
-            # After power cut, SO_KEEPALIVE closes the socket (~90s) and this stops.
+            # TCP still open ⇒ device is powered. Touch last_seen + refresh the
+            # open badge without moving lat/lng (moving yanked the pin vs App/AVL).
             try:
                 touch_device(imei)
                 from travel_platform.telemetry.teltonika.paint_live import (
@@ -121,6 +120,7 @@ async def _tcp_session_keepalive(imei: str) -> None:
                         device,
                         open_channel=True,
                         reason="tcp_keepalive",
+                        move_coords=False,
                     )
             except Exception:
                 logger.debug("Teltonika TCP keepalive paint skipped IMEI=%s", imei, exc_info=True)

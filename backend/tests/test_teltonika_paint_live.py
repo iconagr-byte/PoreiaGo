@@ -63,6 +63,41 @@ class TeltonikaPaintLiveTests(unittest.TestCase):
         self.assertFalse(ok)
         process.assert_not_awaited()
 
+    def test_move_coords_false_keeps_existing_pin_latlng(self):
+        from travel_platform.telemetry.live_fleet import LiveFleetService
+
+        LiveFleetService._vehicles = {}
+        LiveFleetService._code_index = {}
+        vid = "veh-keep"
+        LiveFleetService._code_index[f"{self.tenant}:EEX5670"] = vid
+        LiveFleetService._vehicles[vid] = {
+            "vehicle_id": vid,
+            "tenant_id": self.tenant,
+            "vehicle_code": "EEX5670",
+            "bus_plate": "EEX5670",
+            "lat": 40.801,
+            "lng": 22.052,
+            "speed_kmh": 12.0,
+            "source": "teltonika",
+        }
+        with patch(
+            "travel_platform.telemetry.teltonika.paint_live.process_telemetry_payload",
+            new_callable=AsyncMock,
+        ) as process:
+            ok = asyncio.run(
+                paint_live_pin_from_device(
+                    self.device,
+                    open_channel=True,
+                    reason="tcp_keepalive",
+                    move_coords=False,
+                )
+            )
+        self.assertTrue(ok)
+        payload = process.await_args.args[0]
+        self.assertAlmostEqual(float(payload["latitude"]), 40.801, places=4)
+        self.assertAlmostEqual(float(payload["longitude"]), 22.052, places=4)
+        self.assertAlmostEqual(float(payload["speed_kmh"]), 12.0, places=1)
+
 
 if __name__ == "__main__":
     unittest.main()

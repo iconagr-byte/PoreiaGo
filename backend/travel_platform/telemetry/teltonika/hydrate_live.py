@@ -211,10 +211,20 @@ async def hydrate_tenant_live_from_devices(
         ):
             continue
 
+        # Reclaim App-only pin → move to hardware coords. Refreshing an existing
+        # Teltonika pin must not re-stamp store lat/lng (pin jump / GPS noise).
+        reclaim_from_app = bool(
+            existing_meta
+            and (
+                is_phone_source(existing_meta.get("source"))
+                or not is_tracker_source(existing_meta.get("source"))
+            )
+        )
         ok = await paint_live_pin_from_device(
             device,
             open_channel=True,
             reason="hydrate_force" if force else "hydrate",
+            move_coords=reclaim_from_app or not existing_meta,
         )
         if ok:
             written += 1

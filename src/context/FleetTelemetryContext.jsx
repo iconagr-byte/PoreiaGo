@@ -120,12 +120,24 @@ function pickHydratedFromStore(msg, prev) {
   return Boolean(prev?.hydrated_from_store);
 }
 
+/** ~3m — ignore App/jitter polls that would restart pin animation. */
+const COORDS_NEAR_DEG = 0.00003;
+
+function coordsNear(aLat, aLng, bLat, bLng) {
+  return (
+    Number.isFinite(aLat) &&
+    Number.isFinite(aLng) &&
+    Number.isFinite(bLat) &&
+    Number.isFinite(bLng) &&
+    Math.abs(aLat - bLat) < COORDS_NEAR_DEG &&
+    Math.abs(aLng - bLng) < COORDS_NEAR_DEG
+  );
+}
+
 function normalizeVehicle(msg, id, prev) {
-  const targetLat = Number(msg.lat ?? msg.latitude);
-  const targetLng = Number(msg.lng ?? msg.longitude);
+  let targetLat = Number(msg.lat ?? msg.latitude);
+  let targetLng = Number(msg.lng ?? msg.longitude);
   if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng)) return null;
-  const prevLat = Number.isFinite(prev?.lat) ? prev.lat : targetLat;
-  const prevLng = Number.isFinite(prev?.lng) ? prev.lng : targetLng;
   const appSeenAt = pickAppSeenAt(msg, prev);
   const listed = listedGpsSources(msg);
   const appDriverId = pickAppDriverId(msg, prev);
@@ -144,6 +156,39 @@ function normalizeVehicle(msg, id, prev) {
         (prev?.gps_sources || []).includes('teltonika') &&
         isChannelFresh(prev?.tracker_signal_at, SOURCE_FRESH_MS)),
   );
+  const msgSource = gpsSourceKind(msg.source);
+  // Hardware owns the pin while Teltonika is live — ignore App lat/lng frames
+  // that were making the bus jump between phone GPS and vehicle GPS.
+  if (
+    prev &&
+    keepTeltonika &&
+    msgSource === 'app' &&
+    Number.isFinite(prev.targetLat) &&
+    Number.isFinite(prev.targetLng)
+  ) {
+    targetLat = prev.targetLat;
+    targetLng = prev.targetLng;
+  }
+  const prevTargetLat = Number.isFinite(prev?.targetLat) ? prev.targetLat : prev?.lat;
+  const prevTargetLng = Number.isFinite(prev?.targetLng) ? prev.targetLng : prev?.lng;
+  const unchanged = Boolean(
+    prev && coordsNear(prevTargetLat, prevTargetLng, targetLat, targetLng),
+  );
+  const prevLat = unchanged
+    ? Number.isFinite(prev?.lat)
+      ? prev.lat
+      : targetLat
+    : Number.isFinite(prev?.lat)
+      ? prev.lat
+      : targetLat;
+  const prevLng = unchanged
+    ? Number.isFinite(prev?.lng)
+      ? prev.lng
+      : targetLng
+    : Number.isFinite(prev?.lng)
+      ? prev.lng
+      : targetLng;
+  const nowAnim = typeof performance !== 'undefined' ? performance.now() : 0;
   return {
     id,
     vehicle_id: msg.vehicle_id || id,
@@ -161,8 +206,8 @@ function normalizeVehicle(msg, id, prev) {
     lng: prevLng,
     targetLat,
     targetLng,
-    prevLat,
-    prevLng,
+    prevLat: unchanged ? targetLat : prevLat,
+    prevLng: unchanged ? targetLng : prevLng,
     speed: msg.speed ?? msg.speed_kmh ?? 0,
     heading: msg.heading ?? msg.heading_deg,
     timestamp: msg.timestamp || msg.updated_at,
@@ -184,7 +229,7 @@ function normalizeVehicle(msg, id, prev) {
       keepApp: appStillLive,
       keepTeltonika,
     }),
-    animStart: typeof performance !== 'undefined' ? performance.now() : 0,
+    animStart: unchanged && prev?.animStart != null ? prev.animStart : nowAnim,
   };
 }
 
