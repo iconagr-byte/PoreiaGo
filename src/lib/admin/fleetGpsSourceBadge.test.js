@@ -123,8 +123,8 @@ assert.deepEqual(
   ['teltonika', 'app'],
 );
 
-// Hydrated + signal within Codec window (≤5 min) → still show hardware chip.
-const recentParked = new Date(Date.now() - 2 * 60_000).toISOString();
+// Hydrated + signal within alive window (≤90s) → still show hardware chip.
+const recentParked = new Date(Date.now() - 30_000).toISOString();
 assert.deepEqual(
   resolveFleetGpsSources({
     source: 'teltonika',
@@ -135,6 +135,22 @@ assert.deepEqual(
     app_seen_at: now,
   }),
   ['teltonika', 'app'],
+);
+
+// Hydrated + stale signal (power cut) → App only, no fake «GPS οχήματος».
+clearStickyTeltonika('EEXPOWER');
+assert.deepEqual(
+  resolveFleetGpsSources({
+    source: 'teltonika',
+    imei: '861',
+    bus_plate: 'EEXPOWER',
+    hydrated_from_store: true,
+    tracker_signal_at: old,
+    updated_at: now,
+    app_seen_at: now,
+    gps_sources: ['app'],
+  }),
+  ['app'],
 );
 
 // Sticky dual: after Teltonika was seen, App-only poll still shows both briefly.

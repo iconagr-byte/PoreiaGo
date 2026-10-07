@@ -3,10 +3,10 @@
  */
 
 const SOURCE_FRESH_MS = 90_000;
-/** Match Teltonika Codec TCP idle timeout — parked AVL is often rarer than 90s. */
-const TELTONIKA_BADGE_FRESH_MS = 300_000;
-/** Keep «GPS οχήματος» after a brief server/App-only poll gap. */
-const TELTONIKA_STICKY_MS = 300_000;
+/** Align with backend alive window — unplugged GPS must drop «active» quickly. */
+const TELTONIKA_BADGE_FRESH_MS = 90_000;
+/** Brief sticky only — covers multi-worker poll gaps, not power-cut lag. */
+const TELTONIKA_STICKY_MS = 90_000;
 
 /** plate → sticky-until epoch ms — survives intermittent App-only polls. */
 const stickyTeltonikaUntil = new Map();

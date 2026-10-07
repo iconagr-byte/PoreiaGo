@@ -20,9 +20,10 @@ TRACKER_LIVE_SOURCES = frozenset(
 
 # Prefer tracker while a live pin reports within this window (seconds).
 DEFAULT_TRACKER_ALIVE_SECONDS = 90
-# Codec TCP read timeout is 300s; reconnect gaps are longer when parked.
-# Badge/device-online must not drop «GPS οχήματος» between sparse AVL / TCP flaps.
-DEVICE_ONLINE_BADGE_SECONDS = 900
+# Badge / «GPS οχήματος» online window — keep aligned with alive.
+# Was 900s and kept buses looking active ~15 min after GPS power cut.
+# Open Codec TCP still counts as online via is_tracker_binding_alive().
+DEVICE_ONLINE_BADGE_SECONDS = 90
 
 
 # Greek lookalikes → Latin so App/Teltonika plates collapse to one key.
@@ -111,8 +112,8 @@ def resolve_live_gps_sources(
     elif is_phone_source(meta.get("source")) and pin_age is not None and pin_age <= alive:
         out.append("app")
 
-    # Device online (TCP last_seen) → always advertise Teltonika on the badge.
-    # Use the longer Codec window so parked / sparse AVL still shows both chips.
+    # Device online (fresh last_seen or open Codec TCP) → advertise Teltonika.
+    # Keep window = alive so unplugged GPS stops looking "active" within ~90s.
     if check_device_store and "teltonika" not in out:
         tid = str(tenant_id or meta.get("tenant_id") or "").strip()
         plate = meta_plate(meta)
