@@ -31,6 +31,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  position: relative;
 }
 
 @media (min-width: 1024px) {
@@ -41,7 +42,7 @@
   }
 }
 
-/* Sidebar */
+/* Sidebar — stays put while the main canvas scrolls */
 .page-design-wizard__sidebar {
   flex-shrink: 0;
 }
@@ -51,7 +52,85 @@
     width: 17.5rem;
     position: sticky;
     top: 0.75rem;
+    align-self: flex-start;
+    max-height: calc(100vh - 1.5rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    z-index: 5;
+    transition: width 0.2s ease, opacity 0.18s ease, margin 0.2s ease;
   }
+
+  .page-design-wizard__sidebar.is-collapsed {
+    width: 0;
+    max-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    max-height: 0;
+  }
+}
+
+/* Collapse control — top-right of the sidebar hero */
+.page-design-wizard__nav-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.15rem -0.2rem 0 0;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.page-design-wizard__nav-collapse:hover {
+  background: rgba(0, 0, 0, 0.36);
+}
+
+/* Expand chip when nav is collapsed — top of canvas */
+.page-design-wizard__nav-expand {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .page-design-wizard__layout.is-nav-collapsed .page-design-wizard__nav-expand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    position: sticky;
+    top: 0.75rem;
+    align-self: flex-start;
+    z-index: 6;
+    margin: 0;
+    padding: 0.55rem 0.85rem;
+    border: 1px solid var(--pdw-stroke);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--pdw-ink);
+    font-size: 0.78rem;
+    font-weight: 700;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .page-design-wizard__layout.is-nav-collapsed .page-design-wizard__nav-expand:hover {
+    background: var(--pdw-fill);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  }
+}
+
+.page-design-wizard__nav-expand-label {
+  line-height: 1;
 }
 
 .page-design-wizard__hero {
@@ -99,7 +178,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  margin-top: 0.55rem;
+  margin-top: 0.35rem;
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
   font-size: 0.62rem;
