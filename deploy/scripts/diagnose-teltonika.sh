@@ -89,30 +89,63 @@ for r in rows:
 PY
 
 echo
-echo "=== TCP IMEI probe (localhost :${PORT}) ==="
+echo "=== TCP health probe (bogus IMEI — does NOT refresh real last_seen) ==="
 "${COMPOSE[@]}" exec -T api-blue python - <<'PY'
-import json, socket, struct
+import socket, struct
+from datetime import datetime, timezone
 from travel_platform.telemetry.teltonika import list_devices
+from travel_platform.telemetry.teltonika.tcp_server import get_teltonika_status
 
-rows = list_devices()
-imei = None
-for r in rows:
-    if r.get("enabled") and r.get("imei"):
-        imei = str(r["imei"])
-        break
-if not imei:
-    print("PROBE_SKIP no enabled IMEI")
-else:
-    payload = struct.pack(">H", len(imei)) + imei.encode("ascii")
-    try:
-        s = socket.create_connection(("127.0.0.1", 5027), timeout=5)
-        s.sendall(payload)
-        resp = s.recv(1)
-        s.close()
-        code = resp.hex() if resp else "empty"
-        print("PROBE_IMEI", imei, "reply=0x" + code, "OK" if resp == b"\x01" else "REJECT")
-    except Exception as exc:
-        print("PROBE_FAIL", type(exc).__name__, str(exc)[:200])
+# Server listening + reject path only (never login a bound IMEI — that faked online).
+try:
+    s = socket.create_connection(("127.0.0.1", 5027), timeout=5)
+    imei = "000000000000001"
+    s.sendall(struct.pack(">H", len(imei)) + imei.encode("ascii"))
+    resp = s.recv(1)
+    s.close()
+    print(
+        "PROBE_BOGUS reply=0x" + (resp.hex() if resp else "empty"),
+        "REJECT_OK" if resp == b"\x00" else "UNEXPECTED",
+    )
+except Exception as exc:
+    print("PROBE_FAIL", type(exc).__name__, str(exc)[:200])
+
+st = get_teltonika_status()
+print(
+    "SERVER_STATUS",
+    "listening=", st.get("listening"),
+    "enabled=", st.get("enabled"),
+    "active_connections=", st.get("active_connections"),
+    "open_imeis=", st.get("open_imeis"),
+    "accepted=", st.get("accepted_imeis"),
+    "packets_ok=", st.get("packets_ok"),
+)
+
+now = datetime.now(timezone.utc)
+print("DEVICE_ONLINE_WINDOW_SEC=90")
+for r in list_devices():
+    if not r.get("enabled"):
+        continue
+    seen = r.get("last_seen_at")
+    age = None
+    if seen:
+        try:
+            dt = datetime.fromisoformat(str(seen).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            age = max(0.0, (now - dt).total_seconds())
+        except Exception:
+            age = None
+    live = age is not None and age <= 90
+    print(
+        "DEVICE_LIVE_CHECK",
+        "plate=", r.get("vehicle_code"),
+        "imei=", r.get("imei"),
+        "last_seen=", seen,
+        "age_sec=", None if age is None else round(age, 1),
+        "badge=", "ONLINE" if live else "OFFLINE",
+        "speed=", r.get("last_speed_kmh"),
+    )
 PY
 
 echo
@@ -253,4 +286,4 @@ echo "=== recent api logs (teltonika/codec/imei) ==="
 echo
 echo "=== done ==="
 
-# diagnose bump 20261001T081500Z
+# diagnose bump 20261007T072300Z — safe probe + DEVICE_LIVE_CHECK ages
