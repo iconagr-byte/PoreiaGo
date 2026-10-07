@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import socket
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -26,10 +27,15 @@ logger = logging.getLogger("poreiago.teltonika")
 _server: asyncio.AbstractServer | None = None
 # IMEIs with an open Codec TCP session on this worker (sparse AVL when parked).
 _open_imeis: set[str] = set()
-# Refresh map pin while TCP is up — do NOT bump last_seen (that faked online after unplug).
+# Refresh map pin + last_seen while TCP is up (parked devices send AVL rarely).
 _TCP_KEEPALIVE_SEC = 30
-# Half-open sockets after power cut — fail faster than the old 300s idle.
-_TCP_AVL_READ_TIMEOUT_SEC = 90
+# Do NOT close quiet Codec sessions quickly — parked Teltonika often waits
+# minutes between AVL. Dead peers after power-cut are detected via SO_KEEPALIVE.
+_TCP_AVL_READ_TIMEOUT_SEC = 1800
+# Linux TCP keepalive: detect unplugged GPS ~90s without killing idle-but-alive links.
+_TCP_KEEPIDLE_SEC = 45
+_TCP_KEEPINTVL_SEC = 10
+_TCP_KEEPCNT = 4
 _status: dict[str, Any] = {
     "enabled": False,
     "listening": False,
@@ -50,17 +56,36 @@ def is_imei_tcp_connected(imei: str | None) -> bool:
     return bool(key) and key in _open_imeis
 
 
+def _enable_socket_keepalive(writer: asyncio.StreamWriter) -> None:
+    """Fail half-open sockets after power cut; keep quiet parked sessions alive."""
+    sock = writer.get_extra_info("socket")
+    if sock is None:
+        return
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        if hasattr(socket, "TCP_KEEPIDLE"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, _TCP_KEEPIDLE_SEC)
+        if hasattr(socket, "TCP_KEEPINTVL"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, _TCP_KEEPINTVL_SEC)
+        if hasattr(socket, "TCP_KEEPCNT"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, _TCP_KEEPCNT)
+    except OSError:
+        logger.debug("Teltonika SO_KEEPALIVE not applied", exc_info=True)
+
+
 async def _tcp_session_keepalive(imei: str) -> None:
-    """Refresh last-known pin while TCP stays up — without faking a live signal."""
+    """Keep last_seen + open pin fresh while the Codec TCP session is truly open."""
     key = normalize_imei(imei)
     try:
         while key in _open_imeis:
             await asyncio.sleep(_TCP_KEEPALIVE_SEC)
             if key not in _open_imeis:
                 break
-            # Do not touch_device() here — keepalive must not refresh last_seen_at
-            # or tracker_signal_at after GPS power cut (half-open TCP).
+            # TCP still open ⇒ device is powered. Touch + open paint so hydrate
+            # and the map keep the pin between sparse parked AVL packets.
+            # After power cut, SO_KEEPALIVE closes the socket (~90s) and this stops.
             try:
+                touch_device(imei)
                 from travel_platform.telemetry.teltonika.paint_live import (
                     paint_live_pin_from_device,
                 )
@@ -69,7 +94,7 @@ async def _tcp_session_keepalive(imei: str) -> None:
                 if device:
                     await paint_live_pin_from_device(
                         device,
-                        open_channel=False,
+                        open_channel=True,
                         reason="tcp_keepalive",
                     )
             except Exception:
@@ -141,6 +166,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
     imei: str | None = None
     keepalive_task: asyncio.Task | None = None
     buf = bytearray()
+    _enable_socket_keepalive(writer)
     try:
         # Phase 1: IMEI login
         while imei is None:
@@ -327,6 +353,30 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
     finally:
         if imei:
             _open_imeis.discard(normalize_imei(imei))
+            # TCP gone ⇒ drop hardware pin immediately (no 90s ghost after unplug).
+            try:
+                from travel_platform.telemetry.teltonika.hydrate_live import (
+                    _drop_offline_hardware_pin,
+                )
+                from travel_platform.telemetry.processor import get_live_fleet
+
+                device = get_device_by_imei(imei) or {}
+                plate = str(device.get("vehicle_code") or imei).strip()
+                tid = str(device.get("tenant_id") or "").strip()
+                fleet = get_live_fleet()
+                if fleet and tid and plate:
+                    vid = fleet.find_vehicle_id(tid, plate)
+                    meta = fleet._vehicles.get(vid, {}) if vid else {}  # noqa: SLF001
+                    if meta:
+                        await _drop_offline_hardware_pin(
+                            fleet, tenant_id=tid, plate=plate, meta=meta
+                        )
+            except Exception:
+                logger.debug(
+                    "Teltonika TCP-close pin drop skipped IMEI=%s",
+                    imei,
+                    exc_info=True,
+                )
         if keepalive_task is not None:
             keepalive_task.cancel()
             try:

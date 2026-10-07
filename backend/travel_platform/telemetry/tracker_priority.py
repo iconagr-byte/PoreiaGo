@@ -171,8 +171,8 @@ def is_tracker_binding_alive(
     if age is not None and age <= max(1, int(max_age_sec)):
         return True
     # Open Codec TCP on this worker counts as online (reconnect before AVL).
-    # Keepalive no longer refreshes last_seen — half-open sockets die at the
-    # AVL read timeout (~90s) and then the pin is dropped by hydrate.
+    # Keepalive refreshes last_seen only while the socket is open; dead peers
+    # after power-cut are closed via SO_KEEPALIVE (~90s), then hydrate drops.
     try:
         from travel_platform.telemetry.teltonika.tcp_server import is_imei_tcp_connected
 
