@@ -107,6 +107,16 @@ class LiveFleetService:
             merged["bus_plate"] = plate
         if raw.get("heading_deg") is not None:
             merged["heading_deg"] = raw.get("heading_deg")
+        if raw.get("altitude_m") is not None:
+            try:
+                merged["altitude_m"] = float(raw.get("altitude_m"))
+            except (TypeError, ValueError):
+                pass
+        if raw.get("satellites") is not None:
+            try:
+                merged["satellites"] = int(raw.get("satellites"))
+            except (TypeError, ValueError):
+                pass
         if raw.get("source"):
             merged["source"] = str(raw.get("source"))
         if raw.get("imei"):
@@ -864,6 +874,9 @@ class LiveFleetService:
                 "lng": meta.get("lng"),
                 "speed": meta.get("speed_kmh") or 0,
                 "heading": meta.get("heading_deg"),
+                "altitude_m": meta.get("altitude_m"),
+                "satellites": meta.get("satellites"),
+                "engine_on": bool(meta.get("engine_on", False)),
                 "timestamp": meta.get("updated_at") or now_iso,
                 "source": meta.get("source") or "teltonika",
                 "imei": meta.get("imei"),
@@ -1047,6 +1060,9 @@ class LiveFleetService:
             "lng": float(meta["lng"]),
             "speed": float(meta.get("speed_kmh") or meta.get("speed") or 0),
             "heading": meta.get("heading_deg") if meta.get("heading_deg") is not None else meta.get("heading"),
+            "altitude_m": meta.get("altitude_m"),
+            "satellites": meta.get("satellites"),
+            "engine_on": bool(meta.get("engine_on", False)),
             "timestamp": meta.get("updated_at") or datetime.now(timezone.utc).isoformat(),
             "source": "teltonika",
             "imei": meta.get("imei"),

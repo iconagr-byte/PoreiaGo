@@ -56,28 +56,37 @@ async def paint_live_pin_from_device(
     lat = float(device["last_lat"])
     lng = float(device["last_lng"])
     speed = float(device.get("last_speed_kmh") or 0)
-    if not move_coords:
-        try:
-            from travel_platform.telemetry.processor import get_live_fleet
+    heading_deg = None
+    altitude_m = None
+    satellites = None
+    try:
+        from travel_platform.telemetry.processor import get_live_fleet
 
-            fleet = get_live_fleet()
-            vid = fleet.find_vehicle_id(tid, plate) if fleet else None
-            meta = (fleet._vehicles.get(vid) or {}) if vid and fleet else {}  # noqa: SLF001
-            if meta.get("lat") is not None and meta.get("lng") is not None:
-                lat = float(meta["lat"])
-                lng = float(meta["lng"])
-                if meta.get("speed_kmh") is not None:
-                    speed = float(meta.get("speed_kmh") or 0)
-        except Exception:
-            logger.debug(
-                "teltonika paint keep-coords lookup skipped plate=%s",
-                plate,
-                exc_info=True,
-            )
+        fleet = get_live_fleet()
+        vid = fleet.find_vehicle_id(tid, plate) if fleet else None
+        meta = (fleet._vehicles.get(vid) or {}) if vid and fleet else {}  # noqa: SLF001
+        if meta.get("heading_deg") is not None:
+            heading_deg = float(meta.get("heading_deg"))
+        if meta.get("altitude_m") is not None:
+            altitude_m = float(meta.get("altitude_m"))
+        if meta.get("satellites") is not None:
+            satellites = int(meta.get("satellites"))
+        if not move_coords and meta.get("lat") is not None and meta.get("lng") is not None:
+            lat = float(meta["lat"])
+            lng = float(meta["lng"])
+            if meta.get("speed_kmh") is not None:
+                speed = float(meta.get("speed_kmh") or 0)
+    except Exception:
+        logger.debug(
+            "teltonika paint meta lookup skipped plate=%s",
+            plate,
+            exc_info=True,
+        )
 
     recorded = datetime.now(timezone.utc).isoformat()
     signal_at = str(device.get("last_seen_at") or recorded)
     # Server receive time keeps list_active from dropping the pin as stale.
+    # Omit heading_deg when unknown — do not overwrite a real AVL heading with 0.
     payload: dict[str, Any] = {
         "tenant_id": tid,
         "vehicle_code": plate,
@@ -85,7 +94,6 @@ async def paint_live_pin_from_device(
         "longitude": lng,
         "speed_kmh": speed,
         "engine_status": "on" if open_channel else "off",
-        "heading_deg": 0.0,
         "bus_plate": plate,
         "driver_name": str(device.get("label") or f"GPS {plate}"),
         "driver_id": device.get("driver_id") or None,
@@ -95,6 +103,12 @@ async def paint_live_pin_from_device(
         "tracker_signal_at": recorded if open_channel else signal_at,
         "hydrated_from_store": not open_channel,
     }
+    if heading_deg is not None:
+        payload["heading_deg"] = heading_deg
+    if altitude_m is not None:
+        payload["altitude_m"] = altitude_m
+    if satellites is not None:
+        payload["satellites"] = satellites
     try:
         await process_telemetry_payload(payload)
         logger.info(

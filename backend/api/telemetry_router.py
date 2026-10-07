@@ -37,6 +37,24 @@ router = APIRouter(tags=["telemetry"])
 ingest_router = APIRouter(prefix="/telemetry", tags=["telemetry-ingest"])
 
 
+def _safe_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(value) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def verify_device_key(x_device_key: str | None = Header(default=None, alias="X-Device-Key")) -> str:
     env = os.getenv("ENVIRONMENT", "development").lower()
     raw = (os.getenv("TELEMETRY_DEVICE_KEYS") or "").strip()
@@ -249,6 +267,8 @@ async def fleet_live(
                     driver_name=meta.get("driver_name"),
                     bus_plate=media.get("bus_plate") or meta.get("bus_plate", v.vehicle_code),
                     heading_deg=meta.get("heading_deg"),
+                    altitude_m=_safe_float(meta.get("altitude_m")),
+                    satellites=_safe_int(meta.get("satellites")),
                     driver_id=chat_driver_id,
                     app_driver_id=app_driver_id,
                     photo_url=media.get("photo_url"),

@@ -7,6 +7,7 @@ import {
   mapSosAlertsWithCoords,
 } from '../../lib/admin/fleetMapAlerts.js';
 import {
+  fleetTelemetryIndicators,
   formatBoardingLabel,
   formatUpdatedAgo,
   resolveFleetMarkerImage,
@@ -15,6 +16,10 @@ import {
   resolveVehicleTripTitle,
   vehicleHasActiveExcursion,
 } from '../../lib/admin/fleetBusPillLabel.js';
+import {
+  formatFleetGpsSourceChipLabel,
+  resolveFleetGpsSources,
+} from '../../lib/admin/fleetGpsSourceBadge.js';
 import { mergeRentalOverlays } from '../../lib/admin/mergeRentalOverlays.js';
 import { collapseVehicleListByPlate } from '../../lib/admin/fleetPinDedupe.js';
 import { resolveSiteAssetUrl } from '../../services/siteAppearanceApi.js';
@@ -212,6 +217,8 @@ export default function FleetLiveMapWebSocket() {
                 {mapVehicles.map((v) => {
                   const img = resolveSiteAssetUrl(resolveFleetMarkerImage(v));
                   const active = (selected?.id || selectedId) === v.id;
+                  const indicators = fleetTelemetryIndicators(v);
+                  const gpsSources = resolveFleetGpsSources(v);
                   return (
                     <li key={v.id}>
                       <button
@@ -252,12 +259,33 @@ export default function FleetLiveMapWebSocket() {
                               })()}
                             </div>
                             <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-[var(--fleet-secondary)]">
-                              <span>{Math.round(v.speed || 0)} km/h</span>
                               <span>
                                 {Number(v.lat).toFixed(4)}, {Number(v.lng).toFixed(4)}
                               </span>
                               <span>{formatUpdatedAgo(v.timestamp) || '—'}</span>
                               {formatBoardingLabel(v) ? <span>{formatBoardingLabel(v)}</span> : null}
+                            </div>
+                            <div className="fleet-apple-telemetry-chips">
+                              {indicators.map((chip) => (
+                                <span
+                                  key={chip.key}
+                                  className={`fleet-apple-telemetry-chip${chip.tone ? ` fleet-apple-telemetry-chip--${chip.tone}` : ''}`}
+                                >
+                                  <span className="fleet-apple-telemetry-chip__label">{chip.label}</span>
+                                  <span className="fleet-apple-telemetry-chip__value">{chip.value}</span>
+                                </span>
+                              ))}
+                              {gpsSources.map((kind) => (
+                                <span
+                                  key={`gps-${kind}`}
+                                  className="fleet-apple-telemetry-chip fleet-apple-telemetry-chip--gps"
+                                >
+                                  <span className="fleet-apple-telemetry-chip__label">GPS</span>
+                                  <span className="fleet-apple-telemetry-chip__value">
+                                    {formatFleetGpsSourceChipLabel(kind)}
+                                  </span>
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>
