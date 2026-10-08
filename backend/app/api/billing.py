@@ -65,18 +65,39 @@ async def get_subscription(
 ):
     tenant = await _load_tenant(db, tenant_id)
     billing = BillingService(db)
-    sub = await billing.get_or_create_subscription(tenant)
+    try:
+        sub = await billing.get_or_create_subscription(tenant)
+    except Exception:
+        # Last resort: heal schema (subscriptions.plan) then retry once.
+        logger.exception("billing subscription load failed tenant=%s — healing", tenant_id)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        from app.services.tenant_modules import _heal_subscription_plan_column
+
+        await _heal_subscription_plan_column(db)
+        try:
+            sub = await billing.get_or_create_subscription(tenant)
+        except Exception as exc:
+            logger.exception("billing subscription still failing after heal")
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Αποτυχία φόρτωσης συνδρομής — δοκιμάστε Ανανέωση ή επικοινωνήστε με υποστήριξη.",
+            ) from exc
+    plan = getattr(sub.plan, "value", None) or str(sub.plan or tenant.plan.value)
+    status_val = getattr(sub.status, "value", None) or str(sub.status or "trialing")
     return BillingSubscriptionResponse(
         tenant_id=tenant.id,
-        plan=sub.plan.value,
-        status=sub.status.value,
+        plan=plan,
+        status=status_val,
         is_active=tenant.is_active,
         stripe_customer_id=tenant.stripe_customer_id,
         stripe_subscription_id=sub.stripe_subscription_id,
         current_period_end=sub.current_period_end,
         trial_ends_at=sub.trial_ends_at,
-        cancel_at_period_end=sub.cancel_at_period_end,
-        base_amount_cents=sub.base_amount_cents,
+        cancel_at_period_end=bool(sub.cancel_at_period_end),
+        base_amount_cents=int(sub.base_amount_cents or 0),
     )
 
 

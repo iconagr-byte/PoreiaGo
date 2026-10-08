@@ -118,6 +118,23 @@ def _plan_base_cents(plan: TenantPlan, *, billing_interval: str = "month") -> in
     return monthly
 
 
+def _is_missing_subscription_plan_error(exc: BaseException) -> bool:
+    """True when Postgres/ORM choke on a missing or drifted subscriptions.plan."""
+    msg = str(exc or "").lower()
+    if "subscriptions" in msg and "plan" in msg:
+        return True
+    if "undefinedcolumn" in msg.replace(" ", "") or "undefined column" in msg:
+        return "plan" in msg or "subscription" in msg
+    # asyncpg / SQLAlchemy wrappers
+    orig = getattr(exc, "orig", None)
+    if orig is not None and orig is not exc:
+        return _is_missing_subscription_plan_error(orig)
+    cause = getattr(exc, "__cause__", None)
+    if cause is not None and cause is not exc:
+        return _is_missing_subscription_plan_error(cause)
+    return False
+
+
 def _status_from_stripe(raw: str | None) -> SubscriptionStatus:
     try:
         return SubscriptionStatus(raw or "incomplete")
@@ -143,6 +160,31 @@ class BillingService:
         return result.scalar_one_or_none()
 
     async def get_or_create_subscription(self, tenant: Tenant) -> Subscription:
+        """
+        Load or create the office subscription row.
+
+        Contabo DBs sometimes miss ``subscriptions.plan`` — ORM SELECT then
+        500s on Συμβόλαιο. Heal the column and retry once.
+        """
+        try:
+            return await self._get_or_create_subscription_once(tenant)
+        except Exception as exc:
+            if not _is_missing_subscription_plan_error(exc):
+                raise
+            logger.warning(
+                "subscriptions.plan missing/corrupt — healing then retry tenant=%s",
+                tenant.id,
+            )
+            try:
+                await self._session.rollback()
+            except Exception:
+                pass
+            from app.services.tenant_modules import _heal_subscription_plan_column
+
+            await _heal_subscription_plan_column(self._session)
+            return await self._get_or_create_subscription_once(tenant)
+
+    async def _get_or_create_subscription_once(self, tenant: Tenant) -> Subscription:
         sub = await self.get_subscription(tenant.id)
         if sub:
             return sub
