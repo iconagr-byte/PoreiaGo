@@ -18,7 +18,7 @@ export const SERVICE_HUB = {
   busesLabel: 'Εκδρομές & λεωφορεία',
   busesHint: 'Κρατήσεις · GPS · στόλος',
   rentLabel: 'Ενοικιάσεις',
-  rentHint: 'Αυτοκίνητα · SOS · συμβόλαιο',
+  rentHint: 'Αυτοκίνητα · βοήθεια · συμβόλαιο',
 };
 
 /** Below-hub sessions — ένα καθαρό block ανά υπηρεσία. */
@@ -40,11 +40,11 @@ export const BUSES_SESSION = {
 export const RENT_SESSION = {
   id: 'session-rent',
   kicker: 'Ενοικιάσεις',
-  hook: 'Νοίκιασε αυτοκίνητο όπως κλείνεις εκδρομή — καθαρά, με ασφάλεια και SOS',
+  hook: 'Νοίκιασε αυτοκίνητο όπως κλείνεις εκδρομή — καθαρά, με ασφάλεια και οδική βοήθεια',
   support:
     'Ξεχωριστή πόρτα για ενοικιάσεις: στόλος, ημερομηνίες, ασφάλειες και ψηφιακή υπογραφή. Μπορεί να είναι add-on στο πλάνο λεωφορείων ή αυτόνομο συμβόλαιο.',
   points: [
-    { icon: 'sos', label: 'SOS + οδική βοήθεια 24/7' },
+    { icon: 'health_and_safety', label: 'Οδική βοήθεια 24/7' },
     { icon: 'shield', label: 'CDW / SCDW πριν την υπογραφή' },
     { icon: 'draw', label: 'Ψηφιακό συμβόλαιο & checklist' },
   ],
@@ -114,11 +114,11 @@ export const FEATURES = [
   },
   {
     id: 'rent-safety',
-    icon: 'sos',
+    icon: 'health_and_safety',
     accent: 'teal',
     visual: 'gps',
     lane: 'rent',
-    title: 'SOS & ασφάλειες',
+    title: 'Οδική βοήθεια & ασφάλειες',
     body: 'Οδική βοήθεια 24/7, CDW/SCDW πριν την υπογραφή και live τοποθεσία όταν χρειάζεται.',
     hook: 'Καθαρή ασφάλεια πριν φύγει το όχημα',
   },
@@ -172,7 +172,7 @@ export const FEATURE_LANES = {
   },
   rent: {
     kicker: 'Ενοικιάσεις',
-    title: 'Αυτοκίνητα με SOS και συμβόλαιο',
+    title: 'Αυτοκίνητα με βοήθεια και συμβόλαιο',
     href: '#session-rent',
   },
   shared: {
@@ -224,7 +224,7 @@ export const AUDIENCE = {
     points: [
       { icon: 'car_rental', text: 'Ενοικιάσεις χωρίς να μπερδεύονται με τις εκδρομές' },
       { icon: 'shield', text: 'Ασφάλειες και υπογραφή πριν φύγει το όχημα' },
-      { icon: 'sos', text: 'SOS και οδική βοήθεια όταν ο πελάτης είναι στον δρόμο' },
+      { icon: 'health_and_safety', text: 'Οδική βοήθεια όταν ο πελάτης είναι στον δρόμο' },
     ],
   },
 };

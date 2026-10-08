@@ -200,7 +200,7 @@ export default function PlatformMarketingHeader() {
                 </span>
                 <span>
                   <strong>Ενοικιάσεις οχημάτων</strong>
-                  <em>SOS · ασφάλεια · συμβόλαιο</em>
+                  <em>Ασφάλεια · οδική βοήθεια · συμβόλαιο</em>
                 </span>
               </a>
               <Link to="/rent" className="pm-mobile-link pm-mobile-link--rent" onClick={closeAll}>
