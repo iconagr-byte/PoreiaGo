@@ -18,7 +18,38 @@ export const SERVICE_HUB = {
   busesLabel: 'Εκδρομές & λεωφορεία',
   busesHint: 'Κρατήσεις · GPS · στόλος',
   rentLabel: 'Ενοικιάσεις',
-  rentHint: 'Στόλος αυτοκινήτων · /rent',
+  rentHint: 'Αυτοκίνητα · SOS · συμβόλαιο',
+};
+
+/** Below-hub sessions — ένα καθαρό block ανά υπηρεσία. */
+export const BUSES_SESSION = {
+  id: 'session-buses',
+  kicker: 'Λεωφορεία',
+  hook: 'Από την κράτηση μέχρι το GPS — όλη η εκδρομή σε μία ροή',
+  support:
+    'Ο πελάτης κλείνει θέση online με QR. Εσείς βλέπετε στόλο, πληρότητα και ζωντανή διαδρομή — χωρίς Excel και χωρίς τηλέφωνα την ώρα της αναχώρησης.',
+  points: [
+    { icon: 'confirmation_number', label: 'Online κράτηση & QR εισιτήριο' },
+    { icon: 'map', label: 'Ζωντανό GPS στο λεωφορείο' },
+    { icon: 'event_seat', label: 'Θέσεις & πληρότητα σε πραγματικό χρόνο' },
+  ],
+  ctaLabel: 'Δείτε εκδρομές & στόλο',
+  ctaHref: '#platform-trips',
+};
+
+export const RENT_SESSION = {
+  id: 'session-rent',
+  kicker: 'Ενοικιάσεις',
+  hook: 'Νοίκιασε αυτοκίνητο όπως κλείνεις εκδρομή — καθαρά, με ασφάλεια και SOS',
+  support:
+    'Ξεχωριστή πόρτα για ενοικιάσεις: στόλος, ημερομηνίες, ασφάλειες και ψηφιακή υπογραφή. Μπορεί να είναι add-on στο πλάνο λεωφορείων ή αυτόνομο συμβόλαιο.',
+  points: [
+    { icon: 'sos', label: 'SOS + οδική βοήθεια 24/7' },
+    { icon: 'shield', label: 'CDW / SCDW πριν την υπογραφή' },
+    { icon: 'draw', label: 'Ψηφιακό συμβόλαιο & checklist' },
+  ],
+  ctaLabel: 'Άνοιγμα σελίδας ενοικιάσεων',
+  ctaTo: '/rent',
 };
 
 /** Hero background — πλήρες cover, χωρίς demo εκδρομή */
