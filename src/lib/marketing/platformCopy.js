@@ -70,119 +70,167 @@ export const STATS = [
   { value: `${CAMPAIGN_TEMPLATE_COUNT}+`, label: 'Έτοιμα πρότυπα email' },
 ];
 
+/** Feature grid — still used where a flat list is needed. */
 export const FEATURES = [
-  {
-    id: 'email',
-    icon: 'campaign',
-    accent: 'violet',
-    visual: 'email',
-    title: 'Καμπάνιες email & έτοιμα πρότυπα',
-    body: `${CAMPAIGN_TEMPLATE_COUNT} σχεδιασμένα πρότυπα (προσφορές, εκδρομές, πακέτα, κύκλος ζωής πελάτη) — επιλέγετε, προσαρμόζετε το brand και στέλνετε σε λίστες πελατών.`,
-    hook: 'Ενημερωτικά & προσφορές χωρίς σχεδιαστή ή εξωτερικό εργαλείο',
-  },
   {
     id: 'bookings',
     icon: 'confirmation_number',
     accent: 'sky',
     visual: 'qr',
+    lane: 'buses',
     title: 'Online κρατήσεις & QR',
     body: 'Ο πελάτης κλείνει θέση online. Ο οδηγός σκανάρει QR — χωρίς χαρτί, χωρίς λίστες στο χέρι.',
-    hook: 'Λιγότερες ακυρώσεις, γρηγορότερο check-in',
+    hook: 'Γρηγορότερο check-in στην αναχώρηση',
   },
   {
     id: 'gps',
     icon: 'map',
-    accent: 'emerald',
+    accent: 'sky',
     visual: 'gps',
-    title: 'Ζωντανό GPS & τηλεματική',
-    body: 'Βλέπετε όλο τον στόλο σε χάρτη, εκτιμώμενη άφιξη για επιβάτες, ειδοποιήσεις ζώνης και ιστορικό διαδρομών.',
-    hook: 'Ο πελάτης εμπιστεύεται — εσείς ελέγχετε',
+    lane: 'buses',
+    title: 'Ζωντανό GPS λεωφορείου',
+    body: 'Στόλος στον χάρτη, εκτιμώμενη άφιξη, ειδοποιήσεις ζώνης και ιστορικό διαδρομών.',
+    hook: 'Ελέγχετε τη διαδρομή σε πραγματικό χρόνο',
   },
   {
-    id: 'panel',
-    icon: 'dashboard',
-    accent: 'indigo',
+    id: 'fleet',
+    icon: 'directions_bus',
+    accent: 'sky',
     visual: 'panel',
-    title: 'Πίνακας ελέγχου για το γραφείο',
-    body: 'Εκδρομές, πελάτες, στόλος, καμπάνιες email, απωλεσθέντα — όλα σε ένα πίσω γραφείο.',
-    hook: 'Η ομάδα σας δουλεύει από ένα σημείο',
+    lane: 'buses',
+    title: 'Στόλος & θέσεις',
+    body: 'Λεωφορεία, πληρότητα και εκδρομές στο ίδιο πίσω γραφείο — έτοιμα για το site σας.',
+    hook: 'Λιγότερα τηλέφωνα την ώρα της αναχώρησης',
   },
   {
     id: 'rent',
     icon: 'car_rental',
     accent: 'teal',
     visual: 'rent',
-    title: 'Ενοικιάσεις οχημάτων',
-    body: 'Ξεχωριστό συμβόλαιο ή πρόσθετο: εφαρμογή ενοικιάσεων, SOS, οδική βοήθεια 24/7, ασφάλειες, κοινή χρήση διαδρομής και λίστα ελέγχου — για πελάτες που νοικιάζουν.',
-    hook: 'Ίδια πλατφόρμα · ξεχωριστή υπηρεσία & τιμολόγηση',
+    lane: 'rent',
+    title: 'Σελίδα ενοικιάσεων',
+    body: 'Ξεχωριστή πόρτα /rent: στόλος αυτοκινήτων, ημερομηνίες, τιμές — χωρίς να μπερδεύεται με τις εκδρομές.',
+    hook: 'Ίδια πλατφόρμα · ξεχωριστή εμπειρία πελάτη',
   },
   {
-    id: 'billing',
-    icon: 'payments',
-    accent: 'amber',
+    id: 'rent-safety',
+    icon: 'sos',
+    accent: 'teal',
+    visual: 'gps',
+    lane: 'rent',
+    title: 'SOS & ασφάλειες',
+    body: 'Οδική βοήθεια 24/7, CDW/SCDW πριν την υπογραφή και live τοποθεσία όταν χρειάζεται.',
+    hook: 'Καθαρή ασφάλεια πριν φύγει το όχημα',
+  },
+  {
+    id: 'rent-sign',
+    icon: 'draw',
+    accent: 'teal',
     visual: 'billing',
-    title: 'Συμβόλαιο μηνιαίο ή ετήσιο',
-    body: 'Ηλεκτρονικές χρεώσεις με μέτρηση χρήσης για λεωφορεία & εκδρομές. Επιλέγετε πλάνο — ξεκινάτε σε λίγα λεπτά.',
-    hook: 'Προβλέψιμο κόστος, κλιμάκωση χωρίς πόνο',
+    lane: 'rent',
+    title: 'Ψηφιακό συμβόλαιο',
+    body: 'Υπογραφή, checklist και έγγραφα στην ίδια ροή — χωρίς χαρτιά στο γραφείο.',
+    hook: 'Παραλαβή σε λίγα λεπτά',
   },
   {
     id: 'brand',
     icon: 'palette',
-    accent: 'rose',
+    accent: 'sky',
     visual: 'brand',
-    title: 'Δική σας βιτρίνα με το brand σας',
-    body: 'Το δικό σας λογότυπο, χρώματα και αρχική σελίδα. Ο επιβάτης βλέπει το brand σας — όχι γενική πύλη.',
-    hook: 'Επαγγελματική εικόνα από την πρώτη μέρα',
+    lane: 'shared',
+    title: 'Δική σας βιτρίνα',
+    body: 'Λογότυπο, χρώματα και αρχική με το brand του γραφείου σας — όχι γενική πύλη.',
+    hook: 'Ο πελάτης βλέπει εσάς',
+  },
+  {
+    id: 'email',
+    icon: 'campaign',
+    accent: 'sky',
+    visual: 'email',
+    lane: 'shared',
+    title: 'Email καμπάνιες',
+    body: `${CAMPAIGN_TEMPLATE_COUNT}+ έτοιμα πρότυπα για προσφορές εκδρομών και ενοικιάσεων.`,
+    hook: 'Χωρίς Word και χωρίς εξωτερικό εργαλείο',
+  },
+  {
+    id: 'billing',
+    icon: 'payments',
+    accent: 'teal',
+    visual: 'billing',
+    lane: 'shared',
+    title: 'Συμβόλαιο ανά υπηρεσία',
+    body: 'Πλάνο λεωφορείων, add-on Rent ή μόνο Ενοικιάσεις — μηνιαίο ή ετήσιο.',
+    hook: 'Πληρώνετε ό,τι ανοίγετε',
   },
 ];
+
+export const FEATURE_LANES = {
+  buses: {
+    kicker: 'Λεωφορεία',
+    title: 'Εκδρομές από κράτηση έως GPS',
+    href: '#session-buses',
+  },
+  rent: {
+    kicker: 'Ενοικιάσεις',
+    title: 'Αυτοκίνητα με SOS και συμβόλαιο',
+    href: '#session-rent',
+  },
+  shared: {
+    kicker: 'Κοινά',
+    title: 'Ό,τι μοιράζονται και οι δύο πόρτες',
+    href: '#pricing',
+  },
+};
 
 export const STEPS = [
   {
     step: '01',
-    title: 'Επιλέγετε συμβόλαιο',
-    body: 'Μηνιαίο ή ετήσιο · Starter, Professional, Enterprise ή μόνο Ενοικιάσεις.',
+    title: 'Επιλέγετε πόρτες',
+    body: 'Λεωφορεία, Ενοικιάσεις, ή και τα δύο — με το συμβόλαιο που σας ταιριάζει.',
   },
   {
     step: '02',
-    title: 'Ρυθμίζετε το γραφείο',
-    body: 'Εμφάνιση brand, εκδρομές, στόλος, οδηγοί, καμπάνιες — μέσα σε ώρες, όχι μήνες.',
+    title: 'Βάζετε το brand σας',
+    body: 'Site, χρώματα, στόλος και εκδρομές ή οχήματα — μέσα σε ώρες, όχι μήνες.',
   },
   {
     step: '03',
-    title: 'Πουλάτε & εκτελείτε',
-    body: 'Οι πελάτες κλείνουν online · εσείς διαχειρίζεστε από τον πίνακα ελέγχου.',
+    title: 'Πουλάτε online',
+    body: 'Ο πελάτης κλείνει εκδρομή ή ενοικίαση · εσείς δουλεύετε από έναν πίνακα.',
   },
 ];
 
+/** Audience — δύο στήλες, μία ανά υπηρεσία (όχι 6 ίδια cards). */
+export const AUDIENCE = {
+  kicker: 'Για ποιον είναι',
+  title: 'Αναγνωρίζετε τον εαυτό σας;',
+  support: 'Ίδια πλατφόρμα · δύο πόρτες. Διαλέξτε ό,τι τρέχει το γραφείο σας σήμερα.',
+  close:
+    'Αν απαντήσατε «ναι» σε κάτι — ανοίγετε λεωφορεία, ενοικιάσεις, ή και τα δύο, με το δικό σας brand.',
+  buses: {
+    kicker: 'Λεωφορεία',
+    title: 'Τρέχετε εκδρομές και θέλετε τάξη στην αναχώρηση',
+    href: '#session-buses',
+    points: [
+      { icon: 'language', text: 'Έχετε site, αλλά οι κρατήσεις έρχονται ακόμα στο τηλέφωνο' },
+      { icon: 'table_chart', text: 'Excel για λίστες επιβατών και πληρότητα' },
+      { icon: 'my_location', text: 'Θέλετε GPS χωρίς δεύτερο συνδρομητικό' },
+    ],
+  },
+  rent: {
+    kicker: 'Ενοικιάσεις',
+    title: 'Θέλετε αυτοκίνητα δίπλα στα λεωφορεία — καθαρά',
+    href: '#session-rent',
+    points: [
+      { icon: 'car_rental', text: 'Ενοικιάσεις χωρίς να μπερδεύονται με τις εκδρομές' },
+      { icon: 'shield', text: 'Ασφάλειες και υπογραφή πριν φύγει το όχημα' },
+      { icon: 'sos', text: 'SOS και οδική βοήθεια όταν ο πελάτης είναι στον δρόμο' },
+    ],
+  },
+};
+
+/** @deprecated Prefer AUDIENCE — kept for older imports/tests. */
 export const AUDIENCE_HOOKS = [
-  {
-    text: 'Έχετε ήδη site αλλά κρατήσεις στο τηλέφωνο;',
-    icon: 'language',
-    accent: 'violet',
-  },
-  {
-    text: 'Χρησιμοποιείτε Excel για εκδρομές και λίστες επιβατών;',
-    icon: 'table_chart',
-    accent: 'sky',
-  },
-  {
-    text: 'Θέλετε GPS χωρίς ξεχωριστό συνδρομητικό;',
-    icon: 'my_location',
-    accent: 'emerald',
-  },
-  {
-    text: 'Στέλνετε ενημερωτικά με αντιγραφή από Word ή χωρίς πρότυπα;',
-    icon: 'campaign',
-    accent: 'amber',
-  },
-  {
-    text: 'Χρειάζεστε εργαλεία έτοιμα για προστασία δεδομένων πελατών;',
-    icon: 'verified_user',
-    accent: 'indigo',
-  },
-  {
-    text: 'Θέλετε και ενοικιάσεις οχημάτων δίπλα στα λεωφορεία;',
-    icon: 'car_rental',
-    accent: 'emerald',
-  },
+  ...AUDIENCE.buses.points.map((p) => ({ text: p.text, icon: p.icon, accent: 'sky' })),
+  ...AUDIENCE.rent.points.map((p) => ({ text: p.text, icon: p.icon, accent: 'teal' })),
 ];

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AUDIENCE_HOOKS,
+  AUDIENCE,
   FEATURES,
+  FEATURE_LANES,
   FEATURES_BACKGROUND_IMAGE,
   HERO,
   HERO_BACKGROUND_IMAGE,
@@ -13,17 +14,7 @@ import {
 import { mergeRentPlanCatalog } from '../../lib/billing/planCatalog.js';
 import { fetchPublicRentPlanCatalog } from '../../services/rentPlanCatalogApi.js';
 import AgencyPlansHook from './AgencyPlansHook.jsx';
-import { FeatureVisual } from './FeatureVisuals.jsx';
-
-const FEATURE_ICON_STYLES = {
-  violet: 'bg-[#f5f5f7] text-[#6e6e73]',
-  sky: 'bg-[#f5f5f7] text-[#6e6e73]',
-  emerald: 'bg-[#f5f5f7] text-[#6e6e73]',
-  teal: 'bg-[#f5f5f7] text-[#6e6e73]',
-  indigo: 'bg-[#f5f5f7] text-[#6e6e73]',
-  amber: 'bg-[#f5f5f7] text-[#6e6e73]',
-  rose: 'bg-[#f5f5f7] text-[#6e6e73]',
-};
+import '../../styles/platform-landing-rest.css';
 
 export function HeroSection() {
   return (
@@ -121,214 +112,145 @@ export function HeroSection() {
 
 export function PainPointsSection() {
   return (
-    <section className="relative py-20 md:py-28 overflow-hidden bg-[#f5f7fb] border-y border-slate-200/70 text-slate-900">
-      <div
-        className="absolute inset-0 pointer-events-none"
-        aria-hidden
-        style={{
-          backgroundImage:
-            'radial-gradient(ellipse 90% 55% at 50% -15%, rgba(99,102,241,0.10), transparent 58%), radial-gradient(ellipse 50% 35% at 0% 80%, rgba(14,165,233,0.06), transparent 55%), radial-gradient(ellipse 45% 30% at 100% 90%, rgba(99,102,241,0.05), transparent 50%)',
-        }}
-      />
-      <div
-        className="absolute inset-0 opacity-40 pointer-events-none"
-        aria-hidden
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(148,163,184,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.12) 1px, transparent 1px)',
-          backgroundSize: '44px 44px',
-          maskImage: 'linear-gradient(180deg, black 0%, transparent 92%)',
-          WebkitMaskImage: 'linear-gradient(180deg, black 0%, transparent 92%)',
-        }}
-      />
-
-      <div className="relative max-w-6xl mx-auto px-4 md:px-8">
-        <div className="text-center max-w-2xl mx-auto mb-12 md:mb-16">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100/90 border border-indigo-200/70 text-xs font-bold uppercase tracking-wider text-indigo-700 mb-5">
-            <span className="material-symbols-outlined text-[16px]">groups</span>
-            Για ποιον είναι
-          </span>
-          <h2 className="text-2xl md:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
-            Αναγνωρίζετε τον εαυτό σας;
-          </h2>
-          <p className="text-slate-600 mt-3 text-base md:text-lg leading-relaxed">
-            Έξι καθημερινές προκλήσεις που λύνουμε με μία πλατφόρμα.
+    <section className="pg-rest pg-audience" aria-labelledby="audience-title">
+      <div className="pg-audience-inner">
+        <div className="pg-audience-head">
+          <p className="pg-audience-kicker">
+            <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 16 }}>
+              groups
+            </span>
+            {AUDIENCE.kicker}
           </p>
+          <h2 id="audience-title">{AUDIENCE.title}</h2>
+          <p>{AUDIENCE.support}</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 max-w-5xl mx-auto">
-          {AUDIENCE_HOOKS.map((item, index) => {
-            const iconStyle = FEATURE_ICON_STYLES[item.accent] || FEATURE_ICON_STYLES.indigo;
-
-            return (
-              <article
-                key={item.text}
-                className="group relative flex flex-col gap-4 p-6 md:p-7 rounded-[22px] bg-gradient-to-br from-indigo-50/90 via-white to-sky-50/70 border border-indigo-200/70 shadow-[0_8px_28px_rgba(79,91,213,0.08)] hover:shadow-[0_16px_40px_rgba(79,91,213,0.14)] hover:border-indigo-300 hover:-translate-y-1 transition-all duration-300"
-              >
-                <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ${iconStyle}`}
-                >
-                  <span className="material-symbols-outlined text-[24px] font-light" aria-hidden>
-                    {item.icon}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[15px] md:text-base font-semibold text-slate-800 leading-snug group-hover:text-slate-900">
-                    {item.text}
-                  </p>
-                  <span className="inline-flex items-center gap-1 mt-3 text-xs font-bold text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                    Ναι — αυτό λύνουμε
-                  </span>
-                </div>
-                <div
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-indigo-100/90 text-indigo-500 flex items-center justify-center text-xs font-black"
-                  aria-hidden
-                >
-                  {index + 1}
-                </div>
-              </article>
-            );
-          })}
+        <div className="pg-audience-grid">
+          {[
+            { key: 'buses', lane: AUDIENCE.buses, mod: 'buses', icon: 'directions_bus' },
+            { key: 'rent', lane: AUDIENCE.rent, mod: 'rent', icon: 'car_rental' },
+          ].map(({ key, lane, mod, icon }) => (
+            <article key={key} className={`pg-audience-lane pg-audience-lane--${mod}`}>
+              <p className="pg-audience-lane-kicker">
+                <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 15 }}>
+                  {icon}
+                </span>
+                {lane.kicker}
+              </p>
+              <h3>{lane.title}</h3>
+              <ul>
+                {lane.points.map((point) => (
+                  <li key={point.text}>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      {point.icon}
+                    </span>
+                    <span>{point.text}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href={lane.href} className="pg-audience-lane-link">
+                {mod === 'buses' ? 'Πίσω στις εκδρομές' : 'Πίσω στις ενοικιάσεις'}
+                <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 18 }}>
+                  arrow_upward
+                </span>
+              </a>
+            </article>
+          ))}
         </div>
 
-        <div className="mt-12 md:mt-16 max-w-2xl mx-auto text-center">
-          <div className="inline-flex flex-col items-center gap-4 px-8 py-6 rounded-[24px] bg-gradient-to-br from-indigo-50 to-sky-50 border border-indigo-200/80 shadow-[0_8px_32px_rgba(99,102,241,0.08)] text-slate-800">
-            <span className="material-symbols-outlined text-[28px] text-indigo-500">handshake</span>
-            <p className="text-sm md:text-base text-slate-600 leading-relaxed font-medium">
-              Αν απαντήσατε «ναι» σε οποιοδήποτε — η πλατφόρμα είναι φτιαγμένη για εσάς, όχι για ένα
-              μεμονωμένο brand.
-            </p>
-          </div>
-        </div>
+        <p className="pg-audience-close">{AUDIENCE.close}</p>
       </div>
     </section>
   );
 }
 
 export function FeaturesSection() {
+  const lanes = useMemo(() => {
+    const byLane = { buses: [], rent: [], shared: [] };
+    for (const feature of FEATURES) {
+      const key = feature.lane && byLane[feature.lane] ? feature.lane : 'shared';
+      byLane[key].push(feature);
+    }
+    return ['buses', 'rent', 'shared'].map((id) => ({
+      id,
+      meta: FEATURE_LANES[id],
+      items: byLane[id],
+    }));
+  }, []);
+
   return (
-    <section
-      id="features"
-      className="relative isolate overflow-hidden py-24 md:py-32 antialiased"
-      style={{
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
-      }}
-    >
-      <div className="absolute inset-0 -z-10" aria-hidden>
-        <img
-          src={FEATURES_BACKGROUND_IMAGE}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover object-[center_45%] scale-105"
-        />
-        <div className="absolute inset-0 bg-slate-950/60" />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-950/50 to-slate-950/80" />
-        <div
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage:
-              'radial-gradient(ellipse 60% 40% at 50% 0%, rgba(56,189,248,0.18), transparent), radial-gradient(ellipse 40% 30% at 90% 80%, rgba(45,212,191,0.12), transparent)',
-          }}
-        />
+    <section id="features" className="pg-rest pg-features-rest" aria-labelledby="features-title">
+      <div className="pg-features-rest-bg" aria-hidden>
+        <img src={FEATURES_BACKGROUND_IMAGE} alt="" />
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-5 md:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-14 md:mb-16">
-          <p className="inline-flex items-center gap-2 text-sm font-semibold text-sky-200/90 tracking-wide mb-4">
-            <span className="w-8 h-px bg-sky-300/60" aria-hidden />
-            Δυνατότητες
-            <span className="w-8 h-px bg-sky-300/60" aria-hidden />
-          </p>
-          <h2 className="text-[32px] md:text-[46px] font-semibold text-white tracking-[-0.03em] leading-[1.08]">
-            Ό,τι χρειάζεται ένα σύγχρονο γραφείο.
-            <br className="hidden sm:block" />
-            <span className="text-white/70">Όλα ενσωματωμένα.</span>
+      <div className="pg-features-rest-inner">
+        <div className="pg-features-rest-head">
+          <p className="pg-audience-kicker">Δυνατότητες</p>
+          <h2 id="features-title">
+            Δύο πόρτες. Ένας πίνακας.
           </h2>
-          <p className="text-[17px] md:text-[19px] text-white/70 mt-5 leading-relaxed font-normal">
-            Έτοιμη υποδομή για περισσότερες εκδρομές με λιγότερη διαχείριση.
+          <p>
+            Λεωφορεία για εκδρομές, ενοικιάσεις για αυτοκίνητα — και κοινά εργαλεία brand, email και
+            συμβολαίου.
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 items-stretch">
-          {FEATURES.map((f, index) => {
-            const iconStyle = FEATURE_ICON_STYLES[f.accent] || FEATURE_ICON_STYLES.indigo;
-            const wide = index === FEATURES.length - 1;
-            return (
-              <article
-                key={f.id || f.title}
-                className={`group h-full flex flex-col rounded-[20px] bg-white/95 overflow-hidden shadow-[0_8px_28px_rgba(0,0,0,0.16)] ring-1 ring-white/30 hover:shadow-[0_12px_36px_rgba(0,0,0,0.2)] transition-shadow duration-300 ease-out ${
-                  wide ? 'sm:col-span-2 lg:col-span-1' : ''
-                }`}
-                style={{
-                  animation: `featFadeUp 0.55s ease ${Math.min(index, 6) * 0.04}s both`,
-                }}
-              >
-                <FeatureVisual kind={f.visual} />
-                <div className="flex flex-col flex-1 p-5 md:p-6 pt-4">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div
-                      className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 ${iconStyle}`}
-                    >
-                      <span className="material-symbols-outlined text-[20px] font-light" aria-hidden>
-                        {f.icon}
-                      </span>
+        <div className="pg-features-lanes">
+          {lanes.map((lane) => (
+            <article key={lane.id} className={`pg-features-lane pg-features-lane--${lane.id}`}>
+              <p className="pg-features-lane-kicker">{lane.meta.kicker}</p>
+              <h3>{lane.meta.title}</h3>
+              <ul>
+                {lane.items.map((item) => (
+                  <li key={item.id}>
+                    <span className="material-symbols-outlined" aria-hidden>
+                      {item.icon}
+                    </span>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span>{item.body}</span>
                     </div>
-                    <h3 className="text-[17px] font-semibold text-[#1d1d1f] tracking-[-0.02em] leading-snug pt-1">
-                      {f.title}
-                    </h3>
-                  </div>
-                  <p className="text-[14px] text-[#6e6e73] leading-[1.5] flex-1">{f.body}</p>
-                  <p className="text-[12.5px] font-medium text-[#0071e3] mt-4 leading-snug inline-flex items-center gap-1">
-                    {f.hook}
-                    <span className="material-symbols-outlined text-[15px] opacity-60">arrow_forward</span>
-                  </p>
-                </div>
-              </article>
-            );
-          })}
+                  </li>
+                ))}
+              </ul>
+              <a href={lane.meta.href} className="pg-features-lane-link">
+                {lane.id === 'shared' ? 'Δείτε τιμές' : 'Πίσω στο session'}
+                <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 17 }}>
+                  {lane.id === 'shared' ? 'arrow_downward' : 'arrow_upward'}
+                </span>
+              </a>
+            </article>
+          ))}
         </div>
       </div>
-
-      <style>{`
-        @keyframes featFadeUp {
-          from { opacity: 0; transform: translateY(18px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </section>
   );
 }
 
 export function HowItWorksSection() {
   return (
-    <section className="py-20 md:py-24 bg-white text-slate-900 border-y border-slate-200/70">
-      <div className="max-w-6xl mx-auto px-4 md:px-8">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-[#1d1d1f]">
-            Πώς ξεκινάτε
-          </h2>
-          <p className="text-[#86868b] mt-3 text-[17px]">Τρία βήματα · χωρίς IT ομάδα</p>
+    <section className="pg-rest pg-how" aria-labelledby="how-title">
+      <div className="pg-how-inner">
+        <div className="pg-how-head">
+          <h2 id="how-title">Πώς ξεκινάτε</h2>
+          <p>Τρία βήματα · λεωφορεία, ενοικιάσεις, ή και τα δύο</p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          {STEPS.map((s, i) => (
-            <div key={s.step} className="relative">
-              {i < STEPS.length - 1 && (
-                <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-slate-200" />
-              )}
-              <span className="text-4xl font-black text-slate-200">{s.step}</span>
-              <h3 className="text-xl font-bold mt-2 mb-2 text-[#1d1d1f]">{s.title}</h3>
-              <p className="text-sm text-[#6e6e73] leading-relaxed">{s.body}</p>
+        <div className="pg-how-steps">
+          {STEPS.map((s) => (
+            <div key={s.step}>
+              <span className="pg-how-step-num">{s.step}</span>
+              <h3>{s.title}</h3>
+              <p>{s.body}</p>
             </div>
           ))}
         </div>
-        <div className="text-center mt-12">
-          <Link
-            to="/grafeia"
-            className="inline-flex items-center gap-2 px-8 py-3.5 bg-sky-500 hover:bg-sky-400 text-white rounded-full font-bold transition-colors"
-          >
+        <div className="pg-how-cta">
+          <Link to="/grafeia">
             Δείτε συμβόλαια & τιμές
-            <span className="material-symbols-outlined">payments</span>
+            <span className="material-symbols-outlined" aria-hidden>
+              payments
+            </span>
           </Link>
         </div>
       </div>
@@ -449,27 +371,23 @@ export function RentProductSection() {
 
 export function FinalCtaSection() {
   return (
-    <section className="py-20 px-4 md:px-8">
-      <div className="max-w-4xl mx-auto text-center rounded-[32px] bg-gradient-to-br from-indigo-600 to-violet-700 p-10 md:p-14 text-white shadow-2xl">
-        <h2 className="text-2xl md:text-3xl font-bold mb-4">
-          Έτοιμοι να ξεκινήσετε;
-        </h2>
-        <p className="text-white/80 mb-8 max-w-lg mx-auto">
-          Ζητήστε συμβόλαιο και ξεκινήστε — η πλατφόρμα δουλεύει από την πρώτη μέρα.
+    <section className="pg-rest pg-final" aria-labelledby="final-cta-title">
+      <div className="pg-final-panel">
+        <h2 id="final-cta-title">Έτοιμοι να ανοίξετε τις πόρτες σας;</h2>
+        <p>
+          Επιλέξτε συμβόλαιο για λεωφορεία, ενοικιάσεις, ή και τα δύο — με το brand του γραφείου σας
+          από την πρώτη μέρα.
         </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Link
-            to="/grafeia"
-            className="px-8 py-3.5 bg-white text-indigo-900 rounded-full font-bold hover:opacity-95"
-          >
+        <div className="pg-final-actions">
+          <Link to="/grafeia" className="pg-final-cta-btn pg-final-cta-btn--primary">
             Επιλογή συμβολαίου
           </Link>
-          <Link
-            to="/rent"
-            className="px-8 py-3.5 border border-white/40 rounded-full font-bold hover:bg-white/10"
-          >
-            Δείτε τις ενοικιάσεις
-          </Link>
+          <a href="#session-buses" className="pg-final-cta-btn pg-final-cta-btn--buses">
+            Λεωφορεία
+          </a>
+          <a href="#session-rent" className="pg-final-cta-btn pg-final-cta-btn--rent">
+            Ενοικιάσεις
+          </a>
         </div>
       </div>
     </section>
