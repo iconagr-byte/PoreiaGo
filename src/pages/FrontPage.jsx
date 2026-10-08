@@ -1,10 +1,10 @@
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
 import PlatformMarketingHeader from '../components/marketing/PlatformMarketingHeader.jsx';
 import PlatformOpsShowcase from '../components/marketing/PlatformOpsShowcase.jsx';
+import PlatformServiceHub from '../components/marketing/PlatformServiceHub.jsx';
 import {
   FeaturesSection,
   FinalCtaSection,
-  HeroSection,
   HowItWorksSection,
   PainPointsSection,
   PricingTeaserSection,
@@ -24,7 +24,7 @@ export default function FrontPage() {
       <PlatformMarketingHeader />
 
       <main>
-        <HeroSection />
+        <PlatformServiceHub />
         <PlatformOpsShowcase />
         <PainPointsSection />
         <FeaturesSection />
@@ -46,6 +46,9 @@ export default function FrontPage() {
               <span className="text-[11px] font-bold uppercase tracking-wider text-sky-300/80">
                 Λεωφορεία
               </span>
+              <a href="#platform-ops" className="hover:text-white">
+                Εκδρομές & στόλος
+              </a>
               <a href="#platform-trips" className="hover:text-white">
                 Εκδρομές
               </a>

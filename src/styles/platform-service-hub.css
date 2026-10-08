@@ -1,0 +1,240 @@
+/* PoreiaGo homepage service hub — brand + two doors */
+
+.pg-hub {
+  --pg-hub-sky: #38bdf8;
+  --pg-hub-cyan: #67e8f9;
+  --pg-hub-teal: #2dd4bf;
+  --pg-hub-ink: #f8fafc;
+  --pg-hub-muted: rgba(248, 250, 252, 0.72);
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: #020617;
+  color: var(--pg-hub-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica,
+    sans-serif;
+}
+
+.pg-hub-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.pg-hub-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.04);
+  animation: pgHubKen 22s ease-in-out infinite alternate;
+}
+
+.pg-hub-media-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(105deg, rgba(2, 6, 23, 0.92) 0%, rgba(2, 6, 23, 0.78) 42%, rgba(2, 6, 23, 0.42) 100%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.55) 0%, transparent 38%, rgba(2, 6, 23, 0.88) 100%);
+}
+
+.pg-hub-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 65% 45% at 18% 28%, rgba(56, 189, 248, 0.16), transparent 60%);
+}
+
+.pg-hub-inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 7.5rem 1rem 4.5rem;
+}
+
+@media (min-width: 768px) {
+  .pg-hub-inner {
+    padding: 8.5rem 2rem 5.5rem;
+  }
+}
+
+.pg-hub-copy {
+  max-width: 36rem;
+}
+
+.pg-hub-brand {
+  display: block;
+  margin: 0 0 1.25rem;
+  font-size: clamp(2.75rem, 8vw, 4.75rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  color: #fff;
+  animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pg-hub-brand-accent {
+  background: linear-gradient(105deg, var(--pg-hub-sky) 0%, var(--pg-hub-cyan) 45%, var(--pg-hub-teal) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pg-hub-headline {
+  margin: 0 0 0.85rem;
+  font-size: clamp(1.35rem, 3.2vw, 1.85rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.92);
+  animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+.pg-hub-support {
+  margin: 0 0 2rem;
+  max-width: 30rem;
+  font-size: clamp(1rem, 2.2vw, 1.125rem);
+  line-height: 1.55;
+  color: var(--pg-hub-muted);
+  animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
+}
+
+.pg-hub-doors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  animation: pgHubRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+}
+
+.pg-hub-door {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-height: 3.75rem;
+  padding: 0.85rem 1.35rem 0.85rem 1.1rem;
+  border-radius: 999px;
+  text-decoration: none;
+  transition:
+    transform 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.pg-hub-door:hover {
+  transform: translateY(-2px);
+}
+
+.pg-hub-door:focus-visible {
+  outline: 2px solid var(--pg-hub-sky);
+  outline-offset: 3px;
+}
+
+.pg-hub-door-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  font-size: 1.25rem;
+}
+
+.pg-hub-door-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  line-height: 1.15;
+}
+
+.pg-hub-door-copy strong {
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.pg-hub-door-copy span {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.78;
+}
+
+.pg-hub-door-arrow {
+  font-size: 1.15rem;
+  opacity: 0.75;
+  margin-left: 0.15rem;
+}
+
+.pg-hub-door--buses {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+}
+
+.pg-hub-door--buses .pg-hub-door-icon {
+  background: rgba(14, 165, 233, 0.14);
+  color: #0284c7;
+}
+
+.pg-hub-door--buses:hover {
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+}
+
+.pg-hub-door--rent {
+  background: rgba(45, 212, 191, 0.14);
+  border: 1px solid rgba(45, 212, 191, 0.42);
+  color: #ecfeff;
+}
+
+.pg-hub-door--rent .pg-hub-door-icon {
+  background: rgba(45, 212, 191, 0.18);
+  color: #5eead4;
+}
+
+.pg-hub-door--rent:hover {
+  background: rgba(45, 212, 191, 0.22);
+  border-color: rgba(94, 234, 212, 0.65);
+}
+
+@keyframes pgHubRise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pgHubKen {
+  from {
+    transform: scale(1.04) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.1) translate3d(-1.2%, -0.6%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pg-hub-brand,
+  .pg-hub-headline,
+  .pg-hub-support,
+  .pg-hub-doors,
+  .pg-hub-media img {
+    animation: none !important;
+  }
+
+  .pg-hub-door:hover {
+    transform: none;
+  }
+}
