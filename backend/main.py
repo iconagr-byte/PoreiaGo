@@ -316,6 +316,17 @@ async def lifespan(app: FastAPI):
         __import__("logging").getLogger("poreiago.startup").warning(
             "Bookings schema ensure skipped: %s", bookings_exc
         )
+    try:
+        # GDPR Audit Trail 500s when audit_logs.created_at was never migrated.
+        from app.core.database import AsyncSessionLocal as AuditSessionLocal
+        from app.services.ensure_audit_logs_schema import ensure_audit_logs_schema
+
+        async with AuditSessionLocal() as session:
+            await ensure_audit_logs_schema(session)
+    except Exception as audit_exc:
+        __import__("logging").getLogger("poreiago.startup").warning(
+            "Audit logs schema ensure skipped: %s", audit_exc
+        )
     if start_consumer and process_telemetry_payload:
         await start_consumer(process_telemetry_payload)
     try:

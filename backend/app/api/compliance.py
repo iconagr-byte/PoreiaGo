@@ -57,20 +57,47 @@ async def list_audit_logs(
         except ValueError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Invalid action: {action}") from exc
 
-    entries, total = await AuditService(db).list_logs(
-        tenant_id,
-        resource_type=resource_type,
-        resource_id=resource_id,
-        action=action_enum,
-        limit=limit,
-        offset=offset,
-    )
-    return AuditLogListResponse(
-        items=[AuditLogResponse(**audit_log_to_dict(e)) for e in entries],
-        total=total,
-        offset=offset,
-        limit=limit,
-    )
+    async def _load() -> AuditLogListResponse:
+        entries, total = await AuditService(db).list_logs(
+            tenant_id,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            action=action_enum,
+            limit=limit,
+            offset=offset,
+        )
+        return AuditLogListResponse(
+            items=[AuditLogResponse(**audit_log_to_dict(e)) for e in entries],
+            total=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    try:
+        return await _load()
+    except Exception as exc:
+        from app.services.ensure_audit_logs_schema import (
+            ensure_audit_logs_schema,
+            is_audit_logs_schema_drift_error,
+        )
+
+        if not is_audit_logs_schema_drift_error(exc):
+            raise
+        # Heal missing created_at / table, then retry once.
+        await db.rollback()
+        healed = await ensure_audit_logs_schema(db, force=True)
+        if not healed:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Audit trail schema unavailable — try again after deploy",
+            ) from exc
+        try:
+            return await _load()
+        except Exception as retry_exc:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Audit trail temporarily unavailable",
+            ) from retry_exc
 
 
 @router.post("/gdpr/export", response_model=GdprExportResponse)
