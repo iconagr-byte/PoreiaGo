@@ -26,7 +26,7 @@ export default function PlatformBusesSession() {
       className="pg-session pg-session--buses"
       aria-labelledby="buses-session-hook"
     >
-      <div className="pg-session-intro">
+      <div className="pg-session-intro pg-session-intro--buses">
         <p className="pg-session-kicker">
           <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 16 }}>
             directions_bus
@@ -37,13 +37,14 @@ export default function PlatformBusesSession() {
           {BUSES_SESSION.hook}
         </h2>
         <p className="pg-session-support">{BUSES_SESSION.support}</p>
-        <ul className="pg-session-points">
+        <ul className="pg-session-benefits" aria-label="Λειτουργίες και παροχές λεωφορείων">
           {BUSES_SESSION.points.map((point) => (
             <li key={point.label}>
               <span className="material-symbols-outlined" aria-hidden>
                 {point.icon}
               </span>
-              {point.label}
+              <strong>{point.label}</strong>
+              {point.detail ? <span>{point.detail}</span> : null}
             </li>
           ))}
         </ul>

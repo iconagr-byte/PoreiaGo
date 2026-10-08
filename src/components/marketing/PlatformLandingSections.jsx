@@ -306,7 +306,7 @@ export function RentProductSection() {
               Νέα υπηρεσία · Rent
             </span>
             <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight">
-              Ενοικιάσεις οχημάτων με SOS, οδική βοήθεια και καθαρή ασφάλεια
+              Ενοικιάσεις οχημάτων με οδική βοήθεια και καθαρή ασφάλεια
             </h2>
             <p className="mt-4 text-base md:text-lg text-teal-50/75 leading-relaxed max-w-xl">
               Ξεχωριστό συμβόλαιο μόνο για Rent, ή add-on πάνω στο πλάνο λεωφορείων. Δες στόλο και
@@ -314,7 +314,7 @@ export function RentProductSection() {
             </p>
             <ul className="mt-6 grid sm:grid-cols-2 gap-2.5 text-sm text-teal-50/90">
               {[
-                'SOS + live τοποθεσία',
+                'Live τοποθεσία όταν χρειάζεται',
                 'Οδική βοήθεια 24/7',
                 'CDW / SCDW πριν την υπογραφή',
                 'Share trip στην οικογένεια',
