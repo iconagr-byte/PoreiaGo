@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { fetchLoginAudits } from '../../services/platformApi.js';
+
+const PAGE_SIZE = 20;
 
 const ACTOR_FILTERS = [
   { id: '', label: 'Όλοι' },
@@ -45,20 +47,23 @@ export default function LoginAuditPanel() {
   const [result, setResult] = useState('');
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchLoginAudits({
-        limit: 150,
+        limit: 500,
         actorType: actorType || undefined,
         success: result === 'ok' ? true : result === 'fail' ? false : undefined,
         q: query || undefined,
       });
       setItems(Array.isArray(data.items) ? data.items : []);
+      setPage(1);
     } catch (err) {
       toast.error(err.message || 'Αποτυχία φόρτωσης συνδέσεων');
       setItems([]);
+      setPage(1);
     } finally {
       setLoading(false);
     }
@@ -68,9 +73,23 @@ export default function LoginAuditPanel() {
     load();
   }, [load]);
 
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return items.slice(start, start + PAGE_SIZE);
+  }, [items, safePage]);
+
+  const rangeStart = items.length ? (safePage - 1) * PAGE_SIZE + 1 : 0;
+  const rangeEnd = Math.min(safePage * PAGE_SIZE, items.length);
+
   const onSearch = (e) => {
     e.preventDefault();
     setQuery(q.trim());
+  };
+
+  const goToPage = (next) => {
+    setPage(Math.max(1, Math.min(totalPages, next)));
   };
 
   return (
@@ -152,77 +171,149 @@ export default function LoginAuditPanel() {
             Δεν υπάρχουν καταγραφές ακόμα. Θα εμφανιστούν μετά την επόμενη σύνδεση.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-black/[0.05]">
-            <table className="w-full min-w-[880px] text-sm">
-              <thead>
-                <tr className="bg-surface-container-low/70 text-left text-[11px] uppercase tracking-wider text-on-surface-variant">
-                  <th className="px-4 py-3 font-bold">Χρόνος</th>
-                  <th className="px-4 py-3 font-bold">Τύπος</th>
-                  <th className="px-4 py-3 font-bold">Χρήστης</th>
-                  <th className="px-4 py-3 font-bold">Αποτέλεσμα</th>
-                  <th className="px-4 py-3 font-bold">IP</th>
-                  <th className="px-4 py-3 font-bold">Συσκευή</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((row) => (
-                  <tr key={row.id} className="border-t border-black/[0.04] hover:bg-surface-container-lowest">
-                    <td className="px-4 py-3 whitespace-nowrap tabular-nums text-on-surface">
-                      {formatWhen(row.at)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold ${actorBadgeClass(
-                          row.actor_type,
-                        )}`}
-                      >
-                        {row.actor_type_label || row.actor_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-on-surface">{row.identity || '—'}</div>
-                      {row.actor_name ? (
-                        <div className="text-xs text-on-surface-variant">{row.actor_name}</div>
-                      ) : null}
-                      {row.method && row.method !== 'password' ? (
-                        <div className="text-[11px] text-gray-400 mt-0.5">{row.method}</div>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3">
-                      {row.success ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-700 font-bold text-xs">
-                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                          Επιτυχία
+          <>
+            <div className="overflow-x-auto rounded-2xl border border-black/[0.05]">
+              <table className="w-full min-w-[880px] text-sm">
+                <thead>
+                  <tr className="bg-surface-container-low/70 text-left text-[11px] uppercase tracking-wider text-on-surface-variant">
+                    <th className="px-4 py-3 font-bold">Χρόνος</th>
+                    <th className="px-4 py-3 font-bold">Τύπος</th>
+                    <th className="px-4 py-3 font-bold">Χρήστης</th>
+                    <th className="px-4 py-3 font-bold">Αποτέλεσμα</th>
+                    <th className="px-4 py-3 font-bold">IP</th>
+                    <th className="px-4 py-3 font-bold">Συσκευή</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageItems.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="border-t border-black/[0.04] hover:bg-surface-container-lowest"
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap tabular-nums text-on-surface">
+                        {formatWhen(row.at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold ${actorBadgeClass(
+                            row.actor_type,
+                          )}`}
+                        >
+                          {row.actor_type_label || row.actor_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-on-surface">{row.identity || '—'}</div>
+                        {row.actor_name ? (
+                          <div className="text-xs text-on-surface-variant">{row.actor_name}</div>
+                        ) : null}
+                        {row.method && row.method !== 'password' ? (
+                          <div className="text-[11px] text-gray-400 mt-0.5">{row.method}</div>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        {row.success ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700 font-bold text-xs">
+                            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                            Επιτυχία
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-rose-700 font-bold text-xs">
+                            <span className="material-symbols-outlined text-[16px]">cancel</span>
+                            Αποτυχία
+                          </span>
+                        )}
+                        {row.detail && !row.success ? (
+                          <div
+                            className="text-[11px] text-rose-500/80 mt-0.5 max-w-[180px] truncate"
+                            title={row.detail}
+                          >
+                            {row.detail}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-on-surface">
+                        {row.ip || '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-on-surface font-medium">{row.device || '—'}</div>
+                        {row.user_agent ? (
+                          <div
+                            className="text-[10px] text-gray-400 max-w-[220px] truncate"
+                            title={row.user_agent}
+                          >
+                            {row.user_agent}
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p className="text-xs text-on-surface-variant tabular-nums">
+                {rangeStart}–{rangeEnd} από {items.length} · σελίδα {safePage} από {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => goToPage(safePage - 1)}
+                  disabled={safePage <= 1}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border border-black/10 bg-white text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                  Προηγούμενη
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((n) => {
+                      if (totalPages <= 7) return true;
+                      if (n === 1 || n === totalPages) return true;
+                      return Math.abs(n - safePage) <= 1;
+                    })
+                    .reduce((acc, n, idx, arr) => {
+                      if (idx > 0 && n - arr[idx - 1] > 1) acc.push('…');
+                      acc.push(n);
+                      return acc;
+                    }, [])
+                    .map((n, idx) =>
+                      n === '…' ? (
+                        <span
+                          key={`gap-${idx}`}
+                          className="px-1 text-xs text-on-surface-variant"
+                        >
+                          …
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-rose-700 font-bold text-xs">
-                          <span className="material-symbols-outlined text-[16px]">cancel</span>
-                          Αποτυχία
-                        </span>
-                      )}
-                      {row.detail && !row.success ? (
-                        <div className="text-[11px] text-rose-500/80 mt-0.5 max-w-[180px] truncate" title={row.detail}>
-                          {row.detail}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-on-surface">{row.ip || '—'}</td>
-                    <td className="px-4 py-3">
-                      <div className="text-on-surface font-medium">{row.device || '—'}</div>
-                      {row.user_agent ? (
-                        <div
-                          className="text-[10px] text-gray-400 max-w-[220px] truncate"
-                          title={row.user_agent}
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => goToPage(n)}
+                          className={`min-w-[32px] h-8 px-2 rounded-full text-xs font-bold transition-colors ${
+                            n === safePage
+                              ? 'bg-gray-900 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
                         >
-                          {row.user_agent}
-                        </div>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          {n}
+                        </button>
+                      ),
+                    )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => goToPage(safePage + 1)}
+                  disabled={safePage >= totalPages}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border border-black/10 bg-white text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Επόμενη
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>
