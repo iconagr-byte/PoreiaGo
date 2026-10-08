@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import {
   HERO_BACKGROUND_IMAGE,
   PLATFORM_NAME,
@@ -7,7 +6,7 @@ import {
 import '../../styles/platform-service-hub.css';
 
 /**
- * Marketing homepage hub — brand-first chooser: buses ops vs rent storefront.
+ * Marketing homepage hub — brand-first chooser: buses session vs rent session.
  */
 export default function PlatformServiceHub() {
   return (
@@ -27,7 +26,7 @@ export default function PlatformServiceHub() {
           <p className="pg-hub-support">{SERVICE_HUB.support}</p>
 
           <div className="pg-hub-doors" role="group" aria-label="Πόρτες υπηρεσιών">
-            <a href="#platform-ops" className="pg-hub-door pg-hub-door--buses">
+            <a href="#session-buses" className="pg-hub-door pg-hub-door--buses">
               <span className="pg-hub-door-icon material-symbols-outlined" aria-hidden>
                 directions_bus
               </span>
@@ -40,7 +39,7 @@ export default function PlatformServiceHub() {
               </span>
             </a>
 
-            <Link to="/rent" className="pg-hub-door pg-hub-door--rent">
+            <a href="#session-rent" className="pg-hub-door pg-hub-door--rent">
               <span className="pg-hub-door-icon material-symbols-outlined" aria-hidden>
                 car_rental
               </span>
@@ -49,9 +48,9 @@ export default function PlatformServiceHub() {
                 <span>{SERVICE_HUB.rentHint}</span>
               </span>
               <span className="pg-hub-door-arrow material-symbols-outlined" aria-hidden>
-                arrow_forward
+                arrow_downward
               </span>
-            </Link>
+            </a>
           </div>
         </div>
       </div>

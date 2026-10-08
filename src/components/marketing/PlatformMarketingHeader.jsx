@@ -5,9 +5,9 @@ import '../../styles/platform-marketing-header.css';
 
 const BUS_LINKS = [
   {
-    href: '#platform-ops',
-    label: 'Εκδρομές & στόλος',
-    hint: 'Προεπισκόπηση λεωφορείων',
+    href: '#session-buses',
+    label: 'Εκδρομές & λεωφορεία',
+    hint: 'Κρατήσεις, GPS, στόλος',
     icon: 'directions_bus',
   },
   {
@@ -126,12 +126,12 @@ export default function PlatformMarketingHeader() {
           <span className="pm-nav-rule" aria-hidden />
 
           <div className="pm-nav-cluster pm-nav-cluster--rent">
-            <Link to="/rent" className="pm-nav-rent" onClick={closeAll}>
+            <a href="#session-rent" className="pm-nav-rent" onClick={closeAll}>
               <span className="material-symbols-outlined" aria-hidden>
                 car_rental
               </span>
               Ενοικιάσεις
-            </Link>
+            </a>
           </div>
 
           <a href="#pricing" className="pm-nav-link" onClick={closeAll}>
@@ -194,13 +194,22 @@ export default function PlatformMarketingHeader() {
                 </span>
                 Ενοικιάσεις
               </p>
+              <a href="#session-rent" className="pm-mobile-link pm-mobile-link--rent" onClick={closeAll}>
+                <span className="material-symbols-outlined" aria-hidden>
+                  car_rental
+                </span>
+                <span>
+                  <strong>Ενοικιάσεις οχημάτων</strong>
+                  <em>SOS · ασφάλεια · συμβόλαιο</em>
+                </span>
+              </a>
               <Link to="/rent" className="pm-mobile-link pm-mobile-link--rent" onClick={closeAll}>
                 <span className="material-symbols-outlined" aria-hidden>
                   open_in_new
                 </span>
                 <span>
                   <strong>Σελίδα ενοικιάσεων</strong>
-                  <em>Στόλος αυτοκινήτων · /rent</em>
+                  <em>Πλήρης εμπειρία · /rent</em>
                 </span>
               </Link>
             </section>

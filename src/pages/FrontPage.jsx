@@ -1,6 +1,7 @@
 import PlatformBrand from '../components/marketing/PlatformBrand.jsx';
+import PlatformBusesSession from '../components/marketing/PlatformBusesSession.jsx';
 import PlatformMarketingHeader from '../components/marketing/PlatformMarketingHeader.jsx';
-import PlatformOpsShowcase from '../components/marketing/PlatformOpsShowcase.jsx';
+import PlatformRentSession from '../components/marketing/PlatformRentSession.jsx';
 import PlatformServiceHub from '../components/marketing/PlatformServiceHub.jsx';
 import {
   FeaturesSection,
@@ -25,7 +26,8 @@ export default function FrontPage() {
 
       <main>
         <PlatformServiceHub />
-        <PlatformOpsShowcase />
+        <PlatformBusesSession />
+        <PlatformRentSession />
         <PainPointsSection />
         <FeaturesSection />
         <HowItWorksSection />
@@ -46,8 +48,8 @@ export default function FrontPage() {
               <span className="text-[11px] font-bold uppercase tracking-wider text-sky-300/80">
                 Λεωφορεία
               </span>
-              <a href="#platform-ops" className="hover:text-white">
-                Εκδρομές & στόλος
+              <a href="#session-buses" className="hover:text-white">
+                Εκδρομές & λεωφορεία
               </a>
               <a href="#platform-trips" className="hover:text-white">
                 Εκδρομές
@@ -63,6 +65,9 @@ export default function FrontPage() {
               <span className="text-[11px] font-bold uppercase tracking-wider text-teal-300/80">
                 Ενοικιάσεις
               </span>
+              <a href="#session-rent" className="hover:text-white">
+                Ενοικιάσεις οχημάτων
+              </a>
               <Link to="/rent" className="hover:text-white">
                 Σελίδα Rent
               </Link>
