@@ -5,6 +5,12 @@ import '../../styles/platform-marketing-header.css';
 
 const BUS_LINKS = [
   {
+    href: '#platform-ops',
+    label: 'Εκδρομές & στόλος',
+    hint: 'Προεπισκόπηση λεωφορείων',
+    icon: 'directions_bus',
+  },
+  {
     href: '#platform-trips',
     label: 'Εκδρομές',
     hint: 'Κάρτες ταξιδιών & κρατήσεις',

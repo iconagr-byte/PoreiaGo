@@ -11,6 +11,16 @@ export const HERO = {
     'Το γραφείο σας με δική του επωνυμία, δικό του ιστότοπο και δικό του συμβόλαιο.',
 };
 
+/** Homepage hub — δύο πόρτες (λεωφορεία / ενοικιάσεις), όχι κατευθείαν στα buses. */
+export const SERVICE_HUB = {
+  headline: 'Επιλέξτε υπηρεσία',
+  support: 'Εκδρομές με λεωφορεία ή ενοικιάσεις οχημάτων — ίδια πλατφόρμα, δύο ξεχωριστές πόρτες.',
+  busesLabel: 'Εκδρομές & λεωφορεία',
+  busesHint: 'Κρατήσεις · GPS · στόλος',
+  rentLabel: 'Ενοικιάσεις',
+  rentHint: 'Στόλος αυτοκινήτων · /rent',
+};
+
 /** Hero background — πλήρες cover, χωρίς demo εκδρομή */
 export const HERO_BACKGROUND_IMAGE =
   'https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?auto=format&fit=crop&w=2000&q=85';
