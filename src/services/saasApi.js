@@ -217,6 +217,13 @@ export async function saasLogin({ email, password, tenantSlug, tenantId, mfaCode
   return { ...data, roles };
 }
 
+/** Best-effort email from a Google GIS id_token (unverified decode for session label). */
+function emailFromGoogleIdToken(idToken) {
+  const payload = decodeJwtPayload(idToken);
+  const email = String(payload?.email || '').trim().toLowerCase();
+  return email || undefined;
+}
+
 /** POST /api/v1/auth/google — admin Back Office Google Sign-In. */
 export async function saasGoogleLogin({ idToken, tenantSlug, tenantId, email }) {
   let res;
@@ -237,10 +244,15 @@ export async function saasGoogleLogin({ idToken, tenantSlug, tenantId, email }) 
   const data = await res.json();
   const resolvedTenantId =
     data.tenant_id || decodeJwtPayload(data.access_token)?.tenant_id || DEV_TENANT;
+  const resolvedEmail =
+    email ||
+    emailFromGoogleIdToken(idToken) ||
+    getSaasUserEmail() ||
+    undefined;
   setSaasSession({
     accessToken: data.access_token,
     tenantId: resolvedTenantId,
-    email: email || getSaasUserEmail() || undefined,
+    email: resolvedEmail,
   });
   if (Array.isArray(data.roles) && data.roles.length) {
     storeSaasRoles(data.roles);
