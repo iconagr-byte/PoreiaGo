@@ -23,54 +23,76 @@ export const SERVICE_HUB = {
 };
 
 /** Below-hub sessions — ένα καθαρό block ανά υπηρεσία. */
+const BUSES_SESSION_GROUPS = [
+  {
+    id: 'sell',
+    label: 'Πουλάτε',
+    items: [
+      {
+        icon: 'confirmation_number',
+        label: 'Online κρατήσεις',
+        detail: 'Τιμές, ημερομηνίες και πληρωμή στο site σας',
+      },
+      {
+        icon: 'event_seat',
+        label: 'Χάρτης θέσεων',
+        detail: 'Πληρότητα και επιλογή θέσης σε πραγματικό χρόνο',
+      },
+      {
+        icon: 'campaign',
+        label: 'Email καμπάνιες',
+        detail: 'Έτοιμα πρότυπα για προσφορές εκδρομών',
+      },
+    ],
+  },
+  {
+    id: 'board',
+    label: 'Επιβιβάζετε',
+    items: [
+      {
+        icon: 'qr_code_2',
+        label: 'QR εισιτήρια',
+        detail: 'Check-in χωρίς χαρτί και χωρίς λίστες στο χέρι',
+      },
+      {
+        icon: 'account_balance_wallet',
+        label: 'My Wallet',
+        detail: 'Το εισιτήριο στο κινητό — χωρίς ψάξιμο στο email',
+      },
+      {
+        icon: 'badge',
+        label: 'Εφαρμογή οδηγού',
+        detail: 'Επιβάτες, επιβίβαση και βάρδια στο κινητό',
+      },
+    ],
+  },
+  {
+    id: 'run',
+    label: 'Τρέχετε',
+    items: [
+      {
+        icon: 'directions_bus',
+        label: 'Στόλος λεωφορείων',
+        detail: 'Οχήματα και ανέσεις όπως τα βλέπει ο πελάτης',
+      },
+      {
+        icon: 'dashboard',
+        label: 'Πίνακας γραφείου',
+        detail: 'Εκδρομές, πελάτες και κρατήσεις σε ένα σημείο',
+      },
+    ],
+  },
+];
+
 export const BUSES_SESSION = {
   id: 'session-buses',
   kicker: 'Λεωφορεία',
   hook: 'Πουλήστε εκδρομές online και εκτελέστε τις χωρίς χάος',
+  hookAccent: 'χωρίς χάος',
   support:
     'Ο πελάτης βλέπει εκδρομές, κλείνει θέση και κρατάει QR εισιτήριο στο κινητό. Εσείς διαχειρίζεστε στόλο, πληρότητα, οδηγούς και αναχώρηση από έναν πίνακα — χωρίς Excel και χωρίς τηλέφωνα την τελευταία στιγμή.',
-  points: [
-    {
-      icon: 'confirmation_number',
-      label: 'Online κρατήσεις',
-      detail: 'Τιμές, ημερομηνίες και πληρωμή στο site του γραφείου σας',
-    },
-    {
-      icon: 'qr_code_2',
-      label: 'QR εισιτήρια',
-      detail: 'Check-in στην επιβίβαση χωρίς χαρτί και χωρίς λίστες στο χέρι',
-    },
-    {
-      icon: 'event_seat',
-      label: 'Χάρτης θέσεων',
-      detail: 'Πληρότητα και επιλογή θέσης σε πραγματικό χρόνο',
-    },
-    {
-      icon: 'directions_bus',
-      label: 'Στόλος λεωφορείων',
-      detail: 'Οχήματα, ανέσεις και φωτογραφίες όπως τα βλέπει ο πελάτης',
-    },
-    {
-      icon: 'badge',
-      label: 'Εφαρμογή οδηγού',
-      detail: 'Επιβάτες, επιβίβαση και βάρδια στο κινητό του οδηγού',
-    },
-    {
-      icon: 'account_balance_wallet',
-      label: 'My Wallet',
-      detail: 'Ο πελάτης βρίσκει το εισιτήριό του χωρίς να ψάχνει email',
-    },
-    {
-      icon: 'campaign',
-      label: 'Email καμπάνιες',
-      detail: 'Έτοιμα πρότυπα για προσφορές και ενημερώσεις εκδρομών',
-    },
-    {
-      icon: 'dashboard',
-      label: 'Πίνακας γραφείου',
-      detail: 'Εκδρομές, πελάτες, κρατήσεις και στόλος σε ένα σημείο',
-    },
-  ],
+  groups: BUSES_SESSION_GROUPS,
+  points: BUSES_SESSION_GROUPS.flatMap((g) => g.items),
   ctaLabel: 'Δείτε εκδρομές & στόλο',
   ctaHref: '#platform-trips',
 };
