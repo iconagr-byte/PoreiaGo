@@ -133,10 +133,6 @@ export default function PlatformMarketingHeader() {
               Ενοικιάσεις
             </a>
           </div>
-
-          <a href="#pricing" className="pm-nav-link" onClick={closeAll}>
-            Τιμές
-          </a>
         </nav>
 
         <div className="pm-header-actions">
@@ -213,16 +209,6 @@ export default function PlatformMarketingHeader() {
                 </span>
               </Link>
             </section>
-
-            <a href="#pricing" className="pm-mobile-link" onClick={closeAll}>
-              <span className="material-symbols-outlined" aria-hidden>
-                payments
-              </span>
-              <span>
-                <strong>Τιμές</strong>
-                <em>Συμβόλαια πλατφόρμας</em>
-              </span>
-            </a>
 
             <div className="pm-mobile-footer">
               <Link to="/admin/login" className="pm-mobile-login" onClick={closeAll}>
