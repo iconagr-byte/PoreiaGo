@@ -97,18 +97,6 @@ export const BUSES_SESSION = {
   points: BUSES_SESSION_GROUPS.flatMap((g) => g.items),
   ctaLabel: 'Δείτε εκδρομές & στόλο',
   ctaHref: '#platform-trips',
-  tripsPreview: {
-    eyebrow: 'Εκδρομές',
-    title: 'Έτσι κλείνει θέση ο πελάτης',
-    subtitle:
-      'Επιλέγει εκδρομή και ημερομηνία → θέση στον χάρτη → πληρωμή → QR εισιτήριο στο κινητό. Ίδια ροή στο site του γραφείου σας — χωρίς τηλέφωνο και χωρίς Excel.',
-  },
-  abroadPreview: {
-    eyebrow: 'Εξωτερικό',
-    title: 'Ίδια κράτηση · εκδρομές εξωτερικού',
-    subtitle:
-      'Παρίσι · Ρώμη · Πράγα & Βιέννη — ίδια κάρτα, ίδια επιλογή θέσης και ίδιο QR εισιτήριο με τις εγχώριες.',
-  },
 };
 
 export const RENT_SESSION = {
