@@ -4,6 +4,7 @@ import {
   applyExtrasToPending,
   buildTripExtrasLines,
   createTripExtraOption,
+  normalizeTripExtraIcon,
   normalizeTripExtraOptions,
   tripExtrasTotal,
   visibleTripExtraOptions,
@@ -14,6 +15,12 @@ describe('tripBookingExtras catalog', () => {
     const opts = normalizeTripExtraOptions([]);
     expect(opts.length).toBe(DEFAULT_TRIP_EXTRA_OPTIONS.length);
     expect(opts[0].title).toContain('Ασφάλεια');
+  });
+
+  it('remaps tour_guide icon that renders as GUIDE text', () => {
+    expect(normalizeTripExtraIcon('tour_guide')).toBe('flag');
+    const opt = createTripExtraOption({ title: 'Ξενάγηση', icon: 'tour_guide' });
+    expect(opt.icon).toBe('flag');
   });
 
   it('prices per person and per booking', () => {
