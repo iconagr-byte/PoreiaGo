@@ -5,6 +5,16 @@ import {
 } from '../../lib/marketing/platformCopy.js';
 import '../../styles/platform-service-hub.css';
 
+function scrollToSession(event, sessionId) {
+  const el = document.getElementById(sessionId);
+  if (!el) return;
+  event.preventDefault();
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (typeof window !== 'undefined' && window.history?.replaceState) {
+    window.history.replaceState(null, '', `#${sessionId}`);
+  }
+}
+
 /**
  * Marketing homepage hub — brand-first chooser: buses session vs rent session.
  */
@@ -26,7 +36,11 @@ export default function PlatformServiceHub() {
           <p className="pg-hub-support">{SERVICE_HUB.support}</p>
 
           <div className="pg-hub-doors" role="group" aria-label="Πόρτες υπηρεσιών">
-            <a href="#session-buses" className="pg-hub-door pg-hub-door--buses">
+            <a
+              href="#session-buses"
+              className="pg-hub-door pg-hub-door--buses"
+              onClick={(e) => scrollToSession(e, 'session-buses')}
+            >
               <span className="pg-hub-door-icon material-symbols-outlined" aria-hidden>
                 directions_bus
               </span>
@@ -39,7 +53,11 @@ export default function PlatformServiceHub() {
               </span>
             </a>
 
-            <a href="#session-rent" className="pg-hub-door pg-hub-door--rent">
+            <a
+              href="#session-rent"
+              className="pg-hub-door pg-hub-door--rent"
+              onClick={(e) => scrollToSession(e, 'session-rent')}
+            >
               <span className="pg-hub-door-icon material-symbols-outlined" aria-hidden>
                 car_rental
               </span>
