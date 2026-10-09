@@ -516,9 +516,6 @@ export default function FleetRentalPanel({
           <div className="bg-white rounded-2xl border border-black/[0.06] p-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h3 className="font-bold text-gray-900">Πελάτες ενοικιάσεων</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Ξεχωριστό CRM rent — δεν αναμειγνύεται με λεωφορεία ({clients.length}).
-              </p>
             </div>
             <label className="block text-xs font-bold text-gray-500 min-w-[12rem] flex-1 max-w-sm">
               Αναζήτηση
