@@ -79,9 +79,9 @@ export default function FrontPage() {
               <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">
                 Πλατφόρμα
               </span>
-              <a href="#pricing" className="hover:text-white">
-                Τιμές
-              </a>
+              <Link to="/grafeia" className="hover:text-white">
+                Συμβόλαια
+              </Link>
               <Link to="/my-booking" className="hover:text-white">
                 Ανάκτηση κράτησης
               </Link>

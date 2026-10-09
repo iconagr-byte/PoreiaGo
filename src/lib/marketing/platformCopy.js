@@ -252,7 +252,7 @@ export const FEATURE_LANES = {
   shared: {
     kicker: 'Κοινά',
     title: 'Ό,τι μοιράζονται και οι δύο πόρτες',
-    href: '#pricing',
+    href: '/grafeia',
   },
 };
 

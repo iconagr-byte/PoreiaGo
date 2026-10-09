@@ -214,16 +214,21 @@ export function FeaturesSection() {
                   </li>
                 ))}
               </ul>
-              <a href={lane.meta.href} className="pg-features-lane-link">
-                {lane.id === 'shared'
-                  ? 'Δείτε τιμές'
-                  : lane.id === 'buses'
-                    ? 'Πίσω στις εκδρομές'
-                    : 'Πίσω στις ενοικιάσεις'}
-                <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 17 }}>
-                  {lane.id === 'shared' ? 'arrow_downward' : 'arrow_upward'}
-                </span>
-              </a>
+              {lane.id === 'shared' ? (
+                <Link to={lane.meta.href} className="pg-features-lane-link">
+                  Δείτε συμβόλαια
+                  <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 17 }}>
+                    arrow_forward
+                  </span>
+                </Link>
+              ) : (
+                <a href={lane.meta.href} className="pg-features-lane-link">
+                  {lane.id === 'buses' ? 'Πίσω στις εκδρομές' : 'Πίσω στις ενοικιάσεις'}
+                  <span className="material-symbols-outlined" aria-hidden style={{ fontSize: 17 }}>
+                    arrow_upward
+                  </span>
+                </a>
+              )}
             </article>
           ))}
         </div>
