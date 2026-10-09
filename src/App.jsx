@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { Toaster } from 'react-hot-toast';
@@ -100,6 +100,17 @@ function PreferRentSessionBoot() {
   return null;
 }
 
+/** Reset window scroll on route change so links like «Άνοιγμα σελίδας ενοικιάσεων» open at the top. */
+function ScrollToTop() {
+  const { pathname, hash } = useLocation();
+  useLayoutEffect(() => {
+    // Keep in-page hash targets (e.g. #session-rent); only reset on path changes without a hash.
+    if (hash) return;
+    window.scrollTo(0, 0);
+  }, [pathname, hash]);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -107,6 +118,7 @@ function App() {
         <BrandingBoot />
         <RentalPwaBoot />
         <PreferRentSessionBoot />
+        <ScrollToTop />
         <MaintenanceGate>
           <Toaster position="top-center" />
           <Routes>
