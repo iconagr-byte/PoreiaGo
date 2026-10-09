@@ -22,7 +22,9 @@ import toast, { Toaster } from 'react-hot-toast';
 import FleetLiveMapWebSocket from '../components/admin/FleetLiveMapWebSocket.jsx';
 import DriverChatDashboardWidget from '../components/admin/DriverChatDashboardWidget.jsx';
 import AdminNotificationBell from '../components/admin/AdminNotificationBell.jsx';
+import AdminLanguageSwitcher from '../components/admin/AdminLanguageSwitcher.jsx';
 import AdminAccountMenu from '../components/admin/AdminAccountMenu.jsx';
+import { useUiLang } from '../hooks/useUiLang.js';
 import OfficeWalletShareCard from '../components/admin/OfficeWalletShareCard.jsx';
 import { FleetTelemetryProvider } from '../context/FleetTelemetryContext.jsx';
 import ImpersonationBanner from '../components/admin/ImpersonationBanner.jsx';
@@ -126,6 +128,7 @@ function bookingStatusBadgeClass(status) {
 export default function BackOffice() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t: uiT } = useUiLang();
   const [activeTab, setActiveTab] = useState(() => {
     const fromQuery = new URLSearchParams(window.location.search).get('tab');
     return fromQuery || location.state?.activeTab || 'dashboard';
@@ -2259,7 +2262,7 @@ export default function BackOffice() {
             <button
               type="button"
               className="md:hidden w-11 h-11 rounded-full bg-white border border-black/[0.08] shadow-sm flex items-center justify-center shrink-0"
-              aria-label="Άνοιγμα μενού"
+              aria-label={uiT('open_menu')}
               onClick={() => setMobileNavOpen(true)}
             >
               <span className="material-symbols-outlined">menu</span>
@@ -2268,7 +2271,8 @@ export default function BackOffice() {
               <TemplateSearch onUseTemplate={useEmailTemplate} />
             </div>
           </div>
-          <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <AdminLanguageSwitcher />
             <AdminNotificationBell
               onNavigate={(tab, extra = {}) => {
                 if (extra.driverId) setChatFocusDriverId(extra.driverId);
