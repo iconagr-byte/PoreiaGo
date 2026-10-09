@@ -2,6 +2,8 @@
 
 export const PLATFORM_NAME = 'PoreiaGo';
 export const PLATFORM_TAGLINE = 'Η πλατφόρμα που τρέχει το ταξιδιωτικό σας γραφείο';
+/** Short line under the wordmark (header / footer mark). */
+export const PLATFORM_BRAND_LINE = 'Πλατφόρμα για ταξιδιωτικά γραφεία';
 
 export const HERO = {
   title: 'Μία πλατφόρμα για',

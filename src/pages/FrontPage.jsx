@@ -10,7 +10,7 @@ import {
   PainPointsSection,
   PricingTeaserSection,
 } from '../components/marketing/PlatformLandingSections.jsx';
-import { PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
+import { PLATFORM_BRAND_LINE, PLATFORM_NAME } from '../lib/marketing/platformCopy.js';
 import { Link } from 'react-router-dom';
 
 export default function FrontPage() {
@@ -89,7 +89,7 @@ export default function FrontPage() {
           </div>
         </div>
         <p className="text-center text-xs text-white/30 mt-10">
-          © {new Date().getFullYear()} {PLATFORM_NAME} — SaaS για ταξιδιωτικά γραφεία
+          © {new Date().getFullYear()} {PLATFORM_NAME} — {PLATFORM_BRAND_LINE}
         </p>
       </footer>
     </div>

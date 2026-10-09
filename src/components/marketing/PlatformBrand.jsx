@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { PLATFORM_NAME } from '../../lib/marketing/platformCopy.js';
+import { PLATFORM_BRAND_LINE, PLATFORM_NAME } from '../../lib/marketing/platformCopy.js';
 
 /** Neutral platform wordmark — not a single travel agency. */
 export default function PlatformBrand({ className = '', variant = 'dark', asLink = true }) {
@@ -24,11 +24,11 @@ export default function PlatformBrand({ className = '', variant = 'dark', asLink
           {PLATFORM_NAME}
         </span>
         <span
-          className={`text-[10px] font-semibold uppercase tracking-[0.14em] mt-0.5 ${
+          className={`text-[10px] font-semibold tracking-[0.04em] mt-0.5 ${
             isDark ? 'text-white/50' : 'text-slate-500'
           }`}
         >
-          SaaS για ταξιδιωτικά γραφεία
+          {PLATFORM_BRAND_LINE}
         </span>
       </span>
     </span>
