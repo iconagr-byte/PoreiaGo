@@ -32,7 +32,14 @@ export default function PlatformRentSession() {
             </li>
           ))}
         </ul>
-        <Link to={RENT_SESSION.ctaTo} className="pg-session-cta pg-session-cta--rent">
+        <Link
+          to={RENT_SESSION.ctaTo}
+          className="pg-session-cta pg-session-cta--rent"
+          onClick={() => {
+            // Homepage is often scrolled mid-session; open /rent at the top.
+            window.scrollTo(0, 0);
+          }}
+        >
           {RENT_SESSION.ctaLabel}
           <span className="material-symbols-outlined" aria-hidden>
             arrow_forward
