@@ -4,12 +4,13 @@ import {
   armNotificationAudioUnlock,
   unlockNotificationAudio,
 } from '../../lib/admin/notificationClickSound.js';
+import { useUiLang } from '../../hooks/useUiLang.js';
 import { getSaasTenantId } from '../../services/saasApi.js';
 
-function formatWhen(iso) {
+function formatWhen(iso, dateLocale) {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleString('el-GR', {
+    return new Date(iso).toLocaleString(dateLocale || 'el-GR', {
       day: 'numeric',
       month: 'short',
       hour: '2-digit',
@@ -34,6 +35,7 @@ function iconFor(type) {
  * Top-right admin bell — inbox + classic click sound on new events.
  */
 export default function AdminNotificationBell({ onNavigate } = {}) {
+  const { t, dateLocale } = useUiLang();
   // Must use the logged-in office tenant — DEMO default broke Achillio alerts WS.
   const officeTenantId = getSaasTenantId();
   const { items, unreadCount, open, setOpen, markAllRead, markRead, clearAll } =
@@ -72,7 +74,9 @@ export default function AdminNotificationBell({ onNavigate } = {}) {
         type="button"
         className="relative p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full hover:bg-black/[0.04]"
         aria-label={
-          unreadCount > 0 ? `Ειδοποιήσεις, ${unreadCount} νέες` : 'Ειδοποιήσεις'
+          unreadCount > 0
+            ? t('notifications_unread', { n: unreadCount })
+            : t('notifications')
         }
         aria-expanded={open}
         onClick={() => {
@@ -96,24 +100,24 @@ export default function AdminNotificationBell({ onNavigate } = {}) {
         <div
           className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-1.5rem))] max-h-[min(28rem,70vh)] overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-xl z-50 flex flex-col"
           role="dialog"
-          aria-label="Ειδοποιήσεις"
+          aria-label={t('notifications')}
         >
           <div className="px-4 py-3 border-b border-black/[0.06] flex items-center justify-between gap-2">
-            <p className="text-sm font-bold text-gray-900">Ειδοποιήσεις</p>
+            <p className="text-sm font-bold text-gray-900">{t('notifications')}</p>
             {items.length > 0 ? (
               <button
                 type="button"
                 onClick={clearAll}
                 className="text-[11px] font-bold text-gray-500 hover:text-gray-800"
               >
-                Καθαρισμός
+                {t('clear')}
               </button>
             ) : null}
           </div>
           <div className="overflow-y-auto flex-1">
             {items.length === 0 ? (
               <p className="px-4 py-8 text-sm text-gray-500 text-center">
-                Δεν υπάρχουν ειδοποιήσεις ακόμα.
+                {t('notifications_empty')}
               </p>
             ) : (
               <ul className="divide-y divide-black/[0.05]">
@@ -142,7 +146,7 @@ export default function AdminNotificationBell({ onNavigate } = {}) {
                           </span>
                         ) : null}
                         <span className="block text-[11px] text-gray-400 mt-1">
-                          {formatWhen(item.at)}
+                          {formatWhen(item.at, dateLocale)}
                         </span>
                       </span>
                     </button>

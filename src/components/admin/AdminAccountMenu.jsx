@@ -12,6 +12,7 @@ import {
   hasImpersonationBackup,
 } from '../../services/saasApi.js';
 import toast from 'react-hot-toast';
+import { useUiLang } from '../../hooks/useUiLang.js';
 
 function initialsFromEmail(email) {
   const local = String(email || '')
@@ -26,35 +27,36 @@ function initialsFromEmail(email) {
   return local.slice(0, 2).toUpperCase();
 }
 
-function displayNameFromEmail(email) {
+function displayNameFromEmail(email, fallbackAdmin) {
   const local = String(email || '').split('@')[0] || '';
-  if (!local) return 'Διαχειριστής';
+  if (!local) return fallbackAdmin;
   return local
     .replace(/[._-]+/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
     .trim();
 }
 
-function roleLabel() {
-  if (isImpersonating()) return 'Impersonation';
-  if (canAccessPlatformOperatorUi()) return 'Super Admin';
+function roleLabel(t) {
+  if (isImpersonating()) return t('role_impersonation');
+  if (canAccessPlatformOperatorUi()) return t('role_super');
   const roles = getSaasRoles();
-  if (roles.includes('tenant_admin')) return 'Διαχειριστής γραφείου';
-  if (roles.includes('agent')) return 'Agent';
-  return 'Διαχειριστής';
+  if (roles.includes('tenant_admin')) return t('role_office_admin');
+  if (roles.includes('agent')) return t('role_agent');
+  return t('role_admin');
 }
 
 /**
  * Header account chip + menu — name, role, logout (and exit impersonation).
  */
 export default function AdminAccountMenu({ onOpenSettings } = {}) {
+  const { t } = useUiLang();
   const navigate = useNavigate();
   const rootRef = useRef(null);
   const [open, setOpen] = useState(false);
   const email = useMemo(() => getSaasUserEmail(), [open]);
-  const name = displayNameFromEmail(email);
+  const name = displayNameFromEmail(email, t('role_admin'));
   const initials = initialsFromEmail(email);
-  const role = roleLabel();
+  const role = roleLabel(t);
   const impersonating = isImpersonating() && hasImpersonationBackup();
 
   useEffect(() => {
@@ -83,7 +85,7 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
   const exitImpersonation = () => {
     setOpen(false);
     if (exitImpersonationSession()) {
-      toast.success('Επιστροφή σε Super Admin');
+      toast.success(t('back_super'));
       window.location.assign('/admin?tab=settings&sub=tenants');
     }
   };
@@ -106,7 +108,7 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
             ? 'bg-sky-50 border-sky-200 shadow-sm'
             : 'bg-white border-black/[0.08] hover:border-black/[0.14] hover:bg-black/[0.02]'
         }`}
-        aria-label="Λογαριασμός"
+        aria-label={t('account')}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
@@ -147,7 +149,7 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
           <div className="px-3.5 py-3 border-b border-black/[0.06] bg-slate-50/80">
             <p className="text-sm font-bold text-on-surface truncate">{name}</p>
             <p className="text-xs text-on-surface-variant truncate mt-0.5">
-              {email || 'Συνδεδεμένος διαχειριστής'}
+              {email || t('signed_in_admin')}
             </p>
             <span
               className={`inline-flex items-center gap-1 mt-2 text-[11px] font-bold px-2 py-0.5 rounded-full ${
@@ -173,7 +175,7 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
               <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden>
                 settings
               </span>
-              Ρυθμίσεις
+              {t('settings')}
             </button>
 
             {impersonating ? (
@@ -186,7 +188,7 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
                 <span className="material-symbols-outlined text-[20px]" aria-hidden>
                   logout
                 </span>
-                Έξοδος impersonation
+                {t('exit_impersonation')}
               </button>
             ) : null}
 
@@ -199,7 +201,7 @@ export default function AdminAccountMenu({ onOpenSettings } = {}) {
               <span className="material-symbols-outlined text-[20px]" aria-hidden>
                 logout
               </span>
-              Αποσύνδεση
+              {t('logout')}
             </button>
           </div>
         </div>

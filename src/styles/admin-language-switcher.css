@@ -1,0 +1,113 @@
+.admin-lang {
+  position: relative;
+}
+
+.admin-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 2.5rem;
+  padding: 0.35rem 0.55rem 0.35rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.admin-lang-btn:hover,
+.admin-lang-btn.is-open {
+  background: rgba(14, 165, 233, 0.08);
+  border-color: rgba(14, 165, 233, 0.28);
+  color: #0369a1;
+}
+
+.admin-lang-icon {
+  font-size: 1.15rem;
+}
+
+.admin-lang-code {
+  min-width: 1.25rem;
+  text-align: center;
+}
+
+.admin-lang-chevron {
+  font-size: 1.05rem;
+  opacity: 0.7;
+  transition: transform 0.15s ease;
+}
+
+.admin-lang-btn.is-open .admin-lang-chevron {
+  transform: rotate(180deg);
+}
+
+.admin-lang-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 60;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  min-width: 10.5rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.14);
+}
+
+.admin-lang-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: #0f172a;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-lang-option:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.admin-lang-option.is-active {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0369a1;
+}
+
+.admin-lang-option-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.admin-lang-option.is-active .admin-lang-option-code {
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.admin-lang-option-label {
+  flex: 1;
+}
+
+.admin-lang-check {
+  font-size: 1.05rem;
+}

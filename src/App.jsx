@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { bootUiLang } from './lib/i18n/uiLang.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { Toaster } from 'react-hot-toast';
 import { captureRentalInstallPrompt, setupRentalPwa } from './lib/rental/registerRentalPwa.js';
@@ -111,10 +112,18 @@ function ScrollToTop() {
   return null;
 }
 
+function UiLangBoot() {
+  useEffect(() => {
+    bootUiLang();
+  }, []);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <Router>
+        <UiLangBoot />
         <BrandingBoot />
         <RentalPwaBoot />
         <PreferRentSessionBoot />
