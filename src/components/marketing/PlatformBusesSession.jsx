@@ -109,9 +109,9 @@ export default function PlatformBusesSession() {
         <div className="pg-apple-cards-band">
           <TripsSection
             id="platform-trips"
-            eyebrow="Εκδρομές"
-            title="Κάρτες ταξιδιών"
-            subtitle="Online κράτηση με τιμές, θέσεις και ημερομηνία — όπως στο site του γραφείου."
+            eyebrow={BUSES_SESSION.tripsPreview.eyebrow}
+            title={BUSES_SESSION.tripsPreview.title}
+            subtitle={BUSES_SESSION.tripsPreview.subtitle}
             trips={domesticTrips}
             emptyMessage="Δεν υπάρχουν εκδρομές προς εμφάνιση."
             siteAppearance={{
@@ -126,9 +126,9 @@ export default function PlatformBusesSession() {
           <TripsSection
             id="platform-abroad"
             compact
-            eyebrow="Εξωτερικό"
-            title="Εκδρομές εξωτερικού"
-            subtitle="Παρίσι · Ρώμη · Πράγα & Βιέννη — ίδια κάρτα εμφάνισης με τις εγχώριες."
+            eyebrow={BUSES_SESSION.abroadPreview.eyebrow}
+            title={BUSES_SESSION.abroadPreview.title}
+            subtitle={BUSES_SESSION.abroadPreview.subtitle}
             trips={intlTrips}
             emptyMessage="Δεν υπάρχουν διεθνείς εκδρομές προς εμφάνιση."
             siteAppearance={{
