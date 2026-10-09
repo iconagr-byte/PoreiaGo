@@ -15,10 +15,8 @@
 .pg-session--buses {
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -8%, rgba(56, 189, 248, 0.16), transparent 58%),
-    radial-gradient(ellipse 45% 40% at 100% 70%, rgba(14, 165, 233, 0.07), transparent 55%),
-    linear-gradient(180deg, #eef6fc 0%, #f5f7fa 42%, #f8fafc 100%);
+  /* White so sky accents pop and the gray trip preview below stays distinct. */
+  background: #ffffff;
   color: var(--pg-session-ink);
 }
 
@@ -32,19 +30,20 @@
 .pg-buses-atmosphere-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 50% 35% at 18% 18%, rgba(125, 211, 252, 0.22), transparent 60%);
+  /* Soft depth only — no blue wash competing with the next section. */
+  background: radial-gradient(ellipse 55% 40% at 50% 0%, rgba(15, 23, 42, 0.035), transparent 62%);
 }
 
 .pg-buses-atmosphere-grid {
   position: absolute;
   inset: 0;
-  opacity: 0.35;
+  opacity: 0.45;
   background-image:
-    linear-gradient(rgba(14, 165, 233, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(14, 165, 233, 0.07) 1px, transparent 1px);
+    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
   background-size: 48px 48px;
-  mask-image: linear-gradient(180deg, black 0%, transparent 72%);
-  -webkit-mask-image: linear-gradient(180deg, black 0%, transparent 72%);
+  mask-image: linear-gradient(180deg, black 0%, transparent 68%);
+  -webkit-mask-image: linear-gradient(180deg, black 0%, transparent 68%);
 }
 
 .pg-session--rent {
