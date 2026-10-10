@@ -136,18 +136,17 @@ export default function FleetVehicleHistoryModal({
 
   const openFullHistory = () => {
     const tripId = vehicle?.trip_id ?? vehicle?.tripId;
-    if (tripId) {
-      const params = buildFleetPlaybackSearchParams({
-        tripId,
-        driverId: vehicle?.driver_id ?? vehicle?.driverId,
-        driverName: vehicle?.driver_name ?? vehicle?.driverName,
-        date: 'today',
-      });
-      navigate(`/admin?${params.toString()}`);
-      onClose?.();
-      return;
-    }
-    navigate('/admin?tab=fleet_route_playback&subtab=playback');
+    const vehicleId = vehicle?.vehicle_id ?? vehicle?.id ?? vehicle?.vehicleId;
+    const vehicleCode = vehicle?.bus_plate ?? vehicle?.vehicle_code ?? vehicle?.plate;
+    const params = buildFleetPlaybackSearchParams({
+      tripId: tripId || undefined,
+      driverId: vehicle?.driver_id ?? vehicle?.driverId,
+      driverName: vehicle?.driver_name ?? vehicle?.driverName,
+      vehicleId: vehicleId || undefined,
+      vehicleCode: vehicleCode || undefined,
+      date: 'today',
+    });
+    navigate(`/admin?${params.toString()}`);
     onClose?.();
   };
 
@@ -671,6 +670,11 @@ function PointsPanel({ points, selectedPointIdx, onSelect, onCopy, copied }) {
                       <span className="ml-2 font-semibold text-slate-500">
                         {Math.round(p.speed_kmh || 0)} km/h
                       </span>
+                      {Number.isFinite(Number(p.heading_deg)) ? (
+                        <span className="ml-2 font-semibold text-slate-400">
+                          {Math.round((((Number(p.heading_deg) % 360) + 360) % 360))}°
+                        </span>
+                      ) : null}
                     </p>
                     <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                       {sourceLabel(p.source)}

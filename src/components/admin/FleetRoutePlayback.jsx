@@ -12,7 +12,11 @@ import {
   resolvePlaybackDateRange,
   todayIsoDate,
 } from '../../lib/admin/fleetPlaybackNav.js';
-import { pathLengthKm, segmentGpsSessions } from '../../lib/admin/fleetVehicleHistory.js';
+import {
+  pathLengthKm,
+  segmentGpsSessions,
+  summarizeRoutePoints,
+} from '../../lib/admin/fleetVehicleHistory.js';
 import { resolveVehicleTripTitle } from '../../lib/admin/fleetBusPillLabel.js';
 import { useFleetTelemetryEgress } from '../../context/FleetTelemetryContext.jsx';
 import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
@@ -24,6 +28,79 @@ function FitRoute({ positions }) {
     map.fitBounds(positions, { padding: [40, 40] });
   }, [positions, map]);
   return null;
+}
+
+/** Color by speed so the trail shows motion, not only geometry. */
+function speedColor(kmh) {
+  const n = Number(kmh) || 0;
+  if (n < 3) return '#94a3b8';
+  if (n < 30) return '#16a34a';
+  if (n < 60) return '#ca8a04';
+  if (n < 90) return '#ea580c';
+  return '#dc2626';
+}
+
+function SpeedColoredTrail({ points }) {
+  const segments = useMemo(() => {
+    const list = Array.isArray(points) ? points : [];
+    const out = [];
+    for (let i = 1; i < list.length; i += 1) {
+      const a = list[i - 1];
+      const b = list[i];
+      if (
+        !Number.isFinite(Number(a?.lat)) ||
+        !Number.isFinite(Number(a?.lng)) ||
+        !Number.isFinite(Number(b?.lat)) ||
+        !Number.isFinite(Number(b?.lng))
+      ) {
+        continue;
+      }
+      const speed = Math.max(Number(a.speed_kmh) || 0, Number(b.speed_kmh) || 0);
+      out.push({
+        key: `${i}-${a.recorded_at || i}`,
+        positions: [
+          [Number(a.lat), Number(a.lng)],
+          [Number(b.lat), Number(b.lng)],
+        ],
+        color: speedColor(speed),
+      });
+    }
+    return out;
+  }, [points]);
+
+  return (
+    <>
+      {segments.map((seg) => (
+        <Polyline
+          key={seg.key}
+          positions={seg.positions}
+          pathOptions={{ color: seg.color, weight: 5, opacity: 0.9, lineCap: 'round' }}
+        />
+      ))}
+    </>
+  );
+}
+
+function formatHeading(deg) {
+  const n = Number(deg);
+  if (!Number.isFinite(n)) return null;
+  return `${Math.round(((n % 360) + 360) % 360)}°`;
+}
+
+function sourceLabel(source) {
+  const s = String(source || '').toLowerCase();
+  if (s.includes('teltonika') || s === 'device') return 'Teltonika';
+  if (s.includes('live')) return 'Live';
+  if (s.includes('driver') || s.includes('app') || s.includes('phone')) return 'App';
+  if (s.includes('buffer')) return 'Buffer';
+  return source || 'GPS';
+}
+
+function formatCoords(lat, lng) {
+  const a = Number(lat);
+  const b = Number(lng);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return '—';
+  return `${a.toFixed(5)}, ${b.toFixed(5)}`;
 }
 
 function useRoutePlayback(points, { playing, speed }) {
@@ -108,8 +185,8 @@ export default function FleetRoutePlayback() {
 
   const [tripId, setTripId] = useState(urlFilters.tripId || '');
   const [driverId, setDriverId] = useState(urlFilters.driverId || '');
-  const [vehicleId, setVehicleId] = useState('');
-  const [vehicleCode, setVehicleCode] = useState('');
+  const [vehicleId, setVehicleId] = useState(urlFilters.vehicleId || '');
+  const [vehicleCode, setVehicleCode] = useState(urlFilters.vehicleCode || '');
   const [dateFilter, setDateFilter] = useState(
     urlFilters.dateKey === 'today' || urlFilters.dateKey === '7d' || urlFilters.dateKey === 'all'
       ? urlFilters.dateKey || 'today'
@@ -143,6 +220,14 @@ export default function FleetRoutePlayback() {
   const points = activeSession?.points || allPoints;
   const positions = useMemo(() => points.map((p) => [p.lat, p.lng]), [points]);
   const { index, position, setIndex } = useRoutePlayback(points, { playing, speed });
+  const routeStats = useMemo(() => summarizeRoutePoints(points), [points]);
+  const stampsRef = useRef(null);
+
+  useEffect(() => {
+    if (!stampsRef.current) return;
+    const row = stampsRef.current.querySelector(`[data-stamp-idx="${index}"]`);
+    row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [index]);
 
   const liveVehicles = useMemo(() => {
     return (vehicles || [])
@@ -182,6 +267,8 @@ export default function FleetRoutePlayback() {
     if (urlFilters.tripId) setTripId(urlFilters.tripId);
     if (urlFilters.driverId) setDriverId(urlFilters.driverId);
     if (urlFilters.driverName) setDriverLabel(urlFilters.driverName);
+    if (urlFilters.vehicleId) setVehicleId(urlFilters.vehicleId);
+    if (urlFilters.vehicleCode) setVehicleCode(urlFilters.vehicleCode);
     if (urlFilters.dateKey === 'today' || urlFilters.dateKey === '7d' || urlFilters.dateKey === 'all') {
       setDateFilter(urlFilters.dateKey);
     } else if (/^\d{4}-\d{2}-\d{2}$/.test(urlFilters.dateKey)) {
@@ -193,22 +280,11 @@ export default function FleetRoutePlayback() {
     urlFilters.tripId,
     urlFilters.driverId,
     urlFilters.driverName,
+    urlFilters.vehicleId,
+    urlFilters.vehicleCode,
     urlFilters.dateKey,
     location.search,
   ]);
-
-  useEffect(() => {
-    if (urlFilters.tripId || tripId || vehicleId || vehicleCode) return;
-    const first = liveVehicles[0];
-    if (!first) return;
-    if (first.trip_id) setTripId(String(first.trip_id));
-    if (first.vehicle_id) setVehicleId(first.vehicle_id);
-    if (first.plate) setVehicleCode(first.plate);
-    if (first.driver_id) {
-      setDriverId(first.driver_id);
-      setDriverLabel(first.name);
-    }
-  }, [liveVehicles, tripId, vehicleId, vehicleCode, urlFilters.tripId]);
 
   useEffect(() => {
     setSelectedSessionId('all');
@@ -291,45 +367,100 @@ export default function FleetRoutePlayback() {
       setVehicleId(vehicle.vehicle_id || '');
       setVehicleCode(vehicle.plate || '');
       setDateFilter('today');
-      autoLoadedRef.current = false;
-      window.setTimeout(() => {
-        const { from, to } = resolveDateRange('today', customDate);
-        setLoading(true);
-        setError('');
-        setPlaying(false);
-        const promise = vehicle.trip_id
-          ? fetchTripRoute(Number(vehicle.trip_id), {
-              from,
-              to,
-              driverId: vehicle.driver_id || undefined,
-            })
-          : fetchVehicleRoute(vehicle.vehicle_id || 'by-plate', {
-              from,
-              to,
-              vehicleCode: vehicle.plate || undefined,
-            });
-        promise
-          .then((data) => {
-            applyRouteData(data, {
-              emptyHint:
-                'Δεν υπάρχουν ακόμα αποθηκευμένα σημεία για αυτό το όχημα — μόλις σταλεί GPS θα εμφανιστούν εδώ ως είσοδος/έξοδος.',
-            });
+      const { from, to } = resolveDateRange('today', customDate);
+      setLoading(true);
+      setError('');
+      setPlaying(false);
+      const promise = vehicle.trip_id
+        ? fetchTripRoute(Number(vehicle.trip_id), {
+            from,
+            to,
+            driverId: vehicle.driver_id || undefined,
           })
-          .catch((err) => {
-            setError(err.message || 'Αποτυχία φόρτωσης διαδρομής');
-            setRoute(null);
-          })
-          .finally(() => setLoading(false));
-      }, 0);
+        : fetchVehicleRoute(vehicle.vehicle_id || 'by-plate', {
+            from,
+            to,
+            vehicleCode: vehicle.plate || undefined,
+          });
+      promise
+        .then((data) => {
+          applyRouteData(data, {
+            emptyHint:
+              'Δεν υπάρχουν ακόμα αποθηκευμένα σημεία για αυτό το όχημα — μόλις σταλεί GPS θα εμφανιστούν εδώ ως είσοδος/έξοδος.',
+          });
+        })
+        .catch((err) => {
+          setError(err.message || 'Αποτυχία φόρτωσης διαδρομής');
+          setRoute(null);
+        })
+        .finally(() => setLoading(false));
     },
     [customDate, applyRouteData],
   );
 
+  // URL deep-link → load immediately (no Φόρτωση click).
   useEffect(() => {
-    if (!urlFilters.autoLoad || !urlFilters.tripId || autoLoadedRef.current) return;
+    if (autoLoadedRef.current) return;
+    const urlHasIdentity = Boolean(
+      urlFilters.tripId ||
+        urlFilters.driverId ||
+        urlFilters.vehicleId ||
+        urlFilters.vehicleCode,
+    );
+    if (!urlHasIdentity && !urlFilters.autoLoad) return;
+
+    const hasLoadable = Boolean(tripId || vehicleId || vehicleCode);
+    if (hasLoadable) {
+      autoLoadedRef.current = true;
+      loadRoute();
+      return;
+    }
+
+    // driver_id only → match live bus and load
+    if (urlFilters.driverId && liveVehicles.length) {
+      const match = liveVehicles.find(
+        (v) => String(v.driver_id) === String(urlFilters.driverId),
+      );
+      if (match) {
+        autoLoadedRef.current = true;
+        loadFromLiveVehicle(match);
+      }
+    }
+  }, [
+    urlFilters.autoLoad,
+    urlFilters.tripId,
+    urlFilters.driverId,
+    urlFilters.vehicleId,
+    urlFilters.vehicleCode,
+    tripId,
+    vehicleId,
+    vehicleCode,
+    liveVehicles,
+    loadRoute,
+    loadFromLiveVehicle,
+  ]);
+
+  // Live map → pick first bus/rent vehicle + load history immediately.
+  useEffect(() => {
+    if (autoLoadedRef.current) return;
+    const urlHasIdentity = Boolean(
+      urlFilters.tripId ||
+        urlFilters.driverId ||
+        urlFilters.vehicleId ||
+        urlFilters.vehicleCode,
+    );
+    if (urlHasIdentity) return;
+    if (!liveVehicles.length) return;
     autoLoadedRef.current = true;
-    loadRoute();
-  }, [urlFilters.autoLoad, urlFilters.tripId, loadRoute]);
+    loadFromLiveVehicle(liveVehicles[0]);
+  }, [
+    liveVehicles,
+    urlFilters.tripId,
+    urlFilters.driverId,
+    urlFilters.vehicleId,
+    urlFilters.vehicleCode,
+    loadFromLiveVehicle,
+  ]);
 
   const handleExport = async (format) => {
     const tid = parseInt(tripId, 10);
@@ -372,7 +503,7 @@ export default function FleetRoutePlayback() {
         <div>
           <h2 className="font-headline-md font-bold">Ιστορικό Διαδρομής</h2>
           <p className="text-sm text-on-surface-variant">
-            Στίγματα GPS · ώρα εισόδου / εξόδου από τον χάρτη · αναπαραγωγή διαδρομής
+            Πλήρη στίγματα GPS · ταχύτητα · κατεύθυνση · είσοδος/έξοδος · λεωφορείο ή rent
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -388,12 +519,34 @@ export default function FleetRoutePlayback() {
             />
           </label>
           <label className="text-sm">
+            <span className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Πινακίδα</span>
+            <input
+              type="text"
+              value={vehicleCode}
+              onChange={(e) => {
+                setVehicleCode(e.target.value);
+                setTripId('');
+              }}
+              placeholder="rent / bus"
+              className="w-32 rounded-xl border border-gray-200 px-3 py-2 font-mono uppercase"
+            />
+          </label>
+          <label className="text-sm">
             <span className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Οδηγός</span>
             <select
               value={driverId}
               onChange={(e) => {
                 const id = e.target.value;
                 setDriverId(id);
+                if (!id) {
+                  setDriverLabel('');
+                  return;
+                }
+                const live = liveVehicles.find((v) => String(v.driver_id) === String(id));
+                if (live) {
+                  loadFromLiveVehicle(live);
+                  return;
+                }
                 const match = driverOptions.find((d) => d.id === id);
                 setDriverLabel(match?.name || '');
                 if (match?.trip_id) setTripId(String(match.trip_id));
@@ -614,7 +767,10 @@ export default function FleetRoutePlayback() {
                         {session.pointCount} στίγματα · {formatDuration(session.durationMin)}
                         {session.tripId ? ` · #${session.tripId}` : ''}
                         {Number.isFinite(session.avgSpeed)
-                          ? ` · ~${Math.round(session.avgSpeed)} km/h`
+                          ? ` · μέση ~${Math.round(session.avgSpeed)} km/h`
+                          : ''}
+                        {Number.isFinite(session.maxSpeed) && session.maxSpeed > 0
+                          ? ` · μέγ. ${Math.round(session.maxSpeed)} km/h`
                           : ''}
                       </p>
                       <p
@@ -703,20 +859,49 @@ export default function FleetRoutePlayback() {
               className="w-full"
             />
 
-            <p className="text-xs text-gray-500 font-mono">
-              Σημείο {index + 1} / {points.length}
-              {liveBufferCount ? ` · ${liveBufferCount} live` : ''}
-              {activeSession ? ` · συνεδρία ${activeSession.index}` : ''}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 font-mono">
+              <span>
+                Σημείο {index + 1} / {points.length}
+                {liveBufferCount ? ` · ${liveBufferCount} live` : ''}
+                {activeSession ? ` · συνεδρία ${activeSession.index}` : ''}
+              </span>
               {position ? (
-                <>
-                  {' '}
-                  · {new Date(position.recorded_at).toLocaleString('el-GR')} ·{' '}
-                  {Math.round(position.speed_kmh || 0)} km/h
-                </>
+                <span>
+                  {new Date(position.recorded_at).toLocaleString('el-GR')} ·{' '}
+                  <strong className="text-slate-900">{Math.round(position.speed_kmh || 0)} km/h</strong>
+                  {formatHeading(position.heading_deg) ? (
+                    <> · κατεύθυνση {formatHeading(position.heading_deg)}</>
+                  ) : null}
+                  {' · '}
+                  {formatCoords(position.lat, position.lng)}
+                </span>
               ) : null}
-            </p>
+            </div>
 
-            <div className="h-[min(68vh,560px)] rounded-[24px] overflow-hidden border border-black/[0.08] shadow-level-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="rounded-2xl border border-black/[0.06] bg-white px-3 py-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Στίγματα</p>
+                <p className="text-lg font-bold tabular-nums text-slate-900">{points.length}</p>
+              </div>
+              <div className="rounded-2xl border border-black/[0.06] bg-white px-3 py-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Απόσταση</p>
+                <p className="text-lg font-bold tabular-nums text-slate-900">{formatKm(totalKm)}</p>
+              </div>
+              <div className="rounded-2xl border border-black/[0.06] bg-white px-3 py-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Μέγ. ταχύτητα</p>
+                <p className="text-lg font-bold tabular-nums text-slate-900">
+                  {Math.round(routeStats.maxSpeed || 0)} km/h
+                </p>
+              </div>
+              <div className="rounded-2xl border border-black/[0.06] bg-white px-3 py-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Μέση κίνηση</p>
+                <p className="text-lg font-bold tabular-nums text-slate-900">
+                  {Math.round(routeStats.movingAvg || 0)} km/h
+                </p>
+              </div>
+            </div>
+
+            <div className="h-[min(52vh,480px)] rounded-[24px] overflow-hidden border border-black/[0.08] shadow-level-2">
               <MapContainer center={center} zoom={8} className="h-full w-full" scrollWheelZoom>
                 <TileLayer
                   attribution={LEAFLET_BASEMAP.attribution}
@@ -725,19 +910,23 @@ export default function FleetRoutePlayback() {
                   maxZoom={LEAFLET_BASEMAP.maxZoom}
                 />
                 <FitRoute positions={positions} />
-                {positions.length > 1 ? (
-                  <Polyline
-                    positions={positions}
-                    pathOptions={{ color: '#0040df', weight: 5, opacity: 0.85 }}
-                  />
-                ) : null}
+                {points.length > 1 ? <SpeedColoredTrail points={points} /> : null}
                 {points[0] ? (
                   <CircleMarker
                     center={[points[0].lat, points[0].lng]}
                     radius={8}
                     pathOptions={{ color: '#16a34a', fillColor: '#22c55e', fillOpacity: 1, weight: 2 }}
                   >
-                    <Popup>Μπήκε · {formatDayClock(points[0].recorded_at)}</Popup>
+                    <Popup>
+                      Μπήκε · {formatDayClock(points[0].recorded_at)}
+                      <br />
+                      {Math.round(points[0].speed_kmh || 0)} km/h
+                      {formatHeading(points[0].heading_deg)
+                        ? ` · ${formatHeading(points[0].heading_deg)}`
+                        : ''}
+                      <br />
+                      {formatCoords(points[0].lat, points[0].lng)}
+                    </Popup>
                   </CircleMarker>
                 ) : null}
                 {points.length > 1 ? (
@@ -754,6 +943,16 @@ export default function FleetRoutePlayback() {
                     <Popup>
                       {activeSession?.active ? 'Τώρα στον χάρτη' : 'Βγήκε'} ·{' '}
                       {formatDayClock(points[points.length - 1].recorded_at)}
+                      <br />
+                      {Math.round(points[points.length - 1].speed_kmh || 0)} km/h
+                      {formatHeading(points[points.length - 1].heading_deg)
+                        ? ` · ${formatHeading(points[points.length - 1].heading_deg)}`
+                        : ''}
+                      <br />
+                      {formatCoords(
+                        points[points.length - 1].lat,
+                        points[points.length - 1].lng,
+                      )}
                     </Popup>
                   </CircleMarker>
                 ) : null}
@@ -761,16 +960,123 @@ export default function FleetRoutePlayback() {
                   <CircleMarker
                     center={[position.lat, position.lng]}
                     radius={12}
-                    pathOptions={{ color: '#facc15', fillColor: '#0040df', fillOpacity: 1, weight: 3 }}
+                    pathOptions={{
+                      color: speedColor(position.speed_kmh),
+                      fillColor: '#0040df',
+                      fillOpacity: 1,
+                      weight: 3,
+                    }}
                   >
                     <Popup>
-                      {Math.round(position.speed_kmh || 0)} km/h
+                      <strong>{Math.round(position.speed_kmh || 0)} km/h</strong>
+                      {formatHeading(position.heading_deg)
+                        ? ` · ${formatHeading(position.heading_deg)}`
+                        : ''}
                       <br />
                       {new Date(position.recorded_at).toLocaleString('el-GR')}
+                      <br />
+                      {formatCoords(position.lat, position.lng)}
+                      <br />
+                      {sourceLabel(position.source)}
                     </Popup>
                   </CircleMarker>
                 ) : null}
               </MapContainer>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+              <span className="font-bold uppercase tracking-wide text-slate-400">Ταχύτητα</span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-4 rounded-sm" style={{ background: '#94a3b8' }} /> 0–3
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-4 rounded-sm" style={{ background: '#16a34a' }} /> 3–30
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-4 rounded-sm" style={{ background: '#ca8a04' }} /> 30–60
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-4 rounded-sm" style={{ background: '#ea580c' }} /> 60–90
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-4 rounded-sm" style={{ background: '#dc2626' }} /> 90+
+              </span>
+            </div>
+
+            <div className="rounded-[22px] border border-black/[0.07] bg-white shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-black/[0.06] bg-slate-50/80 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    Καταγραφή πορείας
+                  </p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">
+                    Όλα τα στίγματα · ώρα · ταχύτητα · κατεύθυνση · συντεταγμένες
+                  </p>
+                </div>
+                <span className="text-xs font-semibold text-slate-500 tabular-nums">
+                  {points.length} σημεία
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="px-3 py-2 font-bold">#</th>
+                      <th className="px-3 py-2 font-bold">Ώρα</th>
+                      <th className="px-3 py-2 font-bold">Ταχύτητα</th>
+                      <th className="px-3 py-2 font-bold">Κατεύθυνση</th>
+                      <th className="px-3 py-2 font-bold">Συντεταγμένες</th>
+                      <th className="px-3 py-2 font-bold">Πηγή</th>
+                    </tr>
+                  </thead>
+                  <tbody ref={stampsRef} className="divide-y divide-slate-100">
+                    {points.map((p, idx) => {
+                      const selected = idx === index;
+                      const heading = formatHeading(p.heading_deg);
+                      return (
+                        <tr
+                          key={`${p.recorded_at}-${idx}`}
+                          data-stamp-idx={idx}
+                          className={`cursor-pointer transition ${
+                            selected ? 'bg-[#0040df]/[0.08]' : 'hover:bg-slate-50'
+                          }`}
+                          onClick={() => {
+                            setPlaying(false);
+                            setIndex(idx);
+                          }}
+                        >
+                          <td className="px-3 py-2.5 tabular-nums font-bold text-slate-700">
+                            <span
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[11px]"
+                              style={{
+                                background: selected ? '#0040df' : `${speedColor(p.speed_kmh)}22`,
+                                color: selected ? '#fff' : speedColor(p.speed_kmh),
+                              }}
+                            >
+                              {idx + 1}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 tabular-nums font-semibold text-slate-900 whitespace-nowrap">
+                            {formatDayClock(p.recorded_at)}
+                          </td>
+                          <td className="px-3 py-2.5 tabular-nums font-bold text-slate-900 whitespace-nowrap">
+                            {Math.round(p.speed_kmh || 0)} km/h
+                          </td>
+                          <td className="px-3 py-2.5 tabular-nums text-slate-600">
+                            {heading || '—'}
+                          </td>
+                          <td className="px-3 py-2.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                            {formatCoords(p.lat, p.lng)}
+                          </td>
+                          <td className="px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                            {sourceLabel(p.source)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
