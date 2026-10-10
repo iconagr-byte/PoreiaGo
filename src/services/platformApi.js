@@ -238,9 +238,10 @@ async function updatePlatformSettingsLegacy(body) {
   return { data: body, source: 'local' };
 }
 
-export async function fetchPlatformUsers() {
+export async function fetchPlatformUsers({ allOffices = false } = {}) {
   try {
-    const res = await adminFetch('/api/admin/platform/users');
+    const q = allOffices ? '?all_offices=1' : '';
+    const res = await adminFetch(`/api/admin/platform/users${q}`);
     if (res.ok) return res.json();
   } catch {
     /* offline */

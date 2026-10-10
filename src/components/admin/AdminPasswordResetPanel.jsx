@@ -45,7 +45,7 @@ export default function AdminPasswordResetPanel() {
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
-      const rows = await fetchPlatformUsers();
+      const rows = await fetchPlatformUsers({ allOffices: true });
       setUsers(Array.isArray(rows) ? rows : []);
     } catch {
       setUsers([]);
@@ -62,11 +62,33 @@ export default function AdminPasswordResetPanel() {
     loadUsers();
   }, [superAdmin, loadUsers]);
 
+  const tenantLabelById = useMemo(() => {
+    const map = new Map();
+    for (const t of tenants) {
+      if (t?.id != null) map.set(String(t.id), formatPlatformTenantLabel(t));
+    }
+    return map;
+  }, [tenants]);
+
+  const officeLabelFor = useCallback(
+    (u) => {
+      if (!u) return 'Χωρίς γραφείο';
+      const fromApi = [u.tenant_name, u.tenant_slug].filter(Boolean).join(' · ');
+      if (fromApi) return fromApi;
+      if (u.tenant_id && tenantLabelById.has(String(u.tenant_id))) {
+        return tenantLabelById.get(String(u.tenant_id));
+      }
+      return u.tenant_id ? `Γραφείο ${String(u.tenant_id).slice(0, 8)}…` : 'Χωρίς γραφείο';
+    },
+    [tenantLabelById],
+  );
+
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return users;
-    return users.filter(
-      (u) =>
+    return users.filter((u) => {
+      const office = officeLabelFor(u).toLowerCase();
+      return (
         String(u.name || '')
           .toLowerCase()
           .includes(q) ||
@@ -75,11 +97,39 @@ export default function AdminPasswordResetPanel() {
           .includes(q) ||
         String(u.role || '')
           .toLowerCase()
-          .includes(q),
+          .includes(q) ||
+        office.includes(q) ||
+        String(u.tenant_slug || '')
+          .toLowerCase()
+          .includes(q)
+      );
+    });
+  }, [users, query, officeLabelFor]);
+
+  const usersByOffice = useMemo(() => {
+    const groups = new Map();
+    for (const u of filteredUsers) {
+      const key = String(u.tenant_id || '__none__');
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          label: officeLabelFor(u),
+          slug: u.tenant_slug || '',
+          users: [],
+        });
+      }
+      groups.get(key).users.push(u);
+    }
+    return [...groups.values()].sort((a, b) =>
+      a.label.localeCompare(b.label, 'el', { sensitivity: 'base' }),
     );
-  }, [users, query]);
+  }, [filteredUsers, officeLabelFor]);
 
   const activeCount = users.filter((u) => u.is_active).length;
+  const officeCount = useMemo(() => {
+    const ids = new Set(users.map((u) => String(u.tenant_id || '')).filter(Boolean));
+    return ids.size;
+  }, [users]);
 
   if (!superAdmin) {
     return (
@@ -183,6 +233,10 @@ export default function AdminPasswordResetPanel() {
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
               <span className="material-symbols-outlined text-[16px]">group</span>
               {activeCount} ενεργοί
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
+              <span className="material-symbols-outlined text-[16px]">domain</span>
+              {officeCount} γραφεία
             </span>
           </div>
         </div>
@@ -356,6 +410,13 @@ export default function AdminPasswordResetPanel() {
                       <span className="block text-[11px] text-slate-500 truncate">
                         {m.email}
                       </span>
+                      {m.tenant_id || m.tenant_name ? (
+                        <span className="block text-[10px] font-bold text-slate-400 truncate mt-0.5">
+                          {[m.tenant_name, m.tenant_slug].filter(Boolean).join(' · ') ||
+                            tenantLabelById.get(String(m.tenant_id)) ||
+                            `Γραφείο ${String(m.tenant_id).slice(0, 8)}…`}
+                        </span>
+                      ) : null}
                     </span>
                   </button>
                 ))}
@@ -367,12 +428,12 @@ export default function AdminPasswordResetPanel() {
         <div className="rounded-[24px] border border-slate-200 bg-white overflow-hidden shadow-sm">
           <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="font-bold text-slate-900">Χρήστες τρέχοντος γραφείου</h3>
+              <h3 className="font-bold text-slate-900">Χρήστες ανά γραφείο</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Πάτα «Αποστολή» δίπλα στον χρήστη — θα λάβει email με σύνδεσμο.
+                Ομαδοποιημένοι ανά γραφείο — πάτα «Αποστολή» δίπλα στον χρήστη.
               </p>
             </div>
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full sm:w-72">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">
                 search
               </span>
@@ -380,7 +441,7 @@ export default function AdminPasswordResetPanel() {
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Αναζήτηση ονόματος / email…"
+                placeholder="Αναζήτηση ονόματος / email / γραφείου…"
                 className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
               />
             </div>
@@ -412,54 +473,81 @@ export default function AdminPasswordResetPanel() {
               ) : null}
             </div>
           ) : (
-            <ul className="divide-y divide-slate-100">
-              {filteredUsers.map((u) => {
-                const sending = busyKey === u.id;
-                return (
-                  <li
-                    key={u.id}
-                    className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-slate-50/80"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          u.is_active
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-200 text-slate-500'
-                        }`}
-                      >
-                        {initials(u.name, u.email)}
+            <div className="divide-y divide-slate-100">
+              {usersByOffice.map((group) => (
+                <section key={group.key} className="bg-white">
+                  <div className="sticky top-0 z-[1] flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/95 px-5 py-3 backdrop-blur">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                        <span className="material-symbols-outlined text-[18px]">domain</span>
                       </span>
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-slate-900 truncate">{u.name}</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-                            {ROLE_LABELS[u.role] || u.role || '—'}
-                          </span>
-                          {!u.is_active ? (
-                            <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
-                              Ανενεργός
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-xs text-slate-500 truncate mt-0.5">{u.email}</div>
+                        <h4 className="truncate font-bold text-slate-900">{group.label}</h4>
+                        {group.slug && !group.label.includes(group.slug) ? (
+                          <p className="truncate text-[11px] text-slate-400">{group.slug}</p>
+                        ) : null}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      disabled={Boolean(busyKey) || !u.is_active}
-                      onClick={() => setConfirmUser(u)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">
-                        {sending ? 'progress_activity' : 'lock_reset'}
-                      </span>
-                      {sending ? 'Αποστολή…' : 'Αποστολή link'}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 border border-slate-200">
+                      {group.users.length}{' '}
+                      {group.users.length === 1 ? 'χρήστης' : 'χρήστες'}
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-slate-100">
+                    {group.users.map((u) => {
+                      const sending = busyKey === u.id;
+                      return (
+                        <li
+                          key={u.id}
+                          className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-slate-50/80"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                                u.is_active
+                                  ? 'bg-slate-900 text-white'
+                                  : 'bg-slate-200 text-slate-500'
+                              }`}
+                            >
+                              {initials(u.name, u.email)}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-bold text-slate-900 truncate">
+                                  {u.name}
+                                </span>
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                                  {ROLE_LABELS[u.role] || u.role || '—'}
+                                </span>
+                                {!u.is_active ? (
+                                  <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                                    Ανενεργός
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="text-xs text-slate-500 truncate mt-0.5">
+                                {u.email}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={Boolean(busyKey) || !u.is_active}
+                            onClick={() => setConfirmUser(u)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">
+                              {sending ? 'progress_activity' : 'lock_reset'}
+                            </span>
+                            {sending ? 'Αποστολή…' : 'Αποστολή link'}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -483,8 +571,15 @@ export default function AdminPasswordResetPanel() {
                 </h3>
                 <p className="text-sm text-slate-500 mt-1 leading-relaxed">
                   Θα σταλεί email στον{' '}
-                  <strong className="text-slate-800">{confirmUser.email}</strong> με σύνδεσμο
-                  επαναφοράς κωδικού (λήξη σε 1 ώρα).
+                  <strong className="text-slate-800">{confirmUser.email}</strong>
+                  {confirmUser.tenant_id || confirmUser.tenant_name ? (
+                    <>
+                      {' '}
+                      · γραφείο{' '}
+                      <strong className="text-slate-800">{officeLabelFor(confirmUser)}</strong>
+                    </>
+                  ) : null}{' '}
+                  με σύνδεσμο επαναφοράς κωδικού (λήξη σε 1 ώρα).
                 </p>
               </div>
             </div>
