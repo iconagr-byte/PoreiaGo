@@ -136,18 +136,17 @@ export default function FleetVehicleHistoryModal({
 
   const openFullHistory = () => {
     const tripId = vehicle?.trip_id ?? vehicle?.tripId;
-    if (tripId) {
-      const params = buildFleetPlaybackSearchParams({
-        tripId,
-        driverId: vehicle?.driver_id ?? vehicle?.driverId,
-        driverName: vehicle?.driver_name ?? vehicle?.driverName,
-        date: 'today',
-      });
-      navigate(`/admin?${params.toString()}`);
-      onClose?.();
-      return;
-    }
-    navigate('/admin?tab=fleet_route_playback&subtab=playback');
+    const vehicleId = vehicle?.vehicle_id ?? vehicle?.id ?? vehicle?.vehicleId;
+    const vehicleCode = vehicle?.bus_plate ?? vehicle?.vehicle_code ?? vehicle?.plate;
+    const params = buildFleetPlaybackSearchParams({
+      tripId: tripId || undefined,
+      driverId: vehicle?.driver_id ?? vehicle?.driverId,
+      driverName: vehicle?.driver_name ?? vehicle?.driverName,
+      vehicleId: vehicleId || undefined,
+      vehicleCode: vehicleCode || undefined,
+      date: 'today',
+    });
+    navigate(`/admin?${params.toString()}`);
     onClose?.();
   };
 

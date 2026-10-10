@@ -185,8 +185,8 @@ export default function FleetRoutePlayback() {
 
   const [tripId, setTripId] = useState(urlFilters.tripId || '');
   const [driverId, setDriverId] = useState(urlFilters.driverId || '');
-  const [vehicleId, setVehicleId] = useState('');
-  const [vehicleCode, setVehicleCode] = useState('');
+  const [vehicleId, setVehicleId] = useState(urlFilters.vehicleId || '');
+  const [vehicleCode, setVehicleCode] = useState(urlFilters.vehicleCode || '');
   const [dateFilter, setDateFilter] = useState(
     urlFilters.dateKey === 'today' || urlFilters.dateKey === '7d' || urlFilters.dateKey === 'all'
       ? urlFilters.dateKey || 'today'
@@ -267,6 +267,8 @@ export default function FleetRoutePlayback() {
     if (urlFilters.tripId) setTripId(urlFilters.tripId);
     if (urlFilters.driverId) setDriverId(urlFilters.driverId);
     if (urlFilters.driverName) setDriverLabel(urlFilters.driverName);
+    if (urlFilters.vehicleId) setVehicleId(urlFilters.vehicleId);
+    if (urlFilters.vehicleCode) setVehicleCode(urlFilters.vehicleCode);
     if (urlFilters.dateKey === 'today' || urlFilters.dateKey === '7d' || urlFilters.dateKey === 'all') {
       setDateFilter(urlFilters.dateKey);
     } else if (/^\d{4}-\d{2}-\d{2}$/.test(urlFilters.dateKey)) {
@@ -278,22 +280,11 @@ export default function FleetRoutePlayback() {
     urlFilters.tripId,
     urlFilters.driverId,
     urlFilters.driverName,
+    urlFilters.vehicleId,
+    urlFilters.vehicleCode,
     urlFilters.dateKey,
     location.search,
   ]);
-
-  useEffect(() => {
-    if (urlFilters.tripId || tripId || vehicleId || vehicleCode) return;
-    const first = liveVehicles[0];
-    if (!first) return;
-    if (first.trip_id) setTripId(String(first.trip_id));
-    if (first.vehicle_id) setVehicleId(first.vehicle_id);
-    if (first.plate) setVehicleCode(first.plate);
-    if (first.driver_id) {
-      setDriverId(first.driver_id);
-      setDriverLabel(first.name);
-    }
-  }, [liveVehicles, tripId, vehicleId, vehicleCode, urlFilters.tripId]);
 
   useEffect(() => {
     setSelectedSessionId('all');
@@ -376,45 +367,100 @@ export default function FleetRoutePlayback() {
       setVehicleId(vehicle.vehicle_id || '');
       setVehicleCode(vehicle.plate || '');
       setDateFilter('today');
-      autoLoadedRef.current = false;
-      window.setTimeout(() => {
-        const { from, to } = resolveDateRange('today', customDate);
-        setLoading(true);
-        setError('');
-        setPlaying(false);
-        const promise = vehicle.trip_id
-          ? fetchTripRoute(Number(vehicle.trip_id), {
-              from,
-              to,
-              driverId: vehicle.driver_id || undefined,
-            })
-          : fetchVehicleRoute(vehicle.vehicle_id || 'by-plate', {
-              from,
-              to,
-              vehicleCode: vehicle.plate || undefined,
-            });
-        promise
-          .then((data) => {
-            applyRouteData(data, {
-              emptyHint:
-                'Δεν υπάρχουν ακόμα αποθηκευμένα σημεία για αυτό το όχημα — μόλις σταλεί GPS θα εμφανιστούν εδώ ως είσοδος/έξοδος.',
-            });
+      const { from, to } = resolveDateRange('today', customDate);
+      setLoading(true);
+      setError('');
+      setPlaying(false);
+      const promise = vehicle.trip_id
+        ? fetchTripRoute(Number(vehicle.trip_id), {
+            from,
+            to,
+            driverId: vehicle.driver_id || undefined,
           })
-          .catch((err) => {
-            setError(err.message || 'Αποτυχία φόρτωσης διαδρομής');
-            setRoute(null);
-          })
-          .finally(() => setLoading(false));
-      }, 0);
+        : fetchVehicleRoute(vehicle.vehicle_id || 'by-plate', {
+            from,
+            to,
+            vehicleCode: vehicle.plate || undefined,
+          });
+      promise
+        .then((data) => {
+          applyRouteData(data, {
+            emptyHint:
+              'Δεν υπάρχουν ακόμα αποθηκευμένα σημεία για αυτό το όχημα — μόλις σταλεί GPS θα εμφανιστούν εδώ ως είσοδος/έξοδος.',
+          });
+        })
+        .catch((err) => {
+          setError(err.message || 'Αποτυχία φόρτωσης διαδρομής');
+          setRoute(null);
+        })
+        .finally(() => setLoading(false));
     },
     [customDate, applyRouteData],
   );
 
+  // URL deep-link → load immediately (no Φόρτωση click).
   useEffect(() => {
-    if (!urlFilters.autoLoad || !urlFilters.tripId || autoLoadedRef.current) return;
+    if (autoLoadedRef.current) return;
+    const urlHasIdentity = Boolean(
+      urlFilters.tripId ||
+        urlFilters.driverId ||
+        urlFilters.vehicleId ||
+        urlFilters.vehicleCode,
+    );
+    if (!urlHasIdentity && !urlFilters.autoLoad) return;
+
+    const hasLoadable = Boolean(tripId || vehicleId || vehicleCode);
+    if (hasLoadable) {
+      autoLoadedRef.current = true;
+      loadRoute();
+      return;
+    }
+
+    // driver_id only → match live bus and load
+    if (urlFilters.driverId && liveVehicles.length) {
+      const match = liveVehicles.find(
+        (v) => String(v.driver_id) === String(urlFilters.driverId),
+      );
+      if (match) {
+        autoLoadedRef.current = true;
+        loadFromLiveVehicle(match);
+      }
+    }
+  }, [
+    urlFilters.autoLoad,
+    urlFilters.tripId,
+    urlFilters.driverId,
+    urlFilters.vehicleId,
+    urlFilters.vehicleCode,
+    tripId,
+    vehicleId,
+    vehicleCode,
+    liveVehicles,
+    loadRoute,
+    loadFromLiveVehicle,
+  ]);
+
+  // Live map → pick first bus/rent vehicle + load history immediately.
+  useEffect(() => {
+    if (autoLoadedRef.current) return;
+    const urlHasIdentity = Boolean(
+      urlFilters.tripId ||
+        urlFilters.driverId ||
+        urlFilters.vehicleId ||
+        urlFilters.vehicleCode,
+    );
+    if (urlHasIdentity) return;
+    if (!liveVehicles.length) return;
     autoLoadedRef.current = true;
-    loadRoute();
-  }, [urlFilters.autoLoad, urlFilters.tripId, loadRoute]);
+    loadFromLiveVehicle(liveVehicles[0]);
+  }, [
+    liveVehicles,
+    urlFilters.tripId,
+    urlFilters.driverId,
+    urlFilters.vehicleId,
+    urlFilters.vehicleCode,
+    loadFromLiveVehicle,
+  ]);
 
   const handleExport = async (format) => {
     const tid = parseInt(tripId, 10);
@@ -492,6 +538,15 @@ export default function FleetRoutePlayback() {
               onChange={(e) => {
                 const id = e.target.value;
                 setDriverId(id);
+                if (!id) {
+                  setDriverLabel('');
+                  return;
+                }
+                const live = liveVehicles.find((v) => String(v.driver_id) === String(id));
+                if (live) {
+                  loadFromLiveVehicle(live);
+                  return;
+                }
                 const match = driverOptions.find((d) => d.id === id);
                 setDriverLabel(match?.name || '');
                 if (match?.trip_id) setTripId(String(match.trip_id));
