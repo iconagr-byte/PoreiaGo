@@ -49,14 +49,20 @@ class ImpersonationService:
         """Return ``(access_token, tenant_slug)``.
 
         Audit write is best-effort: a schema/CHECK/INET failure must never
-        block SuperAdmin from opening an office (bare 500 on Contabo).
+        block SuperAdmin from opening an office.
+
+        Snapshot scalar columns before any rollback/commit — after
+        ``ensure_audit_logs_schema`` commits, expired ORM instances raise
+        ``MissingGreenlet`` on attribute access in async SQLAlchemy.
         """
-        tenant_result = await self._session.execute(
-            select(Tenant).where(Tenant.id == target_tenant_id).limit(1),
-        )
-        tenant = tenant_result.scalar_one_or_none()
-        if not tenant:
+        row = (
+            await self._session.execute(
+                select(Tenant.slug).where(Tenant.id == target_tenant_id).limit(1),
+            )
+        ).first()
+        if not row:
             raise ValueError("Tenant not found")
+        tenant_slug = str(row[0] or "").strip()
 
         ttl = self._olympus["impersonation_ttl_minutes"]
         token = create_access_token(
@@ -67,7 +73,7 @@ class ImpersonationService:
             expires_minutes=ttl,
             extra={
                 "email": superadmin_email,
-                "tenant_slug": tenant.slug,
+                "tenant_slug": tenant_slug,
                 "impersonating": True,
                 "original_sub": str(superadmin_id),
                 "impersonation_target": str(target_tenant_id),
@@ -81,7 +87,7 @@ class ImpersonationService:
             client_ip=client_ip,
             detail=f"SuperAdmin impersonation started (TTL {ttl}m)",
         )
-        return token, str(tenant.slug or "")
+        return token, tenant_slug
 
     async def _record_audit_best_effort(
         self,
@@ -117,17 +123,24 @@ class ImpersonationService:
                 except Exception:
                     pass
                 if attempt == 1:
+                    # Heal on a *separate* session so DDL commit does not
+                    # expire ORM state on the request session mid-flight.
                     try:
                         from app.services.ensure_audit_logs_schema import (
-                            ensure_audit_logs_schema,
+                            ensure_audit_logs_schema_best_effort,
                         )
 
-                        await ensure_audit_logs_schema(self._session, force=True)
+                        await ensure_audit_logs_schema_best_effort()
                     except Exception:
                         logger.exception("Audit schema heal during impersonation failed")
                 # attempt 2 exhausted → continue without audit
 
     async def resolve_superadmin_email(self, superadmin_id: UUID) -> str:
-        result = await self._session.execute(select(User).where(User.id == superadmin_id).limit(1))
-        user = result.scalar_one_or_none()
-        return user.email if user else str(superadmin_id)
+        row = (
+            await self._session.execute(
+                select(User.email).where(User.id == superadmin_id).limit(1),
+            )
+        ).first()
+        if not row or not row[0]:
+            return str(superadmin_id)
+        return str(row[0])

@@ -232,7 +232,7 @@ class ImpersonationTests(unittest.IsolatedAsyncioTestCase):
 
         session = AsyncMock()
         tenant_result = MagicMock()
-        tenant_result.scalar_one_or_none.return_value = tenant
+        tenant_result.first.return_value = (tenant.slug,)
         session.execute = AsyncMock(return_value=tenant_result)
 
         audit_mock = AsyncMock()
@@ -267,17 +267,10 @@ class ImpersonationTests(unittest.IsolatedAsyncioTestCase):
         """Contabo audit_logs CHECK/INET drift must not block office open."""
         superadmin_id = uuid4()
         target_tenant_id = uuid4()
-        tenant = Tenant(
-            id=target_tenant_id,
-            slug="poreiago",
-            legal_name="PoreiaGo",
-            subdomain="poreiago",
-            is_active=True,
-        )
 
         session = AsyncMock()
         tenant_result = MagicMock()
-        tenant_result.scalar_one_or_none.return_value = tenant
+        tenant_result.first.return_value = ("poreiago",)
         session.execute = AsyncMock(return_value=tenant_result)
         session.rollback = AsyncMock()
 
@@ -288,7 +281,7 @@ class ImpersonationTests(unittest.IsolatedAsyncioTestCase):
             "olympus.security.impersonation.get_olympus_settings",
             return_value={"impersonation_ttl_minutes": 30},
         ), patch(
-            "app.services.ensure_audit_logs_schema.ensure_audit_logs_schema",
+            "app.services.ensure_audit_logs_schema.ensure_audit_logs_schema_best_effort",
             new=AsyncMock(return_value=True),
         ):
             audit_cls.return_value.record = AsyncMock(
