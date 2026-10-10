@@ -58,6 +58,10 @@ class PlatformUserResponse(BaseModel):
     is_active: bool
     last_login_at: datetime | None = None
     created_at: datetime
+    # Present when listing across offices (superadmin all_offices=1).
+    tenant_id: str | None = None
+    tenant_name: str | None = None
+    tenant_slug: str | None = None
 
 
 class PlatformUserCreate(BaseModel):

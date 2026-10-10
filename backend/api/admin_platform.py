@@ -446,7 +446,21 @@ def _parse_tenant_uuid(request: Request):
 
 
 @router.get("/users", response_model=list[PlatformUserResponse])
-async def get_users(request: Request):
+async def get_users(request: Request, all_offices: bool = False):
+    """List backoffice users for the JWT tenant.
+
+    Superadmin may pass ``all_offices=1`` to get every office's staff,
+    each row labeled with ``tenant_id`` / ``tenant_name`` / ``tenant_slug``.
+    """
+    if all_offices:
+        _require_superadmin(request)
+        from app.core.database import AsyncSessionLocal
+        from travel_platform.settings.users_db import list_all_staff_users_with_tenants
+
+        async with AsyncSessionLocal() as db:
+            rows = await list_all_staff_users_with_tenants(db)
+            return [_user_response(r) for r in rows]
+
     tid = _parse_tenant_uuid(request)
     if tid is not None:
         from app.core.database import AsyncSessionLocal
@@ -637,49 +651,54 @@ async def send_user_password_reset(
     _ = body  # reserved
     is_sa = _require_password_reset_sender(request)
     tid = _parse_tenant_uuid(request)
-    if tid is not None:
-        from uuid import UUID
+    from uuid import UUID
 
-        from app.core.database import AsyncSessionLocal
-        from travel_platform.settings.users_db import get_tenant_user
+    from app.core.database import AsyncSessionLocal
+    from travel_platform.settings.admin_password_reset import get_user_any_tenant
+    from travel_platform.settings.users_db import get_tenant_user
 
+    try:
+        uid = UUID(user_id)
+    except ValueError:
+        uid = None
+    if uid is not None:
         try:
-            uid = UUID(user_id)
-        except ValueError:
-            uid = None
-        if uid is not None:
-            try:
-                async with AsyncSessionLocal() as db:
+            async with AsyncSessionLocal() as db:
+                user = None
+                if tid is not None:
                     user = await get_tenant_user(db, tid, uid)
-                    if user and user.is_active:
-                        result = await _send_reset_for_db_user(
-                            user, include_reset_url=is_sa
+                # Superadmin list spans all offices — allow lookup by id alone.
+                if user is None and is_sa:
+                    user = await get_user_any_tenant(db, uid)
+                if user and user.is_active:
+                    result = await _send_reset_for_db_user(
+                        user, include_reset_url=is_sa
+                    )
+                    try:
+                        from travel_platform.settings.login_audit_store import (
+                            record_login_from_request,
                         )
-                        try:
-                            from travel_platform.settings.login_audit_store import (
-                                record_login_from_request,
-                            )
 
-                            record_login_from_request(
-                                request,
-                                actor_type="admin",
-                                identity=str(
-                                    getattr(request.state, "email", None)
-                                    or getattr(request.state, "sub", None)
-                                    or "admin"
-                                ),
-                                success=True,
-                                method="password_reset_send",
-                                detail=f"reset_link_sent:{user.email}",
-                                tenant_id=str(tid),
-                            )
-                        except Exception:
-                            pass
-                        return result
-            except HTTPException:
-                raise
-            except Exception as exc:
-                logger.warning("send-password-reset DB lookup failed: %s", exc)
+                        record_login_from_request(
+                            request,
+                            actor_type="admin",
+                            identity=str(
+                                getattr(request.state, "email", None)
+                                or getattr(request.state, "sub", None)
+                                or "admin"
+                            ),
+                            success=True,
+                            method="password_reset_send",
+                            detail=f"reset_link_sent:{user.email}",
+                            tenant_id=str(user.tenant_id or tid or ""),
+                        )
+                    except Exception:
+                        pass
+                    return result
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("send-password-reset DB lookup failed: %s", exc)
 
     from travel_platform.settings.admin_password_reset import memory_fallback_allowed
 
@@ -755,6 +774,19 @@ async def send_password_reset_by_email(
                 detail="Δεν βρέθηκε ενεργός λογαριασμός με αυτό το email",
             )
         if len(active) > 1:
+            from sqlalchemy import select
+
+            from app.models.tenant import Tenant
+
+            tenant_ids = {u.tenant_id for u in active if u.tenant_id}
+            labels: dict = {}
+            if tenant_ids:
+                tres = await db.execute(select(Tenant).where(Tenant.id.in_(list(tenant_ids))))
+                for t in tres.scalars().all():
+                    labels[t.id] = {
+                        "tenant_name": t.legal_name,
+                        "tenant_slug": t.slug,
+                    }
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -763,6 +795,8 @@ async def send_password_reset_by_email(
                         {
                             "user_id": str(u.id),
                             "tenant_id": str(u.tenant_id),
+                            "tenant_name": (labels.get(u.tenant_id) or {}).get("tenant_name"),
+                            "tenant_slug": (labels.get(u.tenant_id) or {}).get("tenant_slug"),
                             "name": u.full_name,
                             "email": u.email,
                         }
