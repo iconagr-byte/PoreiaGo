@@ -272,7 +272,12 @@ export default function SuperAdminPanel() {
       toast.success(`Άνοιγμα ως: ${tenant.legal_name || tenant.slug}`);
       window.location.assign('/admin?tab=dashboard');
     } catch (e) {
-      toast.error(e.message || 'Αποτυχία εισόδου στο γραφείο');
+      const msg = String(e?.message || '').trim();
+      toast.error(
+        !msg || msg === 'Internal Server Error'
+          ? 'Αποτυχία ανοίγματος γραφείου — δοκίμασε ξανά σε λίγο'
+          : msg,
+      );
     } finally {
       setWorking(false);
     }

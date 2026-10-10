@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.api.schemas import (
     AuditLogListResponse,
@@ -262,12 +265,16 @@ async def impersonate_tenant(
     superadmin_id: Annotated[UUID, Depends(get_current_user_id)],
     _: Annotated[None, Depends(require_superadmin)],
 ):
-    """SuperAdmin masquerade — short-lived JWT scoped to target tenant."""
+    """SuperAdmin masquerade — short-lived JWT scoped to target tenant.
+
+    Avoids heavy ``get_tenant`` (counts/RLS) after the token is minted —
+    that path can rollback the session and surface as bare 500 on Contabo.
+    """
     service = ImpersonationService(db)
     email = await service.resolve_superadmin_email(superadmin_id)
     client_ip = await get_client_ip(request)
     try:
-        token = await service.start_impersonation(
+        token, tenant_slug = await service.start_impersonation(
             superadmin_id=superadmin_id,
             superadmin_email=email,
             target_tenant_id=tenant_id,
@@ -275,14 +282,17 @@ async def impersonate_tenant(
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("impersonate failed for tenant=%s", tenant_id)
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Αποτυχία ανοίγματος γραφείου: {type(exc).__name__}",
+        ) from exc
 
-    tenant = await PlatformAdminService(db).get_tenant(tenant_id)
-    if not tenant:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     return TokenResponse(
         access_token=token,
         tenant_id=tenant_id,
-        tenant_slug=tenant.get("slug"),
+        tenant_slug=tenant_slug or None,
         roles=["tenant_admin"],
     )
 

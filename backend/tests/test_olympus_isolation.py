@@ -246,7 +246,7 @@ class ImpersonationTests(unittest.IsolatedAsyncioTestCase):
             mock_create.return_value = "impersonation-jwt"
 
             service = ImpersonationService(session)
-            token = await service.start_impersonation(
+            token, slug = await service.start_impersonation(
                 superadmin_id=superadmin_id,
                 superadmin_email="admin@achillio.gr",
                 target_tenant_id=target_tenant_id,
@@ -254,6 +254,7 @@ class ImpersonationTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(token, "impersonation-jwt")
+        self.assertEqual(slug, "achillio")
         mock_create.assert_called_once()
         call_kwargs = mock_create.call_args.kwargs
         self.assertEqual(call_kwargs["user_id"], superadmin_id)
@@ -261,6 +262,49 @@ class ImpersonationTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(call_kwargs["extra"]["impersonating"])
         self.assertEqual(call_kwargs["extra"]["original_sub"], str(superadmin_id))
         audit_mock.assert_awaited_once()
+
+    async def test_impersonation_survives_audit_failure(self):
+        """Contabo audit_logs CHECK/INET drift must not block office open."""
+        superadmin_id = uuid4()
+        target_tenant_id = uuid4()
+        tenant = Tenant(
+            id=target_tenant_id,
+            slug="poreiago",
+            legal_name="PoreiaGo",
+            subdomain="poreiago",
+            is_active=True,
+        )
+
+        session = AsyncMock()
+        tenant_result = MagicMock()
+        tenant_result.scalar_one_or_none.return_value = tenant
+        session.execute = AsyncMock(return_value=tenant_result)
+        session.rollback = AsyncMock()
+
+        with patch("olympus.security.impersonation.AuditService") as audit_cls, patch(
+            "olympus.security.impersonation.create_access_token",
+            return_value="impersonation-jwt",
+        ), patch(
+            "olympus.security.impersonation.get_olympus_settings",
+            return_value={"impersonation_ttl_minutes": 30},
+        ), patch(
+            "app.services.ensure_audit_logs_schema.ensure_audit_logs_schema",
+            new=AsyncMock(return_value=True),
+        ):
+            audit_cls.return_value.record = AsyncMock(
+                side_effect=Exception("check constraint audit_logs_action"),
+            )
+            service = ImpersonationService(session)
+            token, slug = await service.start_impersonation(
+                superadmin_id=superadmin_id,
+                superadmin_email="sa@poreiago.com",
+                target_tenant_id=target_tenant_id,
+                client_ip="not-an-ip",
+            )
+
+        self.assertEqual(token, "impersonation-jwt")
+        self.assertEqual(slug, "poreiago")
+        self.assertEqual(audit_cls.return_value.record.await_count, 2)
 
 
 class SchemaProvisionTests(unittest.TestCase):
