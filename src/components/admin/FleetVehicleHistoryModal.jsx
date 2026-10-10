@@ -671,6 +671,11 @@ function PointsPanel({ points, selectedPointIdx, onSelect, onCopy, copied }) {
                       <span className="ml-2 font-semibold text-slate-500">
                         {Math.round(p.speed_kmh || 0)} km/h
                       </span>
+                      {Number.isFinite(Number(p.heading_deg)) ? (
+                        <span className="ml-2 font-semibold text-slate-400">
+                          {Math.round((((Number(p.heading_deg) % 360) + 360) % 360))}°
+                        </span>
+                      ) : null}
                     </p>
                     <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                       {sourceLabel(p.source)}
