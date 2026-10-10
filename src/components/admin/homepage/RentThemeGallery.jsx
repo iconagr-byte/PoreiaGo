@@ -236,8 +236,8 @@ export default function RentThemeGallery({
       <div className="rounded-2xl border border-teal-600/15 bg-teal-50/80 px-4 py-3 text-sm text-slate-900">
         <p className="font-bold">1. Επίλεξε πλήρη σελίδα /rent</p>
         <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
-          Κάθε θέμα έχει δικό του οπτικό σχέδιο: διαφορετικό hero, φόρμα κράτησης, header,
-          φωτογραφία και κάρτες στόλου — εμπνευσμένο από μεγάλα rent brands, με δικό μας look.
+          Κάθε θέμα έχει δικό του οπτικό σχέδιο: διαφορετικό hero, φόρμα κράτησης, header
+          και wrapping πλέγμα στόλου — χωρίς scroll και χωρίς μαύρο fill.
         </p>
         <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-teal-800">
           <span className="material-symbols-outlined text-[15px]">visibility</span>
