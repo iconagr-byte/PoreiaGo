@@ -52,6 +52,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import BrandingBoot from './components/BrandingBoot.jsx';
 import MaintenanceGate from './components/MaintenanceGate.jsx';
 import RentStorefrontGate from './components/rental/RentStorefrontGate.jsx';
+import WalletNativeShell from './components/wallet/WalletNativeShell.jsx';
 
 function RentalCustomerAppGated() {
   return (
@@ -130,6 +131,7 @@ function App() {
         <ScrollToTop />
         <MaintenanceGate>
           <Toaster position="top-center" />
+          <WalletNativeShell />
           <Routes>
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />

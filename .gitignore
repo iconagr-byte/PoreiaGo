@@ -31,6 +31,15 @@ deploy/.vapid_public.key
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# Android / Capacitor local machine
+android/local.properties
+android/.gradle/
+android/app/build/
+android/build/
+android/captures/
+*.keystore
+!android/app/debug.keystore
 *.suo
 *.ntvs*
 *.njsproj

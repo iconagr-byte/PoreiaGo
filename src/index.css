@@ -1159,3 +1159,8 @@
     opacity: 0;
   }
 }
+
+/* Capacitor Wallet app — room for native bottom tabs */
+html[data-poreiago-app='wallet'] body {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
