@@ -1,7 +1,8 @@
-# PoreiaGo Wallet — Windows helper (packaged My Wallet only)
+﻿# PoreiaGo Wallet - Windows helper (packaged My Wallet only)
 # Usage (PowerShell):
 #   cd C:\Users\User\poreiago
-#   git pull
+#   git fetch origin
+#   git reset --hard origin/cursor/wallet-android-capacitor-5ffb
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-android-fix.ps1
 
 $ErrorActionPreference = "Stop"
@@ -29,17 +30,17 @@ if ($LASTEXITCODE -ne 0) { throw "cap:sync:packaged failed" }
 
 $cfgPath = ".\android\app\src\main\assets\capacitor.config.json"
 if (-not (Test-Path $cfgPath)) {
-  throw "ERROR: missing $cfgPath — sync did not copy assets"
+  throw "ERROR: missing $cfgPath - sync did not copy assets"
 }
 $cfg = Get-Content $cfgPath -Raw
 if ($cfg -match '"server"') {
-  throw "ERROR: capacitor.config still has server.url — packaged sync failed"
+  throw "ERROR: capacitor.config still has server.url - packaged sync failed"
 }
 
 Write-Host ""
 Write-Host "OK. Next in Android Studio:" -ForegroundColor Green
-Write-Host "  1) File → Open → $root\android"
-Write-Host "  2) Settings → Gradle → Gradle JDK = 21 (not 25)"
-Write-Host "  3) Device Manager → start an emulator"
-Write-Host "  4) Run ▶ app"
+Write-Host "  1) File -> Open -> $root\android"
+Write-Host "  2) Settings -> Gradle -> Gradle JDK = 21 (not 25)"
+Write-Host "  3) Device Manager -> start an emulator"
+Write-Host "  4) Run app"
 Write-Host ""
