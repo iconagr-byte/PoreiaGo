@@ -1,61 +1,62 @@
 # PoreiaGo Wallet — Android (Capacitor)
 
-Native shell για **My Wallet πελάτη-ταξιδιώτη** (εισιτήρια + εύρεση κράτησης).  
+Native shell **μόνο για My Wallet** πελάτη-ταξιδιώτη (εισιτήρια + QR).  
+**Δεν** ανοίγει την ιστοσελίδα, admin, οδηγό ή rent.
+
 App id: `com.poreiago.wallet` · όνομα: **PoreiaGo Wallet**
 
 ## Προαπαιτούμενα (στο PC σου)
 
-- Android Studio (εγκατεστημένο)
-- JDK 17
+- Android Studio
+- JDK 17 ή 21 (όχι 25)
 - Node 20+ / npm
 
-## Γρήγορο άνοιγμα (live site μέσα στο app)
+## Build (μόνο My Wallet από τοπικό `dist/`)
 
-Δείχνει το storefront λεωφορείων του γραφείου + `/wallet` για εισιτήρια:
+Στο PowerShell:
 
-```bash
-cd /path/to/poreiago
-npm install
-# Προεπιλογή: My Wallet πελάτη (όχι όλη η ιστοσελίδα)
-npm run cap:android
+```powershell
+cd C:\Users\User\poreiago
+git pull
+npm.cmd install
+npm.cmd run cap:sync:packaged
 ```
 
-Άλλο γραφείο:
+Μετά στο Android Studio: άνοιξε τον φάκελο `android/` → **Run ▶**.
 
-```bash
-node scripts/cap-wallet-sync.mjs --live https://YOUR-OFFICE-DOMAIN/wallet
-npx cap open android
+Ή όλα μαζί:
+
+```powershell
+npm.cmd run cap:android
 ```
 
-Στο Android Studio: άνοιξε τον φάκελο `android/` → **Run ▶** σε emulator ή USB συσκευή.
+Χωρίς `server.url` το WebView φορτώνει τα τοπικά αρχεία — όχι το live site.
 
-## Packaged build (από `dist/`)
+## Τι φαίνεται μέσα στο app
 
-```bash
-npm run cap:android:packaged
-```
+| Οθόνη | Διαδρομή |
+|-------|----------|
+| My Wallet (login / εισιτήρια) | `/wallet` → `/login` |
+| Εύρεση κράτησης | `/my-booking` |
 
-Χωρίς `server.url` το WebView φορτώνει τα τοπικά αρχεία από το `vite build`.  
-Για multi-tenant γραφεία προτίμησε το live URL μέχρι να υπάρχει office picker στο app.
-
-## Πλοήγηση μέσα στο app
-
-Το app ανοίγει στο **`/wallet`** (μόνο πελάτης-ταξιδιώτης).  
-Η αρχική ιστοσελίδα / admin / οδηγός / rent μπλοκάρονται.
-
-| Tab | Διαδρομή |
-|-----|----------|
-| Εισιτήρια | `/wallet` |
-| Κράτηση | `/my-booking` |
-| Λογαριασμός | `/login` |
+Κρυμμένα: Αρχική, Λεωφορεία storefront, Rent, admin, driver.
 
 ## Αρχεία
 
-- `capacitor.config.json` — app id / splash / live storefront URL
+- `capacitor.config.json` — app id / splash (χωρίς live URL)
 - `android/` — Android Studio project
-- `src/components/wallet/WalletNativeShell.jsx` — bottom tabs
-- `scripts/cap-wallet-sync.mjs` — build + sync helper
+- `src/components/wallet/WalletNativeBoot.jsx` — κλειδώνει μόνο wallet routes
+- `src/components/wallet/WalletNativeShell.jsx` — κάτω tabs
+- `scripts/cap-wallet-sync.mjs` — build + sync
+
+## Προαιρετικά: live URL (όχι για Wallet-only)
+
+```bash
+npm run cap:sync:live
+```
+
+Φορτώνει το production site — **μην** το χρησιμοποιείς αν θέλεις μόνο My Wallet.
 
 ## Επόμενα (Driver / Rent)
 
-Ξεχωριστά apps: `com.poreiago.driver`, `com.poreiago.rent` — ίδια τεχνική, διαφορετικό `appId` + start URL.
+Ξεχωριστά apps: `com.poreiago.driver`, `com.poreiago.rent`.

@@ -1164,3 +1164,14 @@
 html[data-poreiago-app='wallet'] body {
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
+
+/* Auth screens have no tab bar */
+html[data-poreiago-app='wallet'] body:has(.wallet-auth-stage) {
+  padding-bottom: 0;
+}
+
+/* Never show platform back-to-home chrome inside the Wallet app */
+html[data-poreiago-app='wallet'] .wallet-auth-back,
+html[data-poreiago-app='wallet'] .rent-auth-back {
+  display: none !important;
+}

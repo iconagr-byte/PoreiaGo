@@ -44,6 +44,7 @@ import {
 } from '../services/officeModulesApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import '../styles/wallet-pass.css';
 
 const ALL_TABS = [
@@ -109,12 +110,12 @@ function WalletAuthGate() {
     return <WalletAuthenticatedApp />;
   }
 
-  // No office/driver chooser — go straight to the right entrance.
-  if (isDriver()) {
+  // Native Wallet app: stay in My Wallet (no driver/admin platform).
+  if (!isNativeApp() && isDriver()) {
     return <Navigate to="/driver" replace />;
   }
 
-  if (isAdmin()) {
+  if (isAdmin() || (isNativeApp() && isDriver())) {
     return <Navigate to="/login" replace state={{ from: '/wallet', walletClaim: true }} />;
   }
 
@@ -267,10 +268,15 @@ function WalletAuthenticatedApp() {
     };
   }, []);
 
-  const rentAvailable = shouldShowRentStorefront(officeModules);
+  const nativeWallet = isNativeApp();
+  const rentAvailable = !nativeWallet && shouldShowRentStorefront(officeModules);
   const tabs = useMemo(
-    () => ALL_TABS.filter((tab) => !tab.requiresRent || rentAvailable),
-    [rentAvailable],
+    () =>
+      ALL_TABS.filter((tab) => {
+        if (nativeWallet && tab.id === 'rentals') return false;
+        return !tab.requiresRent || rentAvailable;
+      }),
+    [rentAvailable, nativeWallet],
   );
 
   useEffect(() => {
@@ -415,7 +421,7 @@ function WalletAuthenticatedApp() {
           brandLabel={displayBrand}
           passengerName={displayPassenger}
           onOpenDetails={openTicket}
-          onBrowseTrips={() => navigate('/')}
+          onBrowseTrips={nativeWallet ? undefined : () => navigate('/')}
           onQrChange={handleQrChange}
           offline={usingOfflinePass}
         />
@@ -462,9 +468,11 @@ function WalletAuthenticatedApp() {
       </div>
 
       <div className="wallet-desktop-rail-actions">
-        <button type="button" className="wallet-btn wallet-btn-primary wallet-btn-block" onClick={() => navigate('/')}>
-          Νέα κράτηση
-        </button>
+        {!nativeWallet ? (
+          <button type="button" className="wallet-btn wallet-btn-primary wallet-btn-block" onClick={() => navigate('/')}>
+            Νέα κράτηση
+          </button>
+        ) : null}
         <button type="button" className="wallet-btn wallet-btn-ghost wallet-btn-block" onClick={() => switchTab('account')}>
           Λογαριασμός
         </button>
@@ -476,12 +484,18 @@ function WalletAuthenticatedApp() {
     <div className={stageClass} data-wallet-device={isPhone ? 'phone' : isDesktop ? 'desktop' : 'tablet'}>
       <div className={`wallet-app${isDesktop ? ' wallet-app--desktop' : ''}${isPhone ? ' wallet-app--phone' : ''}`}>
         <header className="wallet-topbar">
-          <button type="button" className="wallet-topbar-btn" onClick={() => navigate('/')}>
-            <span className="material-symbols-outlined text-[20px]" aria-hidden>
-              arrow_back
+          {nativeWallet ? (
+            <span className="wallet-topbar-btn" aria-hidden style={{ visibility: 'hidden' }}>
+              <span className="material-symbols-outlined text-[20px]">arrow_back</span>
             </span>
-            <span className="wallet-topbar-btn-label">Αρχική</span>
-          </button>
+          ) : (
+            <button type="button" className="wallet-topbar-btn" onClick={() => navigate('/')}>
+              <span className="material-symbols-outlined text-[20px]" aria-hidden>
+                arrow_back
+              </span>
+              <span className="wallet-topbar-btn-label">Αρχική</span>
+            </button>
+          )}
           <div className="wallet-topbar-brand">
             <OfficeBrandMark className="h-8" variant="light" fallbackLabel="My Wallet" asLink={false} />
           </div>
@@ -570,9 +584,15 @@ function WalletAuthenticatedApp() {
 
               {bookings.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-                  <Link to="/" className="wallet-btn wallet-btn-primary">
-                    Κράτηση εκδρομής
-                  </Link>
+                  {nativeWallet ? (
+                    <Link to="/my-booking" className="wallet-btn wallet-btn-primary">
+                      Εύρεση κράτησης
+                    </Link>
+                  ) : (
+                    <Link to="/" className="wallet-btn wallet-btn-primary">
+                      Κράτηση εκδρομής
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <div className={`wallet-list${isDesktop ? ' wallet-list--desktop' : ''}`}>

@@ -1,11 +1,10 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
-/** Traveler wallet only — no full website / marketing home. */
+/** My Wallet only — tickets + account (no buses / rent / home). */
 const TABS = [
   { to: '/wallet', end: false, icon: 'confirmation_number', label: 'Εισιτήρια' },
   { to: '/my-booking', end: false, icon: 'search', label: 'Κράτηση' },
-  { to: '/login', end: false, icon: 'person', label: 'Λογαριασμός' },
 ];
 
 /**
@@ -16,6 +15,14 @@ export default function WalletNativeShell() {
   const native = isNativeApp();
 
   if (!native) return null;
+
+  const authScreen =
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname.startsWith('/forgot-password') ||
+    pathname.startsWith('/reset-password');
+
+  if (authScreen) return null;
 
   const hide =
     pathname.startsWith('/admin') ||
@@ -41,7 +48,7 @@ export default function WalletNativeShell() {
         bottom: 0,
         zIndex: 90,
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
+        gridTemplateColumns: 'repeat(2, 1fr)',
         gap: 4,
         padding: '8px 12px calc(8px + env(safe-area-inset-bottom))',
         background: 'rgba(255,255,255,0.96)',
@@ -57,11 +64,7 @@ export default function WalletNativeShell() {
           style={({ isActive }) => {
             const active =
               isActive ||
-              (tab.to === '/wallet' && pathname.startsWith('/wallet')) ||
-              (tab.to === '/login' &&
-                (pathname === '/login' ||
-                  pathname === '/register' ||
-                  pathname.startsWith('/forgot-password')));
+              (tab.to === '/wallet' && pathname.startsWith('/wallet'));
             return {
               display: 'flex',
               flexDirection: 'column',

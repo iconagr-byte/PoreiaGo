@@ -16,6 +16,7 @@ import {
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -366,19 +367,21 @@ export default function RegisterPage() {
             Σύνδεση
           </Link>
         </p>
-        {!rentIntent ? (
-          <p className="text-xs text-center mt-4">
-            <Link to="/my-booking" className={linkClass}>
-              Εύρεση κράτησης λεωφορείου
-            </Link>
-          </p>
-        ) : (
-          <p className="text-xs text-center mt-4">
-            <Link to="/rent/my-booking" className={linkClass}>
-              Εύρεση κράτησης ενοικίασης
-            </Link>
-          </p>
-        )}
+        {!isNativeApp() ? (
+          !rentIntent ? (
+            <p className="text-xs text-center mt-4">
+              <Link to="/my-booking" className={linkClass}>
+                Εύρεση κράτησης λεωφορείου
+              </Link>
+            </p>
+          ) : (
+            <p className="text-xs text-center mt-4">
+              <Link to="/rent/my-booking" className={linkClass}>
+                Εύρεση κράτησης ενοικίασης
+              </Link>
+            </p>
+          )
+        ) : null}
           </div>
         </div>
       </div>

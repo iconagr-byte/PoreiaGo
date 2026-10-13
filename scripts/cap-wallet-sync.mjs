@@ -2,9 +2,9 @@
 /**
  * Sync PoreiaGo Wallet Android project.
  * Usage:
- *   node scripts/cap-wallet-sync.mjs              # keep current server.url
- *   node scripts/cap-wallet-sync.mjs --live URL   # set live storefront
- *   node scripts/cap-wallet-sync.mjs --packaged   # remove server.url (use dist)
+ *   node scripts/cap-wallet-sync.mjs              # packaged My Wallet (default)
+ *   node scripts/cap-wallet-sync.mjs --packaged   # same — remove server.url (use dist)
+ *   node scripts/cap-wallet-sync.mjs --live URL   # optional live WebView (not recommended)
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -23,7 +23,8 @@ if (liveIdx >= 0) {
     '',
   );
   cfg.server = { url, cleartext: false };
-} else if (args.includes('--packaged')) {
+} else {
+  // Default: packaged local dist — My Wallet only, not the live website.
   delete cfg.server;
 }
 

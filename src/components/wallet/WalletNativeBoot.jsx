@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
-/** Paths that belong to the traveler wallet Android app. */
+/** My Wallet only — no storefront, admin, driver, or rent. */
 const WALLET_APP_PREFIXES = [
   '/wallet',
   '/my-booking',
@@ -11,12 +11,7 @@ const WALLET_APP_PREFIXES = [
   '/forgot-password',
   '/reset-password',
   '/ticket/',
-  '/select-seat',
-  '/checkout',
-  '/trip/',
-  '/book/',
   '/passenger-checkin',
-  '/track/',
 ];
 
 function isWalletAppPath(pathname) {
@@ -25,8 +20,8 @@ function isWalletAppPath(pathname) {
 }
 
 /**
- * Keep the Capacitor Wallet app inside customer-traveler flows.
- * Blocks marketing home, admin, driver, rent storefront, etc.
+ * Capacitor Wallet app: traveler My Wallet only.
+ * Blocks marketing home, trip browse, admin, driver, rent.
  */
 export default function WalletNativeBoot() {
   const location = useLocation();

@@ -11,11 +11,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "cap:sync": "node scripts/cap-wallet-sync.mjs",
+    "cap:sync": "node scripts/cap-wallet-sync.mjs --packaged",
     "cap:sync:live": "node scripts/cap-wallet-sync.mjs --live https://www.achilliotravel.com/wallet",
     "cap:sync:packaged": "node scripts/cap-wallet-sync.mjs --packaged",
     "cap:open": "npx cap open android",
-    "cap:android": "npm run cap:sync:live && npx cap open android",
+    "cap:android": "npm run cap:sync:packaged && npx cap open android",
     "cap:android:packaged": "npm run cap:sync:packaged && npx cap open android"
   },
   "dependencies": {

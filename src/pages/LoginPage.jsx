@@ -44,7 +44,9 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const isPhone = useRentPhone();
   const { enabled: googleEnabled } = useGoogleAuthConfig();
   // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
-  const pathRent = rentEntrance || isRentAuthPath(location.pathname);
+  // Native Wallet Android app: always bus My Wallet (never rent chrome).
+  const pathRent =
+    !isNativeApp() && (rentEntrance || isRentAuthPath(location.pathname));
   const bookingPayContinue =
     typeof location.state?.from === 'string' &&
     (location.state.from.includes('/rent/book/payment') || location.state?.rentBookingPay);
@@ -53,7 +55,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       ? location.state.from
       : '/rent/wallet'
     : location.state?.from || '/wallet';
-  const rentIntent = pathRent || isRentReturn(redirectTo);
+  const rentIntent = !isNativeApp() && (pathRent || isRentReturn(redirectTo));
   const walletIntent =
     !rentIntent && (location.state?.from === '/wallet' || Boolean(location.state?.walletClaim));
   const [error, setError] = useState('');
@@ -348,19 +350,21 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
         </Link>
       </p>
-      {!rentIntent ? (
-        <p className="text-xs text-center mt-3">
-          <Link to="/my-booking" className={linkClass}>
-            Εύρεση κράτησης λεωφορείου
-          </Link>
-        </p>
-      ) : (
-        <p className="text-xs text-center mt-3">
-          <Link to="/rent/my-booking" className={linkClass}>
-            Εύρεση κράτησης ενοικίασης
-          </Link>
-        </p>
-      )}
+      {!isNativeApp() ? (
+        !rentIntent ? (
+          <p className="text-xs text-center mt-3">
+            <Link to="/my-booking" className={linkClass}>
+              Εύρεση κράτησης λεωφορείου
+            </Link>
+          </p>
+        ) : (
+          <p className="text-xs text-center mt-3">
+            <Link to="/rent/my-booking" className={linkClass}>
+              Εύρεση κράτησης ενοικίασης
+            </Link>
+          </p>
+        )
+      ) : null}
     </>
   );
 
