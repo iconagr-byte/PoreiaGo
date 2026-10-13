@@ -14,14 +14,16 @@ App id: `com.poreiago.wallet` · όνομα: **PoreiaGo Wallet**
 
 ## Build + Run (σωστή σειρά)
 
-Στο **PowerShell**:
+Στο **PowerShell** (μία εντολή τη φορά):
 
 ```powershell
 cd C:\Users\User\poreiago
+git checkout -- capacitor.config.json
 git pull
-npm.cmd install
-npm.cmd run cap:sync:packaged
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-android-fix.ps1
 ```
+
+Αν το `git pull` λέει *local changes would be overwritten*, το `git checkout -- capacitor.config.json` τα καθαρίζει (ήταν παλιό live URL).
 
 Μετά Android Studio:
 

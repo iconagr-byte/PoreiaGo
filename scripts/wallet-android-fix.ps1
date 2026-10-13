@@ -1,14 +1,23 @@
 # PoreiaGo Wallet — Windows helper (packaged My Wallet only)
 # Usage (PowerShell):
 #   cd C:\Users\User\poreiago
+#   git pull
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-android-fix.ps1
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-Write-Host "==> git pull" -ForegroundColor Cyan
-git pull
+Write-Host "==> discard local capacitor.config.json (live URL leftovers)" -ForegroundColor Cyan
+git checkout -- capacitor.config.json 2>$null
+git restore capacitor.config.json 2>$null
+
+Write-Host "==> ensure wallet Android branch" -ForegroundColor Cyan
+git fetch origin cursor/wallet-android-capacitor-5ffb
+git checkout cursor/wallet-android-capacitor-5ffb
+if ($LASTEXITCODE -ne 0) { throw "checkout branch failed" }
+git pull origin cursor/wallet-android-capacitor-5ffb
+if ($LASTEXITCODE -ne 0) { throw "git pull failed" }
 
 Write-Host "==> npm install" -ForegroundColor Cyan
 npm.cmd install
@@ -18,7 +27,11 @@ Write-Host "==> cap:sync:packaged (My Wallet only, no live site)" -ForegroundCol
 npm.cmd run cap:sync:packaged
 if ($LASTEXITCODE -ne 0) { throw "cap:sync:packaged failed" }
 
-$cfg = Get-Content .\android\app\src\main\assets\capacitor.config.json -Raw
+$cfgPath = ".\android\app\src\main\assets\capacitor.config.json"
+if (-not (Test-Path $cfgPath)) {
+  throw "ERROR: missing $cfgPath — sync did not copy assets"
+}
+$cfg = Get-Content $cfgPath -Raw
 if ($cfg -match '"server"') {
   throw "ERROR: capacitor.config still has server.url — packaged sync failed"
 }
