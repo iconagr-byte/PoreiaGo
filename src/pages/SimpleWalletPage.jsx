@@ -492,7 +492,7 @@ function WalletAuthenticatedApp() {
         className={`wallet-app${
           nativeWallet || isPhone ? ' wallet-app--phone' : isDesktop ? ' wallet-app--desktop' : ''
         }`}
-      }
+      >
         <header className="wallet-topbar">
           {nativeWallet ? (
             <span className="wallet-topbar-btn" aria-hidden style={{ visibility: 'hidden' }}>
