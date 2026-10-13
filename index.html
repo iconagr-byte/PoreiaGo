@@ -18,6 +18,17 @@
     <meta name="application-name" content="PoreiaGo" />
     <script>
       (function () {
+        // Capacitor Wallet Android/iOS — mark app shell ASAP for full-bleed CSS
+        try {
+          var cap = window.Capacitor;
+          var ua = String(navigator.userAgent || '');
+          var native =
+            (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) ||
+            (cap && typeof cap.getPlatform === 'function' &&
+              /^(android|ios)$/i.test(String(cap.getPlatform() || ''))) ||
+            /Capacitor/i.test(ua);
+          if (native) document.documentElement.setAttribute('data-poreiago-app', 'wallet');
+        } catch (e) { /* ignore */ }
         var host = (location.hostname || '').toLowerCase();
         // Apex without www was indexed by Google with a stale PoreiaGo title.
         // Prefer www as the single public URL (nginx 301 when Host/XFH survive NPM).

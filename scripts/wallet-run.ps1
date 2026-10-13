@@ -55,6 +55,7 @@ $online = & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "dev
 if (-not $online) {
   throw "Emulator not online. In Android Studio start Medium Phone API 37, wait for home screen, rerun this script."
 }
+& $adb uninstall com.poreiago.wallet 2>$null
 & $adb install -r $apk
 if ($LASTEXITCODE -ne 0) { throw "install failed" }
 & $adb shell am start -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity"
