@@ -16,17 +16,56 @@
     <meta property="og:site_name" content="PoreiaGo" />
     <meta name="twitter:title" content="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία" />
     <meta name="application-name" content="PoreiaGo" />
+    <style id="poreiago-wallet-native-boot">
+      /* Full-bleed My Wallet in Capacitor — no website chrome, fast fade */
+      html[data-poreiago-app='wallet'],
+      html[data-poreiago-app='wallet'] body,
+      html[data-poreiago-app='wallet'] #root {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-height: 100% !important;
+        background: #ffffff !important;
+        overflow-x: hidden !important;
+      }
+      html[data-poreiago-app='wallet'] .wallet-auth-stage,
+      html[data-poreiago-app='wallet'] .wallet-auth-shell,
+      html[data-poreiago-app='wallet'] .wallet-auth-scroll,
+      html[data-poreiago-app='wallet'] .wallet-auth-panel,
+      html[data-poreiago-app='wallet'] .wallet-auth-card {
+        background: #ffffff !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: none !important;
+      }
+      html[data-poreiago-app='wallet'] .wallet-auth-stage {
+        min-height: 100dvh !important;
+        animation: pgWalletFade 160ms ease-out;
+      }
+      @keyframes pgWalletFade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      html[data-poreiago-app='wallet'] .wallet-auth-back {
+        display: none !important;
+      }
+    </style>
     <script>
       (function () {
         // Capacitor Wallet Android/iOS — mark app shell ASAP for full-bleed CSS
         try {
           var cap = window.Capacitor;
           var ua = String(navigator.userAgent || '');
+          var host0 = String(location.hostname || '').toLowerCase();
           var native =
             (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) ||
             (cap && typeof cap.getPlatform === 'function' &&
               /^(android|ios)$/i.test(String(cap.getPlatform() || ''))) ||
-            /Capacitor/i.test(ua);
+            /Capacitor/i.test(ua) ||
+            // Packaged Capacitor WebView origin
+            (host0 === 'localhost' && /^https?:$/.test(location.protocol || ''));
           if (native) document.documentElement.setAttribute('data-poreiago-app', 'wallet');
         } catch (e) { /* ignore */ }
         var host = (location.hostname || '').toLowerCase();

@@ -4,17 +4,18 @@
   "webDir": "dist",
   "android": {
     "allowMixedContent": false,
-    "backgroundColor": "#0f4c81"
+    "backgroundColor": "#ffffff"
   },
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": true,
-      "backgroundColor": "#0f4c81",
-      "showSpinner": false
+      "backgroundColor": "#ffffff",
+      "showSpinner": false,
+      "launchFadeOutDuration": 150
     },
     "StatusBar": {
-      "style": "DARK",
-      "backgroundColor": "#0f4c81"
+      "style": "LIGHT",
+      "backgroundColor": "#ffffff"
     }
   }
 }
