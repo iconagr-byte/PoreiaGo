@@ -1,5 +1,6 @@
 import { API_BASE } from '../config/api.js';
 import { getCustomerToken, setCustomerToken } from '../lib/auth.js';
+import { setWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 
 function parseError(data) {
   const detail = data?.detail;
@@ -40,8 +41,11 @@ async function postJson(path, body, auth = false) {
 }
 
 export function persistCustomerSession(profile) {
-  if (profile.access_token) {
+  if (profile?.access_token) {
     setCustomerToken(profile.access_token);
+  }
+  if (profile?.tenant_id) {
+    setWalletTenantId(profile.tenant_id);
   }
   return profile;
 }

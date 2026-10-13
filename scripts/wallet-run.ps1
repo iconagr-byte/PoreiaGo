@@ -1,0 +1,110 @@
+﻿# PoreiaGo Wallet - build + install on running emulator
+# Usage:
+#   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
+
+param(
+  [string]$Sdk = ""
+)
+
+$ErrorActionPreference = "Stop"
+$repo = "C:\Users\User\poreiago"
+Set-Location $repo
+
+Remove-Item Env:ANDROID_HOME -ErrorAction SilentlyContinue
+Remove-Item Env:ANDROID_SDK_ROOT -ErrorAction SilentlyContinue
+
+function Get-JavaMajor($javaHome) {
+  $javaExe = Join-Path $javaHome "bin\java.exe"
+  if (-not (Test-Path -LiteralPath $javaExe)) { return -1 }
+  try {
+    $out = & $javaExe -version 2>&1 | Out-String
+    if ($out -match 'version "(\d+)') { return [int]$Matches[1] }
+    if ($out -match 'version "1\.(\d+)') { return [int]$Matches[1] }
+  } catch {}
+  return -1
+}
+
+function Find-Java21 {
+  $candidates = New-Object System.Collections.Generic.List[string]
+  $jdks = Join-Path $env:USERPROFILE ".jdks"
+  if (Test-Path $jdks) {
+    Get-ChildItem -Path $jdks -Directory -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -match 'jbr-21|jdk-21|21\.' } |
+      ForEach-Object { [void]$candidates.Add($_.FullName) }
+  }
+  foreach ($name in @("Android Studio","Android Studio1","Android Studio2")) {
+    [void]$candidates.Add((Join-Path $env:ProgramFiles ("Android\" + $name + "\jbr")))
+    [void]$candidates.Add((Join-Path $env:LOCALAPPDATA ("Programs\Android\" + $name + "\jbr")))
+  }
+  foreach ($c in $candidates) {
+    if (-not $c) { continue }
+    $major = Get-JavaMajor $c
+    Write-Host ("check Java " + $c + " -> major=" + $major)
+    if ($major -eq 21 -or $major -eq 17) { return $c }
+  }
+  return $null
+}
+
+function Pin-GradleJavaHome($javaHome) {
+  $gp = Join-Path $repo "android\gradle.properties"
+  $line = "org.gradle.java.home=" + ($javaHome -replace '\\','\\')
+  $lines = @()
+  if (Test-Path $gp) {
+    $lines = Get-Content $gp | Where-Object { $_ -notmatch '^\s*org\.gradle\.java\.home=' }
+  }
+  ($lines + $line) | Set-Content -Path $gp -Encoding ASCII
+  Write-Host ("Pinned " + $line) -ForegroundColor Green
+}
+
+if (-not $Sdk) { $Sdk = Join-Path $env:LOCALAPPDATA "Android\Sdk" }
+$adb = Join-Path $Sdk "platform-tools\adb.exe"
+$java = Find-Java21
+if (-not $java) {
+  throw "Need JDK 17 or 21 (not 25). Android Studio -> Settings -> Gradle -> Gradle JDK = jbr-21"
+}
+if (-not (Test-Path -LiteralPath $adb)) { throw "adb not found at $adb" }
+
+$env:JAVA_HOME = $java
+$env:ANDROID_HOME = $Sdk
+$env:ANDROID_SDK_ROOT = $Sdk
+$env:Path = (Join-Path $env:JAVA_HOME "bin") + ";" + (Join-Path $env:ANDROID_HOME "platform-tools") + ";" + $env:Path
+Write-Host ("JAVA_HOME=" + $env:JAVA_HOME + " major=" + (Get-JavaMajor $env:JAVA_HOME)) -ForegroundColor Green
+Write-Host ("ANDROID_HOME=" + $env:ANDROID_HOME)
+
+$sdkSlash = $Sdk -replace '\\', '/'
+Set-Content -Path (Join-Path $repo "android\local.properties") -Value ("sdk.dir=" + $sdkSlash) -Encoding ASCII
+
+Write-Host "==> git fetch/reset" -ForegroundColor Cyan
+git fetch origin cursor/wallet-android-capacitor-5ffb
+git reset --hard origin/cursor/wallet-android-capacitor-5ffb
+git log -1 --oneline
+
+Pin-GradleJavaHome $env:JAVA_HOME
+
+Write-Host "==> cap:sync:packaged" -ForegroundColor Cyan
+npm.cmd run cap:sync:packaged
+if ($LASTEXITCODE -ne 0) { throw "sync failed" }
+
+$htmlHit = Select-String -Path (Join-Path $repo "android\app\src\main\assets\public\index.html") -Pattern "pgWalletFade" -ErrorAction SilentlyContinue
+if (-not $htmlHit) { throw "NEW full-bleed CSS missing from android assets" }
+Write-Host "OK: full-bleed fade CSS present in assets" -ForegroundColor Green
+
+Pin-GradleJavaHome $env:JAVA_HOME
+
+Set-Location (Join-Path $repo "android")
+& .\gradlew.bat --no-daemon -Dorg.gradle.java.home="$env:JAVA_HOME" assembleDebug
+if ($LASTEXITCODE -ne 0) { throw "build failed - JDK must be 17/21 not 25" }
+
+$apk = Join-Path $repo "android\app\build\outputs\apk\debug\app-debug.apk"
+& $adb start-server
+& $adb devices
+$online = & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "device$" }
+if (-not $online) { throw "Emulator not online. Start Medium Phone, wait home screen, rerun." }
+
+Write-Host "==> wipe old app + reinstall" -ForegroundColor Cyan
+& $adb shell am force-stop com.poreiago.wallet
+& $adb uninstall com.poreiago.wallet
+& $adb install -r $apk
+if ($LASTEXITCODE -ne 0) { throw "install failed" }
+& $adb shell am start -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity"
+Write-Host "DONE - white full-screen My Wallet with fast fade" -ForegroundColor Green

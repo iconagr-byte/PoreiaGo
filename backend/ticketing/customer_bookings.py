@@ -61,11 +61,12 @@ async def list_bookings_for_email(
     tid = _normalize_tenant(tenant_id)
     db = get_db()
     if tid:
+        # Strict office seal — never surface NULL/foreign tenant rows.
         cursor = await db.execute(
             """
             SELECT * FROM customer_bookings
             WHERE customer_email = ?
-              AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')
+              AND tenant_id = ?
             ORDER BY updated_at DESC
             """,
             (key, tid),

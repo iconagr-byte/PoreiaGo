@@ -1,4 +1,5 @@
 import { upsertCustomer } from './customers/customerStore.js';
+import { clearWalletTenantId, setWalletTenantId } from './wallet/walletTenantSeal.js';
 
 export const ROLES = {
   CUSTOMER: 'customer',
@@ -52,6 +53,10 @@ export function loginAsCustomer(email, profile = {}, accessToken = null) {
   if (accessToken) setCustomerToken(accessToken);
   else if (profile.access_token) setCustomerToken(profile.access_token);
 
+  // Seal My Wallet to the office stamped at login (never mix offices).
+  const tid = profile.tenant_id || profile.tenantId || null;
+  if (tid) setWalletTenantId(tid);
+
   upsertCustomer({
     email,
     name: profile.name,
@@ -81,4 +86,5 @@ export function logoutCustomer() {
   localStorage.removeItem('userPicture');
   localStorage.removeItem('authProvider');
   localStorage.removeItem(CUSTOMER_TOKEN_KEY);
+  clearWalletTenantId();
 }

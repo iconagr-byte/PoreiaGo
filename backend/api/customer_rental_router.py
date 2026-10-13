@@ -17,62 +17,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/customer/rentals", tags=["Customer Rentals"])
 
 
-async def _tenant_id(request: Request) -> str:
-    """Office scope for Wallet rentals — Host/middleware first; never demo fallback in prod."""
-    tid = getattr(request.state, "tenant_id", None)
-    if tid:
-        return str(tid)
+async def _tenant_id(request: Request, account: dict | None = None) -> str:
+    """Office scope for Wallet rentals — JWT seal + Host; never spoof via Origin."""
+    from api.customer_wallet_seal import resolve_sealed_wallet_tenant
 
-    # Only proxy Host — Origin/Referer must never switch office scope.
-    hosts: list[str] = []
-    for header in ("x-forwarded-host", "host"):
-        raw = (request.headers.get(header) or "").strip()
-        if not raw:
-            continue
-        value = raw.split(",")[0].strip()
-        if "://" in value:
-            try:
-                from urllib.parse import urlparse
-
-                value = urlparse(value).hostname or ""
-            except Exception:
-                value = ""
-        value = value.split(":")[0].strip().lower()
-        if value and value not in hosts:
-            hosts.append(value)
-
+    jwt_tid = None
+    if account:
+        jwt_tid = account.get("tenant_id")
     try:
-        from middleware.domain_tenant import _is_platform_host, _resolve_host_cached
+        return await resolve_sealed_wallet_tenant(request, jwt_tid=jwt_tid)
+    except HTTPException:
+        # Preserve prior demo fallback for local rent catalog without JWT.
+        import os
 
-        for host in hosts:
-            if not host or _is_platform_host(host):
-                continue
-            resolved = await _resolve_host_cached(host)
-            if resolved:
-                request.state.tenant_id = resolved.tenant_id
-                return str(resolved.tenant_id)
-    except Exception:
-        pass
-
-    import os
-
-    env = os.getenv("ENVIRONMENT", "development").lower()
-    if env in ("development", "dev", "local") or os.getenv("ALLOW_DEMO_RENT_FALLBACK", "").lower() in (
-        "1",
-        "true",
-        "yes",
-    ):
-        return DEMO_TENANT_ID
-
-    raise HTTPException(
-        status_code=404,
-        detail="Δεν βρέθηκε γραφείο ενοικίασης για αυτό το domain.",
-    )
+        env = os.getenv("ENVIRONMENT", "development").lower()
+        if account is None and (
+            env in ("development", "dev", "local")
+            or os.getenv("ALLOW_DEMO_RENT_FALLBACK", "").lower() in ("1", "true", "yes")
+        ):
+            return DEMO_TENANT_ID
+        raise
 
 
-async def _require_rent_module(request: Request) -> str:
+async def _require_rent_module(request: Request, account: dict | None = None) -> str:
     """Resolve tenant and block Rent APIs when the office has no active Rent contract."""
-    tid = await _tenant_id(request)
+    tid = await _tenant_id(request, account)
 
     import os
 
@@ -204,10 +173,11 @@ def _public_vehicle_row(r: dict) -> dict:
 async def rental_catalog(
     request: Request,
     category: str | None = None,
-    _: dict = Depends(get_current_customer),
+    account: dict = Depends(get_current_customer),
 ):
-    vehicles = store.public_catalog(await _require_rent_module(request), category=category)
-    return {"vehicles": vehicles, "count": len(vehicles)}
+    tid = await _require_rent_module(request, account)
+    vehicles = store.public_catalog(tid, category=category)
+    return {"vehicles": vehicles, "count": len(vehicles), "tenant_id": tid}
 
 
 @router.post("/public/lookup")
@@ -283,10 +253,12 @@ async def _availability_payload(
     pickup_location: str | None,
     dropoff_location: str | None,
     driver_mode: str | None,
+    account: dict | None = None,
 ) -> dict:
     try:
+        tid = await _require_rent_module(request, account)
         rows = store.check_availability(
-            await _require_rent_module(request),
+            tid,
             start_time=start_time,
             end_time=end_time,
             category=category,
@@ -298,7 +270,7 @@ async def _availability_payload(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     public = [_public_vehicle_row(r) for r in rows]
-    return {"vehicles": public, "count": len(public)}
+    return {"vehicles": public, "count": len(public), "tenant_id": tid}
 
 
 @router.get("/public/availability")
@@ -335,7 +307,7 @@ async def rental_availability(
     pickup_location: str | None = None,
     dropoff_location: str | None = None,
     driver_mode: str | None = None,
-    _: dict = Depends(get_current_customer),
+    account: dict = Depends(get_current_customer),
 ):
     return await _availability_payload(
         request,
@@ -346,6 +318,7 @@ async def rental_availability(
         pickup_location=pickup_location,
         dropoff_location=dropoff_location,
         driver_mode=driver_mode,
+        account=account,
     )
 
 
@@ -354,8 +327,9 @@ async def my_rental_bookings(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
-    rows = store.list_bookings_for_email(await _require_rent_module(request), account["email"])
-    return {"bookings": [_public_booking(b) for b in rows], "total": len(rows)}
+    tid = await _require_rent_module(request, account)
+    rows = store.list_bookings_for_email(tid, account["email"])
+    return {"bookings": [_public_booking(b) for b in rows], "total": len(rows), "tenant_id": tid}
 
 
 @router.post("/bookings")
@@ -364,6 +338,7 @@ async def book_rental(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
+    tid = await _require_rent_module(request, account)
     payload = {
         "vehicle_id": body.vehicle_id,
         "client_name": (account.get("name") or account["email"].split("@")[0]).strip(),
@@ -389,7 +364,7 @@ async def book_rental(
         "total_cost": body.total_cost,
     }
     try:
-        row = store.create_booking(await _require_rent_module(request), payload)
+        row = store.create_booking(tid, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -421,7 +396,7 @@ async def cancel_my_rental(
 ):
     try:
         row = store.cancel_booking_for_customer(
-            await _require_rent_module(request),
+            await _require_rent_module(request, account),
             booking_id,
             email=account["email"],
         )

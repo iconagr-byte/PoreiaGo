@@ -37,12 +37,14 @@ CREATE TABLE IF NOT EXISTS customer_accounts (
     picture TEXT,
     auth_provider TEXT NOT NULL DEFAULT 'email',
     customer_id TEXT,
+    wallet_tenant_id TEXT,
     reset_token TEXT,
     reset_expires_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ca_reset ON customer_accounts(reset_token);
+CREATE INDEX IF NOT EXISTS idx_ca_wallet_tenant ON customer_accounts(wallet_tenant_id);
 
 CREATE TABLE IF NOT EXISTS customer_bookings (
     id TEXT PRIMARY KEY,
@@ -101,6 +103,16 @@ async def init_ticketing_db() -> None:
         pass
     try:
         await _db.execute("ALTER TABLE customer_bookings ADD COLUMN tenant_id TEXT")
+    except Exception:
+        pass
+    try:
+        await _db.execute("ALTER TABLE customer_accounts ADD COLUMN wallet_tenant_id TEXT")
+    except Exception:
+        pass
+    try:
+        await _db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ca_wallet_tenant ON customer_accounts(wallet_tenant_id)"
+        )
     except Exception:
         pass
     try:

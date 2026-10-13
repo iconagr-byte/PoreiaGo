@@ -16,6 +16,7 @@ import {
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -129,6 +130,7 @@ export default function RegisterPage() {
           picture: result.picture,
           provider: result.provider || 'email',
           customerId: result.customer_id,
+          tenant_id: result.tenant_id,
         },
         result.access_token,
       );
@@ -162,6 +164,7 @@ export default function RegisterPage() {
           picture: profile.picture,
           provider: profile.provider || 'google',
           customerId: profile.customer_id,
+          tenant_id: profile.tenant_id,
         },
         profile.access_token,
       );
@@ -191,9 +194,13 @@ export default function RegisterPage() {
         }
       : { from: redirectTo };
 
+  const nativeWallet = isNativeApp();
+  const phoneChrome = nativeWallet || isPhone;
   const shellClass = rentIntent
-    ? `rent-auth-stage${isPhone ? '' : ' rent-auth-stage--desktop'}`
-    : `wallet-auth-stage${isPhone ? '' : ' wallet-auth-stage--desktop'}`;
+    ? `rent-auth-stage${phoneChrome ? '' : ' rent-auth-stage--desktop'}`
+    : `wallet-auth-stage${phoneChrome ? '' : ' wallet-auth-stage--desktop'}${
+        nativeWallet ? ' wallet-auth-stage--native' : ''
+      }`;
   const cardClass = rentIntent ? 'rent-auth-shell' : 'wallet-auth-shell';
   const scrollClass = rentIntent ? 'rent-auth-scroll' : 'wallet-auth-scroll';
   const panelClass = rentIntent ? 'rent-auth-card' : 'wallet-auth-card';
@@ -366,19 +373,21 @@ export default function RegisterPage() {
             Σύνδεση
           </Link>
         </p>
-        {!rentIntent ? (
-          <p className="text-xs text-center mt-4">
-            <Link to="/my-booking" className={linkClass}>
-              Εύρεση κράτησης λεωφορείου
-            </Link>
-          </p>
-        ) : (
-          <p className="text-xs text-center mt-4">
-            <Link to="/rent/my-booking" className={linkClass}>
-              Εύρεση κράτησης ενοικίασης
-            </Link>
-          </p>
-        )}
+        {!isNativeApp() ? (
+          !rentIntent ? (
+            <p className="text-xs text-center mt-4">
+              <Link to="/my-booking" className={linkClass}>
+                Εύρεση κράτησης λεωφορείου
+              </Link>
+            </p>
+          ) : (
+            <p className="text-xs text-center mt-4">
+              <Link to="/rent/my-booking" className={linkClass}>
+                Εύρεση κράτησης ενοικίασης
+              </Link>
+            </p>
+          )
+        ) : null}
           </div>
         </div>
       </div>
