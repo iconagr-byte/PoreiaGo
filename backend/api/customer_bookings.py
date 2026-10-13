@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api.customer_auth import get_current_customer
-from api.request_tenant import public_tenant_id
+from api.customer_wallet_seal import resolve_sealed_wallet_tenant
 from ticketing.customer_bookings import (
     get_booking,
     list_all_bookings,
@@ -46,11 +46,10 @@ class BookingUpsertRequest(BaseModel):
     booking: dict[str, Any]
 
 
-async def _wallet_tenant(request: Request) -> str:
-    tid = await public_tenant_id(request, allow_demo_fallback=True)
-    if not tid:
-        raise HTTPException(status_code=404, detail="Δεν βρέθηκε γραφείο για αυτό το domain.")
-    return tid
+async def _wallet_tenant(request: Request, account: dict) -> str:
+    return await resolve_sealed_wallet_tenant(
+        request, jwt_tid=account.get("tenant_id")
+    )
 
 
 @router.get("/api/customer/bookings")
@@ -58,9 +57,9 @@ async def my_bookings(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
-    tid = await _wallet_tenant(request)
+    tid = await _wallet_tenant(request, account)
     items = await list_bookings_for_email(account["email"], tenant_id=tid)
-    return {"items": items, "total": len(items)}
+    return {"items": items, "total": len(items), "tenant_id": tid}
 
 
 @router.post("/api/customer/bookings/sync")
@@ -70,17 +69,32 @@ async def sync_my_bookings(
     account: dict = Depends(get_current_customer),
 ):
     """Bulk upsert — client στέλνει τοπικές κρατήσεις, server επιστρέφει πλήρη λίστα."""
-    tid = await _wallet_tenant(request)
+    tid = await _wallet_tenant(request, account)
+    # Never accept another office's bookings into this sealed wallet.
+    # Unscoped locals are stamped to the seal; foreign tenant_id rows are dropped.
+    sealed_locals = []
+    for b in body.bookings or []:
+        if not isinstance(b, dict):
+            continue
+        row_tid = str(b.get("tenant_id") or b.get("tenantId") or "").strip()
+        if row_tid and row_tid != tid:
+            continue
+        sealed_locals.append(b)
     try:
         items = await upsert_many_for_customer(
             account["email"],
             account.get("customer_id"),
-            body.bookings,
+            sealed_locals,
             tenant_id=tid,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"items": items, "total": len(items), "synced": len(body.bookings)}
+    return {
+        "items": items,
+        "total": len(items),
+        "synced": len(sealed_locals),
+        "tenant_id": tid,
+    }
 
 
 @router.post("/api/customer/bookings")
@@ -89,7 +103,13 @@ async def upsert_my_booking(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
-    tid = await _wallet_tenant(request)
+    tid = await _wallet_tenant(request, account)
+    foreign = str((body.booking or {}).get("tenant_id") or "").strip()
+    if foreign and foreign != tid:
+        raise HTTPException(
+            status_code=403,
+            detail="Η κράτηση ανήκει σε άλλο γραφείο.",
+        )
     try:
         saved = await upsert_booking(
             body.booking,
@@ -108,7 +128,7 @@ async def get_my_booking(
     request: Request,
     account: dict = Depends(get_current_customer),
 ):
-    tid = await _wallet_tenant(request)
+    tid = await _wallet_tenant(request, account)
     booking = await get_booking(booking_id, tenant_id=tid)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -124,7 +144,7 @@ async def get_my_booking_track_link(
     account: dict = Depends(get_current_customer),
 ):
     """Signed live-track URL for the passenger (map + ETA)."""
-    tid = await _wallet_tenant(request)
+    tid = await _wallet_tenant(request, account)
     booking = await get_booking(booking_id, tenant_id=tid)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -173,7 +193,7 @@ async def get_my_booking_fiscal(
     account: dict = Depends(get_current_customer),
 ):
     """Fresh fiscal MARK / receipt status from Postgres (for wallet polling)."""
-    tid = await _wallet_tenant(request)
+    tid = await _wallet_tenant(request, account)
     cached = await get_booking(booking_id, tenant_id=tid)
     if cached and str(cached.get("email", "")).lower() != account["email"]:
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -244,7 +264,7 @@ async def download_apple_pass(
             detail="Apple Wallet δεν είναι ρυθμισμένο ακόμα (λείπουν certificates)",
         )
 
-    tid = await _wallet_tenant(request)
+    tid = await _wallet_tenant(request, account)
     booking = await get_booking(booking_id, tenant_id=tid)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")

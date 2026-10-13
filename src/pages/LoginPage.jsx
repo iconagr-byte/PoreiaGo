@@ -171,6 +171,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           provider: result.provider || 'email',
           phone: result.phone,
           customerId: result.customer_id,
+          tenant_id: result.tenant_id,
         },
         result.access_token,
       );
@@ -202,6 +203,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           picture: profile.picture,
           provider: profile.provider || 'google',
           customerId: profile.customer_id,
+          tenant_id: profile.tenant_id,
         },
         profile.access_token,
       );

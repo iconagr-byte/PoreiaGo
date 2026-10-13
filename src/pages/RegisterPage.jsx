@@ -130,6 +130,7 @@ export default function RegisterPage() {
           picture: result.picture,
           provider: result.provider || 'email',
           customerId: result.customer_id,
+          tenant_id: result.tenant_id,
         },
         result.access_token,
       );
@@ -163,6 +164,7 @@ export default function RegisterPage() {
           picture: profile.picture,
           provider: profile.provider || 'google',
           customerId: profile.customer_id,
+          tenant_id: profile.tenant_id,
         },
         profile.access_token,
       );

@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
-/** My Wallet only — no storefront, admin, driver, or rent. */
+/**
+ * Unified My Wallet (buses + rentals) — no marketing site / admin / driver.
+ * Rent browse/book stays on office web; app shows sealed wallet passes only.
+ */
 const WALLET_APP_PREFIXES = [
   '/wallet',
   '/my-booking',

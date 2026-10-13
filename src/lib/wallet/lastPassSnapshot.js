@@ -1,9 +1,20 @@
 /**
  * Persist the featured boarding pass so My Wallet can show it offline.
- * Key lives in localStorage (same origin as /wallet offline shell).
+ * Key lives in localStorage (same origin as /wallet offline shell),
+ * namespaced by sealed office so offices never share offline passes.
  */
 
+import {
+  bookingBelongsToWalletOffice,
+  getWalletTenantId,
+  walletOfficeStorageKey,
+} from './walletTenantSeal.js';
+
 export const WALLET_LAST_PASS_KEY = 'wallet_last_pass_v1';
+
+function lastPassKey() {
+  return walletOfficeStorageKey(WALLET_LAST_PASS_KEY);
+}
 
 function pickBookingFields(booking) {
   if (!booking || typeof booking !== 'object') return null;
@@ -24,6 +35,7 @@ function pickBookingFields(booking) {
     passengers: booking.passengers,
     name: booking.name,
     email: booking.email,
+    tenant_id: booking.tenant_id || booking.tenantId || getWalletTenantId() || undefined,
     fiscal_mark: booking.fiscal_mark,
     fiscalMark: booking.fiscalMark,
   };
@@ -32,10 +44,11 @@ function pickBookingFields(booking) {
 export function loadLastPass() {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(WALLET_LAST_PASS_KEY);
+    const raw = localStorage.getItem(lastPassKey());
     if (!raw) return null;
     const snap = JSON.parse(raw);
     if (!snap?.booking?.id) return null;
+    if (!bookingBelongsToWalletOffice(snap.booking)) return null;
     return snap;
   } catch {
     return null;
@@ -44,7 +57,7 @@ export function loadLastPass() {
 
 export function clearLastPass() {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(WALLET_LAST_PASS_KEY);
+  localStorage.removeItem(lastPassKey());
 }
 
 /**
@@ -73,7 +86,7 @@ export function saveLastPass(partial) {
     cachedAt: new Date().toISOString(),
   };
   try {
-    localStorage.setItem(WALLET_LAST_PASS_KEY, JSON.stringify(snap));
+    localStorage.setItem(lastPassKey(), JSON.stringify(snap));
   } catch {
     // Quota / private mode — ignore
   }

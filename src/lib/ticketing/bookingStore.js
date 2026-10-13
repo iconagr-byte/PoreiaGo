@@ -41,10 +41,19 @@ import {
   officeStorageKey,
 } from '../admin/officeTenantStore.js';
 import { stripDemoBookings } from '../admin/demoCatalog.js';
+import {
+  filterBookingsForWalletOffice,
+  getWalletTenantId,
+  walletOfficeStorageKey,
+} from '../wallet/walletTenantSeal.js';
 
 const STORAGE_KEY_BASE = 'aerostride_bookings_v1';
 
 function storageKey() {
+  // Customer My Wallet: namespace by sealed office. Admin sessions keep officeStorageKey.
+  if (!isAuthenticatedOfficeSession() && getWalletTenantId()) {
+    return walletOfficeStorageKey(STORAGE_KEY_BASE);
+  }
   return officeStorageKey(STORAGE_KEY_BASE);
 }
 
@@ -117,11 +126,13 @@ export async function loadAllBookingsAsync() {
   return loadBookings();
 }
 
-/** My Wallet — sync κρατήσεων πελάτη με server. */
+/** My Wallet — sync κρατήσεων πελάτη με server (μόνο sealed office). */
 export async function loadBookingsForCustomer(email) {
   const key = String(email || '').trim().toLowerCase();
-  const localForUser = loadBookings().filter(
-    (b) => String(b.email || '').toLowerCase() === key,
+  const sealed = getWalletTenantId();
+  const localForUser = filterBookingsForWalletOffice(
+    loadBookings().filter((b) => String(b.email || '').toLowerCase() === key),
+    sealed,
   );
 
   if (!getCustomerToken()) {
@@ -130,8 +141,12 @@ export async function loadBookingsForCustomer(email) {
 
   try {
     const synced = await syncMyBookingsToServer(localForUser);
-    mergeBookingsIntoStore(synced);
-    return loadBookings().filter((b) => String(b.email || '').toLowerCase() === key);
+    const sealedSynced = filterBookingsForWalletOffice(synced, sealed);
+    mergeBookingsIntoStore(sealedSynced);
+    return filterBookingsForWalletOffice(
+      loadBookings().filter((b) => String(b.email || '').toLowerCase() === key),
+      sealed,
+    );
   } catch (err) {
     console.warn('[bookings] customer sync failed', err);
     return localForUser;

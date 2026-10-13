@@ -14,6 +14,10 @@ def _now_iso() -> str:
 
 
 def _row_to_account(row) -> dict:
+    keys = row.keys() if hasattr(row, "keys") else []
+    home = ""
+    if "wallet_tenant_id" in keys:
+        home = str(row["wallet_tenant_id"] or "").strip()
     return {
         "email": row["email"],
         "name": row["name"] or "",
@@ -21,6 +25,7 @@ def _row_to_account(row) -> dict:
         "picture": row["picture"] or "",
         "auth_provider": row["auth_provider"] or "email",
         "customer_id": row["customer_id"],
+        "wallet_tenant_id": home or None,
         "has_password": bool(row["password_hash"]),
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
@@ -177,6 +182,35 @@ async def create_password_reset_token(email: str) -> str | None:
     )
     await db.commit()
     return token
+
+
+async def bind_wallet_tenant(email: str, tenant_id: str) -> dict | None:
+    """Seal account home office once. Never overwrite with a different office."""
+    key = email.strip().lower()
+    tid = str(tenant_id or "").strip()
+    if not key or not tid:
+        return await get_account(key) if key else None
+
+    account = await get_account(key)
+    if not account:
+        return None
+    existing = str(account.get("wallet_tenant_id") or "").strip()
+    if existing and existing != tid:
+        raise ValueError("Ο λογαριασμός ανήκει ήδη σε άλλο γραφείο.")
+    if existing == tid:
+        return account
+
+    db = get_db()
+    await db.execute(
+        """
+        UPDATE customer_accounts
+        SET wallet_tenant_id = ?, updated_at = ?
+        WHERE email = ? AND (wallet_tenant_id IS NULL OR wallet_tenant_id = '')
+        """,
+        (tid, _now_iso(), key),
+    )
+    await db.commit()
+    return await get_account(key)
 
 
 async def reset_password_with_token(token: str, new_password: str) -> dict:

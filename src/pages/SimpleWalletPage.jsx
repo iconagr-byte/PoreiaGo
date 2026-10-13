@@ -269,14 +269,11 @@ function WalletAuthenticatedApp() {
   }, []);
 
   const nativeWallet = isNativeApp();
-  const rentAvailable = !nativeWallet && shouldShowRentStorefront(officeModules);
+  // One Wallet for buses + rentals — show Rent tab when the sealed office has Rent.
+  const rentAvailable = shouldShowRentStorefront(officeModules);
   const tabs = useMemo(
-    () =>
-      ALL_TABS.filter((tab) => {
-        if (nativeWallet && tab.id === 'rentals') return false;
-        return !tab.requiresRent || rentAvailable;
-      }),
-    [rentAvailable, nativeWallet],
+    () => ALL_TABS.filter((tab) => !tab.requiresRent || rentAvailable),
+    [rentAvailable],
   );
 
   useEffect(() => {
