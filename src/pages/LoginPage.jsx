@@ -466,11 +466,19 @@ export default function LoginPage({ rentEntrance = false } = {}) {
     );
   }
 
+  const nativeWallet = isNativeApp();
+  // Native Capacitor app: always full-bleed phone chrome (never desktop aside).
+  const phoneChrome = nativeWallet || isPhone;
+
   return (
-    <div className={`wallet-auth-stage${isPhone ? '' : ' wallet-auth-stage--desktop'}`}>
+    <div
+      className={`wallet-auth-stage${phoneChrome ? '' : ' wallet-auth-stage--desktop'}${
+        nativeWallet ? ' wallet-auth-stage--native' : ''
+      }`}
+    >
       <div className="wallet-auth-shell">
         <div className="wallet-auth-scroll">
-          {!isPhone ? (
+          {!phoneChrome ? (
             <aside className="wallet-auth-aside" aria-label="Σχετικά με το My Wallet λεωφορείων">
               <p className="wallet-auth-aside-kicker">My Wallet · Λεωφορεία</p>
               <h2 className="wallet-auth-aside-title">

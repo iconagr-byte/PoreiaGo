@@ -358,14 +358,17 @@ function WalletAuthenticatedApp() {
       new Date(`${b.date}T23:59:59`) >= new Date(),
   );
 
-  const stageClass = [
-    'wallet-phone-stage',
-    isPhone ? 'wallet-phone-stage--phone' : '',
-    isDesktop ? 'wallet-phone-stage--desktop' : '',
-    !isPhone && !isDesktop ? 'wallet-phone-stage--tablet' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  // Native Wallet app: always full-bleed phone shell (no tablet/desktop bezel).
+  const stageClass = nativeWallet
+    ? 'wallet-phone-stage wallet-phone-stage--phone wallet-phone-stage--native'
+    : [
+        'wallet-phone-stage',
+        isPhone ? 'wallet-phone-stage--phone' : '',
+        isDesktop ? 'wallet-phone-stage--desktop' : '',
+        !isPhone && !isDesktop ? 'wallet-phone-stage--tablet' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
 
   const switchTab = (id) => {
     setActiveTab(id);
@@ -481,8 +484,15 @@ function WalletAuthenticatedApp() {
   );
 
   return (
-    <div className={stageClass} data-wallet-device={isPhone ? 'phone' : isDesktop ? 'desktop' : 'tablet'}>
-      <div className={`wallet-app${isDesktop ? ' wallet-app--desktop' : ''}${isPhone ? ' wallet-app--phone' : ''}`}>
+    <div
+      className={stageClass}
+      data-wallet-device={nativeWallet || isPhone ? 'phone' : isDesktop ? 'desktop' : 'tablet'}
+    >
+      <div
+        className={`wallet-app${
+          nativeWallet || isPhone ? ' wallet-app--phone' : isDesktop ? ' wallet-app--desktop' : ''
+        }`}
+      }
         <header className="wallet-topbar">
           {nativeWallet ? (
             <span className="wallet-topbar-btn" aria-hidden style={{ visibility: 'hidden' }}>

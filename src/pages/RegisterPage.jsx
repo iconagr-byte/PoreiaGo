@@ -192,9 +192,13 @@ export default function RegisterPage() {
         }
       : { from: redirectTo };
 
+  const nativeWallet = isNativeApp();
+  const phoneChrome = nativeWallet || isPhone;
   const shellClass = rentIntent
-    ? `rent-auth-stage${isPhone ? '' : ' rent-auth-stage--desktop'}`
-    : `wallet-auth-stage${isPhone ? '' : ' wallet-auth-stage--desktop'}`;
+    ? `rent-auth-stage${phoneChrome ? '' : ' rent-auth-stage--desktop'}`
+    : `wallet-auth-stage${phoneChrome ? '' : ' wallet-auth-stage--desktop'}${
+        nativeWallet ? ' wallet-auth-stage--native' : ''
+      }`;
   const cardClass = rentIntent ? 'rent-auth-shell' : 'wallet-auth-shell';
   const scrollClass = rentIntent ? 'rent-auth-scroll' : 'wallet-auth-scroll';
   const panelClass = rentIntent ? 'rent-auth-card' : 'wallet-auth-card';
