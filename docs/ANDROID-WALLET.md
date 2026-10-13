@@ -7,13 +7,14 @@ App id: `com.poreiago.wallet` · όνομα: **PoreiaGo Wallet**
 
 ## Προαπαιτούμενα (στο PC σου)
 
-- Android Studio
-- JDK 17 ή 21 (όχι 25)
+- Android Studio (τελευταία σταθερή)
+- **Gradle JDK 17 ή 21** (όχι 25)
 - Node 20+ / npm
+- Ένα emulator (π.χ. Pixel 6 · API 34) **ή** USB συσκευή με USB debugging
 
-## Build (μόνο My Wallet από τοπικό `dist/`)
+## Build + Run (σωστή σειρά)
 
-Στο PowerShell:
+Στο **PowerShell**:
 
 ```powershell
 cd C:\Users\User\poreiago
@@ -22,15 +23,52 @@ npm.cmd install
 npm.cmd run cap:sync:packaged
 ```
 
-Μετά στο Android Studio: άνοιξε τον φάκελο `android/` → **Run ▶**.
+Μετά Android Studio:
 
-Ή όλα μαζί:
+1. **File → Open** → φάκελος `C:\Users\User\poreiago\android` (όχι το root `poreiago`)
+2. Περίμενε να τελειώσει το Gradle sync (κάτω δεξιά)
+3. Πάνω στη μπάρα: διάλεξε emulator (π.χ. `Medium Phone API 34`) — **όχι** κενό target
+4. Αν δεν υπάρχει συσκευή: **Tools → Device Manager → Create Device → Pixel 6 → API 34 → Finish → ▶**
+5. **Run ▶** (πράσινο τρίγωνο)
+
+## Αν βλέπεις `Error running 'app' · Unknown error`
+
+Κάνε **με τη σειρά**:
+
+### 1) Gradle JDK = 21
+**File → Settings → Build, Execution, Deployment → Build Tools → Gradle**  
+→ **Gradle JDK** = `jbr-21` ή `Embedded JDK` / `17` / `21`  
+→ Apply → OK  
+**Μην** αφήσεις JDK 25.
+
+### 2) Συσκευή / emulator
+- Πάνω δεξιά δίπλα στο Run: πρέπει να φαίνεται όνομα emulator (π.χ. `Pixel_6_API_34`)
+- Αν λέει `No devices`: άνοιξε Device Manager και πάτα ▶ στο AVD
+- Αν το AVD κολλάει: ▼ μενού → **Cold Boot Now**
+
+### 3) Clean + Invalidate
+```
+Build → Clean Project
+Build → Rebuild Project
+```
+Μετά Run ▶ ξανά.
+
+### 4) Invalidate Caches
+**File → Invalidate Caches… → Invalidate and Restart**
+
+### 5) Ξανά sync από PowerShell
+Κλείσε το Android Studio, μετά:
 
 ```powershell
-npm.cmd run cap:android
+cd C:\Users\User\poreiago
+npm.cmd run cap:sync:packaged
 ```
 
-Χωρίς `server.url` το WebView φορτώνει τα τοπικά αρχεία — όχι το live site.
+Άνοιξε πάλι μόνο τον φάκελο `android\` και Run.
+
+### 6) Δες το πραγματικό μήνυμα
+**View → Tool Windows → Build** (και **Run**)  
+Αν υπάρχει κόκκινο log, αυτό μετράει περισσότερο από το «Unknown error».
 
 ## Τι φαίνεται μέσα στο app
 
@@ -43,19 +81,16 @@ npm.cmd run cap:android
 
 ## Αρχεία
 
-- `capacitor.config.json` — app id / splash (χωρίς live URL)
+- `capacitor.config.json` — app id / splash (**χωρίς** live `server.url`)
 - `android/` — Android Studio project
 - `src/components/wallet/WalletNativeBoot.jsx` — κλειδώνει μόνο wallet routes
-- `src/components/wallet/WalletNativeShell.jsx` — κάτω tabs
 - `scripts/cap-wallet-sync.mjs` — build + sync
 
-## Προαιρετικά: live URL (όχι για Wallet-only)
+## Μην κάνεις
 
-```bash
-npm run cap:sync:live
-```
-
-Φορτώνει το production site — **μην** το χρησιμοποιείς αν θέλεις μόνο My Wallet.
+- `npm run cap:sync:live` — φορτώνει το site, όχι μόνο My Wallet
+- Open του root `poreiago` αντί για `android`
+- Run χωρίς επιλεγμένο emulator
 
 ## Επόμενα (Driver / Rent)
 
