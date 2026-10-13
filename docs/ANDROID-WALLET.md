@@ -1,6 +1,6 @@
 # PoreiaGo Wallet — Android (Capacitor)
 
-Native shell για **λεωφορεία (booking) + εισιτήριο (wallet)**.  
+Native shell για **My Wallet πελάτη-ταξιδιώτη** (εισιτήρια + εύρεση κράτησης).  
 App id: `com.poreiago.wallet` · όνομα: **PoreiaGo Wallet**
 
 ## Προαπαιτούμενα (στο PC σου)
@@ -16,14 +16,14 @@ App id: `com.poreiago.wallet` · όνομα: **PoreiaGo Wallet**
 ```bash
 cd /path/to/poreiago
 npm install
-# Προεπιλογή: Achillio buses storefront
+# Προεπιλογή: My Wallet πελάτη (όχι όλη η ιστοσελίδα)
 npm run cap:android
 ```
 
 Άλλο γραφείο:
 
 ```bash
-node scripts/cap-wallet-sync.mjs --live https://YOUR-OFFICE-DOMAIN
+node scripts/cap-wallet-sync.mjs --live https://YOUR-OFFICE-DOMAIN/wallet
 npx cap open android
 ```
 
@@ -40,13 +40,14 @@ npm run cap:android:packaged
 
 ## Πλοήγηση μέσα στο app
 
-Όταν τρέχει σε Capacitor εμφανίζεται κάτω μπάρα:
+Το app ανοίγει στο **`/wallet`** (μόνο πελάτης-ταξιδιώτης).  
+Η αρχική ιστοσελίδα / admin / οδηγός / rent μπλοκάρονται.
 
 | Tab | Διαδρομή |
 |-----|----------|
-| Λεωφορεία | `/` (storefront κρατήσεων) |
 | Εισιτήρια | `/wallet` |
 | Κράτηση | `/my-booking` |
+| Λογαριασμός | `/login` |
 
 ## Αρχεία
 

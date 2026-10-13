@@ -18,7 +18,10 @@ const args = process.argv.slice(2);
 const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
 const liveIdx = args.indexOf('--live');
 if (liveIdx >= 0) {
-  const url = (args[liveIdx + 1] || 'https://www.achilliotravel.com').replace(/\/$/, '');
+  const url = (args[liveIdx + 1] || 'https://www.achilliotravel.com/wallet').replace(
+    /\/$/,
+    '',
+  );
   cfg.server = { url, cleartext: false };
 } else if (args.includes('--packaged')) {
   delete cfg.server;

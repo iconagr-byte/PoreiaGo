@@ -21,6 +21,7 @@ import {
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -516,10 +517,12 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           ) : null}
           <div className="wallet-auth-panel">
             <div className="wallet-auth-card">{formBody}</div>
-            <Link to="/" className="wallet-auth-back">
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-              Επιστροφή στην Αρχική
-            </Link>
+            {!isNativeApp() ? (
+              <Link to="/" className="wallet-auth-back">
+                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                Επιστροφή στην Αρχική
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>

@@ -1,28 +1,19 @@
-import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
+/** Traveler wallet only — no full website / marketing home. */
 const TABS = [
-  { to: '/', end: true, icon: 'directions_bus', label: 'Λεωφορεία' },
   { to: '/wallet', end: false, icon: 'confirmation_number', label: 'Εισιτήρια' },
   { to: '/my-booking', end: false, icon: 'search', label: 'Κράτηση' },
+  { to: '/login', end: false, icon: 'person', label: 'Λογαριασμός' },
 ];
 
 /**
- * Bottom chrome for the Capacitor Wallet Android app (buses + ticket).
- * Hidden on web / rent / driver / admin routes.
+ * Bottom chrome for the Capacitor Wallet Android app (customer traveler only).
  */
 export default function WalletNativeShell() {
   const { pathname } = useLocation();
   const native = isNativeApp();
-
-  useEffect(() => {
-    if (!native) return;
-    document.documentElement.dataset.poreiagoApp = 'wallet';
-    return () => {
-      delete document.documentElement.dataset.poreiagoApp;
-    };
-  }, [native]);
 
   if (!native) return null;
 
@@ -32,7 +23,10 @@ export default function WalletNativeShell() {
     pathname.startsWith('/rent') ||
     pathname.startsWith('/partner') ||
     pathname.startsWith('/grafeia') ||
-    pathname.startsWith('/sign/');
+    pathname.startsWith('/sign/') ||
+    pathname.startsWith('/select-seat') ||
+    pathname.startsWith('/checkout') ||
+    pathname.startsWith('/trip/');
 
   if (hide) return null;
 
@@ -60,19 +54,28 @@ export default function WalletNativeShell() {
           key={tab.to}
           to={tab.to}
           end={tab.end}
-          style={({ isActive }) => ({
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 2,
-            padding: '6px 4px',
-            borderRadius: 14,
-            textDecoration: 'none',
-            fontSize: 11,
-            fontWeight: 700,
-            color: isActive ? '#0f4c81' : '#64748b',
-            background: isActive ? 'rgba(15,76,129,0.08)' : 'transparent',
-          })}
+          style={({ isActive }) => {
+            const active =
+              isActive ||
+              (tab.to === '/wallet' && pathname.startsWith('/wallet')) ||
+              (tab.to === '/login' &&
+                (pathname === '/login' ||
+                  pathname === '/register' ||
+                  pathname.startsWith('/forgot-password')));
+            return {
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 2,
+              padding: '6px 4px',
+              borderRadius: 14,
+              textDecoration: 'none',
+              fontSize: 11,
+              fontWeight: 700,
+              color: active ? '#0f4c81' : '#64748b',
+              background: active ? 'rgba(15,76,129,0.08)' : 'transparent',
+            };
+          }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
             {tab.icon}

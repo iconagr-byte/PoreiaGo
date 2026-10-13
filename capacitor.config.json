@@ -7,7 +7,7 @@
     "backgroundColor": "#0f4c81"
   },
   "server": {
-    "url": "https://www.achilliotravel.com",
+    "url": "https://www.achilliotravel.com/wallet",
     "cleartext": false
   },
   "plugins": {
