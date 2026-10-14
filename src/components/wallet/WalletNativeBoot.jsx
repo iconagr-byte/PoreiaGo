@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
 /**
@@ -17,7 +17,7 @@ const WALLET_APP_PREFIXES = [
   '/passenger-checkin',
 ];
 
-function isWalletAppPath(pathname) {
+export function isWalletAppPath(pathname) {
   const p = pathname || '/';
   return WALLET_APP_PREFIXES.some((prefix) => p === prefix || p.startsWith(prefix));
 }
@@ -25,6 +25,7 @@ function isWalletAppPath(pathname) {
 /**
  * Capacitor Wallet app: traveler My Wallet only.
  * Blocks marketing home, trip browse, admin, driver, rent.
+ * Render-time Navigate so HomePage never paints on cold start.
  */
 export default function WalletNativeBoot() {
   const location = useLocation();
@@ -45,6 +46,10 @@ export default function WalletNativeBoot() {
     if (isWalletAppPath(path)) return;
     navigate('/wallet', { replace: true });
   }, [native, location.pathname, navigate]);
+
+  if (native && !isWalletAppPath(location.pathname)) {
+    return <Navigate to="/wallet" replace />;
+  }
 
   return null;
 }
