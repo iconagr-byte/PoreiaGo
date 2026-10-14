@@ -4,7 +4,9 @@
 
 param(
   [string]$Sdk = "",
-  [string]$JavaHome = ""
+  [string]$JavaHome = "",
+  # Must include Google Sign-In + native API base — do not default to main until merged.
+  [string]$Branch = "cursor/wallet-google-auth-app-5ffb"
 )
 
 $ErrorActionPreference = "Stop"
@@ -131,10 +133,13 @@ Write-Host ("ANDROID_HOME=" + $env:ANDROID_HOME)
 $sdkSlash = $Sdk -replace '\\', '/'
 Set-Content -Path (Join-Path $repo "android\local.properties") -Value ("sdk.dir=" + $sdkSlash) -Encoding ASCII
 
-Write-Host "==> git fetch/reset (main)" -ForegroundColor Cyan
-git fetch origin main
-git checkout main
-git reset --hard origin/main
+Write-Host ("==> git fetch/reset (" + $Branch + ")") -ForegroundColor Cyan
+git fetch origin $Branch
+if ($LASTEXITCODE -ne 0) { throw ("git fetch failed for " + $Branch) }
+git checkout $Branch
+if ($LASTEXITCODE -ne 0) { throw ("git checkout failed for " + $Branch) }
+git reset --hard ("origin/" + $Branch)
+if ($LASTEXITCODE -ne 0) { throw ("git reset --hard failed for origin/" + $Branch) }
 git clean -fd -e android/local.properties -e android/.gradle -e node_modules
 git log -1 --oneline
 
@@ -168,6 +173,14 @@ if ($oldCopy) {
   throw ("STALE bundle still has old login subtitle in: " + $oldCopy.Path)
 }
 Write-Host "OK: new My Wallet login assets (no ticket/QR subtitle)" -ForegroundColor Green
+
+$googleHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "ή με Google" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+if (-not $googleHit) {
+  throw "Google Sign-In copy missing from android assets — wrong branch or stale build"
+}
+Write-Host "OK: Google Sign-In present in packaged assets" -ForegroundColor Green
 
 Pin-GradleJavaHome $env:JAVA_HOME
 
