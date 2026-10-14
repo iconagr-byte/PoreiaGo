@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS customer_accounts (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ca_reset ON customer_accounts(reset_token);
-CREATE INDEX IF NOT EXISTS idx_ca_wallet_tenant ON customer_accounts(wallet_tenant_id);
+-- idx_ca_wallet_tenant is created after ALTER (legacy DBs lack wallet_tenant_id until migrated)
 
 CREATE TABLE IF NOT EXISTS customer_bookings (
     id TEXT PRIMARY KEY,
