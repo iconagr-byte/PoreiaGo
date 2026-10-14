@@ -26,20 +26,20 @@ No office picker. No “scan QR to find office” as the main path.
 
 ## Windows rebuild
 
-Close Android Studio first, then in **PowerShell**:
+1. **Κλείσε** Android Studio τελείως.
+2. Άνοιξε emulator (home screen).
+3. Στο **PowerShell**:
 
 ```powershell
 cd C:\Users\User\poreiago
-git fetch origin
-git checkout main
-git reset --hard origin/main
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 ```
 
-Το script κάνει `cap sync` + Gradle build + install στον emulator.  
-Μετά άνοιξε στο Studio το `C:\Users\User\poreiago\android` (File → Open → διάλεξε το φάκελο `android`).
+Το script: `git reset main` → καθαρίζει `dist`/assets → `npm build` + `cap sync` → Gradle → uninstall παλιά app → install νέα.
 
-Αν εμφανίσει `does not contain a Gradle build`: δεν έχει τρέξει ακόμα το `wallet-run.ps1` / λείπει sync.
+Πρέπει να εμφανίσει: `OK: new My Wallet login assets (no ticket/QR subtitle)` και μετά `DONE`.
+
+**Μην πατήσεις Run στο Studio** μετά — ξαναβάζει παλιό cache. Άνοιξε μόνο για να δεις logs αν χρειάζεται.
 
 Gradle JDK must be **17 or 21** (not 25).
 

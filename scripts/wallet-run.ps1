@@ -78,25 +78,48 @@ Write-Host "==> git fetch/reset (main)" -ForegroundColor Cyan
 git fetch origin main
 git checkout main
 git reset --hard origin/main
+git clean -fd -e android/local.properties -e android/.gradle -e node_modules
 git log -1 --oneline
+
+# Force a clean web bundle so Android never keeps stale login copy.
+$staleDirs = @(
+  (Join-Path $repo "dist"),
+  (Join-Path $repo "android\app\src\main\assets\public"),
+  (Join-Path $repo "android\app\build")
+)
+foreach ($d in $staleDirs) {
+  if (Test-Path -LiteralPath $d) {
+    Write-Host ("==> wipe " + $d) -ForegroundColor DarkYellow
+    Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
 
 Pin-GradleJavaHome $env:JAVA_HOME
 
-Write-Host "==> cap:sync:packaged" -ForegroundColor Cyan
+Write-Host "==> cap:sync:packaged (npm build + cap sync)" -ForegroundColor Cyan
 npm.cmd run cap:sync:packaged
 if ($LASTEXITCODE -ne 0) { throw "sync failed" }
 
-$htmlHit = Select-String -Path (Join-Path $repo "android\app\src\main\assets\public\index.html") -Pattern "pgWalletFade" -ErrorAction SilentlyContinue
+$assetsPublic = Join-Path $repo "android\app\src\main\assets\public"
+$htmlHit = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "pgWalletFade" -ErrorAction SilentlyContinue
 if (-not $htmlHit) { throw "NEW full-bleed CSS missing from android assets" }
-Write-Host "OK: full-bleed fade CSS present in assets" -ForegroundColor Green
+
+$oldCopy = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js,*.css,*.html -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Σύνδεση για εισιτήρια" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+if ($oldCopy) {
+  throw ("STALE bundle still has old login subtitle in: " + $oldCopy.Path)
+}
+Write-Host "OK: new My Wallet login assets (no ticket/QR subtitle)" -ForegroundColor Green
 
 Pin-GradleJavaHome $env:JAVA_HOME
 
 Set-Location (Join-Path $repo "android")
-& .\gradlew.bat --no-daemon -Dorg.gradle.java.home="$env:JAVA_HOME" assembleDebug
+& .\gradlew.bat --no-daemon -Dorg.gradle.java.home="$env:JAVA_HOME" clean assembleDebug
 if ($LASTEXITCODE -ne 0) { throw "build failed - JDK must be 17/21 not 25" }
 
 $apk = Join-Path $repo "android\app\build\outputs\apk\debug\app-debug.apk"
+if (-not (Test-Path -LiteralPath $apk)) { throw ("APK missing: " + $apk) }
 & $adb start-server
 & $adb devices
 $online = & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "device$" }
@@ -105,7 +128,9 @@ if (-not $online) { throw "Emulator not online. Start Medium Phone, wait home sc
 Write-Host "==> wipe old app + reinstall" -ForegroundColor Cyan
 & $adb shell am force-stop com.poreiago.wallet
 & $adb uninstall com.poreiago.wallet
+# Clear WebView cache leftovers for this package if still present
+& $adb shell pm clear com.poreiago.wallet 2>$null
 & $adb install -r $apk
 if ($LASTEXITCODE -ne 0) { throw "install failed" }
 & $adb shell am start -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity"
-Write-Host "DONE - white full-screen My Wallet with fast fade" -ForegroundColor Green
+Write-Host "DONE - Apple My Wallet login (no ticket/QR subtitle). Do NOT press Studio Run after this." -ForegroundColor Green
