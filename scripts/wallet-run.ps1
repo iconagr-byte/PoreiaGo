@@ -171,12 +171,19 @@ Write-Host "OK: new My Wallet login assets (no ticket/QR subtitle)" -ForegroundC
 
 Pin-GradleJavaHome $env:JAVA_HOME
 
-Set-Location (Join-Path $repo "android")
-# Do NOT pass -Dorg.gradle.java.home on the PowerShell command line — PS eats -D*
-# and Gradle treats ".gradle.java.home=C:..." as a task name. JAVA_HOME + gradle.properties pin instead.
+# Clear any host GRADLE_OPTS that inject broken -Dorg.gradle.java.home=...
+Remove-Item Env:GRADLE_OPTS -ErrorAction SilentlyContinue
+
+$androidDir = Join-Path $repo "android"
 Write-Host "==> gradle clean assembleDebug" -ForegroundColor Cyan
-$gradle = Start-Process -FilePath ".\gradlew.bat" -ArgumentList @("--no-daemon","clean","assembleDebug") -Wait -PassThru -NoNewWindow
-if ($gradle.ExitCode -ne 0) { throw "build failed - JDK must be 17/21 not 25" }
+# Invoke via cmd.exe so PowerShell never rewrites -D / args.
+$gradle = Start-Process -FilePath "cmd.exe" `
+  -ArgumentList @("/c", "gradlew.bat --no-daemon clean assembleDebug") `
+  -WorkingDirectory $androidDir `
+  -Wait -PassThru -NoNewWindow
+if ($null -eq $gradle -or $gradle.ExitCode -ne 0) {
+  throw "build failed - JDK must be 17/21 not 25"
+}
 
 $apk = Join-Path $repo "android\app\build\outputs\apk\debug\app-debug.apk"
 if (-not (Test-Path -LiteralPath $apk)) { throw ("APK missing: " + $apk) }
