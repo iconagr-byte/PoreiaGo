@@ -3,7 +3,8 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 
 param(
-  [string]$Sdk = ""
+  [string]$Sdk = "",
+  [string]$JavaHome = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -64,13 +65,24 @@ function Find-Java21 {
   }
   foreach ($c in $ordered) {
     if (-not $c) { continue }
-    if (-not (Test-Path -LiteralPath (Join-Path $c "bin\java.exe"))) {
+    $javaExe = Join-Path $c "bin\java.exe"
+    if (-not (Test-Path -LiteralPath $javaExe)) {
       Write-Host ("skip Java (no java.exe): " + $c)
       continue
     }
     $major = Get-JavaMajor $c
     Write-Host ("check Java " + $c + " -> major=" + $major)
     if ($major -eq 21 -or $major -eq 17) { return $c }
+    # Last resort: path clearly names 21/17 and java.exe exists (parse bugs on some hosts).
+    $leaf = Split-Path -Leaf $c
+    if ($leaf -match '21') {
+      Write-Host ("accept by folder name (21): " + $c) -ForegroundColor Yellow
+      return $c
+    }
+    if ($leaf -match '17') {
+      Write-Host ("accept by folder name (17): " + $c) -ForegroundColor Yellow
+      return $c
+    }
   }
   return $null
 }
