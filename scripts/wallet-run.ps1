@@ -100,9 +100,23 @@ function Pin-GradleJavaHome($javaHome) {
 
 if (-not $Sdk) { $Sdk = Join-Path $env:LOCALAPPDATA "Android\Sdk" }
 $adb = Join-Path $Sdk "platform-tools\adb.exe"
-$java = Find-Java21
+$java = $null
+if ($JavaHome) {
+  if (-not (Test-Path -LiteralPath (Join-Path $JavaHome "bin\java.exe"))) {
+    throw ("JavaHome has no bin\\java.exe: " + $JavaHome)
+  }
+  $java = $JavaHome
+  Write-Host ("Using -JavaHome " + $java) -ForegroundColor Green
+} else {
+  $java = Find-Java21
+}
 if (-not $java) {
-  throw "Need JDK 17 or 21 (not 25). Android Studio -> Settings -> Gradle -> Gradle JDK = jbr-21"
+  $hint = Join-Path $env:USERPROFILE ".jdks\jbr-21.0.11"
+  throw @"
+Need JDK 17 or 21 (not 25).
+Retry with explicit path:
+  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -JavaHome '$hint'
+"@
 }
 if (-not (Test-Path -LiteralPath $adb)) { throw "adb not found at $adb" }
 
