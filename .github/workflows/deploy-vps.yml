@@ -21,7 +21,8 @@ on:
 # Only one VPS deploy at a time. Parallel SSH deploys fight over api-blue/Traefik
 # and surface Traefik's plain "404 page not found" on api.* while nginx returns 502 on www/api.
 concurrency:
-  group: deploy-vps-production
+  # Bump suffix when a hung runner ignores cancel-in-progress and blocks the queue.
+  group: deploy-vps-production-v2
   cancel-in-progress: true
 
 jobs:
