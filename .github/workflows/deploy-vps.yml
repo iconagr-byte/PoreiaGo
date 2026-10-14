@@ -22,7 +22,7 @@ on:
 # and surface Traefik's plain "404 page not found" on api.* while nginx returns 502 on www/api.
 concurrency:
   # Bump suffix when a hung runner ignores cancel-in-progress and blocks the queue.
-  group: deploy-vps-production-v2
+  group: deploy-vps-production-v3
   cancel-in-progress: true
 
 jobs:
