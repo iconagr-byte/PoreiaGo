@@ -89,7 +89,8 @@ function Find-Java21 {
 
 function Pin-GradleJavaHome($javaHome) {
   $gp = Join-Path $repo "android\gradle.properties"
-  $line = "org.gradle.java.home=" + ($javaHome -replace '\\','\\')
+  # Forward slashes are valid on Windows for Java/Gradle and avoid escape bugs.
+  $line = "org.gradle.java.home=" + ($javaHome -replace '\\', '/')
   $lines = @()
   if (Test-Path $gp) {
     $lines = Get-Content $gp | Where-Object { $_ -notmatch '^\s*org\.gradle\.java\.home=' }
@@ -171,8 +172,11 @@ Write-Host "OK: new My Wallet login assets (no ticket/QR subtitle)" -ForegroundC
 Pin-GradleJavaHome $env:JAVA_HOME
 
 Set-Location (Join-Path $repo "android")
-& .\gradlew.bat --no-daemon -Dorg.gradle.java.home="$env:JAVA_HOME" clean assembleDebug
-if ($LASTEXITCODE -ne 0) { throw "build failed - JDK must be 17/21 not 25" }
+# Do NOT pass -Dorg.gradle.java.home on the PowerShell command line — PS eats -D*
+# and Gradle treats ".gradle.java.home=C:..." as a task name. JAVA_HOME + gradle.properties pin instead.
+Write-Host "==> gradle clean assembleDebug" -ForegroundColor Cyan
+$gradle = Start-Process -FilePath ".\gradlew.bat" -ArgumentList @("--no-daemon","clean","assembleDebug") -Wait -PassThru -NoNewWindow
+if ($gradle.ExitCode -ne 0) { throw "build failed - JDK must be 17/21 not 25" }
 
 $apk = Join-Path $repo "android\app\build\outputs\apk\debug\app-debug.apk"
 if (-not (Test-Path -LiteralPath $apk)) { throw ("APK missing: " + $apk) }
