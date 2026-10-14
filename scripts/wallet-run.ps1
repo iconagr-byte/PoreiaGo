@@ -14,13 +14,35 @@ Remove-Item Env:ANDROID_HOME -ErrorAction SilentlyContinue
 Remove-Item Env:ANDROID_SDK_ROOT -ErrorAction SilentlyContinue
 
 function Get-JavaMajor($javaHome) {
+  if (-not $javaHome) { return -1 }
   $javaExe = Join-Path $javaHome "bin\java.exe"
   if (-not (Test-Path -LiteralPath $javaExe)) { return -1 }
+
+  # Most reliable: JAVA_HOME\release (avoids PowerShell stderr trap on `java -version`)
+  $release = Join-Path $javaHome "release"
+  if (Test-Path -LiteralPath $release) {
+    $rel = Get-Content -LiteralPath $release -Raw -ErrorAction SilentlyContinue
+    if ($rel -match 'JAVA_VERSION="1\.(\d+)') { return [int]$Matches[1] }
+    if ($rel -match 'JAVA_VERSION="(\d+)') { return [int]$Matches[1] }
+  }
+
+  # Folder name hint: jbr-21.0.11 / jdk-17.0.x
+  $leaf = Split-Path -Leaf $javaHome
+  if ($leaf -match '(?:^|[^\d])(21)(?:[^\d]|$)') { return 21 }
+  if ($leaf -match '(?:^|[^\d])(17)(?:[^\d]|$)') { return 17 }
+
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
   try {
-    $out = & $javaExe -version 2>&1 | Out-String
-    if ($out -match 'version "(\d+)') { return [int]$Matches[1] }
+    $lines = & $javaExe -version 2>&1
+    $out = ($lines | ForEach-Object { "$_" }) -join "`n"
     if ($out -match 'version "1\.(\d+)') { return [int]$Matches[1] }
-  } catch {}
+    if ($out -match 'version "(\d+)') { return [int]$Matches[1] }
+  } catch {
+    # ignore
+  } finally {
+    $ErrorActionPreference = $prevEap
+  }
   return -1
 }
 
@@ -29,15 +51,23 @@ function Find-Java21 {
   $jdks = Join-Path $env:USERPROFILE ".jdks"
   if (Test-Path $jdks) {
     Get-ChildItem -Path $jdks -Directory -ErrorAction SilentlyContinue |
-      Where-Object { $_.Name -match 'jbr-21|jdk-21|21\.' } |
+      Where-Object { $_.Name -match 'jbr-21|jdk-21|jbr-17|jdk-17|21\.|17\.' } |
       ForEach-Object { [void]$candidates.Add($_.FullName) }
   }
   foreach ($name in @("Android Studio","Android Studio1","Android Studio2")) {
     [void]$candidates.Add((Join-Path $env:ProgramFiles ("Android\" + $name + "\jbr")))
     [void]$candidates.Add((Join-Path $env:LOCALAPPDATA ("Programs\Android\" + $name + "\jbr")))
   }
-  foreach ($c in $candidates) {
+  # Prefer explicit 21 folders first
+  $ordered = $candidates | Sort-Object {
+    if ($_ -match '21') { 0 } elseif ($_ -match '17') { 1 } else { 2 }
+  }
+  foreach ($c in $ordered) {
     if (-not $c) { continue }
+    if (-not (Test-Path -LiteralPath (Join-Path $c "bin\java.exe"))) {
+      Write-Host ("skip Java (no java.exe): " + $c)
+      continue
+    }
     $major = Get-JavaMajor $c
     Write-Host ("check Java " + $c + " -> major=" + $major)
     if ($major -eq 21 -or $major -eq 17) { return $c }
