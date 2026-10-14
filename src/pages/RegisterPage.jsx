@@ -217,24 +217,20 @@ export default function RegisterPage() {
       <div className={cardClass}>
         <div className={scrollClass}>
           <div className={panelClass}>
-        <div className="text-center mb-8">
-          <span className={iconClass}>
+        <div className={`text-center ${rentIntent ? 'mb-8' : 'wallet-auth-hero'}`}>
+          <span className={iconClass} aria-hidden>
             {rentIntent ? 'directions_car' : 'account_balance_wallet'}
           </span>
           <h1>
             {rentIntent
               ? 'Rent Wallet'
               : claim
-                ? 'Αποθήκευση στο My Wallet'
-                : 'Εγγραφή My Wallet'}
+                ? 'My Wallet'
+                : 'Δημιουργία λογαριασμού'}
           </h1>
-          <p className={leadClass}>
-            {rentIntent
-              ? 'Δημιουργήστε λογαριασμό για ενοικίαση οχήματος'
-              : claim
-                ? 'Δημιουργήστε λογαριασμό για να δείτε το εισιτήριο και το QR επιβίβασης'
-                : 'Δημιουργήστε λογαριασμό για εισιτήρια λεωφορείου'}
-          </p>
+          {rentIntent ? (
+            <p className={leadClass}>Δημιουργήστε λογαριασμό για ενοικίαση οχήματος</p>
+          ) : null}
         </div>
 
         {claim && !rentIntent ? (

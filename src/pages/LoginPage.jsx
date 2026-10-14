@@ -240,22 +240,20 @@ export default function LoginPage({ rentEntrance = false } = {}) {
 
   const formBody = (
     <>
-      <div className="text-center mb-6">
+      <div className={`text-center ${rentIntent ? 'mb-6' : 'wallet-auth-hero'}`}>
         <span className={iconClass} aria-hidden>
           {rentIntent ? 'directions_car' : 'account_balance_wallet'}
         </span>
         <h1>
           {bookingPayContinue ? 'Ολοκλήρωση πληρωμής' : rentIntent ? 'Rent Wallet' : 'My Wallet'}
         </h1>
-        <p className={leadClass}>
-          {bookingPayContinue
-            ? 'Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή — θα επιστρέψετε στη σελίδα πληρωμής.'
-            : rentIntent
-              ? 'Σύνδεση για ενοικίαση οχήματος'
-              : claim
-                ? 'Συνδεθείτε για να δείτε το εισιτήριο της κράτησής σας'
-                : 'Σύνδεση για εισιτήρια & QR επιβίβασης'}
-        </p>
+        {bookingPayContinue || rentIntent ? (
+          <p className={leadClass}>
+            {bookingPayContinue
+              ? 'Συνδεθείτε για να ολοκληρώσετε την κράτηση και την πληρωμή.'
+              : 'Σύνδεση για ενοικίαση οχήματος'}
+          </p>
+        ) : null}
       </div>
 
       {claim && !rentIntent ? (
@@ -481,52 +479,14 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       <div className="wallet-auth-shell">
         <div className="wallet-auth-scroll">
           {!phoneChrome ? (
-            <aside className="wallet-auth-aside" aria-label="Σχετικά με το My Wallet λεωφορείων">
-              <p className="wallet-auth-aside-kicker">My Wallet · Λεωφορεία</p>
+            <aside className="wallet-auth-aside" aria-label="My Wallet">
+              <p className="wallet-auth-aside-kicker">My Wallet</p>
               <h2 className="wallet-auth-aside-title">
-                Τα εισιτήριά σας,<br />πάντα στο κινητό
+                Όλα σε ένα μέρος.<br />Πάντα μαζί σας.
               </h2>
               <p className="wallet-auth-aside-lead">
-                Κρατήσεις λεωφορείου, QR επιβίβασης και ιστορικό ταξιδιών σε ένα μέρος.
+                Απλή, ασφαλής πρόσβαση στον λογαριασμό σας.
               </p>
-              <ul className="wallet-auth-aside-list">
-                <li>
-                  <span className="material-symbols-outlined" aria-hidden>
-                    qr_code_2
-                  </span>
-                  <div>
-                    <strong>QR επιβίβασης</strong>
-                    <span>Ανοίξτε το εισιτήριο χωρίς email ή PDF.</span>
-                  </div>
-                </li>
-                <li>
-                  <span className="material-symbols-outlined" aria-hidden>
-                    confirmation_number
-                  </span>
-                  <div>
-                    <strong>Όλες οι κρατήσεις</strong>
-                    <span>Προσεχή και παλαιά ταξίδια σε μία λίστα.</span>
-                  </div>
-                </li>
-                <li>
-                  <span className="material-symbols-outlined" aria-hidden>
-                    notifications_active
-                  </span>
-                  <div>
-                    <strong>Ενημερώσεις διαδρομής</strong>
-                    <span>Ειδοποιήσεις για αλλαγές και υπενθυμίσεις.</span>
-                  </div>
-                </li>
-                <li>
-                  <span className="material-symbols-outlined" aria-hidden>
-                    lock
-                  </span>
-                  <div>
-                    <strong>Ασφαλής λογαριασμός</strong>
-                    <span>Τα δεδομένα μένουν στο γραφείο σας, όχι μόνο στη συσκευή.</span>
-                  </div>
-                </li>
-              </ul>
             </aside>
           ) : null}
           <div className="wallet-auth-panel">
