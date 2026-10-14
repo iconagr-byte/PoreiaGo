@@ -5,8 +5,8 @@
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  # Must include Google Sign-In + native API base — do not default to main until merged.
-  [string]$Branch = "cursor/wallet-google-auth-app-5ffb"
+  # Google Sign-In + native theme isolation (website look stays separate).
+  [string]$Branch = "cursor/wallet-native-theme-isolate-5ffb"
 )
 
 $ErrorActionPreference = "Stop"
