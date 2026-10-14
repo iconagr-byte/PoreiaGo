@@ -188,14 +188,22 @@ if ($null -eq $gradle -or $gradle.ExitCode -ne 0) {
 $apk = Join-Path $repo "android\app\build\outputs\apk\debug\app-debug.apk"
 if (-not (Test-Path -LiteralPath $apk)) { throw ("APK missing: " + $apk) }
 & $adb start-server
-& $adb devices
-$online = & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "device$" }
-if (-not $online) { throw "Emulator not online. Start Medium Phone, wait home screen, rerun." }
+Write-Host "==> waiting for emulator (home screen / adb device)" -ForegroundColor Cyan
+$deadline = (Get-Date).AddMinutes(3)
+$online = $null
+while ((Get-Date) -lt $deadline) {
+  & $adb devices | Out-Host
+  $online = & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
+  if ($online) { break }
+  Start-Sleep -Seconds 3
+}
+if (-not $online) {
+  throw "Emulator not online. Open Medium Phone, wait for home screen, then rerun OR install only:`n  adb install -r `"$apk`""
+}
 
 Write-Host "==> wipe old app + reinstall" -ForegroundColor Cyan
 & $adb shell am force-stop com.poreiago.wallet
 & $adb uninstall com.poreiago.wallet
-# Clear WebView cache leftovers for this package if still present
 & $adb shell pm clear com.poreiago.wallet 2>$null
 & $adb install -r $apk
 if ($LASTEXITCODE -ne 0) { throw "install failed" }
