@@ -59,13 +59,16 @@
           var cap = window.Capacitor;
           var ua = String(navigator.userAgent || '');
           var host0 = String(location.hostname || '').toLowerCase();
+          var port0 = String(location.port || '');
           var native =
             (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) ||
             (cap && typeof cap.getPlatform === 'function' &&
               /^(android|ios)$/i.test(String(cap.getPlatform() || ''))) ||
             /Capacitor/i.test(ua) ||
-            // Packaged Capacitor WebView origin
-            (host0 === 'localhost' && /^https?:$/.test(location.protocol || ''));
+            // Packaged Capacitor WebView only — never Vite (:5173) or other local ports
+            (host0 === 'localhost' &&
+              /^https?:$/.test(location.protocol || '') &&
+              (!port0 || port0 === '80' || port0 === '443'));
           if (native) document.documentElement.setAttribute('data-poreiago-app', 'wallet');
         } catch (e) { /* ignore */ }
         var host = (location.hostname || '').toLowerCase();

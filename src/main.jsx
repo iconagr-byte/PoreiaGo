@@ -7,6 +7,8 @@ import { isNativeApp } from './lib/capacitor/isNativeApp.js';
 
 if (typeof document !== 'undefined' && isNativeApp()) {
   document.documentElement.dataset.poreiagoApp = 'wallet';
+  // Native-only theme — website never loads this stylesheet.
+  void import('./styles/wallet-native-theme.css');
 }
 
 createRoot(document.getElementById('root')).render(

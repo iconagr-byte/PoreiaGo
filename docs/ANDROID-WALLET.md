@@ -22,6 +22,7 @@ No office picker. No “scan QR to find office” as the main path.
 - One login → one sealed office
 - Tabs: tickets (bus) + rentals (when office has Rent) + account
 - Marketing site / admin / driver stay blocked in Capacitor
+- Native visual theme is separate (`src/styles/wallet-native-theme.css`, loaded only in Capacitor) — website `/wallet` keeps its own blue-card look
 - Switching offices requires a different account (or logout + first bind elsewhere is blocked if home already set)
 
 ## Windows rebuild
