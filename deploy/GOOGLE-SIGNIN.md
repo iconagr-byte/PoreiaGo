@@ -15,6 +15,7 @@
    | `https://www.achilliotravel.com` |
    | `https://achilliotravel.com` (αν χρησιμοποιείται apex) |
    | `http://localhost:5173` (dev) |
+   | `https://localhost` (**Capacitor** Wallet Android/iOS packaged WebView) |
 
 4. **Authorized redirect URIs** — για GIS button / One Tap συνήθως δεν χρειάζονται·
    αν το Console ζητήσει κάτι, βάλε τα ίδια origins με `/`.
