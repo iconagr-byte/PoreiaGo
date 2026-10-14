@@ -66,7 +66,26 @@
             /Capacitor/i.test(ua) ||
             // Packaged Capacitor WebView origin
             (host0 === 'localhost' && /^https?:$/.test(location.protocol || ''));
-          if (native) document.documentElement.setAttribute('data-poreiago-app', 'wallet');
+          if (native) {
+            document.documentElement.setAttribute('data-poreiago-app', 'wallet');
+            // Cold-start on / must become /wallet before React mounts — no marketing homepage flash.
+            // Use history.replaceState (not location.replace) so Capacitor does not re-fetch a missing file.
+            var path0 = location.pathname || '/';
+            var walletOk =
+              path0 === '/wallet' ||
+              path0.indexOf('/wallet/') === 0 ||
+              path0 === '/my-booking' ||
+              path0.indexOf('/my-booking/') === 0 ||
+              path0 === '/login' ||
+              path0 === '/register' ||
+              path0.indexOf('/forgot-password') === 0 ||
+              path0.indexOf('/reset-password') === 0 ||
+              path0.indexOf('/ticket/') === 0 ||
+              path0.indexOf('/passenger-checkin') === 0;
+            if (!walletOk) {
+              history.replaceState(null, '', '/wallet' + (location.search || '') + (location.hash || ''));
+            }
+          }
         } catch (e) { /* ignore */ }
         var host = (location.hostname || '').toLowerCase();
         // Apex without www was indexed by Google with a stale PoreiaGo title.

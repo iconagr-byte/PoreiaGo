@@ -22,6 +22,7 @@ No office picker. No “scan QR to find office” as the main path.
 - One login → one sealed office
 - Tabs: tickets (bus) + rentals (when office has Rent) + account
 - Marketing site / admin / driver stay blocked in Capacitor
+- Cold start opens `/wallet` directly (`history.replaceState` in `index.html` + native `/` → Navigate) — never the marketing homepage
 - Switching offices requires a different account (or logout + first bind elsewhere is blocked if home already set)
 
 ## Windows rebuild
