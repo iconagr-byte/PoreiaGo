@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 
 function GoogleLogo({ className = '' }) {
   return (
@@ -162,11 +163,14 @@ function GoogleUnavailable({ disabled, text = 'signin_with' }) {
  */
 function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
   const { clientId } = useGoogleAuthConfig();
+  const native = isNativeApp();
+  // FedCM / One Tap is unreliable inside Capacitor WebViews — use GIS button modal on tap.
   const [fallbackOpen, setFallbackOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const label = googleButtonLabel(text);
   const callbackRef = useRef({ onSuccess, onError });
   callbackRef.current = { onSuccess, onError };
+  const useFedcm = !native;
 
   const handleCredential = useCallback((credential) => {
     setBusy(false);
@@ -180,7 +184,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
 
   useEffect(() => {
     const g = typeof window !== 'undefined' ? window.google?.accounts?.id : null;
-    if (!g || !clientId) return undefined;
+    if (!g || !clientId || native) return undefined;
     try {
       g.initialize({
         client_id: clientId,
@@ -189,13 +193,13 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
         cancel_on_tap_outside: true,
         context: text === 'signup_with' ? 'signup' : 'signin',
         ux_mode: 'popup',
-        use_fedcm_for_prompt: true,
+        use_fedcm_for_prompt: useFedcm,
       });
     } catch {
       /* GIS not ready yet — click handler will retry */
     }
     return undefined;
-  }, [clientId, handleCredential, text]);
+  }, [clientId, handleCredential, text, native, useFedcm]);
 
   const openFallback = () => {
     setBusy(false);
@@ -204,6 +208,11 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
 
   const onClick = () => {
     if (disabled || busy) return;
+    // Capacitor: skip One Tap prompt — show the official Google button immediately.
+    if (native) {
+      openFallback();
+      return;
+    }
     const g = window.google?.accounts?.id;
     if (!g || !clientId) {
       onError?.('Google Sign-In δεν φόρτωσε. Ανανεώστε τη σελίδα.');
@@ -218,7 +227,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
         cancel_on_tap_outside: true,
         context: text === 'signup_with' ? 'signup' : 'signin',
         ux_mode: 'popup',
-        use_fedcm_for_prompt: true,
+        use_fedcm_for_prompt: useFedcm,
       });
       g.prompt((notification) => {
         // isDismissedMoment also fires after a successful credential — do not

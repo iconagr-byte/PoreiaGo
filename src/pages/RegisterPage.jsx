@@ -7,7 +7,6 @@ import {
   isCustomerAuthBackendAvailable,
 } from '../services/customerAuthApi.js';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
-import { useGoogleAuthConfig } from '../components/GoogleAuthRoot.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import {
   clearWalletClaim,
@@ -44,7 +43,6 @@ export default function RegisterPage() {
       : '/rent/wallet'
     : location.state?.from || '/wallet';
   const rentIntent = pathRent || isRentReturn(redirectTo);
-  const { enabled: googleEnabled } = useGoogleAuthConfig();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -345,23 +343,19 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        {googleEnabled ? (
-          <>
-            <div className={`${dividerClass} mt-5`}>ή με Google</div>
-            <div className="space-y-3 mt-2">
-              <GoogleSignInButton
-                text="signup_with"
-                disabled={googleLoading || loading}
-                onSuccess={handleGoogleCredential}
-                onDemoProfile={handleGoogleDemo}
-                onError={setError}
-              />
-              {googleLoading ? (
-                <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
-              ) : null}
-            </div>
-          </>
-        ) : null}
+        <div className={`${dividerClass} mt-5`}>ή με Google</div>
+        <div className="space-y-3 mt-2">
+          <GoogleSignInButton
+            text="signup_with"
+            disabled={googleLoading || loading}
+            onSuccess={handleGoogleCredential}
+            onDemoProfile={handleGoogleDemo}
+            onError={setError}
+          />
+          {googleLoading ? (
+            <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
+          ) : null}
+        </div>
 
         <p className="text-sm text-center mt-6 text-[#6e6e73]">
           Έχετε ήδη λογαριασμό;{' '}
