@@ -74,9 +74,10 @@ Write-Host ("ANDROID_HOME=" + $env:ANDROID_HOME)
 $sdkSlash = $Sdk -replace '\\', '/'
 Set-Content -Path (Join-Path $repo "android\local.properties") -Value ("sdk.dir=" + $sdkSlash) -Encoding ASCII
 
-Write-Host "==> git fetch/reset" -ForegroundColor Cyan
-git fetch origin cursor/wallet-android-capacitor-5ffb
-git reset --hard origin/cursor/wallet-android-capacitor-5ffb
+Write-Host "==> git fetch/reset (main)" -ForegroundColor Cyan
+git fetch origin main
+git checkout main
+git reset --hard origin/main
 git log -1 --oneline
 
 Pin-GradleJavaHome $env:JAVA_HOME
