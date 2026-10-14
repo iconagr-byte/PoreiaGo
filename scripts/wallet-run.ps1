@@ -220,5 +220,21 @@ Write-Host "==> wipe old app + reinstall" -ForegroundColor Cyan
 & $adb shell pm clear com.poreiago.wallet 2>$null
 & $adb install -r $apk
 if ($LASTEXITCODE -ne 0) { throw "install failed" }
-& $adb shell am start -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity"
-Write-Host "DONE - Apple My Wallet login (no ticket/QR subtitle). Do NOT press Studio Run after this." -ForegroundColor Green
+
+# Verify cold-start /wallet boot is inside the APK assets
+$bootHit = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "replaceState" -ErrorAction SilentlyContinue
+if (-not $bootHit) { throw "Native /wallet cold-start missing from android assets — rebuild failed" }
+Write-Host "OK: native cold-start replaceState present" -ForegroundColor Green
+
+Write-Host "==> launch My Wallet" -ForegroundColor Cyan
+& $adb shell am start -W -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity" -a android.intent.action.MAIN -c android.intent.category.LAUNCHER
+if ($LASTEXITCODE -ne 0) {
+  & $adb shell monkey -p com.poreiago.wallet -c android.intent.category.LAUNCHER 1
+}
+Start-Sleep -Seconds 2
+$pidLine = & $adb shell pidof com.poreiago.wallet 2>$null
+if (-not $pidLine) {
+  & $adb logcat -d -t 80 AndroidRuntime:E Capacitor:E chromium:E *:S | Out-Host
+  throw "App crashed on open — paste logcat above"
+}
+Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Opens /wallet directly. Do NOT press Studio Run.") -ForegroundColor Green

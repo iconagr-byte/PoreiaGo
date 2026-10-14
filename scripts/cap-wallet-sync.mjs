@@ -16,16 +16,26 @@ const cfgPath = path.join(root, 'capacitor.config.json');
 const args = process.argv.slice(2);
 
 const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+const packagedServer = {
+  androidScheme: 'https',
+  allowNavigation: [
+    'https://www.achilliotravel.com/*',
+    'https://achilliotravel.com/*',
+    'https://www.poreiago.com/*',
+    'https://accounts.google.com/*',
+    'https://*.googleusercontent.com/*',
+  ],
+};
 const liveIdx = args.indexOf('--live');
 if (liveIdx >= 0) {
   const url = (args[liveIdx + 1] || 'https://www.achilliotravel.com/wallet').replace(
     /\/$/,
     '',
   );
-  cfg.server = { url, cleartext: false };
+  cfg.server = { ...packagedServer, url, cleartext: false };
 } else {
-  // Default: packaged local dist — My Wallet only, not the live website.
-  delete cfg.server;
+  // Packaged local dist — My Wallet only (no live website url). Keep scheme + allowlist.
+  cfg.server = { ...packagedServer };
 }
 
 writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`);
