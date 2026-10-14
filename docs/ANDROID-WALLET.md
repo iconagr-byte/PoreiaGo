@@ -37,7 +37,9 @@ cd C:\Users\User\poreiago
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 ```
 
-Το script: `git reset main` → καθαρίζει `dist`/assets → `npm build` + `cap sync` → Gradle → uninstall παλιά app → install νέα.
+Το script: `git reset` στο branch με Google Sign-In (`cursor/wallet-google-auth-app-5ffb`) → καθαρίζει `dist`/assets → `npm build` + `cap sync` → Gradle → uninstall παλιά app → install νέα.
+
+Πρέπει να εμφανίσει και: `OK: Google Sign-In present in packaged assets`.
 
 Πρέπει να εμφανίσει: `OK: new My Wallet login assets (no ticket/QR subtitle)` και μετά `DONE`.
 
