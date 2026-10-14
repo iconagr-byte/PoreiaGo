@@ -41,7 +41,25 @@ powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 
 **Μην πατήσεις Run στο Studio** μετά — ξαναβάζει παλιό cache. Άνοιξε μόνο για να δεις logs αν χρειάζεται.
 
-Gradle JDK must be **17 or 21** (not 25).
+## Android Studio Gradle (important)
+
+If Studio shows:
+`Plugin ... InternalProblems ... removed in Gradle 9.6.0`
+
+Studio is using **Gradle 9.6** instead of the project wrapper (**8.14.3**).
+
+Fix:
+1. Settings → Build, Execution, Deployment → Build Tools → **Gradle**
+2. **Use Gradle from** = `gradle-wrapper.properties` (not a local Gradle install)
+3. **Gradle JDK** = `jbr-21` (17 or 21 only)
+4. File → Sync Project with Gradle Files
+
+Or skip Studio Run and use:
+```powershell
+cd C:\Users\User\poreiago; powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
+```
+
+Gradle JDK must be **17 or 21** (not 25). Wrapper = **8.14.3**.
 
 ## Security checklist
 
