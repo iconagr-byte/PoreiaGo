@@ -85,6 +85,27 @@ export default function FrontPage() {
               <Link to="/my-booking" className="hover:text-white">
                 Ανάκτηση κράτησης
               </Link>
+              <Link
+                to="/login"
+                state={{ from: '/wallet' }}
+                className="hover:text-white inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]" aria-hidden>
+                  person
+                </span>
+                Λογαριασμός πελάτη
+              </Link>
+              {/* Discreet staff entry — not in the public header (customers see account login there). */}
+              <Link
+                to="/admin/login"
+                className="mt-1 text-white/35 hover:text-white/70 inline-flex items-center gap-1.5 text-xs"
+                title="Σύνδεση διαχείρισης γραφείου"
+              >
+                <span className="material-symbols-outlined text-[14px]" aria-hidden>
+                  badge
+                </span>
+                Διαχείριση γραφείου
+              </Link>
             </div>
           </div>
         </div>
