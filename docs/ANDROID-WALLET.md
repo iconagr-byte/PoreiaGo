@@ -22,6 +22,7 @@ No office picker. No “scan QR to find office” as the main path.
 - One login → one sealed office
 - Tabs: tickets (bus) + rentals (when office has Rent) + account
 - Marketing site / admin / driver stay blocked in Capacitor
+- Google Sign-In always on login/register; native API → office host (`VITE_NATIVE_API_BASE` or `https://www.achilliotravel.com`)
 - Switching offices requires a different account (or logout + first bind elsewhere is blocked if home already set)
 
 ## Windows rebuild
@@ -35,7 +36,9 @@ cd C:\Users\User\poreiago
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 ```
 
-Το script: `git reset main` → καθαρίζει `dist`/assets → `npm build` + `cap sync` → Gradle → uninstall παλιά app → install νέα.
+Το script: `git reset` στο branch με Google Sign-In (`cursor/wallet-google-auth-app-5ffb`) → καθαρίζει `dist`/assets → `npm build` + `cap sync` → Gradle → uninstall παλιά app → install νέα.
+
+Πρέπει να εμφανίσει και: `OK: Google Sign-In present in packaged assets`.
 
 Πρέπει να εμφανίσει: `OK: new My Wallet login assets (no ticket/QR subtitle)` και μετά `DONE`.
 

@@ -8,7 +8,6 @@ import {
   isDriver,
 } from '../lib/auth.js';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
-import { useGoogleAuthConfig } from '../components/GoogleAuthRoot.jsx';
 import {
   verifyGoogleLogin,
   loginCustomer,
@@ -42,7 +41,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const isPhone = useRentPhone();
-  const { enabled: googleEnabled } = useGoogleAuthConfig();
   // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
   // Native Wallet Android app: always bus My Wallet (never rent chrome).
   const pathRent =
@@ -323,22 +321,20 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         </button>
       </form>
 
-      {googleEnabled ? (
-        <>
-          <div className={`${dividerClass} mt-5`}>ή με Google</div>
-          <div className="space-y-3 mt-2">
-            <GoogleSignInButton
-              disabled={googleLoading || loading}
-              onSuccess={handleGoogleCredential}
-              onDemoProfile={handleGoogleDemo}
-              onError={setError}
-            />
-            {googleLoading ? (
-              <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
-            ) : null}
-          </div>
-        </>
-      ) : null}
+      {/* Always show Google — GoogleSignInButton handles loading / unavailable.
+          Native packaged app previously hid this when /api/google/config failed on localhost. */}
+      <div className={`${dividerClass} mt-5`}>ή με Google</div>
+      <div className="space-y-3 mt-2">
+        <GoogleSignInButton
+          disabled={googleLoading || loading}
+          onSuccess={handleGoogleCredential}
+          onDemoProfile={handleGoogleDemo}
+          onError={setError}
+        />
+        {googleLoading ? (
+          <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
+        ) : null}
+      </div>
 
       <p className="text-sm text-center text-[#6e6e73] mt-5">
         Δεν έχετε λογαριασμό;{' '}
