@@ -1,4 +1,4 @@
-import { API_BASE } from '../config/api.js';
+import { getApiBase } from '../config/api.js';
 import { getCustomerToken, setCustomerToken } from '../lib/auth.js';
 import { setWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 
@@ -20,14 +20,14 @@ export function customerAuthHeaders() {
 async function postJson(path, body, auth = false) {
   let res;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(`${getApiBase()}${path}`, {
       method: 'POST',
       headers: auth ? customerAuthHeaders() : { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
   } catch {
     throw new Error(
-      'Ο server δεν απαντά (port 8000). Ξεκινήστε το backend: cd backend && py -3 -m uvicorn main:app --reload --port 8000',
+      'Δεν υπάρχει σύνδεση με τον server. Ελέγξτε το δίκτυο ή δοκιμάστε σε λίγο.',
     );
   }
   const data = await res.json().catch(() => ({}));
@@ -61,7 +61,7 @@ export async function loginCustomer({ email, password }) {
 }
 
 export async function fetchCustomerMe() {
-  const res = await fetch(`${API_BASE}/api/auth/me`, { headers: customerAuthHeaders() });
+  const res = await fetch(`${getApiBase()}/api/auth/me`, { headers: customerAuthHeaders() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(parseError(data));
   return data;
@@ -126,7 +126,7 @@ export function isGoogleAuthConfigured() {
  */
 export async function fetchGoogleAuthConfig() {
   try {
-    const res = await fetch(`${API_BASE}/api/auth/google/config`, { method: 'GET' });
+    const res = await fetch(`${getApiBase()}/api/auth/google/config`, { method: 'GET' });
     if (!res.ok) {
       return { enabled: Boolean(GOOGLE_CLIENT_ID), client_id: GOOGLE_CLIENT_ID || null };
     }
@@ -143,7 +143,7 @@ export async function fetchGoogleAuthConfig() {
 
 export async function isCustomerAuthBackendAvailable() {
   try {
-    const res = await fetch(`${API_BASE}/health`, { method: 'GET' });
+    const res = await fetch(`${getApiBase()}/health`, { method: 'GET' });
     return res.ok;
   } catch {
     return false;

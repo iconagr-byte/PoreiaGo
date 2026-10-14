@@ -43,7 +43,14 @@ function resolveApiBase() {
   return '';
 }
 
+/** Prefer this — re-resolves after Capacitor / data-poreiago-app boot. */
+export function getApiBase() {
+  return resolveApiBase();
+}
+
+/** Snapshot at first import; native code should prefer getApiBase(). */
 export const API_BASE = resolveApiBase();
+
 export const DRIVER_API_KEY =
   import.meta.env.VITE_DRIVER_API_KEY || 'dev-driver-key';
 
