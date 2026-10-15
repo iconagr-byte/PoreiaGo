@@ -1,4 +1,4 @@
-﻿# PoreiaGo Wallet - build + install on running emulator
+# PoreiaGo Wallet - build + install on running emulator
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 # ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.

@@ -1,4 +1,4 @@
-﻿# Force-stop, (re)build if needed, install latest APK, launch My Wallet. No Studio.
+# Force-stop, (re)build if needed, install latest APK, launch My Wallet. No Studio.
 # ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-open.ps1 -Rebuild
