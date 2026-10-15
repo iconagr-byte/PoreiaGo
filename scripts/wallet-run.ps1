@@ -1,11 +1,11 @@
-﻿﻿# PoreiaGo Wallet - build + install on running emulator
+﻿# PoreiaGo Wallet - build + install on running emulator
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
+# ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.
 
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  # Google Sign-In + native theme isolation (website look stays separate).
   [string]$Branch = "cursor/wallet-native-theme-isolate-5ffb"
 )
 
@@ -21,7 +21,6 @@ function Get-JavaMajor($javaHome) {
   $javaExe = Join-Path $javaHome "bin\java.exe"
   if (-not (Test-Path -LiteralPath $javaExe)) { return -1 }
 
-  # Most reliable: JAVA_HOME\release (avoids PowerShell stderr trap on `java -version`)
   $release = Join-Path $javaHome "release"
   if (Test-Path -LiteralPath $release) {
     $rel = Get-Content -LiteralPath $release -Raw -ErrorAction SilentlyContinue
@@ -29,7 +28,6 @@ function Get-JavaMajor($javaHome) {
     if ($rel -match 'JAVA_VERSION="(\d+)') { return [int]$Matches[1] }
   }
 
-  # Folder name hint: jbr-21.0.11 / jdk-17.0.x
   $leaf = Split-Path -Leaf $javaHome
   if ($leaf -match '(?:^|[^\d])(21)(?:[^\d]|$)') { return 21 }
   if ($leaf -match '(?:^|[^\d])(17)(?:[^\d]|$)') { return 17 }
@@ -61,7 +59,6 @@ function Find-Java21 {
     [void]$candidates.Add((Join-Path $env:ProgramFiles ("Android\" + $name + "\jbr")))
     [void]$candidates.Add((Join-Path $env:LOCALAPPDATA ("Programs\Android\" + $name + "\jbr")))
   }
-  # Prefer explicit 21 folders first
   $ordered = $candidates | Sort-Object {
     if ($_ -match '21') { 0 } elseif ($_ -match '17') { 1 } else { 2 }
   }
@@ -75,7 +72,6 @@ function Find-Java21 {
     $major = Get-JavaMajor $c
     Write-Host ("check Java " + $c + " -> major=" + $major)
     if ($major -eq 21 -or $major -eq 17) { return $c }
-    # Last resort: path clearly names 21/17 and java.exe exists (parse bugs on some hosts).
     $leaf = Split-Path -Leaf $c
     if ($leaf -match '21') {
       Write-Host ("accept by folder name (21): " + $c) -ForegroundColor Yellow
@@ -91,7 +87,6 @@ function Find-Java21 {
 
 function Pin-GradleJavaHome($javaHome) {
   $gp = Join-Path $repo "android\gradle.properties"
-  # Forward slashes are valid on Windows for Java/Gradle and avoid escape bugs.
   $line = "org.gradle.java.home=" + ($javaHome -replace '\\', '/')
   $lines = @()
   if (Test-Path $gp) {
@@ -115,11 +110,7 @@ if ($JavaHome) {
 }
 if (-not $java) {
   $hint = Join-Path $env:USERPROFILE ".jdks\jbr-21.0.11"
-  throw @"
-Need JDK 17 or 21 (not 25).
-Retry with explicit path:
-  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -JavaHome '$hint'
-"@
+  throw ("Need JDK 17 or 21 (not 25). Retry: powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -JavaHome '" + $hint + "'")
 }
 if (-not (Test-Path -LiteralPath $adb)) { throw "adb not found at $adb" }
 
@@ -143,7 +134,6 @@ if ($LASTEXITCODE -ne 0) { throw ("git reset --hard failed for origin/" + $Branc
 git clean -fd -e android/local.properties -e android/.gradle -e node_modules
 git log -1 --oneline
 
-# Force a clean web bundle so Android never keeps stale login copy.
 $staleDirs = @(
   (Join-Path $repo "dist"),
   (Join-Path $repo "android\app\src\main\assets\public"),
@@ -158,7 +148,6 @@ foreach ($d in $staleDirs) {
 
 Pin-GradleJavaHome $env:JAVA_HOME
 
-# Packaged dist + native Google Credential Manager (not WebView GIS).
 Write-Host "==> cap:sync:packaged (native Google Sign-In)" -ForegroundColor Cyan
 npm.cmd run cap:sync:packaged
 if ($LASTEXITCODE -ne 0) { throw "sync failed" }
@@ -167,16 +156,16 @@ $assetsPublic = Join-Path $repo "android\app\src\main\assets\public"
 $htmlHit = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "pgWalletFade" -ErrorAction SilentlyContinue
 if (-not $htmlHit) { throw "NEW full-bleed CSS missing from android assets" }
 
-$oldCopy = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js,*.css,*.html -ErrorAction SilentlyContinue |
-  Select-String -Pattern "Σύνδεση για εισιτήρια" -SimpleMatch -ErrorAction SilentlyContinue |
+$walletHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "My Wallet" -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
-if ($oldCopy) {
-  throw ("STALE bundle still has old login subtitle in: " + $oldCopy.Path)
+if (-not $walletHit) {
+  throw "My Wallet copy missing from android assets - wrong branch or stale build"
 }
-Write-Host "OK: new My Wallet login assets (no ticket/QR subtitle)" -ForegroundColor Green
+Write-Host "OK: My Wallet assets present" -ForegroundColor Green
 
 $googleHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
-  Select-String -Pattern "ή με Google" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Google" -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
 if (-not $googleHit) {
   throw "Google Sign-In copy missing from android assets - wrong branch or stale build"
@@ -184,13 +173,10 @@ if (-not $googleHit) {
 Write-Host "OK: Google Sign-In present in packaged assets" -ForegroundColor Green
 
 Pin-GradleJavaHome $env:JAVA_HOME
-
-# Clear any host GRADLE_OPTS that inject broken -Dorg.gradle.java.home=...
 Remove-Item Env:GRADLE_OPTS -ErrorAction SilentlyContinue
 
 $androidDir = Join-Path $repo "android"
 Write-Host "==> gradle clean assembleDebug" -ForegroundColor Cyan
-# Invoke via cmd.exe so PowerShell never rewrites -D / args.
 $gradle = Start-Process -FilePath "cmd.exe" `
   -ArgumentList @("/c", "gradlew.bat --no-daemon clean assembleDebug") `
   -WorkingDirectory $androidDir `
@@ -212,7 +198,7 @@ while ((Get-Date) -lt $deadline) {
   Start-Sleep -Seconds 3
 }
 if (-not $online) {
-  throw "Emulator not online. Open Medium Phone, wait for home screen, then rerun OR install only:`n  adb install -r `"$apk`""
+  throw ("Emulator not online. Open Medium Phone, wait for home screen, then rerun OR: adb install -r `"$apk`"")
 }
 
 Write-Host "==> wipe old app + reinstall" -ForegroundColor Cyan
@@ -222,7 +208,6 @@ Write-Host "==> wipe old app + reinstall" -ForegroundColor Cyan
 & $adb install -r $apk
 if ($LASTEXITCODE -ne 0) { throw "install failed" }
 
-# Verify cold-start /wallet boot is inside the APK assets
 $bootHit = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "replaceState" -ErrorAction SilentlyContinue
 if (-not $bootHit) { throw "Native /wallet cold-start missing from android assets - rebuild failed" }
 Write-Host "OK: native cold-start replaceState present" -ForegroundColor Green

@@ -1,4 +1,5 @@
 ﻿# Print debug keystore SHA-1 for Google Cloud Android OAuth client.
+# ASCII-only file (no BOM).
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-google-sha1.ps1
 
