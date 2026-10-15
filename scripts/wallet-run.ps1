@@ -148,6 +148,15 @@ foreach ($d in $staleDirs) {
 
 Pin-GradleJavaHome $env:JAVA_HOME
 
+Write-Host "==> npm install (native Google plugin + lockfile)" -ForegroundColor Cyan
+npm.cmd install
+if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+$socialPkg = Join-Path $repo "node_modules\@capgo\capacitor-social-login\package.json"
+if (-not (Test-Path -LiteralPath $socialPkg)) {
+  throw "Missing @capgo/capacitor-social-login after npm install - check package.json"
+}
+Write-Host "OK: @capgo/capacitor-social-login installed" -ForegroundColor Green
+
 Write-Host "==> cap:sync:packaged (native Google Sign-In)" -ForegroundColor Cyan
 npm.cmd run cap:sync:packaged
 if ($LASTEXITCODE -ne 0) { throw "sync failed" }
