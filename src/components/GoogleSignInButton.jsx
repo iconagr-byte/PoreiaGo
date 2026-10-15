@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
-import { startNativeGoogleBridge } from '../lib/capacitor/nativeGoogleBridge.js';
 import { nativeGoogleIdToken } from '../lib/capacitor/nativeGoogleAuth.js';
 
 function GoogleLogo({ className = '' }) {
@@ -220,23 +219,21 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
         } catch (err) {
           setBusy(false);
           const msg = String(err?.message || err || '');
-          if (/28444|not set up|SHA|Developer console/i.test(msg)) {
-            onError?.(
-              'Google Console: δημιούργησε Android OAuth client με package com.poreiago.wallet + SHA-1 (δες scripts/wallet-google-sha1.ps1).',
-            );
-            return;
-          }
           if (/cancel|canceled|cancelled|user.?cancel/i.test(msg)) {
             return;
           }
-          // Last resort: office-host GIS bridge (needs Contabo route).
-          const ok = startNativeGoogleBridge({
-            mode: text === 'signup_with' ? 'signup' : 'signin',
-            returnPath: text === 'signup_with' ? '/register' : '/login',
-          });
-          if (!ok) {
-            onError?.(msg || 'Η σύνδεση με Google απέτυχε στο emulator');
+          // Never navigate out of the Capacitor app (bridge opened Chrome white page).
+          if (/28444|not set up|SHA|Developer console|10:|DEVELOPER_ERROR/i.test(msg)) {
+            onError?.(
+              'Google Android OAuth δεν είναι έτοιμο ακόμα. Περίμενε 5–10 λεπτά μετά το Create στο Console και ξαναπάτα Σύνδεση με Google.',
+            );
+            return;
           }
+          onError?.(
+            msg
+              ? `Google: ${msg}`
+              : 'Η σύνδεση με Google απέτυχε. Μείνε μέσα στο app Wallet (όχι Chrome) και δοκίμασε ξανά.',
+          );
         }
       })();
       return;
