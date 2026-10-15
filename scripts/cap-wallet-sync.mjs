@@ -2,13 +2,12 @@
 /**
  * Sync PoreiaGo Wallet Android project.
  * Usage:
- *   node scripts/cap-wallet-sync.mjs
- *       Default: live WebView at achilliotravel.com — Google Sign-In works
- *       (authorized JS origin). Avoids Capacitor https://localhost origin_mismatch.
- *   node scripts/cap-wallet-sync.mjs --live [URL]
- *       Same, optional custom URL (default /wallet entry).
- *   node scripts/cap-wallet-sync.mjs --packaged
- *       Offline dist only. Requires https://localhost in Google Console origins.
+ *   node scripts/cap-wallet-sync.mjs              # packaged dist (default)
+ *   node scripts/cap-wallet-sync.mjs --packaged   # same
+ *   node scripts/cap-wallet-sync.mjs --live [URL] # remote WebView (optional)
+ *
+ * Google Sign-In on Android uses native Credential Manager (@capgo/capacitor-social-login),
+ * not GIS inside the WebView — so packaged https://localhost is fine for auth.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -31,28 +30,29 @@ const packagedServer = {
   ],
 };
 
-const DEFAULT_LIVE = 'https://www.achilliotravel.com';
-const liveIdx = args.indexOf('--live');
-const wantPackaged = args.includes('--packaged');
+cfg.plugins = cfg.plugins || {};
+cfg.plugins.SocialLogin = {
+  providers: {
+    google: true,
+    facebook: false,
+    apple: false,
+    twitter: false,
+  },
+};
 
-if (wantPackaged && liveIdx < 0) {
-  // Offline packaged assets — Google needs https://localhost in Cloud Console.
-  cfg.server = { ...packagedServer };
-} else {
-  // Live office host = authorized Google JS origin (no origin_mismatch).
-  let url = DEFAULT_LIVE;
-  if (liveIdx >= 0) {
-    url = (args[liveIdx + 1] || DEFAULT_LIVE).replace(/\/$/, '');
-  }
+const liveIdx = args.indexOf('--live');
+const wantLive = liveIdx >= 0;
+
+if (wantLive) {
+  const url = (args[liveIdx + 1] || 'https://www.achilliotravel.com').replace(/\/$/, '');
   cfg.server = { ...packagedServer, url, cleartext: false };
+  console.log(`Capacitor: live WebView → ${url}`);
+} else {
+  cfg.server = { ...packagedServer };
+  console.log('Capacitor: packaged (local dist) + native Google Sign-In');
 }
 
 writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`);
-console.log(
-  wantPackaged && liveIdx < 0
-    ? 'Capacitor: packaged (local dist) — add https://localhost to Google Console'
-    : `Capacitor: live WebView → ${cfg.server.url} (Google Sign-In OK)`,
-);
 
 const build = spawnSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit', shell: true });
 if (build.status !== 0) process.exit(build.status || 1);

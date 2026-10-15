@@ -3,6 +3,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { startNativeGoogleBridge } from '../lib/capacitor/nativeGoogleBridge.js';
+import { nativeGoogleIdToken } from '../lib/capacitor/nativeGoogleAuth.js';
 
 function GoogleLogo({ className = '' }) {
   return (
@@ -209,23 +210,35 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
 
   const onClick = () => {
     if (disabled || busy) return;
+    // Android/iOS: Credential Manager — never GIS inside WebView (origin_mismatch / disallowed_useragent).
     if (native) {
-      const host = String(window.location?.hostname || '').toLowerCase();
-      // Packaged https://localhost → Google origin_mismatch. Jump to office host.
-      if (host === 'localhost' || host === '127.0.0.1') {
-        setBusy(true);
-        const ok = startNativeGoogleBridge({
-          mode: text === 'signup_with' ? 'signup' : 'signin',
-          returnPath: text === 'signup_with' ? '/register' : '/login',
-        });
-        if (!ok) {
+      setBusy(true);
+      void (async () => {
+        try {
+          const idToken = await nativeGoogleIdToken(clientId);
+          handleCredential(idToken);
+        } catch (err) {
           setBusy(false);
-          openFallback();
+          const msg = String(err?.message || err || '');
+          if (/28444|not set up|SHA|Developer console/i.test(msg)) {
+            onError?.(
+              'Google Console: δημιούργησε Android OAuth client με package com.poreiago.wallet + SHA-1 (δες scripts/wallet-google-sha1.ps1).',
+            );
+            return;
+          }
+          if (/cancel|canceled|cancelled|user.?cancel/i.test(msg)) {
+            return;
+          }
+          // Last resort: office-host GIS bridge (needs Contabo route).
+          const ok = startNativeGoogleBridge({
+            mode: text === 'signup_with' ? 'signup' : 'signin',
+            returnPath: text === 'signup_with' ? '/register' : '/login',
+          });
+          if (!ok) {
+            onError?.(msg || 'Η σύνδεση με Google απέτυχε στο emulator');
+          }
         }
-        return;
-      }
-      // Live WebView already on achilliotravel.com / poreiago.com — GIS works here.
-      openFallback();
+      })();
       return;
     }
     const g = window.google?.accounts?.id;

@@ -7,8 +7,6 @@
     "backgroundColor": "#ffffff"
   },
   "server": {
-    "url": "https://www.achilliotravel.com",
-    "cleartext": false,
     "androidScheme": "https",
     "allowNavigation": [
       "https://www.achilliotravel.com/*",
@@ -19,6 +17,14 @@
     ]
   },
   "plugins": {
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      }
+    },
     "CapacitorHttp": {
       "enabled": true
     },

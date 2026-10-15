@@ -158,9 +158,9 @@ foreach ($d in $staleDirs) {
 
 Pin-GradleJavaHome $env:JAVA_HOME
 
-# Live WebView on achilliotravel.com — authorized Google JS origin (avoids origin_mismatch).
-Write-Host "==> cap:sync:live (Google Sign-In safe origin)" -ForegroundColor Cyan
-npm.cmd run cap:sync:live
+# Packaged dist + native Google Credential Manager (not WebView GIS).
+Write-Host "==> cap:sync:packaged (native Google Sign-In)" -ForegroundColor Cyan
+npm.cmd run cap:sync:packaged
 if ($LASTEXITCODE -ne 0) { throw "sync failed" }
 
 $assetsPublic = Join-Path $repo "android\app\src\main\assets\public"
@@ -238,4 +238,12 @@ if (-not $pidLine) {
   & $adb logcat -d -t 80 AndroidRuntime:E Capacitor:E chromium:E *:S | Out-Host
   throw "App crashed on open — paste logcat above"
 }
-Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Live origin = achilliotravel.com (Google OK). Do NOT press Studio Run.") -ForegroundColor Green
+Write-Host ""
+Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan
+$shaScript = Join-Path $repo "scripts\wallet-google-sha1.ps1"
+if (Test-Path -LiteralPath $shaScript) {
+  & powershell -ExecutionPolicy Bypass -File $shaScript
+} else {
+  Write-Host "Run: keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android"
+}
+Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Native Google Sign-In. Do NOT press Studio Run.") -ForegroundColor Green
