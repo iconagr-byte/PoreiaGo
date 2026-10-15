@@ -1,9 +1,9 @@
-# Force-stop, (re)build if needed, install latest APK, launch My Wallet. No Studio.
-# Usage (ONE line, from anywhere):
-#   powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-open.ps1
+﻿# Force-stop, (re)build if needed, install latest APK, launch My Wallet. No Studio.
+# Usage (ONE line, from C:\Users\User\poreiago):
+#   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-open.ps1
 #
 # Rebuild + open in one shot:
-#   powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-open.ps1 -Rebuild
+#   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-open.ps1 -Rebuild
 
 param(
   [switch]$Rebuild
@@ -37,17 +37,16 @@ function Test-WalletAssetsFresh {
 
 $needBuild = $Rebuild -or (-not (Test-Path -LiteralPath $apk)) -or (-not (Test-WalletAssetsFresh))
 if ($needBuild) {
-  Write-Host "==> APK/assets stale or -Rebuild — running wallet-run.ps1 first..." -ForegroundColor Cyan
+  Write-Host "==> APK/assets stale or -Rebuild - running wallet-run.ps1 first..." -ForegroundColor Cyan
   & powershell -ExecutionPolicy Bypass -File (Join-Path $repo "scripts\wallet-run.ps1")
-  if ($LASTEXITCODE -ne 0) { throw "wallet-run.ps1 failed — fix the red error above, then rerun wallet-open.ps1" }
-  # wallet-run already installs + launches; verify process and exit.
+  if ($LASTEXITCODE -ne 0) { throw "wallet-run.ps1 failed - fix the red error above, then rerun wallet-open.ps1" }
   Start-Sleep -Seconds 2
   $pidLine = & $adb shell pidof $pkg 2>$null
   if ($pidLine) {
     Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Do NOT press Studio Run.") -ForegroundColor Green
     exit 0
   }
-  Write-Host "wallet-run finished but process not up — continuing force launch..." -ForegroundColor Yellow
+  Write-Host "wallet-run finished but process not up - continuing force launch..." -ForegroundColor Yellow
 }
 
 if (-not (Test-Path -LiteralPath $apk)) {
@@ -88,7 +87,7 @@ while ((Get-Date) -lt $deadline) {
   Start-Sleep -Seconds 4
 }
 if (-not $online -or $online.Count -eq 0) {
-  throw "Still offline. Close emulator window, then: Device Manager → Cold Boot Now → wait for home → rerun this script."
+  throw "Still offline. Close emulator window, then Device Manager -> Cold Boot Now -> wait for home -> rerun this script."
 }
 
 Write-Host "==> wait for boot_completed" -ForegroundColor Cyan
@@ -103,12 +102,12 @@ Write-Host "==> uninstall + install" -ForegroundColor Cyan
 & $adb shell am force-stop $pkg 2>$null
 & $adb uninstall $pkg 2>$null
 & $adb install -r $apk
-if ($LASTEXITCODE -ne 0) { throw "adb install failed — copy the red error above" }
+if ($LASTEXITCODE -ne 0) { throw "adb install failed - copy the red error above" }
 
 Write-Host "==> launch My Wallet" -ForegroundColor Cyan
 & $adb shell am start -W -n $activity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER
 if ($LASTEXITCODE -ne 0) {
-  Write-Host "am start failed — trying launcher monkey..." -ForegroundColor Yellow
+  Write-Host "am start failed - trying launcher monkey..." -ForegroundColor Yellow
   & $adb shell monkey -p $pkg -c android.intent.category.LAUNCHER 1
   if ($LASTEXITCODE -ne 0) { throw "could not launch app" }
 }
@@ -116,16 +115,15 @@ if ($LASTEXITCODE -ne 0) {
 Start-Sleep -Seconds 3
 $pidLine = & $adb shell pidof $pkg 2>$null
 if (-not $pidLine) {
-  Write-Host "WARN: process not running — checking crash log..." -ForegroundColor Yellow
+  Write-Host "WARN: process not running - checking crash log..." -ForegroundColor Yellow
   & $adb logcat -d -t 120 AndroidRuntime:E Capacitor:E chromium:E ActivityManager:I *:S | Out-Host
   throw "App installed but crashed on open. Paste the logcat lines above."
 }
 
-# Confirm WebView is on /wallet (best-effort; dumpsys may be empty on some images)
 $dump = & $adb shell dumpsys activity activities 2>$null | Out-String
 if ($dump -match "com\.poreiago\.wallet") {
   Write-Host "OK: MainActivity in foreground" -ForegroundColor Green
 }
 
-Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Screen should be My Wallet / login — not the website.") -ForegroundColor Green
+Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Screen should be My Wallet / login - not the website.") -ForegroundColor Green
 Write-Host "Do NOT press Studio Run." -ForegroundColor Green

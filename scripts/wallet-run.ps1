@@ -1,4 +1,4 @@
-﻿# PoreiaGo Wallet - build + install on running emulator
+﻿﻿# PoreiaGo Wallet - build + install on running emulator
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 
@@ -179,7 +179,7 @@ $googleHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorActi
   Select-String -Pattern "ή με Google" -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
 if (-not $googleHit) {
-  throw "Google Sign-In copy missing from android assets — wrong branch or stale build"
+  throw "Google Sign-In copy missing from android assets - wrong branch or stale build"
 }
 Write-Host "OK: Google Sign-In present in packaged assets" -ForegroundColor Green
 
@@ -224,7 +224,7 @@ if ($LASTEXITCODE -ne 0) { throw "install failed" }
 
 # Verify cold-start /wallet boot is inside the APK assets
 $bootHit = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "replaceState" -ErrorAction SilentlyContinue
-if (-not $bootHit) { throw "Native /wallet cold-start missing from android assets — rebuild failed" }
+if (-not $bootHit) { throw "Native /wallet cold-start missing from android assets - rebuild failed" }
 Write-Host "OK: native cold-start replaceState present" -ForegroundColor Green
 
 Write-Host "==> launch My Wallet" -ForegroundColor Cyan
@@ -236,7 +236,7 @@ Start-Sleep -Seconds 2
 $pidLine = & $adb shell pidof com.poreiago.wallet 2>$null
 if (-not $pidLine) {
   & $adb logcat -d -t 80 AndroidRuntime:E Capacitor:E chromium:E *:S | Out-Host
-  throw "App crashed on open — paste logcat above"
+  throw "App crashed on open - paste logcat above"
 }
 Write-Host ""
 Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan

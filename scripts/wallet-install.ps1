@@ -1,4 +1,4 @@
-# Install already-built PoreiaGo Wallet APK onto a running emulator.
+﻿# Install already-built PoreiaGo Wallet APK onto a running emulator.
 # Usage (ONE line):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-install.ps1
 
