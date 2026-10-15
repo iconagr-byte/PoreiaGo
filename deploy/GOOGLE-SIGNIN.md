@@ -37,11 +37,22 @@ Do **not** put the Android client ID in the app. Keep using the Web client ID:
 
 If the OAuth consent screen is in **Testing**, add `iconagr@gmail.com` under **Test users**.
 
-### Rebuild
+### Rebuild (required after any Google/native change)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-open.ps1 -Rebuild
 ```
+
+Look for these green lines before the app opens:
+
+- `OK: SocialLogin in capacitor.settings.gradle`
+- `OK: SocialLoginPlugin inside APK`
+
+Do **not** press Android Studio **Run** — it can install an older APK without the native plugin.
+
+### Error `"SocialLogin" plugin is not implemented on android`
+
+The APK on the emulator was built **without** `@capgo/capacitor-social-login`. Fix: pull latest + `-Rebuild` (above). Website Google Sign-In is unrelated.
 
 ### Error `[28444] Developer console is not set up correctly`
 

@@ -229,6 +229,12 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
             );
             return;
           }
+          if (/not implemented|SocialLogin/i.test(msg)) {
+            onError?.(
+              'Το native Google Sign-In λείπει από αυτό το APK. Τρέξε wallet-open.ps1 -Rebuild (μην πατήσεις Studio Run) και ξαναδοκίμασε.',
+            );
+            return;
+          }
           onError?.(
             msg
               ? `Google: ${msg}`

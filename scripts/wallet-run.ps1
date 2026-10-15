@@ -203,6 +203,41 @@ if ($null -eq $gradle -or $gradle.ExitCode -ne 0) {
 
 $apk = Join-Path $repo "android\app\build\outputs\apk\debug\app-debug.apk"
 if (-not (Test-Path -LiteralPath $apk)) { throw ("APK missing: " + $apk) }
+
+# Prove native SocialLogin is inside THIS APK (not just gradle files on disk).
+function Test-ApkHasSocialLogin([string]$apkPath) {
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $tmp = Join-Path $env:TEMP ("pg-social-" + [guid]::NewGuid().ToString("n"))
+  New-Item -ItemType Directory -Path $tmp | Out-Null
+  try {
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($apkPath, $tmp)
+    $plugins = Join-Path $tmp "assets\capacitor.plugins.json"
+    if (-not (Test-Path -LiteralPath $plugins)) { return $false }
+    $pluginsText = Get-Content -LiteralPath $plugins -Raw -ErrorAction SilentlyContinue
+    if (-not $pluginsText -or $pluginsText -notmatch 'SocialLoginPlugin') { return $false }
+    $dexFiles = @(Get-ChildItem -LiteralPath $tmp -Filter "classes*.dex" -File -ErrorAction SilentlyContinue)
+    if ($dexFiles.Count -eq 0) { return $false }
+    foreach ($dex in $dexFiles) {
+      $bytes = [System.IO.File]::ReadAllBytes($dex.FullName)
+      $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+      if ($ascii -match 'SocialLoginPlugin' -or $ascii -match 'ee/forgr/capacitor/social/login') {
+        return $true
+      }
+    }
+    return $false
+  } catch {
+    Write-Host ("APK SocialLogin check error: " + $_) -ForegroundColor Yellow
+    return $false
+  } finally {
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
+if (-not (Test-ApkHasSocialLogin $apk)) {
+  throw "APK built without SocialLoginPlugin class - Google Sign-In will fail. Check npm install + cap sync."
+}
+Write-Host "OK: SocialLoginPlugin inside APK (v1.0.4)" -ForegroundColor Green
+
 & $adb start-server
 Write-Host "==> waiting for emulator (home screen / adb device)" -ForegroundColor Cyan
 $deadline = (Get-Date).AddMinutes(3)

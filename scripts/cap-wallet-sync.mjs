@@ -9,7 +9,7 @@
  * Google Sign-In on Android uses native Credential Manager (@capgo/capacitor-social-login),
  * not GIS inside the WebView — so packaged https://localhost is fine for auth.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +53,28 @@ if (wantLive) {
 }
 
 writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`);
+
+// Capgo hook also runs on sync; call it explicitly so gradle.properties always
+// has google=implementation even if the lifecycle hook is skipped on Windows.
+const configureDeps = path.join(
+  root,
+  'node_modules/@capgo/capacitor-social-login/scripts/configure-dependencies.js',
+);
+if (existsSync(configureDeps)) {
+  const hook = spawnSync(process.execPath, [configureDeps], {
+    cwd: root,
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      CAPACITOR_ROOT_DIR: root,
+      CAPACITOR_PLATFORM_NAME: 'android',
+      CAPACITOR_CONFIG: JSON.stringify(cfg),
+    },
+  });
+  if (hook.status !== 0) {
+    console.warn('WARN: Capgo configure-dependencies exited non-zero — continuing with committed gradle.properties');
+  }
+}
 
 const build = spawnSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit', shell: true });
 if (build.status !== 0) process.exit(build.status || 1);

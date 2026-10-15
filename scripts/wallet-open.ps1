@@ -33,7 +33,38 @@ function Test-WalletAssetsFresh {
   return [bool]$hit
 }
 
-$needBuild = $Rebuild -or (-not (Test-Path -LiteralPath $apk)) -or (-not (Test-WalletAssetsFresh))
+function Test-ApkHasSocialLogin([string]$apkPath) {
+  if (-not (Test-Path -LiteralPath $apkPath)) { return $false }
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $tmp = Join-Path $env:TEMP ("pg-open-social-" + [guid]::NewGuid().ToString("n"))
+  New-Item -ItemType Directory -Path $tmp | Out-Null
+  try {
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($apkPath, $tmp)
+    $plugins = Join-Path $tmp "assets\capacitor.plugins.json"
+    if (-not (Test-Path -LiteralPath $plugins)) { return $false }
+    $pluginsText = Get-Content -LiteralPath $plugins -Raw -ErrorAction SilentlyContinue
+    if (-not $pluginsText -or $pluginsText -notmatch 'SocialLoginPlugin') { return $false }
+    foreach ($dex in @(Get-ChildItem -LiteralPath $tmp -Filter "classes*.dex" -File -ErrorAction SilentlyContinue)) {
+      $bytes = [System.IO.File]::ReadAllBytes($dex.FullName)
+      $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+      if ($ascii -match 'SocialLoginPlugin' -or $ascii -match 'ee/forgr/capacitor/social/login') {
+        return $true
+      }
+    }
+    return $false
+  } catch {
+    return $false
+  } finally {
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
+$missingSocial = -not (Test-ApkHasSocialLogin $apk)
+if ($missingSocial -and (Test-Path -LiteralPath $apk)) {
+  Write-Host "==> APK missing SocialLoginPlugin - forcing rebuild" -ForegroundColor Yellow
+}
+
+$needBuild = $Rebuild -or $missingSocial -or (-not (Test-Path -LiteralPath $apk)) -or (-not (Test-WalletAssetsFresh))
 if ($needBuild) {
   Write-Host "==> APK/assets stale or -Rebuild - running wallet-run.ps1 first..." -ForegroundColor Cyan
   & powershell -ExecutionPolicy Bypass -File (Join-Path $repo "scripts\wallet-run.ps1")
