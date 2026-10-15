@@ -319,9 +319,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
                 }}
                 onError={() => {
                   setBusy(false);
-                  onError?.(
-                    'Η σύνδεση με Google απέτυχε (origin_mismatch;). Πρόσθεσε https://localhost στα Authorized JavaScript origins ή πάτα «Μέσω ιστοσελίδας».',
-                  );
+                  onError?.('Η σύνδεση με Google απέτυχε. Δοκιμάστε ξανά.');
                 }}
                 theme="outline"
                 size="large"
@@ -331,33 +329,6 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
                 width="320"
                 useOneTap={false}
               />
-              {native ? (
-                <>
-                  <p className="px-1 text-center text-[11px] leading-snug text-[#6e6e73]">
-                    Αν βλέπεις <strong>origin_mismatch</strong>: Google Cloud Console → Credentials →
-                    Web client → Authorized JavaScript origins → πρόσθεσε{' '}
-                    <code className="rounded bg-black/[0.04] px-1">https://localhost</code>
-                  </p>
-                  <button
-                    type="button"
-                    className="text-sm font-semibold text-[#0071e3]"
-                    onClick={() => {
-                      setFallbackOpen(false);
-                      setBusy(true);
-                      const ok = startNativeGoogleBridge({
-                        mode: text === 'signup_with' ? 'signup' : 'signin',
-                        returnPath: text === 'signup_with' ? '/register' : '/login',
-                      });
-                      if (!ok) {
-                        setBusy(false);
-                        onError?.('Δεν άνοιξε το Google bridge');
-                      }
-                    }}
-                  >
-                    Εναλλακτικά: σύνδεση μέσω ιστοσελίδας →
-                  </button>
-                </>
-              ) : null}
             </div>
           </div>
         </div>
