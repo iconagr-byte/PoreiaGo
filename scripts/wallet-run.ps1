@@ -161,6 +161,13 @@ Write-Host "==> cap:sync:packaged (native Google Sign-In)" -ForegroundColor Cyan
 npm.cmd run cap:sync:packaged
 if ($LASTEXITCODE -ne 0) { throw "sync failed" }
 
+$settingsGradle = Join-Path $repo "android\capacitor.settings.gradle"
+$settingsText = Get-Content -LiteralPath $settingsGradle -Raw -ErrorAction SilentlyContinue
+if (-not $settingsText -or $settingsText -notmatch 'capgo-capacitor-social-login') {
+  throw "SocialLogin missing from android/capacitor.settings.gradle after sync - native Google will fail"
+}
+Write-Host "OK: SocialLogin in capacitor.settings.gradle" -ForegroundColor Green
+
 $assetsPublic = Join-Path $repo "android\app\src\main\assets\public"
 $htmlHit = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "pgWalletFade" -ErrorAction SilentlyContinue
 if (-not $htmlHit) { throw "NEW full-bleed CSS missing from android assets" }

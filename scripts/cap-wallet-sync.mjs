@@ -62,4 +62,23 @@ const sync = spawnSync('npx', ['cap', 'sync', 'android'], {
   stdio: 'inherit',
   shell: true,
 });
-process.exit(sync.status || 0);
+if (sync.status !== 0) process.exit(sync.status || 1);
+
+// Fail loudly if native SocialLogin was not wired into the Android project.
+const settingsGradle = readFileSync(path.join(root, 'android/capacitor.settings.gradle'), 'utf8');
+const appCapacitorBuild = readFileSync(path.join(root, 'android/app/capacitor.build.gradle'), 'utf8');
+const pluginsJsonPath = path.join(root, 'android/app/src/main/assets/capacitor.plugins.json');
+const pluginsJson = readFileSync(pluginsJsonPath, 'utf8');
+if (
+  !settingsGradle.includes('capgo-capacitor-social-login') ||
+  !appCapacitorBuild.includes('capgo-capacitor-social-login') ||
+  !pluginsJson.includes('SocialLoginPlugin')
+) {
+  console.error(
+    'ERROR: @capgo/capacitor-social-login not registered in Android after cap sync.\n' +
+      'Check npm install and android/capacitor.settings.gradle',
+  );
+  process.exit(1);
+}
+console.log('OK: SocialLogin native plugin registered in Android');
+process.exit(0);
