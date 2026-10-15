@@ -20,21 +20,46 @@ if (-not (Test-Path -LiteralPath $keystore)) {
   exit 0
 }
 
-$keytool = $null
-foreach ($c in @(
-  (Join-Path $env:JAVA_HOME "bin\keytool.exe"),
-  "keytool.exe",
-  "keytool"
-)) {
-  if ($c -and (Get-Command $c -ErrorAction SilentlyContinue)) { $keytool = $c; break }
-  if ($c -and (Test-Path -LiteralPath $c)) { $keytool = $c; break }
+function Find-Keytool {
+  $candidates = New-Object System.Collections.Generic.List[string]
+
+  if ($env:JAVA_HOME -and $env:JAVA_HOME.Trim() -ne "") {
+    [void]$candidates.Add((Join-Path $env:JAVA_HOME "bin\keytool.exe"))
+  }
+
+  $jdks = Join-Path $env:USERPROFILE ".jdks"
+  if (Test-Path -LiteralPath $jdks) {
+    Get-ChildItem -Path $jdks -Directory -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -match 'jbr-21|jdk-21|jbr-17|jdk-17|21\.|17\.' } |
+      ForEach-Object {
+        [void]$candidates.Add((Join-Path $_.FullName "bin\keytool.exe"))
+      }
+  }
+
+  foreach ($name in @("Android Studio", "Android Studio1", "Android Studio2")) {
+    [void]$candidates.Add((Join-Path $env:ProgramFiles ("Android\" + $name + "\jbr\bin\keytool.exe")))
+    [void]$candidates.Add((Join-Path $env:LOCALAPPDATA ("Programs\Android\" + $name + "\jbr\bin\keytool.exe")))
+  }
+
+  $cmd = Get-Command "keytool.exe" -ErrorAction SilentlyContinue
+  if ($cmd -and $cmd.Source) { [void]$candidates.Add($cmd.Source) }
+
+  foreach ($c in $candidates) {
+    if ($c -and (Test-Path -LiteralPath $c)) { return $c }
+  }
+  return $null
 }
 
+$keytool = Find-Keytool
 if (-not $keytool) {
-  Write-Host "keytool not found. Set JAVA_HOME to JDK 17/21 and rerun." -ForegroundColor Yellow
+  Write-Host "keytool not found." -ForegroundColor Yellow
+  Write-Host "Try:"
+  Write-Host '  $env:JAVA_HOME = "C:\Users\User\.jdks\jbr-21.0.11"'
+  Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-google-sha1.ps1"
   exit 0
 }
 
+Write-Host ("Using keytool: " + $keytool) -ForegroundColor DarkGray
 $out = & $keytool -list -v -keystore $keystore -alias androiddebugkey -storepass android -keypass android 2>&1 | Out-String
 $sha1 = $null
 if ($out -match 'SHA1:\s*([0-9A-Fa-f:]+)') { $sha1 = $Matches[1].Trim() }
