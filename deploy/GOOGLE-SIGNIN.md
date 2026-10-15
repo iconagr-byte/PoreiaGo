@@ -40,15 +40,18 @@ If the OAuth consent screen is in **Testing**, add `iconagr@gmail.com` under **T
 ### Rebuild (required after any Google/native change)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-open.ps1 -Rebuild
+cd C:\Users\User\poreiago; git fetch origin cursor/wallet-native-theme-isolate-5ffb; git reset --hard origin/cursor/wallet-native-theme-isolate-5ffb; powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-go.ps1
 ```
 
 Look for these green lines before the app opens:
 
 - `OK: SocialLogin in capacitor.settings.gradle`
 - `OK: SocialLoginPlugin inside APK`
+- `SHA-1 (gradle signingReport debug): …` ← copy this into Google Console
 
 Do **not** press Android Studio **Run** — it can install an older APK without the native plugin.
+
+Emulator must be a **Google Play** system image (Play Store icon). After first boot: open Play Store → Update.
 
 ### Error `"SocialLogin" plugin is not implemented on android`
 
