@@ -54,6 +54,7 @@ import MaintenanceGate from './components/MaintenanceGate.jsx';
 import RentStorefrontGate from './components/rental/RentStorefrontGate.jsx';
 import WalletNativeBoot from './components/wallet/WalletNativeBoot.jsx';
 import WalletNativeShell from './components/wallet/WalletNativeShell.jsx';
+import WalletNativeGoogleBridgePage from './pages/WalletNativeGoogleBridgePage.jsx';
 import { isNativeApp } from './lib/capacitor/isNativeApp.js';
 
 function RentalCustomerAppGated() {
@@ -145,6 +146,7 @@ function App() {
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
             <Route path="/wallet/magic" element={<WalletMagicPage />} />
+            <Route path="/wallet/native-google" element={<WalletNativeGoogleBridgePage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
             {/* Rent: green URLs — /rent/login + /rent/wallet + /rent/my-booking (not bus). */}
             <Route path="/rent/login" element={<LoginPage rentEntrance />} />

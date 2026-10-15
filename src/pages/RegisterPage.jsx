@@ -16,6 +16,7 @@ import {
 } from '../lib/wallet/walletClaim.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -172,6 +173,14 @@ export default function RegisterPage() {
       setGoogleLoading(false);
     }
   };
+
+  // Capacitor: credential returned from /wallet/native-google on the office host.
+  useEffect(() => {
+    const cred = takeGoogleCredentialFromLocation(location);
+    if (!cred) return;
+    void handleGoogleCredential(cred);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on return from bridge
+  }, []);
 
   const loginState =
     claim && !rentIntent

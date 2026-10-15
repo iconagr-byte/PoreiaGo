@@ -20,7 +20,8 @@ if (typeof document !== 'undefined' && isNativeApp()) {
       path.startsWith('/forgot-password') ||
       path.startsWith('/reset-password') ||
       path.startsWith('/ticket/') ||
-      path.startsWith('/passenger-checkin');
+      path.startsWith('/passenger-checkin') ||
+      path.startsWith('/wallet/native-google');
     if (!walletOk) {
       window.history.replaceState(
         null,

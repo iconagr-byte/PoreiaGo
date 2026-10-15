@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleAuthConfig } from './GoogleAuthRoot.jsx';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import { startNativeGoogleBridge } from '../lib/capacitor/nativeGoogleBridge.js';
 
 function GoogleLogo({ className = '' }) {
   return (
@@ -208,7 +209,8 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
 
   const onClick = () => {
     if (disabled || busy) return;
-    // Capacitor: skip One Tap prompt — show the official Google button immediately.
+    // Capacitor: skip One Tap — show Google button. Needs https://localhost in
+    // Google Console origins (else origin_mismatch). Bridge button is the fallback.
     if (native) {
       openFallback();
       return;
@@ -283,7 +285,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
-            <div className="flex justify-center py-2">
+            <div className="flex flex-col items-center gap-3 py-2">
               <GoogleLogin
                 onSuccess={(response) => {
                   if (!response.credential) {
@@ -294,7 +296,9 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
                 }}
                 onError={() => {
                   setBusy(false);
-                  onError?.('Η σύνδεση με Google απέτυχε');
+                  onError?.(
+                    'Η σύνδεση με Google απέτυχε (origin_mismatch;). Πρόσθεσε https://localhost στα Authorized JavaScript origins ή πάτα «Μέσω ιστοσελίδας».',
+                  );
                 }}
                 theme="outline"
                 size="large"
@@ -304,6 +308,33 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
                 width="320"
                 useOneTap={false}
               />
+              {native ? (
+                <>
+                  <p className="px-1 text-center text-[11px] leading-snug text-[#6e6e73]">
+                    Αν βλέπεις <strong>origin_mismatch</strong>: Google Cloud Console → Credentials →
+                    Web client → Authorized JavaScript origins → πρόσθεσε{' '}
+                    <code className="rounded bg-black/[0.04] px-1">https://localhost</code>
+                  </p>
+                  <button
+                    type="button"
+                    className="text-sm font-semibold text-[#0071e3]"
+                    onClick={() => {
+                      setFallbackOpen(false);
+                      setBusy(true);
+                      const ok = startNativeGoogleBridge({
+                        mode: text === 'signup_with' ? 'signup' : 'signin',
+                        returnPath: text === 'signup_with' ? '/register' : '/login',
+                      });
+                      if (!ok) {
+                        setBusy(false);
+                        onError?.('Δεν άνοιξε το Google bridge');
+                      }
+                    }}
+                  >
+                    Εναλλακτικά: σύνδεση μέσω ιστοσελίδας →
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
         </div>

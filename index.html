@@ -84,7 +84,8 @@
               path0.indexOf('/forgot-password') === 0 ||
               path0.indexOf('/reset-password') === 0 ||
               path0.indexOf('/ticket/') === 0 ||
-              path0.indexOf('/passenger-checkin') === 0;
+              path0.indexOf('/passenger-checkin') === 0 ||
+              path0.indexOf('/wallet/native-google') === 0;
             if (!walletOk) {
               history.replaceState(null, '', '/wallet' + (location.search || '') + (location.hash || ''));
             }

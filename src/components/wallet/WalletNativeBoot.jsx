@@ -15,6 +15,7 @@ const WALLET_APP_PREFIXES = [
   '/reset-password',
   '/ticket/',
   '/passenger-checkin',
+  '/wallet/native-google',
 ];
 
 export function isWalletAppPath(pathname) {
