@@ -128,8 +128,12 @@ while ((Get-Date) -lt $bootDeadline) {
 }
 
 Write-Host "==> uninstall + install" -ForegroundColor Cyan
-& $adb shell am force-stop $pkg 2>$null
-& $adb uninstall $pkg 2>$null
+# adb "Failed" on stderr (package missing) must not abort under Stop.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& $adb shell am force-stop $pkg 2>$null | Out-Null
+& $adb uninstall $pkg 2>$null | Out-Null
+$ErrorActionPreference = $prevEap
 & $adb install -r $apk
 if ($LASTEXITCODE -ne 0) { throw "adb install failed - copy the red error above" }
 

@@ -253,9 +253,14 @@ if (-not $online) {
 }
 
 Write-Host "==> wipe old app + reinstall" -ForegroundColor Cyan
-& $adb shell am force-stop com.poreiago.wallet
-& $adb uninstall com.poreiago.wallet
-& $adb shell pm clear com.poreiago.wallet 2>$null
+# adb writes "Failed" to stderr when the package is already gone; with
+# ErrorActionPreference=Stop that becomes a terminating NativeCommandError.
+# Uninstall already removes app data — do not pm clear after uninstall.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
+& $adb uninstall com.poreiago.wallet 2>$null | Out-Null
+$ErrorActionPreference = $prevEap
 & $adb install -r $apk
 if ($LASTEXITCODE -ne 0) { throw "install failed" }
 
