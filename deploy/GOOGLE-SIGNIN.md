@@ -60,7 +60,21 @@ Do **not** pass a `scopes` array to `SocialLogin.login` on Android unless `MainA
 
 ### Error `[28444] Developer console is not set up correctly`
 
-Almost always: missing/wrong Android OAuth client SHA-1 or package name. Rerun `wallet-google-sha1.ps1` and fix the Console entry.
+Google Credential Manager rejected **package + signing SHA-1 + webClientId**.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-google-sha1.ps1
+```
+
+Checklist:
+
+1. `webClientId` in the app = **Web** OAuth client (never the Android client ID).
+2. Android OAuth client in the **same** GCP project: package `com.poreiago.wallet` + **exact** SHA-1 from the script (prefer APK signing cert).
+3. If SHA-1 changed (new machine / new debug.keystore), update or recreate the Android client.
+4. Consent screen **Testing** → add your Gmail under Test users.
+5. Propagation can take **minutes to a few hours** — then retry in the Wallet app.
+
+Filter Logcat: `GoogleProvider` → compare `signingSha1=` with Console.
 
 ## Web client origins (website only)
 

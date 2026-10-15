@@ -51,9 +51,14 @@ export async function nativeGoogleIdToken(webClientId) {
   // MainActivity implements ModifiedMainActivityForSocialLoginPlugin. Default
   // OIDC scopes (email/profile/openid) are already requested by the plugin and
   // are enough for our backend ID-token verify at /api/auth/google.
+  // filterByAuthorizedAccounts:false avoids Family Link / empty-account failures.
   const res = await SocialLogin.login({
     provider: 'google',
-    options: {},
+    options: {
+      style: 'standard',
+      filterByAuthorizedAccounts: false,
+      autoSelectEnabled: false,
+    },
   });
   const result = res?.result || {};
   const idToken = String(result.idToken || result.id_token || '').trim();

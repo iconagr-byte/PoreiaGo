@@ -225,7 +225,7 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
           // Never navigate out of the Capacitor app (bridge opened Chrome white page).
           if (/28444|not set up|SHA|Developer console|10:|DEVELOPER_ERROR/i.test(msg)) {
             onError?.(
-              'Google Android OAuth δεν είναι έτοιμο ακόμα. Περίμενε 5–10 λεπτά μετά το Create στο Console και ξαναπάτα Σύνδεση με Google.',
+              'Google Console: λάθος SHA-1 ή package στο Android OAuth client (ή ακόμα διαδίδεται). Τρέξε wallet-google-sha1.ps1, σύγκρινε με το Console, βάλε Test user αν είναι Testing, περίμενε έως μερικές ώρες, ξαναπάτα Σύνδεση με Google.',
             );
             return;
           }

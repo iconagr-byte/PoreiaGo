@@ -236,7 +236,7 @@ function Test-ApkHasSocialLogin([string]$apkPath) {
 if (-not (Test-ApkHasSocialLogin $apk)) {
   throw "APK built without SocialLoginPlugin class - Google Sign-In will fail. Check npm install + cap sync."
 }
-Write-Host "OK: SocialLoginPlugin inside APK (v1.0.5)" -ForegroundColor Green
+Write-Host "OK: SocialLoginPlugin inside APK (v1.0.6)" -ForegroundColor Green
 
 & $adb start-server
 Write-Host "==> waiting for emulator (home screen / adb device)" -ForegroundColor Cyan
