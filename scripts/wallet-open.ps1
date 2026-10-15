@@ -146,14 +146,20 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Start-Sleep -Seconds 3
+$ErrorActionPreference = "Continue"
 $pidLine = & $adb shell pidof $pkg 2>$null
+$ErrorActionPreference = "Stop"
 if (-not $pidLine) {
   Write-Host "WARN: process not running - checking crash log..." -ForegroundColor Yellow
+  $ErrorActionPreference = "Continue"
   & $adb logcat -d -t 120 AndroidRuntime:E Capacitor:E chromium:E ActivityManager:I *:S | Out-Host
+  $ErrorActionPreference = "Stop"
   throw "App installed but crashed on open. Paste the logcat lines above."
 }
 
+$ErrorActionPreference = "Continue"
 $dump = & $adb shell dumpsys activity activities 2>$null | Out-String
+$ErrorActionPreference = "Stop"
 if ($dump -match "com\.poreiago\.wallet") {
   Write-Host "OK: MainActivity in foreground" -ForegroundColor Green
 }

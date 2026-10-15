@@ -274,9 +274,13 @@ if ($LASTEXITCODE -ne 0) {
   & $adb shell monkey -p com.poreiago.wallet -c android.intent.category.LAUNCHER 1
 }
 Start-Sleep -Seconds 2
+$ErrorActionPreference = "Continue"
 $pidLine = & $adb shell pidof com.poreiago.wallet 2>$null
+$ErrorActionPreference = "Stop"
 if (-not $pidLine) {
+  $ErrorActionPreference = "Continue"
   & $adb logcat -d -t 80 AndroidRuntime:E Capacitor:E chromium:E *:S | Out-Host
+  $ErrorActionPreference = "Stop"
   throw "App crashed on open - paste logcat above"
 }
 Write-Host ""
