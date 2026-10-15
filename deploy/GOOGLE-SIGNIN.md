@@ -52,7 +52,11 @@ Do **not** press Android Studio **Run** — it can install an older APK without 
 
 ### Error `"SocialLogin" plugin is not implemented on android`
 
-The APK on the emulator was built **without** `@capgo/capacitor-social-login`. Fix: pull latest + `-Rebuild` (above). Website Google Sign-In is unrelated.
+The APK on the emulator was built **without** `@capgo/capacitor-social-login`. Fix: pull latest + `wallet-go.ps1`. Website Google Sign-In is unrelated.
+
+### Error `You CANNOT use scopes without modifying the main activity`
+
+Do **not** pass a `scopes` array to `SocialLogin.login` on Android unless `MainActivity` implements Capgo’s `ModifiedMainActivityForSocialLoginPlugin`. Wallet auth only needs the default ID token (email/profile/openid are built-in).
 
 ### Error `[28444] Developer console is not set up correctly`
 

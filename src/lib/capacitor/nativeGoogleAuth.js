@@ -47,11 +47,13 @@ export async function ensureNativeGoogleAuth(webClientId) {
  */
 export async function nativeGoogleIdToken(webClientId) {
   await ensureNativeGoogleAuth(webClientId);
+  // Do NOT pass scopes here on Android — Capgo rejects any scopes array unless
+  // MainActivity implements ModifiedMainActivityForSocialLoginPlugin. Default
+  // OIDC scopes (email/profile/openid) are already requested by the plugin and
+  // are enough for our backend ID-token verify at /api/auth/google.
   const res = await SocialLogin.login({
     provider: 'google',
-    options: {
-      scopes: ['email', 'profile', 'openid'],
-    },
+    options: {},
   });
   const result = res?.result || {};
   const idToken = String(result.idToken || result.id_token || '').trim();

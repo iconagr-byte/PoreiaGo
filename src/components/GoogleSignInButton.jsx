@@ -231,7 +231,13 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
           }
           if (/not implemented|SocialLogin/i.test(msg)) {
             onError?.(
-              'Το native Google Sign-In λείπει από αυτό το APK. Τρέξε wallet-open.ps1 -Rebuild (μην πατήσεις Studio Run) και ξαναδοκίμασε.',
+              'Το native Google Sign-In λείπει από αυτό το APK. Τρέξε wallet-go.ps1 (μην πατήσεις Studio Run) και ξαναδοκίμασε.',
+            );
+            return;
+          }
+          if (/CANNOT use scopes|modifying the main activity/i.test(msg)) {
+            onError?.(
+              'Χρειάζεται νέο Wallet build (χωρίς custom Google scopes). Τρέξε wallet-go.ps1 και ξαναπάτα Σύνδεση με Google.',
             );
             return;
           }
