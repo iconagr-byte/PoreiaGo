@@ -236,7 +236,32 @@ function Test-ApkHasSocialLogin([string]$apkPath) {
 if (-not (Test-ApkHasSocialLogin $apk)) {
   throw "APK built without SocialLoginPlugin class - Google Sign-In will fail. Check npm install + cap sync."
 }
-Write-Host "OK: SocialLoginPlugin inside APK (v1.0.6)" -ForegroundColor Green
+Write-Host "OK: SocialLoginPlugin inside APK (v1.0.7)" -ForegroundColor Green
+
+Write-Host "==> gradle signingReport (SHA-1 for Google Console)" -ForegroundColor Cyan
+$signReport = Start-Process -FilePath "cmd.exe" `
+  -ArgumentList @("/c", "gradlew.bat --no-daemon signingReport") `
+  -WorkingDirectory $androidDir `
+  -Wait -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $env:TEMP "pg-signing-report.txt") `
+  -RedirectStandardError (Join-Path $env:TEMP "pg-signing-report.err.txt")
+$signOut = ""
+$signFile = Join-Path $env:TEMP "pg-signing-report.txt"
+if (Test-Path -LiteralPath $signFile) {
+  $signOut = Get-Content -LiteralPath $signFile -Raw -ErrorAction SilentlyContinue
+}
+$debugSha = $null
+# Prefer Variant: debug / Config: debug block SHA1
+if ($signOut -match '(?s)Variant:\s*debug.*?SHA1:\s*([0-9A-Fa-f:]+)') {
+  $debugSha = $Matches[1].Trim().ToUpper()
+} elseif ($signOut -match 'SHA1:\s*([0-9A-Fa-f:]+)') {
+  $debugSha = $Matches[1].Trim().ToUpper()
+}
+if ($debugSha) {
+  Write-Host ("SHA-1 (gradle signingReport debug): " + $debugSha) -ForegroundColor Green
+  Write-Host "Put this exact SHA-1 on Android OAuth client for package com.poreiago.wallet" -ForegroundColor Yellow
+} else {
+  Write-Host "Could not parse signingReport SHA-1 - run wallet-google-sha1.ps1" -ForegroundColor Yellow
+}
 
 & $adb start-server
 Write-Host "==> waiting for emulator (home screen / adb device)" -ForegroundColor Cyan
