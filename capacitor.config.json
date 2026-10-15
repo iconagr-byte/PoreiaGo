@@ -7,6 +7,8 @@
     "backgroundColor": "#ffffff"
   },
   "server": {
+    "url": "https://www.achilliotravel.com",
+    "cleartext": false,
     "androidScheme": "https",
     "allowNavigation": [
       "https://www.achilliotravel.com/*",

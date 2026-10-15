@@ -2,9 +2,13 @@
 /**
  * Sync PoreiaGo Wallet Android project.
  * Usage:
- *   node scripts/cap-wallet-sync.mjs              # packaged My Wallet (default)
- *   node scripts/cap-wallet-sync.mjs --packaged   # same — remove server.url (use dist)
- *   node scripts/cap-wallet-sync.mjs --live URL   # optional live WebView (not recommended)
+ *   node scripts/cap-wallet-sync.mjs
+ *       Default: live WebView at achilliotravel.com — Google Sign-In works
+ *       (authorized JS origin). Avoids Capacitor https://localhost origin_mismatch.
+ *   node scripts/cap-wallet-sync.mjs --live [URL]
+ *       Same, optional custom URL (default /wallet entry).
+ *   node scripts/cap-wallet-sync.mjs --packaged
+ *       Offline dist only. Requires https://localhost in Google Console origins.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -26,19 +30,29 @@ const packagedServer = {
     'https://*.googleusercontent.com/*',
   ],
 };
+
+const DEFAULT_LIVE = 'https://www.achilliotravel.com';
 const liveIdx = args.indexOf('--live');
-if (liveIdx >= 0) {
-  const url = (args[liveIdx + 1] || 'https://www.achilliotravel.com/wallet').replace(
-    /\/$/,
-    '',
-  );
-  cfg.server = { ...packagedServer, url, cleartext: false };
-} else {
-  // Packaged local dist — My Wallet only (no live website url). Keep scheme + allowlist.
+const wantPackaged = args.includes('--packaged');
+
+if (wantPackaged && liveIdx < 0) {
+  // Offline packaged assets — Google needs https://localhost in Cloud Console.
   cfg.server = { ...packagedServer };
+} else {
+  // Live office host = authorized Google JS origin (no origin_mismatch).
+  let url = DEFAULT_LIVE;
+  if (liveIdx >= 0) {
+    url = (args[liveIdx + 1] || DEFAULT_LIVE).replace(/\/$/, '');
+  }
+  cfg.server = { ...packagedServer, url, cleartext: false };
 }
 
 writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`);
+console.log(
+  wantPackaged && liveIdx < 0
+    ? 'Capacitor: packaged (local dist) — add https://localhost to Google Console'
+    : `Capacitor: live WebView → ${cfg.server.url} (Google Sign-In OK)`,
+);
 
 const build = spawnSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit', shell: true });
 if (build.status !== 0) process.exit(build.status || 1);

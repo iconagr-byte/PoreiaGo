@@ -209,9 +209,22 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
 
   const onClick = () => {
     if (disabled || busy) return;
-    // Capacitor: skip One Tap — show Google button. Needs https://localhost in
-    // Google Console origins (else origin_mismatch). Bridge button is the fallback.
     if (native) {
+      const host = String(window.location?.hostname || '').toLowerCase();
+      // Packaged https://localhost → Google origin_mismatch. Jump to office host.
+      if (host === 'localhost' || host === '127.0.0.1') {
+        setBusy(true);
+        const ok = startNativeGoogleBridge({
+          mode: text === 'signup_with' ? 'signup' : 'signin',
+          returnPath: text === 'signup_with' ? '/register' : '/login',
+        });
+        if (!ok) {
+          setBusy(false);
+          openFallback();
+        }
+        return;
+      }
+      // Live WebView already on achilliotravel.com / poreiago.com — GIS works here.
       openFallback();
       return;
     }

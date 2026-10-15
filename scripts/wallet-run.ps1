@@ -158,8 +158,9 @@ foreach ($d in $staleDirs) {
 
 Pin-GradleJavaHome $env:JAVA_HOME
 
-Write-Host "==> cap:sync:packaged (npm build + cap sync)" -ForegroundColor Cyan
-npm.cmd run cap:sync:packaged
+# Live WebView on achilliotravel.com — authorized Google JS origin (avoids origin_mismatch).
+Write-Host "==> cap:sync:live (Google Sign-In safe origin)" -ForegroundColor Cyan
+npm.cmd run cap:sync:live
 if ($LASTEXITCODE -ne 0) { throw "sync failed" }
 
 $assetsPublic = Join-Path $repo "android\app\src\main\assets\public"
@@ -237,4 +238,4 @@ if (-not $pidLine) {
   & $adb logcat -d -t 80 AndroidRuntime:E Capacitor:E chromium:E *:S | Out-Host
   throw "App crashed on open — paste logcat above"
 }
-Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Opens /wallet directly. Do NOT press Studio Run.") -ForegroundColor Green
+Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Live origin = achilliotravel.com (Google OK). Do NOT press Studio Run.") -ForegroundColor Green
