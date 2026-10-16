@@ -11,12 +11,29 @@ The Wallet app uses **native Credential Manager** (`@capgo/capacitor-social-logi
 
 ### One-time Google Cloud setup
 
-You need **two** OAuth clients in the **same** project:
+You need **two** OAuth clients in the **same** Google Cloud project:
 
 | Type | Purpose |
 |------|---------|
-| **Web application** | Already exists — used as `webClientId` (same as website) |
+| **Web application** | Used as `webClientId` in the app (and website) |
 | **Android** | Proves the APK is allowed — package + SHA-1 |
+
+**Common 28444 cause:** Android client in project `PoreiaGo` (`967076454927-…`) but app still uses Web client from another project (`838114974488-…`). Fix: create a **Web application** client in the **same** project as the Android client (or create the Android client next to the existing Web client).
+
+#### If Android is already correct in project PoreiaGo
+
+Package `com.poreiago.wallet` + SHA-1 `CA:AE:18:B1:…` is fine. Next:
+
+1. Stay in project **PoreiaGo**
+2. **+ Create credentials → OAuth client ID → Application type: Web application**
+3. Name: `PoreiaGo Wallet Web`
+4. Authorized JavaScript origins:
+   - `https://www.achilliotravel.com`
+   - `https://achilliotravel.com`
+   - `https://www.poreiago.com`
+   - `http://localhost:5173`
+5. **Create** → copy the new Web Client ID
+6. Put that ID in the app as `webClientId` / `GOOGLE_CLIENT_ID` (never the Android client ID `967076454927-nlak…`)
 
 1. On Windows, after a build (or anytime):
 
