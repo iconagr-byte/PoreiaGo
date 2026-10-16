@@ -22,17 +22,42 @@ def is_placeholder_google_client_id(client_id: str) -> bool:
     return False
 
 
+# Wallet native Capgo webClientId (same GCP project as Android OAuth).
+# Kept as a fallback audience so ID tokens verify even before .env.prod is updated.
+_POREIAGO_WALLET_WEB_CLIENT_ID = (
+    "967076454927-c5goejio1jlqr2vki24j7g8133knnqlp.apps.googleusercontent.com"
+)
+
+
 def google_client_id() -> str:
     raw = (os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID") or "").strip()
     if is_placeholder_google_client_id(raw):
         return ""
-    return raw
+    # First id if comma-separated
+    return raw.split(",")[0].strip()
+
+
+def google_client_ids() -> list[str]:
+    """Accepted ID-token audiences (primary env + Wallet PoreiaGo Web client)."""
+    ids: list[str] = []
+    raw = (os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID") or "").strip()
+    if raw:
+        for part in raw.split(","):
+            cid = part.strip()
+            if cid and not is_placeholder_google_client_id(cid) and cid not in ids:
+                ids.append(cid)
+    if (
+        _POREIAGO_WALLET_WEB_CLIENT_ID not in ids
+        and not is_placeholder_google_client_id(_POREIAGO_WALLET_WEB_CLIENT_ID)
+    ):
+        ids.append(_POREIAGO_WALLET_WEB_CLIENT_ID)
+    return ids
 
 
 async def verify_google_id_token(id_token: str) -> dict:
     """Validate token with Google tokeninfo and return claims."""
-    client_id = google_client_id()
-    if not client_id:
+    accepted = google_client_ids()
+    if not accepted:
         raise HTTPException(
             status_code=503,
             detail="Google OAuth not configured (set GOOGLE_CLIENT_ID)",
@@ -49,7 +74,7 @@ async def verify_google_id_token(id_token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid Google token")
 
     data = response.json()
-    if data.get("aud") != client_id:
+    if data.get("aud") not in accepted:
         raise HTTPException(status_code=401, detail="Google token audience mismatch")
 
     email_verified = str(data.get("email_verified", "")).lower()

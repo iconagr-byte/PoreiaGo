@@ -26,10 +26,14 @@ function resolveClientId(raw) {
 }
 
 function nativeOrBuildFallback() {
-  return (
-    resolveClientId(BUILD_GOOGLE_CLIENT_ID) ||
-    (isNativeApp() ? resolveClientId(PRODUCTION_GOOGLE_CLIENT_ID) : '')
-  );
+  // Native Wallet: prefer committed PoreiaGo Web client (same project as Android OAuth).
+  if (isNativeApp()) {
+    return (
+      resolveClientId(PRODUCTION_GOOGLE_CLIENT_ID) ||
+      resolveClientId(BUILD_GOOGLE_CLIENT_ID)
+    );
+  }
+  return resolveClientId(BUILD_GOOGLE_CLIENT_ID);
 }
 
 /**
@@ -50,8 +54,10 @@ export default function GoogleAuthRoot({ children }) {
       try {
         const cfg = await fetchGoogleAuthConfig();
         if (cancelled) return;
-        const clientId =
-          resolveClientId(cfg.client_id) || nativeOrBuildFallback();
+        // Native: never let a stale production config (other GCP project) win.
+        const clientId = isNativeApp()
+          ? nativeOrBuildFallback() || resolveClientId(cfg.client_id)
+          : resolveClientId(cfg.client_id) || nativeOrBuildFallback();
         setState({
           loading: false,
           enabled: Boolean(clientId),

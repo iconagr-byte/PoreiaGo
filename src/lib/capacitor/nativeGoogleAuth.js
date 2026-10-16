@@ -6,10 +6,17 @@ import {
 } from '../googleClientId.js';
 
 let initPromise = null;
+let initClientId = '';
 
 function resolveWebClientId(preferred) {
   const buildId = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
-  for (const raw of [preferred, buildId, PRODUCTION_GOOGLE_CLIENT_ID]) {
+  // Native MUST use the Web client in the same GCP project as the Android OAuth
+  // client. Production /api/auth/google/config can still return an older project
+  // id (838114…) which causes Credential Manager [28444].
+  const order = isNativeApp()
+    ? [PRODUCTION_GOOGLE_CLIENT_ID, buildId, preferred]
+    : [preferred, buildId, PRODUCTION_GOOGLE_CLIENT_ID];
+  for (const raw of order) {
     const id = String(raw || '').trim();
     if (isUsableGoogleClientId(id)) return id;
   }
@@ -26,7 +33,13 @@ export async function ensureNativeGoogleAuth(webClientId) {
   const clientId = resolveWebClientId(webClientId);
   if (!clientId) return { ok: false, reason: 'no_client_id' };
 
+  if (initPromise && initClientId && initClientId !== clientId) {
+    initPromise = null;
+    initClientId = '';
+  }
+
   if (!initPromise) {
+    initClientId = clientId;
     initPromise = SocialLogin.initialize({
       google: {
         webClientId: clientId,
@@ -36,6 +49,7 @@ export async function ensureNativeGoogleAuth(webClientId) {
       .then(() => ({ ok: true, clientId }))
       .catch((err) => {
         initPromise = null;
+        initClientId = '';
         throw err;
       });
   }

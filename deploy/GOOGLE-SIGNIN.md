@@ -74,6 +74,11 @@ Do **not** pass a `scopes` array to `SocialLogin.login` on Android unless `MainA
 
 Google Credential Manager rejected **package + signing SHA-1 + webClientId**.
 
+**Native Wallet** always uses the PoreiaGo Web client
+(`967076454927-c5goejio…`) even if `/api/auth/google/config` still returns an
+older project id — otherwise Android OAuth (project `967076…`) and `webClientId`
+diverge and Google returns 28444.
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-google-sha1.ps1
 ```
