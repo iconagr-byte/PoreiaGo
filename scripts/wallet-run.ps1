@@ -236,7 +236,7 @@ function Test-ApkHasSocialLogin([string]$apkPath) {
 if (-not (Test-ApkHasSocialLogin $apk)) {
   throw "APK built without SocialLoginPlugin class - Google Sign-In will fail. Check npm install + cap sync."
 }
-Write-Host "OK: SocialLoginPlugin inside APK (v1.0.7)" -ForegroundColor Green
+Write-Host "OK: SocialLoginPlugin inside APK (v1.0.8)" -ForegroundColor Green
 
 Write-Host "==> gradle signingReport (SHA-1 for Google Console)" -ForegroundColor Cyan
 $signReport = Start-Process -FilePath "cmd.exe" `
