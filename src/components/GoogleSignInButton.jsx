@@ -241,6 +241,12 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
             );
             return;
           }
+          if (/audience mismatch/i.test(msg)) {
+            onError?.(
+              'Google OK στο app — ο server έχει παλιό Client ID. Merge το PR στο main (ή Actions → Set Google Client ID) και ξαναδοκίμασε σε ~2 λεπτά.',
+            );
+            return;
+          }
           onError?.(
             msg
               ? `Google: ${msg}`
