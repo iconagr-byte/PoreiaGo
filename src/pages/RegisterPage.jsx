@@ -168,7 +168,14 @@ export default function RegisterPage() {
         profile.access_token,
       );
     } catch (err) {
-      setError(err.message || 'Αποτυχία εγγραφής με Google');
+      const msg = String(err?.message || err || '');
+      if (/audience mismatch/i.test(msg)) {
+        setError(
+          'Google OK στο app — ο server έχει παλιό Client ID. Merge το PR στο main (Deploy VPS) και ξαναδοκίμασε σε ~2 λεπτά.',
+        );
+      } else {
+        setError(msg || 'Αποτυχία εγγραφής με Google');
+      }
     } finally {
       setGoogleLoading(false);
     }
