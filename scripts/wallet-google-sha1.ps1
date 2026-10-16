@@ -10,7 +10,7 @@ $apk = Join-Path $repo "android\app\build\outputs\apk\debug\app-debug.apk"
 $sdk = Join-Path $env:LOCALAPPDATA "Android\Sdk"
 $adb = Join-Path $sdk "platform-tools\adb.exe"
 $pkg = "com.poreiago.wallet"
-$webClient = "838114974488-8q36brogbldig001k9n88qrnciqle1j1.apps.googleusercontent.com"
+$webClient = "967076454927-c5goejio1jlqr2vki24j7g8133knnqlp.apps.googleusercontent.com"
 
 Write-Host ""
 Write-Host "=== Google Sign-In checklist (emulator) ===" -ForegroundColor Cyan

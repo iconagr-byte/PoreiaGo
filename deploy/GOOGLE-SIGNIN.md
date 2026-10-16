@@ -18,22 +18,14 @@ You need **two** OAuth clients in the **same** Google Cloud project:
 | **Web application** | Used as `webClientId` in the app (and website) |
 | **Android** | Proves the APK is allowed — package + SHA-1 |
 
-**Common 28444 cause:** Android client in project `PoreiaGo` (`967076454927-…`) but app still uses Web client from another project (`838114974488-…`). Fix: create a **Web application** client in the **same** project as the Android client (or create the Android client next to the existing Web client).
+**Project PoreiaGo (`967076454927`) — both clients must live here:**
 
-#### If Android is already correct in project PoreiaGo
+| Type | Client ID (prefix) |
+|------|--------------------|
+| **Web application** | `967076454927-c5goejio1jlqr2vki24j7g8133knnqlp…` ← `webClientId` in app |
+| **Android** | `967076454927-nlak72ikck4somgc723gb7ebrdt27gg0…` ← Console only (package + SHA-1) |
 
-Package `com.poreiago.wallet` + SHA-1 `CA:AE:18:B1:…` is fine. Next:
-
-1. Stay in project **PoreiaGo**
-2. **+ Create credentials → OAuth client ID → Application type: Web application**
-3. Name: `PoreiaGo Wallet Web`
-4. Authorized JavaScript origins:
-   - `https://www.achilliotravel.com`
-   - `https://achilliotravel.com`
-   - `https://www.poreiago.com`
-   - `http://localhost:5173`
-5. **Create** → copy the new Web Client ID
-6. Put that ID in the app as `webClientId` / `GOOGLE_CLIENT_ID` (never the Android client ID `967076454927-nlak…`)
+Never put the Android client ID in the app. Client **secret** is not required for Sign-In with Google (ID token).
 
 1. On Windows, after a build (or anytime):
 
@@ -49,10 +41,10 @@ powershell -ExecutionPolicy Bypass -File C:\Users\User\poreiago\scripts\wallet-g
 6. **Create** → wait 5–10 minutes (sometimes longer)
 7. Rebuild / reopen Wallet → **Σύνδεση με Google** (native account picker)
 
-Do **not** put the Android client ID in the app. Keep using the Web client ID:
-`838114974488-8q36brogbldig001k9n88qrnciqle1j1.apps.googleusercontent.com`
+Do **not** put the Android client ID in the app. Web client ID:
+`967076454927-c5goejio1jlqr2vki24j7g8133knnqlp.apps.googleusercontent.com`
 
-If the OAuth consent screen is in **Testing**, add `iconagr@gmail.com` under **Test users**.
+If the OAuth consent screen is in **Testing**, add your Gmail under **Audience → Test users** (required — Google blocks everyone else).
 
 ### Rebuild (required after any Google/native change)
 

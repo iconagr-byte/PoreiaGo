@@ -9,7 +9,7 @@
  * /api/auth/google/config cannot be reached from the packaged WebView.
  */
 export const PRODUCTION_GOOGLE_CLIENT_ID =
-  '838114974488-8q36brogbldig001k9n88qrnciqle1j1.apps.googleusercontent.com';
+  '967076454927-c5goejio1jlqr2vki24j7g8133knnqlp.apps.googleusercontent.com';
 
 export function isUsableGoogleClientId(clientId) {
   const id = String(clientId || '').trim();
