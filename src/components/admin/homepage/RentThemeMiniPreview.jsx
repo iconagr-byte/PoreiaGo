@@ -69,11 +69,11 @@ function FleetMock({ theme, ink }) {
 
   if (layout === 'rent_scroll') {
     return (
-      <div className="flex gap-1 overflow-hidden px-1.5 pb-1.5">
+      <div className="grid grid-cols-3 gap-1 px-1.5 pb-1.5">
         {[0, 1, 2].map((n) => (
           <div
             key={n}
-            className={`shrink-0 w-[40%] overflow-hidden border border-black/5 ${radius} ${
+            className={`overflow-hidden border border-black/5 ${radius} ${
               soft ? 'bg-white/80' : 'bg-white'
             }`}
           >

@@ -292,10 +292,10 @@ export const RENT_FLEET_LAYOUT_TEMPLATES = [
   },
   {
     id: 'rent_scroll',
-    label: 'Οριζόντιο scroll',
-    description: 'Swipe καρουζέλ — γρήγορη περιήγηση στόλου στο κινητό.',
-    icon: 'swipe',
-    tags: ['Mobile'],
+    label: 'Πλέγμα wrap',
+    description: 'Ίδιο με 3στήλο πλέγμα — χωρίς οριζόντιο scroll.',
+    icon: 'grid_view',
+    tags: ['Grid'],
   },
   {
     id: 'rent_list',
@@ -530,7 +530,7 @@ export function rentFleetGridClass(layoutId) {
     case 'rent_featured':
       return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0';
     case 'rent_scroll':
-      return 'flex gap-5 overflow-x-auto pb-3 snap-x snap-mandatory list-none p-0 m-0';
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0';
     case 'rent_list':
       return 'flex flex-col gap-3 max-w-3xl list-none p-0 m-0';
     case 'rent_grid_three':
@@ -540,9 +540,6 @@ export function rentFleetGridClass(layoutId) {
 }
 
 export function rentFleetCardWrapperClass(layoutId, index = 0) {
-  if (layoutId === 'rent_scroll') {
-    return 'snap-start shrink-0 w-[min(86vw,300px)]';
-  }
   if (layoutId === 'rent_featured' && index === 0) {
     return 'md:col-span-2';
   }
