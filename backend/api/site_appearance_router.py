@@ -675,12 +675,44 @@ async def get_public_checkout_settings(request: Request):
     return CheckoutSettingsResponse(**_read_checkout_settings(tid))
 
 
+async def _appearance_for_tenant_id(tenant_id: str) -> SiteAppearanceResponse | None:
+    """Load public office branding by sealed wallet / office UUID."""
+    try:
+        from uuid import UUID
+
+        from app.core.database import AsyncSessionLocal
+        from app.services.tenant_site_appearance_service import TenantSiteAppearanceService
+
+        tid = UUID(str(tenant_id).strip())
+    except Exception:
+        return None
+    try:
+        async with AsyncSessionLocal() as session:
+            data = await TenantSiteAppearanceService(session).get_appearance(tid)
+            clean = {k: v for k, v in data.items() if k in SiteAppearanceResponse.model_fields}
+            return SiteAppearanceResponse(**{**DEFAULT_SITE_APPEARANCE, **clean})
+    except Exception:
+        logger.debug("appearance by tenant_id failed", exc_info=True)
+        return None
+
+
 @router.get("/api/site/appearance", response_model=SiteAppearanceResponse)
 async def get_public_site_appearance(
     request: Request,
     host: str | None = Query(default=None),
+    tenant_id: str | None = Query(
+        default=None,
+        description="Sealed wallet office UUID (native Capacitor / localhost)",
+    ),
 ):
     purge_mistaken_platform_logo()
+
+    # Native My Wallet: Host is localhost — resolve branding from sealed tenant_id.
+    explicit_tid = (tenant_id or "").strip()
+    if explicit_tid:
+        by_tid = await _appearance_for_tenant_id(explicit_tid)
+        if by_tid is not None:
+            return by_tid
 
     # Prefer explicit ?host=, else the browser Host (custom domains like achilliotravel.com).
     effective_host = (host or "").strip() or (
@@ -999,6 +1031,10 @@ class OfficeModulesResponse(BaseModel):
 async def get_public_office_modules(
     request: Request,
     host: str | None = Query(default=None),
+    tenant_id: str | None = Query(
+        default=None,
+        description="Sealed wallet office UUID (native Capacitor / localhost)",
+    ),
 ):
     """
     Public storefront modules for an office host.
@@ -1007,6 +1043,58 @@ async def get_public_office_modules(
     effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
     if effective_host and "," in effective_host:
         effective_host = effective_host.split(",")[0].strip()
+
+    explicit_tid = (tenant_id or "").strip()
+    if explicit_tid:
+        try:
+            from uuid import UUID
+
+            from app.core.database import AsyncSessionLocal
+            from app.services.tenant_modules import (
+                apply_known_office_rent_policy,
+                is_achillio_travel_office,
+                is_poreiago_platform_office,
+                modules_for_tenant,
+            )
+            from sqlalchemy import select
+            from app.models.tenant import Tenant
+
+            tid = UUID(explicit_tid)
+            async with AsyncSessionLocal() as session:
+                row = await session.execute(select(Tenant).where(Tenant.id == tid))
+                tenant = row.scalar_one_or_none()
+                if tenant:
+                    try:
+                        updated = apply_known_office_rent_policy(tenant)
+                        if updated is not None:
+                            tenant.settings_json = json.dumps(updated, ensure_ascii=False)
+                            await session.commit()
+                            await session.refresh(tenant)
+                    except Exception:
+                        logger.debug(
+                            "apply_known_office_rent_policy skipped on /site/modules?tenant_id",
+                            exc_info=True,
+                        )
+                    mods = modules_for_tenant(tenant)
+                    if is_achillio_travel_office(tenant):
+                        kind = "achillio_travel"
+                    elif is_poreiago_platform_office(tenant):
+                        kind = "poreiago_platform"
+                        mods = {
+                            **mods,
+                            "rent_enabled": True,
+                            "trips_enabled": True,
+                            "mode": "both",
+                        }
+                    else:
+                        kind = "customer"
+                    return OfficeModulesResponse(
+                        **mods,
+                        tenant_slug=tenant.slug,
+                        office_kind=kind,
+                    )
+        except Exception:
+            logger.debug("modules by tenant_id failed", exc_info=True)
 
     if effective_host:
         try:

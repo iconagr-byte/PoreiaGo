@@ -45,6 +45,10 @@ import {
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import {
+  getWalletTenantId,
+  WALLET_TENANT_CHANGED_EVENT,
+} from '../lib/wallet/walletTenantSeal.js';
 import '../styles/wallet-pass.css';
 
 const ALL_TABS = [
@@ -150,6 +154,8 @@ function WalletAuthenticatedApp() {
   const [bookings, setBookings] = useState([]);
   const [brandLabel, setBrandLabel] = useState('My Wallet');
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
+  /** Sealed office UUID — drives logo/name fetch on native (Host=localhost). */
+  const [sealedTenantId, setSealedTenantId] = useState(() => getWalletTenantId() || '');
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [showWelcome, setShowWelcome] = useState(
     () => Boolean(location.state?.fromClaim || location.state?.highlightBooking),
@@ -240,8 +246,15 @@ function WalletAuthenticatedApp() {
   }, [email, focusId]);
 
   useEffect(() => {
+    const syncSeal = () => setSealedTenantId(getWalletTenantId() || '');
+    syncSeal();
+    window.addEventListener(WALLET_TENANT_CHANGED_EVENT, syncSeal);
+    return () => window.removeEventListener(WALLET_TENANT_CHANGED_EVENT, syncSeal);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
-    fetchSiteAppearance()
+    fetchSiteAppearance(sealedTenantId ? { tenantId: sealedTenantId } : undefined)
       .then((data) => {
         if (cancelled) return;
         const brand = resolveOfficeBrand(data || {});
@@ -252,11 +265,11 @@ function WalletAuthenticatedApp() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sealedTenantId]);
 
   useEffect(() => {
     let cancelled = false;
-    fetchOfficeModules()
+    fetchOfficeModules(sealedTenantId ? { tenantId: sealedTenantId } : undefined)
       .then((mods) => {
         if (!cancelled) setOfficeModules(mods);
       })
@@ -266,7 +279,7 @@ function WalletAuthenticatedApp() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sealedTenantId]);
 
   const nativeWallet = isNativeApp();
   // One Wallet for buses + rentals — show Rent tab when the sealed office has Rent.
@@ -504,7 +517,13 @@ function WalletAuthenticatedApp() {
             </button>
           )}
           <div className="wallet-topbar-brand">
-            <OfficeBrandMark className="h-8" variant="light" fallbackLabel="My Wallet" asLink={false} />
+            <OfficeBrandMark
+              className="h-8"
+              variant="light"
+              fallbackLabel={brandLabel || 'My Wallet'}
+              asLink={false}
+              refreshKey={sealedTenantId}
+            />
           </div>
           <button
             type="button"

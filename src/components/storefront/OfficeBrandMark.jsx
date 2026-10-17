@@ -9,6 +9,7 @@ import {
 import { officeLogoImageStyle, resolveOfficeBrand, clampLogoHeight } from '../../lib/branding/officeBrand.js';
 import { isTenantStorefrontHost } from '../../lib/platform/tenantHost.js';
 import { OFFICE_BRAND_CHANGED_EVENT } from '../admin/OfficeLogoChangeModal.jsx';
+import { WALLET_TENANT_CHANGED_EVENT } from '../../lib/wallet/walletTenantSeal.js';
 
 function normalizeAppearance(data) {
   if (
@@ -102,10 +103,13 @@ export default function OfficeBrandMark({
       // Re-fetch so Postgres wins once persist completes.
       load();
     };
+    const onWalletTenant = () => load();
     window.addEventListener(OFFICE_BRAND_CHANGED_EVENT, onChanged);
+    window.addEventListener(WALLET_TENANT_CHANGED_EVENT, onWalletTenant);
     return () => {
       cancelled = true;
       window.removeEventListener(OFFICE_BRAND_CHANGED_EVENT, onChanged);
+      window.removeEventListener(WALLET_TENANT_CHANGED_EVENT, onWalletTenant);
     };
   }, [refreshKey, preferAdmin]);
 
