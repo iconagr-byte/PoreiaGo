@@ -210,7 +210,7 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       const msg = String(err?.message || err || '');
       if (/audience mismatch/i.test(msg)) {
         setError(
-          'Google OK στο app — ο server έχει παλιό Client ID. Merge το PR στο main (Deploy VPS) ή Actions → Set Google Client ID με το PoreiaGo Web client, περίμενε ~2 λεπτά, ξαναδοκίμασε.',
+          'Google Client ID δεν ταιριάζει ακόμα με τον server. Ctrl+Shift+R (σκληρό refresh), περίμενε ~2 λεπτά μετά το Deploy, ξανά Σύνδεση με Google.',
         );
       } else {
         setError(msg || 'Αποτυχία σύνδεσης με Google');
