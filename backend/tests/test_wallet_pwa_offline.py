@@ -53,8 +53,10 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         conf = (ROOT / "deploy" / "nginx" / "frontend.conf").read_text(encoding="utf-8")
         shared = (ROOT / "deploy" / "nginx" / "frontend-shared.inc").read_text(encoding="utf-8")
         # Host/XFH-based SPA shell (NPM may not preserve Host for server_name).
+        # Default index.html = PoreiaGo; Achillio is index.achillio.html only.
         self.assertIn("map $http_x_forwarded_host $spa_from_xfh", conf)
-        self.assertIn("index.poreiago.html", conf)
+        self.assertIn("index.achillio.html", conf)
+        self.assertIn("~*achilliotravel\\.com /index.achillio.html;", conf)
         self.assertIn("set $spa_shell /index.html;", conf)
         self.assertIn("try_files $uri @seo_shell;", conf)
         self.assertIn("location @seo_shell", conf)
