@@ -247,6 +247,12 @@ function LiveGoogleSignIn({ onSuccess, onError, disabled, text }) {
             );
             return;
           }
+          if (/No credentials available|NoCredential/i.test(msg)) {
+            onError?.(
+              'Δεν υπάρχει Google λογαριασμός στο emulator. Settings → Passwords & accounts → Add account → Google, μετά ξανά Σύνδεση με Google.',
+            );
+            return;
+          }
           onError?.(
             msg
               ? `Google: ${msg}`
