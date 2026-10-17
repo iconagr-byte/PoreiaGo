@@ -33,6 +33,7 @@ const CRITICAL_MAIN_IDS = [
   'fleet_live_map',
   'routes',
   'customers',
+  'wallet_registrations',
   'fleet',
   'fleet_ops',
   'drivers',
@@ -47,6 +48,7 @@ export const PLATFORM_NAV_IDS = PLATFORM_OPERATOR_TABS.map((t) => `settings_${t.
 export const DEFAULT_MAIN_NAV_ORDER = [
   'dashboard',
   'fleet_live_map',
+  'wallet_registrations',
   'routes',
   'customers',
   'fleet',
@@ -64,6 +66,7 @@ export const DEFAULT_RENT_NAV_ORDER = [...RENT_DESK_NAV_IDS];
 /** Rent-only office — no bus trips / coach fleet / driver ops. */
 export const RENT_ONLY_MAIN_NAV_ORDER = [
   'dashboard',
+  'wallet_registrations',
   'customers',
   'fleet_live_map',
   'email',
@@ -353,6 +356,16 @@ export const ADMIN_NAV_ITEMS = {
     tab: 'customers',
     navGroup: 'main',
     accent: 'violet',
+  },
+  wallet_registrations: {
+    id: 'wallet_registrations',
+    label: 'Εγγραφές πελατών',
+    icon: 'person_add',
+    filled: true,
+    type: 'tab',
+    tab: 'wallet_registrations',
+    navGroup: 'main',
+    accent: 'sky',
   },
   loyalty: {
     id: 'loyalty',

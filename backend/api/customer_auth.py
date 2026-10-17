@@ -155,6 +155,22 @@ async def register_customer(request: Request, body: RegisterRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     token, tid, account = await _issue_customer_token(request, email, account=account)
+    record_login_from_request(
+        request,
+        actor_type="customer",
+        identity=email,
+        success=True,
+        actor_id=str(account.get("customer_id") or email),
+        actor_name=account.get("name"),
+        method="register",
+        tenant_id=tid,
+    )
+    try:
+        from ticketing.customer_registration_notify import notify_customer_registration
+
+        await notify_customer_registration(account, tenant_id=tid, method="email")
+    except Exception:
+        pass
     return _profile_response(account, token, tenant_id=tid)
 
 
@@ -288,6 +304,8 @@ async def verify_google_token(request: Request, body: GoogleTokenRequest):
     if email in STAFF_EMAILS:
         raise HTTPException(status_code=403, detail="Use Admin Login for staff accounts")
 
+    prior = await get_account(email)
+    is_new = prior is None
     account = await upsert_google_account(email, data.get("name"), data.get("picture"))
     token, tid, account = await _issue_customer_token(
         request, email, extra={"provider": "google"}, account=account
@@ -299,9 +317,16 @@ async def verify_google_token(request: Request, body: GoogleTokenRequest):
         success=True,
         actor_id=str(account.get("customer_id") or email),
         actor_name=account.get("name") or data.get("name"),
-        method="google",
+        method="google_signup" if is_new else "google",
         tenant_id=tid,
     )
+    if is_new:
+        try:
+            from ticketing.customer_registration_notify import notify_customer_registration
+
+            await notify_customer_registration(account, tenant_id=tid, method="google")
+        except Exception:
+            pass
     return _profile_response(account, token, tenant_id=tid)
 
 
