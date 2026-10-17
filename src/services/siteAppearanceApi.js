@@ -158,10 +158,44 @@ export function resolveSiteAssetUrl(url) {
   return url;
 }
 
-export async function fetchSiteAppearance(host = typeof window !== 'undefined' ? window.location.hostname : '') {
+/**
+ * Public site appearance.
+ * @param {string|{ host?: string, tenantId?: string }} [hostOrOpts]
+ *   Native Wallet passes sealed `tenantId` because Host is localhost.
+ */
+export async function fetchSiteAppearance(
+  hostOrOpts = typeof window !== 'undefined' ? window.location.hostname : '',
+) {
+  let host =
+    typeof hostOrOpts === 'string'
+      ? hostOrOpts
+      : String(hostOrOpts?.host || (typeof window !== 'undefined' ? window.location.hostname : ''));
+  let tenantId =
+    typeof hostOrOpts === 'object' && hostOrOpts
+      ? String(hostOrOpts.tenantId || '').trim()
+      : '';
+
+  // Capacitor / platform host: use sealed wallet office for logo + name.
+  if (!tenantId) {
+    try {
+      const { getWalletTenantId } = await import('../lib/wallet/walletTenantSeal.js');
+      const { isNativeApp } = await import('../lib/capacitor/isNativeApp.js');
+      const { isPlatformMarketingHost } = await import('../lib/platform/tenantHost.js');
+      const sealed = getWalletTenantId();
+      if (sealed && (isNativeApp() || isPlatformMarketingHost(host))) {
+        tenantId = sealed;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   try {
-    const qs = host ? `?host=${encodeURIComponent(host)}` : '';
-    const res = await fetch(`${API_BASE}/api/site/appearance${qs}`);
+    const qs = new URLSearchParams();
+    if (tenantId) qs.set('tenant_id', tenantId);
+    else if (host) qs.set('host', host);
+    const q = qs.toString() ? `?${qs}` : '';
+    const res = await fetch(`${API_BASE}/api/site/appearance${q}`);
     if (res.ok) {
       const data = await res.json();
       const merged = finalizeAppearance(data);

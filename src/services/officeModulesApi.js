@@ -41,13 +41,37 @@ function normalizeModules(data = {}) {
  * Public office modules for the current (or given) host.
  * Rent-only contracts → homepage shows only Rent; bus + add-on → both.
  */
-export async function fetchOfficeModules(host) {
-  const effectiveHost =
-    host ||
-    (typeof window !== 'undefined'
-      ? window.location.hostname
-      : '');
-  const q = effectiveHost ? `?host=${encodeURIComponent(effectiveHost)}` : '';
+export async function fetchOfficeModules(hostOrOpts) {
+  let effectiveHost =
+    typeof hostOrOpts === 'string'
+      ? hostOrOpts
+      : String(hostOrOpts?.host || '');
+  if (!effectiveHost && typeof window !== 'undefined') {
+    effectiveHost = window.location.hostname;
+  }
+  let tenantId =
+    typeof hostOrOpts === 'object' && hostOrOpts
+      ? String(hostOrOpts.tenantId || '').trim()
+      : '';
+
+  if (!tenantId) {
+    try {
+      const { getWalletTenantId } = await import('../lib/wallet/walletTenantSeal.js');
+      const { isNativeApp } = await import('../lib/capacitor/isNativeApp.js');
+      const { isPlatformMarketingHost } = await import('../lib/platform/tenantHost.js');
+      const sealed = getWalletTenantId();
+      if (sealed && (isNativeApp() || isPlatformMarketingHost(effectiveHost))) {
+        tenantId = sealed;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const qs = new URLSearchParams();
+  if (tenantId) qs.set('tenant_id', tenantId);
+  else if (effectiveHost) qs.set('host', effectiveHost);
+  const q = qs.toString() ? `?${qs}` : '';
   try {
     const res = await fetch(`${API_BASE}/api/site/modules${q}`);
     if (!res.ok) return { ...DEFAULT_OFFICE_MODULES };
