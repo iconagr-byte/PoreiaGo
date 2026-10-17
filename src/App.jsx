@@ -54,6 +54,8 @@ import MaintenanceGate from './components/MaintenanceGate.jsx';
 import RentStorefrontGate from './components/rental/RentStorefrontGate.jsx';
 import WalletNativeBoot from './components/wallet/WalletNativeBoot.jsx';
 import WalletNativeShell from './components/wallet/WalletNativeShell.jsx';
+import WalletNativeGoogleBridgePage from './pages/WalletNativeGoogleBridgePage.jsx';
+import { isNativeApp } from './lib/capacitor/isNativeApp.js';
 
 function RentalCustomerAppGated() {
   return (
@@ -121,6 +123,12 @@ function UiLangBoot() {
   return null;
 }
 
+/** Capacitor Wallet: never mount marketing HomePage on `/`. */
+function NativeAwareHome() {
+  if (isNativeApp()) return <Navigate to="/wallet" replace />;
+  return <HomePage />;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -138,6 +146,7 @@ function App() {
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
             <Route path="/wallet/magic" element={<WalletMagicPage />} />
+            <Route path="/wallet/native-google" element={<WalletNativeGoogleBridgePage />} />
             <Route path="/wallet" element={<SimpleWalletPage />} />
             {/* Rent: green URLs — /rent/login + /rent/wallet + /rent/my-booking (not bus). */}
             <Route path="/rent/login" element={<LoginPage rentEntrance />} />
@@ -154,7 +163,7 @@ function App() {
             <Route path="/rent/*" element={<RentalCustomerAppGated />} />
             {/* Contactless rental contract signature (token from SMS/email). */}
             <Route path="/sign/:token" element={<RentalRemoteSignPage />} />
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<NativeAwareHome />} />
             <Route path="/storefront" element={<StorefrontDemoPage />} />
             <Route path="/grafeia" element={<AgencyPlansPage />} />
             <Route path="/grafeia/signup" element={<AgencySignupPage />} />

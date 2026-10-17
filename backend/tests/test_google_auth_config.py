@@ -44,15 +44,16 @@ def test_google_config_falls_back_to_vite_env(monkeypatch):
     assert data["client_id"] == "vite-only.apps.googleusercontent.com"
 
 
-def test_google_login_503_when_not_configured(monkeypatch):
+def test_google_login_rejects_invalid_token_with_wallet_fallback(monkeypatch):
+    """Empty env still accepts PoreiaGo Wallet Web audience; bad token → 401."""
     monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
     monkeypatch.delenv("VITE_GOOGLE_CLIENT_ID", raising=False)
     res = _client().post(
         "/api/auth/google",
         json={"id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.e30.x"},
     )
-    assert res.status_code == 503
-    assert "GOOGLE_CLIENT_ID" in res.json()["detail"]
+    assert res.status_code == 401
+    assert "Invalid Google token" in res.json()["detail"]
 
 
 def test_google_config_rejects_docs_placeholder_client_id(monkeypatch):
@@ -68,7 +69,8 @@ def test_google_config_rejects_docs_placeholder_client_id(monkeypatch):
     assert data["client_id"] is None
 
 
-def test_google_login_503_when_placeholder_client_id(monkeypatch):
+def test_google_login_rejects_invalid_token_when_placeholder_env(monkeypatch):
+    """Placeholder env is ignored; Wallet PoreiaGo fallback still verifies via Google."""
     monkeypatch.setenv(
         "GOOGLE_CLIENT_ID",
         "123456789-xxxx.apps.googleusercontent.com",
@@ -78,4 +80,4 @@ def test_google_login_503_when_placeholder_client_id(monkeypatch):
         "/api/auth/google",
         json={"id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.e30.x"},
     )
-    assert res.status_code == 503
+    assert res.status_code == 401

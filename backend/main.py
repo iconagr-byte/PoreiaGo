@@ -22,19 +22,39 @@ from ticketing.demo_catalog import allow_demo_seeds, purge_seed_demo_catalog
 
 
 # Explicit origins required when allow_credentials=True (browsers reject "*").
+# Capacitor Wallet WebView uses https://localhost (Android) / capacitor://localhost (iOS).
 _DEFAULT_CORS_ORIGINS = (
     "https://www.poreiago.com,"
     "https://poreiago.com,"
+    "https://www.achilliotravel.com,"
+    "https://achilliotravel.com,"
     "http://localhost:5173,"
     "http://localhost:3000,"
     "http://127.0.0.1:5173,"
-    "http://127.0.0.1:3000"
+    "http://127.0.0.1:3000,"
+    "https://localhost,"
+    "http://localhost,"
+    "capacitor://localhost,"
+    "ionic://localhost"
+)
+
+
+_CAPACITOR_CORS_ORIGINS = (
+    "https://localhost",
+    "http://localhost",
+    "capacitor://localhost",
+    "ionic://localhost",
 )
 
 
 def _cors_origins() -> list[str]:
     raw = (os.getenv("CORS_ORIGINS") or _DEFAULT_CORS_ORIGINS).strip()
-    return [o.strip() for o in raw.split(",") if o.strip()]
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    # Always allow Capacitor Wallet WebView even if CORS_ORIGINS was set without them.
+    for origin in _CAPACITOR_CORS_ORIGINS:
+        if origin not in origins:
+            origins.append(origin)
+    return origins
 
 try:
     from api.bookings import router as bookings_router

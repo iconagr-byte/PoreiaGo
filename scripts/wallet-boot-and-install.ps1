@@ -1,5 +1,5 @@
-# Start first available AVD (if needed), then install PoreiaGo Wallet APK.
-# Usage (ONE short line — do not paste multi-line blocks):
+﻿# Start first available AVD (if needed), then install PoreiaGo Wallet APK.
+# Usage (ONE short line - do not paste multi-line blocks):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
 
 $ErrorActionPreference = "Stop"

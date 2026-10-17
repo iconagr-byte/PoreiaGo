@@ -6,7 +6,28 @@
     "allowMixedContent": false,
     "backgroundColor": "#ffffff"
   },
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": [
+      "https://www.achilliotravel.com/*",
+      "https://achilliotravel.com/*",
+      "https://www.poreiago.com/*",
+      "https://accounts.google.com/*",
+      "https://*.googleusercontent.com/*"
+    ]
+  },
   "plugins": {
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      }
+    },
+    "CapacitorHttp": {
+      "enabled": true
+    },
     "SplashScreen": {
       "launchAutoHide": true,
       "backgroundColor": "#ffffff",

@@ -3,6 +3,14 @@
  * Live prod had `123456789-xxxx.apps.googleusercontent.com` from GOOGLE-SIGNIN.md.
  */
 
+/**
+ * Public Web Client ID used on Achillio / PoreiaGo production.
+ * Safe to embed (GIS client ids are public). Used as Capacitor fallback when
+ * /api/auth/google/config cannot be reached from the packaged WebView.
+ */
+export const PRODUCTION_GOOGLE_CLIENT_ID =
+  '967076454927-c5goejio1jlqr2vki24j7g8133knnqlp.apps.googleusercontent.com';
+
 export function isUsableGoogleClientId(clientId) {
   const id = String(clientId || '').trim();
   if (!id) return false;

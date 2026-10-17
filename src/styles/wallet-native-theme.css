@@ -1,0 +1,115 @@
+/**
+ * Capacitor PoreiaGo Wallet — native-only visual theme.
+ * Loaded ONLY when isNativeApp() is true (see main.jsx).
+ * Website /wallet and /login never import this file.
+ */
+
+html[data-poreiago-app='wallet'],
+html[data-poreiago-app='wallet'] body,
+html[data-poreiago-app='wallet'] #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  background: #ffffff;
+  overflow-x: hidden;
+}
+
+/* Room for native bottom tabs (auth screens reset below). */
+html[data-poreiago-app='wallet'] body {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+html[data-poreiago-app='wallet'] body:has(.wallet-auth-stage) {
+  padding-bottom: 0;
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-back,
+html[data-poreiago-app='wallet'] .rent-auth-back {
+  display: none !important;
+}
+
+/* Full-bleed white auth — no blue website stage / floating card */
+html[data-poreiago-app='wallet'] .wallet-auth-stage,
+html[data-poreiago-app='wallet'] .wallet-auth-stage--native,
+html[data-poreiago-app='wallet'] .wallet-auth-shell {
+  width: 100% !important;
+  min-height: 100dvh !important;
+  max-width: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+  animation: pgWalletNativeFade 160ms ease-out;
+}
+
+@keyframes pgWalletNativeFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-scroll {
+  width: 100% !important;
+  min-height: 100dvh !important;
+  padding: max(1.5rem, env(safe-area-inset-top, 0px)) 1.35rem
+    max(1.5rem, env(safe-area-inset-bottom, 0px)) !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  background: #ffffff !important;
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-panel,
+html[data-poreiago-app='wallet'] .wallet-auth-card {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: auto !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: #ffffff !important;
+  padding: 0.35rem 0 1rem !important;
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-card .wallet-auth-icon {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin: 0 auto 1.15rem;
+  font-size: 2.05rem;
+  line-height: 1;
+  color: #ffffff;
+  background: linear-gradient(165deg, #3aa0ff 0%, #0071e3 55%, #0060c4 100%);
+  border-radius: 1.2rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 10px 28px rgba(0, 113, 227, 0.28);
+}
+
+html[data-poreiago-app='wallet'] .wallet-auth-card h1 {
+  font-size: 2.05rem;
+  letter-spacing: -0.045em;
+}
+
+html[data-poreiago-app='wallet'] .wallet-phone-stage,
+html[data-poreiago-app='wallet'] .wallet-phone-stage--native,
+html[data-poreiago-app='wallet'] .wallet-phone-stage--phone {
+  width: 100%;
+  padding: 0;
+  background: #f5f5f7;
+}
+
+html[data-poreiago-app='wallet'] .wallet-app,
+html[data-poreiago-app='wallet'] .wallet-app--phone {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+}

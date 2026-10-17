@@ -4,7 +4,11 @@ import {
   GOOGLE_CLIENT_ID as BUILD_GOOGLE_CLIENT_ID,
   fetchGoogleAuthConfig,
 } from '../services/customerAuthApi.js';
-import { isUsableGoogleClientId } from '../lib/googleClientId.js';
+import {
+  isUsableGoogleClientId,
+  PRODUCTION_GOOGLE_CLIENT_ID,
+} from '../lib/googleClientId.js';
+import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 
 const GoogleAuthConfigContext = createContext({
   loading: true,
@@ -21,12 +25,23 @@ function resolveClientId(raw) {
   return isUsableGoogleClientId(clientId) ? clientId : '';
 }
 
+function nativeOrBuildFallback() {
+  // Native Wallet: prefer committed PoreiaGo Web client (same project as Android OAuth).
+  if (isNativeApp()) {
+    return (
+      resolveClientId(PRODUCTION_GOOGLE_CLIENT_ID) ||
+      resolveClientId(BUILD_GOOGLE_CLIENT_ID)
+    );
+  }
+  return resolveClientId(BUILD_GOOGLE_CLIENT_ID);
+}
+
 /**
  * Loads Google OAuth Web Client ID from the API (runtime) with Vite build fallback.
  * Wraps children in GoogleOAuthProvider when a real (non-placeholder) client id is available.
  */
 export default function GoogleAuthRoot({ children }) {
-  const buildId = resolveClientId(BUILD_GOOGLE_CLIENT_ID);
+  const buildId = nativeOrBuildFallback();
   const [state, setState] = useState({
     loading: true,
     enabled: Boolean(buildId),
@@ -39,7 +54,10 @@ export default function GoogleAuthRoot({ children }) {
       try {
         const cfg = await fetchGoogleAuthConfig();
         if (cancelled) return;
-        const clientId = resolveClientId(cfg.client_id || BUILD_GOOGLE_CLIENT_ID);
+        // Native: never let a stale production config (other GCP project) win.
+        const clientId = isNativeApp()
+          ? nativeOrBuildFallback() || resolveClientId(cfg.client_id)
+          : resolveClientId(cfg.client_id) || nativeOrBuildFallback();
         setState({
           loading: false,
           enabled: Boolean(clientId),
@@ -47,7 +65,7 @@ export default function GoogleAuthRoot({ children }) {
         });
       } catch {
         if (cancelled) return;
-        const clientId = resolveClientId(BUILD_GOOGLE_CLIENT_ID);
+        const clientId = nativeOrBuildFallback();
         setState({
           loading: false,
           enabled: Boolean(clientId),

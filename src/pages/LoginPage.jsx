@@ -8,7 +8,6 @@ import {
   isDriver,
 } from '../lib/auth.js';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
-import { useGoogleAuthConfig } from '../components/GoogleAuthRoot.jsx';
 import {
   verifyGoogleLogin,
   loginCustomer,
@@ -22,6 +21,7 @@ import {
 } from '../lib/wallet/walletClaim.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -42,7 +42,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const isPhone = useRentPhone();
-  const { enabled: googleEnabled } = useGoogleAuthConfig();
   // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
   // Native Wallet Android app: always bus My Wallet (never rent chrome).
   const pathRent =
@@ -208,11 +207,26 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         profile.access_token,
       );
     } catch (err) {
-      setError(err.message || 'Αποτυχία σύνδεσης με Google');
+      const msg = String(err?.message || err || '');
+      if (/audience mismatch/i.test(msg)) {
+        setError(
+          'Google OK στο app — ο server έχει παλιό Client ID. Merge το PR στο main (Deploy VPS) ή Actions → Set Google Client ID με το PoreiaGo Web client, περίμενε ~2 λεπτά, ξαναδοκίμασε.',
+        );
+      } else {
+        setError(msg || 'Αποτυχία σύνδεσης με Google');
+      }
     } finally {
       setGoogleLoading(false);
     }
   };
+
+  // Capacitor: credential returned from /wallet/native-google on the office host.
+  useEffect(() => {
+    const cred = takeGoogleCredentialFromLocation(location);
+    if (!cred) return;
+    void handleGoogleCredential(cred);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on return from bridge
+  }, []);
 
   const registerState =
     claim && !rentIntent
@@ -323,22 +337,20 @@ export default function LoginPage({ rentEntrance = false } = {}) {
         </button>
       </form>
 
-      {googleEnabled ? (
-        <>
-          <div className={`${dividerClass} mt-5`}>ή με Google</div>
-          <div className="space-y-3 mt-2">
-            <GoogleSignInButton
-              disabled={googleLoading || loading}
-              onSuccess={handleGoogleCredential}
-              onDemoProfile={handleGoogleDemo}
-              onError={setError}
-            />
-            {googleLoading ? (
-              <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
-            ) : null}
-          </div>
-        </>
-      ) : null}
+      {/* Always show Google — GoogleSignInButton handles loading / unavailable.
+          Native packaged app previously hid this when /api/google/config failed on localhost. */}
+      <div className={`${dividerClass} mt-5`}>ή με Google</div>
+      <div className="space-y-3 mt-2">
+        <GoogleSignInButton
+          disabled={googleLoading || loading}
+          onSuccess={handleGoogleCredential}
+          onDemoProfile={handleGoogleDemo}
+          onError={setError}
+        />
+        {googleLoading ? (
+          <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
+        ) : null}
+      </div>
 
       <p className="text-sm text-center text-[#6e6e73] mt-5">
         Δεν έχετε λογαριασμό;{' '}

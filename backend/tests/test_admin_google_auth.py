@@ -20,11 +20,13 @@ def client():
     return TestClient(app)
 
 
-def test_admin_google_503_without_client_id(client, monkeypatch):
+def test_admin_google_rejects_invalid_token_with_wallet_fallback(client, monkeypatch):
+    """Empty env still accepts PoreiaGo Wallet Web audience; bad token → 401."""
     monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
     monkeypatch.delenv("VITE_GOOGLE_CLIENT_ID", raising=False)
     res = client.post("/api/v1/auth/google", json={"id_token": "fake-token"})
-    assert res.status_code == 503
+    assert res.status_code == 401
+    assert "Invalid Google token" in res.json()["detail"]
 
 
 def test_admin_google_rejects_unknown_user(client, monkeypatch):

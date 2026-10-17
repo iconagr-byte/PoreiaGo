@@ -7,7 +7,6 @@ import {
   isCustomerAuthBackendAvailable,
 } from '../services/customerAuthApi.js';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
-import { useGoogleAuthConfig } from '../components/GoogleAuthRoot.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import {
   clearWalletClaim,
@@ -17,6 +16,7 @@ import {
 } from '../lib/wallet/walletClaim.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -44,7 +44,6 @@ export default function RegisterPage() {
       : '/rent/wallet'
     : location.state?.from || '/wallet';
   const rentIntent = pathRent || isRentReturn(redirectTo);
-  const { enabled: googleEnabled } = useGoogleAuthConfig();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -169,11 +168,26 @@ export default function RegisterPage() {
         profile.access_token,
       );
     } catch (err) {
-      setError(err.message || 'Αποτυχία εγγραφής με Google');
+      const msg = String(err?.message || err || '');
+      if (/audience mismatch/i.test(msg)) {
+        setError(
+          'Google OK στο app — ο server έχει παλιό Client ID. Merge το PR στο main (Deploy VPS) και ξαναδοκίμασε σε ~2 λεπτά.',
+        );
+      } else {
+        setError(msg || 'Αποτυχία εγγραφής με Google');
+      }
     } finally {
       setGoogleLoading(false);
     }
   };
+
+  // Capacitor: credential returned from /wallet/native-google on the office host.
+  useEffect(() => {
+    const cred = takeGoogleCredentialFromLocation(location);
+    if (!cred) return;
+    void handleGoogleCredential(cred);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on return from bridge
+  }, []);
 
   const loginState =
     claim && !rentIntent
@@ -345,23 +359,19 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        {googleEnabled ? (
-          <>
-            <div className={`${dividerClass} mt-5`}>ή με Google</div>
-            <div className="space-y-3 mt-2">
-              <GoogleSignInButton
-                text="signup_with"
-                disabled={googleLoading || loading}
-                onSuccess={handleGoogleCredential}
-                onDemoProfile={handleGoogleDemo}
-                onError={setError}
-              />
-              {googleLoading ? (
-                <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
-              ) : null}
-            </div>
-          </>
-        ) : null}
+        <div className={`${dividerClass} mt-5`}>ή με Google</div>
+        <div className="space-y-3 mt-2">
+          <GoogleSignInButton
+            text="signup_with"
+            disabled={googleLoading || loading}
+            onSuccess={handleGoogleCredential}
+            onDemoProfile={handleGoogleDemo}
+            onError={setError}
+          />
+          {googleLoading ? (
+            <p className="text-xs text-center text-[#6e6e73]">Επαλήθευση Google…</p>
+          ) : null}
+        </div>
 
         <p className="text-sm text-center mt-6 text-[#6e6e73]">
           Έχετε ήδη λογαριασμό;{' '}

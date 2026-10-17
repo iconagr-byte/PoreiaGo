@@ -1,10 +1,12 @@
-﻿# PoreiaGo Wallet - build + install on running emulator
+# PoreiaGo Wallet - build + install on running emulator
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
+# ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.
 
 param(
   [string]$Sdk = "",
-  [string]$JavaHome = ""
+  [string]$JavaHome = "",
+  [string]$Branch = "cursor/wallet-native-theme-isolate-5ffb"
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,7 +21,6 @@ function Get-JavaMajor($javaHome) {
   $javaExe = Join-Path $javaHome "bin\java.exe"
   if (-not (Test-Path -LiteralPath $javaExe)) { return -1 }
 
-  # Most reliable: JAVA_HOME\release (avoids PowerShell stderr trap on `java -version`)
   $release = Join-Path $javaHome "release"
   if (Test-Path -LiteralPath $release) {
     $rel = Get-Content -LiteralPath $release -Raw -ErrorAction SilentlyContinue
@@ -27,7 +28,6 @@ function Get-JavaMajor($javaHome) {
     if ($rel -match 'JAVA_VERSION="(\d+)') { return [int]$Matches[1] }
   }
 
-  # Folder name hint: jbr-21.0.11 / jdk-17.0.x
   $leaf = Split-Path -Leaf $javaHome
   if ($leaf -match '(?:^|[^\d])(21)(?:[^\d]|$)') { return 21 }
   if ($leaf -match '(?:^|[^\d])(17)(?:[^\d]|$)') { return 17 }
@@ -59,7 +59,6 @@ function Find-Java21 {
     [void]$candidates.Add((Join-Path $env:ProgramFiles ("Android\" + $name + "\jbr")))
     [void]$candidates.Add((Join-Path $env:LOCALAPPDATA ("Programs\Android\" + $name + "\jbr")))
   }
-  # Prefer explicit 21 folders first
   $ordered = $candidates | Sort-Object {
     if ($_ -match '21') { 0 } elseif ($_ -match '17') { 1 } else { 2 }
   }
@@ -73,7 +72,6 @@ function Find-Java21 {
     $major = Get-JavaMajor $c
     Write-Host ("check Java " + $c + " -> major=" + $major)
     if ($major -eq 21 -or $major -eq 17) { return $c }
-    # Last resort: path clearly names 21/17 and java.exe exists (parse bugs on some hosts).
     $leaf = Split-Path -Leaf $c
     if ($leaf -match '21') {
       Write-Host ("accept by folder name (21): " + $c) -ForegroundColor Yellow
@@ -89,7 +87,6 @@ function Find-Java21 {
 
 function Pin-GradleJavaHome($javaHome) {
   $gp = Join-Path $repo "android\gradle.properties"
-  # Forward slashes are valid on Windows for Java/Gradle and avoid escape bugs.
   $line = "org.gradle.java.home=" + ($javaHome -replace '\\', '/')
   $lines = @()
   if (Test-Path $gp) {
@@ -113,11 +110,7 @@ if ($JavaHome) {
 }
 if (-not $java) {
   $hint = Join-Path $env:USERPROFILE ".jdks\jbr-21.0.11"
-  throw @"
-Need JDK 17 or 21 (not 25).
-Retry with explicit path:
-  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -JavaHome '$hint'
-"@
+  throw ("Need JDK 17 or 21 (not 25). Retry: powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -JavaHome '" + $hint + "'")
 }
 if (-not (Test-Path -LiteralPath $adb)) { throw "adb not found at $adb" }
 
@@ -131,14 +124,16 @@ Write-Host ("ANDROID_HOME=" + $env:ANDROID_HOME)
 $sdkSlash = $Sdk -replace '\\', '/'
 Set-Content -Path (Join-Path $repo "android\local.properties") -Value ("sdk.dir=" + $sdkSlash) -Encoding ASCII
 
-Write-Host "==> git fetch/reset (main)" -ForegroundColor Cyan
-git fetch origin main
-git checkout main
-git reset --hard origin/main
+Write-Host ("==> git fetch/reset (" + $Branch + ")") -ForegroundColor Cyan
+git fetch origin $Branch
+if ($LASTEXITCODE -ne 0) { throw ("git fetch failed for " + $Branch) }
+git checkout $Branch
+if ($LASTEXITCODE -ne 0) { throw ("git checkout failed for " + $Branch) }
+git reset --hard ("origin/" + $Branch)
+if ($LASTEXITCODE -ne 0) { throw ("git reset --hard failed for origin/" + $Branch) }
 git clean -fd -e android/local.properties -e android/.gradle -e node_modules
 git log -1 --oneline
 
-# Force a clean web bundle so Android never keeps stale login copy.
 $staleDirs = @(
   (Join-Path $repo "dist"),
   (Join-Path $repo "android\app\src\main\assets\public"),
@@ -153,30 +148,51 @@ foreach ($d in $staleDirs) {
 
 Pin-GradleJavaHome $env:JAVA_HOME
 
-Write-Host "==> cap:sync:packaged (npm build + cap sync)" -ForegroundColor Cyan
+Write-Host "==> npm install (native Google plugin + lockfile)" -ForegroundColor Cyan
+npm.cmd install
+if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+$socialPkg = Join-Path $repo "node_modules\@capgo\capacitor-social-login\package.json"
+if (-not (Test-Path -LiteralPath $socialPkg)) {
+  throw "Missing @capgo/capacitor-social-login after npm install - check package.json"
+}
+Write-Host "OK: @capgo/capacitor-social-login installed" -ForegroundColor Green
+
+Write-Host "==> cap:sync:packaged (native Google Sign-In)" -ForegroundColor Cyan
 npm.cmd run cap:sync:packaged
 if ($LASTEXITCODE -ne 0) { throw "sync failed" }
+
+$settingsGradle = Join-Path $repo "android\capacitor.settings.gradle"
+$settingsText = Get-Content -LiteralPath $settingsGradle -Raw -ErrorAction SilentlyContinue
+if (-not $settingsText -or $settingsText -notmatch 'capgo-capacitor-social-login') {
+  throw "SocialLogin missing from android/capacitor.settings.gradle after sync - native Google will fail"
+}
+Write-Host "OK: SocialLogin in capacitor.settings.gradle" -ForegroundColor Green
 
 $assetsPublic = Join-Path $repo "android\app\src\main\assets\public"
 $htmlHit = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "pgWalletFade" -ErrorAction SilentlyContinue
 if (-not $htmlHit) { throw "NEW full-bleed CSS missing from android assets" }
 
-$oldCopy = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js,*.css,*.html -ErrorAction SilentlyContinue |
-  Select-String -Pattern "Σύνδεση για εισιτήρια" -SimpleMatch -ErrorAction SilentlyContinue |
+$walletHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "My Wallet" -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
-if ($oldCopy) {
-  throw ("STALE bundle still has old login subtitle in: " + $oldCopy.Path)
+if (-not $walletHit) {
+  throw "My Wallet copy missing from android assets - wrong branch or stale build"
 }
-Write-Host "OK: new My Wallet login assets (no ticket/QR subtitle)" -ForegroundColor Green
+Write-Host "OK: My Wallet assets present" -ForegroundColor Green
+
+$googleHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Google" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+if (-not $googleHit) {
+  throw "Google Sign-In copy missing from android assets - wrong branch or stale build"
+}
+Write-Host "OK: Google Sign-In present in packaged assets" -ForegroundColor Green
 
 Pin-GradleJavaHome $env:JAVA_HOME
-
-# Clear any host GRADLE_OPTS that inject broken -Dorg.gradle.java.home=...
 Remove-Item Env:GRADLE_OPTS -ErrorAction SilentlyContinue
 
 $androidDir = Join-Path $repo "android"
 Write-Host "==> gradle clean assembleDebug" -ForegroundColor Cyan
-# Invoke via cmd.exe so PowerShell never rewrites -D / args.
 $gradle = Start-Process -FilePath "cmd.exe" `
   -ArgumentList @("/c", "gradlew.bat --no-daemon clean assembleDebug") `
   -WorkingDirectory $androidDir `
@@ -187,6 +203,66 @@ if ($null -eq $gradle -or $gradle.ExitCode -ne 0) {
 
 $apk = Join-Path $repo "android\app\build\outputs\apk\debug\app-debug.apk"
 if (-not (Test-Path -LiteralPath $apk)) { throw ("APK missing: " + $apk) }
+
+# Prove native SocialLogin is inside THIS APK (not just gradle files on disk).
+function Test-ApkHasSocialLogin([string]$apkPath) {
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $tmp = Join-Path $env:TEMP ("pg-social-" + [guid]::NewGuid().ToString("n"))
+  New-Item -ItemType Directory -Path $tmp | Out-Null
+  try {
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($apkPath, $tmp)
+    $plugins = Join-Path $tmp "assets\capacitor.plugins.json"
+    if (-not (Test-Path -LiteralPath $plugins)) { return $false }
+    $pluginsText = Get-Content -LiteralPath $plugins -Raw -ErrorAction SilentlyContinue
+    if (-not $pluginsText -or $pluginsText -notmatch 'SocialLoginPlugin') { return $false }
+    $dexFiles = @(Get-ChildItem -LiteralPath $tmp -Filter "classes*.dex" -File -ErrorAction SilentlyContinue)
+    if ($dexFiles.Count -eq 0) { return $false }
+    foreach ($dex in $dexFiles) {
+      $bytes = [System.IO.File]::ReadAllBytes($dex.FullName)
+      $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+      if ($ascii -match 'SocialLoginPlugin' -or $ascii -match 'ee/forgr/capacitor/social/login') {
+        return $true
+      }
+    }
+    return $false
+  } catch {
+    Write-Host ("APK SocialLogin check error: " + $_) -ForegroundColor Yellow
+    return $false
+  } finally {
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
+if (-not (Test-ApkHasSocialLogin $apk)) {
+  throw "APK built without SocialLoginPlugin class - Google Sign-In will fail. Check npm install + cap sync."
+}
+Write-Host "OK: SocialLoginPlugin inside APK (v1.0.9)" -ForegroundColor Green
+
+Write-Host "==> gradle signingReport (SHA-1 for Google Console)" -ForegroundColor Cyan
+$signReport = Start-Process -FilePath "cmd.exe" `
+  -ArgumentList @("/c", "gradlew.bat --no-daemon signingReport") `
+  -WorkingDirectory $androidDir `
+  -Wait -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $env:TEMP "pg-signing-report.txt") `
+  -RedirectStandardError (Join-Path $env:TEMP "pg-signing-report.err.txt")
+$signOut = ""
+$signFile = Join-Path $env:TEMP "pg-signing-report.txt"
+if (Test-Path -LiteralPath $signFile) {
+  $signOut = Get-Content -LiteralPath $signFile -Raw -ErrorAction SilentlyContinue
+}
+$debugSha = $null
+# Prefer Variant: debug / Config: debug block SHA1
+if ($signOut -match '(?s)Variant:\s*debug.*?SHA1:\s*([0-9A-Fa-f:]+)') {
+  $debugSha = $Matches[1].Trim().ToUpper()
+} elseif ($signOut -match 'SHA1:\s*([0-9A-Fa-f:]+)') {
+  $debugSha = $Matches[1].Trim().ToUpper()
+}
+if ($debugSha) {
+  Write-Host ("SHA-1 (gradle signingReport debug): " + $debugSha) -ForegroundColor Green
+  Write-Host "Put this exact SHA-1 on Android OAuth client for package com.poreiago.wallet" -ForegroundColor Yellow
+} else {
+  Write-Host "Could not parse signingReport SHA-1 - run wallet-google-sha1.ps1" -ForegroundColor Yellow
+}
+
 & $adb start-server
 Write-Host "==> waiting for emulator (home screen / adb device)" -ForegroundColor Cyan
 $deadline = (Get-Date).AddMinutes(3)
@@ -198,14 +274,46 @@ while ((Get-Date) -lt $deadline) {
   Start-Sleep -Seconds 3
 }
 if (-not $online) {
-  throw "Emulator not online. Open Medium Phone, wait for home screen, then rerun OR install only:`n  adb install -r `"$apk`""
+  throw ("Emulator not online. Open Medium Phone, wait for home screen, then rerun OR: adb install -r `"$apk`"")
 }
 
 Write-Host "==> wipe old app + reinstall" -ForegroundColor Cyan
-& $adb shell am force-stop com.poreiago.wallet
-& $adb uninstall com.poreiago.wallet
-& $adb shell pm clear com.poreiago.wallet 2>$null
+# adb writes "Failed" to stderr when the package is already gone; with
+# ErrorActionPreference=Stop that becomes a terminating NativeCommandError.
+# Uninstall already removes app data — do not pm clear after uninstall.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
+& $adb uninstall com.poreiago.wallet 2>$null | Out-Null
+$ErrorActionPreference = $prevEap
 & $adb install -r $apk
 if ($LASTEXITCODE -ne 0) { throw "install failed" }
-& $adb shell am start -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity"
-Write-Host "DONE - Apple My Wallet login (no ticket/QR subtitle). Do NOT press Studio Run after this." -ForegroundColor Green
+
+$bootHit = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "replaceState" -ErrorAction SilentlyContinue
+if (-not $bootHit) { throw "Native /wallet cold-start missing from android assets - rebuild failed" }
+Write-Host "OK: native cold-start replaceState present" -ForegroundColor Green
+
+Write-Host "==> launch My Wallet" -ForegroundColor Cyan
+& $adb shell am start -W -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity" -a android.intent.action.MAIN -c android.intent.category.LAUNCHER
+if ($LASTEXITCODE -ne 0) {
+  & $adb shell monkey -p com.poreiago.wallet -c android.intent.category.LAUNCHER 1
+}
+Start-Sleep -Seconds 2
+$ErrorActionPreference = "Continue"
+$pidLine = & $adb shell pidof com.poreiago.wallet 2>$null
+$ErrorActionPreference = "Stop"
+if (-not $pidLine) {
+  $ErrorActionPreference = "Continue"
+  & $adb logcat -d -t 80 AndroidRuntime:E Capacitor:E chromium:E *:S | Out-Host
+  $ErrorActionPreference = "Stop"
+  throw "App crashed on open - paste logcat above"
+}
+Write-Host ""
+Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan
+$shaScript = Join-Path $repo "scripts\wallet-google-sha1.ps1"
+if (Test-Path -LiteralPath $shaScript) {
+  & powershell -ExecutionPolicy Bypass -File $shaScript
+} else {
+  Write-Host "Run: keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android"
+}
+Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Native Google Sign-In. Do NOT press Studio Run.") -ForegroundColor Green
