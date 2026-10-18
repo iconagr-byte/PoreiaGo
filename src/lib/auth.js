@@ -88,4 +88,10 @@ export function logoutCustomer() {
   localStorage.removeItem('authProvider');
   localStorage.removeItem(CUSTOMER_TOKEN_KEY);
   clearWalletTenantId();
+  // Next login shows PoreiaGo brand splash again.
+  try {
+    sessionStorage.removeItem(WALLET_BRAND_SPLASH_KEY);
+  } catch {
+    /* ignore */
+  }
 }
