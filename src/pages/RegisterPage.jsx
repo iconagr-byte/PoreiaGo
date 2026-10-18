@@ -17,6 +17,8 @@ import {
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
+import WalletBrandSplash from '../components/wallet/WalletBrandSplash.jsx';
+import { hasSeenWalletBrandSplash } from '../lib/wallet/walletBrandSplash.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -48,6 +50,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
+  const [showBrandSplash, setShowBrandSplash] = useState(() => {
+    if (!isNativeApp()) return false;
+    return !hasSeenWalletBrandSplash();
+  });
 
   const claim = useMemo(() => {
     const fromState = location.state?.walletClaim
@@ -225,6 +231,10 @@ export default function RegisterPage() {
   const linkClass = rentIntent ? 'rent-auth-link' : 'wallet-auth-link';
   const submitClass = rentIntent ? 'rent-auth-submit' : 'wallet-auth-submit';
   const dividerClass = rentIntent ? 'rent-auth-divider' : 'wallet-auth-divider';
+
+  if (nativeWallet && showBrandSplash) {
+    return <WalletBrandSplash onDone={() => setShowBrandSplash(false)} />;
+  }
 
   return (
     <div className={shellClass}>

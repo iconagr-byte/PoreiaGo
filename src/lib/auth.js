@@ -1,5 +1,6 @@
 import { upsertCustomer } from './customers/customerStore.js';
 import { clearWalletTenantId, setWalletTenantId } from './wallet/walletTenantSeal.js';
+import { WALLET_BRAND_SPLASH_KEY } from './wallet/walletBrandSplash.js';
 
 export const ROLES = {
   CUSTOMER: 'customer',
