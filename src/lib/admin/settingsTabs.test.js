@@ -12,6 +12,7 @@ assert.equal(sanitizeSettingsSubTab('integrations', false), 'platform');
 assert.equal(sanitizeSettingsSubTab('backup', false), 'platform');
 assert.equal(sanitizeSettingsSubTab('growth', false), 'platform');
 assert.equal(sanitizeSettingsSubTab('homepage', false), 'homepage');
+assert.equal(sanitizeSettingsSubTab('wallet_home', false), 'wallet_home');
 assert.equal(sanitizeSettingsSubTab('domain', false), 'domain');
 assert.equal(sanitizeSettingsSubTab('tenants', true), 'tenants');
 assert.equal(sanitizeSettingsSubTab('integrations', true), 'saas_infra');
@@ -19,6 +20,7 @@ assert.equal(sanitizeSettingsSubTab('growth', true), 'growth');
 
 const tenantTabs = settingsTabsForRole(false);
 assert.ok(tenantTabs.some((t) => t.id === 'homepage'));
+assert.ok(tenantTabs.some((t) => t.id === 'wallet_home'));
 assert.ok(tenantTabs.some((t) => t.id === 'domain'));
 assert.ok(!tenantTabs.some((t) => t.id === 'drivers'));
 assert.ok(tenantTabs.some((t) => t.id === 'telematics'));

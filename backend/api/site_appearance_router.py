@@ -200,6 +200,30 @@ DEFAULT_SITE_APPEARANCE = {
     "intl_section_subtitle": (
         "Οριζόντια προβολή διεθνών εκδρομών με λεωφορείο — σύρετε για να δείτε όλες."
     ),
+    "wallet_home_hook": "",
+    "wallet_home_headline": "",
+    "wallet_home_body": "",
+    "wallet_home_image_url": "",
+    "wallet_home_services": [
+        {
+            "icon": "confirmation_number",
+            "title": "Online κράτηση",
+            "body": "Κλείστε θέση σε λίγα βήματα από το κινητό.",
+        },
+        {
+            "icon": "qr_code_2",
+            "title": "Ψηφιακό εισιτήριο",
+            "body": "Το εισιτήριό σας πάντα στο Wallet.",
+        },
+        {
+            "icon": "support_agent",
+            "title": "Υποστήριξη γραφείου",
+            "body": "Είμαστε δίπλα σας πριν και κατά το ταξίδι.",
+        },
+    ],
+    "wallet_home_news": [],
+    "wallet_home_show_trips": True,
+    "wallet_home_trips_title": "Επερχόμενες εκδρομές",
     "updated_at": None,
 }
 
@@ -312,6 +336,14 @@ class SiteAppearanceResponse(BaseModel):
     intl_section_subtitle: str = (
         "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     )
+    wallet_home_hook: str = ""
+    wallet_home_headline: str = ""
+    wallet_home_body: str = ""
+    wallet_home_image_url: str = ""
+    wallet_home_services: list[dict] = Field(default_factory=list)
+    wallet_home_news: list[dict] = Field(default_factory=list)
+    wallet_home_show_trips: bool = True
+    wallet_home_trips_title: str = "Επερχόμενες εκδρομές"
     # Needed by native Wallet scrub guard — without slug, localhost treated Achillio
     # office branding as platform poison and cleared the logo.
     tenant_slug: str | None = None
@@ -432,6 +464,14 @@ class SiteAppearanceUpdate(BaseModel):
     intl_section_eyebrow: str | None = None
     intl_section_title: str | None = None
     intl_section_subtitle: str | None = None
+    wallet_home_hook: str | None = None
+    wallet_home_headline: str | None = None
+    wallet_home_body: str | None = None
+    wallet_home_image_url: str | None = None
+    wallet_home_services: list[dict] | None = None
+    wallet_home_news: list[dict] | None = None
+    wallet_home_show_trips: bool | None = None
+    wallet_home_trips_title: str | None = None
 
 
 def _clamp_logo_fields(data: dict) -> dict:

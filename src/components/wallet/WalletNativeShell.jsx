@@ -16,6 +16,7 @@ import {
  * Απωλεσθέντα lives inside Εγώ (account), not on the dock.
  */
 const BASE_TABS = [
+  { id: 'start', to: '/wallet', tab: 'start', icon: 'home', label: 'Αρχική' },
   { id: 'home', to: '/wallet', tab: 'home', icon: 'confirmation_number', label: 'Εισιτήριο' },
   { id: 'bookings', to: '/wallet', tab: 'bookings', icon: 'event_note', label: 'Κρατήσεις' },
   {
@@ -35,14 +36,14 @@ function walletTabFromPath(pathname, search) {
   if (pathname !== '/wallet' && !pathname.startsWith('/wallet/')) return '';
   try {
     const q = new URLSearchParams(search || '');
-    const tab = String(q.get('tab') || 'home').trim();
+    const tab = String(q.get('tab') || 'start').trim();
     // lost_found opens from Εγώ — highlight account when deep-linked.
     if (tab === 'lost_found') return 'account';
-    if (['home', 'bookings', 'rentals', 'account'].includes(tab)) return tab;
+    if (['start', 'home', 'bookings', 'rentals', 'account'].includes(tab)) return tab;
   } catch {
     /* ignore */
   }
-  return 'home';
+  return 'start';
 }
 
 export default function WalletNativeShell() {
@@ -162,7 +163,7 @@ export default function WalletNativeShell() {
                 navigate('/my-booking', { state: { from: '/wallet' } });
                 return;
               }
-              const q = tab.tab && tab.tab !== 'home' ? `?tab=${tab.tab}` : '';
+              const q = tab.tab && tab.tab !== 'start' ? `?tab=${tab.tab}` : '';
               navigate(`/wallet${q}`, { replace: pathname.startsWith('/wallet') });
             }}
             style={{

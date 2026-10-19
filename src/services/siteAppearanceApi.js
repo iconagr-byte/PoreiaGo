@@ -103,6 +103,30 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_slider_options: {},
   rent_slider_slides: [],
   ...HOMEPAGE_LAYOUT_DEFAULTS,
+  wallet_home_hook: '',
+  wallet_home_headline: '',
+  wallet_home_body: '',
+  wallet_home_image_url: '',
+  wallet_home_services: [
+    {
+      icon: 'confirmation_number',
+      title: 'Online κράτηση',
+      body: 'Κλείστε θέση σε λίγα βήματα από το κινητό.',
+    },
+    {
+      icon: 'qr_code_2',
+      title: 'Ψηφιακό εισιτήριο',
+      body: 'Το εισιτήριό σας πάντα στο Wallet.',
+    },
+    {
+      icon: 'support_agent',
+      title: 'Υποστήριξη γραφείου',
+      body: 'Είμαστε δίπλα σας πριν και κατά το ταξίδι.',
+    },
+  ],
+  wallet_home_news: [],
+  wallet_home_show_trips: true,
+  wallet_home_trips_title: 'Επερχόμενες εκδρομές',
   updated_at: null,
 };
 

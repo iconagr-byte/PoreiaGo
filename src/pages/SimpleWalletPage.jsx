@@ -35,9 +35,10 @@ import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
 import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
 import WalletOfficeExcursionsPanel from '../components/wallet/WalletOfficeExcursionsPanel.jsx';
+import WalletStartFeed from '../components/wallet/WalletStartFeed.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
-import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import { DEFAULT_SITE_APPEARANCE, fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import { fetchCustomerMe } from '../services/customerAuthApi.js';
 import {
   DEFAULT_OFFICE_MODULES,
@@ -56,6 +57,7 @@ import { WALLET_TABS_BUILD_MARKER } from '../lib/wallet/walletBrandSplash.js';
 import '../styles/wallet-pass.css';
 
 const ALL_TABS = [
+  { id: 'start', label: 'Αρχική', icon: 'home' },
   { id: 'home', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'rentals', label: 'Rent', icon: 'directions_car', requiresRent: true },
@@ -159,16 +161,19 @@ function WalletAuthenticatedApp() {
     try {
       const q = new URLSearchParams(location.search || '');
       const tab = String(q.get('tab') || '').trim();
-      if (['home', 'bookings', 'rentals', 'lost_found', 'account'].includes(tab)) return tab;
+      if (['start', 'home', 'bookings', 'rentals', 'lost_found', 'account'].includes(tab)) {
+        return tab;
+      }
     } catch {
       /* ignore */
     }
-    return 'home';
+    return 'start';
   });
   // lost_found is opened from Εγώ — keep it as an in-page panel, not a dock tab.
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [brandLabel, setBrandLabel] = useState('My Wallet');
+  const [siteAppearance, setSiteAppearance] = useState(DEFAULT_SITE_APPEARANCE);
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   /** Sealed office UUID — drives logo/name fetch on native (Host=localhost). */
   const [sealedTenantId, setSealedTenantId] = useState(() => getWalletTenantId() || '');
@@ -292,6 +297,7 @@ function WalletAuthenticatedApp() {
     fetchSiteAppearance(sealedTenantId ? { tenantId: sealedTenantId } : undefined)
       .then((data) => {
         if (cancelled) return;
+        setSiteAppearance(data || DEFAULT_SITE_APPEARANCE);
         const brand = resolveOfficeBrand(data || {});
         const name = brand.displayName || brand.name;
         // Prefer real office name — never keep generic Γραφείο / My Wallet when API sent one.
@@ -341,8 +347,8 @@ function WalletAuthenticatedApp() {
     if (!nativeWallet) return;
     try {
       const q = new URLSearchParams(location.search || '');
-      const tab = String(q.get('tab') || 'home').trim();
-      if (['home', 'bookings', 'rentals', 'lost_found', 'account'].includes(tab)) {
+      const tab = String(q.get('tab') || 'start').trim();
+      if (['start', 'home', 'bookings', 'rentals', 'lost_found', 'account'].includes(tab)) {
         setActiveTab(tab);
         if (tab !== 'ticket') setSelectedBookingId(null);
       }
@@ -446,7 +452,7 @@ function WalletAuthenticatedApp() {
     setActiveTab(id);
     setSelectedBookingId(null);
     if (nativeWalletEarly && id !== 'ticket') {
-      const q = id && id !== 'home' ? `?tab=${id}` : '';
+      const q = id && id !== 'start' ? `?tab=${id}` : '';
       navigate(`/wallet${q}`, { replace: true });
     }
   };
@@ -632,6 +638,16 @@ function WalletAuthenticatedApp() {
         ) : null}
 
         <main className="wallet-main">
+        {activeTab === 'start' && !isTicketView ? (
+          <WalletStartFeed
+            appearance={siteAppearance}
+            officeName={brandLabel && brandLabel !== 'My Wallet' ? brandLabel : ''}
+            tenantId={sealedTenantId}
+            onOpenBookings={() => switchTab('bookings')}
+            onOpenTicket={() => switchTab('home')}
+          />
+        ) : null}
+
         {activeTab === 'home' && !isTicketView ? (
           isDesktop ? (
             <div className="wallet-desktop-home">
