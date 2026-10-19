@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   WALLET_SPLASH_BRAND,
+  WALLET_SPLASH_BUILD_MARKER,
   WALLET_SPLASH_DURATION_MS,
   WALLET_SPLASH_HOOK,
   WALLET_SPLASH_SUPPORT,
@@ -80,7 +81,7 @@ export default function WalletBrandSplash({ onDone }) {
       }}
       tabIndex={0}
     >
-      <div className="pg-wallet-splash-mark">
+      <div className="pg-wallet-splash-mark" data-pg-splash={WALLET_SPLASH_BUILD_MARKER}>
         <PoreiaGoGlyph />
         <h1 className="pg-wallet-splash-wordmark">
           {brandMain}

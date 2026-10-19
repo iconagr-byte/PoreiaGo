@@ -49,6 +49,7 @@ import {
   getWalletTenantId,
   WALLET_TENANT_CHANGED_EVENT,
 } from '../lib/wallet/walletTenantSeal.js';
+import { WALLET_TABS_BUILD_MARKER } from '../lib/wallet/walletBrandSplash.js';
 import '../styles/wallet-pass.css';
 
 const ALL_TABS = [
@@ -799,6 +800,7 @@ function WalletAuthenticatedApp() {
               <button
                 type="button"
                 className="wallet-btn wallet-btn-primary wallet-btn-block"
+                data-pg-wallet={WALLET_TABS_BUILD_MARKER}
                 onClick={() => switchTab('lost_found')}
               >
                 Άνοιγμα απωλεσθέντων

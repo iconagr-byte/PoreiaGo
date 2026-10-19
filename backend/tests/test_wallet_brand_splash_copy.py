@@ -19,6 +19,8 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
         self.assertNotIn("Αξιοπιστία σε κάθε διαδρομή", text)
         self.assertNotIn("η εμπειρία που αξίζει", text)
         self.assertIn("seenThisRuntime", text)
+        self.assertIn("pg_wallet_apple_splash_v2", text)
+        self.assertIn("pg_wallet_tabs_lostfound_in_account_v1", text)
 
     def test_not_b2b_office_platform_line(self):
         text = SPLASH_JS.read_text(encoding="utf-8")

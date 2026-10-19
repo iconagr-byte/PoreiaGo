@@ -14,6 +14,10 @@ export const WALLET_SPLASH_HOOK = 'Κάθε διαδρομή, με σιγουρ�
 export const WALLET_SPLASH_SUPPORT =
   'Ασφάλεια · άνεση · εμπιστοσύνη';
 
+/** ASCII build markers for wallet-run.ps1 (PowerShell 5.1 is ASCII-only). */
+export const WALLET_SPLASH_BUILD_MARKER = 'pg_wallet_apple_splash_v2';
+export const WALLET_TABS_BUILD_MARKER = 'pg_wallet_tabs_lostfound_in_account_v1';
+
 /** Resets every time the Capacitor WebView loads the JS bundle. */
 let seenThisRuntime = false;
 
