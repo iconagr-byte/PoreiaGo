@@ -8,8 +8,8 @@ export const WALLET_BOOT_SPLASH_ID = 'pg-wallet-boot-splash';
 
 export const WALLET_SPLASH_BRAND = 'PoreiaGo';
 
-/** Quality-first hook under the wordmark (Apple-style secondary line). */
-export const WALLET_SPLASH_HOOK = 'Αξιοπιστία σε κάθε διαδρομή';
+/** Short Apple-style quality hook under the wordmark. */
+export const WALLET_SPLASH_HOOK = 'Κάθε διαδρομή, με σιγουριά.';
 
 export const WALLET_SPLASH_SUPPORT =
   'Ασφάλεια · άνεση · εμπιστοσύνη';

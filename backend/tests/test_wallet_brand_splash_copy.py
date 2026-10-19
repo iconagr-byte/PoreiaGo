@@ -13,9 +13,11 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
     def test_brand_and_hook_present(self):
         text = SPLASH_JS.read_text(encoding="utf-8")
         self.assertIn("PoreiaGo", text)
-        self.assertIn("Αξιοπιστία σε κάθε διαδρομή", text)
+        self.assertIn("Κάθε διαδρομή, με σιγουριά.", text)
         self.assertIn("Ασφάλεια", text)
         self.assertIn("εμπιστοσύνη", text)
+        self.assertNotIn("Αξιοπιστία σε κάθε διαδρομή", text)
+        self.assertNotIn("η εμπειρία που αξίζει", text)
         self.assertIn("seenThisRuntime", text)
 
     def test_not_b2b_office_platform_line(self):

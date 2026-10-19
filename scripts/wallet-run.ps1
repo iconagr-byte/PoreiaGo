@@ -182,7 +182,7 @@ if (-not $walletHit) {
 Write-Host "OK: My Wallet assets present" -ForegroundColor Green
 
 $splashJs = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
-  Select-String -Pattern "Αξιοπιστία σε κάθε διαδρομή" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Κάθε διαδρομή, με σιγουριά." -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
 $splashHtml = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "pg-wallet-boot-splash" -ErrorAction SilentlyContinue
 if (-not $splashJs -or -not $splashHtml) {

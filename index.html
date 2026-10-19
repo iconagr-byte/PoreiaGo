@@ -64,7 +64,7 @@
         background:
           radial-gradient(ellipse 100% 60% at 50% 12%, rgba(0, 113, 227, 0.07), transparent 58%),
           linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
-        font-family: 'Figtree', 'SF Pro Display', 'Avenir Next', system-ui, sans-serif;
+        font-family: 'Plus Jakarta Sans', 'SF Pro Display', 'Avenir Next', system-ui, sans-serif;
         -webkit-font-smoothing: antialiased;
         text-align: center;
         transition: opacity 0.38s ease, transform 0.38s ease;
@@ -106,20 +106,24 @@
         color: transparent;
       }
       #pg-wallet-boot-splash .pg-boot-hook {
-        margin: 1.35rem 0 0;
-        font-size: 1.12rem;
-        font-weight: 560;
-        letter-spacing: -0.03em;
+        margin: 1.55rem 0 0;
+        max-width: 16.5rem;
+        font-size: clamp(1.2rem, 4.6vw, 1.4rem);
+        font-weight: 500;
+        letter-spacing: -0.028em;
+        line-height: 1.38;
         color: #1d1d1f;
       }
       #pg-wallet-boot-splash .pg-boot-support {
-        margin: 0.7rem 0 0;
-        font-size: 0.875rem;
-        font-weight: 450;
+        margin: 0.95rem 0 0;
+        font-size: 0.9375rem;
+        font-weight: 400;
+        letter-spacing: -0.008em;
+        line-height: 1.55;
         color: #6e6e73;
       }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
       (function () {
         // Capacitor Wallet Android/iOS — mark app shell ASAP for full-bleed CSS
@@ -172,7 +176,7 @@
                 '<path d="M8.2 27.2h12.6c1.85 0 2.95-2 1.95-3.5l-1.7-2.55" stroke="#fff" stroke-width="2.35" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>' +
                 '</svg></div>' +
                 '<p class="pg-boot-word">Poreia<span>Go</span></p>' +
-                '<p class="pg-boot-hook">Αξιοπιστία σε κάθε διαδρομή</p>' +
+                '<p class="pg-boot-hook">Κάθε διαδρομή, με σιγουριά.</p>' +
                 '<p class="pg-boot-support">Ασφάλεια · άνεση · εμπιστοσύνη</p>';
               document.body.appendChild(boot);
               // Safety: never leave boot splash forever if React fails to mount.
