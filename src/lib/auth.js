@@ -1,5 +1,6 @@
 import { upsertCustomer } from './customers/customerStore.js';
 import { clearWalletTenantId, setWalletTenantId } from './wallet/walletTenantSeal.js';
+import { resetWalletBrandSplash } from './wallet/walletBrandSplash.js';
 
 export const ROLES = {
   CUSTOMER: 'customer',
@@ -87,4 +88,6 @@ export function logoutCustomer() {
   localStorage.removeItem('authProvider');
   localStorage.removeItem(CUSTOMER_TOKEN_KEY);
   clearWalletTenantId();
+  // Next login / cold start after logout shows PoreiaGo brand splash again.
+  resetWalletBrandSplash();
 }

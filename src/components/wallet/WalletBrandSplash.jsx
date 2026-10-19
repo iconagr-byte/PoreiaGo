@@ -4,6 +4,7 @@ import {
   WALLET_SPLASH_DURATION_MS,
   WALLET_SPLASH_HOOK,
   WALLET_SPLASH_SUPPORT,
+  dismissWalletBootSplash,
   markWalletBrandSplashSeen,
 } from '../../lib/wallet/walletBrandSplash.js';
 import '../../styles/wallet-brand-splash.css';
@@ -53,6 +54,8 @@ export default function WalletBrandSplash({ onDone }) {
   };
 
   useEffect(() => {
+    // Hand off from HTML boot splash (painted before React) to this screen.
+    dismissWalletBootSplash();
     const t = window.setTimeout(finish, WALLET_SPLASH_DURATION_MS);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once auto-advance

@@ -22,6 +22,11 @@ import {
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
+import {
+  hasSeenWalletBrandSplash,
+  markWalletBrandSplashSeen,
+} from '../lib/wallet/walletBrandSplash.js';
+import WalletBrandSplash from '../components/wallet/WalletBrandSplash.jsx';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -61,6 +66,11 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
+  // Belt-and-suspenders: if App gate missed the splash, show it on native login.
+  const [showLoginSplash, setShowLoginSplash] = useState(() => {
+    if (!isNativeApp()) return false;
+    return !hasSeenWalletBrandSplash();
+  });
 
   const claim = useMemo(() => {
     const fromState = location.state?.walletClaim
@@ -481,6 +491,17 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const nativeWallet = isNativeApp();
   // Native Capacitor app: always full-bleed phone chrome (never desktop aside).
   const phoneChrome = nativeWallet || isPhone;
+
+  if (nativeWallet && showLoginSplash) {
+    return (
+      <WalletBrandSplash
+        onDone={() => {
+          markWalletBrandSplashSeen();
+          setShowLoginSplash(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div

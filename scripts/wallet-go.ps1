@@ -5,7 +5,7 @@
 
 $ErrorActionPreference = "Stop"
 $repo = "C:\Users\User\poreiago"
-$branch = "main"
+$branch = "cursor/wallet-splash-apple-5ffb"
 
 if (-not (Test-Path -LiteralPath $repo)) {
   throw ("Repo missing: " + $repo)

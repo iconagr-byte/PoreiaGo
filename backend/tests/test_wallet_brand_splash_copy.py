@@ -27,6 +27,14 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
         app = (ROOT / "src" / "App.jsx").read_text(encoding="utf-8")
         self.assertIn("WalletNativeSplashGate", app)
 
+    def test_html_boot_splash_and_login_fallback(self):
+        html = (ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertIn("pg-wallet-boot-splash", html)
+        login = (ROOT / "src" / "pages" / "LoginPage.jsx").read_text(encoding="utf-8")
+        self.assertIn("WalletBrandSplash", login)
+        auth = (ROOT / "src" / "lib" / "auth.js").read_text(encoding="utf-8")
+        self.assertIn("resetWalletBrandSplash", auth)
+
 
 if __name__ == "__main__":
     unittest.main()

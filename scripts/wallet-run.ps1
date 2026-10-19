@@ -6,8 +6,8 @@
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  # Default main so splash + Google fixes are never wiped by an old feature branch.
-  [string]$Branch = "main"
+  # Apple splash + login gate fix — rebuild must not wipe back to a branch without splash.
+  [string]$Branch = "cursor/wallet-splash-apple-5ffb"
 )
 
 $ErrorActionPreference = "Stop"
@@ -180,6 +180,15 @@ if (-not $walletHit) {
   throw "My Wallet copy missing from android assets - wrong branch or stale build"
 }
 Write-Host "OK: My Wallet assets present" -ForegroundColor Green
+
+$splashJs = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Αξιοπιστία σε κάθε διαδρομή" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+$splashHtml = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "pg-wallet-boot-splash" -ErrorAction SilentlyContinue
+if (-not $splashJs -or -not $splashHtml) {
+  throw "Brand splash missing from android assets - wrong branch (need WalletBrandSplash + HTML boot splash)"
+}
+Write-Host "OK: PoreiaGo brand splash present in packaged assets" -ForegroundColor Green
 
 $googleHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
   Select-String -Pattern "Google" -SimpleMatch -ErrorAction SilentlyContinue |
