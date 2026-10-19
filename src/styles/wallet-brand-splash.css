@@ -1,14 +1,19 @@
 /**
- * Native Wallet brand splash — Qatar-style centered wordmark on white.
- * Loaded only with WalletBrandSplash (Capacitor / native entrance).
+ * Native Wallet brand splash — Apple aesthetic.
+ * Soft white field, SF-like Figtree, squircle mark, restrained motion.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap');
 
 .pg-wallet-splash {
-  --pg-splash-ink: #0b1f33;
-  --pg-splash-accent: #0a4f8a;
-  --pg-splash-mute: #5a6b7d;
+  --pg-splash-ink: #1d1d1f;
+  --pg-splash-secondary: #6e6e73;
+  --pg-splash-tertiary: #86868b;
+  --pg-splash-line: #d2d2d7;
+  --pg-splash-blue: #0071e3;
+  --pg-splash-blue-bright: #2997ff;
+  --pg-splash-font: 'Figtree', 'SF Pro Display', 'SF Pro Text', 'Avenir Next',
+    'Segoe UI', system-ui, sans-serif;
   position: fixed;
   inset: 0;
   z-index: 200;
@@ -16,20 +21,24 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: max(2rem, env(safe-area-inset-top, 0px)) 1.75rem
-    max(2rem, env(safe-area-inset-bottom, 0px));
+  padding: max(2.5rem, env(safe-area-inset-top, 0px)) 2rem
+    max(2.5rem, env(safe-area-inset-bottom, 0px));
   background:
-    radial-gradient(ellipse 120% 70% at 50% 0%, rgba(10, 79, 138, 0.06), transparent 55%),
-    #ffffff;
+    radial-gradient(ellipse 100% 60% at 50% 12%, rgba(0, 113, 227, 0.07), transparent 58%),
+    radial-gradient(ellipse 80% 45% at 50% 105%, rgba(29, 29, 31, 0.035), transparent 52%),
+    linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
   color: var(--pg-splash-ink);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  animation: pgSplashIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  animation: pgSplashIn 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .pg-wallet-splash--out {
-  animation: pgSplashOut 320ms ease-in forwards;
+  animation: pgSplashOut 400ms cubic-bezier(0.4, 0, 1, 1) forwards;
   pointer-events: none;
 }
 
@@ -45,9 +54,11 @@
 @keyframes pgSplashOut {
   from {
     opacity: 1;
+    transform: scale(1);
   }
   to {
     opacity: 0;
+    transform: scale(1.025);
   }
 }
 
@@ -58,82 +69,204 @@
   text-align: center;
   gap: 0;
   max-width: 18rem;
-  animation: pgSplashRise 700ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
+  animation: pgSplashRise 980ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
 }
 
 @keyframes pgSplashRise {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(22px) scale(0.94);
+    filter: blur(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    filter: blur(0);
   }
+}
+
+.pg-wallet-splash-glyph-wrap {
+  position: relative;
+  width: 5.1rem;
+  height: 5.1rem;
+  margin: 0 0 1.85rem;
+  display: grid;
+  place-items: center;
+  animation: pgSplashGlyph 1.05s cubic-bezier(0.16, 1, 0.3, 1) 20ms both;
+}
+
+.pg-wallet-splash-glyph-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -18%;
+  border-radius: 34%;
+  background: radial-gradient(
+    circle,
+    rgba(0, 113, 227, 0.22) 0%,
+    rgba(41, 151, 255, 0.1) 42%,
+    transparent 70%
+  );
+  animation: pgSplashGlow 2.8s ease-in-out 0.4s infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes pgSplashGlow {
+  from {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes pgSplashGlyph {
+  from {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pg-wallet-splash-glyph {
+  position: relative;
+  z-index: 1;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 1.28rem;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, transparent 42%),
+    linear-gradient(165deg, #5ac8fa 0%, #0071e3 46%, #0058b0 100%);
+  box-shadow:
+    0 1.5px 0 rgba(255, 255, 255, 0.45) inset,
+    0 -1px 0 rgba(0, 50, 120, 0.18) inset,
+    0 18px 40px rgba(0, 113, 227, 0.32),
+    0 4px 10px rgba(0, 113, 227, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.pg-wallet-splash-glyph svg {
+  width: 2rem;
+  height: 2rem;
+  display: block;
+  filter: drop-shadow(0 1px 1px rgba(0, 40, 100, 0.18));
 }
 
 .pg-wallet-splash-wordmark {
   margin: 0;
-  font-family: 'Sora', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-family: var(--pg-splash-font);
   font-weight: 700;
-  font-size: clamp(2.35rem, 9vw, 2.85rem);
-  letter-spacing: -0.04em;
-  line-height: 1.05;
+  font-size: clamp(2.7rem, 10.5vw, 3.25rem);
+  letter-spacing: -0.062em;
+  line-height: 0.98;
   color: var(--pg-splash-ink);
+  font-feature-settings: 'kern' 1, 'liga' 1;
 }
 
 .pg-wallet-splash-wordmark span {
-  color: var(--pg-splash-accent);
+  font-weight: 650;
+  background: linear-gradient(
+    115deg,
+    #0071e3 0%,
+    #2997ff 55%,
+    #64d2ff 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .pg-wallet-splash-rule {
-  width: 2.75rem;
+  width: 1.75rem;
   height: 2px;
-  margin: 1.35rem 0 1.15rem;
+  margin: 1.55rem 0 1.25rem;
   border: 0;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, var(--pg-splash-accent), transparent);
-  opacity: 0.85;
-  animation: pgSplashRise 700ms cubic-bezier(0.22, 1, 0.36, 1) 180ms both;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--pg-splash-blue), transparent);
+  opacity: 0.55;
+  animation: pgSplashRise 980ms cubic-bezier(0.16, 1, 0.3, 1) 140ms both;
 }
 
 .pg-wallet-splash-hook {
   margin: 0;
-  font-family: 'Source Serif 4', 'Iowan Old Style', Georgia, serif;
-  font-weight: 600;
-  font-size: clamp(1.05rem, 4.2vw, 1.2rem);
-  letter-spacing: -0.015em;
-  line-height: 1.35;
+  font-family: var(--pg-splash-font);
+  font-weight: 560;
+  font-size: clamp(1.08rem, 4.2vw, 1.28rem);
+  letter-spacing: -0.032em;
+  line-height: 1.32;
   color: var(--pg-splash-ink);
-  animation: pgSplashRise 700ms cubic-bezier(0.22, 1, 0.36, 1) 260ms both;
+  animation: pgSplashRise 980ms cubic-bezier(0.16, 1, 0.3, 1) 200ms both;
 }
 
 .pg-wallet-splash-support {
-  margin: 0.85rem 0 0;
-  max-width: 16.5rem;
-  font-family: 'Sora', 'Avenir Next', 'Segoe UI', sans-serif;
-  font-weight: 500;
-  font-size: 0.78rem;
-  letter-spacing: 0.01em;
-  line-height: 1.45;
-  color: var(--pg-splash-mute);
-  animation: pgSplashRise 700ms cubic-bezier(0.22, 1, 0.36, 1) 340ms both;
+  margin: 0.75rem 0 0;
+  max-width: 15.75rem;
+  font-family: var(--pg-splash-font);
+  font-weight: 450;
+  font-size: 0.875rem;
+  letter-spacing: -0.012em;
+  line-height: 1.48;
+  color: var(--pg-splash-secondary);
+  animation: pgSplashRise 980ms cubic-bezier(0.16, 1, 0.3, 1) 280ms both;
+}
+
+.pg-wallet-splash-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 2.35rem;
+  animation: pgSplashRise 980ms cubic-bezier(0.16, 1, 0.3, 1) 360ms both;
+}
+
+.pg-wallet-splash-dots span {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--pg-splash-blue);
+  opacity: 0.28;
+  animation: pgSplashDot 1.2s ease-in-out infinite;
+}
+
+.pg-wallet-splash-dots span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.pg-wallet-splash-dots span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes pgSplashDot {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
 }
 
 .pg-wallet-splash-hint {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: max(1.75rem, env(safe-area-inset-bottom, 0px));
+  bottom: max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem));
   margin: 0;
   text-align: center;
-  font-family: 'Sora', 'Avenir Next', 'Segoe UI', sans-serif;
-  font-size: 0.7rem;
+  font-family: var(--pg-splash-font);
+  font-size: 0.8125rem;
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(90, 107, 125, 0.75);
-  animation: pgSplashHint 1.4s ease-in-out 0.9s infinite alternate;
+  letter-spacing: -0.008em;
+  color: var(--pg-splash-tertiary);
+  animation: pgSplashHint 1.7s ease-in-out 1.05s infinite alternate;
 }
 
 @keyframes pgSplashHint {
@@ -141,6 +274,25 @@
     opacity: 0.35;
   }
   to {
-    opacity: 0.9;
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pg-wallet-splash,
+  .pg-wallet-splash-mark,
+  .pg-wallet-splash-glyph-wrap,
+  .pg-wallet-splash-rule,
+  .pg-wallet-splash-hook,
+  .pg-wallet-splash-support,
+  .pg-wallet-splash-dots,
+  .pg-wallet-splash-hint,
+  .pg-wallet-splash-glyph-wrap::before,
+  .pg-wallet-splash-dots span {
+    animation: none !important;
+  }
+
+  .pg-wallet-splash--out {
+    opacity: 0;
   }
 }
