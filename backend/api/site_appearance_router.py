@@ -1378,35 +1378,49 @@ class PublicTripResponse(BaseModel):
 async def get_public_office_trips(
     request: Request,
     host: str | None = Query(default=None),
+    tenant_id: str | None = Query(
+        default=None,
+        description="Sealed wallet office UUID (native Capacitor / localhost)",
+    ),
 ):
     """
     Published trips for an office Host — strictly scoped by tenant_id.
     Never returns another office's catalog or shared demo trips.
+    Native My Wallet passes tenant_id because Host is localhost.
     """
     from travel_platform.operations.tenant_trip_catalog_store import list_tenant_trips
 
-    effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
-    if effective_host and "," in effective_host:
-        effective_host = effective_host.split(",")[0].strip()
-    if effective_host and ":" in effective_host:
-        effective_host = effective_host.split(":")[0].strip()
-
-    tenant_id: str | None = None
-    if effective_host:
+    resolved_tid: str | None = (tenant_id or "").strip() or None
+    if resolved_tid:
         try:
-            from app.core.database import AsyncSessionLocal
-            from olympus.tenant.domain_resolver import DomainResolver
+            from uuid import UUID
 
-            async with AsyncSessionLocal() as session:
-                resolved = await DomainResolver(session).resolve(effective_host)
-                if resolved:
-                    tenant_id = str(resolved.tenant_id)
+            UUID(resolved_tid)
         except Exception:
-            logger.exception("public trips resolve failed for host=%s", effective_host)
-            tenant_id = None
+            resolved_tid = None
 
-    if not tenant_id:
+    if not resolved_tid:
+        effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
+        if effective_host and "," in effective_host:
+            effective_host = effective_host.split(",")[0].strip()
+        if effective_host and ":" in effective_host:
+            effective_host = effective_host.split(":")[0].strip()
+
+        if effective_host:
+            try:
+                from app.core.database import AsyncSessionLocal
+                from olympus.tenant.domain_resolver import DomainResolver
+
+                async with AsyncSessionLocal() as session:
+                    resolved = await DomainResolver(session).resolve(effective_host)
+                    if resolved:
+                        resolved_tid = str(resolved.tenant_id)
+            except Exception:
+                logger.exception("public trips resolve failed for host=%s", effective_host)
+                resolved_tid = None
+
+    if not resolved_tid:
         return []
 
-    rows = list_tenant_trips(tenant_id, published_only=True)
+    rows = list_tenant_trips(resolved_tid, published_only=True)
     return [PublicTripResponse(**row) for row in rows]

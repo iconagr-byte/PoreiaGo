@@ -34,6 +34,7 @@ import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
 import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
+import WalletOfficeExcursionsPanel from '../components/wallet/WalletOfficeExcursionsPanel.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
@@ -499,7 +500,13 @@ function WalletAuthenticatedApp() {
           brandLabel={displayBrand}
           passengerName={displayPassenger}
           onOpenDetails={openTicket}
-          onBrowseTrips={nativeWallet ? undefined : () => navigate('/')}
+          onBrowseTrips={() => {
+            if (nativeWallet) {
+              switchTab('bookings');
+              return;
+            }
+            navigate('/');
+          }}
           onQrChange={handleQrChange}
           offline={usingOfflinePass}
         />
@@ -671,20 +678,22 @@ function WalletAuthenticatedApp() {
               <p className="wallet-panel-lead">
                 {bookings.length
                   ? `${bookings.length} κρατήσεις στο λογαριασμό σας`
-                  : 'Δεν υπάρχουν κρατήσεις ακόμα'}
+                  : 'Δεν υπάρχουν κρατήσεις ακόμα — επιλέξτε εκδρομή από κάτω'}
               </p>
 
               {bookings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-                  {nativeWallet ? (
-                    <Link to="/my-booking" className="wallet-btn wallet-btn-primary">
-                      Εύρεση κράτησης
-                    </Link>
-                  ) : (
-                    <Link to="/" className="wallet-btn wallet-btn-primary">
-                      Κράτηση εκδρομής
-                    </Link>
-                  )}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem',
+                    justifyContent: 'center',
+                    padding: '0.75rem 0 0.25rem',
+                  }}
+                >
+                  <Link to="/my-booking" className="wallet-btn wallet-btn-secondary">
+                    Εύρεση κράτησης
+                  </Link>
                 </div>
               ) : (
                 <div className={`wallet-list${isDesktop ? ' wallet-list--desktop' : ''}`}>
@@ -735,6 +744,13 @@ function WalletAuthenticatedApp() {
                 </div>
               )}
             </div>
+
+            {officeModules?.trips_enabled !== false ? (
+              <WalletOfficeExcursionsPanel
+                tenantId={sealedTenantId}
+                officeName={brandLabel && brandLabel !== 'My Wallet' ? brandLabel : ''}
+              />
+            ) : null}
           </div>
         )}
 

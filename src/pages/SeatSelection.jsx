@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
+import { resolvePublicOfficeTrip } from '../lib/wallet/walletOfficeTrips.js';
+import { getWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 import { generateSeatMap } from '../lib/seats/generateSeatMap.js';
 import {
   findSeatConflicts,
@@ -39,8 +41,7 @@ export default function SeatSelection() {
   const [occupiedSeats, setOccupiedSeats] = useState([]);
   const [occupancyLoading, setOccupancyLoading] = useState(true);
   const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
-
-  const trip = useMemo(() => {
+  const [trip, setTrip] = useState(() => {
     const id = Number(tripId);
     if (!id) return null;
     const found = loadTrips().find((t) => t.id === id) || null;
@@ -49,6 +50,34 @@ export default function SeatSelection() {
       return loadPlatformDemoTrips().find((t) => t.id === id) || null;
     }
     return null;
+  });
+
+  useEffect(() => {
+    const id = Number(tripId);
+    if (!id) {
+      setTrip(null);
+      return undefined;
+    }
+    const local =
+      loadTrips().find((t) => t.id === id) ||
+      (isPlatformSeatBookingDemo()
+        ? loadPlatformDemoTrips().find((t) => t.id === id)
+        : null);
+    if (local) {
+      setTrip(local);
+      return undefined;
+    }
+    let cancelled = false;
+    resolvePublicOfficeTrip(id, getWalletTenantId())
+      .then((found) => {
+        if (!cancelled) setTrip(found);
+      })
+      .catch(() => {
+        if (!cancelled) setTrip(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [tripId]);
 
   const { pricePerSeat, quote } = useTripPricing(trip);
