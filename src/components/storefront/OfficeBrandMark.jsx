@@ -120,7 +120,13 @@ export default function OfficeBrandMark({
 
   const logoSrc = !imgBroken && brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();
-  const label = brand.displayName || brand.name || fallbackLabel || (onTenant ? 'Γραφείο' : 'PoreiaGo');
+  // Prefer a real office name from props over generic resolveOfficeBrand fallback «Γραφείο».
+  const resolvedName = brand.displayName || (brand.name !== 'Γραφείο' ? brand.name : '');
+  const label =
+    resolvedName ||
+    (fallbackLabel && fallbackLabel !== 'Γραφείο' ? fallbackLabel : '') ||
+    brand.name ||
+    (onTenant ? 'Γραφείο' : 'PoreiaGo');
   const resolvedHeight =
     minHeightPx != null
       ? Math.max(clampLogoHeight(appearance.logo_height_px), clampLogoHeight(minHeightPx))

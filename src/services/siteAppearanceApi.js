@@ -16,10 +16,11 @@ function appearanceStorageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
 }
 
-function finalizeAppearance(data = {}) {
+function finalizeAppearance(data = {}, opts = {}) {
   const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
   // Scrubs Achillio Travel only on PoreiaGo marketing host or platform seed slug.
-  return scrubAchillioBrandForPlatformHost(merged);
+  // Native Wallet passes skipScrub so sealed-office branding is never wiped on localhost.
+  return scrubAchillioBrandForPlatformHost(merged, opts);
 }
 
 export const DEFAULT_SITE_APPEARANCE = {
@@ -201,14 +202,15 @@ export async function fetchSiteAppearance(
     const res = await fetch(`${base}/api/site/appearance${q}`);
     if (res.ok) {
       const data = await res.json();
-      const merged = finalizeAppearance(data);
+      // Sealed tenant_id = real office (native Capacitor) — never scrub logo/name.
+      const merged = finalizeAppearance(data, { skipScrub: Boolean(tenantId) });
       cacheLocally(merged);
       return merged;
     }
   } catch {
     /* offline */
   }
-  return loadCached() || finalizeAppearance({});
+  return loadCached() || finalizeAppearance({}, { skipScrub: Boolean(tenantId) });
 }
 
 /** Admin panel — SaaS Postgres when JWT present, else file store. */

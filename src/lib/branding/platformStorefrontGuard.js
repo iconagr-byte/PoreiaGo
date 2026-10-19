@@ -37,14 +37,40 @@ export function isAchillioTravelAppearance(appearance = {}) {
   return fields.some((v) => isAchillioTravelBrandText(v));
 }
 
+function isNativeWalletShell() {
+  if (typeof document === 'undefined') return false;
+  try {
+    return document.documentElement?.getAttribute('data-poreiago-app') === 'wallet';
+  } catch {
+    return false;
+  }
+}
+
+function isPersistedOfficeLogoUrl(url) {
+  const value = String(url || '').trim();
+  // Keep server-hosted office uploads. data: URLs on platform seed can still be poison.
+  return (
+    value.startsWith('/api/site/office-assets/') || value.startsWith('/api/site/assets/')
+  );
+}
+
 /**
  * Strip Achillio Travel identity from appearance for PoreiaGo hosts / platform seed.
  * @param {object} appearance
- * @param {{ force?: boolean }} [opts] force=true for admin JWT when tenant_slug is platform
+ * @param {{ force?: boolean, skipScrub?: boolean }} [opts]
+ *   force=true for admin JWT when tenant_slug is platform
+ *   skipScrub=true when native Wallet loaded branding via sealed tenant_id
  */
 export function scrubAchillioBrandForPlatformHost(appearance = {}, opts = {}) {
   const force = Boolean(opts.force);
+  const skipScrub = Boolean(opts.skipScrub);
   const slug = appearance?.tenant_slug;
+
+  // Capacitor My Wallet (localhost) must keep the sealed office logo/name.
+  if (!force && (skipScrub || isNativeWalletShell())) {
+    return appearance;
+  }
+
   // Real customer offices (incl. Achillio Travel) keep branding even when the
   // admin UI runs on www.poreiago.com — only scrub platform seed / marketing.
   if (!force && slug && !isPoreiagoPlatformTenantSlug(slug)) {
@@ -67,7 +93,8 @@ export function scrubAchillioBrandForPlatformHost(appearance = {}, opts = {}) {
   }
 
   const logo = String(next.logo_url || '').trim();
-  if (isAchillioTravelBrandText(logo) || brandPoisoned) {
+  // Never wipe persisted office uploads (/api/site/...). Scrub other Achillio poison paths.
+  if (!isPersistedOfficeLogoUrl(logo) && (isAchillioTravelBrandText(logo) || brandPoisoned)) {
     next.logo_url = '';
   }
   // Shared demo hero filename still reads as Achillio — use empty (CSS/hero fallback).

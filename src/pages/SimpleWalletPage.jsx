@@ -37,6 +37,7 @@ import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import { fetchCustomerMe } from '../services/customerAuthApi.js';
 import {
   DEFAULT_OFFICE_MODULES,
   fetchOfficeModules,
@@ -47,6 +48,7 @@ import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import {
   getWalletTenantId,
+  setWalletTenantId,
   WALLET_TENANT_CHANGED_EVENT,
 } from '../lib/wallet/walletTenantSeal.js';
 import { WALLET_TABS_BUILD_MARKER } from '../lib/wallet/walletBrandSplash.js';
@@ -265,6 +267,25 @@ function WalletAuthenticatedApp() {
     return () => window.removeEventListener(WALLET_TENANT_CHANGED_EVENT, syncSeal);
   }, []);
 
+  // Re-seal office from /auth/me when localStorage seal is missing (old sessions).
+  useEffect(() => {
+    if (sealedTenantId || !getCustomerToken()) return undefined;
+    let cancelled = false;
+    fetchCustomerMe()
+      .then((me) => {
+        if (cancelled) return;
+        const tid = String(me?.tenant_id || me?.tenantId || '').trim();
+        if (tid) {
+          setWalletTenantId(tid);
+          setSealedTenantId(tid);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [sealedTenantId]);
+
   useEffect(() => {
     let cancelled = false;
     fetchSiteAppearance(sealedTenantId ? { tenantId: sealedTenantId } : undefined)
@@ -272,7 +293,9 @@ function WalletAuthenticatedApp() {
         if (cancelled) return;
         const brand = resolveOfficeBrand(data || {});
         const name = brand.displayName || brand.name;
-        if (name) setBrandLabel(name);
+        // Prefer real office name — never keep generic Γραφείο / My Wallet when API sent one.
+        if (name && name !== 'Γραφείο') setBrandLabel(name);
+        else if (data?.footer_brand_name) setBrandLabel(String(data.footer_brand_name));
       })
       .catch(() => {});
     return () => {
