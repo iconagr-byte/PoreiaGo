@@ -6,7 +6,10 @@ import {
   fetchOfficeModules,
   shouldShowRentStorefront,
 } from '../../services/officeModulesApi.js';
-import { getWalletTenantId } from '../../lib/wallet/walletTenantSeal.js';
+import {
+  getWalletTenantId,
+  WALLET_TENANT_CHANGED_EVENT,
+} from '../../lib/wallet/walletTenantSeal.js';
 
 /**
  * Single native bottom dock — My Wallet cards.
@@ -47,22 +50,50 @@ export default function WalletNativeShell() {
   const navigate = useNavigate();
   const native = isNativeApp();
   const [rentAvailable, setRentAvailable] = useState(false);
+  const [sealedTenantId, setSealedTenantId] = useState(() => getWalletTenantId() || '');
+
+  useEffect(() => {
+    if (!native) return undefined;
+    const syncSeal = () => setSealedTenantId(getWalletTenantId() || '');
+    syncSeal();
+    window.addEventListener('storage', syncSeal);
+    window.addEventListener(WALLET_TENANT_CHANGED_EVENT, syncSeal);
+    return () => {
+      window.removeEventListener('storage', syncSeal);
+      window.removeEventListener(WALLET_TENANT_CHANGED_EVENT, syncSeal);
+    };
+  }, [native]);
 
   useEffect(() => {
     if (!native) return undefined;
     let cancelled = false;
-    const tenantId = getWalletTenantId() || '';
-    fetchOfficeModules(tenantId ? { tenantId } : undefined)
+    // Default hidden until modules resolve — never flash Rent for unpaid offices.
+    setRentAvailable(false);
+    fetchOfficeModules(sealedTenantId ? { tenantId: sealedTenantId } : undefined)
       .then((mods) => {
-        if (!cancelled) setRentAvailable(shouldShowRentStorefront(mods));
+        if (!cancelled) {
+          setRentAvailable(
+            shouldShowRentStorefront(mods, {
+              nativeWallet: true,
+              sealedTenant: Boolean(sealedTenantId),
+            }),
+          );
+        }
       })
       .catch(() => {
-        if (!cancelled) setRentAvailable(shouldShowRentStorefront(DEFAULT_OFFICE_MODULES));
+        if (!cancelled) {
+          setRentAvailable(
+            shouldShowRentStorefront(DEFAULT_OFFICE_MODULES, {
+              nativeWallet: true,
+              sealedTenant: Boolean(sealedTenantId),
+            }),
+          );
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [native]);
+  }, [native, sealedTenantId]);
 
   const tabs = useMemo(
     () => BASE_TABS.filter((t) => !t.requiresRent || rentAvailable),

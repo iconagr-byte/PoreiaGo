@@ -125,7 +125,13 @@ function isPoreiagoPlatformModules(modules) {
  */
 /**
  * Public storefront /rent — only when the office has Rent enabled.
- * PoreiaGo marketing host (poreiago.com) always keeps Rent as product demo.
+ * PoreiaGo marketing host (poreiago.com) keeps Rent as product demo on the web.
+ *
+ * Native Wallet runs on localhost (also a “marketing” host) with a sealed office
+ * tenant — never use the demo shortcut there; follow rent_enabled / office_kind.
+ *
+ * @param {object} [modules]
+ * @param {{ hostname?: string, nativeWallet?: boolean, sealedTenant?: boolean }} [opts]
  */
 export function shouldShowRentStorefront(modules, opts = {}) {
   const hostname =
@@ -133,10 +139,15 @@ export function shouldShowRentStorefront(modules, opts = {}) {
     (typeof window !== 'undefined' ? window.location.hostname : '');
   // Achillio Travel domain is bus-only even if modules API drifts.
   if (isAchillioTravelHost(hostname)) return false;
-  // PoreiaGo marketing keeps Rent as product demo.
-  if (isPlatformMarketingHost(hostname)) return true;
-  // Achillio Travel is bus-only — never expose Rent on wallet / storefront.
+  // Achillio Travel office is bus-only — check before marketing host, because
+  // Capacitor Wallet uses localhost + sealed Achillio tenant.
   if (modules?.office_kind === 'achillio_travel') return false;
+  // Sealed / native wallet: only show Rent if that office paid for the contract.
+  if (opts.nativeWallet || opts.sealedTenant) {
+    return Boolean(modules?.rent_enabled);
+  }
+  // PoreiaGo marketing keeps Rent as product demo (web only).
+  if (isPlatformMarketingHost(hostname)) return true;
   return Boolean(modules?.rent_enabled);
 }
 

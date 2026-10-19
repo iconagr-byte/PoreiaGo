@@ -318,9 +318,13 @@ function WalletAuthenticatedApp() {
   }, [sealedTenantId]);
 
   const nativeWallet = isNativeApp();
-  // One Wallet for buses + rentals — show Rent tab when the sealed office has Rent.
+  // One Wallet for buses + rentals — show Rent only when the sealed office paid for it.
   // Native dock (WalletNativeShell) owns Κράτηση lookup — web keeps in-app tabs only.
-  const rentAvailable = shouldShowRentStorefront(officeModules);
+  // Capacitor localhost is a marketing host; pass nativeWallet so we never force Rent demo.
+  const rentAvailable = shouldShowRentStorefront(officeModules, {
+    nativeWallet,
+    sealedTenant: Boolean(sealedTenantId),
+  });
   const tabs = useMemo(
     () =>
       ALL_TABS.filter((tab) => {

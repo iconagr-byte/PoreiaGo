@@ -178,4 +178,38 @@ describe('shouldShowRentStorefront', () => {
       ),
     ).toBe(false);
   });
+
+  it('hides Rent for Achillio on native Wallet even when hostname is marketing localhost', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        {
+          rent_enabled: false,
+          office_kind: 'achillio_travel',
+          tenant_slug: 'admin-achillio-gr',
+        },
+        { nativeWallet: true, sealedTenant: true, hostname: 'localhost' },
+      ),
+    ).toBe(false);
+  });
+
+  it('hides Rent on native Wallet for unpaid office despite marketing localhost', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        { rent_enabled: false, office_kind: 'customer', tenant_slug: 'sunny-buses' },
+        { nativeWallet: true, sealedTenant: true, hostname: 'localhost' },
+      ),
+    ).toBe(false);
+  });
+
+  it('shows Rent on native Wallet only when rent_enabled is paid', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    expect(
+      shouldShowRentStorefront(
+        { rent_enabled: true, office_kind: 'customer', tenant_slug: 'rent-office' },
+        { nativeWallet: true, sealedTenant: true, hostname: 'localhost' },
+      ),
+    ).toBe(true);
+  });
 });
