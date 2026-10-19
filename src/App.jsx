@@ -54,6 +54,7 @@ import MaintenanceGate from './components/MaintenanceGate.jsx';
 import RentStorefrontGate from './components/rental/RentStorefrontGate.jsx';
 import WalletNativeBoot from './components/wallet/WalletNativeBoot.jsx';
 import WalletNativeShell from './components/wallet/WalletNativeShell.jsx';
+import WalletNativeSplashGate from './components/wallet/WalletNativeSplashGate.jsx';
 import WalletNativeGoogleBridgePage from './pages/WalletNativeGoogleBridgePage.jsx';
 import { isNativeApp } from './lib/capacitor/isNativeApp.js';
 
@@ -142,6 +143,7 @@ function App() {
           <Toaster position="top-center" />
           <WalletNativeBoot />
           <WalletNativeShell />
+          <WalletNativeSplashGate>
           <Routes>
             <Route path="/ticket/print/:bookingId" element={<TicketPrintPage />} />
             <Route path="/wallet/receipt/:bookingId" element={<FiscalReceiptPrintPage />} />
@@ -210,6 +212,7 @@ function App() {
             <Route path="/in-bus" element={<InBusPortal />} />
             <Route path="/track/trip/:tripId" element={<PassengerTrackPage />} />
           </Routes>
+          </WalletNativeSplashGate>
         </MaintenanceGate>
       </Router>
     </ErrorBoundary>

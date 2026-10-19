@@ -4,7 +4,8 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-open.ps1 -Rebuild
 
 param(
-  [switch]$Rebuild
+  [switch]$Rebuild,
+  [string]$Branch = "main"
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,8 +67,8 @@ if ($missingSocial -and (Test-Path -LiteralPath $apk)) {
 
 $needBuild = $Rebuild -or $missingSocial -or (-not (Test-Path -LiteralPath $apk)) -or (-not (Test-WalletAssetsFresh))
 if ($needBuild) {
-  Write-Host "==> APK/assets stale or -Rebuild - running wallet-run.ps1 first..." -ForegroundColor Cyan
-  & powershell -ExecutionPolicy Bypass -File (Join-Path $repo "scripts\wallet-run.ps1")
+  Write-Host ("==> APK/assets stale or -Rebuild - running wallet-run.ps1 -Branch " + $Branch + " ...") -ForegroundColor Cyan
+  & powershell -ExecutionPolicy Bypass -File (Join-Path $repo "scripts\wallet-run.ps1") -Branch $Branch
   if ($LASTEXITCODE -ne 0) { throw "wallet-run.ps1 failed - fix the red error above, then rerun wallet-open.ps1" }
   Start-Sleep -Seconds 2
   $pidLine = & $adb shell pidof $pkg 2>$null

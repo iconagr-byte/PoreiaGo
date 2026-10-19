@@ -1,6 +1,5 @@
 import { upsertCustomer } from './customers/customerStore.js';
 import { clearWalletTenantId, setWalletTenantId } from './wallet/walletTenantSeal.js';
-import { WALLET_BRAND_SPLASH_KEY } from './wallet/walletBrandSplash.js';
 
 export const ROLES = {
   CUSTOMER: 'customer',
@@ -88,10 +87,4 @@ export function logoutCustomer() {
   localStorage.removeItem('authProvider');
   localStorage.removeItem(CUSTOMER_TOKEN_KEY);
   clearWalletTenantId();
-  // Next login shows PoreiaGo brand splash again.
-  try {
-    sessionStorage.removeItem(WALLET_BRAND_SPLASH_KEY);
-  } catch {
-    /* ignore */
-  }
 }

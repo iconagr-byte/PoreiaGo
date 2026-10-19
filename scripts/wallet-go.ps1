@@ -5,7 +5,7 @@
 
 $ErrorActionPreference = "Stop"
 $repo = "C:\Users\User\poreiago"
-$branch = "cursor/wallet-native-theme-isolate-5ffb"
+$branch = "main"
 
 if (-not (Test-Path -LiteralPath $repo)) {
   throw ("Repo missing: " + $repo)

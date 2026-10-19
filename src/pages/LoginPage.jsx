@@ -22,8 +22,6 @@ import {
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
-import WalletBrandSplash from '../components/wallet/WalletBrandSplash.jsx';
-import { hasSeenWalletBrandSplash } from '../lib/wallet/walletBrandSplash.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
 
@@ -63,12 +61,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
-  /** Native only: PoreiaGo brand splash before email/password fields. */
-  const [showBrandSplash, setShowBrandSplash] = useState(() => {
-    if (!isNativeApp()) return false;
-    if (isCustomer() && getCustomerToken()) return false;
-    return !hasSeenWalletBrandSplash();
-  });
 
   const claim = useMemo(() => {
     const fromState = location.state?.walletClaim
@@ -489,10 +481,6 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const nativeWallet = isNativeApp();
   // Native Capacitor app: always full-bleed phone chrome (never desktop aside).
   const phoneChrome = nativeWallet || isPhone;
-
-  if (nativeWallet && showBrandSplash) {
-    return <WalletBrandSplash onDone={() => setShowBrandSplash(false)} />;
-  }
 
   return (
     <div

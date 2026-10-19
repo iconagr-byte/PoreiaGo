@@ -6,7 +6,8 @@
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  [string]$Branch = "cursor/wallet-native-theme-isolate-5ffb"
+  # Default main so splash + Google fixes are never wiped by an old feature branch.
+  [string]$Branch = "main"
 )
 
 $ErrorActionPreference = "Stop"
