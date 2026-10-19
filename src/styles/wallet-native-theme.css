@@ -15,13 +15,37 @@ html[data-poreiago-app='wallet'] #root {
   overflow-x: hidden;
 }
 
-/* Room for native bottom tabs (auth screens reset below). */
-html[data-poreiago-app='wallet'] body {
+/* Outer shell tabbar only (e.g. /my-booking) — not when in-app wallet-nav owns the dock. */
+html[data-poreiago-app='wallet'] body:has(.wallet-native-tabbar) {
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
 html[data-poreiago-app='wallet'] body:has(.wallet-auth-stage) {
   padding-bottom: 0;
+}
+
+/* In-app wallet cards must sit above the home indicator, fully visible. */
+html[data-poreiago-app='wallet'] .wallet-app--phone .wallet-nav {
+  left: 0.55rem;
+  right: 0.55rem;
+  bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  padding: 0.4rem 0.28rem;
+  font-size: inherit;
+}
+
+html[data-poreiago-app='wallet'] .wallet-app--phone .wallet-nav button {
+  font-size: 0.62rem;
+  padding: 0.45rem 0.05rem;
+  min-width: 0;
+}
+
+html[data-poreiago-app='wallet'] .wallet-app--phone .wallet-nav .material-symbols-outlined {
+  font-size: 1.28rem;
+}
+
+html[data-poreiago-app='wallet'] .wallet-app--phone .wallet-main {
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
 }
 
 html[data-poreiago-app='wallet'] .wallet-auth-back,

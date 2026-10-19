@@ -55,6 +55,7 @@ const ALL_TABS = [
   { id: 'home', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'rentals', label: 'Rent', icon: 'directions_car', requiresRent: true },
+  { id: 'lookup', label: 'Κράτηση', icon: 'search', nativeOnly: true },
   { id: 'lost_found', label: 'Απωλ.', icon: 'support_agent' },
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
@@ -283,10 +284,16 @@ function WalletAuthenticatedApp() {
 
   const nativeWallet = isNativeApp();
   // One Wallet for buses + rentals — show Rent tab when the sealed office has Rent.
+  // Native: also show Κράτηση (lookup) so every card is reachable without the outer shell.
   const rentAvailable = shouldShowRentStorefront(officeModules);
   const tabs = useMemo(
-    () => ALL_TABS.filter((tab) => !tab.requiresRent || rentAvailable),
-    [rentAvailable],
+    () =>
+      ALL_TABS.filter((tab) => {
+        if (tab.requiresRent && !rentAvailable) return false;
+        if (tab.nativeOnly && !nativeWallet) return false;
+        return true;
+      }),
+    [rentAvailable, nativeWallet],
   );
 
   useEffect(() => {
@@ -754,13 +761,23 @@ function WalletAuthenticatedApp() {
         </main>
 
         {!isDesktop && !isTicketView ? (
-          <nav className="wallet-nav" aria-label="My Wallet">
+          <nav
+            className="wallet-nav"
+            aria-label="My Wallet"
+            style={{ gridTemplateColumns: `repeat(${Math.max(tabs.length, 1)}, 1fr)` }}
+          >
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 className={activeTab === tab.id ? 'is-active' : ''}
-                onClick={() => switchTab(tab.id)}
+                onClick={() => {
+                  if (tab.id === 'lookup') {
+                    navigate('/my-booking', { state: { from: '/wallet' } });
+                    return;
+                  }
+                  switchTab(tab.id);
+                }}
               >
                 <span className="material-symbols-outlined" aria-hidden>
                   {tab.icon}

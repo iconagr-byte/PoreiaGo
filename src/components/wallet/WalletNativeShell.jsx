@@ -1,15 +1,16 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
-/** My Wallet only — tickets + account (no buses / rent / home). */
+/**
+ * Bottom chrome outside authenticated My Wallet.
+ * On /wallet the in-app wallet-nav already shows all cards
+ * (Εισιτήριο, Κρατήσεις, Rent, Απωλ., Εγώ) — do not cover them.
+ */
 const TABS = [
   { to: '/wallet', end: false, icon: 'confirmation_number', label: 'Εισιτήρια' },
   { to: '/my-booking', end: false, icon: 'search', label: 'Κράτηση' },
 ];
 
-/**
- * Bottom chrome for the Capacitor Wallet Android app (customer traveler only).
- */
 export default function WalletNativeShell() {
   const { pathname } = useLocation();
   const native = isNativeApp();
@@ -23,6 +24,11 @@ export default function WalletNativeShell() {
     pathname.startsWith('/reset-password');
 
   if (authScreen) return null;
+
+  // Authenticated wallet has its own full tab bar — never overlay it.
+  if (pathname === '/wallet' || pathname.startsWith('/wallet/')) {
+    return null;
+  }
 
   const hide =
     pathname.startsWith('/admin') ||
@@ -48,7 +54,7 @@ export default function WalletNativeShell() {
         bottom: 0,
         zIndex: 90,
         display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
+        gridTemplateColumns: `repeat(${TABS.length}, 1fr)`,
         gap: 4,
         padding: '8px 12px calc(8px + env(safe-area-inset-bottom))',
         background: 'rgba(255,255,255,0.96)',
