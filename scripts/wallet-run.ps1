@@ -211,13 +211,13 @@ Write-Host ""
 $tabsHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
   Select-String -Pattern "Κρατήσεις" -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
-$tabsLost = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
-  Select-String -Pattern "Απωλ." -SimpleMatch -ErrorAction SilentlyContinue |
+$tabsMe = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Άνοιγμα απωλεσθέντων" -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
-if (-not $tabsHit -or -not $tabsLost) {
-  throw "Full wallet tab dock missing from android assets - need Κρατήσεις + Απωλ. in native shell"
+if (-not $tabsHit -or -not $tabsMe) {
+  throw "Full wallet tabs missing — need Κρατήσεις dock + Απωλεσθέντα inside Εγώ"
 }
-Write-Host "OK: Full wallet tab cards present in packaged assets" -ForegroundColor Green
+Write-Host "OK: Full wallet tab cards present (Απωλεσθέντα in Εγώ)" -ForegroundColor Green
 
 $googleHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
   Select-String -Pattern "Google" -SimpleMatch -ErrorAction SilentlyContinue |

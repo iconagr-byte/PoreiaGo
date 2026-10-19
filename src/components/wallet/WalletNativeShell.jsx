@@ -9,8 +9,8 @@ import {
 import { getWalletTenantId } from '../../lib/wallet/walletTenantSeal.js';
 
 /**
- * Single native bottom dock — all My Wallet cards.
- * Replaces the old 2-tab bar that hid Κρατήσεις / Rent / Απωλ. / Εγώ.
+ * Single native bottom dock — My Wallet cards.
+ * Απωλεσθέντα lives inside Εγώ (account), not on the dock.
  */
 const BASE_TABS = [
   { id: 'home', to: '/wallet', tab: 'home', icon: 'confirmation_number', label: 'Εισιτήριο' },
@@ -24,7 +24,6 @@ const BASE_TABS = [
     requiresRent: true,
   },
   { id: 'lookup', to: '/my-booking', tab: null, icon: 'search', label: 'Κράτηση' },
-  { id: 'lost_found', to: '/wallet', tab: 'lost_found', icon: 'support_agent', label: 'Απωλ.' },
   { id: 'account', to: '/wallet', tab: 'account', icon: 'person', label: 'Εγώ' },
 ];
 
@@ -34,7 +33,9 @@ function walletTabFromPath(pathname, search) {
   try {
     const q = new URLSearchParams(search || '');
     const tab = String(q.get('tab') || 'home').trim();
-    if (['home', 'bookings', 'rentals', 'lost_found', 'account'].includes(tab)) return tab;
+    // lost_found opens from Εγώ — highlight account when deep-linked.
+    if (tab === 'lost_found') return 'account';
+    if (['home', 'bookings', 'rentals', 'account'].includes(tab)) return tab;
   } catch {
     /* ignore */
   }

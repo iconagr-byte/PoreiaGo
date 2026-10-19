@@ -1,4 +1,4 @@
-import { API_BASE } from '../config/api.js';
+import { API_BASE, getApiBase } from '../config/api.js';
 import { adminBearerHeaders, adminFetch } from './adminApi.js';
 import { getSaasToken, saasFetch } from './saasApi.js';
 import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
@@ -153,7 +153,9 @@ export function resolveSiteAssetUrl(url) {
     return url;
   }
   if (url.startsWith('/api/')) {
-    return API_BASE ? `${API_BASE}${url}` : url;
+    // Prefer live getApiBase() — static API_BASE can be empty before Capacitor boots.
+    const base = String(getApiBase() || API_BASE || '').replace(/\/$/, '');
+    return base ? `${base}${url}` : url;
   }
   return url;
 }
@@ -195,7 +197,8 @@ export async function fetchSiteAppearance(
     if (tenantId) qs.set('tenant_id', tenantId);
     else if (host) qs.set('host', host);
     const q = qs.toString() ? `?${qs}` : '';
-    const res = await fetch(`${API_BASE}/api/site/appearance${q}`);
+    const base = String(getApiBase() || API_BASE || '').replace(/\/$/, '');
+    const res = await fetch(`${base}/api/site/appearance${q}`);
     if (res.ok) {
       const data = await res.json();
       const merged = finalizeAppearance(data);

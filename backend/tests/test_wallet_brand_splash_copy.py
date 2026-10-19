@@ -41,14 +41,14 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
         shell = (ROOT / "src" / "components" / "wallet" / "WalletNativeShell.jsx").read_text(
             encoding="utf-8"
         )
-        for label in ("Εισιτήριο", "Κρατήσεις", "Κράτηση", "Απωλ.", "Εγώ"):
+        for label in ("Εισιτήριο", "Κρατήσεις", "Κράτηση", "Εγώ"):
             self.assertIn(label, shell)
-        # Old 2-only dock must not be the only tabs.
+        # Απωλεσθέντα moved into Εγώ — not a dock tab.
+        self.assertNotIn("label: 'Απωλ.'", shell)
         self.assertIn("requiresRent", shell)
-        self.assertNotIn(
-            "My Wallet only — tickets + account",
-            shell,
-        )
+        wallet = (ROOT / "src" / "pages" / "SimpleWalletPage.jsx").read_text(encoding="utf-8")
+        self.assertIn("Άνοιγμα απωλεσθέντων", wallet)
+        self.assertIn("tenantId={sealedTenantId", wallet)
 
 
 if __name__ == "__main__":

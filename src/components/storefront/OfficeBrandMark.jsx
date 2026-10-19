@@ -60,6 +60,8 @@ export default function OfficeBrandMark({
   fallbackLabel = 'Γραφείο',
   refreshKey = 0,
   preferAdmin = false,
+  /** Native Wallet: sealed office UUID (Host is localhost). */
+  tenantId = '',
   /** Optional minimum height for admin sidebar / drawers (px). */
   minHeightPx,
 }) {
@@ -67,6 +69,7 @@ export default function OfficeBrandMark({
   const [brand, setBrand] = useState(() => resolveOfficeBrand({}));
   const [imgBroken, setImgBroken] = useState(false);
   const isDark = variant === 'dark';
+  const sealedTenant = String(tenantId || '').trim();
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +80,9 @@ export default function OfficeBrandMark({
       setImgBroken(false);
     };
     const load = () => {
-      const loader = preferAdmin ? fetchAdminSiteAppearance() : fetchSiteAppearance();
+      const loader = preferAdmin
+        ? fetchAdminSiteAppearance()
+        : fetchSiteAppearance(sealedTenant ? { tenantId: sealedTenant } : undefined);
       loader
         .then((data) => {
           if (cancelled) return;
@@ -111,7 +116,7 @@ export default function OfficeBrandMark({
       window.removeEventListener(OFFICE_BRAND_CHANGED_EVENT, onChanged);
       window.removeEventListener(WALLET_TENANT_CHANGED_EVENT, onWalletTenant);
     };
-  }, [refreshKey, preferAdmin]);
+  }, [refreshKey, preferAdmin, sealedTenant]);
 
   const logoSrc = !imgBroken && brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();

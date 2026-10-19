@@ -56,7 +56,6 @@ const ALL_TABS = [
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'rentals', label: 'Rent', icon: 'directions_car', requiresRent: true },
   { id: 'lookup', label: 'Κράτηση', icon: 'search', nativeOnly: true },
-  { id: 'lost_found', label: 'Απωλ.', icon: 'support_agent' },
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
@@ -162,6 +161,7 @@ function WalletAuthenticatedApp() {
     }
     return 'home';
   });
+  // lost_found is opened from Εγώ — keep it as an in-page panel, not a dock tab.
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [brandLabel, setBrandLabel] = useState('My Wallet');
@@ -560,6 +560,7 @@ function WalletAuthenticatedApp() {
               fallbackLabel={brandLabel || 'My Wallet'}
               asLink={false}
               refreshKey={sealedTenantId}
+              tenantId={sealedTenantId || undefined}
             />
           </div>
           <button
@@ -732,7 +733,22 @@ function WalletAuthenticatedApp() {
           </div>
         ) : null}
 
-        {activeTab === 'lost_found' && <LostFoundPanel bookings={bookings} />}
+        {activeTab === 'lost_found' && (
+          <div className="wallet-stack">
+            <button
+              type="button"
+              className="wallet-btn wallet-btn-ghost"
+              onClick={() => switchTab('account')}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                arrow_back
+              </span>
+              Πίσω στον λογαριασμό
+            </button>
+            <LostFoundPanel bookings={bookings} />
+          </div>
+        )}
 
         {activeTab === 'account' && (
           <div className="wallet-stack">
@@ -769,6 +785,24 @@ function WalletAuthenticatedApp() {
                   </div>
                 ))}
               </dl>
+            </section>
+            <section className="wallet-panel">
+              <div className="wallet-panel-head">
+                <span className="wallet-panel-head-icon" aria-hidden>
+                  <span className="material-symbols-outlined">support_agent</span>
+                </span>
+                <div>
+                  <h2>Απωλεσθέντα</h2>
+                  <p>Δήλωση ή αναζήτηση αντικειμένων από τις διαδρομές σας.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="wallet-btn wallet-btn-primary wallet-btn-block"
+                onClick={() => switchTab('lost_found')}
+              >
+                Άνοιγμα απωλεσθέντων
+              </button>
             </section>
             <PushNotificationsPanel email={profile.email} />
             <CustomerSecurityPanel email={profile.email} authProvider={profile.provider} />
