@@ -6,7 +6,8 @@
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  [string]$Branch = "cursor/wallet-native-theme-isolate-5ffb"
+  # Default main so splash + Google fixes are never wiped by an old feature branch.
+  [string]$Branch = "main"
 )
 
 $ErrorActionPreference = "Stop"
@@ -233,10 +234,62 @@ function Test-ApkHasSocialLogin([string]$apkPath) {
   }
 }
 
+function Test-ApkHasMainActivity([string]$apkPath) {
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $tmp = Join-Path $env:TEMP ("pg-mainact-" + [guid]::NewGuid().ToString("n"))
+  New-Item -ItemType Directory -Path $tmp | Out-Null
+  try {
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($apkPath, $tmp)
+    $dexFiles = @(Get-ChildItem -LiteralPath $tmp -Filter "classes*.dex" -File -ErrorAction SilentlyContinue)
+    if ($dexFiles.Count -eq 0) { return $false }
+    foreach ($dex in $dexFiles) {
+      $bytes = [System.IO.File]::ReadAllBytes($dex.FullName)
+      $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+      # Dalvik type descriptor for com.poreiago.wallet.MainActivity
+      if ($ascii -match 'Lcom/poreiago/wallet/MainActivity;' -or $ascii -match 'com/poreiago/wallet/MainActivity') {
+        return $true
+      }
+    }
+    return $false
+  } catch {
+    Write-Host ("APK MainActivity check error: " + $_) -ForegroundColor Yellow
+    return $false
+  } finally {
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
 if (-not (Test-ApkHasSocialLogin $apk)) {
   throw "APK built without SocialLoginPlugin class - Google Sign-In will fail. Check npm install + cap sync."
 }
 Write-Host "OK: SocialLoginPlugin inside APK (v1.0.9)" -ForegroundColor Green
+
+if (-not (Test-ApkHasMainActivity $apk)) {
+  throw "APK built without com.poreiago.wallet.MainActivity in classes.dex - check android/app/src/main/java"
+}
+Write-Host "OK: MainActivity class present in APK dex" -ForegroundColor Green
+
+# Prefer aapt dump badging when SDK build-tools is available.
+$aapt = $null
+$btRoot = Join-Path $Sdk "build-tools"
+if (Test-Path -LiteralPath $btRoot) {
+  $bt = Get-ChildItem -LiteralPath $btRoot -Directory -ErrorAction SilentlyContinue |
+    Sort-Object Name -Descending |
+    Select-Object -First 1
+  if ($bt) {
+    $cand = Join-Path $bt.FullName "aapt.exe"
+    if (Test-Path -LiteralPath $cand) { $aapt = $cand }
+  }
+}
+if ($aapt) {
+  Write-Host "==> aapt dump badging (launchable-activity)" -ForegroundColor Cyan
+  $badging = & $aapt dump badging $apk 2>$null | Out-String
+  if ($badging -notmatch 'launchable-activity:\s*name=''com\.poreiago\.wallet\.MainActivity''') {
+    Write-Host $badging
+    throw "APK has no launchable MainActivity in manifest - check AndroidManifest.xml merge"
+  }
+  Write-Host "OK: launchable-activity = com.poreiago.wallet.MainActivity" -ForegroundColor Green
+}
 
 Write-Host "==> gradle signingReport (SHA-1 for Google Console)" -ForegroundColor Cyan
 $signReport = Start-Process -FilePath "cmd.exe" `
@@ -277,36 +330,58 @@ if (-not $online) {
   throw ("Emulator not online. Open Medium Phone, wait for home screen, then rerun OR: adb install -r `"$apk`"")
 }
 
-Write-Host "==> wipe old app + reinstall" -ForegroundColor Cyan
+Write-Host "==> wipe old app + reinstall (user 0)" -ForegroundColor Cyan
 # adb writes "Failed" to stderr when the package is already gone; with
 # ErrorActionPreference=Stop that becomes a terminating NativeCommandError.
 # Uninstall already removes app data — do not pm clear after uninstall.
 $prevEap = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 & $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
+& $adb uninstall --user 0 com.poreiago.wallet 2>$null | Out-Null
 & $adb uninstall com.poreiago.wallet 2>$null | Out-Null
 $ErrorActionPreference = $prevEap
-& $adb install -r $apk
+# Fresh install for user 0 — avoids Error type 3 on API 36/37 when a stale
+# Studio deploy left a package with no launcher activities.
+& $adb install -r -t --user 0 $apk
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "install --user 0 failed - retry plain install -r" -ForegroundColor Yellow
+  & $adb install -r $apk
+}
 if ($LASTEXITCODE -ne 0) { throw "install failed" }
+
+$ErrorActionPreference = "Continue"
+& $adb shell pm enable com.poreiago.wallet/com.poreiago.wallet.MainActivity 2>$null | Out-Null
+& $adb shell cmd package resolve-activity --brief com.poreiago.wallet 2>$null | Out-Host
+$ErrorActionPreference = "Stop"
 
 $bootHit = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "replaceState" -ErrorAction SilentlyContinue
 if (-not $bootHit) { throw "Native /wallet cold-start missing from android assets - rebuild failed" }
 Write-Host "OK: native cold-start replaceState present" -ForegroundColor Green
 
 Write-Host "==> launch My Wallet" -ForegroundColor Cyan
-& $adb shell am start -W -n "com.poreiago.wallet/com.poreiago.wallet.MainActivity" -a android.intent.action.MAIN -c android.intent.category.LAUNCHER
-if ($LASTEXITCODE -ne 0) {
-  & $adb shell monkey -p com.poreiago.wallet -c android.intent.category.LAUNCHER 1
+$ErrorActionPreference = "Continue"
+# Prefer launcher intent (lets PackageManager resolve MainActivity).
+& $adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p com.poreiago.wallet | Out-Host
+$launchOk = ($LASTEXITCODE -eq 0)
+if (-not $launchOk) {
+  & $adb shell am start -W -n com.poreiago.wallet/com.poreiago.wallet.MainActivity | Out-Host
+  $launchOk = ($LASTEXITCODE -eq 0)
 }
-Start-Sleep -Seconds 2
+if (-not $launchOk) {
+  & $adb shell monkey -p com.poreiago.wallet -c android.intent.category.LAUNCHER 1 | Out-Host
+}
+$ErrorActionPreference = "Stop"
+Start-Sleep -Seconds 3
 $ErrorActionPreference = "Continue"
 $pidLine = & $adb shell pidof com.poreiago.wallet 2>$null
 $ErrorActionPreference = "Stop"
 if (-not $pidLine) {
   $ErrorActionPreference = "Continue"
-  & $adb logcat -d -t 80 AndroidRuntime:E Capacitor:E chromium:E *:S | Out-Host
+  Write-Host "==> package activities (diagnose Error type 3):" -ForegroundColor Yellow
+  & $adb shell dumpsys package com.poreiago.wallet | Select-String -Pattern 'Activity|enabled|versionName|ActivityInfo' | Select-Object -First 40 | Out-Host
+  & $adb logcat -d -t 80 AndroidRuntime:E ActivityManager:E Capacitor:E chromium:E *:S | Out-Host
   $ErrorActionPreference = "Stop"
-  throw "App crashed on open - paste logcat above"
+  throw "App crashed on open - paste logcat above. If Activity class does not exist: Device Manager -> Wipe Data on the AVD, Cold Boot, rerun wallet-open.ps1 -Rebuild. Do NOT press Studio Run."
 }
 Write-Host ""
 Write-Host "==> Google Android OAuth (required once for emulator Sign-In)" -ForegroundColor Cyan

@@ -16,11 +16,16 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
         self.assertIn("Αξιοπιστία σε κάθε διαδρομή", text)
         self.assertIn("Ασφάλεια", text)
         self.assertIn("εμπιστοσύνη", text)
+        self.assertIn("seenThisRuntime", text)
 
     def test_not_b2b_office_platform_line(self):
         text = SPLASH_JS.read_text(encoding="utf-8")
         self.assertNotIn("ταξιδιωτικά γραφεία", text)
         self.assertNotIn("PLATFORM_TAGLINE", text)
+
+    def test_app_wraps_native_splash_gate(self):
+        app = (ROOT / "src" / "App.jsx").read_text(encoding="utf-8")
+        self.assertIn("WalletNativeSplashGate", app)
 
 
 if __name__ == "__main__":

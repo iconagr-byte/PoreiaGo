@@ -9,13 +9,16 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- Fully-qualified name: relative ".MainActivity" can fail Error type 3
+             (Activity class does not exist) on some API 36/37 emulator installs. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
-            android:name=".MainActivity"
+            android:name="com.poreiago.wallet.MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            android:exported="true">
+            android:exported="true"
+            android:enabled="true">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
