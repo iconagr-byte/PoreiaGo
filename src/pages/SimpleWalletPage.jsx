@@ -149,8 +149,19 @@ function WalletAuthenticatedApp() {
   const isMobile = useRentMobile();
   /** Narrow phones only — full-bleed PWA chrome. */
   const isPhone = useRentPhone();
-  const isDesktop = !isMobile;
-  const [activeTab, setActiveTab] = useState('home');
+  const nativeWalletEarly = isNativeApp();
+  // Native Capacitor: always phone chrome — never hide bottom cards on wide emulator.
+  const isDesktop = nativeWalletEarly ? false : !isMobile;
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const q = new URLSearchParams(location.search || '');
+      const tab = String(q.get('tab') || '').trim();
+      if (['home', 'bookings', 'rentals', 'lost_found', 'account'].includes(tab)) return tab;
+    } catch {
+      /* ignore */
+    }
+    return 'home';
+  });
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [brandLabel, setBrandLabel] = useState('My Wallet');
@@ -284,17 +295,32 @@ function WalletAuthenticatedApp() {
 
   const nativeWallet = isNativeApp();
   // One Wallet for buses + rentals — show Rent tab when the sealed office has Rent.
-  // Native: also show Κράτηση (lookup) so every card is reachable without the outer shell.
+  // Native dock (WalletNativeShell) owns Κράτηση lookup — web keeps in-app tabs only.
   const rentAvailable = shouldShowRentStorefront(officeModules);
   const tabs = useMemo(
     () =>
       ALL_TABS.filter((tab) => {
         if (tab.requiresRent && !rentAvailable) return false;
-        if (tab.nativeOnly && !nativeWallet) return false;
+        if (tab.nativeOnly) return false; // native shell shows Κράτηση
         return true;
       }),
-    [rentAvailable, nativeWallet],
+    [rentAvailable],
   );
+
+  // Native shell navigates with ?tab= — keep in-app content in sync.
+  useEffect(() => {
+    if (!nativeWallet) return;
+    try {
+      const q = new URLSearchParams(location.search || '');
+      const tab = String(q.get('tab') || 'home').trim();
+      if (['home', 'bookings', 'rentals', 'lost_found', 'account'].includes(tab)) {
+        setActiveTab(tab);
+        if (tab !== 'ticket') setSelectedBookingId(null);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [nativeWallet, location.search]);
 
   useEffect(() => {
     if (!rentAvailable && activeTab === 'rentals') {
@@ -390,6 +416,10 @@ function WalletAuthenticatedApp() {
   const switchTab = (id) => {
     setActiveTab(id);
     setSelectedBookingId(null);
+    if (nativeWalletEarly && id !== 'ticket') {
+      const q = id && id !== 'home' ? `?tab=${id}` : '';
+      navigate(`/wallet${q}`, { replace: true });
+    }
   };
 
   const homePass = (
@@ -760,7 +790,8 @@ function WalletAuthenticatedApp() {
         )}
         </main>
 
-        {!isDesktop && !isTicketView ? (
+        {/* Native: WalletNativeShell is the single full dock (all cards). Web/phone PWA keeps in-app nav. */}
+        {!nativeWallet && !isDesktop && !isTicketView ? (
           <nav
             className="wallet-nav"
             aria-label="My Wallet"
@@ -771,13 +802,7 @@ function WalletAuthenticatedApp() {
                 key={tab.id}
                 type="button"
                 className={activeTab === tab.id ? 'is-active' : ''}
-                onClick={() => {
-                  if (tab.id === 'lookup') {
-                    navigate('/my-booking', { state: { from: '/wallet' } });
-                    return;
-                  }
-                  switchTab(tab.id);
-                }}
+                onClick={() => switchTab(tab.id)}
               >
                 <span className="material-symbols-outlined" aria-hidden>
                   {tab.icon}

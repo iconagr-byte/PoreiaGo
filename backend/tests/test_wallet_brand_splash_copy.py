@@ -37,6 +37,19 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
         auth = (ROOT / "src" / "lib" / "auth.js").read_text(encoding="utf-8")
         self.assertIn("resetWalletBrandSplash", auth)
 
+    def test_native_shell_has_all_wallet_cards(self):
+        shell = (ROOT / "src" / "components" / "wallet" / "WalletNativeShell.jsx").read_text(
+            encoding="utf-8"
+        )
+        for label in ("Εισιτήριο", "Κρατήσεις", "Κράτηση", "Απωλ.", "Εγώ"):
+            self.assertIn(label, shell)
+        # Old 2-only dock must not be the only tabs.
+        self.assertIn("requiresRent", shell)
+        self.assertNotIn(
+            "My Wallet only — tickets + account",
+            shell,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

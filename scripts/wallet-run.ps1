@@ -190,6 +190,17 @@ if (-not $splashJs -or -not $splashHtml) {
 }
 Write-Host "OK: PoreiaGo brand splash present in packaged assets" -ForegroundColor Green
 
+$tabsHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Κρατήσεις" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+$tabsLost = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Απωλ." -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+if (-not $tabsHit -or -not $tabsLost) {
+  throw "Full wallet tab dock missing from android assets - need Κρατήσεις + Απωλ. in native shell"
+}
+Write-Host "OK: Full wallet tab cards present in packaged assets" -ForegroundColor Green
+
 $googleHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
   Select-String -Pattern "Google" -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
