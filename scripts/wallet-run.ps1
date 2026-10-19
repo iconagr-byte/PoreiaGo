@@ -190,6 +190,24 @@ if (-not $splashJs -or -not $splashHtml) {
 }
 Write-Host "OK: PoreiaGo brand splash present in packaged assets" -ForegroundColor Green
 
+# Fail loud if stale Qatar splash (serif + old hook) snuck into the APK.
+$staleHook = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Αξιοπιστία σε κάθε διαδρομή" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+$staleLong = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "η εμπειρία που αξίζει" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+if ($staleHook -or $staleLong) {
+  throw "STALE Qatar splash still in assets — you built the wrong branch (main). Use: wallet-fix-splash.ps1"
+}
+Write-Host "OK: stale Qatar splash copy absent" -ForegroundColor Green
+Write-Host ""
+Write-Host ">>> Splash text in THIS APK:" -ForegroundColor Magenta
+Write-Host ">>>   PoreiaGo" -ForegroundColor Magenta
+Write-Host ">>>   Καθε διαδρομη, με σιγουρια." -ForegroundColor Magenta
+Write-Host ">>>   Ασφαλεια · ανεση · εμπιστοσυνη" -ForegroundColor Magenta
+Write-Host ""
+
 $tabsHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
   Select-String -Pattern "Κρατήσεις" -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
