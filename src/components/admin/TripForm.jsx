@@ -7,7 +7,6 @@ import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripI
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import LocationPicker from './LocationPicker.jsx';
-import HybridPassengerManifest from './hybrid/HybridPassengerManifest.jsx';
 import HybridCrewEditor from './hybrid/HybridCrewEditor.jsx';
 import HybridRoomingExtras from './hybrid/HybridRoomingExtras.jsx';
 import { LEAFLET_BASEMAP } from '../../lib/maps/appleMapTheme.js';
@@ -1110,27 +1109,6 @@ export default function TripForm({
         hint="Tour leader, οδηγός και ξεναγός για το hybrid πρόγραμμα."
       >
         <HybridCrewEditor formData={formData} setFormData={setFormData} />
-      </Section>
-
-      <Section
-        icon="airline_seat_recline_extra"
-        title="Ενιαίο manifest (λεωφορείο + πτήση)"
-        hint="Χαρτογράφηση θέσης λεωφορείου, θέσης πτήσης και PNR/ticket ανά επιβάτη."
-        action={
-          tripId ? (
-            <a
-              href={`/tour-leader/${tripId}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined text-[16px]">luggage</span>
-              Tour leader
-            </a>
-          ) : null
-        }
-      >
-        <HybridPassengerManifest formData={formData} setFormData={setFormData} tripId={tripId} />
       </Section>
 
       <Section
