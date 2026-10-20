@@ -590,12 +590,13 @@ function WalletAuthenticatedApp() {
           )}
           <div className="wallet-topbar-brand">
             <OfficeBrandMark
-              className="h-8"
+              className="wallet-topbar-mark"
               variant="light"
               fallbackLabel={brandLabel || 'My Wallet'}
               asLink={false}
               refreshKey={sealedTenantId}
               tenantId={sealedTenantId || undefined}
+              maxHeightPx={26}
             />
           </div>
           <button

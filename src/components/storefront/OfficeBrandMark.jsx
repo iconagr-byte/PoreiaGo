@@ -64,6 +64,8 @@ export default function OfficeBrandMark({
   tenantId = '',
   /** Optional minimum height for admin sidebar / drawers (px). */
   minHeightPx,
+  /** Cap logo height (e.g. discreet Wallet topbar). */
+  maxHeightPx,
 }) {
   const [appearance, setAppearance] = useState({});
   const [brand, setBrand] = useState(() => resolveOfficeBrand({}));
@@ -127,12 +129,29 @@ export default function OfficeBrandMark({
     (fallbackLabel && fallbackLabel !== 'Γραφείο' ? fallbackLabel : '') ||
     brand.name ||
     (onTenant ? 'Γραφείο' : 'PoreiaGo');
-  const resolvedHeight =
+  let resolvedHeight =
     minHeightPx != null
       ? Math.max(clampLogoHeight(appearance.logo_height_px), clampLogoHeight(minHeightPx))
       : undefined;
+  if (maxHeightPx != null) {
+    const cap = clampLogoHeight(maxHeightPx);
+    const base =
+      resolvedHeight != null
+        ? resolvedHeight
+        : clampLogoHeight(appearance.logo_height_px);
+    resolvedHeight = Math.min(base, cap);
+  }
   const logoStyle = officeLogoImageStyle(
-    resolvedHeight != null ? { ...appearance, logo_height_px: resolvedHeight } : appearance,
+    resolvedHeight != null
+      ? {
+          ...appearance,
+          logo_height_px: resolvedHeight,
+          logo_max_width_px: Math.min(
+            Number(appearance.logo_max_width_px) || 180,
+            Math.round(resolvedHeight * 3.2),
+          ),
+        }
+      : appearance,
   );
 
   const inner = logoSrc ? (

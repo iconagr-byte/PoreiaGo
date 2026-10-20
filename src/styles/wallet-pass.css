@@ -90,6 +90,30 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
+  max-width: min(58vw, 220px);
+}
+
+.wallet-topbar-mark {
+  gap: 0.4rem !important;
+}
+
+.wallet-topbar-mark img {
+  max-height: 26px !important;
+  height: 26px !important;
+  width: auto !important;
+  max-width: 72px !important;
+}
+
+.wallet-topbar-mark .text-base,
+.wallet-topbar-mark span.font-bold {
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 9.5rem;
 }
 
 .wallet-nav {
