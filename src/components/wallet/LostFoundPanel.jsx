@@ -15,7 +15,7 @@ function statusChipClass(status) {
   return 'wallet-chip wallet-chip-warn';
 }
 
-export default function LostFoundPanel({ bookings = [] }) {
+export default function LostFoundPanel({ bookings = [], onBack }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -65,6 +65,14 @@ export default function LostFoundPanel({ bookings = [] }) {
 
   return (
     <div className="wallet-stack">
+      {typeof onBack === 'function' ? (
+        <button type="button" className="wallet-back-link" onClick={onBack}>
+          <span className="material-symbols-outlined" aria-hidden>
+            arrow_back
+          </span>
+          Εγώ
+        </button>
+      ) : null}
       <section className="wallet-panel">
         <div className="wallet-panel-head">
           <span className="wallet-panel-head-icon" aria-hidden>
