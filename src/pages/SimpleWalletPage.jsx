@@ -61,7 +61,6 @@ const ALL_TABS = [
   { id: 'home', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'rentals', label: 'Rent', icon: 'directions_car', requiresRent: true },
-  { id: 'lookup', label: 'Κράτηση', icon: 'search', nativeOnly: true },
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
@@ -326,19 +325,14 @@ function WalletAuthenticatedApp() {
 
   const nativeWallet = isNativeApp();
   // One Wallet for buses + rentals — show Rent only when the sealed office paid for it.
-  // Native dock (WalletNativeShell) owns Κράτηση lookup — web keeps in-app tabs only.
   // Capacitor localhost is a marketing host; pass nativeWallet so we never force Rent demo.
+  // Booking lookup lives under Κρατήσεις → «Εύρεση κράτησης» (not a dock tab).
   const rentAvailable = shouldShowRentStorefront(officeModules, {
     nativeWallet,
     sealedTenant: Boolean(sealedTenantId),
   });
   const tabs = useMemo(
-    () =>
-      ALL_TABS.filter((tab) => {
-        if (tab.requiresRent && !rentAvailable) return false;
-        if (tab.nativeOnly) return false; // native shell shows Κράτηση
-        return true;
-      }),
+    () => ALL_TABS.filter((tab) => !(tab.requiresRent && !rentAvailable)),
     [rentAvailable],
   );
 

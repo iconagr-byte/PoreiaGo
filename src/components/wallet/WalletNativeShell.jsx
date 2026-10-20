@@ -27,12 +27,12 @@ const BASE_TABS = [
     label: 'Rent',
     requiresRent: true,
   },
-  { id: 'lookup', to: '/my-booking', tab: null, icon: 'search', label: 'Κράτηση' },
   { id: 'account', to: '/wallet', tab: 'account', icon: 'person', label: 'Εγώ' },
 ];
 
 function walletTabFromPath(pathname, search) {
-  if (pathname === '/my-booking' || pathname.startsWith('/my-booking/')) return 'lookup';
+  // Booking lookup (/my-booking) is linked from Κρατήσεις — not a dock tab.
+  if (pathname === '/my-booking' || pathname.startsWith('/my-booking/')) return '';
   if (pathname !== '/wallet' && !pathname.startsWith('/wallet/')) return '';
   try {
     const q = new URLSearchParams(search || '');
@@ -159,10 +159,6 @@ export default function WalletNativeShell() {
             className={active ? 'is-active' : ''}
             aria-current={active ? 'page' : undefined}
             onClick={() => {
-              if (tab.id === 'lookup') {
-                navigate('/my-booking', { state: { from: '/wallet' } });
-                return;
-              }
               const q = tab.tab && tab.tab !== 'start' ? `?tab=${tab.tab}` : '';
               navigate(`/wallet${q}`, { replace: pathname.startsWith('/wallet') });
             }}
