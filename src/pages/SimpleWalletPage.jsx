@@ -42,6 +42,7 @@ import {
   fetchOfficeModules,
   shouldShowRentStorefront,
 } from '../services/officeModulesApi.js';
+import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
 import { resolveOfficeBrand } from '../lib/branding/officeBrand.js';
 import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
@@ -156,6 +157,7 @@ function WalletAuthenticatedApp() {
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   /** Sealed office UUID — drives logo/name fetch on native (Host=localhost). */
   const [sealedTenantId, setSealedTenantId] = useState(() => getWalletTenantId() || '');
+  const [officeTrips, setOfficeTrips] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [showWelcome, setShowWelcome] = useState(
     () => Boolean(location.state?.fromClaim || location.state?.highlightBooking),
@@ -280,6 +282,21 @@ function WalletAuthenticatedApp() {
       cancelled = true;
     };
   }, [sealedTenantId]);
+
+  useEffect(() => {
+    if (!isDesktop) return undefined;
+    let cancelled = false;
+    fetchPublicOfficeTrips()
+      .then((trips) => {
+        if (!cancelled) setOfficeTrips(Array.isArray(trips) ? trips : []);
+      })
+      .catch(() => {
+        if (!cancelled) setOfficeTrips([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDesktop, sealedTenantId]);
 
   const nativeWallet = isNativeApp();
   // One Wallet for buses + rentals — show Rent tab when the sealed office has Rent.
@@ -435,8 +452,15 @@ function WalletAuthenticatedApp() {
           passengerName={displayPassenger}
           onOpenDetails={openTicket}
           onBrowseTrips={nativeWallet ? undefined : () => navigate('/')}
+          onOpenTrip={
+            nativeWallet
+              ? undefined
+              : (trip) => navigate(trip?.id ? `/trip/${trip.id}` : '/')
+          }
           onQrChange={handleQrChange}
           offline={usingOfflinePass}
+          layout={isDesktop ? 'desktop' : 'phone'}
+          featuredTrips={!displayBooking && isDesktop ? officeTrips : []}
         />
       )}
 
@@ -444,49 +468,93 @@ function WalletAuthenticatedApp() {
     </>
   );
 
+  const railBookings = (
+    otherUpcoming.length ? otherUpcoming : bookings.filter((b) => b.id !== featured?.id)
+  ).slice(0, 5);
+  const railEmpty = !featured && railBookings.length === 0;
+
   const upcomingRail = (
-    <aside className="wallet-desktop-rail" aria-label="Επόμενες κρατήσεις">
-      <div className="wallet-desktop-rail-card">
+    <aside className="wallet-desktop-rail" aria-label="Λογαριασμός και επόμενες">
+      <div className="wallet-desktop-rail-hello">
         <p className="wallet-desktop-rail-kicker">Γεια σας</p>
         <p className="wallet-desktop-rail-name truncate">{profile.name}</p>
         <p className="wallet-desktop-rail-email truncate">{profile.email}</p>
       </div>
 
-      <div className="wallet-desktop-rail-card">
+      <div className="wallet-desktop-rail-panel">
         <div className="wallet-desktop-rail-head">
-          <h2>Επόμενες</h2>
-          <button type="button" className="wallet-desktop-rail-link" onClick={() => switchTab('bookings')}>
-            Όλες
-          </button>
+          <h2>{railEmpty ? 'Επόμενο βήμα' : 'Επόμενες'}</h2>
+          {!railEmpty ? (
+            <button
+              type="button"
+              className="wallet-desktop-rail-link"
+              onClick={() => switchTab('bookings')}
+            >
+              Όλες
+            </button>
+          ) : null}
         </div>
-        {otherUpcoming.length === 0 && bookings.length <= 1 ? (
-          <p className="wallet-desktop-rail-empty">Δεν υπάρχουν άλλες κρατήσεις.</p>
+        {railEmpty ? (
+          <ul className="wallet-desktop-rail-steps">
+            <li>
+              <button
+                type="button"
+                className="wallet-desktop-rail-step"
+                onClick={() => (nativeWallet ? switchTab('bookings') : navigate('/'))}
+              >
+                <span className="wallet-desktop-rail-step-num">1</span>
+                <span>
+                  <strong>Επιλέξτε εκδρομή</strong>
+                  <em>Από το site του γραφείου</em>
+                </span>
+              </button>
+            </li>
+            <li>
+              <Link to="/my-booking" className="wallet-desktop-rail-step">
+                <span className="wallet-desktop-rail-step-num">2</span>
+                <span>
+                  <strong>Ή εισάγετε κωδικό</strong>
+                  <em>Αν έχετε ήδη κράτηση</em>
+                </span>
+              </Link>
+            </li>
+          </ul>
         ) : (
           <ul className="wallet-desktop-rail-list">
-            {(otherUpcoming.length ? otherUpcoming : bookings.filter((b) => b.id !== featured?.id))
-              .slice(0, 5)
-              .map((b) => (
-                <li key={b.id}>
-                  <button type="button" className="wallet-desktop-rail-item" onClick={() => openTicket(b)}>
-                    <span className="wallet-desktop-rail-item-title truncate">{b.tripTitle}</span>
-                    <span className="wallet-desktop-rail-item-meta">
-                      {b.date}
-                      {b.seat ? ` · ${b.seat}` : ''}
-                    </span>
-                  </button>
-                </li>
-              ))}
+            {railBookings.map((b) => (
+              <li key={b.id}>
+                <button
+                  type="button"
+                  className="wallet-desktop-rail-item"
+                  onClick={() => openTicket(b)}
+                >
+                  <span className="wallet-desktop-rail-item-title truncate">{b.tripTitle}</span>
+                  <span className="wallet-desktop-rail-item-meta">
+                    {b.date}
+                    {b.seat ? ` · ${b.seat}` : ''}
+                  </span>
+                </button>
+              </li>
+            ))}
           </ul>
         )}
       </div>
 
       <div className="wallet-desktop-rail-actions">
         {!nativeWallet ? (
-          <button type="button" className="wallet-btn wallet-btn-primary wallet-btn-block" onClick={() => navigate('/')}>
-            Νέα κράτηση
+          <button
+            type="button"
+            className="wallet-btn wallet-btn-primary wallet-btn-block"
+            onClick={() => navigate('/')}
+          >
+            {railEmpty ? 'Δείτε εκδρομές' : 'Νέα κράτηση'}
           </button>
         ) : null}
-        <button type="button" className="wallet-btn wallet-btn-ghost wallet-btn-block" onClick={() => switchTab('account')}>
+        <button
+          type="button"
+          className="wallet-btn wallet-btn-ghost wallet-btn-block"
+          onClick={() => switchTab('account')}
+        >
           Λογαριασμός
         </button>
       </div>
