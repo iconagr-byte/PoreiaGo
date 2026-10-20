@@ -212,6 +212,14 @@ function WalletAuthenticatedApp() {
   }, [location.state?.highlightBooking, location.state?.fromClaim]);
 
   useEffect(() => {
+    const tab = location.state?.walletTab;
+    if (tab === 'account' || tab === 'bookings' || tab === 'home' || tab === 'rentals') {
+      setActiveTab(tab);
+      setSelectedBookingId(null);
+    }
+  }, [location.state?.walletTab]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoadingBookings(true);
     loadMyBookings(email)
