@@ -147,7 +147,11 @@ async def get_occupied_seats(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_guest_booking(body: GuestBookingCreate, request: Request):
-    """Public B2C / office checkout — tenant from Host when possible; body.tenant_id must match."""
+    """Public B2C / office checkout — tenant from Host when possible; body.tenant_id must match.
+
+    Optional My Wallet Bearer JWT stamps the booking with the logged-in account so
+    the office sees who booked without the customer re-entering identity.
+    """
     tenant_id = await _resolve_guest_tenant(request, body.tenant_id)
     ref = f"BK-{secrets.token_hex(4).upper()}"
     total = Decimal(str(body.total_eur if body.total_eur is not None else body.amount_eur))
@@ -194,12 +198,31 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
     else:
         payment_status_label = "PAID (SaaS)"
 
+    # Optional My Wallet session — never trust body alone for account linkage.
+    wallet_email: str | None = None
+    wallet_customer_id: str | None = None
+    auth = request.headers.get("Authorization") or ""
+    if auth.startswith("Bearer "):
+        try:
+            from ticketing.customer_jwt import decode_customer_token
+
+            payload = decode_customer_token(auth[7:].strip())
+            wallet_email = str(payload.get("sub") or "").strip().lower() or None
+            wallet_customer_id = str(payload.get("customer_id") or "").strip() or None
+        except Exception:
+            wallet_email = None
+            wallet_customer_id = None
+
+    passenger_email = (wallet_email or (body.passenger_email or "")).strip().lower()
+    passenger_name = (body.passenger_name or "").strip()
+    passenger_phone = (body.phone or "").strip() or None
+
     metadata = {
         "external_trip_id": body.external_trip_id,
         "trip_title": body.trip_title,
         "seats": requested_seats,
         "payment_method": pay_method,
-        "phone": body.phone,
+        "phone": passenger_phone,
         "source": source,
         "agent_name": agent_name,
         "departure_at": body.departure_at,
@@ -214,6 +237,9 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         "payment_status": payment_status_label,
         "boarding_pass_issued": True,
         "ticket_ref": ref,
+        "account_linked": bool(wallet_email),
+        "wallet_customer_email": wallet_email,
+        "wallet_customer_id": wallet_customer_id,
     }
     if body.passengers:
         metadata["passengers"] = body.passengers
@@ -253,8 +279,8 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
             status=booking_status,
             payment_status=payment_status,
             seat_label=seat_label,
-            passenger_name=body.passenger_name,
-            passenger_email=body.passenger_email,
+            passenger_name=passenger_name,
+            passenger_email=passenger_email,
             total_price=total,
             amount_paid=paid_now,
             amount_eur=total,

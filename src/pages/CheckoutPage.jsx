@@ -4,10 +4,13 @@ import toast from 'react-hot-toast';
 import {
   getCustomerEmail,
   getCustomerName,
+  getCustomerPhone,
   getCustomerToken,
   isCustomer,
+  loginAsCustomer,
 } from '../lib/auth.js';
 import CustomerLoginModal from '../components/auth/CustomerLoginModal.jsx';
+import { fetchCustomerMe } from '../services/customerAuthApi.js';
 import {
   saveWalletClaim,
   walletClaimAuthPath,
@@ -62,7 +65,7 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({
     name: getCustomerName() || '',
     email: getCustomerEmail() || '',
-    phone: '',
+    phone: getCustomerPhone() || '',
     cardNumber: '',
     expiry: '',
     cvv: '',
@@ -73,6 +76,45 @@ export default function CheckoutPage() {
     () => Boolean(isCustomer() && getCustomerToken()),
   );
   const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
+
+  // Keep identity until logout: hydrate form from JWT + /api/auth/me.
+  useEffect(() => {
+    if (!getCustomerToken() || !isCustomer()) {
+      setAccountReady(false);
+      return undefined;
+    }
+    setAccountReady(true);
+    let cancelled = false;
+    fetchCustomerMe()
+      .then((me) => {
+        if (cancelled || !me?.email) return;
+        loginAsCustomer(
+          me.email,
+          {
+            name: me.name,
+            phone: me.phone,
+            picture: me.picture,
+            provider: me.provider,
+            customerId: me.customer_id,
+            tenant_id: me.tenant_id,
+          },
+          getCustomerToken(),
+        );
+        setForm((prev) => ({
+          ...prev,
+          name: me.name || prev.name || '',
+          email: me.email || prev.email || '',
+          phone: me.phone || prev.phone || '',
+        }));
+        setAccountReady(true);
+      })
+      .catch(() => {
+        /* stale token — keep localStorage prefill; user can re-login */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const trip = useMemo(() => {
     const id = Number(tripId);
@@ -263,7 +305,7 @@ export default function CheckoutPage() {
       email: profile?.email || prev.email || '',
       phone: profile?.phone || prev.phone || '',
     }));
-    toast.success('Συνδεθήκατε — η κράτηση θα συνδεθεί με τον λογαριασμό σας');
+    toast.success('Συνδεθήκατε — τα στοιχεία σας μένουν μέχρι Έξοδο· το γραφείο βλέπει ποιος κλείνει');
   };
 
   const validate = () => {
@@ -517,7 +559,13 @@ export default function CheckoutPage() {
                     type="email"
                     value={form.email}
                     onChange={handleChange('email')}
-                    className="mt-1 w-full rounded-xl border border-surface-container bg-surface-container-low px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none"
+                    readOnly={accountReady}
+                    className={`mt-1 w-full rounded-xl border border-surface-container px-3 py-2.5 focus:ring-2 focus:ring-primary focus:outline-none ${
+                      accountReady
+                        ? 'bg-surface-container/80 text-on-surface cursor-default'
+                        : 'bg-surface-container-low'
+                    }`}
+                    title={accountReady ? 'Email λογαριασμού My Wallet' : undefined}
                   />
                 </label>
                 <label className="block text-sm">

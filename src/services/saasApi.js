@@ -369,9 +369,19 @@ export async function saasCreateGuestBooking(payload) {
   if (Array.isArray(payload.passengers) && payload.passengers.length) {
     body.passengers = payload.passengers;
   }
+  // When the shopper is logged into My Wallet, stamp the booking with their
+  // account so the office CRM / wallet know who booked (no re-entry of identity).
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    const { getCustomerToken } = await import('../lib/auth.js');
+    const token = getCustomerToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    /* ignore */
+  }
   const res = await fetch(`${API_BASE}/api/v1/bookings/guest`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) await parseError(res);
