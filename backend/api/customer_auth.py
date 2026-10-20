@@ -122,6 +122,9 @@ async def _issue_customer_token(
     payload_extra["tenant_id"] = tid
     # Refresh account after bind so profile carries home office.
     fresh = await get_account(email) or acct or {"email": email}
+    cid = str((fresh or {}).get("customer_id") or "").strip()
+    if cid:
+        payload_extra["customer_id"] = cid
     return create_customer_token(email, extra=payload_extra), tid, fresh
 
 

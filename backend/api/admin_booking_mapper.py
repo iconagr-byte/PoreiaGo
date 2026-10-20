@@ -272,12 +272,20 @@ def booking_to_admin_dict(
     if boarding is None:
         boarding = paid or status in (BookingStatus.CONFIRMED, BookingStatus.PAID, BookingStatus.BOARDED)
 
+    wallet_cid = str(meta.get("wallet_customer_id") or "").strip() or None
+    wallet_email = str(meta.get("wallet_customer_email") or "").strip().lower() or None
+    account_linked = bool(meta.get("account_linked") or wallet_email)
     result = {
         "id": local_id_from_reference(booking.reference_code),
         "saasBookingId": str(booking.id),
         "syncedToSaas": True,
         "customerName": booking.passenger_name,
-        "customerId": str(booking.customer_user_id) if booking.customer_user_id else None,
+        # Prefer SaaS user UUID; fall back to My Wallet CUST-* so office CRM sees who booked.
+        "customerId": (
+            str(booking.customer_user_id)
+            if booking.customer_user_id
+            else wallet_cid
+        ),
         "tripTitle": meta.get("trip_title") or "—",
         "tripId": trip_id,
         "date": trip_date,
@@ -297,7 +305,7 @@ def booking_to_admin_dict(
         "checkInStatus": check_in_status,
         "checkedIn": checked_in,
         "phone": meta.get("phone") or "",
-        "email": booking.passenger_email or "",
+        "email": booking.passenger_email or wallet_email or "",
         "paymentStatus": payment_status,
         "paymentMethod": meta.get("payment_method") or "Online",
         "paymentDate": meta.get("payment_date")
@@ -314,6 +322,9 @@ def booking_to_admin_dict(
         "notes": booking.notes,
         "tenant_id": str(booking.tenant_id) if getattr(booking, "tenant_id", None) else None,
         "tenantId": str(booking.tenant_id) if getattr(booking, "tenant_id", None) else None,
+        "accountLinked": account_linked,
+        "walletCustomerId": wallet_cid,
+        "walletCustomerEmail": wallet_email,
     }
     result.update(build_fiscal_admin_fields(booking, fiscal_invoices))
     return result
