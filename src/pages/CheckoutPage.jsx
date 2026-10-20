@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { getCustomerEmail, getCustomerToken, isCustomer } from '../lib/auth.js';
+import {
+  getCustomerEmail,
+  getCustomerName,
+  getCustomerToken,
+  isCustomer,
+} from '../lib/auth.js';
+import CustomerLoginModal from '../components/auth/CustomerLoginModal.jsx';
 import {
   saveWalletClaim,
   walletClaimAuthPath,
@@ -54,7 +60,7 @@ export default function CheckoutPage() {
   const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
   const [ibanRevealed, setIbanRevealed] = useState(false);
   const [form, setForm] = useState({
-    name: '',
+    name: getCustomerName() || '',
     email: getCustomerEmail() || '',
     phone: '',
     cardNumber: '',
@@ -62,6 +68,10 @@ export default function CheckoutPage() {
     cvv: '',
   });
   const [companionNames, setCompanionNames] = useState([]);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [accountReady, setAccountReady] = useState(
+    () => Boolean(isCustomer() && getCustomerToken()),
+  );
   const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
 
   const trip = useMemo(() => {
@@ -243,6 +253,17 @@ export default function CheckoutPage() {
     }
     if (field === 'cvv') value = value.replace(/\D/g, '').slice(0, 4);
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAccountLogin = (profile) => {
+    setAccountReady(true);
+    setForm((prev) => ({
+      ...prev,
+      name: profile?.name || prev.name || '',
+      email: profile?.email || prev.email || '',
+      phone: profile?.phone || prev.phone || '',
+    }));
+    toast.success('Συνδεθήκατε — η κράτηση θα συνδεθεί με τον λογαριασμό σας');
   };
 
   const validate = () => {
@@ -435,6 +456,46 @@ export default function CheckoutPage() {
                 <span className="material-symbols-outlined text-primary">person</span>
                 Στοιχεία επιβάτη
               </h2>
+
+              {!isDemo ? (
+                <div
+                  className={`mb-5 rounded-2xl border px-4 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 ${
+                    accountReady
+                      ? 'border-emerald-200/80 bg-emerald-50/80'
+                      : 'border-primary/20 bg-primary/[0.06]'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-on-surface">
+                      {accountReady
+                        ? 'Συνδεδεμένος λογαριασμός'
+                        : 'Log in to your account'}
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+                      {accountReady
+                        ? `Η κράτηση θα συνδεθεί με ${form.email || 'τον λογαριασμό σας'} και θα εμφανιστεί στο My Wallet.`
+                        : 'Για να γνωρίζει το σύστημα ποιος κάνει την κράτηση — το εισιτήριο μπαίνει αυτόματα στο My Wallet σας.'}
+                    </p>
+                  </div>
+                  {!accountReady ? (
+                    <button
+                      type="button"
+                      onClick={() => setLoginOpen(true)}
+                      className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full bg-primary text-white px-4 py-2.5 text-sm font-bold shadow-sm hover:opacity-95"
+                    >
+                      <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                        login
+                      </span>
+                      Log in
+                    </button>
+                  ) : (
+                    <span className="material-symbols-outlined text-emerald-600 text-[28px] shrink-0" aria-hidden>
+                      verified_user
+                    </span>
+                  )}
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="block sm:col-span-2 text-sm">
                   <span className="font-bold text-on-surface-variant text-xs uppercase">
@@ -893,6 +954,14 @@ export default function CheckoutPage() {
           </div>
         </form>
       </div>
+
+      <CustomerLoginModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={handleAccountLogin}
+        prefillEmail={form.email}
+        registerFrom={`/checkout/${tripId || ''}`}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCustomerToken, isCustomer } from '../../lib/auth.js';
+import CustomerLoginModal from '../auth/CustomerLoginModal.jsx';
 import StorefrontBrand from './StorefrontBrand.jsx';
 
 const HEADER_STYLES = {
@@ -78,6 +79,7 @@ export default function StorefrontHeader({
   const isDark = style.variant === 'dark';
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [walletReady, setWalletReady] = useState(() =>
     typeof window !== 'undefined' ? hasWalletSession() : false,
   );
@@ -133,9 +135,56 @@ export default function StorefrontHeader({
 
   const closeMenu = () => setMenuOpen(false);
 
-  const walletLink = walletReady
-    ? { to: '/wallet' }
-    : { to: '/login', state: { from: '/wallet', walletClaim: true } };
+  const openLogin = () => {
+    setMenuOpen(false);
+    setLoginOpen(true);
+  };
+
+  const accountCta = walletReady ? (
+    <Link to="/wallet" className={walletCta} title="Άνοιγμα My Wallet">
+      <span className="material-symbols-outlined text-[18px]" aria-hidden>
+        account_balance_wallet
+      </span>
+      My Wallet
+    </Link>
+  ) : (
+    <button
+      type="button"
+      className={walletCta}
+      title="Log in to your account"
+      onClick={openLogin}
+    >
+      <span className="material-symbols-outlined text-[18px]" aria-hidden>
+        login
+      </span>
+      Log in
+    </button>
+  );
+
+  const accountCtaMobile = walletReady ? (
+    <Link
+      to="/wallet"
+      className={`${walletCta} !px-3 !py-1.5 !text-xs`}
+      aria-label="My Wallet"
+    >
+      <span className="material-symbols-outlined text-[16px]" aria-hidden>
+        account_balance_wallet
+      </span>
+      Wallet
+    </Link>
+  ) : (
+    <button
+      type="button"
+      className={`${walletCta} !px-3 !py-1.5 !text-xs`}
+      aria-label="Log in to your account"
+      onClick={openLogin}
+    >
+      <span className="material-symbols-outlined text-[16px]" aria-hidden>
+        login
+      </span>
+      Log in
+    </button>
+  );
 
   return (
     <header className={wrapClass}>
@@ -179,31 +228,11 @@ export default function StorefrontHeader({
               <span className="tabular-nums tracking-tight">{phone}</span>
             </a>
           ) : null}
-          <Link
-            to={walletLink.to}
-            state={walletLink.state}
-            className={walletCta}
-            title={walletReady ? 'Άνοιγμα My Wallet' : 'Σύνδεση στο My Wallet'}
-          >
-            <span className="material-symbols-outlined text-[18px]" aria-hidden>
-              account_balance_wallet
-            </span>
-            My Wallet
-          </Link>
+          {accountCta}
         </nav>
 
         <div className="flex md:hidden items-center gap-2">
-          <Link
-            to={walletLink.to}
-            state={walletLink.state}
-            className={`${walletCta} !px-3 !py-1.5 !text-xs`}
-            aria-label="My Wallet"
-          >
-            <span className="material-symbols-outlined text-[16px]" aria-hidden>
-              account_balance_wallet
-            </span>
-            Wallet
-          </Link>
+          {accountCtaMobile}
           <button
             type="button"
             className={menuBtn}
@@ -258,17 +287,29 @@ export default function StorefrontHeader({
                 {phone}
               </a>
             ) : null}
-            <Link
-              to={walletLink.to}
-              state={walletLink.state}
-              onClick={closeMenu}
-              className="rounded-xl px-3 py-3 text-sm font-bold hover:bg-black/5 inline-flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined text-[18px]" aria-hidden>
-                account_balance_wallet
-              </span>
-              My Wallet
-            </Link>
+            {walletReady ? (
+              <Link
+                to="/wallet"
+                onClick={closeMenu}
+                className="rounded-xl px-3 py-3 text-sm font-bold hover:bg-black/5 inline-flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                  account_balance_wallet
+                </span>
+                My Wallet
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={openLogin}
+                className="rounded-xl px-3 py-3 text-sm font-bold hover:bg-black/5 inline-flex items-center gap-2 text-left"
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                  login
+                </span>
+                Log in to your account
+              </button>
+            )}
             {tripsEnabled ? (
               <Link
                 to="/my-booking"
@@ -281,6 +322,13 @@ export default function StorefrontHeader({
           </nav>
         </div>
       ) : null}
+
+      <CustomerLoginModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={() => setWalletReady(true)}
+        registerFrom="/wallet"
+      />
     </header>
   );
 }
