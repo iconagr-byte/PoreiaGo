@@ -335,6 +335,8 @@ export function catalogTripToLocal(row) {
     market: row.market || null,
     vehicleType: row.vehicleType || row.vehicle_type || '',
     currency: row.currency || 'EUR',
+    officeSeed: Boolean(row.officeSeed || row.office_seed),
+    catalogSource: row.catalogSource || row.catalog_source || '',
   });
 }
 

@@ -532,11 +532,23 @@ async def ensure_achillio_travel_office(session: Any) -> dict[str, Any]:
     except Exception:
         pass
 
+    trips_seeded = 0
+    try:
+        from travel_platform.operations.achillio_seed_trips import (
+            seed_achillio_office_excursions,
+        )
+
+        seed_result = seed_achillio_office_excursions(str(office.id))
+        trips_seeded = int(seed_result.get("saved") or 0)
+    except Exception:
+        logger.exception("Achillio office excursion seed failed")
+
     return {
         "created": created,
         "domain_set": domain_set,
         "poison_cleared": poison_cleared,
         "admin_upserted": admin_upserted,
+        "trips_seeded": trips_seeded,
         "slug": _tenant_slug(office),
         "tenant_id": str(office.id),
         "custom_domain": office.custom_domain or "",

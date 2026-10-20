@@ -40,9 +40,26 @@ export function isDemoBooking(booking) {
   return isDemoTripTitle(booking.tripTitle);
 }
 
+/** Achillio Travel starter ids (PoreiaGo demo content adopted as office catalog). */
+export const OFFICE_SEED_TRIP_IDS = new Set([91001, 91002, 91003]);
+
+export function isOfficeSeedTrip(trip) {
+  if (!trip || typeof trip !== 'object') return false;
+  if (trip.officeSeed || trip.office_seed) return true;
+  if (String(trip.catalogSource || trip.catalog_source || '').trim() === 'office_seed') {
+    return true;
+  }
+  const id = Number(trip.id);
+  return Number.isFinite(id) && OFFICE_SEED_TRIP_IDS.has(id);
+}
+
 export function stripDemoTrips(trips) {
   if (!Array.isArray(trips)) return [];
-  return trips.filter((t) => !isDemoTripTitle(t?.title));
+  return trips.filter((t) => {
+    // Keep office-owned starter catalog (Achillio seeded from PoreiaGo demos).
+    if (isOfficeSeedTrip(t)) return true;
+    return !isDemoTripTitle(t?.title);
+  });
 }
 
 export function stripDemoBookings(bookings) {
