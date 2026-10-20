@@ -1,7 +1,9 @@
 /**
  * In-page login dialog for storefront / checkout — so bookings attach to a real account.
+ * Portaled to document.body so fixed header / backdrop-filter cannot clip it.
  */
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { loginAsCustomer } from '../../lib/auth.js';
 import GoogleSignInButton from '../GoogleSignInButton.jsx';
@@ -28,14 +30,22 @@ export default function CustomerLoginModal({
   const [googleLoading, setGoogleLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [entered, setEntered] = useState(false);
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open) {
+      setEntered(false);
+      return undefined;
+    }
     setError('');
     setLoading(false);
     setGoogleLoading(false);
+    setEntered(false);
     isCustomerAuthBackendAvailable().then(setBackendOk);
-    const t = window.setTimeout(() => emailRef.current?.focus(), 40);
+    const enter = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setEntered(true));
+    });
+    const t = window.setTimeout(() => emailRef.current?.focus(), 280);
     const onKey = (e) => {
       if (e.key === 'Escape') onClose?.();
     };
@@ -43,13 +53,14 @@ export default function CustomerLoginModal({
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
+      window.cancelAnimationFrame(enter);
       window.clearTimeout(t);
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
   const finish = (email, profile = {}, accessToken = null) => {
     loginAsCustomer(email, profile, accessToken);
@@ -118,8 +129,11 @@ export default function CustomerLoginModal({
     }
   };
 
-  return (
-    <div className="cust-login-modal" role="presentation">
+  const node = (
+    <div
+      className={`cust-login-modal${entered ? ' is-open' : ''}`}
+      role="presentation"
+    >
       <button
         type="button"
         className="cust-login-modal-backdrop"
@@ -132,7 +146,12 @@ export default function CustomerLoginModal({
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <button type="button" className="cust-login-modal-close" onClick={onClose} aria-label="Κλείσιμο">
+        <button
+          type="button"
+          className="cust-login-modal-close"
+          onClick={onClose}
+          aria-label="Κλείσιμο"
+        >
           <span className="material-symbols-outlined" aria-hidden>
             close
           </span>
@@ -152,7 +171,9 @@ export default function CustomerLoginModal({
               Η σύνδεση με τον server απέτυχε. Ανανεώστε τη σελίδα ή δοκιμάστε σε λίγο.
             </p>
           ) : null}
-          {error ? <p className="cust-login-modal-banner cust-login-modal-banner--err">{error}</p> : null}
+          {error ? (
+            <p className="cust-login-modal-banner cust-login-modal-banner--err">{error}</p>
+          ) : null}
 
           <label className="cust-login-modal-field">
             <span>Email</span>
@@ -190,7 +211,11 @@ export default function CustomerLoginModal({
             </div>
           </label>
 
-          <button type="submit" className="cust-login-modal-submit" disabled={loading || googleLoading}>
+          <button
+            type="submit"
+            className="cust-login-modal-submit"
+            disabled={loading || googleLoading}
+          >
             {loading ? 'Σύνδεση…' : 'Log in to your account'}
           </button>
         </form>
@@ -217,4 +242,6 @@ export default function CustomerLoginModal({
       </div>
     </div>
   );
+
+  return createPortal(node, document.body);
 }
