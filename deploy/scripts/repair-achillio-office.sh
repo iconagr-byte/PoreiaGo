@@ -68,6 +68,7 @@ for rel in \
   travel_platform/settings/office_host_guard.py \
   travel_platform/operations/achillio_seed_trips.py \
   travel_platform/operations/tenant_trip_catalog_store.py \
+  api/site_appearance_router.py \
   app/api/auth.py \
   app/services/auth_service.py
 do
@@ -153,6 +154,19 @@ else
     fi
   else
     echo "WARN: missing $NGINX_CONF"
+  fi
+
+  # Rebuild SPA when node is available so Back Office stripDemo keeps
+  # Achillio office-seed trips (91001–91003) instead of purging by title.
+  if command -v npm >/dev/null 2>&1 && [[ -f "$REPO_ROOT/package.json" ]]; then
+    echo "==> npm run build (office-seed stripDemo + hydrate)"
+    (
+      cd "$REPO_ROOT"
+      if [[ ! -d node_modules ]]; then
+        npm ci --prefer-offline --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund
+      fi
+      npm run build
+    ) || echo "WARN: npm build failed — will copy existing dist/ if present"
   fi
 
   # Refresh static SPA if dist exists (does not replace nginx.conf).
