@@ -99,7 +99,7 @@
   bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(var(--wallet-nav-cols, 4), 1fr);
   gap: 0.15rem;
   padding: 0.35rem;
   border-radius: 22px;
@@ -1431,6 +1431,25 @@
   font-weight: 600;
   color: var(--wallet-muted);
   font-style: italic;
+}
+
+.wallet-back-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0 0 0.35rem;
+  padding: 0.35rem 0.15rem;
+  color: var(--wallet-accent-deep);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wallet-back-link .material-symbols-outlined {
+  font-size: 1.15rem;
 }
 
 .wallet-account-rows {

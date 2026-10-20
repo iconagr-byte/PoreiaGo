@@ -52,13 +52,20 @@ import {
 } from '../lib/wallet/walletTenantSeal.js';
 import '../styles/wallet-pass.css';
 
+/** Match native Wallet IA: Αρχική · Κρατήσεις · Rent? · Εγώ. Lost & Found lives under Εγώ. */
 const ALL_TABS = [
-  { id: 'home', label: 'Εισιτήριο', icon: 'confirmation_number' },
+  { id: 'home', label: 'Αρχική', icon: 'home' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'rentals', label: 'Rent', icon: 'directions_car', requiresRent: true },
-  { id: 'lost_found', label: 'Απωλ.', icon: 'support_agent' },
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
+
+function tabIsActive(activeTab, tabId) {
+  if (activeTab === tabId) return true;
+  // Lost & Found is nested under Εγώ — keep Me highlighted while viewing it.
+  if (activeTab === 'lost_found' && tabId === 'account') return true;
+  return false;
+}
 
 function resolveCustomerProfile() {
   const email = (getCustomerEmail() || '').toLowerCase();
@@ -581,7 +588,7 @@ function WalletAuthenticatedApp() {
               <span className="material-symbols-outlined text-[20px]" aria-hidden>
                 arrow_back
               </span>
-              <span className="wallet-topbar-btn-label">Αρχική</span>
+              <span className="wallet-topbar-btn-label">Εκδρομές</span>
             </button>
           )}
           <div className="wallet-topbar-brand">
@@ -609,12 +616,16 @@ function WalletAuthenticatedApp() {
         </header>
 
         {isDesktop && !isTicketView ? (
-          <nav className="wallet-nav wallet-nav--desktop" aria-label="My Wallet">
+          <nav
+            className="wallet-nav wallet-nav--desktop"
+            aria-label="My Wallet"
+            style={{ '--wallet-nav-cols': tabs.length }}
+          >
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
-                className={activeTab === tab.id ? 'is-active' : ''}
+                className={tabIsActive(activeTab, tab.id) ? 'is-active' : ''}
                 onClick={() => switchTab(tab.id)}
               >
                 <span className="material-symbols-outlined" aria-hidden>
@@ -763,7 +774,12 @@ function WalletAuthenticatedApp() {
           </div>
         ) : null}
 
-        {activeTab === 'lost_found' && <LostFoundPanel bookings={bookings} />}
+        {activeTab === 'lost_found' && (
+          <LostFoundPanel
+            bookings={bookings}
+            onBack={() => switchTab('account')}
+          />
+        )}
 
         {activeTab === 'account' && (
           <div className="wallet-stack">
@@ -801,6 +817,24 @@ function WalletAuthenticatedApp() {
                 ))}
               </dl>
             </section>
+            <section className="wallet-panel">
+              <div className="wallet-panel-head">
+                <span className="wallet-panel-head-icon" aria-hidden>
+                  <span className="material-symbols-outlined">support_agent</span>
+                </span>
+                <div>
+                  <h2>Απωλεσθέντα</h2>
+                  <p>Δήλωση αντικειμένου που ξεχάσατε στο λεωφορείο.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="wallet-btn wallet-btn-ghost wallet-btn-block"
+                onClick={() => switchTab('lost_found')}
+              >
+                Άνοιγμα απωλεσθέντων
+              </button>
+            </section>
             <PushNotificationsPanel email={profile.email} />
             <CustomerSecurityPanel email={profile.email} authProvider={profile.provider} />
           </div>
@@ -822,12 +856,16 @@ function WalletAuthenticatedApp() {
         </main>
 
         {!isDesktop && !isTicketView ? (
-          <nav className="wallet-nav" aria-label="My Wallet">
+          <nav
+            className="wallet-nav"
+            aria-label="My Wallet"
+            style={{ '--wallet-nav-cols': tabs.length }}
+          >
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
-                className={activeTab === tab.id ? 'is-active' : ''}
+                className={tabIsActive(activeTab, tab.id) ? 'is-active' : ''}
                 onClick={() => switchTab(tab.id)}
               >
                 <span className="material-symbols-outlined" aria-hidden>
