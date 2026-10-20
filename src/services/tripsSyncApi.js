@@ -113,21 +113,23 @@ export async function fetchOfficeTripCatalog() {
   return Array.isArray(data) ? data : [];
 }
 
-/** Hydrate local trip list from durable server catalog (+ Postgres titles). */
+/** Hydrate local trip list from durable server catalog (+ Postgres titles).
+ * Prunes local ghosts deleted on another device / browser.
+ */
 export async function hydrateTripsFromServer() {
   const { mergeServerTripsIntoStore } = await import('../lib/trips/tripStore.js');
   const rows = await fetchOfficeTripCatalog();
-  return mergeServerTripsIntoStore(rows);
+  return mergeServerTripsIntoStore(rows, { pruneMissingLocal: true });
 }
 
 export async function syncAllLocalTrips() {
   const { loadTrips, mergeServerTripsIntoStore } = await import(
     '../lib/trips/tripStore.js'
   );
-  // Never replace the public catalog with a partial local list.
+  // Reconcile first so deleted-elsewhere ghosts are not pushed back to the catalog.
   try {
     const remote = await fetchOfficeTripCatalog();
-    if (remote.length) mergeServerTripsIntoStore(remote);
+    mergeServerTripsIntoStore(remote, { pruneMissingLocal: true });
   } catch (err) {
     console.warn('[trips-sync] pre-sync hydrate failed', err);
   }
