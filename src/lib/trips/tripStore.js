@@ -339,28 +339,40 @@ export function catalogTripToLocal(row) {
 }
 
 /**
- * Merge server catalog trips into localStorage without dropping richer local rows.
- * Local wins on field conflicts; server fills missing ids (recovery after cache wipe).
- * @returns {{ trips: object[], added: number, total: number }}
+ * Merge server catalog trips into localStorage.
+ * Local wins on field conflicts for shared ids; server fills missing ids.
+ *
+ * When `pruneMissingLocal` is true (admin hydrate), drop local trips that are
+ * no longer on the durable catalog — e.g. deleted on another device.
+ *
+ * @param {object[]} serverTrips
+ * @param {{ pruneMissingLocal?: boolean }} [opts]
+ * @returns {{ trips: object[], added: number, removed: number, total: number }}
  */
-export function mergeServerTripsIntoStore(serverTrips) {
+export function mergeServerTripsIntoStore(serverTrips, opts = {}) {
+  const pruneMissingLocal = Boolean(opts.pruneMissingLocal);
   const local = loadTrips();
-  const byId = new Map();
+  const localById = new Map();
   for (const t of local) {
-    if (t?.id != null) byId.set(Number(t.id), t);
+    if (t?.id != null) localById.set(Number(t.id), t);
   }
+
+  const byId = new Map();
+  const serverIds = new Set();
   let added = 0;
+
   for (const raw of serverTrips || []) {
     const mapped = catalogTripToLocal(raw);
     if (!mapped) continue;
     const id = Number(mapped.id);
     if (recentlyDeletedTripIds.has(id)) continue;
-    if (!byId.has(id)) {
+    serverIds.add(id);
+    const cur = localById.get(id);
+    if (!cur) {
       byId.set(id, mapped);
       added += 1;
     } else {
       // Fill blank local fields from server without overwriting office edits.
-      const cur = byId.get(id);
       const merged = { ...mapped, ...cur };
       for (const [k, v] of Object.entries(mapped)) {
         if (cur[k] == null || cur[k] === '') merged[k] = v;
@@ -368,7 +380,20 @@ export function mergeServerTripsIntoStore(serverTrips) {
       byId.set(id, normalizeTrip(merged));
     }
   }
+
+  let removed = 0;
+  if (pruneMissingLocal) {
+    for (const id of localById.keys()) {
+      if (!serverIds.has(id)) removed += 1;
+    }
+  } else {
+    // Legacy merge: keep local-only rows (recovery / incomplete remote).
+    for (const [id, trip] of localById) {
+      if (!byId.has(id)) byId.set(id, trip);
+    }
+  }
+
   const trips = stripDemoTrips([...byId.values()].sort((a, b) => Number(a.id) - Number(b.id)));
   saveTrips(trips);
-  return { trips, added, total: trips.length };
+  return { trips, added, removed, total: trips.length };
 }
