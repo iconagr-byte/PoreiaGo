@@ -1369,6 +1369,9 @@ class PublicTripResponse(BaseModel):
     market: str | None = None
     vehicleType: str = ""
     currency: str = "EUR"
+    # Office starter catalog (Achillio seed) — Back Office must not strip these.
+    officeSeed: bool = False
+    catalogSource: str = ""
 
 
 @router.get("/api/site/trips", response_model=list[PublicTripResponse])

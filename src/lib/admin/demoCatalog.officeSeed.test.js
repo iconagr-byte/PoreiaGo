@@ -10,8 +10,18 @@ describe('office seed trips vs platform demos', () => {
       { id: 91001, title: 'Ημερήσια στα Μετέωρα', officeSeed: true },
       { id: 1, title: 'Ημερήσια στα Μετέωρα' },
       { id: 42, title: 'Ναύπλιο Weekend' },
+      { id: 1792475148749, title: 'ΚΩΝΣΤΑΝΤΙΝΟΥΠΟΛΗ: Η ΒΑΣΙΛΙΔΑ ΤΩΝ ΠΟΛΕΩΝ' },
     ]);
-    expect(kept.map((t) => t.id)).toEqual([91001, 42]);
+    expect(kept.map((t) => t.id)).toEqual([91001, 42, 1792475148749]);
+  });
+
+  it('does not strip marketing titles when id is an office seed / timestamp', () => {
+    const kept = stripDemoTrips([
+      { id: 91002, title: 'Απόδραση στην Πρωτεύουσα' },
+      { id: 91003, title: 'Μαγευτικά Ιωάννινα' },
+      { id: 3, title: 'Μαγευτικά Ιωάννινα' },
+    ]);
+    expect(kept.map((t) => t.id)).toEqual([91002, 91003]);
   });
 
   it('recognizes seed by reserved id range', () => {
