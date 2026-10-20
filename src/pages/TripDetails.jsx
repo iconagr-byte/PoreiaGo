@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
+import { resolvePublicOfficeTrip } from '../lib/wallet/walletOfficeTrips.js';
+import { getWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 import { isInternationalTrip, MARKET_LABELS } from '../lib/trips/tripMarket.js';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { fleetCategoryLabel } from '../lib/fleet/fleetVehicleCategories.js';
@@ -58,13 +60,29 @@ export default function TripDetails() {
 
   useEffect(() => {
     const tripId = parseInt(id, 10);
+    if (!Number.isFinite(tripId)) {
+      setTrip(null);
+      return undefined;
+    }
     let found = loadTrips().find((t) => t.id === tripId);
     if (!found && isPlatformSeatBookingDemo()) {
       found = loadPlatformDemoTrips().find((t) => t.id === tripId);
     }
     if (found) {
       setTrip(found);
+      return undefined;
     }
+    let cancelled = false;
+    resolvePublicOfficeTrip(tripId, getWalletTenantId())
+      .then((row) => {
+        if (!cancelled) setTrip(row);
+      })
+      .catch(() => {
+        if (!cancelled) setTrip(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // Generate coordinates for polyline

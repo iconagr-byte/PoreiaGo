@@ -5,7 +5,7 @@
 
 param(
   [switch]$Rebuild,
-  [string]$Branch = "main"
+  [string]$Branch = "cursor/wallet-splash-apple-5ffb"
 )
 
 $ErrorActionPreference = "Stop"

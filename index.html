@@ -51,7 +51,83 @@
       html[data-poreiago-app='wallet'] .wallet-auth-back {
         display: none !important;
       }
+      /* Apple boot splash — paints before React so login never flashes first */
+      #pg-wallet-boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2.5rem 2rem;
+        background:
+          radial-gradient(ellipse 100% 60% at 50% 12%, rgba(0, 113, 227, 0.07), transparent 58%),
+          linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Plus Jakarta Sans', 'Segoe UI', Roboto, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        text-align: center;
+        transition: opacity 0.38s ease, transform 0.38s ease;
+      }
+      #pg-wallet-boot-splash.pg-wallet-boot-splash--out {
+        opacity: 0;
+        transform: scale(1.025);
+        pointer-events: none;
+      }
+      #pg-wallet-boot-splash .pg-boot-glyph {
+        width: 4.5rem;
+        height: 4.5rem;
+        margin: 0 auto 1.75rem;
+        border-radius: 1.28rem;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(165deg, #5ac8fa 0%, #0071e3 46%, #0058b0 100%);
+        box-shadow:
+          0 1.5px 0 rgba(255, 255, 255, 0.45) inset,
+          0 18px 40px rgba(0, 113, 227, 0.32);
+      }
+      #pg-wallet-boot-splash .pg-boot-glyph svg {
+        width: 2rem;
+        height: 2rem;
+        display: block;
+      }
+      #pg-wallet-boot-splash .pg-boot-word {
+        margin: 0;
+        font-size: clamp(2.5rem, 10vw, 3.1rem);
+        font-weight: 700;
+        letter-spacing: -0.06em;
+        line-height: 1;
+        color: #1d1d1f;
+      }
+      #pg-wallet-boot-splash .pg-boot-word span {
+        background: linear-gradient(115deg, #0071e3, #2997ff 55%, #64d2ff);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      #pg-wallet-boot-splash .pg-boot-hook {
+        margin: 1.55rem 0 0;
+        max-width: 16.5rem;
+        font-family: inherit !important;
+        font-style: normal !important;
+        font-size: clamp(1.2rem, 4.6vw, 1.4rem);
+        font-weight: 500;
+        letter-spacing: -0.028em;
+        line-height: 1.38;
+        color: #1d1d1f;
+      }
+      #pg-wallet-boot-splash .pg-boot-support {
+        margin: 0.95rem 0 0;
+        font-family: inherit !important;
+        font-style: normal !important;
+        font-size: 0.9375rem;
+        font-weight: 400;
+        letter-spacing: -0.008em;
+        line-height: 1.55;
+        color: #6e6e73;
+      }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
       (function () {
         // Capacitor Wallet Android/iOS — mark app shell ASAP for full-bleed CSS
@@ -89,6 +165,34 @@
             if (!walletOk) {
               history.replaceState(null, '', '/wallet' + (location.search || '') + (location.hash || ''));
             }
+            // Paint PoreiaGo splash before React — login credentials must not appear first.
+            function paintBootSplash() {
+              if (!document.body || document.getElementById('pg-wallet-boot-splash')) return;
+              var boot = document.createElement('div');
+              boot.id = 'pg-wallet-boot-splash';
+              boot.setAttribute('role', 'dialog');
+              boot.setAttribute('aria-label', 'PoreiaGo');
+              boot.innerHTML =
+                '<div class="pg-boot-glyph" aria-hidden="true">' +
+                '<svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+                '<path d="M6.5 25.5c5.2-9.2 11.6-13.8 18.8-14.6" stroke="#fff" stroke-width="2.35" stroke-linecap="round"/>' +
+                '<circle cx="27.2" cy="10.2" r="2.55" fill="#fff"/>' +
+                '<path d="M8.2 27.2h12.6c1.85 0 2.95-2 1.95-3.5l-1.7-2.55" stroke="#fff" stroke-width="2.35" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>' +
+                '</svg></div>' +
+                '<p class="pg-boot-word">Poreia<span>Go</span></p>' +
+                '<p class="pg-boot-hook">Κάθε διαδρομή, με σιγουριά.</p>' +
+                '<p class="pg-boot-support">Ασφάλεια · άνεση · εμπιστοσύνη</p>';
+              document.body.appendChild(boot);
+              // Safety: never leave boot splash forever if React fails to mount.
+              setTimeout(function () {
+                var el = document.getElementById('pg-wallet-boot-splash');
+                if (!el) return;
+                el.classList.add('pg-wallet-boot-splash--out');
+                setTimeout(function () { try { el.remove(); } catch (e2) {} }, 400);
+              }, 5200);
+            }
+            if (document.body) paintBootSplash();
+            else document.addEventListener('DOMContentLoaded', paintBootSplash);
           }
         } catch (e) { /* ignore */ }
         var host = (location.hostname || '').toLowerCase();

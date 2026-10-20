@@ -90,6 +90,30 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
+  max-width: min(58vw, 220px);
+}
+
+.wallet-topbar-mark {
+  gap: 0.4rem !important;
+}
+
+.wallet-topbar-mark img {
+  max-height: 26px !important;
+  height: 26px !important;
+  width: auto !important;
+  max-width: 72px !important;
+}
+
+.wallet-topbar-mark .text-base,
+.wallet-topbar-mark span.font-bold {
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 9.5rem;
 }
 
 .wallet-nav {
@@ -1182,6 +1206,287 @@
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+}
+
+/* Wallet «Αρχική» — office brand feed */
+.wallet-start-feed {
+  gap: 0.85rem;
+}
+
+.wallet-start-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.35rem;
+  min-height: 280px;
+  color: #fff;
+  background: linear-gradient(160deg, #0b3a63 0%, #0f4c81 48%, #1d6aa8 100%);
+  box-shadow: 0 18px 40px rgba(15, 76, 129, 0.18);
+}
+
+.wallet-start-hero-media {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transform: scale(1.02);
+}
+
+.wallet-start-hero-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(8, 28, 48, 0.25) 0%, rgba(8, 28, 48, 0.72) 58%, rgba(8, 28, 48, 0.88) 100%);
+}
+
+.wallet-start-hero-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1.35rem 1.2rem 1.25rem;
+  min-height: 280px;
+  justify-content: flex-end;
+}
+
+.wallet-start-hook {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.wallet-start-hero-copy h1 {
+  margin: 0;
+  font-size: 1.55rem;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.wallet-start-headline {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.wallet-start-body {
+  margin: 0.15rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 36rem;
+}
+
+.wallet-start-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.wallet-start-hero-actions .wallet-btn-secondary {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.wallet-start-service-list,
+.wallet-start-news-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.wallet-start-service {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 0.7rem;
+  align-items: start;
+  padding: 0.75rem 0.8rem;
+  border-radius: 1rem;
+  background: var(--wallet-sand, #f8fafc);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.wallet-start-service-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 76, 129, 0.1);
+  color: #0f4c81;
+}
+
+.wallet-start-service h3,
+.wallet-start-news-item h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--wallet-ink, #0f172a);
+}
+
+.wallet-start-service p,
+.wallet-start-news-item p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.wallet-start-news-item {
+  padding: 0.85rem 0.9rem;
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.07);
+}
+
+.wallet-start-news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.wallet-start-news-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(15, 76, 129, 0.1);
+  color: #0f4c81;
+}
+
+.wallet-start-news-meta time {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+/* Wallet: browse / book office excursions */
+.wallet-excursions {
+  margin-top: 0.85rem;
+}
+
+.wallet-excursion-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.85rem 0 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #fff;
+}
+
+.wallet-excursion-search .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: #64748b;
+}
+
+.wallet-excursion-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--wallet-ink, #0f172a);
+}
+
+.wallet-excursion-search input::placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.wallet-excursion-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.wallet-excursion-card {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 0.75rem;
+  align-items: stretch;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  background: var(--wallet-sand, #f8fafc);
+  overflow: hidden;
+}
+
+.wallet-excursion-cover {
+  min-height: 96px;
+  background:
+    linear-gradient(160deg, rgba(15, 76, 129, 0.55), rgba(15, 23, 42, 0.35)),
+    #0f4c81;
+  background-size: cover;
+  background-position: center;
+}
+
+.wallet-excursion-body {
+  padding: 0.7rem 0.75rem 0.75rem 0;
+  min-width: 0;
+}
+
+.wallet-excursion-body h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--wallet-ink, #0f172a);
+  line-height: 1.25;
+}
+
+.wallet-excursion-body p {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.wallet-excursion-price {
+  margin-top: 0.35rem !important;
+  font-size: 0.92rem !important;
+  font-weight: 800 !important;
+  color: #0f4c81 !important;
+}
+
+.wallet-excursion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.wallet-excursion-actions .wallet-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.wallet-excursions--compact .wallet-excursion-card {
+  grid-template-columns: 72px 1fr;
 }
 
 .wallet-list-item {

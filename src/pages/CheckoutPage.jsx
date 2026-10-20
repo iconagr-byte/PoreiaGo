@@ -19,6 +19,8 @@ import {
   loadPendingCheckout,
 } from '../lib/ticketing/pendingCheckout.js';
 import { loadTrips, loadPlatformDemoTrips } from '../lib/trips/tripStore.js';
+import { resolvePublicOfficeTrip } from '../lib/wallet/walletOfficeTrips.js';
+import { getWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 import MinimalPageBackground from '../components/MinimalPageBackground.jsx';
 import { checkTripAvailable } from '../lib/fleet/vehicleAvailability.js';
 import { trackAbandonedCheckout } from '../lib/revenue/abandonedCart.js';
@@ -64,13 +66,39 @@ export default function CheckoutPage() {
   const [companionNames, setCompanionNames] = useState([]);
   const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
 
-  const trip = useMemo(() => {
+  const [trip, setTrip] = useState(() => {
     const id = Number(tripId);
     if (!id) return null;
     const found = loadTrips().find((t) => t.id === id) || null;
     if (found) return found;
     if (isDemo) return loadPlatformDemoTrips().find((t) => t.id === id) || null;
     return null;
+  });
+
+  useEffect(() => {
+    const id = Number(tripId);
+    if (!id) {
+      setTrip(null);
+      return undefined;
+    }
+    const local =
+      loadTrips().find((t) => t.id === id) ||
+      (isDemo ? loadPlatformDemoTrips().find((t) => t.id === id) : null);
+    if (local) {
+      setTrip(local);
+      return undefined;
+    }
+    let cancelled = false;
+    resolvePublicOfficeTrip(id, getWalletTenantId())
+      .then((found) => {
+        if (!cancelled) setTrip(found);
+      })
+      .catch(() => {
+        if (!cancelled) setTrip(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [tripId, isDemo]);
 
   const pending = useMemo(() => loadPendingCheckout(), [tripId]);

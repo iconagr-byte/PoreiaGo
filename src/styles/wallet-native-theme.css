@@ -15,13 +15,22 @@ html[data-poreiago-app='wallet'] #root {
   overflow-x: hidden;
 }
 
-/* Room for native bottom tabs (auth screens reset below). */
-html[data-poreiago-app='wallet'] body {
+/* Full native dock (all wallet cards) — always reserve space when present. */
+html[data-poreiago-app='wallet'] body:has(.wallet-native-tabbar) {
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
 html[data-poreiago-app='wallet'] body:has(.wallet-auth-stage) {
   padding-bottom: 0;
+}
+
+html[data-poreiago-app='wallet'] .wallet-app--phone .wallet-main {
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Hide duplicate in-app dock if it ever mounts on native. */
+html[data-poreiago-app='wallet'] .wallet-app--phone .wallet-nav:not(.wallet-nav--desktop) {
+  display: none !important;
 }
 
 html[data-poreiago-app='wallet'] .wallet-auth-back,

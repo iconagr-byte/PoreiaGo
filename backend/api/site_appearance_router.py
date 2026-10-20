@@ -200,6 +200,30 @@ DEFAULT_SITE_APPEARANCE = {
     "intl_section_subtitle": (
         "Οριζόντια προβολή διεθνών εκδρομών με λεωφορείο — σύρετε για να δείτε όλες."
     ),
+    "wallet_home_hook": "",
+    "wallet_home_headline": "",
+    "wallet_home_body": "",
+    "wallet_home_image_url": "",
+    "wallet_home_services": [
+        {
+            "icon": "confirmation_number",
+            "title": "Online κράτηση",
+            "body": "Κλείστε θέση σε λίγα βήματα από το κινητό.",
+        },
+        {
+            "icon": "qr_code_2",
+            "title": "Ψηφιακό εισιτήριο",
+            "body": "Το εισιτήριό σας πάντα στο Wallet.",
+        },
+        {
+            "icon": "support_agent",
+            "title": "Υποστήριξη γραφείου",
+            "body": "Είμαστε δίπλα σας πριν και κατά το ταξίδι.",
+        },
+    ],
+    "wallet_home_news": [],
+    "wallet_home_show_trips": True,
+    "wallet_home_trips_title": "Επερχόμενες εκδρομές",
     "updated_at": None,
 }
 
@@ -312,6 +336,17 @@ class SiteAppearanceResponse(BaseModel):
     intl_section_subtitle: str = (
         "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     )
+    wallet_home_hook: str = ""
+    wallet_home_headline: str = ""
+    wallet_home_body: str = ""
+    wallet_home_image_url: str = ""
+    wallet_home_services: list[dict] = Field(default_factory=list)
+    wallet_home_news: list[dict] = Field(default_factory=list)
+    wallet_home_show_trips: bool = True
+    wallet_home_trips_title: str = "Επερχόμενες εκδρομές"
+    # Needed by native Wallet scrub guard — without slug, localhost treated Achillio
+    # office branding as platform poison and cleared the logo.
+    tenant_slug: str | None = None
     updated_at: str | None = None
 
 
@@ -429,6 +464,14 @@ class SiteAppearanceUpdate(BaseModel):
     intl_section_eyebrow: str | None = None
     intl_section_title: str | None = None
     intl_section_subtitle: str | None = None
+    wallet_home_hook: str | None = None
+    wallet_home_headline: str | None = None
+    wallet_home_body: str | None = None
+    wallet_home_image_url: str | None = None
+    wallet_home_services: list[dict] | None = None
+    wallet_home_news: list[dict] | None = None
+    wallet_home_show_trips: bool | None = None
+    wallet_home_trips_title: str | None = None
 
 
 def _clamp_logo_fields(data: dict) -> dict:
@@ -1375,35 +1418,49 @@ class PublicTripResponse(BaseModel):
 async def get_public_office_trips(
     request: Request,
     host: str | None = Query(default=None),
+    tenant_id: str | None = Query(
+        default=None,
+        description="Sealed wallet office UUID (native Capacitor / localhost)",
+    ),
 ):
     """
     Published trips for an office Host — strictly scoped by tenant_id.
     Never returns another office's catalog or shared demo trips.
+    Native My Wallet passes tenant_id because Host is localhost.
     """
     from travel_platform.operations.tenant_trip_catalog_store import list_tenant_trips
 
-    effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
-    if effective_host and "," in effective_host:
-        effective_host = effective_host.split(",")[0].strip()
-    if effective_host and ":" in effective_host:
-        effective_host = effective_host.split(":")[0].strip()
-
-    tenant_id: str | None = None
-    if effective_host:
+    resolved_tid: str | None = (tenant_id or "").strip() or None
+    if resolved_tid:
         try:
-            from app.core.database import AsyncSessionLocal
-            from olympus.tenant.domain_resolver import DomainResolver
+            from uuid import UUID
 
-            async with AsyncSessionLocal() as session:
-                resolved = await DomainResolver(session).resolve(effective_host)
-                if resolved:
-                    tenant_id = str(resolved.tenant_id)
+            UUID(resolved_tid)
         except Exception:
-            logger.exception("public trips resolve failed for host=%s", effective_host)
-            tenant_id = None
+            resolved_tid = None
 
-    if not tenant_id:
+    if not resolved_tid:
+        effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
+        if effective_host and "," in effective_host:
+            effective_host = effective_host.split(",")[0].strip()
+        if effective_host and ":" in effective_host:
+            effective_host = effective_host.split(":")[0].strip()
+
+        if effective_host:
+            try:
+                from app.core.database import AsyncSessionLocal
+                from olympus.tenant.domain_resolver import DomainResolver
+
+                async with AsyncSessionLocal() as session:
+                    resolved = await DomainResolver(session).resolve(effective_host)
+                    if resolved:
+                        resolved_tid = str(resolved.tenant_id)
+            except Exception:
+                logger.exception("public trips resolve failed for host=%s", effective_host)
+                resolved_tid = None
+
+    if not resolved_tid:
         return []
 
-    rows = list_tenant_trips(tenant_id, published_only=True)
+    rows = list_tenant_trips(resolved_tid, published_only=True)
     return [PublicTripResponse(**row) for row in rows]

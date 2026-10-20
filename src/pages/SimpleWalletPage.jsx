@@ -34,9 +34,12 @@ import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
 import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
+import WalletOfficeExcursionsPanel from '../components/wallet/WalletOfficeExcursionsPanel.jsx';
+import WalletStartFeed from '../components/wallet/WalletStartFeed.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
-import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import { DEFAULT_SITE_APPEARANCE, fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import { fetchCustomerMe } from '../services/customerAuthApi.js';
 import {
   DEFAULT_OFFICE_MODULES,
   fetchOfficeModules,
@@ -47,15 +50,17 @@ import { useRentMobile, useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import {
   getWalletTenantId,
+  setWalletTenantId,
   WALLET_TENANT_CHANGED_EVENT,
 } from '../lib/wallet/walletTenantSeal.js';
+import { WALLET_TABS_BUILD_MARKER } from '../lib/wallet/walletBrandSplash.js';
 import '../styles/wallet-pass.css';
 
 const ALL_TABS = [
+  { id: 'start', label: 'Αρχική', icon: 'home' },
   { id: 'home', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
   { id: 'rentals', label: 'Rent', icon: 'directions_car', requiresRent: true },
-  { id: 'lost_found', label: 'Απωλ.', icon: 'support_agent' },
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
@@ -148,11 +153,26 @@ function WalletAuthenticatedApp() {
   const isMobile = useRentMobile();
   /** Narrow phones only — full-bleed PWA chrome. */
   const isPhone = useRentPhone();
-  const isDesktop = !isMobile;
-  const [activeTab, setActiveTab] = useState('home');
+  const nativeWalletEarly = isNativeApp();
+  // Native Capacitor: always phone chrome — never hide bottom cards on wide emulator.
+  const isDesktop = nativeWalletEarly ? false : !isMobile;
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const q = new URLSearchParams(location.search || '');
+      const tab = String(q.get('tab') || '').trim();
+      if (['start', 'home', 'bookings', 'rentals', 'lost_found', 'account'].includes(tab)) {
+        return tab;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'start';
+  });
+  // lost_found is opened from Εγώ — keep it as an in-page panel, not a dock tab.
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [brandLabel, setBrandLabel] = useState('My Wallet');
+  const [siteAppearance, setSiteAppearance] = useState(DEFAULT_SITE_APPEARANCE);
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   /** Sealed office UUID — drives logo/name fetch on native (Host=localhost). */
   const [sealedTenantId, setSealedTenantId] = useState(() => getWalletTenantId() || '');
@@ -252,14 +272,36 @@ function WalletAuthenticatedApp() {
     return () => window.removeEventListener(WALLET_TENANT_CHANGED_EVENT, syncSeal);
   }, []);
 
+  // Re-seal office from /auth/me when localStorage seal is missing (old sessions).
+  useEffect(() => {
+    if (sealedTenantId || !getCustomerToken()) return undefined;
+    let cancelled = false;
+    fetchCustomerMe()
+      .then((me) => {
+        if (cancelled) return;
+        const tid = String(me?.tenant_id || me?.tenantId || '').trim();
+        if (tid) {
+          setWalletTenantId(tid);
+          setSealedTenantId(tid);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [sealedTenantId]);
+
   useEffect(() => {
     let cancelled = false;
     fetchSiteAppearance(sealedTenantId ? { tenantId: sealedTenantId } : undefined)
       .then((data) => {
         if (cancelled) return;
+        setSiteAppearance(data || DEFAULT_SITE_APPEARANCE);
         const brand = resolveOfficeBrand(data || {});
         const name = brand.displayName || brand.name;
-        if (name) setBrandLabel(name);
+        // Prefer real office name — never keep generic Γραφείο / My Wallet when API sent one.
+        if (name && name !== 'Γραφείο') setBrandLabel(name);
+        else if (data?.footer_brand_name) setBrandLabel(String(data.footer_brand_name));
       })
       .catch(() => {});
     return () => {
@@ -282,12 +324,32 @@ function WalletAuthenticatedApp() {
   }, [sealedTenantId]);
 
   const nativeWallet = isNativeApp();
-  // One Wallet for buses + rentals — show Rent tab when the sealed office has Rent.
-  const rentAvailable = shouldShowRentStorefront(officeModules);
+  // One Wallet for buses + rentals — show Rent only when the sealed office paid for it.
+  // Capacitor localhost is a marketing host; pass nativeWallet so we never force Rent demo.
+  // Booking lookup lives under Κρατήσεις → «Εύρεση κράτησης» (not a dock tab).
+  const rentAvailable = shouldShowRentStorefront(officeModules, {
+    nativeWallet,
+    sealedTenant: Boolean(sealedTenantId),
+  });
   const tabs = useMemo(
-    () => ALL_TABS.filter((tab) => !tab.requiresRent || rentAvailable),
+    () => ALL_TABS.filter((tab) => !(tab.requiresRent && !rentAvailable)),
     [rentAvailable],
   );
+
+  // Native shell navigates with ?tab= — keep in-app content in sync.
+  useEffect(() => {
+    if (!nativeWallet) return;
+    try {
+      const q = new URLSearchParams(location.search || '');
+      const tab = String(q.get('tab') || 'start').trim();
+      if (['start', 'home', 'bookings', 'rentals', 'lost_found', 'account'].includes(tab)) {
+        setActiveTab(tab);
+        if (tab !== 'ticket') setSelectedBookingId(null);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [nativeWallet, location.search]);
 
   useEffect(() => {
     if (!rentAvailable && activeTab === 'rentals') {
@@ -383,6 +445,10 @@ function WalletAuthenticatedApp() {
   const switchTab = (id) => {
     setActiveTab(id);
     setSelectedBookingId(null);
+    if (nativeWalletEarly && id !== 'ticket') {
+      const q = id && id !== 'start' ? `?tab=${id}` : '';
+      navigate(`/wallet${q}`, { replace: true });
+    }
   };
 
   const homePass = (
@@ -434,7 +500,13 @@ function WalletAuthenticatedApp() {
           brandLabel={displayBrand}
           passengerName={displayPassenger}
           onOpenDetails={openTicket}
-          onBrowseTrips={nativeWallet ? undefined : () => navigate('/')}
+          onBrowseTrips={() => {
+            if (nativeWallet) {
+              switchTab('bookings');
+              return;
+            }
+            navigate('/');
+          }}
           onQrChange={handleQrChange}
           offline={usingOfflinePass}
         />
@@ -518,11 +590,13 @@ function WalletAuthenticatedApp() {
           )}
           <div className="wallet-topbar-brand">
             <OfficeBrandMark
-              className="h-8"
+              className="wallet-topbar-mark"
               variant="light"
               fallbackLabel={brandLabel || 'My Wallet'}
               asLink={false}
               refreshKey={sealedTenantId}
+              tenantId={sealedTenantId || undefined}
+              maxHeightPx={26}
             />
           </div>
           <button
@@ -559,6 +633,16 @@ function WalletAuthenticatedApp() {
         ) : null}
 
         <main className="wallet-main">
+        {activeTab === 'start' && !isTicketView ? (
+          <WalletStartFeed
+            appearance={siteAppearance}
+            officeName={brandLabel && brandLabel !== 'My Wallet' ? brandLabel : ''}
+            tenantId={sealedTenantId}
+            onOpenBookings={() => switchTab('bookings')}
+            onOpenTicket={() => switchTab('home')}
+          />
+        ) : null}
+
         {activeTab === 'home' && !isTicketView ? (
           isDesktop ? (
             <div className="wallet-desktop-home">
@@ -605,20 +689,22 @@ function WalletAuthenticatedApp() {
               <p className="wallet-panel-lead">
                 {bookings.length
                   ? `${bookings.length} κρατήσεις στο λογαριασμό σας`
-                  : 'Δεν υπάρχουν κρατήσεις ακόμα'}
+                  : 'Δεν υπάρχουν κρατήσεις ακόμα — επιλέξτε εκδρομή από κάτω'}
               </p>
 
               {bookings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-                  {nativeWallet ? (
-                    <Link to="/my-booking" className="wallet-btn wallet-btn-primary">
-                      Εύρεση κράτησης
-                    </Link>
-                  ) : (
-                    <Link to="/" className="wallet-btn wallet-btn-primary">
-                      Κράτηση εκδρομής
-                    </Link>
-                  )}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem',
+                    justifyContent: 'center',
+                    padding: '0.75rem 0 0.25rem',
+                  }}
+                >
+                  <Link to="/my-booking" className="wallet-btn wallet-btn-secondary">
+                    Εύρεση κράτησης
+                  </Link>
                 </div>
               ) : (
                 <div className={`wallet-list${isDesktop ? ' wallet-list--desktop' : ''}`}>
@@ -669,6 +755,13 @@ function WalletAuthenticatedApp() {
                 </div>
               )}
             </div>
+
+            {officeModules?.trips_enabled !== false ? (
+              <WalletOfficeExcursionsPanel
+                tenantId={sealedTenantId}
+                officeName={brandLabel && brandLabel !== 'My Wallet' ? brandLabel : ''}
+              />
+            ) : null}
           </div>
         )}
 
@@ -695,7 +788,22 @@ function WalletAuthenticatedApp() {
           </div>
         ) : null}
 
-        {activeTab === 'lost_found' && <LostFoundPanel bookings={bookings} />}
+        {activeTab === 'lost_found' && (
+          <div className="wallet-stack">
+            <button
+              type="button"
+              className="wallet-btn wallet-btn-ghost"
+              onClick={() => switchTab('account')}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                arrow_back
+              </span>
+              Πίσω στον λογαριασμό
+            </button>
+            <LostFoundPanel bookings={bookings} />
+          </div>
+        )}
 
         {activeTab === 'account' && (
           <div className="wallet-stack">
@@ -733,6 +841,25 @@ function WalletAuthenticatedApp() {
                 ))}
               </dl>
             </section>
+            <section className="wallet-panel">
+              <div className="wallet-panel-head">
+                <span className="wallet-panel-head-icon" aria-hidden>
+                  <span className="material-symbols-outlined">support_agent</span>
+                </span>
+                <div>
+                  <h2>Απωλεσθέντα</h2>
+                  <p>Δήλωση ή αναζήτηση αντικειμένων από τις διαδρομές σας.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="wallet-btn wallet-btn-primary wallet-btn-block"
+                data-pg-wallet={WALLET_TABS_BUILD_MARKER}
+                onClick={() => switchTab('lost_found')}
+              >
+                Άνοιγμα απωλεσθέντων
+              </button>
+            </section>
             <PushNotificationsPanel email={profile.email} />
             <CustomerSecurityPanel email={profile.email} authProvider={profile.provider} />
           </div>
@@ -753,8 +880,13 @@ function WalletAuthenticatedApp() {
         )}
         </main>
 
-        {!isDesktop && !isTicketView ? (
-          <nav className="wallet-nav" aria-label="My Wallet">
+        {/* Native: WalletNativeShell is the single full dock (all cards). Web/phone PWA keeps in-app nav. */}
+        {!nativeWallet && !isDesktop && !isTicketView ? (
+          <nav
+            className="wallet-nav"
+            aria-label="My Wallet"
+            style={{ gridTemplateColumns: `repeat(${Math.max(tabs.length, 1)}, 1fr)` }}
+          >
             {tabs.map((tab) => (
               <button
                 key={tab.id}

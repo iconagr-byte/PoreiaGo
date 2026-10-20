@@ -6,6 +6,7 @@ import TripExtrasEditor from './TripExtrasEditor.jsx';
 import UsersManagementPanel from './UsersManagementPanel.jsx';
 import BrandingPanel from './BrandingPanel.jsx';
 import HomepageSettingsPanel from './HomepageSettingsPanel.jsx';
+import WalletHomeSettingsPanel from './WalletHomeSettingsPanel.jsx';
 import PartnerWebhooksPanel from './PartnerWebhooksPanel.jsx';
 import GdprCompliancePanel from './GdprCompliancePanel.jsx';
 import LoginAuditPanel from './LoginAuditPanel.jsx';
@@ -80,6 +81,7 @@ export default function SettingsTabPanels({
   if (tab === 'compliance') return <GdprCompliancePanel />;
   if (tab === 'logins') return <LoginAuditPanel />;
   if (tab === 'homepage') return <HomepageSettingsPanel />;
+  if (tab === 'wallet_home') return <WalletHomeSettingsPanel />;
   // Domain της προσωπικής σελίδας γραφείου — όχι κάτω από platform Growth.
   if (tab === 'domain') return <BrandingPanel />;
   if (tab === 'growth') {

@@ -1,4 +1,4 @@
-import { API_BASE } from '../config/api.js';
+import { API_BASE, getApiBase } from '../config/api.js';
 import { adminBearerHeaders, adminFetch } from './adminApi.js';
 import { getSaasToken, saasFetch } from './saasApi.js';
 import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
@@ -16,10 +16,11 @@ function appearanceStorageKey() {
   return officeStorageKey(STORAGE_KEY_BASE);
 }
 
-function finalizeAppearance(data = {}) {
+function finalizeAppearance(data = {}, opts = {}) {
   const merged = scrubSiteAppearancePlaceholders({ ...DEFAULT_SITE_APPEARANCE, ...data });
   // Scrubs Achillio Travel only on PoreiaGo marketing host or platform seed slug.
-  return scrubAchillioBrandForPlatformHost(merged);
+  // Native Wallet passes skipScrub so sealed-office branding is never wiped on localhost.
+  return scrubAchillioBrandForPlatformHost(merged, opts);
 }
 
 export const DEFAULT_SITE_APPEARANCE = {
@@ -102,6 +103,30 @@ export const DEFAULT_SITE_APPEARANCE = {
   rent_slider_options: {},
   rent_slider_slides: [],
   ...HOMEPAGE_LAYOUT_DEFAULTS,
+  wallet_home_hook: '',
+  wallet_home_headline: '',
+  wallet_home_body: '',
+  wallet_home_image_url: '',
+  wallet_home_services: [
+    {
+      icon: 'confirmation_number',
+      title: 'Online κράτηση',
+      body: 'Κλείστε θέση σε λίγα βήματα από το κινητό.',
+    },
+    {
+      icon: 'qr_code_2',
+      title: 'Ψηφιακό εισιτήριο',
+      body: 'Το εισιτήριό σας πάντα στο Wallet.',
+    },
+    {
+      icon: 'support_agent',
+      title: 'Υποστήριξη γραφείου',
+      body: 'Είμαστε δίπλα σας πριν και κατά το ταξίδι.',
+    },
+  ],
+  wallet_home_news: [],
+  wallet_home_show_trips: true,
+  wallet_home_trips_title: 'Επερχόμενες εκδρομές',
   updated_at: null,
 };
 
@@ -153,7 +178,9 @@ export function resolveSiteAssetUrl(url) {
     return url;
   }
   if (url.startsWith('/api/')) {
-    return API_BASE ? `${API_BASE}${url}` : url;
+    // Prefer live getApiBase() — static API_BASE can be empty before Capacitor boots.
+    const base = String(getApiBase() || API_BASE || '').replace(/\/$/, '');
+    return base ? `${base}${url}` : url;
   }
   return url;
 }
@@ -195,17 +222,19 @@ export async function fetchSiteAppearance(
     if (tenantId) qs.set('tenant_id', tenantId);
     else if (host) qs.set('host', host);
     const q = qs.toString() ? `?${qs}` : '';
-    const res = await fetch(`${API_BASE}/api/site/appearance${q}`);
+    const base = String(getApiBase() || API_BASE || '').replace(/\/$/, '');
+    const res = await fetch(`${base}/api/site/appearance${q}`);
     if (res.ok) {
       const data = await res.json();
-      const merged = finalizeAppearance(data);
+      // Sealed tenant_id = real office (native Capacitor) — never scrub logo/name.
+      const merged = finalizeAppearance(data, { skipScrub: Boolean(tenantId) });
       cacheLocally(merged);
       return merged;
     }
   } catch {
     /* offline */
   }
-  return loadCached() || finalizeAppearance({});
+  return loadCached() || finalizeAppearance({}, { skipScrub: Boolean(tenantId) });
 }
 
 /** Admin panel — SaaS Postgres when JWT present, else file store. */

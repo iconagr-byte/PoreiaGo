@@ -60,13 +60,18 @@ export default function OfficeBrandMark({
   fallbackLabel = 'Γραφείο',
   refreshKey = 0,
   preferAdmin = false,
+  /** Native Wallet: sealed office UUID (Host is localhost). */
+  tenantId = '',
   /** Optional minimum height for admin sidebar / drawers (px). */
   minHeightPx,
+  /** Cap logo height (e.g. discreet Wallet topbar). */
+  maxHeightPx,
 }) {
   const [appearance, setAppearance] = useState({});
   const [brand, setBrand] = useState(() => resolveOfficeBrand({}));
   const [imgBroken, setImgBroken] = useState(false);
   const isDark = variant === 'dark';
+  const sealedTenant = String(tenantId || '').trim();
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +82,9 @@ export default function OfficeBrandMark({
       setImgBroken(false);
     };
     const load = () => {
-      const loader = preferAdmin ? fetchAdminSiteAppearance() : fetchSiteAppearance();
+      const loader = preferAdmin
+        ? fetchAdminSiteAppearance()
+        : fetchSiteAppearance(sealedTenant ? { tenantId: sealedTenant } : undefined);
       loader
         .then((data) => {
           if (cancelled) return;
@@ -111,17 +118,40 @@ export default function OfficeBrandMark({
       window.removeEventListener(OFFICE_BRAND_CHANGED_EVENT, onChanged);
       window.removeEventListener(WALLET_TENANT_CHANGED_EVENT, onWalletTenant);
     };
-  }, [refreshKey, preferAdmin]);
+  }, [refreshKey, preferAdmin, sealedTenant]);
 
   const logoSrc = !imgBroken && brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();
-  const label = brand.displayName || brand.name || fallbackLabel || (onTenant ? 'Γραφείο' : 'PoreiaGo');
-  const resolvedHeight =
+  // Prefer a real office name from props over generic resolveOfficeBrand fallback «Γραφείο».
+  const resolvedName = brand.displayName || (brand.name !== 'Γραφείο' ? brand.name : '');
+  const label =
+    resolvedName ||
+    (fallbackLabel && fallbackLabel !== 'Γραφείο' ? fallbackLabel : '') ||
+    brand.name ||
+    (onTenant ? 'Γραφείο' : 'PoreiaGo');
+  let resolvedHeight =
     minHeightPx != null
       ? Math.max(clampLogoHeight(appearance.logo_height_px), clampLogoHeight(minHeightPx))
       : undefined;
+  if (maxHeightPx != null) {
+    const cap = clampLogoHeight(maxHeightPx);
+    const base =
+      resolvedHeight != null
+        ? resolvedHeight
+        : clampLogoHeight(appearance.logo_height_px);
+    resolvedHeight = Math.min(base, cap);
+  }
   const logoStyle = officeLogoImageStyle(
-    resolvedHeight != null ? { ...appearance, logo_height_px: resolvedHeight } : appearance,
+    resolvedHeight != null
+      ? {
+          ...appearance,
+          logo_height_px: resolvedHeight,
+          logo_max_width_px: Math.min(
+            Number(appearance.logo_max_width_px) || 180,
+            Math.round(resolvedHeight * 3.2),
+          ),
+        }
+      : appearance,
   );
 
   const inner = logoSrc ? (

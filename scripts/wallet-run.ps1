@@ -6,8 +6,8 @@
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  # Default main so splash + Google fixes are never wiped by an old feature branch.
-  [string]$Branch = "main"
+  # Apple splash + login gate fix - rebuild must not wipe back to a branch without splash.
+  [string]$Branch = "cursor/wallet-splash-apple-5ffb"
 )
 
 $ErrorActionPreference = "Stop"
@@ -181,6 +181,39 @@ if (-not $walletHit) {
 }
 Write-Host "OK: My Wallet assets present" -ForegroundColor Green
 
+# ASCII-only markers (Windows PowerShell 5.1 breaks on Greek inside .ps1 strings).
+$splashJs = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "pg_wallet_apple_splash_v2" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+$splashHtml = Select-String -Path (Join-Path $assetsPublic "index.html") -Pattern "pg-wallet-boot-splash" -ErrorAction SilentlyContinue
+if (-not $splashJs -or -not $splashHtml) {
+  throw "Brand splash missing from android assets - wrong branch (need WalletBrandSplash + HTML boot splash)"
+}
+Write-Host "OK: PoreiaGo brand splash present in packaged assets" -ForegroundColor Green
+
+# Fail loud if stale Qatar splash CSS snuck into the APK (serif Source Serif era).
+$staleSerif = Get-ChildItem -Path $assetsPublic -Recurse -Include *.css,*.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "Source Serif" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+if ($staleSerif) {
+  throw "STALE Qatar splash still in assets - wrong branch (main). Re-run with -Branch cursor/wallet-splash-apple-5ffb"
+}
+Write-Host "OK: stale Qatar splash copy absent" -ForegroundColor Green
+Write-Host ""
+Write-Host ">>> Splash in THIS APK: Apple hook + sans (pg_wallet_apple_splash_v2)" -ForegroundColor Magenta
+Write-Host ""
+
+$tabsHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "pg_wallet_tabs_lostfound_in_account_v1" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+$tabsDock = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
+  Select-String -Pattern "requiresRent" -SimpleMatch -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+if (-not $tabsHit -or -not $tabsDock) {
+  throw "Full wallet tabs missing - need dock + lost-found inside account marker"
+}
+Write-Host "OK: Full wallet tab cards present (lost-found inside account)" -ForegroundColor Green
+
 $googleHit = Get-ChildItem -Path $assetsPublic -Recurse -Include *.js -ErrorAction SilentlyContinue |
   Select-String -Pattern "Google" -SimpleMatch -ErrorAction SilentlyContinue |
   Select-Object -First 1
@@ -333,14 +366,14 @@ if (-not $online) {
 Write-Host "==> wipe old app + reinstall (user 0)" -ForegroundColor Cyan
 # adb writes "Failed" to stderr when the package is already gone; with
 # ErrorActionPreference=Stop that becomes a terminating NativeCommandError.
-# Uninstall already removes app data — do not pm clear after uninstall.
+# Uninstall already removes app data - do not pm clear after uninstall.
 $prevEap = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 & $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
 & $adb uninstall --user 0 com.poreiago.wallet 2>$null | Out-Null
 & $adb uninstall com.poreiago.wallet 2>$null | Out-Null
 $ErrorActionPreference = $prevEap
-# Fresh install for user 0 — avoids Error type 3 on API 36/37 when a stale
+# Fresh install for user 0 - avoids Error type 3 on API 36/37 when a stale
 # Studio deploy left a package with no launcher activities.
 & $adb install -r -t --user 0 $apk
 if ($LASTEXITCODE -ne 0) {

@@ -75,6 +75,7 @@ export const RENT_ONLY_RENT_NAV_ORDER = [...RENT_DESK_NAV_IDS];
 export const RENT_ONLY_SETTINGS_NAV_ORDER = [
   'settings_platform',
   'settings_homepage',
+  'settings_wallet_home',
   'settings_domain',
   'settings_payments',
   'settings_fiscal',

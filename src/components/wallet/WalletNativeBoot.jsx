@@ -35,10 +35,9 @@ export default function WalletNativeBoot() {
 
   useEffect(() => {
     if (!native) return;
+    // Keep the wallet shell mark for the whole session — do not clear on
+    // StrictMode remount or route changes (that used to skip the splash gate).
     document.documentElement.dataset.poreiagoApp = 'wallet';
-    return () => {
-      delete document.documentElement.dataset.poreiagoApp;
-    };
   }, [native]);
 
   useEffect(() => {
