@@ -1,4 +1,4 @@
-﻿# Install already-built PoreiaGo Wallet APK onto a running emulator.
+# Install already-built PoreiaGo Wallet APK onto a running emulator.
 # Usage (ONE line):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-install.ps1
 
@@ -15,17 +15,23 @@ if (-not (Test-Path -LiteralPath $apk)) {
 }
 
 & $adb start-server
-Write-Host "==> waiting for emulator device..." -ForegroundColor Cyan
+Write-Host "==> waiting for emulator/USB device (up to 3 min)..." -ForegroundColor Cyan
 $deadline = (Get-Date).AddMinutes(3)
 $online = $null
+$emptyHintShown = $false
 while ((Get-Date) -lt $deadline) {
   & $adb devices | Out-Host
   $online = & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
   if ($online) { break }
+  if (-not $emptyHintShown) {
+    Write-Host "NO DEVICE yet. Device Manager -> Play (home screen), or USB phone + debugging." -ForegroundColor Yellow
+    Write-Host "Or: powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Yellow
+    $emptyHintShown = $true
+  }
   Start-Sleep -Seconds 3
 }
 if (-not $online) {
-  throw "No emulator online. Device Manager -> Play on Medium Phone, wait for home screen, rerun this script."
+  throw "No emulator/phone online. Device Manager -> Play on Medium Phone, wait for home screen, then: wallet-boot-and-install.ps1"
 }
 
 Write-Host "==> install + launch" -ForegroundColor Cyan

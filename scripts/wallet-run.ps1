@@ -1,13 +1,22 @@
-# PoreiaGo Wallet - build + install on running emulator
-# Usage:
+# PoreiaGo Wallet - build + install on emulator/USB device
+# Usage (from repo root; ALWAYS pull main first if this file is stale):
+#   cd C:\Users\User\poreiago
+#   git fetch origin main; git checkout main; git pull origin main
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
+# Optional:
+#   -Branch main          (default; do NOT use old feature branches)
+#   -WaitMinutes 5        (adb device wait timeout; default 3)
+#   -StartEmulator        (auto-start first AVD if adb devices is empty)
 # ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.
 
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  # Default main so splash + Google fixes are never wiped by an old feature branch.
-  [string]$Branch = "main"
+  # Always default to main (v1.0.10+). Old hardcode cursor/wallet-splash-apple-5ffb
+  # produced stale APKs (v1.0.9) missing recent Wallet UI fixes (tabs / multi-ticket).
+  [string]$Branch = "main",
+  [double]$WaitMinutes = 3,
+  [switch]$StartEmulator
 )
 
 $ErrorActionPreference = "Stop"
@@ -125,6 +134,14 @@ Write-Host ("ANDROID_HOME=" + $env:ANDROID_HOME)
 $sdkSlash = $Sdk -replace '\\', '/'
 Set-Content -Path (Join-Path $repo "android\local.properties") -Value ("sdk.dir=" + $sdkSlash) -Encoding ASCII
 
+if ($Branch -ne "main") {
+  Write-Host ("WARNING: -Branch is '" + $Branch + "' (not main).") -ForegroundColor Yellow
+  Write-Host "You will get an OLD Wallet build. Prefer: -Branch main (default)." -ForegroundColor Yellow
+  if ($Branch -match 'wallet-splash-apple') {
+    Write-Host "cursor/wallet-splash-apple-5ffb is obsolete (v1.0.9). Use main (v1.0.10+)." -ForegroundColor Red
+  }
+}
+
 Write-Host ("==> git fetch/reset (" + $Branch + ")") -ForegroundColor Cyan
 git fetch origin $Branch
 if ($LASTEXITCODE -ne 0) { throw ("git fetch failed for " + $Branch) }
@@ -134,6 +151,7 @@ git reset --hard ("origin/" + $Branch)
 if ($LASTEXITCODE -ne 0) { throw ("git reset --hard failed for origin/" + $Branch) }
 git clean -fd -e android/local.properties -e android/.gradle -e node_modules
 git log -1 --oneline
+Write-Host ("OK: building from origin/" + $Branch) -ForegroundColor Green
 
 $staleDirs = @(
   (Join-Path $repo "dist"),
@@ -317,30 +335,75 @@ if ($debugSha) {
 }
 
 & $adb start-server
-Write-Host "==> waiting for emulator (home screen / adb device)" -ForegroundColor Cyan
-$deadline = (Get-Date).AddMinutes(3)
+$emu = Join-Path $Sdk "emulator\emulator.exe"
+
+function Get-OnlineAdbDevice {
+  return @(
+    & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
+  )
+}
+
+$online = Get-OnlineAdbDevice
+if (-not $online -or $online.Count -eq 0) {
+  Write-Host ""
+  Write-Host "NO DEVICE: adb devices is empty." -ForegroundColor Yellow
+  Write-Host "  1) Android Studio -> Device Manager -> Play on an AVD (e.g. Medium Phone)" -ForegroundColor Yellow
+  Write-Host "  2) OR plug a phone with USB debugging ON (Developer options)" -ForegroundColor Yellow
+  Write-Host "  3) OR: powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Yellow
+  Write-Host ("APK ready at: " + $apk) -ForegroundColor DarkYellow
+  Write-Host ""
+
+  if ($StartEmulator -and (Test-Path -LiteralPath $emu)) {
+    $avds = @(& $emu -list-avds 2>$null | Where-Object { $_.Trim() -ne "" })
+    if ($avds -and $avds.Count -gt 0) {
+      Write-Host ("==> -StartEmulator: launching AVD " + $avds[0]) -ForegroundColor Cyan
+      Start-Process -FilePath $emu -ArgumentList @("-avd", $avds[0], "-netdelay", "none", "-netspeed", "full")
+    } else {
+      Write-Host "No AVDs found to auto-start. Create one in Device Manager." -ForegroundColor Yellow
+    }
+  }
+}
+
+$waitMins = $WaitMinutes
+if ($waitMins -lt 0.5) { $waitMins = 0.5 }
+Write-Host ("==> waiting for adb device (up to " + $waitMins + " min)...") -ForegroundColor Cyan
+$deadline = (Get-Date).AddMinutes($waitMins)
 $online = $null
+$emptyHintShown = $false
 while ((Get-Date) -lt $deadline) {
-  & $adb devices | Out-Host
-  $online = & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
-  if ($online) { break }
+  $devs = & $adb devices
+  $devs | Out-Host
+  $online = @(
+    $devs | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
+  )
+  if ($online -and $online.Count -gt 0) { break }
+  if (-not $emptyHintShown) {
+    Write-Host "Still empty - leave this window open, start the emulator, wait for home screen..." -ForegroundColor DarkYellow
+    $emptyHintShown = $true
+  }
   Start-Sleep -Seconds 3
 }
-if (-not $online) {
-  throw ("Emulator not online. Open Medium Phone, wait for home screen, then rerun OR: adb install -r `"$apk`"")
+if (-not $online -or $online.Count -eq 0) {
+  Write-Host ""
+  Write-Host "Timed out: no emulator/phone in 'adb devices'." -ForegroundColor Red
+  Write-Host "APK was built OK. Install later with either:" -ForegroundColor Yellow
+  Write-Host ("  adb install -r `"$apk`"") -ForegroundColor Cyan
+  Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Cyan
+  Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -StartEmulator" -ForegroundColor Cyan
+  throw "No adb device online after build. Start AVD / USB phone, then install (commands above)."
 }
 
 Write-Host "==> wipe old app + reinstall (user 0)" -ForegroundColor Cyan
 # adb writes "Failed" to stderr when the package is already gone; with
 # ErrorActionPreference=Stop that becomes a terminating NativeCommandError.
-# Uninstall already removes app data — do not pm clear after uninstall.
+# Uninstall already removes app data - do not pm clear after uninstall.
 $prevEap = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 & $adb shell am force-stop com.poreiago.wallet 2>$null | Out-Null
 & $adb uninstall --user 0 com.poreiago.wallet 2>$null | Out-Null
 & $adb uninstall com.poreiago.wallet 2>$null | Out-Null
 $ErrorActionPreference = $prevEap
-# Fresh install for user 0 — avoids Error type 3 on API 36/37 when a stale
+# Fresh install for user 0 - avoids Error type 3 on API 36/37 when a stale
 # Studio deploy left a package with no launcher activities.
 & $adb install -r -t --user 0 $apk
 if ($LASTEXITCODE -ne 0) {

@@ -32,9 +32,15 @@ No office picker. No “scan QR to find office” as the main path.
 
 Rebuild native whenever Wallet UI/nav changes land on `main` (e.g. remove Κράτηση tab, multi-ticket stack, PWA v4). Stale `android/app/src/main/assets/public` is gitignored — only a fresh `npm run build` + `npx cap sync android` (or `wallet-run.ps1`) picks up the new WebView bundle. Current packaged app version: **1.0.10** (`versionCode` 10).
 
-1. **Κλείσε** Android Studio τελείως.
-2. Άνοιξε emulator (home screen).
-3. Στο **PowerShell**:
+**Always build from `main`.** Do not use old feature branches (e.g. `cursor/wallet-splash-apple-5ffb` = stale v1.0.9). `wallet-run.ps1` defaults to `-Branch main`.
+
+### Steps (PowerShell)
+
+1. **Close** Android Studio (optional but avoids Gradle fights).
+2. **Start a device first** (or the script will wait / fail with a clear message):
+   - Android Studio → **Device Manager** → Play on an AVD (e.g. Medium Phone) → wait until you see the **home screen**, **or**
+   - Plug a phone with **USB debugging** on (Developer options → USB debugging), accept the RSA prompt.
+3. Pull `main` and run the script:
 
 ```powershell
 cd C:\Users\User\poreiago
@@ -44,7 +50,32 @@ git pull origin main
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 ```
 
-Το script: `git reset` στο `main` (default) → καθαρίζει `dist`/assets → `npm build` + `cap sync` → Gradle → uninstall παλιά app → install νέα.
+Optional flags:
+
+```powershell
+# Auto-start first AVD if adb devices is empty
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -StartEmulator
+
+# Longer wait (minutes) for slow cold boots
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -WaitMinutes 5
+```
+
+What the script does: `git reset` to **`main`** (default) → wipe stale `dist`/assets → `npm install` + `cap:sync:packaged` → Gradle `assembleDebug` → uninstall old app → install new APK → launch.
+
+### If build succeeds but install hangs / “waiting for emulator”
+
+`adb devices` is empty — nothing to install onto.
+
+```powershell
+# Check
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
+
+# Start AVD + install already-built APK
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
+
+# Or install manually after Device Manager Play + home screen
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r .\android\app\build\outputs\apk\debug\app-debug.apk
+```
 
 ### Linux / CI (assets only — no APK without Android SDK)
 
