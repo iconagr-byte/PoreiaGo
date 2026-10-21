@@ -261,7 +261,8 @@
 
 /* —— Classic Apple Wallet vertical stack (phone + desktop) ——
  * Back passes: header strip only (~64–88px). Front pass expands with QR.
- * Tap a peek header to bring that pass to the front. */
+ * Phone/native: scroll-snap unfurl (scroll drives expand/collapse).
+ * Desktop: tap a peek header to bring that pass to the front. */
 .wallet-pass--vstack {
   max-width: min(26.5rem, 100%);
   margin-inline: auto;
@@ -289,18 +290,104 @@
   padding-bottom: 0.35rem;
 }
 
+/* Phone / native: dedicated snap scroller so passes unfurl with scroll. */
+.wallet-pass-vstack--unfurl {
+  --wallet-unfurl-max: calc(100dvh - 10.75rem);
+  max-height: var(--wallet-unfurl-max);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-snap-type: y mandatory;
+  scroll-padding-top: 0.2rem;
+  scroll-padding-bottom: 1.75rem;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 1.5rem;
+  scrollbar-width: none;
+  touch-action: pan-y;
+}
+
+.wallet-pass-vstack--unfurl::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.wallet-pass--vstack-native .wallet-pass-vstack--unfurl {
+  /* Extra room under Capacitor safe areas + tab bar */
+  --wallet-unfurl-max: calc(100dvh - 11.5rem - env(safe-area-inset-bottom, 0px));
+}
+
 .wallet-pass-vstack-slot {
   position: relative;
   width: 100%;
   transition:
     transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.3s ease;
+    filter 0.3s ease,
+    margin 0.32s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
 .wallet-pass-vstack-slot + .wallet-pass-vstack-slot {
   /* Slight tuck — Apple Wallet layered depth between header strips */
   margin-top: -0.65rem;
+}
+
+.wallet-pass-vstack--unfurl .wallet-pass-vstack-slot {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  flex-shrink: 0;
+}
+
+.wallet-pass-vstack--unfurl .wallet-pass-vstack-slot + .wallet-pass-vstack-slot {
+  /* Slightly less tuck so snap targets stay reachable while scrolling */
+  margin-top: -0.4rem;
+}
+
+.wallet-pass-vstack--unfurl .wallet-pass-vstack-slot.is-front {
+  /* Keep QR fully in the snap viewport before the next peek */
+  padding-bottom: 0.35rem;
+  margin-bottom: 0.15rem;
+}
+
+/* Trailing space so the last pass can snap up into the “front” band. */
+.wallet-pass-vstack-unfurl-end {
+  flex-shrink: 0;
+  height: max(10rem, calc(var(--wallet-unfurl-max, 70dvh) - 18rem));
+  min-height: 8rem;
+  pointer-events: none;
+}
+
+.wallet-pass-vstack--unfurl .wallet-pass-vstack-slot.is-peek .wallet-pass-card {
+  transition:
+    height 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s ease,
+    border-radius 0.3s ease;
+}
+
+.wallet-pass-vstack--unfurl .wallet-pass-vstack-slot.is-front .wallet-pass-card {
+  animation: wallet-pass-unfurl-in 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes wallet-pass-unfurl-in {
+  from {
+    transform: translateY(6px);
+    opacity: 0.92;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-pass-vstack--unfurl {
+    scroll-snap-type: y proximity;
+  }
+
+  .wallet-pass-vstack--unfurl .wallet-pass-vstack-slot.is-front .wallet-pass-card {
+    animation: none;
+  }
 }
 
 .wallet-pass-vstack-slot.is-peek {

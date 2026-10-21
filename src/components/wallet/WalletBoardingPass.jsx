@@ -2,12 +2,12 @@
  * My Wallet home — boarding pass(es). Multi-seat bookings get one QR per traveler
  * (airline-style), still under a single booker wallet account.
  *
- * Phone / native / desktop: classic Apple Wallet vertical stack —
- * back passes show only a header peek; tap to bring that pass to the front
- * (expands QR + actions). Tickets stay chronological — earliest departure first
- * (see expandWalletTickets sort).
+ * Classic Apple Wallet vertical stack: back passes show only a header peek.
+ * Phone / native: scroll-snap unfurl — scroll drives which pass is expanded
+ * (QR + actions); tap a peek still jumps to that pass. Desktop: tap-to-front.
+ * Tickets stay chronological — earliest departure first (expandWalletTickets).
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import TicketQrCode from '../TicketQrCode.jsx';
 import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
@@ -15,6 +15,7 @@ import WalletDeviceSave from './WalletDeviceSave.jsx';
 import { isPaid, statusStyle } from '../../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../../lib/fiscal/fiscalDisplay.js';
 import { expandWalletTickets } from '../../lib/ticketing/bookingPassengers.js';
+import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
 function formatTripWhen(booking) {
   const date = booking?.date || '—';
@@ -271,6 +272,7 @@ export default function WalletBoardingPass({
   tripImageFor,
 }) {
   const isDesktop = layout === 'desktop';
+  const nativeApp = isNativeApp();
   const ticketList = useMemo(() => {
     const sources =
       Array.isArray(bookings) && bookings.length > 0
@@ -297,6 +299,83 @@ export default function WalletBoardingPass({
     const next = ticketList[index];
     if (next) setActiveKey(next.key);
   };
+
+  const multi = ticketList.length > 1;
+  /** Phone + native: scroll-driven expand/collapse. Desktop keeps tap stack. */
+  const scrollUnfurl = multi && !isDesktop;
+  const unfurlRef = useRef(null);
+  const slotRefs = useRef([]);
+  const skipScrollSync = useRef(false);
+
+  const scrollSlotIntoUnfurl = (index, behavior = 'smooth') => {
+    const root = unfurlRef.current;
+    const el = slotRefs.current[index];
+    if (!root || !el) return;
+    const rootRect = root.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const nextTop = root.scrollTop + (elRect.top - rootRect.top);
+    root.scrollTo({ top: Math.max(0, nextTop), behavior });
+  };
+
+  const selectPass = (index, { scroll = true } = {}) => {
+    setActiveIndex(index);
+    if (!scrollUnfurl || !scroll) return;
+    skipScrollSync.current = true;
+    scrollSlotIntoUnfurl(index, 'smooth');
+    window.setTimeout(() => {
+      skipScrollSync.current = false;
+    }, 420);
+  };
+
+  // Scroll-snap + IntersectionObserver → active pass (Apple Wallet unfurl feel).
+  useEffect(() => {
+    if (!scrollUnfurl) return undefined;
+    const root = unfurlRef.current;
+    if (!root) return undefined;
+
+    const ratios = new Map();
+    const pickFront = () => {
+      if (skipScrollSync.current) return;
+      let best = -1;
+      let bestRatio = 0.28;
+      ratios.forEach((ratio, index) => {
+        if (ratio >= bestRatio) {
+          bestRatio = ratio;
+          best = index;
+        }
+      });
+      if (best < 0) return;
+      const next = ticketList[best];
+      if (next) setActiveKey(next.key);
+    };
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const raw = entry.target.getAttribute('data-unfurl-index');
+          const index = Number(raw);
+          if (!Number.isFinite(index)) continue;
+          ratios.set(index, entry.isIntersecting ? entry.intersectionRatio : 0);
+        }
+        pickFront();
+      },
+      {
+        root,
+        // Bias toward the upper band of the stack viewport (selected pass sits up top).
+        rootMargin: '0px 0px -42% 0px',
+        threshold: [0.2, 0.35, 0.5, 0.65, 0.8, 1],
+      },
+    );
+
+    slotRefs.current.forEach((el) => {
+      if (el) io.observe(el);
+    });
+
+    // Land on the first (earliest) pass without animating.
+    root.scrollTo({ top: 0, behavior: 'auto' });
+
+    return () => io.disconnect();
+  }, [scrollUnfurl, ticketSignature, ticketList]);
 
   if (!ticketList.length) {
     const trips = Array.isArray(featuredTrips) ? featuredTrips.slice(0, 3) : [];
@@ -360,17 +439,33 @@ export default function WalletBoardingPass({
     );
   }
 
-  const multi = ticketList.length > 1;
   const front = ticketList[Math.min(activeIndex, ticketList.length - 1)] || ticketList[0];
 
-  // Multi-ticket: classic Apple Wallet vertical stack (phone + desktop)
+  // Multi-ticket: Apple Wallet vertical stack
+  // Phone/native — scroll-snap unfurl; desktop — tap-to-front.
   if (multi) {
     return (
-      <section className="wallet-pass wallet-pass--vstack" aria-label="Εισιτήρια επιβίβασης">
+      <section
+        className={[
+          'wallet-pass',
+          'wallet-pass--vstack',
+          scrollUnfurl ? 'wallet-pass--vstack-scroll' : '',
+          nativeApp ? 'wallet-pass--vstack-native' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        aria-label="Εισιτήρια επιβίβασης"
+      >
         <p className="wallet-pass-vstack-hint" role="status">
-          {ticketList.length} εισιτήρια · πατήστε μία κεφαλίδα για να έρθει μπροστά
+          {scrollUnfurl
+            ? `${ticketList.length} εισιτήρια · κυλήστε για άνοιγμα · πατήστε κεφαλίδα`
+            : `${ticketList.length} εισιτήρια · πατήστε μία κεφαλίδα για να έρθει μπροστά`}
         </p>
-        <div className="wallet-pass-vstack" style={{ '--wallet-stack-count': ticketList.length }}>
+        <div
+          ref={scrollUnfurl ? unfurlRef : undefined}
+          className={`wallet-pass-vstack${scrollUnfurl ? ' wallet-pass-vstack--unfurl' : ''}`}
+          style={{ '--wallet-stack-count': ticketList.length }}
+        >
           {ticketList.map((ticket, index) => {
             const paid = isPaid(ticket.booking);
             const st = statusStyle(ticket.booking);
@@ -387,6 +482,10 @@ export default function WalletBoardingPass({
             return (
               <div
                 key={ticket.key}
+                ref={(el) => {
+                  slotRefs.current[index] = el;
+                }}
+                data-unfurl-index={index}
                 className={`wallet-pass-vstack-slot${isFront ? ' is-front' : ' is-peek'}`}
                 style={{ zIndex: z }}
               >
@@ -406,13 +505,16 @@ export default function WalletBoardingPass({
                   showQr={isFront}
                   compactHeader
                   isFront={isFront}
-                  onSelect={() => setActiveIndex(index)}
+                  onSelect={() => selectPass(index)}
                   stackIndex={index}
                   stackTotal={ticketList.length}
                 />
               </div>
             );
           })}
+          {scrollUnfurl ? (
+            <div className="wallet-pass-vstack-unfurl-end" aria-hidden />
+          ) : null}
         </div>
       </section>
     );
