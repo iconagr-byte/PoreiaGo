@@ -52,14 +52,14 @@ import {
 } from '../lib/wallet/walletTenantSeal.js';
 import '../styles/wallet-pass.css';
 
-/** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · Κράτηση · Εγώ.
+/** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · Εγώ.
  * Desktop → left sidebar; phone → bottom dock.
+ * Lookup/book stays on home CTAs + /my-booking links (not a primary tab).
  * Rent + Lost & Found live under Εγώ (not primary tabs). */
 const ALL_TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
   { id: 'pass', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
-  { id: 'lookup', label: 'Κράτηση', icon: 'search', route: '/my-booking' },
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
