@@ -8,9 +8,11 @@ import { getSaasTenantId, getSaasToken } from './saasApi.js';
  *
  * When Back Office runs on a marketing host (poreiago.com) but the JWT is an
  * office session, send Bearer + tenant_id so hydrate can merge storefront seeds
- * into Διαχείριση Εκδρομών (API ignores tenant_id unless JWT matches).
+ * into Διαχείριση Εκδρομών.
  *
- * Native / sealed Wallet: pass `{ tenantId }` (Host is localhost).
+ * Native / sealed Wallet: pass `{ tenantId }` (Host may be localhost or a
+ * broken proxy Host). Always also send browser `host` when available so
+ * DomainResolver still works if tenant_id is missing.
  *
  * @param {string | { host?: string, tenantId?: string }} [hostOrOpts]
  */
@@ -28,15 +30,10 @@ export async function fetchPublicOfficeTrips(hostOrOpts) {
   if (!tenantId) {
     try {
       const { getWalletTenantId } = await import('../lib/wallet/walletTenantSeal.js');
-      const { isNativeApp } = await import('../lib/capacitor/isNativeApp.js');
-      const { isPlatformMarketingHost } = await import('../lib/platform/tenantHost.js');
       const sealed = getWalletTenantId();
-      const hostOnly = String(effectiveHost || '')
-        .split(':')[0]
-        .toLowerCase();
-      if (sealed && (isNativeApp() || isPlatformMarketingHost(hostOnly))) {
-        tenantId = sealed;
-      }
+      // Sealed My Wallet office — native localhost, marketing host, or
+      // desktop on the office domain (Achillio). Published catalog only.
+      if (sealed) tenantId = sealed;
     } catch {
       /* ignore */
     }
@@ -49,8 +46,11 @@ export async function fetchPublicOfficeTrips(hostOrOpts) {
 
   try {
     const params = new URLSearchParams();
+    // Prefer sealed tenant_id (API honors it for published catalogs).
+    // Always include browser host too — NPM often rewrites Request Host to
+    // 127.0.0.1, so ?host=www.achilliotravel.com is the reliable fallback.
     if (tenantId) params.set('tenant_id', tenantId);
-    else if (effectiveHost) params.set('host', effectiveHost);
+    if (effectiveHost) params.set('host', effectiveHost);
     const qs = params.toString() ? `?${params}` : '';
     const headers = {};
     const token = getSaasToken();
