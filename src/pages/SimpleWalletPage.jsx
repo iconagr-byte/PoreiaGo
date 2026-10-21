@@ -107,7 +107,7 @@ function pickFeaturedBooking(bookings, highlightId) {
     const hit = bookings.find((b) => b.id === highlightId);
     if (hit) return hit;
   }
-  // Same calendar-first order as Εισιτήριο / fan / desktop gallery.
+  // Same calendar-first order as Εισιτήριο fan stack (earliest first).
   const selected = selectWalletPassBookings(bookings);
   return selected[0] || null;
 }
@@ -416,7 +416,7 @@ function WalletAuthenticatedApp() {
   };
 
   /**
-   * All wallet tickets for Εισιτήριο (gallery / fan) and the «Επόμενες» rail.
+   * All wallet tickets for Εισιτήριο fan stack and the «Επόμενες» rail.
    * Must not collapse to featured-only when trip dates are past — that left the
    * rail showing 2 other bookings while the center showed a single hero.
    */
@@ -552,7 +552,7 @@ function WalletAuthenticatedApp() {
     </>
   );
 
-  /** Per-seat passes for the rail — same expansion as the gallery / native stack. */
+  /** Per-seat passes for the rail — same expansion as the Apple Wallet fan stack. */
   const railTickets = passTickets.slice(0, 8);
   const railEmpty = railTickets.length === 0;
 
@@ -737,38 +737,7 @@ function WalletAuthenticatedApp() {
               {upcomingRail}
             </div>
           ) : (
-            <>
-              {homePass}
-              {passTickets.length > 1 ? (
-                <div className="wallet-home-more">
-                  {passTickets.slice(0, 4).map((ticket) => {
-                    const seat = ticket.passenger?.seat || ticket.booking.seat || '';
-                    return (
-                      <button
-                        key={ticket.key}
-                        type="button"
-                        className="wallet-home-more-btn"
-                        onClick={() => openTicket(ticket.booking)}
-                      >
-                        <span className="truncate pr-2">{ticket.booking.tripTitle}</span>
-                        <span>
-                          {ticket.booking.date}
-                          {seat ? ` · ${seat}` : ''}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    className="wallet-home-more-btn"
-                    onClick={() => switchTab('bookings')}
-                  >
-                    <span>Όλες οι κρατήσεις</span>
-                    <span>{bookings.length}</span>
-                  </button>
-                </div>
-              ) : null}
-            </>
+            homePass
           )
         ) : null}
 

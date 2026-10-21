@@ -173,7 +173,7 @@ export function sortWalletBookingsByDeparture(bookings) {
 }
 
 /**
- * Bookings that feed the Εισιτήριο gallery / native stack.
+ * Bookings that feed the Εισιτήριο Apple Wallet fan stack.
  *
  * Prefer non-cancelled upcoming trips. When every trip date is in the past
  * (demo dates, clock skew, or travel already done), still return all
@@ -194,8 +194,8 @@ export function selectWalletPassBookings(bookings, { now = new Date() } = {}) {
 
 /**
  * Flatten bookings → one wallet ticket per seat/passenger.
- * Used by My Wallet pass stack / desktop gallery / Επόμενες rail.
- * Tickets are ordered by departure ascending so front/fan/gallery stay calendar-first.
+ * Used by My Wallet pass fan stack / Επόμενες rail.
+ * Tickets are ordered by departure ascending so front pass is earliest-first.
  */
 export function expandWalletTickets(bookings, { passengerName = '' } = {}) {
   const list = Array.isArray(bookings) ? bookings.filter(Boolean) : [];
