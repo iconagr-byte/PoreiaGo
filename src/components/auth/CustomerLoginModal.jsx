@@ -20,7 +20,8 @@ export default function CustomerLoginModal({
   onSuccess,
   title = 'Log in to your account',
   lead = 'Συνδεθείτε για να γνωρίζει το σύστημα ποιος κάνει την κράτηση — το εισιτήριο μπαίνει στο My Wallet σας.',
-  registerFrom = '/wallet',
+  /** After signup, return here (storefront home / checkout). Not My Wallet claim. */
+  registerFrom = '/',
   prefillEmail = '',
 }) {
   const titleId = useId();
@@ -235,7 +236,11 @@ export default function CustomerLoginModal({
 
         <p className="cust-login-modal-footer">
           Δεν έχετε λογαριασμό;{' '}
-          <Link to="/register" state={{ from: registerFrom }} onClick={onClose}>
+          <Link
+            to="/register"
+            state={{ from: registerFrom || '/', cleanRegister: true }}
+            onClick={onClose}
+          >
             Εγγραφή
           </Link>
         </p>

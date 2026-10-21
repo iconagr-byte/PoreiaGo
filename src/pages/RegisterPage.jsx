@@ -19,6 +19,7 @@ import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
 import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
+import '../styles/customer-auth.css';
 
 function isRentReturn(path) {
   return typeof path === 'string' && (path === '/rent' || path.startsWith('/rent/'));
@@ -33,39 +34,61 @@ function isRentAuthPath(pathname) {
   );
 }
 
+function isWalletReturn(path) {
+  return typeof path === 'string' && (path === '/wallet' || path.startsWith('/wallet/'));
+}
+
+/**
+ * Genuine wallet claim/activate: nav state from checkout/lookup/magic link,
+ * or resume a session claim only when returning to /wallet (not storefront).
+ * Storefront «Εγγραφή» sets cleanRegister and must never show claim chrome.
+ */
+function resolveClaim(locationState) {
+  if (locationState?.cleanRegister) return null;
+  const fromState = locationState?.walletClaim
+    ? {
+        email: locationState.email,
+        name: locationState.name,
+        phone: locationState.phone,
+        bookingId: locationState.highlightBooking,
+        reference: locationState.reference,
+        source: locationState.claimSource || 'manual',
+      }
+    : null;
+  if (fromState?.email) return fromState;
+  const from = locationState?.from;
+  if (from && !isWalletReturn(from)) return null;
+  return getWalletClaim();
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isPhone = useRentPhone();
   const pathRent = isRentAuthPath(location.pathname);
+  const cleanRegister = Boolean(location.state?.cleanRegister) && !pathRent;
   const redirectTo = pathRent
     ? isRentReturn(location.state?.from)
       ? location.state.from
       : '/rent/wallet'
-    : location.state?.from || '/wallet';
+    : cleanRegister
+      ? location.state?.from || '/'
+      : location.state?.from || '/wallet';
   const rentIntent = pathRent || isRentReturn(redirectTo);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [backendOk, setBackendOk] = useState(null);
 
-  const claim = useMemo(() => {
-    const fromState = location.state?.walletClaim
-      ? {
-          email: location.state.email,
-          name: location.state.name,
-          phone: location.state.phone,
-          bookingId: location.state.highlightBooking,
-          reference: location.state.reference,
-          source: location.state.claimSource || 'manual',
-        }
-      : null;
-    return fromState?.email ? fromState : getWalletClaim();
-  }, [location.state]);
+  const claim = useMemo(
+    () => (rentIntent ? null : resolveClaim(location.state)),
+    [location.state, rentIntent],
+  );
 
   const prefillEmail = claim?.email || '';
   const prefillName = claim?.name || '';
   const highlightBooking = claim?.bookingId || location.state?.highlightBooking;
+  const walletClaimFlow = Boolean(claim) && !rentIntent && !cleanRegister;
 
   useEffect(() => {
     isCustomerAuthBackendAvailable().then(setBackendOk);
@@ -86,15 +109,20 @@ export default function RegisterPage() {
     clearWalletClaim();
     if (rentIntent) {
       navigate(redirectTo, { replace: true });
-    } else {
-      navigate(redirectTo === '/wallet' || redirectTo.startsWith('/wallet') ? redirectTo : '/wallet', {
+      return;
+    }
+    if (walletClaimFlow || isWalletReturn(redirectTo)) {
+      navigate(isWalletReturn(redirectTo) ? redirectTo : '/wallet', {
         replace: true,
         state: walletHomeNavState({
           highlightBooking,
           fromClaim: hadClaim,
         }),
       });
+      return;
     }
+    // Clean storefront / checkout signup — stay where the guest came from.
+    navigate(redirectTo || '/', { replace: true });
   };
 
   const handleSubmit = async (e) => {
@@ -206,48 +234,97 @@ export default function RegisterPage() {
           ),
           from: redirectTo,
         }
-      : { from: redirectTo };
+      : cleanRegister
+        ? { from: redirectTo, cleanRegister: true }
+        : { from: redirectTo };
 
   const nativeWallet = isNativeApp();
   const phoneChrome = nativeWallet || isPhone;
+  const useCustomerShell = cleanRegister || (!rentIntent && !walletClaimFlow && !nativeWallet);
+
   const shellClass = rentIntent
     ? `rent-auth-stage${phoneChrome ? '' : ' rent-auth-stage--desktop'}`
-    : `wallet-auth-stage${phoneChrome ? '' : ' wallet-auth-stage--desktop'}${
-        nativeWallet ? ' wallet-auth-stage--native' : ''
-      }`;
-  const cardClass = rentIntent ? 'rent-auth-shell' : 'wallet-auth-shell';
-  const scrollClass = rentIntent ? 'rent-auth-scroll' : 'wallet-auth-scroll';
-  const panelClass = rentIntent ? 'rent-auth-card' : 'wallet-auth-card';
+    : useCustomerShell
+      ? `customer-auth-stage${phoneChrome ? '' : ' customer-auth-stage--desktop'}`
+      : `wallet-auth-stage${phoneChrome ? '' : ' wallet-auth-stage--desktop'}${
+          nativeWallet ? ' wallet-auth-stage--native' : ''
+        }`;
+  const cardClass = rentIntent
+    ? 'rent-auth-shell'
+    : useCustomerShell
+      ? 'customer-auth-shell'
+      : 'wallet-auth-shell';
+  const scrollClass = rentIntent
+    ? 'rent-auth-scroll'
+    : useCustomerShell
+      ? 'customer-auth-scroll'
+      : 'wallet-auth-scroll';
+  const panelClass = rentIntent
+    ? 'rent-auth-card'
+    : useCustomerShell
+      ? 'customer-auth-card'
+      : 'wallet-auth-card';
   const iconClass = rentIntent
     ? 'material-symbols-outlined rent-auth-icon'
-    : 'material-symbols-outlined wallet-auth-icon';
-  const leadClass = rentIntent ? 'rent-auth-lead' : 'wallet-auth-lead';
-  const linkClass = rentIntent ? 'rent-auth-link' : 'wallet-auth-link';
-  const submitClass = rentIntent ? 'rent-auth-submit' : 'wallet-auth-submit';
-  const dividerClass = rentIntent ? 'rent-auth-divider' : 'wallet-auth-divider';
+    : useCustomerShell
+      ? 'material-symbols-outlined customer-auth-icon'
+      : 'material-symbols-outlined wallet-auth-icon';
+  const leadClass = rentIntent
+    ? 'rent-auth-lead'
+    : useCustomerShell
+      ? 'customer-auth-lead'
+      : 'wallet-auth-lead';
+  const linkClass = rentIntent
+    ? 'rent-auth-link'
+    : useCustomerShell
+      ? 'customer-auth-link'
+      : 'wallet-auth-link';
+  const submitClass = rentIntent
+    ? 'rent-auth-submit'
+    : useCustomerShell
+      ? 'customer-auth-submit'
+      : 'wallet-auth-submit';
+  const dividerClass = rentIntent
+    ? 'rent-auth-divider'
+    : useCustomerShell
+      ? 'customer-auth-divider'
+      : 'wallet-auth-divider';
+  const heroClass = rentIntent
+    ? 'mb-8'
+    : useCustomerShell
+      ? 'customer-auth-hero'
+      : 'wallet-auth-hero';
 
   return (
     <div className={shellClass}>
       <div className={cardClass}>
         <div className={scrollClass}>
           <div className={panelClass}>
-        <div className={`text-center ${rentIntent ? 'mb-8' : 'wallet-auth-hero'}`}>
+        <div className={`text-center ${heroClass}`}>
           <span className={iconClass} aria-hidden>
-            {rentIntent ? 'directions_car' : 'account_balance_wallet'}
+            {rentIntent
+              ? 'directions_car'
+              : walletClaimFlow
+                ? 'account_balance_wallet'
+                : 'account_circle'}
           </span>
           <h1>
             {rentIntent
               ? 'Rent Wallet'
-              : claim
+              : walletClaimFlow
                 ? 'My Wallet'
                 : 'Δημιουργία λογαριασμού'}
           </h1>
           {rentIntent ? (
             <p className={leadClass}>Δημιουργήστε λογαριασμό για ενοικίαση οχήματος</p>
-          ) : null}
+          ) : walletClaimFlow ? null : (
+            <p className={leadClass}>
+              Όνομα, email και κωδικός — για κρατήσεις στο όνομά σας.
+            </p>
+          )}
         </div>
 
-        {claim && !rentIntent ? (
+        {walletClaimFlow ? (
           <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-on-surface">
             <p className="font-bold text-primary mb-1">Η κράτησή σας είναι έτοιμη</p>
             <p className="text-on-surface-variant">
@@ -308,7 +385,7 @@ export default function RegisterPage() {
               className="w-full px-4 py-3.5 bg-surface-container-low rounded-2xl focus:ring-2 focus:ring-primary-container"
               placeholder="π.χ. Μαρία Παπαδοπούλου"
             />
-            {claim ? (
+            {walletClaimFlow ? (
               <p className="text-xs text-on-surface-variant">
                 Το όνομα του επιβάτη για το εισιτήριο στο My Wallet.
               </p>
@@ -353,7 +430,7 @@ export default function RegisterPage() {
               ? 'Δημιουργία…'
               : rentIntent
                 ? 'Δημιουργία & είσοδος στην Ενοικίαση'
-                : claim
+                : walletClaimFlow
                   ? 'Δημιουργία & άνοιγμα Wallet'
                   : 'Δημιουργία λογαριασμού'}
           </button>
@@ -380,16 +457,22 @@ export default function RegisterPage() {
           </Link>
         </p>
         {!isNativeApp() ? (
-          !rentIntent ? (
+          !rentIntent && !cleanRegister ? (
             <p className="text-xs text-center mt-4">
               <Link to="/my-booking" className={linkClass}>
                 Εύρεση κράτησης λεωφορείου
               </Link>
             </p>
-          ) : (
+          ) : rentIntent ? (
             <p className="text-xs text-center mt-4">
               <Link to="/rent/my-booking" className={linkClass}>
                 Εύρεση κράτησης ενοικίασης
+              </Link>
+            </p>
+          ) : (
+            <p className="text-xs text-center mt-4">
+              <Link to="/" className={linkClass}>
+                Επιστροφή στην αρχική
               </Link>
             </p>
           )
