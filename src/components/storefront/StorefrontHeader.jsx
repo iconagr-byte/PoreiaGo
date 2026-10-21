@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getCustomerToken, isCustomer } from '../../lib/auth.js';
+import CustomerLoginModal from '../auth/CustomerLoginModal.jsx';
+import StorefrontAccountMenu from './StorefrontAccountMenu.jsx';
 import StorefrontBrand from './StorefrontBrand.jsx';
 
 const HEADER_STYLES = {
@@ -64,10 +65,6 @@ function phoneHref(phone) {
   return digits ? `tel:${digits}` : '';
 }
 
-function hasWalletSession() {
-  return Boolean(isCustomer() && getCustomerToken());
-}
-
 export default function StorefrontHeader({
   siteAppearance,
   templateId = 'glass_dark',
@@ -78,9 +75,7 @@ export default function StorefrontHeader({
   const isDark = style.variant === 'dark';
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [walletReady, setWalletReady] = useState(() =>
-    typeof window !== 'undefined' ? hasWalletSession() : false,
-  );
+  const [loginOpen, setLoginOpen] = useState(false);
 
   const phone = String(siteAppearance?.footer_contact_phone || '').trim();
   const showFleet = tripsEnabled && siteAppearance?.show_fleet_section !== false;
@@ -91,17 +86,6 @@ export default function StorefrontHeader({
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  useEffect(() => {
-    const sync = () => setWalletReady(hasWalletSession());
-    sync();
-    window.addEventListener('storage', sync);
-    window.addEventListener('focus', sync);
-    return () => {
-      window.removeEventListener('storage', sync);
-      window.removeEventListener('focus', sync);
-    };
   }, []);
 
   useEffect(() => {
@@ -117,10 +101,6 @@ export default function StorefrontHeader({
     ? 'text-sm font-semibold text-white/80 hover:text-white transition-colors'
     : 'text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors';
 
-  const walletCta = isDark
-    ? 'inline-flex items-center gap-1.5 rounded-full bg-white text-slate-900 px-4 py-2 text-sm font-bold shadow-sm hover:bg-white/90 transition-colors'
-    : 'inline-flex items-center gap-1.5 rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-slate-800 transition-colors';
-
   const phoneLink = isDark
     ? 'hidden lg:inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 hover:text-white transition-colors'
     : 'hidden lg:inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors';
@@ -133,9 +113,10 @@ export default function StorefrontHeader({
 
   const closeMenu = () => setMenuOpen(false);
 
-  const walletLink = walletReady
-    ? { to: '/wallet' }
-    : { to: '/login', state: { from: '/wallet', walletClaim: true } };
+  const openLogin = () => {
+    setMenuOpen(false);
+    setLoginOpen(true);
+  };
 
   return (
     <header className={wrapClass}>
@@ -179,31 +160,11 @@ export default function StorefrontHeader({
               <span className="tabular-nums tracking-tight">{phone}</span>
             </a>
           ) : null}
-          <Link
-            to={walletLink.to}
-            state={walletLink.state}
-            className={walletCta}
-            title={walletReady ? 'Άνοιγμα My Wallet' : 'Σύνδεση στο My Wallet'}
-          >
-            <span className="material-symbols-outlined text-[18px]" aria-hidden>
-              account_balance_wallet
-            </span>
-            My Wallet
-          </Link>
+          <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
         </nav>
 
         <div className="flex md:hidden items-center gap-2">
-          <Link
-            to={walletLink.to}
-            state={walletLink.state}
-            className={`${walletCta} !px-3 !py-1.5 !text-xs`}
-            aria-label="My Wallet"
-          >
-            <span className="material-symbols-outlined text-[16px]" aria-hidden>
-              account_balance_wallet
-            </span>
-            Wallet
-          </Link>
+          <StorefrontAccountMenu isDark={isDark} compact onOpenLogin={openLogin} />
           <button
             type="button"
             className={menuBtn}
@@ -258,17 +219,9 @@ export default function StorefrontHeader({
                 {phone}
               </a>
             ) : null}
-            <Link
-              to={walletLink.to}
-              state={walletLink.state}
-              onClick={closeMenu}
-              className="rounded-xl px-3 py-3 text-sm font-bold hover:bg-black/5 inline-flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined text-[18px]" aria-hidden>
-                account_balance_wallet
-              </span>
-              My Wallet
-            </Link>
+            <div className="px-3 py-2">
+              <StorefrontAccountMenu isDark={isDark} onOpenLogin={openLogin} />
+            </div>
             {tripsEnabled ? (
               <Link
                 to="/my-booking"
@@ -281,6 +234,15 @@ export default function StorefrontHeader({
           </nav>
         </div>
       ) : null}
+
+      <CustomerLoginModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={() => {
+          window.dispatchEvent(new Event('focus'));
+        }}
+        registerFrom="/wallet"
+      />
     </header>
   );
 }

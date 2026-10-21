@@ -128,6 +128,50 @@ function PassengerTicketCard({
   );
 }
 
+function WalletEmptyHorizon({ brandLabel }) {
+  return (
+    <div className="wallet-pass-empty-art" aria-hidden>
+      <svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" focusable="false">
+        <defs>
+          <linearGradient id="walletEmptySky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#7eb6ff" stopOpacity="0.55" />
+            <stop offset="55%" stopColor="#c8dff8" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#eef4fb" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="walletEmptySea" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#0a4a8a" stopOpacity="0.2" />
+            <stop offset="50%" stopColor="#0071e3" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="#0a2540" stopOpacity="0.18" />
+          </linearGradient>
+        </defs>
+        <rect width="640" height="220" fill="url(#walletEmptySky)" />
+        <circle cx="520" cy="58" r="28" fill="#fff7e0" opacity="0.9" />
+        <path
+          d="M0 148 C90 128 150 158 240 142 C330 126 390 112 470 128 C540 140 590 136 640 124 L640 220 L0 220 Z"
+          fill="url(#walletEmptySea)"
+        />
+        <path
+          d="M48 168 C88 148 118 152 148 168 C118 172 88 176 48 168 Z"
+          fill="#0a2540"
+          opacity="0.12"
+        />
+        <rect x="268" y="118" width="104" height="58" rx="14" fill="#fff" opacity="0.92" />
+        <rect x="280" y="132" width="48" height="8" rx="4" fill="#0071e3" opacity="0.85" />
+        <rect x="280" y="146" width="72" height="6" rx="3" fill="#0a2540" opacity="0.18" />
+        <rect x="280" y="158" width="36" height="6" rx="3" fill="#0a2540" opacity="0.12" />
+        <circle cx="348" cy="156" r="14" fill="#0071e3" opacity="0.9" />
+        <path
+          d="M342 156 h12 M348 150 v12"
+          stroke="#fff"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="wallet-pass-empty-art-brand">{brandLabel}</span>
+    </div>
+  );
+}
+
 export default function WalletBoardingPass({
   booking,
   coverImage,
@@ -135,33 +179,70 @@ export default function WalletBoardingPass({
   passengerName = '',
   onOpenDetails,
   onBrowseTrips,
+  onOpenTrip,
   onQrChange,
   offline = false,
+  layout = 'phone',
+  featuredTrips = [],
 }) {
   if (!booking) {
+    const isDesktop = layout === 'desktop';
+    const trips = Array.isArray(featuredTrips) ? featuredTrips.slice(0, 3) : [];
     return (
-      <section className="wallet-pass-empty">
+      <section
+        className={`wallet-pass-empty${isDesktop ? ' wallet-pass-empty--desktop' : ''}`}
+      >
+        {isDesktop ? <WalletEmptyHorizon brandLabel={brandLabel} /> : null}
         <div className="wallet-pass-empty-inner">
-          <span className="material-symbols-outlined wallet-pass-empty-icon" aria-hidden>
-            confirmation_number
-          </span>
-          <h2 className="wallet-pass-empty-title">Δεν έχετε ακόμα εισιτήριο</h2>
+          {!isDesktop ? (
+            <span className="material-symbols-outlined wallet-pass-empty-icon" aria-hidden>
+              confirmation_number
+            </span>
+          ) : (
+            <p className="wallet-pass-empty-kicker">{brandLabel}</p>
+          )}
+          <h2 className="wallet-pass-empty-title">
+            {isDesktop ? 'Το εισιτήριό σας, πάντα μαζί σας' : 'Δεν έχετε ακόμα εισιτήριο'}
+          </h2>
           <p className="wallet-pass-empty-copy">
-            {onBrowseTrips
-              ? 'Κάντε κράτηση στο site — μετά την πληρωμή δημιουργείτε My Wallet και εμφανίζεται εδώ το QR επιβίβασης.'
-              : 'Μετά την πληρωμή κράτησης, συνδεθείτε εδώ για να εμφανιστεί το QR επιβίβασης.'}
+            {isDesktop
+              ? 'Κράτηση στο site → QR επιβίβασης εδώ. Ένα σημείο για κάθε διαδρομή.'
+              : onBrowseTrips
+                ? 'Κάντε κράτηση στο site — μετά την πληρωμή δημιουργείτε My Wallet και εμφανίζεται εδώ το QR επιβίβασης.'
+                : 'Μετά την πληρωμή κράτησης, συνδεθείτε εδώ για να εμφανιστεί το QR επιβίβασης.'}
           </p>
-          {onBrowseTrips ? (
-            <button type="button" className="wallet-pass-cta" onClick={onBrowseTrips}>
-              Δείτε εκδρομές
-              <span className="material-symbols-outlined" aria-hidden>
-                arrow_forward
-              </span>
-            </button>
+          <div className="wallet-pass-empty-actions">
+            {onBrowseTrips ? (
+              <button type="button" className="wallet-pass-cta" onClick={onBrowseTrips}>
+                Δείτε εκδρομές
+                <span className="material-symbols-outlined" aria-hidden>
+                  arrow_forward
+                </span>
+              </button>
+            ) : null}
+            <Link to="/my-booking" className="wallet-pass-empty-secondary">
+              Έχω ήδη κωδικό κράτησης
+            </Link>
+          </div>
+          {isDesktop && trips.length > 0 ? (
+            <div className="wallet-pass-empty-trips" aria-label="Εκδρομές γραφείου">
+              {trips.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="wallet-pass-empty-trip"
+                  onClick={() => (onOpenTrip ? onOpenTrip(t) : onBrowseTrips?.())}
+                >
+                  <span className="wallet-pass-empty-trip-title truncate">{t.title}</span>
+                  {t.price != null && t.price !== '' ? (
+                    <span className="wallet-pass-empty-trip-meta">
+                      από €{Number(t.price).toFixed(0)}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
           ) : null}
-          <Link to="/my-booking" className="wallet-pass-empty-secondary">
-            Έχω ήδη κωδικό κράτησης
-          </Link>
         </div>
       </section>
     );
