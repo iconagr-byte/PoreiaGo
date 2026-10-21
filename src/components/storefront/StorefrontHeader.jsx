@@ -241,7 +241,7 @@ export default function StorefrontHeader({
         onSuccess={() => {
           window.dispatchEvent(new Event('focus'));
         }}
-        registerFrom="/wallet"
+        registerFrom="/"
       />
     </header>
   );
