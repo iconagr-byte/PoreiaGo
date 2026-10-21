@@ -126,8 +126,26 @@ export function bookerNameFromPassengers(passengers, fallback = '') {
 }
 
 /**
+ * Bookings that feed the Εισιτήριο gallery / native stack.
+ *
+ * Prefer non-cancelled upcoming trips. When every trip date is in the past
+ * (demo dates, clock skew, or travel already done), still return all
+ * non-cancelled bookings — otherwise desktop collapses to a single featured
+ * hero while the «Επόμενες» rail still lists the other tickets.
+ */
+export function selectWalletPassBookings(bookings, { now = new Date() } = {}) {
+  const list = Array.isArray(bookings) ? bookings.filter(Boolean) : [];
+  const active = list.filter((b) => b.status !== 'Ακυρωμένη');
+  const upcoming = active
+    .filter((b) => !b.date || new Date(`${b.date}T23:59:59`) >= now)
+    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+  if (upcoming.length) return upcoming;
+  return [...active].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+}
+
+/**
  * Flatten bookings → one wallet ticket per seat/passenger.
- * Used by My Wallet pass stack / desktop gallery.
+ * Used by My Wallet pass stack / desktop gallery / Επόμενες rail.
  */
 export function expandWalletTickets(bookings, { passengerName = '' } = {}) {
   const list = Array.isArray(bookings) ? bookings.filter(Boolean) : [];
