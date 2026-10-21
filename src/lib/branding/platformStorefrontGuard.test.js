@@ -78,14 +78,24 @@ describe('platformStorefrontGuard', () => {
     expect(scrubAchillioBrandForPlatformHost(raw)).toEqual(raw);
   });
 
-  it('still scrubs Achillio poison on marketing host without customer slug', () => {
+  it('keeps office-assets logo on marketing host even without slug', () => {
     isPlatformMarketingHost.mockReturnValue(true);
     const next = scrubAchillioBrandForPlatformHost({
       footer_brand_name: 'Achillio Travel',
       logo_url: '/api/site/office-assets/tid/logo/logo.jpg',
     });
     expect(next.footer_brand_name).toBe('PoreiaGo');
-    expect(next.logo_url).toBe('');
+    // Uploaded office logo must survive — native Wallet relied on this path.
+    expect(next.logo_url).toBe('/api/site/office-assets/tid/logo/logo.jpg');
+  });
+
+  it('skips scrub entirely when skipScrub or native wallet shell', () => {
+    isPlatformMarketingHost.mockReturnValue(true);
+    const raw = {
+      footer_brand_name: 'Achillio Travel',
+      logo_url: '/api/site/office-assets/tid/logo/logo.jpg',
+    };
+    expect(scrubAchillioBrandForPlatformHost(raw, { skipScrub: true })).toEqual(raw);
   });
 
   it('blocks storefront on PoreiaGo marketing host', () => {

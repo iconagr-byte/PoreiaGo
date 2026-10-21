@@ -24,6 +24,7 @@ class AppearanceByTenantIdTests(unittest.IsolatedAsyncioTestCase):
             "footer_brand_name": "Achillio Travel",
             "rent_office_name": "Achillio Travel",
             "logo_show_name": True,
+            "tenant_slug": "admin-achillio-gr",
         }
 
         session_cm = MagicMock()
@@ -45,6 +46,7 @@ class AppearanceByTenantIdTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(out, SiteAppearanceResponse)
         self.assertEqual(out.logo_url, fake["logo_url"])
         self.assertEqual(out.footer_brand_name, "Achillio Travel")
+        self.assertEqual(out.tenant_slug, "admin-achillio-gr")
 
     async def test_public_endpoint_prefers_tenant_id_query(self):
         req = MagicMock()

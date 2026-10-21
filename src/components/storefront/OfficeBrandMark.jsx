@@ -60,6 +60,8 @@ export default function OfficeBrandMark({
   fallbackLabel = 'Γραφείο',
   refreshKey = 0,
   preferAdmin = false,
+  /** Sealed wallet office UUID — Capacitor Host=localhost needs this for logo. */
+  tenantId = '',
   /** Optional minimum height for admin sidebar / drawers (px). */
   minHeightPx,
 }) {
@@ -67,6 +69,7 @@ export default function OfficeBrandMark({
   const [brand, setBrand] = useState(() => resolveOfficeBrand({}));
   const [imgBroken, setImgBroken] = useState(false);
   const isDark = variant === 'dark';
+  const sealedTenantId = String(tenantId || '').trim();
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +80,9 @@ export default function OfficeBrandMark({
       setImgBroken(false);
     };
     const load = () => {
-      const loader = preferAdmin ? fetchAdminSiteAppearance() : fetchSiteAppearance();
+      const loader = preferAdmin
+        ? fetchAdminSiteAppearance()
+        : fetchSiteAppearance(sealedTenantId ? { tenantId: sealedTenantId } : undefined);
       loader
         .then((data) => {
           if (cancelled) return;
@@ -111,11 +116,17 @@ export default function OfficeBrandMark({
       window.removeEventListener(OFFICE_BRAND_CHANGED_EVENT, onChanged);
       window.removeEventListener(WALLET_TENANT_CHANGED_EVENT, onWalletTenant);
     };
-  }, [refreshKey, preferAdmin]);
+  }, [refreshKey, preferAdmin, sealedTenantId]);
 
   const logoSrc = !imgBroken && brand.hasLogo ? resolveSiteAssetUrl(brand.logoUrl) : '';
   const onTenant = isTenantStorefrontHost();
-  const label = brand.displayName || brand.name || fallbackLabel || (onTenant ? 'Γραφείο' : 'PoreiaGo');
+  // Prefer a real office name from props over generic resolveOfficeBrand fallback «Γραφείο».
+  const resolvedName = brand.displayName || (brand.name !== 'Γραφείο' ? brand.name : '');
+  const label =
+    resolvedName ||
+    (fallbackLabel && fallbackLabel !== 'Γραφείο' ? fallbackLabel : '') ||
+    brand.name ||
+    (onTenant ? 'Γραφείο' : 'PoreiaGo');
   const resolvedHeight =
     minHeightPx != null
       ? Math.max(clampLogoHeight(appearance.logo_height_px), clampLogoHeight(minHeightPx))
