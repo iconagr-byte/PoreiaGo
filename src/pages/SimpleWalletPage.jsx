@@ -23,6 +23,10 @@ import {
 import { loadLastPass, patchLastPassQr, saveLastPass } from '../lib/wallet/lastPassSnapshot.js';
 import { setupWalletPwa } from '../lib/wallet/registerWalletPwa.js';
 import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookingStore.js';
+import {
+  expandWalletTickets,
+  selectWalletPassBookings,
+} from '../lib/ticketing/bookingPassengers.js';
 import { loadTrips } from '../lib/trips/tripStore.js';
 import { bookingCoverUrl } from '../lib/trips/tripPhotos.js';
 import { isPaid, statusStyle } from '../lib/bookingDisplay.js';
@@ -420,27 +424,24 @@ function WalletAuthenticatedApp() {
     setBookings((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
   };
 
-  const otherUpcoming = bookings.filter(
-    (b) =>
-      b.id !== featured?.id &&
-      b.status !== 'Ακυρωμένη' &&
-      b.date &&
-      new Date(`${b.date}T23:59:59`) >= new Date(),
-  );
-
-  /** All upcoming (or featured) bookings for Εισιτήριο — expand to per-seat passes. */
+  /**
+   * All wallet tickets for Εισιτήριο (gallery / fan) and the «Επόμενες» rail.
+   * Must not collapse to featured-only when trip dates are past — that left the
+   * rail showing 2 other bookings while the center showed a single hero.
+   */
   const passBookings = useMemo(() => {
     if (usingOfflinePass && displayBooking) return [displayBooking];
-    const now = new Date();
-    const upcoming = bookings
-      .filter((b) => b.status !== 'Ακυρωμένη')
-      .filter((b) => !b.date || new Date(`${b.date}T23:59:59`) >= now)
-      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    if (upcoming.length) return upcoming;
+    const selected = selectWalletPassBookings(bookings);
+    if (selected.length) return selected;
     if (featured) return [featured];
     if (displayBooking) return [displayBooking];
     return [];
   }, [bookings, featured, displayBooking, usingOfflinePass]);
+
+  const passTickets = useMemo(
+    () => expandWalletTickets(passBookings, { passengerName: displayPassenger }),
+    [passBookings, displayPassenger],
+  );
 
   // Native Wallet app: always full-bleed phone shell (no tablet/desktop bezel).
   const stageClass = nativeWallet
@@ -560,10 +561,9 @@ function WalletAuthenticatedApp() {
     </>
   );
 
-  const railBookings = (
-    otherUpcoming.length ? otherUpcoming : bookings.filter((b) => b.id !== featured?.id)
-  ).slice(0, 5);
-  const railEmpty = !featured && railBookings.length === 0;
+  /** Per-seat passes for the rail — same expansion as the gallery / native stack. */
+  const railTickets = passTickets.slice(0, 8);
+  const railEmpty = railTickets.length === 0;
 
   const upcomingRail = (
     <aside className="wallet-desktop-rail" aria-label="Λογαριασμός και επόμενες">
@@ -613,21 +613,26 @@ function WalletAuthenticatedApp() {
           </ul>
         ) : (
           <ul className="wallet-desktop-rail-list">
-            {railBookings.map((b) => (
-              <li key={b.id}>
-                <button
-                  type="button"
-                  className="wallet-desktop-rail-item"
-                  onClick={() => openTicket(b)}
-                >
-                  <span className="wallet-desktop-rail-item-title truncate">{b.tripTitle}</span>
-                  <span className="wallet-desktop-rail-item-meta">
-                    {b.date}
-                    {b.seat ? ` · ${b.seat}` : ''}
-                  </span>
-                </button>
-              </li>
-            ))}
+            {railTickets.map((ticket) => {
+              const seat = ticket.passenger?.seat || ticket.booking.seat || '';
+              return (
+                <li key={ticket.key}>
+                  <button
+                    type="button"
+                    className="wallet-desktop-rail-item"
+                    onClick={() => openTicket(ticket.booking)}
+                  >
+                    <span className="wallet-desktop-rail-item-title truncate">
+                      {ticket.booking.tripTitle}
+                    </span>
+                    <span className="wallet-desktop-rail-item-meta">
+                      {ticket.booking.date}
+                      {seat ? ` · ${seat}` : ''}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -743,22 +748,25 @@ function WalletAuthenticatedApp() {
           ) : (
             <>
               {homePass}
-              {otherUpcoming.length > 0 || bookings.length > 1 ? (
+              {passTickets.length > 1 ? (
                 <div className="wallet-home-more">
-                  {otherUpcoming.slice(0, 2).map((b) => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      className="wallet-home-more-btn"
-                      onClick={() => openTicket(b)}
-                    >
-                      <span className="truncate pr-2">{b.tripTitle}</span>
-                      <span>
-                        {b.date}
-                        {b.seat ? ` · ${b.seat}` : ''}
-                      </span>
-                    </button>
-                  ))}
+                  {passTickets.slice(0, 4).map((ticket) => {
+                    const seat = ticket.passenger?.seat || ticket.booking.seat || '';
+                    return (
+                      <button
+                        key={ticket.key}
+                        type="button"
+                        className="wallet-home-more-btn"
+                        onClick={() => openTicket(ticket.booking)}
+                      >
+                        <span className="truncate pr-2">{ticket.booking.tripTitle}</span>
+                        <span>
+                          {ticket.booking.date}
+                          {seat ? ` · ${seat}` : ''}
+                        </span>
+                      </button>
+                    );
+                  })}
                   <button
                     type="button"
                     className="wallet-home-more-btn"

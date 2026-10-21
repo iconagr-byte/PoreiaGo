@@ -4,6 +4,7 @@ import {
   getBookingPassengers,
   seatListFromBooking,
   expandWalletTickets,
+  selectWalletPassBookings,
 } from './bookingPassengers.js';
 
 describe('bookingPassengers', () => {
@@ -72,5 +73,103 @@ describe('bookingPassengers', () => {
     ]);
     expect(tickets).toHaveLength(3);
     expect(tickets[2].passenger.seat).toBe('5F');
+  });
+
+  test('expandWalletTickets keeps separate Achillio bookings (5D, 4D, 3A)', () => {
+    const tickets = expandWalletTickets([
+      {
+        id: 'B-ioa-5d',
+        tripTitle: 'Μαγευτικά Ιωάννινα',
+        date: '2026-06-17',
+        seat: '5D',
+        seats: ['5D'],
+        customerName: 'sdsdsdsdsdsd',
+        status: 'Επιβεβαιωμένη',
+      },
+      {
+        id: 'B-ioa-4d',
+        tripTitle: 'Μαγευτικά Ιωάννινα',
+        date: '2026-06-17',
+        seat: '4D',
+        seats: ['4D'],
+        customerName: 'Axilleas',
+        status: 'Επιβεβαιωμένη',
+      },
+      {
+        id: 'B-met-3a',
+        tripTitle: 'Ημερήσια στα Μετέωρα',
+        date: '2026-06-15',
+        seat: '3A',
+        seats: ['3A'],
+        customerName: 'Axilleas',
+        status: 'Επιβεβαιωμένη',
+      },
+    ]);
+    expect(tickets).toHaveLength(3);
+    expect(tickets.map((t) => t.passenger.seat)).toEqual(['5D', '4D', '3A']);
+  });
+
+  test('expandWalletTickets splits seat string when seats[] truncated', () => {
+    const tickets = expandWalletTickets([
+      {
+        id: 'B-party',
+        tripTitle: 'Ιωάννινα',
+        seats: ['5D'],
+        seat: '5D, 4D',
+        passengers: [{ seat: '5D', name: 'Buyer', role: 'booker' }],
+        customerName: 'Buyer',
+      },
+    ]);
+    expect(tickets).toHaveLength(2);
+    expect(tickets.map((t) => t.passenger.seat)).toEqual(['5D', '4D']);
+  });
+
+  test('selectWalletPassBookings keeps past tickets when none are upcoming', () => {
+    const now = new Date('2026-10-21T12:00:00');
+    const selected = selectWalletPassBookings(
+      [
+        {
+          id: 'B1',
+          date: '2026-06-17',
+          seat: '5D',
+          status: 'Επιβεβαιωμένη',
+        },
+        {
+          id: 'B2',
+          date: '2026-06-17',
+          seat: '4D',
+          status: 'Επιβεβαιωμένη',
+        },
+        {
+          id: 'B3',
+          date: '2026-06-15',
+          seat: '3A',
+          status: 'Επιβεβαιωμένη',
+        },
+        {
+          id: 'B-x',
+          date: '2026-06-01',
+          seat: '1A',
+          status: 'Ακυρωμένη',
+        },
+      ],
+      { now },
+    );
+    expect(selected).toHaveLength(3);
+    expect(selected.map((b) => b.seat)).toEqual(['3A', '5D', '4D']);
+  });
+
+  test('selectWalletPassBookings prefers upcoming when mixed', () => {
+    const now = new Date('2026-06-16T12:00:00');
+    const selected = selectWalletPassBookings(
+      [
+        { id: 'past', date: '2026-06-15', seat: '3A', status: 'Επιβεβαιωμένη' },
+        { id: 'next', date: '2026-06-17', seat: '5D', status: 'Επιβεβαιωμένη' },
+        { id: 'next2', date: '2026-06-17', seat: '4D', status: 'Επιβεβαιωμένη' },
+      ],
+      { now },
+    );
+    expect(selected).toHaveLength(2);
+    expect(selected.map((b) => b.seat)).toEqual(['5D', '4D']);
   });
 });
