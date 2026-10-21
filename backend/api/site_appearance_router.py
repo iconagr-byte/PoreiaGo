@@ -1358,6 +1358,8 @@ class PublicTripResponse(BaseModel):
     totalSeats: int = 0
     description: str = ""
     image: str = ""
+    # Gallery for Wallet / storefront covers when primary image is empty.
+    images: list[str] = Field(default_factory=list)
     hook: str = ""
     durationLabel: str = ""
     badge: str = ""

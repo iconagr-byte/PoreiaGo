@@ -1792,6 +1792,11 @@
 .wallet-booking-cover {
   position: relative;
   height: 7rem;
+  /* Fallback when trip cover is missing — same family as .wallet-pass-hero */
+  background:
+    radial-gradient(90% 70% at 88% 8%, rgba(255, 159, 10, 0.18), transparent 52%),
+    radial-gradient(110% 85% at 8% 100%, rgba(0, 113, 227, 0.45), transparent 52%),
+    linear-gradient(165deg, #0a2540 0%, #0d4a9a 46%, #071528 100%);
   background-size: cover;
   background-position: center;
 }

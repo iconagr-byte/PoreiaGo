@@ -37,3 +37,56 @@ export function collectTripPhotoUrls(trip) {
 export function tripCoverUrl(trip) {
   return collectTripPhotoUrls(trip)[0] || '';
 }
+
+function normTitle(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Match a wallet booking to a published office trip.
+ * Prefer numeric tripId (Achillio seeds 91001+), then exact title.
+ */
+export function findTripForBooking(booking, trips = []) {
+  if (!booking || !Array.isArray(trips) || !trips.length) return null;
+
+  const id = Number(booking.tripId ?? booking.trip_id);
+  if (Number.isFinite(id) && id > 0) {
+    const byId = trips.find((t) => Number(t?.id) === id);
+    if (byId) return byId;
+  }
+
+  const title = normTitle(booking.tripTitle || booking.trip_title);
+  if (!title) return null;
+  return trips.find((t) => normTitle(t?.title) === title) || null;
+}
+
+/**
+ * Cover URL for a My Wallet booking card / pass hero.
+ * Uses booking-embedded image fields first, then catalogs (office API, cache, local).
+ *
+ * On tenant storefront hosts loadTrips() is intentionally empty — callers must
+ * pass the sealed-office catalog from fetchPublicOfficeTrips.
+ */
+export function bookingCoverUrl(booking, ...catalogs) {
+  if (!booking || typeof booking !== 'object') return '';
+
+  const embedded = [
+    booking.coverImage,
+    booking.cover_image,
+    booking.image,
+    booking.image_url,
+    booking.tripImage,
+    booking.trip_image,
+    booking.tripCover,
+    booking.trip_cover,
+  ];
+  for (const raw of embedded) {
+    if (isRealTripPhoto(raw)) return String(raw).trim();
+  }
+
+  const trips = catalogs.flatMap((c) => (Array.isArray(c) ? c : [])).filter(Boolean);
+  return tripCoverUrl(findTripForBooking(booking, trips));
+}

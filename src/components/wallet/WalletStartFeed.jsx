@@ -149,14 +149,14 @@ export default function WalletStartFeed({
             <p className="wallet-panel-lead">Δεν υπάρχουν δημοσιευμένες εκδρομές αυτή τη στιγμή.</p>
           ) : (
             <ul className="wallet-excursion-list">
-              {trips.map((trip) => (
+              {trips.map((trip) => {
+                const cover = tripCoverUrl(trip);
+                return (
                 <li key={trip.id}>
                   <article className="wallet-excursion-card">
                     <div
                       className="wallet-excursion-cover"
-                      style={{
-                        backgroundImage: `url(${tripCoverUrl(trip)})`,
-                      }}
+                      style={cover ? { backgroundImage: `url(${cover})` } : undefined}
                       aria-hidden
                     />
                     <div className="wallet-excursion-body">
@@ -187,7 +187,8 @@ export default function WalletStartFeed({
                     </div>
                   </article>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
           {trips.length > 0 ? (
