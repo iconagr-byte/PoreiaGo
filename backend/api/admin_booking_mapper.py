@@ -325,9 +325,12 @@ def booking_to_admin_dict(
         "accountLinked": account_linked,
         "walletCustomerId": wallet_cid,
         "walletCustomerEmail": wallet_email,
+        # Per-seat party for My Wallet multi-QR (keep even if seats[] is incomplete).
+        "passengers": meta.get("passengers") or [],
     }
     result.update(build_fiscal_admin_fields(booking, fiscal_invoices))
     return result
+
 
 
 def parse_status(value: str | None) -> BookingStatus | None:

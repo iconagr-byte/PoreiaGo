@@ -3,6 +3,7 @@ import {
   validateCompanionNames,
   getBookingPassengers,
   seatListFromBooking,
+  expandWalletTickets,
 } from './bookingPassengers.js';
 
 describe('bookingPassengers', () => {
@@ -36,5 +37,40 @@ describe('bookingPassengers', () => {
 
   test('parses seat strings', () => {
     expect(seatListFromBooking('2A, 2B')).toEqual(['2A', '2B']);
+  });
+
+  test('prefers fuller seat string over truncated seats[]', () => {
+    expect(
+      seatListFromBooking({
+        seats: ['5D'],
+        seat: '5D, 5E, 5F',
+      }),
+    ).toEqual(['5D', '5E', '5F']);
+  });
+
+  test('expands short passengers[] to match all seats', () => {
+    const list = getBookingPassengers({
+      customerName: 'Buyer',
+      seats: ['5D'],
+      seat: '5D, 5E, 5F',
+      passengers: [{ seat: '5D', name: 'Buyer', role: 'booker' }],
+    });
+    expect(list).toHaveLength(3);
+    expect(list.map((p) => p.seat)).toEqual(['5D', '5E', '5F']);
+    expect(list[0].name).toBe('Buyer');
+    expect(list[1].role).toBe('companion');
+  });
+
+  test('expandWalletTickets flattens multi-seat bookings', () => {
+    const tickets = expandWalletTickets([
+      {
+        id: 'B1',
+        tripTitle: 'Ιωάννινα',
+        seats: ['5D', '5E', '5F'],
+        customerName: 'Buyer',
+      },
+    ]);
+    expect(tickets).toHaveLength(3);
+    expect(tickets[2].passenger.seat).toBe('5F');
   });
 });
