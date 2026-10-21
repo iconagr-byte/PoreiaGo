@@ -12,6 +12,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
 import { LEAFLET_BASEMAP } from '../lib/maps/appleMapTheme.js';
+import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
 
 // Custom Red Pin Marker (Google Maps Style)
 const redIcon = L.divIcon({
@@ -58,13 +59,27 @@ export default function TripDetails() {
 
   useEffect(() => {
     const tripId = parseInt(id, 10);
-    let found = loadTrips().find((t) => t.id === tripId);
+    let found = loadTrips().find((t) => Number(t.id) === tripId);
     if (!found && isPlatformSeatBookingDemo()) {
-      found = loadPlatformDemoTrips().find((t) => t.id === tripId);
+      found = loadPlatformDemoTrips().find((t) => Number(t.id) === tripId);
     }
     if (found) {
       setTrip(found);
+      return undefined;
     }
+    let cancelled = false;
+    fetchPublicOfficeTrips()
+      .then((list) => {
+        if (cancelled) return;
+        const hit = (list || []).find((t) => Number(t.id) === tripId) || null;
+        setTrip(hit);
+      })
+      .catch(() => {
+        if (!cancelled) setTrip(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // Generate coordinates for polyline
@@ -120,8 +135,18 @@ export default function TripDetails() {
 
   if (!trip) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface gap-4 px-6">
         <p className="font-headline-md text-on-surface">Το δρομολόγιο δεν βρέθηκε.</p>
+        <button
+          type="button"
+          onClick={() => navigate('/#search-results')}
+          className="inline-flex items-center gap-2 rounded-full bg-primary text-on-primary px-5 py-2.5 text-sm font-bold"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden>
+            arrow_back
+          </span>
+          Πίσω στις εκδρομές
+        </button>
       </div>
     );
   }
@@ -130,8 +155,12 @@ export default function TripDetails() {
     <div className="min-h-screen bg-surface flex flex-col font-sans relative">
       {/* Navbar Minimal */}
       <header className="absolute top-0 w-full z-50 px-margin-desktop py-6">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-on-surface-variant bg-surface-container hover:bg-surface-container-high px-4 py-2 rounded-full transition-colors font-label-md shadow-sm border border-black/[0.05]">
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span> Πίσω
+        <button
+          type="button"
+          onClick={() => navigate('/#search-results')}
+          className="flex items-center gap-2 text-on-surface-variant bg-surface-container hover:bg-surface-container-high px-4 py-2 rounded-full transition-colors font-label-md shadow-sm border border-black/[0.05]"
+        >
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span> Πίσω στις εκδρομές
         </button>
       </header>
 

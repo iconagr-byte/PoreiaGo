@@ -23,12 +23,24 @@ import {
 } from '../lib/seats/seatPricing.js';
 import { fetchPublicSeatPricing } from '../services/seatPricingApi.js';
 import { fetchOccupiedSeats, getSaasTenantId } from '../services/saasApi.js';
+import { fetchPublicOfficeTrips } from '../services/officeTripsApi.js';
 import {
   getSeatMapCheckoutButtonClass,
   getSeatMapHeaderClasses,
   resolveTripSeatMapTheme,
 } from '../lib/seats/seatMapThemes.js';
 import { isPlatformSeatBookingDemo } from '../lib/marketing/platformBusDemoShowcase.js';
+
+function resolveLocalTrip(tripId) {
+  const id = Number(tripId);
+  if (!id) return null;
+  const found = loadTrips().find((t) => Number(t.id) === id) || null;
+  if (found) return found;
+  if (isPlatformSeatBookingDemo()) {
+    return loadPlatformDemoTrips().find((t) => Number(t.id) === id) || null;
+  }
+  return null;
+}
 
 export default function SeatSelection() {
   const { tripId } = useParams();
@@ -38,18 +50,33 @@ export default function SeatSelection() {
   const [seatPricingConfig, setSeatPricingConfig] = useState(null);
   const [occupiedSeats, setOccupiedSeats] = useState([]);
   const [occupancyLoading, setOccupancyLoading] = useState(true);
+  const [remoteTrip, setRemoteTrip] = useState(null);
   const isDemo = useMemo(() => isPlatformSeatBookingDemo(), []);
 
-  const trip = useMemo(() => {
-    const id = Number(tripId);
-    if (!id) return null;
-    const found = loadTrips().find((t) => t.id === id) || null;
-    if (found) return found;
-    if (isPlatformSeatBookingDemo()) {
-      return loadPlatformDemoTrips().find((t) => t.id === id) || null;
+  const localTrip = useMemo(() => resolveLocalTrip(tripId), [tripId]);
+  const trip = localTrip || remoteTrip;
+
+  useEffect(() => {
+    if (localTrip) {
+      setRemoteTrip(null);
+      return undefined;
     }
-    return null;
-  }, [tripId]);
+    const id = Number(tripId);
+    if (!id) return undefined;
+    let cancelled = false;
+    fetchPublicOfficeTrips()
+      .then((list) => {
+        if (cancelled) return;
+        const hit = (list || []).find((t) => Number(t.id) === id) || null;
+        setRemoteTrip(hit);
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteTrip(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId, localTrip]);
 
   const { pricePerSeat, quote } = useTripPricing(trip);
   const tripBasePrice = quote?.finalPrice ?? trip?.price ?? 0;
@@ -214,11 +241,14 @@ export default function SeatSelection() {
       <div className="relative z-10 max-w-7xl mx-auto">
         <button
           type="button"
-          onClick={() => navigate(`/trip/${trip.id}`)}
+          onClick={() => {
+            // Κράτηση from storefront cards lands here directly — back to trips, not a broken /trip/:id.
+            navigate('/#search-results');
+          }}
           className="mb-4 flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-bold text-sm"
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-          Πίσω
+          Πίσω στις εκδρομές
         </button>
 
         {isDemo ? (
