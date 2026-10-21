@@ -34,9 +34,10 @@ import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
 import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
+import WalletStartFeed from '../components/wallet/WalletStartFeed.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
-import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import { DEFAULT_SITE_APPEARANCE, fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import {
   DEFAULT_OFFICE_MODULES,
   fetchOfficeModules,
@@ -166,6 +167,7 @@ function WalletAuthenticatedApp() {
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [brandLabel, setBrandLabel] = useState('My Wallet');
+  const [siteAppearance, setSiteAppearance] = useState(DEFAULT_SITE_APPEARANCE);
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   /** Sealed office UUID — drives logo/name fetch on native (Host=localhost). */
   const [sealedTenantId, setSealedTenantId] = useState(() => getWalletTenantId() || '');
@@ -279,6 +281,7 @@ function WalletAuthenticatedApp() {
     fetchSiteAppearance(sealedTenantId ? { tenantId: sealedTenantId } : undefined)
       .then((data) => {
         if (cancelled) return;
+        setSiteAppearance(data || DEFAULT_SITE_APPEARANCE);
         const brand = resolveOfficeBrand(data || {});
         const name = brand.displayName || brand.name;
         if (name) setBrandLabel(name);
@@ -306,7 +309,7 @@ function WalletAuthenticatedApp() {
   useEffect(() => {
     if (!isDesktop) return undefined;
     let cancelled = false;
-    fetchPublicOfficeTrips()
+    fetchPublicOfficeTrips(sealedTenantId ? { tenantId: sealedTenantId } : undefined)
       .then((trips) => {
         if (!cancelled) setOfficeTrips(Array.isArray(trips) ? trips : []);
       })
@@ -426,6 +429,16 @@ function WalletAuthenticatedApp() {
     }
     switchTab(tab.id);
   };
+
+  const homeFeed = (
+    <WalletStartFeed
+      appearance={siteAppearance}
+      officeName={brandLabel && brandLabel !== 'My Wallet' ? brandLabel : ''}
+      tenantId={sealedTenantId}
+      onOpenTicket={() => switchTab('pass')}
+      onBrowseAllTrips={nativeWallet ? undefined : () => navigate('/')}
+    />
+  );
 
   const homePass = (
     <>
@@ -659,6 +672,17 @@ function WalletAuthenticatedApp() {
         {activeTab === 'home' && !isTicketView ? (
           isDesktop ? (
             <div className="wallet-desktop-home">
+              <div className="wallet-desktop-pass-col">{homeFeed}</div>
+              {upcomingRail}
+            </div>
+          ) : (
+            homeFeed
+          )
+        ) : null}
+
+        {activeTab === 'pass' && !isTicketView ? (
+          isDesktop ? (
+            <div className="wallet-desktop-home">
               <div className="wallet-desktop-pass-col">{homePass}</div>
               {upcomingRail}
             </div>
@@ -692,14 +716,6 @@ function WalletAuthenticatedApp() {
                 </div>
               ) : null}
             </>
-          )
-        ) : null}
-
-        {activeTab === 'pass' && !isTicketView ? (
-          isDesktop ? (
-            <div className="wallet-desktop-pass-col">{homePass}</div>
-          ) : (
-            homePass
           )
         ) : null}
 
