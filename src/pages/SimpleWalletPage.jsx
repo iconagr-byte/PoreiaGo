@@ -430,6 +430,19 @@ function WalletAuthenticatedApp() {
     switchTab(tab.id);
   };
 
+  /** Desktop: keep trips inside Wallet Αρχική (sealed office). Storefront `/` is secondary. */
+  const openOfficeTrips = () => {
+    switchTab('home');
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        const el = document.getElementById('wallet-upcoming-trips');
+        if (el && typeof el.scrollIntoView === 'function') {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
+  };
+
   const homeFeed = (
     <WalletStartFeed
       appearance={siteAppearance}
@@ -489,11 +502,13 @@ function WalletAuthenticatedApp() {
           brandLabel={displayBrand}
           passengerName={displayPassenger}
           onOpenDetails={openTicket}
-          onBrowseTrips={nativeWallet ? undefined : () => navigate('/')}
+          onBrowseTrips={
+            nativeWallet ? undefined : isDesktop ? openOfficeTrips : () => navigate('/')
+          }
           onOpenTrip={
             nativeWallet
               ? undefined
-              : (trip) => navigate(trip?.id ? `/trip/${trip.id}` : '/')
+              : (trip) => navigate(trip?.id ? `/select-seat/${trip.id}` : '/')
           }
           onQrChange={handleQrChange}
           offline={usingOfflinePass}
@@ -538,12 +553,12 @@ function WalletAuthenticatedApp() {
               <button
                 type="button"
                 className="wallet-desktop-rail-step"
-                onClick={() => (nativeWallet ? switchTab('bookings') : navigate('/'))}
+                onClick={() => (nativeWallet ? switchTab('bookings') : openOfficeTrips())}
               >
                 <span className="wallet-desktop-rail-step-num">1</span>
                 <span>
                   <strong>Επιλέξτε εκδρομή</strong>
-                  <em>Από το site του γραφείου</em>
+                  <em>Από την Αρχική του Wallet</em>
                 </span>
               </button>
             </li>
@@ -583,7 +598,7 @@ function WalletAuthenticatedApp() {
           <button
             type="button"
             className="wallet-btn wallet-btn-primary wallet-btn-block"
-            onClick={() => navigate('/')}
+            onClick={() => (railEmpty ? openOfficeTrips() : navigate('/'))}
           >
             {railEmpty ? 'Δείτε εκδρομές' : 'Νέα κράτηση'}
           </button>

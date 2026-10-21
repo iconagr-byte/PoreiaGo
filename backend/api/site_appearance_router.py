@@ -1380,15 +1380,28 @@ async def get_public_office_trips(
     host: str | None = Query(default=None),
     tenant_id: str | None = Query(
         default=None,
-        description="Optional — only honored with a matching office Bearer JWT "
-        "(Back Office on marketing host).",
+        description="Sealed wallet office UUID (native Capacitor / desktop Wallet). "
+        "Published catalog only — same trust model as /api/site/appearance?tenant_id=.",
     ),
 ):
     """
-    Published trips for an office Host — strictly scoped by tenant_id.
+    Published trips for an office — strictly scoped by tenant_id.
     Never returns another office's catalog or shared demo trips.
+
+    Resolution order (matches appearance / modules for sealed Wallet):
+    1. Explicit ?tenant_id= (My Wallet seal — Host may be localhost or 127.0.0.1
+       behind NPM, so Host alone is unreliable).
+    2. Host / X-Forwarded-Host → DomainResolver.
+    3. Office Bearer JWT tenant (Back Office hydrate on marketing host).
     """
     from travel_platform.operations.tenant_trip_catalog_store import list_tenant_trips
+
+    # Sealed My Wallet (desktop + native): prefer explicit office UUID.
+    # Published trips are public per office — same as appearance/modules.
+    explicit_tid = (tenant_id or "").strip() or None
+    if explicit_tid:
+        rows = list_tenant_trips(explicit_tid, published_only=True)
+        return [PublicTripResponse(**row) for row in rows]
 
     effective_host = host or request.headers.get("x-forwarded-host") or request.headers.get("host")
     if effective_host and "," in effective_host:
@@ -1410,11 +1423,9 @@ async def get_public_office_trips(
             logger.exception("public trips resolve failed for host=%s", effective_host)
             resolved_tenant = None
 
-    # Host wins when it maps to an office.
     tid = resolved_tenant
     if not tid:
         # Fallback: office JWT on marketing host (admin hydrate).
-        # Never trust naked tenant_id query without matching Bearer tenant.
         jwt_tid: str | None = None
         auth = request.headers.get("Authorization", "")
         if auth.startswith("Bearer "):
@@ -1430,8 +1441,7 @@ async def get_public_office_trips(
                         jwt_tid = str(raw).strip()
             except Exception:
                 jwt_tid = None
-        query_tid = (tenant_id or "").strip() or None
-        if jwt_tid and (not query_tid or query_tid == jwt_tid):
+        if jwt_tid:
             tid = jwt_tid
 
     if not tid:
