@@ -194,7 +194,7 @@ export function selectWalletPassBookings(bookings, { now = new Date() } = {}) {
 
 /**
  * Flatten bookings → one wallet ticket per seat/passenger.
- * Used by My Wallet pass (phone fan / desktop side-by-side gallery) / Επόμενες rail.
+ * Used by My Wallet pass (Apple Wallet vertical stack) / Επόμενες rail.
  * Tickets are ordered by departure ascending so front/first pass is earliest-first.
  */
 export function expandWalletTickets(bookings, { passengerName = '' } = {}) {
