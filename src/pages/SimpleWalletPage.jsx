@@ -52,19 +52,23 @@ import {
 } from '../lib/wallet/walletTenantSeal.js';
 import '../styles/wallet-pass.css';
 
-/** Match native Wallet IA: Αρχική · Κρατήσεις · Rent? · Εγώ.
- * Desktop → left sidebar; phone → bottom dock. Lost & Found lives under Εγώ. */
+/** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · Κράτηση · Εγώ.
+ * Desktop → left sidebar; phone → bottom dock.
+ * Rent + Lost & Found live under Εγώ (not primary tabs). */
 const ALL_TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
+  { id: 'pass', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
-  { id: 'rentals', label: 'Rent', icon: 'directions_car', requiresRent: true },
+  { id: 'lookup', label: 'Κράτηση', icon: 'search', route: '/my-booking' },
   { id: 'account', label: 'Εγώ', icon: 'person' },
 ];
 
 function tabIsActive(activeTab, tabId) {
   if (activeTab === tabId) return true;
-  // Lost & Found is nested under Εγώ — keep Me highlighted while viewing it.
-  if (activeTab === 'lost_found' && tabId === 'account') return true;
+  // Nested under Εγώ — keep Me highlighted.
+  if ((activeTab === 'lost_found' || activeTab === 'rentals') && tabId === 'account') {
+    return true;
+  }
   return false;
 }
 
@@ -315,16 +319,13 @@ function WalletAuthenticatedApp() {
   }, [isDesktop, sealedTenantId]);
 
   const nativeWallet = isNativeApp();
-  // One Wallet for buses + rentals — show Rent tab when the sealed office has Rent.
+  // Rent opens from Εγώ when the sealed office has Rent — not a primary tab.
   const rentAvailable = shouldShowRentStorefront(officeModules);
-  const tabs = useMemo(
-    () => ALL_TABS.filter((tab) => !tab.requiresRent || rentAvailable),
-    [rentAvailable],
-  );
+  const tabs = ALL_TABS;
 
   useEffect(() => {
     if (!rentAvailable && activeTab === 'rentals') {
-      setActiveTab('home');
+      setActiveTab('account');
     }
   }, [rentAvailable, activeTab]);
 
@@ -416,6 +417,14 @@ function WalletAuthenticatedApp() {
   const switchTab = (id) => {
     setActiveTab(id);
     setSelectedBookingId(null);
+  };
+
+  const onNavTabClick = (tab) => {
+    if (tab.route) {
+      navigate(tab.route);
+      return;
+    }
+    switchTab(tab.id);
   };
 
   const homePass = (
@@ -635,7 +644,7 @@ function WalletAuthenticatedApp() {
                 key={tab.id}
                 type="button"
                 className={tabIsActive(activeTab, tab.id) ? 'is-active' : ''}
-                onClick={() => switchTab(tab.id)}
+                onClick={() => onNavTabClick(tab)}
               >
                 <span className="material-symbols-outlined" aria-hidden>
                   {tab.icon}
@@ -683,6 +692,14 @@ function WalletAuthenticatedApp() {
                 </div>
               ) : null}
             </>
+          )
+        ) : null}
+
+        {activeTab === 'pass' && !isTicketView ? (
+          isDesktop ? (
+            <div className="wallet-desktop-pass-col">{homePass}</div>
+          ) : (
+            homePass
           )
         ) : null}
 
@@ -762,6 +779,16 @@ function WalletAuthenticatedApp() {
 
         {activeTab === 'rentals' && rentAvailable ? (
           <div className="wallet-stack">
+            <button
+              type="button"
+              className="wallet-ticket-back"
+              onClick={() => switchTab('account')}
+            >
+              <span className="material-symbols-outlined" aria-hidden>
+                arrow_back
+              </span>
+              Εγώ
+            </button>
             <section className="wallet-panel">
               <div className="wallet-panel-head">
                 <span className="wallet-panel-head-icon" aria-hidden>
@@ -844,6 +871,26 @@ function WalletAuthenticatedApp() {
                 Άνοιγμα απωλεσθέντων
               </button>
             </section>
+            {rentAvailable ? (
+              <section className="wallet-panel">
+                <div className="wallet-panel-head">
+                  <span className="wallet-panel-head-icon" aria-hidden>
+                    <span className="material-symbols-outlined">directions_car</span>
+                  </span>
+                  <div>
+                    <h2>Rent</h2>
+                    <p>Ενοικίαση οχήματος από το γραφείο σας.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="wallet-btn wallet-btn-ghost wallet-btn-block"
+                  onClick={() => switchTab('rentals')}
+                >
+                  Άνοιγμα ενοικιάσεων
+                </button>
+              </section>
+            ) : null}
             <PushNotificationsPanel email={profile.email} />
             <CustomerSecurityPanel email={profile.email} authProvider={profile.provider} />
           </div>
@@ -876,7 +923,7 @@ function WalletAuthenticatedApp() {
                 key={tab.id}
                 type="button"
                 className={tabIsActive(activeTab, tab.id) ? 'is-active' : ''}
-                onClick={() => switchTab(tab.id)}
+                onClick={() => onNavTabClick(tab)}
               >
                 <span className="material-symbols-outlined" aria-hidden>
                   {tab.icon}
