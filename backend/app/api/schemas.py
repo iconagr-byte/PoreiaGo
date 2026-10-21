@@ -121,6 +121,12 @@ class BookingResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class GuestBookingResponse(BookingResponse):
+    """Guest B2C create — optional one-shot token to open My Wallet without a password."""
+
+    wallet_activate_token: str | None = None
+
+
 class FiscalInvoiceResponse(BaseModel):
     id: UUID
     booking_id: UUID
