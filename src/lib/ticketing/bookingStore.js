@@ -513,7 +513,8 @@ export async function createBookingFromCheckout({
         passenger_email: passenger.email.trim().toLowerCase(),
       }).catch(() => {});
       await pushBookingToServer(saved);
-      notifyPaymentConfirmationSafe(saved, { paymentMethod, paymentPlan });
+      // Office + customer payment emails are sent server-side from POST /bookings/guest
+      // when amount_paid > 0 (require_office). Skip frontend fire-and-forget to avoid duplicates.
       return saved;
     } catch (err) {
       // Seat conflict / validation — never invent a local double booking.

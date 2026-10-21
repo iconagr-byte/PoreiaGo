@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from decimal import Decimal
 from typing import Annotated
@@ -8,6 +9,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.api.schemas import (
     BookingCreate,
@@ -392,6 +395,29 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
                 )
             except Exception:
                 activate_token = None
+
+        # Mandatory server-side office (+ customer) payment emails when money was taken.
+        # Do not rely on frontend fire-and-forget notifyPaymentConfirmationSafe.
+        if paid_now > 0:
+            try:
+                from api.admin_booking_mapper import booking_to_admin_dict
+                from ticketing.payment_confirmation_email import (
+                    send_payment_confirmation_notifications,
+                )
+
+                notify_payload = booking_to_admin_dict(booking)
+                notify_payload.setdefault("tenant_id", str(tenant_id))
+                await send_payment_confirmation_notifications(
+                    notify_payload,
+                    require_office=True,
+                )
+            except Exception as exc:
+                logger.error(
+                    "Guest booking office payment email failed ref=%s tenant=%s: %s",
+                    ref,
+                    tenant_id,
+                    exc,
+                )
 
         return GuestBookingResponse(
             id=booking.id,
