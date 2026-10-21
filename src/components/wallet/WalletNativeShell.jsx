@@ -1,14 +1,14 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
-/** My Wallet only — tickets + account (no buses / rent / home). */
+/** My Wallet only — tickets (Κράτηση removed; use in-app CTAs / /my-booking). */
 const TABS = [
   { to: '/wallet', end: false, icon: 'confirmation_number', label: 'Εισιτήρια' },
-  { to: '/my-booking', end: false, icon: 'search', label: 'Κράτηση' },
 ];
 
 /**
  * Bottom chrome for the Capacitor Wallet Android app (customer traveler only).
+ * Primary tabs live in SimpleWalletPage (Αρχική · Εισιτήριο · Κρατήσεις · Εγώ).
  */
 export default function WalletNativeShell() {
   const { pathname } = useLocation();
@@ -33,7 +33,9 @@ export default function WalletNativeShell() {
     pathname.startsWith('/sign/') ||
     pathname.startsWith('/select-seat') ||
     pathname.startsWith('/checkout') ||
-    pathname.startsWith('/trip/');
+    pathname.startsWith('/trip/') ||
+    // Avoid a second dock on /wallet — SimpleWalletPage owns the 4-tab bar.
+    pathname.startsWith('/wallet');
 
   if (hide) return null;
 
@@ -48,7 +50,7 @@ export default function WalletNativeShell() {
         bottom: 0,
         zIndex: 90,
         display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
+        gridTemplateColumns: `repeat(${TABS.length}, 1fr)`,
         gap: 4,
         padding: '8px 12px calc(8px + env(safe-area-inset-bottom))',
         background: 'rgba(255,255,255,0.96)',
