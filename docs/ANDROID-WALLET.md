@@ -30,16 +30,31 @@ No office picker. No “scan QR to find office” as the main path.
 
 ## Windows rebuild
 
+Rebuild native whenever Wallet UI/nav changes land on `main` (e.g. remove Κράτηση tab, multi-ticket stack, PWA v4). Stale `android/app/src/main/assets/public` is gitignored — only a fresh `npm run build` + `npx cap sync android` (or `wallet-run.ps1`) picks up the new WebView bundle. Current packaged app version: **1.0.10** (`versionCode` 10).
+
 1. **Κλείσε** Android Studio τελείως.
 2. Άνοιξε emulator (home screen).
 3. Στο **PowerShell**:
 
 ```powershell
 cd C:\Users\User\poreiago
+git fetch origin main
+git checkout main
+git pull origin main
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 ```
 
-Το script: `git reset` στο branch με Google Sign-In (`cursor/wallet-google-auth-app-5ffb`) → καθαρίζει `dist`/assets → `npm build` + `cap sync` → Gradle → uninstall παλιά app → install νέα.
+Το script: `git reset` στο `main` (default) → καθαρίζει `dist`/assets → `npm build` + `cap sync` → Gradle → uninstall παλιά app → install νέα.
+
+### Linux / CI (assets only — no APK without Android SDK)
+
+```bash
+npm ci   # or npm install
+npm run cap:sync:packaged   # vite build + npx cap sync android
+# Then on a machine with SDK:
+cd android && ./gradlew assembleDebug
+# APK: android/app/build/outputs/apk/debug/app-debug.apk
+```
 
 Πρέπει να εμφανίσει και: `OK: Google Sign-In present in packaged assets`.
 
