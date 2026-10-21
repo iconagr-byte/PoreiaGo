@@ -262,7 +262,7 @@ function Test-ApkHasMainActivity([string]$apkPath) {
 if (-not (Test-ApkHasSocialLogin $apk)) {
   throw "APK built without SocialLoginPlugin class - Google Sign-In will fail. Check npm install + cap sync."
 }
-Write-Host "OK: SocialLoginPlugin inside APK (v1.0.9)" -ForegroundColor Green
+Write-Host "OK: SocialLoginPlugin inside APK (v1.0.10)" -ForegroundColor Green
 
 if (-not (Test-ApkHasMainActivity $apk)) {
   throw "APK built without com.poreiago.wallet.MainActivity in classes.dex - check android/app/src/main/java"
