@@ -173,7 +173,7 @@ export function sortWalletBookingsByDeparture(bookings) {
 }
 
 /**
- * Bookings that feed the Εισιτήριο Apple Wallet fan stack.
+ * Bookings that feed the Εισιτήριο gallery / native stack.
  *
  * Prefer non-cancelled upcoming trips. When every trip date is in the past
  * (demo dates, clock skew, or travel already done), still return all
