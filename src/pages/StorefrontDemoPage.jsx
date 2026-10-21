@@ -23,6 +23,7 @@ import {
 import {
   isStorefrontPreviewMode,
   readHomepagePreviewDraft,
+  subscribeHomepagePreviewDraft,
 } from '../lib/homepage/homepagePreview.js';
 import {
   getHomepageThemeById,
@@ -173,19 +174,16 @@ export default function StorefrontDemoPage() {
       if (!applyPreviewAppearance()) {
         fetchSiteAppearance().then(setSiteAppearance).catch(() => {});
       }
-      const onStorage = (e) => {
-        if (e.key === 'aerostride_homepage_preview_v1' || e.key === 'aerostride_site_appearance_v1') {
-          applyPreviewAppearance();
-        }
-      };
-      window.addEventListener('storage', onStorage);
+      const unsub = subscribeHomepagePreviewDraft(() => {
+        applyPreviewAppearance();
+      });
       loadCommon();
       setFleetLoading(true);
       fetchPublicFleet()
         .then(setFleetShowcase)
         .finally(() => setFleetLoading(false));
       fetchPublicOfficeTrips().then(setTrips);
-      return () => window.removeEventListener('storage', onStorage);
+      return () => unsub();
     }
 
     fetchSiteAppearance().then(setSiteAppearance).catch(() => {});

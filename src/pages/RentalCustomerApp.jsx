@@ -21,6 +21,7 @@ import {
 import {
   isStorefrontPreviewMode,
   readHomepagePreviewDraft,
+  subscribeHomepagePreviewDraft,
 } from '../lib/homepage/homepagePreview.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import {
@@ -173,52 +174,66 @@ function RentalGuestPreviewApp({ onRequireLogin, onPickVehicle } = {}) {
 
   useEffect(() => {
     let cancelled = false;
+    let baseAppearance = null;
+
+    const applyAppearance = (data) => {
+      if (cancelled) return;
+      // Design studio draft (?preview=1) overlays live appearance for theme preview.
+      // URL ?theme=<id> wins so the live preview iframe always shows the clicked theme.
+      const draft = isStorefrontPreviewMode() ? readHomepagePreviewDraft() : null;
+      const themeParam = isStorefrontPreviewMode()
+        ? new URLSearchParams(window.location.search).get('theme')
+        : null;
+      const themeFromUrl = themeParam ? getRentThemeById(themeParam) : null;
+      const themePatch =
+        themeFromUrl && themeFromUrl.id === themeParam
+          ? rentThemeToAppearancePatch(themeFromUrl, { includeColors: true })
+          : null;
+      const appearance = { ...(data || {}), ...(draft || {}), ...(themePatch || {}) };
+      const brand = resolveOfficeBrand(appearance);
+      setFooterAddress(String(appearance?.footer_address || '').trim());
+      setSiteAppearance(appearance);
+      setPickupLocations(
+        Array.isArray(appearance?.rent_pickup_locations)
+          ? appearance.rent_pickup_locations.map((x) => String(x || '').trim()).filter(Boolean)
+          : [],
+      );
+      setBranding(
+        resolveRentAppBranding(
+          {
+            ...appearance,
+            footer_brand_name: appearance?.footer_brand_name || brand.displayName || '',
+            display_name: brand.displayName || '',
+            logo_url: appearance?.logo_url || brand.logoUrl || '',
+            logo_show_name: brand.showName,
+          },
+          { guest: true },
+        ),
+      );
+    };
+
     fetchSiteAppearance()
       .then((data) => {
         if (cancelled) return;
-        // Design studio draft (?preview=1) overlays live appearance for theme preview.
-        // URL ?theme=<id> wins so the live preview iframe always shows the clicked theme.
-        const draft = isStorefrontPreviewMode() ? readHomepagePreviewDraft() : null;
-        const themeParam = isStorefrontPreviewMode()
-          ? new URLSearchParams(window.location.search).get('theme')
-          : null;
-        const themeFromUrl = themeParam ? getRentThemeById(themeParam) : null;
-        const themePatch =
-          themeFromUrl && themeFromUrl.id === themeParam
-            ? rentThemeToAppearancePatch(themeFromUrl, { includeColors: true })
-            : null;
-        const appearance = { ...(data || {}), ...(draft || {}), ...(themePatch || {}) };
-        const brand = resolveOfficeBrand(appearance);
-        setFooterAddress(String(appearance?.footer_address || '').trim());
-        setSiteAppearance(appearance);
-        setPickupLocations(
-          Array.isArray(appearance?.rent_pickup_locations)
-            ? appearance.rent_pickup_locations.map((x) => String(x || '').trim()).filter(Boolean)
-            : [],
-        );
-        setBranding(
-          resolveRentAppBranding(
-            {
-              ...appearance,
-              footer_brand_name: appearance?.footer_brand_name || brand.displayName || '',
-              display_name: brand.displayName || '',
-              logo_url: appearance?.logo_url || brand.logoUrl || '',
-              logo_show_name: brand.showName,
-            },
-            { guest: true },
-          ),
-        );
+        baseAppearance = data || {};
+        applyAppearance(baseAppearance);
       })
       .catch(() => {
         if (cancelled) return;
         if (!isStorefrontPreviewMode()) return;
         const draft = readHomepagePreviewDraft();
         if (!draft) return;
-        setSiteAppearance(draft);
-        setBranding(resolveRentAppBranding(draft, { guest: true }));
+        baseAppearance = draft;
+        applyAppearance(draft);
       });
+
+    const unsub = isStorefrontPreviewMode()
+      ? subscribeHomepagePreviewDraft(() => applyAppearance(baseAppearance || {}))
+      : null;
+
     return () => {
       cancelled = true;
+      unsub?.();
     };
   }, []);
 

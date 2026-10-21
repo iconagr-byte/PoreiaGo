@@ -70,9 +70,13 @@ const DESIGN_PAGES = [
     blurb: 'Θέματα, hero, slider και κάρτες εκδρομών της αρχικής σελίδας.',
     // Storefront shell only on office domains — never on www.poreiago.com.
     previewTo: '/storefront?preview=1',
-    previewLabel: 'Προεπισκόπηση σε νέο tab',
+    previewLabel: 'Άνοιγμα αρχικής',
+    previewSrc: '/storefront?preview=1',
+    previewPathLabel: '/storefront?preview=1',
+    openSiteHref: '/storefront',
     platformPreviewTo: '/',
     platformPreviewLabel: 'Αρχική PoreiaGo (χωρίς storefront γραφείου)',
+    platformPreviewSrc: '/?preview=1',
     icon: 'directions_bus',
     accentFrom: 'from-sky-700',
     accentVia: 'via-indigo-700',
@@ -83,8 +87,11 @@ const DESIGN_PAGES = [
     label: 'Ενοικιάσεις',
     title: 'Σελίδα /rent',
     blurb: 'Όνομα γραφείου, κείμενα και hero slider για την εφαρμογή ενοικίασης.',
-    previewTo: '/rent',
+    previewTo: '/rent?preview=1',
     previewLabel: 'Άνοιγμα /rent',
+    previewSrc: '/rent?preview=1',
+    previewPathLabel: '/rent?preview=1',
+    openSiteHref: '/rent',
     icon: 'car_rental',
     accentFrom: 'from-teal-700',
     accentVia: 'via-cyan-700',
@@ -730,8 +737,11 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   const [form, setForm] = useState({ ...DEFAULT_SITE_APPEARANCE });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingHero, setUploadingHero] = useState(false);
+  const savedSnapshotRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -814,14 +824,32 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     onPlatformHost && activePageMeta.platformPreviewLabel
       ? activePageMeta.platformPreviewLabel
       : activePageMeta.previewLabel;
+  const previewSrc =
+    onPlatformHost && activePageMeta.platformPreviewSrc
+      ? activePageMeta.platformPreviewSrc
+      : activePageMeta.previewSrc || previewTo;
+  const previewPathLabel = activePageMeta.previewPathLabel || previewSrc;
+  const openSiteHref =
+    onPlatformHost && activePageMeta.platformPreviewTo
+      ? activePageMeta.platformPreviewTo
+      : activePageMeta.openSiteHref || previewTo;
+  const copyLinkHref =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}${String(openSiteHref || '/').split('?')[0]}`
+      : openSiteHref;
   const rentPreview = resolveRentAppBranding(form, { guest: false });
   const contractBadge = contractDesignLabel(officeMode);
+  const brandName =
+    (form.footer_brand_name || form.display_name || rentPreview.brandLabel || '').trim();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchAdminSiteAppearance();
-      setForm({ ...DEFAULT_SITE_APPEARANCE, ...data });
+      const next = { ...DEFAULT_SITE_APPEARANCE, ...data };
+      setForm(next);
+      savedSnapshotRef.current = JSON.stringify(next);
+      setDirty(false);
     } catch (err) {
       if (err.message === 'AUTH_EXPIRED') return;
       toast.error('Αποτυχία φόρτωσης ρυθμίσεων αρχικής');
@@ -837,8 +865,40 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   useEffect(() => {
     if (!loading) {
       pushHomepagePreviewDraft(form);
+      if (savedSnapshotRef.current != null) {
+        setDirty(JSON.stringify(form) !== savedSnapshotRef.current);
+      }
     }
   }, [form, loading]);
+
+  const markSaved = useCallback((nextForm) => {
+    const snapshot = JSON.stringify(nextForm);
+    savedSnapshotRef.current = snapshot;
+    setDirty(false);
+    setPreviewRefreshToken((n) => n + 1);
+  }, []);
+
+  const saveAll = useCallback(async () => {
+    setSaving(true);
+    try {
+      const result = await updateSiteAppearance(form);
+      const next = { ...form, ...result.data };
+      setForm(next);
+      markSaved(next);
+      if (result.offline) {
+        toast.success('Αποθηκεύτηκε τοπικά — ο server δεν είναι διαθέσιμος αυτή τη στιγμή', {
+          id: 'homepage-save-all-offline',
+        });
+      } else {
+        toast.success('Οι ρυθμίσεις εμφάνισης αποθηκεύτηκαν', { id: 'homepage-save-all-ok' });
+      }
+    } catch (err) {
+      if (err.message === 'AUTH_EXPIRED') return;
+      toast.error(err.message || 'Αποτυχία αποθήκευσης', { id: 'homepage-save-all-err' });
+    } finally {
+      setSaving(false);
+    }
+  }, [form, markSaved]);
 
   const handleThemePreview = (theme, { includeColors = false } = {}) => {
     // Sync draft to localStorage BEFORE the live preview iframe mounts
@@ -854,7 +914,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     setSaving(true);
     try {
       const result = await updateSiteAppearance(patch);
-      setForm((p) => ({ ...p, ...result.data }));
+      let next = null;
+      setForm((p) => {
+        next = { ...p, ...result.data };
+        return next;
+      });
+      if (next) markSaved(next);
       if (result.offline) {
         toast.success('Το θέμα αποθηκεύτηκε τοπικά', { id: 'theme-apply' });
       } else {
@@ -882,7 +947,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     setSaving(true);
     try {
       const result = await updateSiteAppearance(patch);
-      setForm((p) => ({ ...p, ...result.data, ...patch }));
+      let next = null;
+      setForm((p) => {
+        next = { ...p, ...result.data, ...patch };
+        return next;
+      });
+      if (next) markSaved(next);
       toast.success(
         includeColors
           ? `Εφαρμόστηκε θέμα /rent «${theme.nameEl}» + χρώματα`
@@ -905,7 +975,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     try {
       const result = await updateSiteAppearance(patch);
       // Prefer the values we just saved if the API response omits layout keys.
-      setForm((p) => ({ ...p, ...result.data, ...patch }));
+      let next = null;
+      setForm((p) => {
+        next = { ...p, ...result.data, ...patch };
+        return next;
+      });
+      if (next) markSaved(next);
       if (result.offline) {
         toast.success('Αποθηκεύτηκε τοπικά — ο server δεν είναι διαθέσιμος αυτή τη στιγμή', {
           id: 'homepage-save-offline',
@@ -2062,6 +2137,17 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         onSelectSection={selectSection}
         previewTo={previewTo}
         previewLabel={previewLabel}
+        previewSrc={previewSrc}
+        previewPathLabel={previewPathLabel}
+        openSiteHref={openSiteHref}
+        copyLinkHref={copyLinkHref}
+        backOfficeTo="/admin"
+        siteLabel={designPage === 'rent' ? 'Ενοικιάσεις' : 'Ιστοσελίδα γραφείου'}
+        brandName={brandName}
+        saving={saving}
+        dirty={dirty}
+        onSave={saveAll}
+        previewRefreshToken={previewRefreshToken}
       >
         {sectionContent}
       </PageDesignWizardShell>
