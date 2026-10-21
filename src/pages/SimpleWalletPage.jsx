@@ -24,7 +24,7 @@ import { loadLastPass, patchLastPassQr, saveLastPass } from '../lib/wallet/lastP
 import { setupWalletPwa } from '../lib/wallet/registerWalletPwa.js';
 import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookingStore.js';
 import { loadTrips } from '../lib/trips/tripStore.js';
-import { tripCoverUrl } from '../lib/trips/tripPhotos.js';
+import { bookingCoverUrl } from '../lib/trips/tripPhotos.js';
 import { isPaid, statusStyle } from '../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../lib/fiscal/fiscalDisplay.js';
 import PassengerTrackCTA from '../components/passenger/PassengerTrackCTA.jsx';
@@ -51,6 +51,10 @@ import {
   getWalletTenantId,
   WALLET_TENANT_CHANGED_EVENT,
 } from '../lib/wallet/walletTenantSeal.js';
+import {
+  getCachedWalletOfficeTrips,
+  rememberWalletOfficeTrips,
+} from '../lib/wallet/walletOfficeTrips.js';
 import '../styles/wallet-pass.css';
 
 /** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · Εγώ.
@@ -90,14 +94,6 @@ function resolveCustomerProfile() {
 function loadMyBookings(email) {
   if (!email) return Promise.resolve([]);
   return loadBookingsForCustomer(email);
-}
-
-function tripImageFor(booking) {
-  const trips = loadTrips();
-  const t =
-    trips.find((x) => x.id === booking.tripId) ||
-    trips.find((x) => x.title === booking.tripTitle);
-  return tripCoverUrl(t);
 }
 
 function pickFeaturedBooking(bookings, highlightId) {
@@ -171,7 +167,9 @@ function WalletAuthenticatedApp() {
   const [officeModules, setOfficeModules] = useState(DEFAULT_OFFICE_MODULES);
   /** Sealed office UUID — drives logo/name fetch on native (Host=localhost). */
   const [sealedTenantId, setSealedTenantId] = useState(() => getWalletTenantId() || '');
-  const [officeTrips, setOfficeTrips] = useState([]);
+  const [officeTrips, setOfficeTrips] = useState(() =>
+    getCachedWalletOfficeTrips(getWalletTenantId() || ''),
+  );
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [showWelcome, setShowWelcome] = useState(
     () => Boolean(location.state?.fromClaim || location.state?.highlightBooking),
@@ -306,20 +304,24 @@ function WalletAuthenticatedApp() {
     };
   }, [sealedTenantId]);
 
+  // Published office catalog for pass/booking covers. On tenant hosts loadTrips()
+  // is empty by design — covers must come from /api/site/trips (sealed tenant).
   useEffect(() => {
-    if (!isDesktop) return undefined;
     let cancelled = false;
     fetchPublicOfficeTrips(sealedTenantId ? { tenantId: sealedTenantId } : undefined)
       .then((trips) => {
-        if (!cancelled) setOfficeTrips(Array.isArray(trips) ? trips : []);
+        if (cancelled) return;
+        const list = Array.isArray(trips) ? trips : [];
+        rememberWalletOfficeTrips(list, sealedTenantId || null);
+        setOfficeTrips(list);
       })
       .catch(() => {
-        if (!cancelled) setOfficeTrips([]);
+        if (!cancelled) setOfficeTrips(getCachedWalletOfficeTrips(sealedTenantId || ''));
       });
     return () => {
       cancelled = true;
     };
-  }, [isDesktop, sealedTenantId]);
+  }, [sealedTenantId]);
 
   const nativeWallet = isNativeApp();
   // Rent opens from Εγώ when the sealed office has Rent — not a primary tab.
@@ -332,12 +334,33 @@ function WalletAuthenticatedApp() {
     }
   }, [rentAvailable, activeTab]);
 
+  const tripCatalog = useMemo(() => {
+    let local = [];
+    try {
+      local = loadTrips();
+    } catch {
+      local = [];
+    }
+    const cached = getCachedWalletOfficeTrips(sealedTenantId || '');
+    const byId = new Map();
+    for (const t of [...local, ...cached, ...officeTrips]) {
+      if (!t || t.id == null) continue;
+      byId.set(Number(t.id), t);
+    }
+    return Array.from(byId.values());
+  }, [officeTrips, sealedTenantId]);
+
+  const coverForBooking = useCallback(
+    (booking) => bookingCoverUrl(booking, tripCatalog),
+    [tripCatalog],
+  );
+
   const featured = useMemo(
     () => pickFeaturedBooking(bookings, focusId || peekWalletFocusBooking()),
     [bookings, focusId],
   );
 
-  const featuredCover = featured ? tripImageFor(featured) : '';
+  const featuredCover = featured ? coverForBooking(featured) : '';
   const usingOfflinePass = !featured && Boolean(offlineSnap?.booking);
   const displayBooking = useMemo(() => {
     if (featured) return featured;
@@ -777,11 +800,12 @@ function WalletAuthenticatedApp() {
                   {bookings.map((b) => {
                     const st = statusStyle(b);
                     const paid = isPaid(b);
+                    const cover = coverForBooking(b);
                     return (
                       <article key={b.id} className="wallet-booking-card">
                         <div
                           className="wallet-booking-cover"
-                          style={{ backgroundImage: `url(${tripImageFor(b)})` }}
+                          style={cover ? { backgroundImage: `url(${cover})` } : undefined}
                         >
                           <div className="wallet-booking-cover-shade" />
                           <div className="wallet-booking-cover-copy">
@@ -946,7 +970,7 @@ function WalletAuthenticatedApp() {
         {isTicketView && (
           <WalletTicketDetail
             booking={selectedBooking}
-            coverImage={tripImageFor(selectedBooking)}
+            coverImage={coverForBooking(selectedBooking)}
             brandLabel={brandLabel}
             passengerName={profile.name}
             onBookingUpdated={handleBookingUpdated}

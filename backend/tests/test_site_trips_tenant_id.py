@@ -24,6 +24,8 @@ class SiteTripsByTenantIdTests(unittest.IsolatedAsyncioTestCase):
                 "totalSeats": 30,
                 "vehicleType": "Luxury Coach",
                 "currency": "EUR",
+                "image": "/images/meteora.png",
+                "images": ["/images/meteora.png", "/images/demo/meteora-2.jpg"],
                 "officeSeed": True,
                 "catalogSource": "office_seed",
             }
@@ -53,6 +55,8 @@ class SiteTripsByTenantIdTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0].id, 91001)
         self.assertEqual(out[0].title, "Ημερήσια στα Μετέωρα")
+        self.assertEqual(out[0].image, "/images/meteora.png")
+        self.assertEqual(out[0].images[0], "/images/meteora.png")
 
     async def test_empty_without_tenant_or_host(self):
         req = MagicMock()

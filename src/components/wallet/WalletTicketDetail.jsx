@@ -93,7 +93,10 @@ export default function WalletTicketDetail({
       </button>
 
       <section className="wallet-pass" aria-label="Λεπτομέρειες εισιτηρίου">
-        <div className="wallet-pass-hero" style={{ backgroundImage: `url(${cover})` }}>
+        <div
+          className="wallet-pass-hero"
+          style={cover ? { backgroundImage: `url(${cover})` } : undefined}
+        >
           <div className="wallet-pass-hero-shade" aria-hidden />
           <div className="wallet-pass-hero-copy">
             <p className="wallet-pass-brand">{brandLabel}</p>
