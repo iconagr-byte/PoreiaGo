@@ -257,12 +257,17 @@
   overflow: hidden;
 }
 
-/* —— Apple Wallet fan (phone / native multi-ticket) —— */
+/* —— Apple Wallet fan (phone / native / desktop multi-ticket) ——
+ * Peeks sit beside/behind the front pass — not a vertical list underneath. */
 .wallet-pass--fan {
   max-width: 26.5rem;
   margin-inline: auto;
   width: 100%;
   filter: none;
+}
+
+.wallet-pass--fan-desktop {
+  max-width: min(34rem, 100%);
 }
 
 .wallet-pass-fan-hint {
@@ -279,19 +284,21 @@
   width: 100%;
   min-height: var(--wallet-fan-height, 32rem);
   margin: 0 auto;
-  perspective: 900px;
+  padding-right: var(--wallet-fan-peek-pad, 2.5rem);
+  perspective: 1100px;
+  overflow: visible;
 }
 
 .wallet-pass-fan-slot {
   position: absolute;
   left: 0.1rem;
-  right: 0.1rem;
+  right: calc(0.1rem + var(--wallet-fan-peek-pad, 2.5rem));
   top: 0;
   transition:
     transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
     filter 0.35s ease;
   will-change: transform;
-  transform-origin: 50% 0%;
+  transform-origin: 12% 8%;
 }
 
 .wallet-pass-fan-slot.is-peek {
@@ -314,10 +321,23 @@
 }
 
 .wallet-pass-fan-slot.is-peek .wallet-pass-card.is-peek-collapsed {
-  min-height: 4.6rem;
+  min-height: 26.5rem;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.55) inset,
-    0 10px 28px rgba(15, 23, 42, 0.14);
+    0 14px 36px rgba(15, 23, 42, 0.16);
+}
+
+.wallet-pass-fan-slot.is-peek .wallet-pass-card.is-peek-collapsed .wallet-pass-card-hero {
+  min-height: 26.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 1.15rem;
+}
+
+.wallet-pass-fan-slot.is-peek .wallet-pass-card.is-peek-collapsed .wallet-pass-peek-seat {
+  top: 1.35rem;
+  transform: none;
 }
 
 .wallet-pass-card-hero {
@@ -336,7 +356,6 @@
 
 .wallet-pass-card.is-peek-collapsed .wallet-pass-card-hero {
   border-radius: 1.45rem;
-  min-height: 4.6rem;
 }
 
 .wallet-pass-card-hero-shade {
@@ -2742,6 +2761,13 @@
 .wallet-desktop-pass-col .wallet-offline-banner,
 .wallet-desktop-pass-col .wallet-install {
   width: min(26.5rem, 100%);
+  align-self: center;
+}
+
+/* Desktop fan needs extra width so side peeks stay visible */
+.wallet-desktop-pass-col .wallet-pass--fan {
+  width: min(34rem, 100%);
+  max-width: none;
   align-self: center;
 }
 

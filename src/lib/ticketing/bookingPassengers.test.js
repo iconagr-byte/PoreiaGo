@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest';
 import {
   buildBookingPassengers,
   validateCompanionNames,
@@ -5,6 +6,8 @@ import {
   seatListFromBooking,
   expandWalletTickets,
   selectWalletPassBookings,
+  sortWalletBookingsByDeparture,
+  walletBookingDepartureMs,
 } from './bookingPassengers.js';
 
 describe('bookingPassengers', () => {
@@ -75,12 +78,13 @@ describe('bookingPassengers', () => {
     expect(tickets[2].passenger.seat).toBe('5F');
   });
 
-  test('expandWalletTickets keeps separate Achillio bookings (5D, 4D, 3A)', () => {
+  test('expandWalletTickets keeps separate Achillio bookings sorted by date', () => {
     const tickets = expandWalletTickets([
       {
         id: 'B-ioa-5d',
         tripTitle: 'Μαγευτικά Ιωάννινα',
         date: '2026-06-17',
+        time: '12:00 μ.μ.',
         seat: '5D',
         seats: ['5D'],
         customerName: 'sdsdsdsdsdsd',
@@ -90,6 +94,7 @@ describe('bookingPassengers', () => {
         id: 'B-ioa-4d',
         tripTitle: 'Μαγευτικά Ιωάννινα',
         date: '2026-06-17',
+        time: '12:00 μ.μ.',
         seat: '4D',
         seats: ['4D'],
         customerName: 'Axilleas',
@@ -99,6 +104,7 @@ describe('bookingPassengers', () => {
         id: 'B-met-3a',
         tripTitle: 'Ημερήσια στα Μετέωρα',
         date: '2026-06-15',
+        time: '08:00 π.μ.',
         seat: '3A',
         seats: ['3A'],
         customerName: 'Axilleas',
@@ -106,7 +112,30 @@ describe('bookingPassengers', () => {
       },
     ]);
     expect(tickets).toHaveLength(3);
-    expect(tickets.map((t) => t.passenger.seat)).toEqual(['5D', '4D', '3A']);
+    // Μετέωρα 2026-06-15 before Ιωάννινα 2026-06-17
+    expect(tickets.map((t) => t.passenger.seat)).toEqual(['3A', '4D', '5D']);
+    expect(tickets[0].booking.tripTitle).toMatch(/Μετέωρα/);
+  });
+
+  test('sortWalletBookingsByDeparture puts 2026-06-15 before 2026-06-17', () => {
+    const sorted = sortWalletBookingsByDeparture([
+      {
+        id: 'ioannina',
+        tripTitle: 'Μαγευτικά Ιωάννινα',
+        date: '2026-06-17',
+        time: '12:00 μ.μ.',
+      },
+      {
+        id: 'meteora',
+        tripTitle: 'Ημερήσια στα Μετέωρα',
+        date: '2026-06-15',
+        time: '08:00 π.μ.',
+      },
+    ]);
+    expect(sorted.map((b) => b.id)).toEqual(['meteora', 'ioannina']);
+    expect(walletBookingDepartureMs(sorted[0])).toBeLessThan(
+      walletBookingDepartureMs(sorted[1]),
+    );
   });
 
   test('expandWalletTickets splits seat string when seats[] truncated', () => {
@@ -131,18 +160,21 @@ describe('bookingPassengers', () => {
         {
           id: 'B1',
           date: '2026-06-17',
+          time: '12:00 μ.μ.',
           seat: '5D',
           status: 'Επιβεβαιωμένη',
         },
         {
           id: 'B2',
           date: '2026-06-17',
+          time: '12:00 μ.μ.',
           seat: '4D',
           status: 'Επιβεβαιωμένη',
         },
         {
           id: 'B3',
           date: '2026-06-15',
+          time: '08:00 π.μ.',
           seat: '3A',
           status: 'Επιβεβαιωμένη',
         },
@@ -156,7 +188,10 @@ describe('bookingPassengers', () => {
       { now },
     );
     expect(selected).toHaveLength(3);
-    expect(selected.map((b) => b.seat)).toEqual(['3A', '5D', '4D']);
+    // Earliest calendar first — featured/front ticket is Μετέωρα (3A)
+    expect(selected[0].seat).toBe('3A');
+    expect(selected[0].date).toBe('2026-06-15');
+    expect(selected.map((b) => b.date)).toEqual(['2026-06-15', '2026-06-17', '2026-06-17']);
   });
 
   test('selectWalletPassBookings prefers upcoming when mixed', () => {
@@ -170,6 +205,7 @@ describe('bookingPassengers', () => {
       { now },
     );
     expect(selected).toHaveLength(2);
-    expect(selected.map((b) => b.seat)).toEqual(['5D', '4D']);
+    expect(selected.every((b) => b.date === '2026-06-17')).toBe(true);
+    expect(selected.map((b) => b.id).sort()).toEqual(['next', 'next2']);
   });
 });

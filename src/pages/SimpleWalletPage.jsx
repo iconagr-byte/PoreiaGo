@@ -26,6 +26,7 @@ import { getBookingById, loadBookingsForCustomer } from '../lib/ticketing/bookin
 import {
   expandWalletTickets,
   selectWalletPassBookings,
+  sortWalletBookingsByDeparture,
 } from '../lib/ticketing/bookingPassengers.js';
 import { loadTrips } from '../lib/trips/tripStore.js';
 import { bookingCoverUrl } from '../lib/trips/tripPhotos.js';
@@ -106,17 +107,9 @@ function pickFeaturedBooking(bookings, highlightId) {
     const hit = bookings.find((b) => b.id === highlightId);
     if (hit) return hit;
   }
-  const now = new Date();
-  const upcoming = bookings
-    .filter((b) => b.status !== 'Ακυρωμένη')
-    .filter((b) => !b.date || new Date(`${b.date}T23:59:59`) >= now)
-    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-  if (upcoming.length) {
-    return upcoming.find((b) => isPaid(b)) || upcoming[0];
-  }
-  return [...bookings].sort(
-    (a, b) => new Date(b.paymentDate || b.date || 0) - new Date(a.paymentDate || a.date || 0),
-  )[0];
+  // Same calendar-first order as Εισιτήριο fan stack (earliest first).
+  const selected = selectWalletPassBookings(bookings);
+  return selected[0] || null;
 }
 
 function WalletAuthGate() {
@@ -241,15 +234,13 @@ function WalletAuthenticatedApp() {
     loadMyBookings(email)
       .then((list) => {
         if (cancelled) return;
-        const sorted = [...list].sort(
-          (a, b) =>
-            new Date(b.paymentDate || b.date || 0) - new Date(a.paymentDate || a.date || 0),
-        );
+        // Κρατήσεις + pass feeds: earliest excursion first (date+time).
+        let sorted = sortWalletBookingsByDeparture(list);
         const focus = focusId || peekWalletFocusBooking();
         if (focus && !sorted.some((b) => b.id === focus)) {
           const local = getBookingById(focus);
           if (local && String(local.email || '').toLowerCase() === email) {
-            sorted.unshift(local);
+            sorted = sortWalletBookingsByDeparture([...sorted, local]);
           }
         }
         setBookings(sorted);
@@ -425,7 +416,7 @@ function WalletAuthenticatedApp() {
   };
 
   /**
-   * All wallet tickets for Εισιτήριο (gallery / fan) and the «Επόμενες» rail.
+   * All wallet tickets for Εισιτήριο fan stack and the «Επόμενες» rail.
    * Must not collapse to featured-only when trip dates are past — that left the
    * rail showing 2 other bookings while the center showed a single hero.
    */
@@ -561,7 +552,7 @@ function WalletAuthenticatedApp() {
     </>
   );
 
-  /** Per-seat passes for the rail — same expansion as the gallery / native stack. */
+  /** Per-seat passes for the rail — same expansion as the Apple Wallet fan stack. */
   const railTickets = passTickets.slice(0, 8);
   const railEmpty = railTickets.length === 0;
 
@@ -746,38 +737,7 @@ function WalletAuthenticatedApp() {
               {upcomingRail}
             </div>
           ) : (
-            <>
-              {homePass}
-              {passTickets.length > 1 ? (
-                <div className="wallet-home-more">
-                  {passTickets.slice(0, 4).map((ticket) => {
-                    const seat = ticket.passenger?.seat || ticket.booking.seat || '';
-                    return (
-                      <button
-                        key={ticket.key}
-                        type="button"
-                        className="wallet-home-more-btn"
-                        onClick={() => openTicket(ticket.booking)}
-                      >
-                        <span className="truncate pr-2">{ticket.booking.tripTitle}</span>
-                        <span>
-                          {ticket.booking.date}
-                          {seat ? ` · ${seat}` : ''}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    className="wallet-home-more-btn"
-                    onClick={() => switchTab('bookings')}
-                  >
-                    <span>Όλες οι κρατήσεις</span>
-                    <span>{bookings.length}</span>
-                  </button>
-                </div>
-              ) : null}
-            </>
+            homePass
           )
         ) : null}
 

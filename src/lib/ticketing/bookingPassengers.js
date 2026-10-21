@@ -126,26 +126,76 @@ export function bookerNameFromPassengers(passengers, fallback = '') {
 }
 
 /**
- * Bookings that feed the Εισιτήριο gallery / native stack.
+ * Departure instant for calendar sort (date + time ascending).
+ * Accepts ISO `departureAt`, or `date` + Greek/24h `time` (e.g. "12:00 μ.μ.").
+ */
+export function walletBookingDepartureMs(booking) {
+  if (!booking) return 0;
+  const iso = booking.departureAt || booking.departure_at;
+  if (iso) {
+    const fromIso = new Date(iso).getTime();
+    if (!Number.isNaN(fromIso)) return fromIso;
+  }
+  const date = String(booking.date || '').trim();
+  if (!date) return 0;
+  const timeRaw = String(booking.time || '').trim().toLowerCase();
+  let hh = 0;
+  let mm = 0;
+  const m = timeRaw.match(/(\d{1,2}):(\d{2})/);
+  if (m) {
+    hh = Number(m[1]);
+    mm = Number(m[2]);
+    const isPm = /μ\.?\s*μ|pm/.test(timeRaw);
+    const isAm = /π\.?\s*μ|am/.test(timeRaw);
+    if (isPm && hh < 12) hh += 12;
+    if (isAm && hh === 12) hh = 0;
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  const fromParts = new Date(`${date}T${pad(hh)}:${pad(mm)}:00`).getTime();
+  if (!Number.isNaN(fromParts)) return fromParts;
+  const dayOnly = new Date(`${date}T00:00:00`).getTime();
+  return Number.isNaN(dayOnly) ? 0 : dayOnly;
+}
+
+/** Ascending by excursion departure (calendar-first), then booking id. */
+export function compareWalletBookingsByDeparture(a, b) {
+  const byDate = walletBookingDepartureMs(a) - walletBookingDepartureMs(b);
+  if (byDate !== 0) return byDate;
+  const idA = String(a?.id || a?.pnr || '');
+  const idB = String(b?.id || b?.pnr || '');
+  return idA.localeCompare(idB);
+}
+
+export function sortWalletBookingsByDeparture(bookings) {
+  return [...(Array.isArray(bookings) ? bookings.filter(Boolean) : [])].sort(
+    compareWalletBookingsByDeparture,
+  );
+}
+
+/**
+ * Bookings that feed the Εισιτήριο Apple Wallet fan stack.
  *
  * Prefer non-cancelled upcoming trips. When every trip date is in the past
  * (demo dates, clock skew, or travel already done), still return all
  * non-cancelled bookings — otherwise desktop collapses to a single featured
  * hero while the «Επόμενες» rail still lists the other tickets.
+ *
+ * Always sorted earliest departure first (same order on phone + desktop).
  */
 export function selectWalletPassBookings(bookings, { now = new Date() } = {}) {
   const list = Array.isArray(bookings) ? bookings.filter(Boolean) : [];
   const active = list.filter((b) => b.status !== 'Ακυρωμένη');
-  const upcoming = active
-    .filter((b) => !b.date || new Date(`${b.date}T23:59:59`) >= now)
-    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+  const upcoming = sortWalletBookingsByDeparture(
+    active.filter((b) => !b.date || new Date(`${b.date}T23:59:59`) >= now),
+  );
   if (upcoming.length) return upcoming;
-  return [...active].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+  return sortWalletBookingsByDeparture(active);
 }
 
 /**
  * Flatten bookings → one wallet ticket per seat/passenger.
- * Used by My Wallet pass stack / desktop gallery / Επόμενες rail.
+ * Used by My Wallet pass fan stack / Επόμενες rail.
+ * Tickets are ordered by departure ascending so front pass is earliest-first.
  */
 export function expandWalletTickets(bookings, { passengerName = '' } = {}) {
   const list = Array.isArray(bookings) ? bookings.filter(Boolean) : [];
@@ -176,5 +226,6 @@ export function expandWalletTickets(bookings, { passengerName = '' } = {}) {
       });
     });
   }
-  return tickets;
+  // Calendar-first across bookings; stable sort keeps party seat order within one booking.
+  return tickets.sort((a, b) => compareWalletBookingsByDeparture(a.booking, b.booking));
 }
