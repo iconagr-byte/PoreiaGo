@@ -1369,12 +1369,20 @@ class PublicTripResponse(BaseModel):
     market: str | None = None
     vehicleType: str = ""
     currency: str = "EUR"
+    # Office starter catalog (Achillio seed) — Back Office must not strip these.
+    officeSeed: bool = False
+    catalogSource: str = ""
 
 
 @router.get("/api/site/trips", response_model=list[PublicTripResponse])
 async def get_public_office_trips(
     request: Request,
     host: str | None = Query(default=None),
+    tenant_id: str | None = Query(
+        default=None,
+        description="Optional — only honored with a matching office Bearer JWT "
+        "(Back Office on marketing host).",
+    ),
 ):
     """
     Published trips for an office Host — strictly scoped by tenant_id.
@@ -1388,7 +1396,7 @@ async def get_public_office_trips(
     if effective_host and ":" in effective_host:
         effective_host = effective_host.split(":")[0].strip()
 
-    tenant_id: str | None = None
+    resolved_tenant: str | None = None
     if effective_host:
         try:
             from app.core.database import AsyncSessionLocal
@@ -1397,13 +1405,37 @@ async def get_public_office_trips(
             async with AsyncSessionLocal() as session:
                 resolved = await DomainResolver(session).resolve(effective_host)
                 if resolved:
-                    tenant_id = str(resolved.tenant_id)
+                    resolved_tenant = str(resolved.tenant_id)
         except Exception:
             logger.exception("public trips resolve failed for host=%s", effective_host)
-            tenant_id = None
+            resolved_tenant = None
 
-    if not tenant_id:
+    # Host wins when it maps to an office.
+    tid = resolved_tenant
+    if not tid:
+        # Fallback: office JWT on marketing host (admin hydrate).
+        # Never trust naked tenant_id query without matching Bearer tenant.
+        jwt_tid: str | None = None
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                import jwt
+                from middleware.tenant import _jwt_settings
+
+                secret, algorithm, _ = _jwt_settings()
+                if secret:
+                    payload = jwt.decode(auth[7:].strip(), secret, algorithms=[algorithm])
+                    raw = payload.get("tenant_id")
+                    if raw:
+                        jwt_tid = str(raw).strip()
+            except Exception:
+                jwt_tid = None
+        query_tid = (tenant_id or "").strip() or None
+        if jwt_tid and (not query_tid or query_tid == jwt_tid):
+            tid = jwt_tid
+
+    if not tid:
         return []
 
-    rows = list_tenant_trips(tenant_id, published_only=True)
+    rows = list_tenant_trips(tid, published_only=True)
     return [PublicTripResponse(**row) for row in rows]

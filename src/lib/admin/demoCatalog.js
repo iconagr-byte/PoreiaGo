@@ -1,5 +1,8 @@
 /**
  * Platform demo trips/bookings — strip from authenticated offices for production.
+ *
+ * Achillio Travel may reuse the same marketing titles (Μετέωρα / Αθήνα / Ιωάννινα)
+ * with reserved office-seed ids 91001+ — those must stay in Διαχείριση Εκδρομών.
  */
 
 export const DEMO_TRIP_TITLES = new Set([
@@ -7,10 +10,13 @@ export const DEMO_TRIP_TITLES = new Set([
   'Απόδραση στην Πρωτεύουσα',
   'Μαγευτικά Ιωάννινα',
   '3ήμερο Ναύπλιο',
-    'Παρίσι — City of Light',
+  'Παρίσι — City of Light',
   'Ρώμη — La Dolce Vita',
   'Πράγα & Βιέννη',
 ]);
+
+/** Historic PoreiaGo mockData ids — never office catalog rows. */
+export const DEMO_TRIP_IDS = new Set([1, 2, 3, 4, 5, 6]);
 
 export const DEMO_BOOKING_REFS = new Set(
   [
@@ -40,9 +46,34 @@ export function isDemoBooking(booking) {
   return isDemoTripTitle(booking.tripTitle);
 }
 
+/** Achillio Travel starter ids (PoreiaGo demo content adopted as office catalog). */
+export const OFFICE_SEED_TRIP_IDS = new Set([91001, 91002, 91003]);
+
+export function isOfficeSeedTrip(trip) {
+  if (!trip || typeof trip !== 'object') return false;
+  if (trip.officeSeed || trip.office_seed) return true;
+  if (String(trip.catalogSource || trip.catalog_source || '').trim() === 'office_seed') {
+    return true;
+  }
+  const id = Number(trip.id);
+  return Number.isFinite(id) && OFFICE_SEED_TRIP_IDS.has(id);
+}
+
 export function stripDemoTrips(trips) {
   if (!Array.isArray(trips)) return [];
-  return trips.filter((t) => !isDemoTripTitle(t?.title));
+  return trips.filter((t) => {
+    // Keep office-owned starter catalog (Achillio seeded from PoreiaGo demos).
+    if (isOfficeSeedTrip(t)) return true;
+    const id = Number(t?.id);
+    // Platform mock ids 1–6 always go.
+    if (Number.isFinite(id) && DEMO_TRIP_IDS.has(id)) return false;
+    // Title match only for small/platform-like ids — never wipe office timestamp
+    // ids or Achillio seed copies that reuse the same marketing titles.
+    if (isDemoTripTitle(t?.title) && Number.isFinite(id) && id > 0 && id < 1000) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export function stripDemoBookings(bookings) {
