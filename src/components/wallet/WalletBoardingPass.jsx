@@ -5,7 +5,7 @@
  * Phone / native: Apple Wallet fan stack — tap a peek to bring that pass to front.
  * Desktop: graphical card gallery of every ticket.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import TicketQrCode from '../TicketQrCode.jsx';
 import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
@@ -279,18 +279,22 @@ export default function WalletBoardingPass({
     return expandWalletTickets(sources, { passengerName });
   }, [bookings, booking, passengerName]);
 
-  const [activeIndex, setActiveIndex] = useState(0);
-
   const ticketSignature = ticketList.map((t) => t.key).join('|');
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [ticketSignature]);
-
-  useEffect(() => {
-    if (activeIndex >= ticketList.length) {
-      setActiveIndex(Math.max(0, ticketList.length - 1));
-    }
-  }, [activeIndex, ticketList.length]);
+  const [activeKey, setActiveKey] = useState(() => ticketList[0]?.key || '');
+  // Reset selection when the ticket set changes (new claim / hydrate).
+  const [prevSignature, setPrevSignature] = useState(ticketSignature);
+  if (prevSignature !== ticketSignature) {
+    setPrevSignature(ticketSignature);
+    setActiveKey(ticketList[0]?.key || '');
+  }
+  const activeIndex = Math.max(
+    0,
+    ticketList.findIndex((t) => t.key === activeKey),
+  );
+  const setActiveIndex = (index) => {
+    const next = ticketList[index];
+    if (next) setActiveKey(next.key);
+  };
 
   if (!ticketList.length) {
     const trips = Array.isArray(featuredTrips) ? featuredTrips.slice(0, 3) : [];
