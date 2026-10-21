@@ -162,11 +162,7 @@
   padding: 0.85rem 1rem 5.6rem;
 }
 
-/* Fan peeks must not be clipped by the scrollport — keep them inside the pad, but
-   allow slight rotate overhang without eating the side strips. */
-.wallet-main:has(.wallet-pass--fan) {
-  overflow-x: visible;
-}
+/* Vertical stack peeks stay inside the scrollport — no side overhang. */
 
 .wallet-pass {
   display: flex;
@@ -263,19 +259,18 @@
   overflow: hidden;
 }
 
-/* —— Apple Wallet fan (phone / native multi-ticket only) ——
- * Peeks sit left AND right of the front pass — not stacked under an opaque card.
- * Desktop uses .wallet-pass--gallery (side-by-side) instead. */
-.wallet-pass--fan {
-  max-width: min(28.5rem, 100%);
+/* —— Classic Apple Wallet vertical stack (phone + desktop) ——
+ * Back passes: header strip only (~64–88px). Front pass expands with QR.
+ * Tap a peek header to bring that pass to the front. */
+.wallet-pass--vstack {
+  max-width: min(26.5rem, 100%);
   margin-inline: auto;
   width: 100%;
   filter: none;
-  overflow: visible;
 }
 
-.wallet-pass-fan-hint {
-  margin: 0 0 0.75rem;
+.wallet-pass-vstack-hint {
+  margin: 0 0 0.85rem;
   text-align: center;
   font-size: 0.78rem;
   font-weight: 650;
@@ -283,94 +278,108 @@
   color: var(--wallet-muted);
 }
 
-.wallet-pass-fan {
+.wallet-pass-vstack {
+  --wallet-peek-height: 4.75rem; /* ~76px header strip */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   position: relative;
   width: 100%;
-  min-height: var(--wallet-fan-height, 32rem);
-  margin: 0 auto;
-  /* Symmetric gutters so left + right peeks stay inside the layout box */
-  padding-left: var(--wallet-fan-peek-pad, 3.75rem);
-  padding-right: var(--wallet-fan-peek-pad, 3.75rem);
-  perspective: 1100px;
-  overflow: visible;
+  padding-bottom: 0.35rem;
 }
 
-.wallet-pass-fan-slot {
-  position: absolute;
-  left: var(--wallet-fan-peek-pad, 3.75rem);
-  right: var(--wallet-fan-peek-pad, 3.75rem);
-  top: 0;
+.wallet-pass-vstack-slot {
+  position: relative;
+  width: 100%;
   transition:
-    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.35s ease,
-    box-shadow 0.35s ease;
+    transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.3s ease;
   will-change: transform;
-  transform-origin: 50% 8%;
 }
 
-.wallet-pass-fan-slot.is-peek {
+.wallet-pass-vstack-slot + .wallet-pass-vstack-slot {
+  /* Slight tuck — Apple Wallet layered depth between header strips */
+  margin-top: -0.65rem;
+}
+
+.wallet-pass-vstack-slot.is-peek {
   cursor: pointer;
-  filter: brightness(0.94) saturate(0.92);
 }
 
-.wallet-pass-fan-slot.is-peek:active {
-  filter: brightness(0.9) saturate(0.9);
+.wallet-pass-vstack-slot.is-peek:active {
+  transform: translateY(1px);
 }
 
-.wallet-pass-fan-slot.is-peek-left {
-  transform-origin: 88% 10%;
+.wallet-pass-vstack-slot.is-peek:focus-within .wallet-pass-card {
+  box-shadow:
+    0 0 0 3px rgba(0, 113, 227, 0.28),
+    0 -2px 0 rgba(255, 255, 255, 0.35) inset,
+    0 10px 22px rgba(15, 23, 42, 0.18);
 }
 
-.wallet-pass-fan-slot.is-peek-right {
-  transform-origin: 12% 10%;
-}
-
-.wallet-pass-fan-slot.is-front {
-  filter: none;
-}
-
-.wallet-pass-fan-slot .wallet-pass-card {
+.wallet-pass-vstack-slot .wallet-pass-card {
   margin-top: 0;
   padding: 0;
-  border-radius: 1.45rem;
+  border-radius: 1.15rem;
+  transition:
+    box-shadow 0.35s ease,
+    border-radius 0.35s ease,
+    height 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.wallet-pass-fan-slot.is-front .wallet-pass-card {
+.wallet-pass-vstack-slot.is-front .wallet-pass-card {
+  border-radius: 1.25rem;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 22px 48px rgba(15, 23, 42, 0.18);
+    0 -1px 0 rgba(15, 23, 42, 0.04) inset,
+    0 18px 40px rgba(15, 23, 42, 0.16),
+    0 2px 8px rgba(15, 23, 42, 0.08);
 }
 
-.wallet-pass-fan-slot.is-peek .wallet-pass-card.is-peek-collapsed {
-  min-height: 26.5rem;
+/* Collapsed: clip to header strip only (Apple Wallet peek) */
+.wallet-pass-vstack-slot.is-peek .wallet-pass-card.is-peek-collapsed {
+  height: var(--wallet-peek-height);
+  min-height: var(--wallet-peek-height);
+  max-height: var(--wallet-peek-height);
+  overflow: hidden;
+  border-radius: 1.1rem;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.45) inset,
-    0 12px 28px rgba(15, 23, 42, 0.2);
+    0 -1px 0 rgba(255, 255, 255, 0.28) inset,
+    0 8px 20px rgba(15, 23, 42, 0.16),
+    0 1px 0 rgba(15, 23, 42, 0.06);
   border-color: rgba(15, 23, 42, 0.1);
 }
 
-.wallet-pass-fan-slot.is-peek .wallet-pass-card.is-peek-collapsed .wallet-pass-card-hero {
-  min-height: 26.5rem;
+.wallet-pass-vstack-slot.is-peek .wallet-pass-card.is-peek-collapsed .wallet-pass-card-hero {
+  min-height: var(--wallet-peek-height);
+  height: var(--wallet-peek-height);
+  padding: 0.7rem 1rem 0.65rem;
+  border-radius: 1.1rem;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  padding-top: 1.15rem;
+  justify-content: center;
 }
 
-.wallet-pass-fan-slot.is-peek .wallet-pass-card.is-peek-collapsed .wallet-pass-peek-seat {
-  top: 1.35rem;
-  transform: none;
+.wallet-pass-vstack-slot.is-peek .wallet-pass-card-trip {
+  font-size: 0.98rem;
+  margin-top: 0.05rem;
 }
 
-/* Keep the seat chip on the visible outer edge of each peek */
-.wallet-pass-fan-slot.is-peek-left .wallet-pass-peek-seat {
-  right: auto;
-  left: 0.75rem;
+.wallet-pass-vstack-slot.is-peek .wallet-pass-when {
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  opacity: 0.9;
 }
 
-.wallet-pass-fan-slot.is-peek-right .wallet-pass-peek-seat {
-  right: 0.75rem;
-  left: auto;
+.wallet-pass-vstack-slot.is-peek .wallet-pass-brand {
+  margin-bottom: 0.1rem;
+  font-size: 0.58rem;
+}
+
+.wallet-pass-vstack-slot.is-peek .wallet-pass-peek-seat {
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .wallet-pass-card-hero {
@@ -384,11 +393,11 @@
   background-size: cover;
   background-position: center;
   color: #fff;
-  border-radius: 1.45rem 1.45rem 0 0;
+  border-radius: 1.25rem 1.25rem 0 0;
 }
 
 .wallet-pass-card.is-peek-collapsed .wallet-pass-card-hero {
-  border-radius: 1.45rem;
+  border-radius: 1.1rem;
 }
 
 .wallet-pass-card-hero-shade {
@@ -406,6 +415,7 @@
   position: relative;
   z-index: 1;
   padding-right: 3rem;
+  min-width: 0;
 }
 
 .wallet-pass-card-trip {
@@ -436,149 +446,33 @@
   color: #fff;
 }
 
-.wallet-pass-fan-slot .wallet-pass-card-top,
-.wallet-pass-fan-slot .wallet-pass-meta,
-.wallet-pass-fan-slot .wallet-pass-perforation,
-.wallet-pass-fan-slot .wallet-pass-qr-wrap,
-.wallet-pass-fan-slot .wallet-pass-actions {
+.wallet-pass-vstack-slot .wallet-pass-card-top,
+.wallet-pass-vstack-slot .wallet-pass-meta,
+.wallet-pass-vstack-slot .wallet-pass-perforation,
+.wallet-pass-vstack-slot .wallet-pass-qr-wrap,
+.wallet-pass-vstack-slot .wallet-pass-actions {
   padding-left: 1.2rem;
   padding-right: 1.2rem;
 }
 
-.wallet-pass-fan-slot .wallet-pass-card-top {
+.wallet-pass-vstack-slot .wallet-pass-card-top {
   padding-top: 1.15rem;
 }
 
-.wallet-pass-fan-slot .wallet-pass-actions {
+.wallet-pass-vstack-slot .wallet-pass-actions {
   padding-bottom: 1.25rem;
 }
 
-.wallet-pass-fan-dots {
-  display: flex;
-  justify-content: center;
-  gap: 0.4rem;
-  margin-top: 0.85rem;
+.wallet-desktop-pass-col .wallet-pass--vstack {
+  width: min(26.5rem, 100%);
+  max-width: min(26.5rem, 100%);
+  align-self: center;
 }
 
-.wallet-pass-fan-dot {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  border: 0;
-  padding: 0;
-  background: rgba(15, 23, 42, 0.18);
-  cursor: pointer;
-}
-
-.wallet-pass-fan-dot.is-active {
-  background: var(--wallet-accent);
-  width: 1.05rem;
-}
-
-/* —— Desktop multi-ticket gallery (side-by-side, not fan) —— */
-.wallet-pass--gallery {
-  max-width: none;
-  width: 100%;
-  filter: none;
-}
-
-.wallet-pass-gallery-head {
-  margin: 0 0 1.15rem;
-}
-
-.wallet-pass-gallery-kicker {
-  margin: 0;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--wallet-accent);
-}
-
-.wallet-pass-gallery-title {
-  margin: 0.35rem 0 0;
-  font-size: clamp(1.45rem, 2.2vw, 1.85rem);
-  font-weight: 800;
-  letter-spacing: -0.035em;
-  color: var(--wallet-accent-deep);
-}
-
-.wallet-pass-gallery-copy {
-  margin: 0.35rem 0 0;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--wallet-muted);
-}
-
-.wallet-pass-gallery {
-  display: grid;
-  /* Prefer a horizontal row when 2–3 tickets fit; wrap only when narrow */
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
-  gap: 1.15rem;
-  align-items: start;
-}
-
-.wallet-pass-gallery-item {
-  cursor: pointer;
-  border-radius: 1.5rem;
-  outline: none;
-  transition:
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.28s ease;
-}
-
-.wallet-pass-gallery-item:hover {
-  transform: translateY(-3px);
-}
-
-.wallet-pass-gallery-item:focus-visible {
-  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.35);
-}
-
-.wallet-pass-gallery-item .wallet-pass-card {
-  margin-top: 0;
-  padding: 0;
-  height: 100%;
-  transition: box-shadow 0.28s ease, border-color 0.28s ease;
-}
-
-.wallet-pass-gallery-item.is-active .wallet-pass-card {
-  border-color: rgba(0, 113, 227, 0.35);
-  box-shadow:
-    0 0 0 1px rgba(0, 113, 227, 0.2),
-    0 22px 48px rgba(15, 23, 42, 0.14);
-}
-
-.wallet-pass-gallery-item .wallet-pass-card-top,
-.wallet-pass-gallery-item .wallet-pass-meta,
-.wallet-pass-gallery-item .wallet-pass-perforation,
-.wallet-pass-gallery-item .wallet-pass-qr-wrap,
-.wallet-pass-gallery-item .wallet-pass-actions {
-  padding-left: 1.05rem;
-  padding-right: 1.05rem;
-}
-
-.wallet-pass-gallery-item .wallet-pass-card-top {
-  padding-top: 1rem;
-}
-
-.wallet-pass-gallery-item .wallet-pass-actions {
-  padding-bottom: 1.1rem;
-}
-
-.wallet-pass-gallery-item:not(.is-active) .wallet-pass-qr-wrap,
-.wallet-pass-gallery-item:not(.is-active) .wallet-pass-actions {
-  display: none;
-}
-
-.wallet-pass-gallery-item:not(.is-active) .wallet-pass-card {
-  padding-bottom: 1rem;
-}
-
-.wallet-desktop-pass-col .wallet-pass--gallery {
-  width: 100%;
-  max-width: none;
-  align-self: stretch;
+@media (min-width: 768px) {
+  .wallet-pass-vstack {
+    --wallet-peek-height: 5.25rem; /* ~84px on desktop */
+  }
 }
 
 .wallet-pass-card-enter {

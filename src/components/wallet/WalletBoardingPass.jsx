@@ -2,9 +2,10 @@
  * My Wallet home — boarding pass(es). Multi-seat bookings get one QR per traveler
  * (airline-style), still under a single booker wallet account.
  *
- * Phone / native: Apple Wallet fan stack — peeks beside/behind; tap to bring forward.
- * Desktop: side-by-side card gallery (not z-stacked fan). Click a card to expand QR.
- * Tickets stay chronological — earliest departure first (see expandWalletTickets sort).
+ * Phone / native / desktop: classic Apple Wallet vertical stack —
+ * back passes show only a header peek; tap to bring that pass to the front
+ * (expands QR + actions). Tickets stay chronological — earliest departure first
+ * (see expandWalletTickets sort).
  */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -362,131 +363,32 @@ export default function WalletBoardingPass({
   const multi = ticketList.length > 1;
   const front = ticketList[Math.min(activeIndex, ticketList.length - 1)] || ticketList[0];
 
-  // Desktop: side-by-side gallery — every ticket adjacent, not z-stacked behind
-  if (isDesktop && multi) {
-    return (
-      <section className="wallet-pass wallet-pass--gallery" aria-label="Εισιτήρια επιβίβασης">
-        <header className="wallet-pass-gallery-head">
-          <p className="wallet-pass-gallery-kicker">{brandLabel}</p>
-          <h1 className="wallet-pass-gallery-title">Τα εισιτήριά σας</h1>
-          <p className="wallet-pass-gallery-copy">
-            {ticketList.length} εισιτήρια · πατήστε ένα για λεπτομέρειες
-          </p>
-        </header>
-        <div className="wallet-pass-gallery">
-          {ticketList.map((ticket, index) => {
-            const paid = isPaid(ticket.booking);
-            const st = statusStyle(ticket.booking);
-            const pnr = ticket.booking.pnr || ticket.booking.id;
-            const mark = bookingFiscalMark(ticket.booking);
-            const cover = coverForBooking(ticket.booking, coverImage, tripImageFor);
-            const isActive = index === activeIndex;
-            return (
-              <div
-                key={ticket.key}
-                className={`wallet-pass-gallery-item${isActive ? ' is-active' : ''}`}
-                onClick={() => {
-                  if (!isActive) setActiveIndex(index);
-                }}
-                onKeyDown={
-                  isActive
-                    ? undefined
-                    : (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setActiveIndex(index);
-                        }
-                      }
-                }
-                role={isActive ? undefined : 'button'}
-                tabIndex={isActive ? undefined : 0}
-                aria-pressed={isActive}
-              >
-                <PassengerTicketCard
-                  booking={ticket.booking}
-                  passenger={ticket.passenger}
-                  coverImage={cover}
-                  brandLabel={brandLabel}
-                  paid={paid}
-                  status={st}
-                  pnr={pnr}
-                  mark={mark}
-                  offline={offline}
-                  onOpenDetails={onOpenDetails}
-                  onQrChange={isActive ? onQrChange : undefined}
-                  showActions={isActive}
-                  showQr={isActive}
-                  compactHeader
-                  isFront
-                  stackIndex={index}
-                  stackTotal={ticketList.length}
-                />
-              </div>
-            );
-          })}
-        </div>
-      </section>
-    );
-  }
-
-  // Phone / native: Apple Wallet fan — peeks left/right of the front card
+  // Multi-ticket: classic Apple Wallet vertical stack (phone + desktop)
   if (multi) {
-    const peekCount = Math.min(ticketList.length - 1, 4);
-    // Side peeks need a little extra height for depth offset, not a vertical list.
-    const fanHeight = `calc(28.5rem + ${Math.min(peekCount, 3) * 0.65}rem)`;
-    // Wide enough strips that edges read clearly on a ~390px phone (not ~1.2rem slivers).
-    const sideStep = 2.85;
-    const depthStep = 0.55;
-    const layersOut = Math.ceil(peekCount / 2);
-    const peekPad = `${layersOut * sideStep + 0.9}rem`;
-
     return (
-      <section className="wallet-pass wallet-pass--fan" aria-label="Εισιτήρια επιβίβασης">
-        <p className="wallet-pass-fan-hint" role="status">
-          {ticketList.length} εισιτήρια · πατήστε ένα για να έρθει μπροστά
+      <section className="wallet-pass wallet-pass--vstack" aria-label="Εισιτήρια επιβίβασης">
+        <p className="wallet-pass-vstack-hint" role="status">
+          {ticketList.length} εισιτήρια · πατήστε μία κεφαλίδα για να έρθει μπροστά
         </p>
-        <div
-          className="wallet-pass-fan"
-          style={{
-            '--wallet-fan-height': fanHeight,
-            '--wallet-fan-peek-pad': peekPad,
-            height: fanHeight,
-          }}
-        >
+        <div className="wallet-pass-vstack" style={{ '--wallet-stack-count': ticketList.length }}>
           {ticketList.map((ticket, index) => {
             const paid = isPaid(ticket.booking);
             const st = statusStyle(ticket.booking);
             const pnr = ticket.booking.pnr || ticket.booking.id;
-            const mark = index === activeIndex ? bookingFiscalMark(ticket.booking) : null;
-            const cover = coverForBooking(ticket.booking, coverImage, tripImageFor);
             const isFront = index === activeIndex;
-            // Peeks alternate right / left so 3 tickets show both side edges.
-            let rank = 0;
-            if (!isFront) {
-              const behind = ticketList
-                .map((_, i) => i)
-                .filter((i) => i !== activeIndex);
-              rank = behind.indexOf(index) + 1;
-            }
-            const layer = rank === 0 ? 0 : Math.ceil(rank / 2);
-            const side = rank === 0 ? 0 : rank % 2 === 1 ? 1 : -1;
-            const offsetX = side * layer * sideStep;
-            const offsetY = layer * depthStep;
-            const scale = 1 - layer * 0.035;
-            const rot = side * layer * 2.4;
-            const z = isFront ? ticketList.length + 2 : ticketList.length - rank;
+            const mark = isFront ? bookingFiscalMark(ticket.booking) : null;
+            const cover = coverForBooking(ticket.booking, coverImage, tripImageFor);
+            // Peeks above the front stay under it; peeks below sit on top of the front bottom edge.
+            const z = isFront
+              ? ticketList.length + 2
+              : index < activeIndex
+                ? index + 1
+                : ticketList.length - index + ticketList.length;
             return (
               <div
                 key={ticket.key}
-                className={`wallet-pass-fan-slot${isFront ? ' is-front' : ' is-peek'}${
-                  side < 0 ? ' is-peek-left' : side > 0 ? ' is-peek-right' : ''
-                }`}
-                style={{
-                  zIndex: z,
-                  transform: isFront
-                    ? 'translate3d(0, 0, 0) rotate(0deg) scale(1)'
-                    : `translate3d(${offsetX}rem, ${offsetY}rem, 0) rotate(${rot}deg) scale(${scale})`,
-                }}
+                className={`wallet-pass-vstack-slot${isFront ? ' is-front' : ' is-peek'}`}
+                style={{ zIndex: z }}
               >
                 <PassengerTicketCard
                   booking={ticket.booking}
@@ -501,6 +403,7 @@ export default function WalletBoardingPass({
                   onOpenDetails={onOpenDetails}
                   onQrChange={isFront ? onQrChange : undefined}
                   showActions={isFront}
+                  showQr={isFront}
                   compactHeader
                   isFront={isFront}
                   onSelect={() => setActiveIndex(index)}
@@ -511,20 +414,6 @@ export default function WalletBoardingPass({
             );
           })}
         </div>
-        {ticketList.length > 1 ? (
-          <div className="wallet-pass-fan-dots" role="tablist" aria-label="Επιλογή εισιτηρίου">
-            {ticketList.map((t, i) => (
-              <button
-                key={t.key}
-                type="button"
-                className={`wallet-pass-fan-dot${i === activeIndex ? ' is-active' : ''}`}
-                onClick={() => setActiveIndex(i)}
-                aria-label={`Εισιτήριο ${i + 1}`}
-                aria-current={i === activeIndex ? 'true' : undefined}
-              />
-            ))}
-          </div>
-        ) : null}
       </section>
     );
   }

@@ -107,7 +107,7 @@ function pickFeaturedBooking(bookings, highlightId) {
     const hit = bookings.find((b) => b.id === highlightId);
     if (hit) return hit;
   }
-  // Same calendar-first order as Εισιτήριο fan stack (earliest first).
+  // Same calendar-first order as Εισιτήριο vertical stack (earliest first).
   const selected = selectWalletPassBookings(bookings);
   return selected[0] || null;
 }
@@ -416,7 +416,7 @@ function WalletAuthenticatedApp() {
   };
 
   /**
-   * All wallet tickets for Εισιτήριο fan stack and the «Επόμενες» rail.
+   * All wallet tickets for Εισιτήριο vertical stack and the «Επόμενες» rail.
    * Must not collapse to featured-only when trip dates are past — that left the
    * rail showing 2 other bookings while the center showed a single hero.
    */
@@ -552,7 +552,7 @@ function WalletAuthenticatedApp() {
     </>
   );
 
-  /** Per-seat passes for the rail — same expansion as the Apple Wallet fan stack. */
+  /** Per-seat passes for the rail — same expansion as the Apple Wallet vertical stack. */
   const railTickets = passTickets.slice(0, 8);
   const railEmpty = railTickets.length === 0;
 
