@@ -552,7 +552,7 @@ function WalletAuthenticatedApp() {
           offline={usingOfflinePass}
           layout={isDesktop ? 'desktop' : 'phone'}
           featuredTrips={!displayBooking && isDesktop ? officeTrips : []}
-          tripImageFor={tripImageFor}
+          tripImageFor={coverForBooking}
         />
       )}
 
