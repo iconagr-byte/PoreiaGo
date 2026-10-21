@@ -48,6 +48,7 @@ export function mapSaasBookingToLocal(row) {
     time: tripTime,
     seats,
     seat: row.seat_label || seats.join(', '),
+    passengers: Array.isArray(meta.passengers) ? meta.passengers : undefined,
     price: totalEur,
     amountPaid,
     balanceDue,
