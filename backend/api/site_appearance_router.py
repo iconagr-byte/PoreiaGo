@@ -312,6 +312,9 @@ class SiteAppearanceResponse(BaseModel):
     intl_section_subtitle: str = (
         "Οριζόντιες κάρτες διεθνών εκδρομών με λεωφορείο — Παρίσι, Ρώμη και Κεντρική Ευρώπη."
     )
+    # Needed by native Wallet scrub guard — without slug, localhost treated Achillio
+    # office branding as platform poison and cleared the logo.
+    tenant_slug: str | None = None
     updated_at: str | None = None
 
 
