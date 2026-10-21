@@ -19,9 +19,9 @@ on:
         default: ""
         type: string
       git_ref:
-        description: "Git branch/ref to deploy (default: seed PR branch)"
+        description: "Git branch/ref to deploy (default: main)"
         required: false
-        default: "cursor/achillio-seed-poreiago-trips-5ffb"
+        default: "main"
         type: string
 
 concurrency:
