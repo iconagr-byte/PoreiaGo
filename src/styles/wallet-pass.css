@@ -162,6 +162,12 @@
   padding: 0.85rem 1rem 5.6rem;
 }
 
+/* Fan peeks must not be clipped by the scrollport — keep them inside the pad, but
+   allow slight rotate overhang without eating the side strips. */
+.wallet-main:has(.wallet-pass--fan) {
+  overflow-x: visible;
+}
+
 .wallet-pass {
   display: flex;
   flex-direction: column;
@@ -258,16 +264,17 @@
 }
 
 /* —— Apple Wallet fan (phone / native / desktop multi-ticket) ——
- * Peeks sit beside/behind the front pass — not a vertical list underneath. */
+ * Peeks sit left AND right of the front pass — not stacked under an opaque card. */
 .wallet-pass--fan {
-  max-width: 26.5rem;
+  max-width: min(28.5rem, 100%);
   margin-inline: auto;
   width: 100%;
   filter: none;
+  overflow: visible;
 }
 
 .wallet-pass--fan-desktop {
-  max-width: min(34rem, 100%);
+  max-width: min(40rem, 100%);
 }
 
 .wallet-pass-fan-hint {
@@ -284,30 +291,41 @@
   width: 100%;
   min-height: var(--wallet-fan-height, 32rem);
   margin: 0 auto;
-  padding-right: var(--wallet-fan-peek-pad, 2.5rem);
+  /* Symmetric gutters so left + right peeks stay inside the layout box */
+  padding-left: var(--wallet-fan-peek-pad, 3.75rem);
+  padding-right: var(--wallet-fan-peek-pad, 3.75rem);
   perspective: 1100px;
   overflow: visible;
 }
 
 .wallet-pass-fan-slot {
   position: absolute;
-  left: 0.1rem;
-  right: calc(0.1rem + var(--wallet-fan-peek-pad, 2.5rem));
+  left: var(--wallet-fan-peek-pad, 3.75rem);
+  right: var(--wallet-fan-peek-pad, 3.75rem);
   top: 0;
   transition:
     transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.35s ease;
+    filter 0.35s ease,
+    box-shadow 0.35s ease;
   will-change: transform;
-  transform-origin: 12% 8%;
+  transform-origin: 50% 8%;
 }
 
 .wallet-pass-fan-slot.is-peek {
   cursor: pointer;
-  filter: brightness(0.96);
+  filter: brightness(0.94) saturate(0.92);
 }
 
 .wallet-pass-fan-slot.is-peek:active {
-  filter: brightness(0.92);
+  filter: brightness(0.9) saturate(0.9);
+}
+
+.wallet-pass-fan-slot.is-peek-left {
+  transform-origin: 88% 10%;
+}
+
+.wallet-pass-fan-slot.is-peek-right {
+  transform-origin: 12% 10%;
 }
 
 .wallet-pass-fan-slot.is-front {
@@ -320,11 +338,18 @@
   border-radius: 1.45rem;
 }
 
+.wallet-pass-fan-slot.is-front .wallet-pass-card {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 22px 48px rgba(15, 23, 42, 0.18);
+}
+
 .wallet-pass-fan-slot.is-peek .wallet-pass-card.is-peek-collapsed {
   min-height: 26.5rem;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.55) inset,
-    0 14px 36px rgba(15, 23, 42, 0.16);
+    0 1px 0 rgba(255, 255, 255, 0.45) inset,
+    0 12px 28px rgba(15, 23, 42, 0.2);
+  border-color: rgba(15, 23, 42, 0.1);
 }
 
 .wallet-pass-fan-slot.is-peek .wallet-pass-card.is-peek-collapsed .wallet-pass-card-hero {
@@ -338,6 +363,17 @@
 .wallet-pass-fan-slot.is-peek .wallet-pass-card.is-peek-collapsed .wallet-pass-peek-seat {
   top: 1.35rem;
   transform: none;
+}
+
+/* Keep the seat chip on the visible outer edge of each peek */
+.wallet-pass-fan-slot.is-peek-left .wallet-pass-peek-seat {
+  right: auto;
+  left: 0.75rem;
+}
+
+.wallet-pass-fan-slot.is-peek-right .wallet-pass-peek-seat {
+  right: 0.75rem;
+  left: auto;
 }
 
 .wallet-pass-card-hero {
@@ -2764,9 +2800,9 @@
   align-self: center;
 }
 
-/* Desktop fan needs extra width so side peeks stay visible */
+/* Desktop fan needs extra width so left+right peeks stay visible */
 .wallet-desktop-pass-col .wallet-pass--fan {
-  width: min(34rem, 100%);
+  width: min(40rem, 100%);
   max-width: none;
   align-self: center;
 }

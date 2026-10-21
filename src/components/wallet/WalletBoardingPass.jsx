@@ -362,13 +362,16 @@ export default function WalletBoardingPass({
   const multi = ticketList.length > 1;
   const front = ticketList[Math.min(activeIndex, ticketList.length - 1)] || ticketList[0];
 
-  // Phone / native / desktop: Apple Wallet fan — peeks beside/behind, not listed below
+  // Phone / native / desktop: Apple Wallet fan — peeks left/right of the front card
   if (multi) {
     const peekCount = Math.min(ticketList.length - 1, 4);
     // Side peeks need a little extra height for depth offset, not a vertical list.
-    const fanHeight = `calc(28.5rem + ${Math.min(peekCount, 3) * 0.55}rem)`;
-    const sideStep = isDesktop ? 1.55 : 1.2;
-    const depthStep = isDesktop ? 0.42 : 0.38;
+    const fanHeight = `calc(28.5rem + ${Math.min(peekCount, 3) * 0.65}rem)`;
+    // Wide enough strips that edges read clearly on a ~390px phone (not ~1.2rem slivers).
+    const sideStep = isDesktop ? 3.35 : 2.85;
+    const depthStep = isDesktop ? 0.62 : 0.55;
+    const layersOut = Math.ceil(peekCount / 2);
+    const peekPad = `${layersOut * sideStep + 0.9}rem`;
 
     return (
       <section
@@ -382,7 +385,7 @@ export default function WalletBoardingPass({
           className="wallet-pass-fan"
           style={{
             '--wallet-fan-height': fanHeight,
-            '--wallet-fan-peek-pad': `${peekCount * sideStep + 0.75}rem`,
+            '--wallet-fan-peek-pad': peekPad,
             height: fanHeight,
           }}
         >
@@ -393,7 +396,7 @@ export default function WalletBoardingPass({
             const mark = index === activeIndex ? bookingFiscalMark(ticket.booking) : null;
             const cover = coverForBooking(ticket.booking, coverImage, tripImageFor);
             const isFront = index === activeIndex;
-            // Peeks sit beside/behind the front pass (not stacked underneath).
+            // Peeks alternate right / left so 3 tickets show both side edges.
             let rank = 0;
             if (!isFront) {
               const behind = ticketList
@@ -401,19 +404,23 @@ export default function WalletBoardingPass({
                 .filter((i) => i !== activeIndex);
               rank = behind.indexOf(index) + 1;
             }
-            const offsetX = rank * sideStep;
-            const offsetY = rank * depthStep;
-            const scale = 1 - rank * 0.018;
-            const rot = rank * 1.35;
+            const layer = rank === 0 ? 0 : Math.ceil(rank / 2);
+            const side = rank === 0 ? 0 : rank % 2 === 1 ? 1 : -1;
+            const offsetX = side * layer * sideStep;
+            const offsetY = layer * depthStep;
+            const scale = 1 - layer * 0.035;
+            const rot = side * layer * 2.4;
             const z = isFront ? ticketList.length + 2 : ticketList.length - rank;
             return (
               <div
                 key={ticket.key}
-                className={`wallet-pass-fan-slot${isFront ? ' is-front' : ' is-peek'}`}
+                className={`wallet-pass-fan-slot${isFront ? ' is-front' : ' is-peek'}${
+                  side < 0 ? ' is-peek-left' : side > 0 ? ' is-peek-right' : ''
+                }`}
                 style={{
                   zIndex: z,
                   transform: isFront
-                    ? 'translate3d(0, 0, 0) rotate(0deg)'
+                    ? 'translate3d(0, 0, 0) rotate(0deg) scale(1)'
                     : `translate3d(${offsetX}rem, ${offsetY}rem, 0) rotate(${rot}deg) scale(${scale})`,
                 }}
               >
