@@ -14,6 +14,7 @@ from app.api.schemas import (
     BookingResponse,
     GuestBookingCreate,
     GuestBookingLookup,
+    GuestBookingResponse,
     OccupiedSeatsResponse,
 )
 from app.core.auth_deps import (
@@ -143,7 +144,7 @@ async def get_occupied_seats(
 
 @router.post(
     "/guest",
-    response_model=BookingResponse,
+    response_model=GuestBookingResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_guest_booking(body: GuestBookingCreate, request: Request):
@@ -151,6 +152,9 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
 
     Optional My Wallet Bearer JWT stamps the booking with the logged-in account so
     the office sees who booked without the customer re-entering identity.
+
+    Guest B2C checkouts (no Bearer) get a one-shot ``wallet_activate_token`` so the
+    storefront can open My Wallet immediately after payment without a password.
     """
     tenant_id = await _resolve_guest_tenant(request, body.tenant_id)
     ref = f"BK-{secrets.token_hex(4).upper()}"
@@ -366,7 +370,48 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         except Exception:
             pass
 
-        return booking
+        # Guest website checkout → mint one-shot activate token (not stored on booking).
+        activate_token: str | None = None
+        src_l = source.lower()
+        is_office_desk = (
+            "office" in src_l
+            or "walk-in" in src_l
+            or "walk_in" in src_l
+            or "desk" in src_l
+            or "γκισέ" in src_l
+        )
+        if not wallet_email and passenger_email and not is_office_desk:
+            try:
+                from ticketing.wallet_magic import create_wallet_magic_token
+
+                activate_token = await create_wallet_magic_token(
+                    email=passenger_email,
+                    booking_id=str(booking.id),
+                    name=passenger_name,
+                    phone=passenger_phone,
+                )
+            except Exception:
+                activate_token = None
+
+        return GuestBookingResponse(
+            id=booking.id,
+            tenant_id=booking.tenant_id,
+            reference_code=booking.reference_code,
+            status=booking.status.value if hasattr(booking.status, "value") else str(booking.status),
+            payment_status=(
+                booking.payment_status.value
+                if hasattr(booking.payment_status, "value")
+                else str(booking.payment_status)
+            ),
+            total_price=booking.total_price,
+            amount_paid=booking.amount_paid,
+            amount_eur=booking.amount_eur,
+            passenger_name=booking.passenger_name,
+            passenger_email=booking.passenger_email,
+            seat_label=booking.seat_label,
+            metadata_json=booking.metadata_json,
+            wallet_activate_token=activate_token,
+        )
 
 
 @router.post(

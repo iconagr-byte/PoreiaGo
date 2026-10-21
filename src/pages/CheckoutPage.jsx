@@ -10,8 +10,9 @@ import {
   loginAsCustomer,
 } from '../lib/auth.js';
 import CustomerLoginModal from '../components/auth/CustomerLoginModal.jsx';
-import { fetchCustomerMe } from '../services/customerAuthApi.js';
+import { consumeWalletMagic, fetchCustomerMe } from '../services/customerAuthApi.js';
 import {
+  clearWalletClaim,
   saveWalletClaim,
   walletClaimAuthPath,
   walletClaimNavState,
@@ -428,6 +429,51 @@ export default function CheckoutPage() {
         return;
       }
 
+      // Guest checkout → auto-create My Wallet from email (one-shot server token).
+      const activateToken = booking.walletActivateToken;
+      if (activateToken) {
+        try {
+          const profile = await consumeWalletMagic(activateToken);
+          loginAsCustomer(
+            profile.email,
+            {
+              name: profile.name || form.name,
+              picture: profile.picture,
+              provider: profile.provider || 'magic',
+              phone: profile.phone || form.phone,
+              customerId: profile.customer_id,
+              tenant_id: profile.tenant_id,
+            },
+            profile.access_token,
+          );
+          clearWalletClaim();
+          try {
+            const { upsertBookingOnServer } = await import(
+              '../services/customerBookingsApi.js'
+            );
+            await upsertBookingOnServer(booking);
+          } catch {
+            /* wallet can still show local + claim later */
+          }
+          toast.success(
+            isBankTransfer
+              ? 'Κράτηση OK — δημιουργήθηκε My Wallet με το εισιτήριό σας'
+              : 'Πληρωμή OK — ανοίγει το My Wallet με το εισιτήριό σας',
+          );
+          navigate('/wallet', {
+            replace: true,
+            state: walletHomeNavState({
+              highlightBooking: profile.highlight_booking || booking.id,
+              fromClaim: true,
+            }),
+          });
+          return;
+        } catch (activateErr) {
+          console.warn('[checkout] auto wallet activate failed', activateErr);
+          /* fall through to manual claim */
+        }
+      }
+
       const claim = saveWalletClaim({
         email: form.email,
         name: form.name,
@@ -438,8 +484,8 @@ export default function CheckoutPage() {
       });
       toast.success(
         isBankTransfer
-          ? 'Κράτηση OK — δημιουργήστε My Wallet για το εισιτήριο'
-          : 'Πληρωμή OK — δημιουργήστε My Wallet για να δείτε το εισιτήριο',
+          ? 'Κράτηση OK — ολοκληρώστε My Wallet για το εισιτήριο'
+          : 'Πληρωμή OK — ολοκληρώστε My Wallet για το εισιτήριο',
       );
       navigate(walletClaimAuthPath({ preferLogin: false }), {
         replace: true,
@@ -487,7 +533,9 @@ export default function CheckoutPage() {
           <p className="text-sm text-on-surface-variant mt-1">
             {isDemo
               ? 'Προεπισκόπηση διαδικασίας κράτησης θέσης'
-              : 'Ασφαλής πληρωμή · μετά δημιουργείτε My Wallet για το εισιτήριο'}
+              : accountReady
+                ? 'Ασφαλής πληρωμή · το εισιτήριο μπαίνει στο My Wallet σας'
+                : 'Ασφαλής πληρωμή με email · μετά ανοίγει αυτόματα το My Wallet'}
           </p>
         </div>
 
@@ -511,12 +559,12 @@ export default function CheckoutPage() {
                     <p className="text-sm font-bold text-on-surface">
                       {accountReady
                         ? 'Συνδεδεμένος λογαριασμός'
-                        : 'Log in to your account'}
+                        : 'Έχετε ήδη My Wallet;'}
                     </p>
                     <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
                       {accountReady
                         ? `Η κράτηση θα συνδεθεί με ${form.email || 'τον λογαριασμό σας'} και θα εμφανιστεί στο My Wallet.`
-                        : 'Για να γνωρίζει το σύστημα ποιος κάνει την κράτηση — το εισιτήριο μπαίνει αυτόματα στο My Wallet σας.'}
+                        : 'Μπορείτε να κλείσετε με email — μετά την πληρωμή ανοίγει αυτόματα λογαριασμός My Wallet. Αν έχετε ήδη, συνδεθείτε.'}
                     </p>
                   </div>
                   {!accountReady ? (

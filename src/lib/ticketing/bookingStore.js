@@ -486,6 +486,10 @@ export async function createBookingFromCheckout({
           bankAccountId,
         },
       );
+      // One-shot My Wallet activate after guest checkout (server-minted).
+      if (api.wallet_activate_token) {
+        booking.walletActivateToken = String(api.wallet_activate_token);
+      }
       const saved = addBooking(booking);
       try {
         const sync = await syncTicketForBoarding(saved);
