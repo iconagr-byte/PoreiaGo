@@ -435,7 +435,11 @@ async def confirm_bank_deposit(
     )
 
     try:
-        await send_payment_confirmation_notifications(saved, event=EVENT_BANK_CONFIRMED)
+        await send_payment_confirmation_notifications(
+            saved,
+            event=EVENT_BANK_CONFIRMED,
+            require_office=True,
+        )
     except Exception:
         pass
 
@@ -687,7 +691,11 @@ async def record_cash_payment_admin(
         pass
 
     try:
-        await send_payment_confirmation_notifications(saved, event=EVENT_CASH_PAYMENT)
+        await send_payment_confirmation_notifications(
+            saved,
+            event=EVENT_CASH_PAYMENT,
+            require_office=True,
+        )
     except Exception:
         pass
 

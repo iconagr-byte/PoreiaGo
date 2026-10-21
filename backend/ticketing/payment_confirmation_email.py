@@ -37,11 +37,26 @@ def _money(value: Any) -> str:
         return "—"
 
 
-def _read_notification_settings() -> dict[str, Any]:
+def _valid_email(value: Any) -> str | None:
+    email = str(value or "").strip().lower()
+    return email if email and "@" in email and "." in email.split("@", 1)[-1] else None
+
+
+def _tenant_id_from_booking(booking: dict[str, Any] | None) -> str | None:
+    if not booking:
+        return None
+    for key in ("tenant_id", "tenantId", "office_id", "officeId"):
+        raw = booking.get(key)
+        if raw:
+            return str(raw).strip()
+    return None
+
+
+def _read_notification_settings(tenant_id: str | None = None) -> dict[str, Any]:
     try:
         from travel_platform.settings.payment_settings_store import read_payment_settings
 
-        security = read_payment_settings().get("security") or {}
+        security = read_payment_settings(tenant_id).get("security") or {}
     except Exception:
         security = {}
     return {
@@ -51,22 +66,110 @@ def _read_notification_settings() -> dict[str, Any]:
     }
 
 
-def _admin_recipient() -> str | None:
-    cfg = _read_notification_settings()
-    if cfg["admin_email"] and "@" in cfg["admin_email"]:
-        return cfg["admin_email"].lower()
+def _admin_recipient(tenant_id: str | None = None) -> str | None:
+    """Sync fallback chain for office/admin payment emails.
+
+    Order: tenant payment admin_notification_email → platform support_email →
+    ADMIN_NOTIFICATION_EMAIL env.
+    Prefer ``resolve_office_recipient`` (async) when tenant DB lookups are needed.
+    """
+    cfg = _read_notification_settings(tenant_id)
+    if _valid_email(cfg["admin_email"]):
+        return _valid_email(cfg["admin_email"])
     try:
         from travel_platform.settings.platform_store import get_platform_config
 
-        email = str(get_platform_config().support_email or "").strip().lower()
-        if email and "@" in email:
+        email = _valid_email(get_platform_config().support_email)
+        if email:
             return email
     except Exception:
         pass
     import os
 
-    env = os.getenv("ADMIN_NOTIFICATION_EMAIL", "").strip().lower()
-    return env if env and "@" in env else None
+    return _valid_email(os.getenv("ADMIN_NOTIFICATION_EMAIL", ""))
+
+
+async def _tenant_office_emails(tenant_id: str) -> list[str]:
+    """Collect office contact emails from tenant settings / appearance / admin users."""
+    found: list[str] = []
+    seen: set[str] = set()
+
+    def _add(value: Any) -> None:
+        email = _valid_email(value)
+        if email and email not in seen:
+            seen.add(email)
+            found.append(email)
+
+    try:
+        from uuid import UUID
+
+        from sqlalchemy import select
+
+        from app.core.database import AsyncSessionLocal
+        from app.models.tenant import Tenant
+        from app.models.user import User, UserRole
+
+        tid = UUID(str(tenant_id))
+        async with AsyncSessionLocal() as session:
+            tenant = (
+                await session.execute(select(Tenant).where(Tenant.id == tid))
+            ).scalar_one_or_none()
+            if tenant and tenant.settings_json:
+                import json
+
+                try:
+                    settings = json.loads(tenant.settings_json)
+                except (json.JSONDecodeError, TypeError):
+                    settings = {}
+                if isinstance(settings, dict):
+                    platform = settings.get("platform") if isinstance(settings.get("platform"), dict) else {}
+                    appearance = (
+                        settings.get("site_appearance")
+                        if isinstance(settings.get("site_appearance"), dict)
+                        else {}
+                    )
+                    _add(platform.get("support_email"))
+                    _add(platform.get("admin_notification_email"))
+                    _add(appearance.get("footer_contact_email"))
+                    _add(settings.get("support_email"))
+                    _add(settings.get("contact_email"))
+
+            # Prefer an active tenant_admin as last resort for this office.
+            users = (
+                await session.execute(
+                    select(User)
+                    .where(User.tenant_id == tid, User.is_active.is_(True))
+                    .limit(25)
+                )
+            ).scalars().all()
+            for user in users:
+                roles = list(user.roles or [])
+                if UserRole.TENANT_ADMIN.value in roles or UserRole.DISPATCHER.value in roles:
+                    _add(user.email)
+    except Exception as exc:
+        logger.debug("tenant office email lookup failed tenant=%s: %s", tenant_id, exc)
+
+    return found
+
+
+async def resolve_office_recipient(
+    tenant_id: str | None = None,
+    *,
+    booking: dict[str, Any] | None = None,
+) -> str | None:
+    """Resolve office email for a booking's tenant — never silently prefer wrong tenant."""
+    tid = (str(tenant_id).strip() if tenant_id else None) or _tenant_id_from_booking(booking)
+
+    cfg = _read_notification_settings(tid)
+    if _valid_email(cfg["admin_email"]):
+        return _valid_email(cfg["admin_email"])
+
+    if tid:
+        for email in await _tenant_office_emails(tid):
+            return email
+
+    # Global fallbacks (platform / env) — used when tenant has no contact configured.
+    return _admin_recipient(None)
 
 
 def _wrap_html(title: str, body: str) -> str:
@@ -96,19 +199,81 @@ def _wrap_html(title: str, body: str) -> str:
 </html>"""
 
 
+def _seats_display(booking: dict[str, Any]) -> str:
+    seats = booking.get("seat") or booking.get("seats")
+    if isinstance(seats, (list, tuple)):
+        return ", ".join(str(s) for s in seats if s) or "—"
+    return str(seats or "—")
+
+
 def _booking_summary_rows(booking: dict[str, Any]) -> str:
     pnr = booking.get("pnr") or booking.get("id") or "—"
+    saas_id = booking.get("saasBookingId") or booking.get("saas_booking_id") or ""
+    source = booking.get("bookingSource") or booking.get("source") or ""
+    agent = booking.get("agentName") or booking.get("agent_name") or ""
+    trip_id = booking.get("tripId") or booking.get("trip_id") or booking.get("external_trip_id") or ""
+    extra_rows = ""
+    if saas_id:
+        extra_rows += f'<tr><td style="padding:4px 0;"><strong>Booking ID:</strong> {saas_id}</td></tr>'
+    if trip_id:
+        extra_rows += f'<tr><td style="padding:4px 0;"><strong>Trip ID:</strong> {trip_id}</td></tr>'
+    if source:
+        extra_rows += f'<tr><td style="padding:4px 0;"><strong>Πηγή:</strong> {source}</td></tr>'
+    if agent:
+        extra_rows += f'<tr><td style="padding:4px 0;"><strong>Πράκτορας:</strong> {agent}</td></tr>'
     return f"""
     <table width="100%" style="background:#f8fafc;border-radius:12px;padding:16px;font-size:13px;color:#475569;margin-top:16px;">
       <tr><td style="padding:4px 0;"><strong>PNR:</strong> {pnr}</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Εκδρομή:</strong> {booking.get("tripTitle") or "—"}</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Θέσεις:</strong> {booking.get("seat") or booking.get("seats") or "—"}</td></tr>
+      {extra_rows}
+      <tr><td style="padding:4px 0;"><strong>Εκδρομή:</strong> {booking.get("tripTitle") or booking.get("trip_title") or "—"}</td></tr>
+      <tr><td style="padding:4px 0;"><strong>Θέσεις:</strong> {_seats_display(booking)}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Ημερομηνία:</strong> {booking.get("date") or "—"} {booking.get("time") or ""}</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Πελάτης:</strong> {booking.get("customerName") or "—"}</td></tr>
+      <tr><td style="padding:4px 0;"><strong>Πελάτης:</strong> {booking.get("customerName") or booking.get("customer_name") or "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Email:</strong> {booking.get("email") or "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Τηλέφωνο:</strong> {booking.get("phone") or "—"}</td></tr>
     </table>
     """
+
+
+def _payment_detail_rows(booking: dict[str, Any]) -> str:
+    plan = booking.get("paymentPlan") or booking.get("payment_plan") or ""
+    deposit_pct = booking.get("depositPercent") or booking.get("deposit_percent")
+    txn = booking.get("transactionId") or booking.get("transaction_id") or ""
+    invoice = booking.get("invoiceNumber") or booking.get("invoice_number") or ""
+    pay_date = booking.get("paymentDate") or booking.get("payment_date") or ""
+    balance_method = booking.get("balanceDueMethod") or booking.get("balance_due_method") or ""
+    tenant = booking.get("tenant_id") or booking.get("tenantId") or ""
+    rows = [
+        f'<tr><td style="padding:4px 0;"><strong>Τρόπος πληρωμής:</strong> {booking.get("paymentMethod") or booking.get("payment_method") or "—"}</td></tr>',
+        f'<tr><td style="padding:4px 0;"><strong>Κατάσταση κράτησης:</strong> {booking.get("status") or "—"}</td></tr>',
+        f'<tr><td style="padding:4px 0;"><strong>Κατάσταση πληρωμής:</strong> {booking.get("paymentStatus") or booking.get("payment_status") or "—"}</td></tr>',
+        f'<tr><td style="padding:4px 0;"><strong>Πληρώθηκε τώρα / σύνολο πληρωμών:</strong> {_money(booking.get("amountPaid") or booking.get("amount_paid") or booking.get("price"))}</td></tr>',
+        f'<tr><td style="padding:4px 0;"><strong>Υπόλοιπο:</strong> {_money(booking.get("balanceDue") or booking.get("balance_due") or 0)}</td></tr>',
+        f'<tr><td style="padding:4px 0;"><strong>Σύνολο κράτησης:</strong> {_money(booking.get("price") or booking.get("amount") or booking.get("total_eur"))}</td></tr>',
+    ]
+    if plan:
+        plan_label = plan
+        if deposit_pct:
+            plan_label = f"{plan} ({deposit_pct}%)"
+        rows.append(f'<tr><td style="padding:4px 0;"><strong>Πλάνο:</strong> {plan_label}</td></tr>')
+    if balance_method:
+        rows.append(
+            f'<tr><td style="padding:4px 0;"><strong>Υπόλοιπο — τρόπος:</strong> {balance_method}</td></tr>'
+        )
+    if txn:
+        rows.append(f'<tr><td style="padding:4px 0;"><strong>Transaction:</strong> {txn}</td></tr>')
+    if invoice:
+        rows.append(f'<tr><td style="padding:4px 0;"><strong>Τιμολόγιο:</strong> {invoice}</td></tr>')
+    if pay_date:
+        rows.append(f'<tr><td style="padding:4px 0;"><strong>Ημ/νία πληρωμής:</strong> {pay_date}</td></tr>')
+    if tenant:
+        rows.append(f'<tr><td style="padding:4px 0;"><strong>Tenant / γραφείο:</strong> {tenant}</td></tr>')
+    return (
+        '<table width="100%" style="background:#eff6ff;border-radius:12px;padding:16px;'
+        'font-size:13px;color:#1e3a8a;margin-top:12px;border:1px solid #bfdbfe;">'
+        + "".join(rows)
+        + "</table>"
+    )
 
 
 def _fiscal_mark_block(booking: dict[str, Any]) -> str:
@@ -304,14 +469,11 @@ def build_admin_payment_email(booking: dict[str, Any], event: str) -> tuple[str,
         EVENT_ONLINE_FULL: "Νέα κράτηση — πλήρης πληρωμή online",
     }
     label = labels.get(event, "Ενημέρωση πληρωμής")
-    subject = f"[Admin] {label} · {pnr}"
+    subject = f"[Γραφείο] {label} · {pnr}"
     body = f"""
     <p><strong>{label}</strong></p>
-    <p>Τρόπος πληρωμής: {booking.get("paymentMethod") or "—"}<br/>
-    Κατάσταση: {booking.get("status") or "—"} · {booking.get("paymentStatus") or "—"}</p>
-    <p>Πληρώθηκε: {_money(booking.get("amountPaid") or booking.get("price"))} ·
-    Υπόλοιπο: {_money(booking.get("balanceDue") or 0)} ·
-    Σύνολο: {_money(booking.get("price") or booking.get("amount"))}</p>
+    <p>Νέα / ενημερωμένη κράτηση εκδρομής — στοιχεία πληρωμής παρακάτω.</p>
+    {_payment_detail_rows(booking)}
     {_fiscal_mark_block(booking) if event == EVENT_FISCAL_RECEIPT else ""}
     {_bank_transfer_email_block(booking) if event == EVENT_BANK_PENDING else ""}
     {_booking_summary_rows(booking)}
@@ -374,13 +536,31 @@ async def send_payment_confirmation_notifications(
     booking: dict[str, Any],
     *,
     event: str | None = None,
+    require_office: bool = False,
+    notify_customer: bool | None = None,
 ) -> dict[str, Any]:
-    cfg = _read_notification_settings()
-    ev = detect_payment_event(booking, event)
-    customer_email = str(booking.get("email") or "").strip().lower()
-    results: dict[str, Any] = {"event": ev, "customer": None, "admin": None, "ticket": None}
+    """Send customer + office payment emails.
 
-    if cfg["notify_customer"] and customer_email and "@" in customer_email:
+    ``require_office=True`` (paid/confirmed success paths): always attempt the
+    office email even if ``notify_admin_on_payment`` is disabled, and log at
+    error level when no recipient can be resolved.
+    """
+    tenant_id = _tenant_id_from_booking(booking)
+    cfg = _read_notification_settings(tenant_id)
+    ev = detect_payment_event(booking, event)
+    customer_email = _valid_email(booking.get("email"))
+    send_customer = cfg["notify_customer"] if notify_customer is None else bool(notify_customer)
+    send_admin = True if require_office else cfg["notify_admin"]
+    results: dict[str, Any] = {
+        "event": ev,
+        "customer": None,
+        "admin": None,
+        "ticket": None,
+        "tenant_id": tenant_id,
+        "require_office": require_office,
+    }
+
+    if send_customer and customer_email:
         try:
             subject, html = build_customer_payment_email(booking, ev)
             ref = await send_email(customer_email, subject, html)
@@ -393,20 +573,69 @@ async def send_payment_confirmation_notifications(
             logger.warning("Customer payment email failed: %s", exc)
             results["customer_error"] = str(exc)
 
-    if cfg["notify_admin"]:
-        admin_to = _admin_recipient()
+    if send_admin:
+        admin_to = await resolve_office_recipient(tenant_id, booking=booking)
         if admin_to:
             try:
                 subject, html = build_admin_payment_email(booking, ev)
                 ref = await send_email(admin_to, subject, html)
                 results["admin"] = {"email": admin_to, "reference": ref}
+                logger.info(
+                    "Office payment email sent event=%s pnr=%s to=%s tenant=%s",
+                    ev,
+                    booking.get("pnr") or booking.get("id"),
+                    admin_to,
+                    tenant_id,
+                )
             except Exception as exc:
-                logger.warning("Admin payment email failed: %s", exc)
+                logger.error(
+                    "Office payment email failed event=%s pnr=%s tenant=%s: %s",
+                    ev,
+                    booking.get("pnr") or booking.get("id"),
+                    tenant_id,
+                    exc,
+                )
                 results["admin_error"] = str(exc)
         else:
+            msg = (
+                f"No office/admin email configured for paid booking "
+                f"event={ev} pnr={booking.get('pnr') or booking.get('id')} tenant={tenant_id}"
+            )
+            if require_office:
+                logger.error(msg)
+            else:
+                logger.warning(msg)
             results["admin_skipped"] = "No admin email configured"
 
     return results
+
+
+def is_paid_success_booking(booking: dict[str, Any] | None = None, *, amount_paid: float | None = None) -> bool:
+    """True when money was collected / booking is paid or partially paid online."""
+    if amount_paid is not None:
+        try:
+            return float(amount_paid) > 0
+        except (TypeError, ValueError):
+            return False
+    if not booking:
+        return False
+    try:
+        paid = float(
+            booking.get("amountPaid")
+            if booking.get("amountPaid") is not None
+            else booking.get("amount_paid")
+            if booking.get("amount_paid") is not None
+            else 0
+        )
+    except (TypeError, ValueError):
+        paid = 0.0
+    if paid > 0:
+        return True
+    status = str(booking.get("status") or "").lower()
+    pay_status = str(booking.get("paymentStatus") or booking.get("payment_status") or "").lower()
+    return status in {"επιβεβαιωμένη", "confirmed", "paid"} and (
+        "paid" in pay_status or pay_status in {"paid", "partial", "deposit"}
+    )
 
 
 async def notify_fiscal_receipt_issued(
