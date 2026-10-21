@@ -2798,13 +2798,6 @@
   align-self: center;
 }
 
-/* Desktop multi-ticket gallery stretches full pass column (side-by-side cards) */
-.wallet-desktop-pass-col .wallet-pass--gallery {
-  width: 100%;
-  max-width: none;
-  align-self: stretch;
-}
-
 .wallet-desktop-pass-col .wallet-start-feed {
   width: 100%;
   max-width: none;
