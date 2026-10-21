@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class WalletPwaOfflineContractTests(unittest.TestCase):
     def test_wallet_sw_and_manifest_exist(self):
         sw = (ROOT / "public" / "wallet-pwa" / "sw.js").read_text(encoding="utf-8")
-        self.assertIn("poreiago-wallet-v3", sw)
+        self.assertIn("poreiago-wallet-v4", sw)
         self.assertIn("/wallet-pwa/offline.html", sw)
         self.assertIn("pathname.startsWith('/wallet')", sw)
 
@@ -48,6 +48,23 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("/wallet-pwa/sw.js", reg)
+
+    def test_wallet_primary_nav_has_no_kratisi_search_tab(self):
+        """Regression: #799 — Κράτηση (search) must not return as a primary nav tab."""
+        page = (ROOT / "src" / "pages" / "SimpleWalletPage.jsx").read_text(encoding="utf-8")
+        shell = (ROOT / "src" / "components" / "wallet" / "WalletNativeShell.jsx").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("id: 'lookup'", page)
+        self.assertNotIn("label: 'Κράτηση'", page)
+        self.assertNotIn("icon: 'search'", page)
+        self.assertIn("label: 'Αρχική'", page)
+        self.assertIn("label: 'Εισιτήριο'", page)
+        self.assertIn("label: 'Κρατήσεις'", page)
+        self.assertIn("label: 'Εγώ'", page)
+        self.assertNotIn("label: 'Κράτηση'", shell)
+        self.assertNotIn("icon: 'search'", shell)
+        self.assertNotIn("to: '/my-booking'", shell)
 
     def test_nginx_avoids_wallet_directory_trap(self):
         conf = (ROOT / "deploy" / "nginx" / "frontend.conf").read_text(encoding="utf-8")

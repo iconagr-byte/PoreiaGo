@@ -1,7 +1,9 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 
-/** My Wallet only — tickets (Κράτηση removed; use in-app CTAs / /my-booking). */
+/** Capacitor chrome outside /wallet — tickets only.
+ * Do NOT add search/Κράτηση here (or in SimpleWalletPage ALL_TABS).
+ * Booking lookup stays on in-app CTAs + /my-booking. */
 const TABS = [
   { to: '/wallet', end: false, icon: 'confirmation_number', label: 'Εισιτήρια' },
 ];
