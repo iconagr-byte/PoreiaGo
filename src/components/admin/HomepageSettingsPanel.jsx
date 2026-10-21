@@ -106,17 +106,17 @@ const HOME_SECTIONS = [
   { id: 'header', label: 'Header', icon: 'web_asset', accent: 'bg-sky-500' },
   { id: 'hero', label: 'Hero', icon: 'panorama', accent: 'bg-indigo-500' },
   { id: 'slider', label: 'Slider', icon: 'slideshow', accent: 'bg-cyan-600' },
-  { id: 'trips', label: 'Καρτέλες εκδρομών', icon: 'view_carousel', accent: 'bg-emerald-500' },
-  { id: 'branding', label: 'Μάρκα & λογότυπο', icon: 'image', accent: 'bg-amber-500' },
+  { id: 'trips', label: 'Καρτέλες', icon: 'view_carousel', accent: 'bg-emerald-500' },
+  { id: 'branding', label: 'Μάρκα', icon: 'image', accent: 'bg-amber-500' },
   { id: 'footer', label: 'Footer', icon: 'vertical_align_bottom', accent: 'bg-rose-500' },
 ];
 
 const RENT_SECTIONS = [
   { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-teal-600' },
   { id: 'themes', label: 'Θέματα', icon: 'palette', accent: 'bg-fuchsia-500' },
-  { id: 'branding', label: 'Μάρκα & λογότυπο', icon: 'image', accent: 'bg-amber-500' },
-  { id: 'copy', label: 'Όνομα & κείμενα', icon: 'edit_note', accent: 'bg-cyan-600' },
-  { id: 'fleet', label: 'Καρτέλες στόλου', icon: 'directions_car', accent: 'bg-sky-600' },
+  { id: 'branding', label: 'Μάρκα', icon: 'image', accent: 'bg-amber-500' },
+  { id: 'copy', label: 'Κείμενα', icon: 'edit_note', accent: 'bg-cyan-600' },
+  { id: 'fleet', label: 'Στόλος', icon: 'directions_car', accent: 'bg-sky-600' },
   { id: 'slider', label: 'Slider', icon: 'slideshow', accent: 'bg-emerald-600' },
 ];
 
@@ -128,11 +128,11 @@ function PanelCard({ title, description, children, action }) {
   return (
     <div className="page-design-wizard__panel">
       <div className="page-design-wizard__panel-head">
-        <div>
+        <div className="min-w-0 flex-1">
           <h4 className="page-design-wizard__panel-title">{title}</h4>
           {description && <p className="page-design-wizard__panel-desc">{description}</p>}
         </div>
-        {action}
+        {action ? <div className="page-design-wizard__panel-action">{action}</div> : null}
       </div>
       <div className="page-design-wizard__panel-body">{children}</div>
     </div>
@@ -512,9 +512,19 @@ function LogoBlock({
   );
 }
 
-function SaveButton({ saving, label = 'Αποθήκευση' }) {
+function SaveButton({ saving, label = 'Αποθήκευση ενότητας', primary = false }) {
   return (
-    <button type="submit" disabled={saving} className="page-design-wizard__save">
+    <button
+      type="submit"
+      disabled={saving}
+      className={
+        primary ? 'page-design-wizard__save' : 'page-design-wizard__save page-design-wizard__save--section'
+      }
+      title="Αποθηκεύει μόνο αυτή την ενότητα. Για τα πάντα χρησιμοποίησε «Αποθήκευση» πάνω δεξιά."
+    >
+      <span className="material-symbols-outlined text-[16px]" aria-hidden>
+        {saving ? 'progress_activity' : 'save'}
+      </span>
       {saving ? 'Αποθήκευση…' : label}
     </button>
   );
@@ -1299,7 +1309,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   <PanelCard
                     title="2. Χρώματα μετά το θέμα"
                     description="Άλλαξε accent, secondary και surface χωρίς να χαλάσει η διάταξη που επέλεξες."
-                    action={<SaveButton saving={saving} label="Αποθήκευση χρωμάτων" />}
+                    action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
                   >
                     <BrandColorEditor
                       accent={
@@ -1436,7 +1446,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   <PanelCard
                     title="Διάταξη στόλου ενοικίασης"
                     description="Πώς εμφανίζονται τα οχήματα στο block ενοικίασης της αρχικής / στο storefront."
-                    action={<SaveButton saving={saving} label="Αποθήκευση διάταξης" />}
+                    action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
                   >
                     <TemplatePicker
                       category="rent_fleet_layout"
@@ -1451,7 +1461,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   <PanelCard
                     title="Στυλ κάρτας οχήματος"
                     description="Premium showroom, overlay, συμπαγής λίστα ή spec sheet — επιλέξτε εμφάνιση κάρτας."
-                    action={<SaveButton saving={saving} label="Αποθήκευση στυλ" />}
+                    action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
                   >
                     <TemplatePicker
                       category="rent_fleet_card"
@@ -1518,7 +1528,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                   onClick={() => selectSection('branding')}
                   className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800"
                 >
-                  Μάρκα & λογότυπο
+                  Μάρκα
                 </button>
               </div>
             ) : null}
@@ -1530,7 +1540,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             </PanelCard>
             <PanelCard
               title="Γρήγορη εκκίνηση"
-              description="Προτείνουμε: Θέματα → Γενικά → Header → Hero → Καρτέλες → Footer."
+              description="Προτεινόμενη σειρά: Θέματα → Γενικά → Header → Hero → Καρτέλες → Μάρκα → Footer. Χρησιμοποίησε Πίσω/Επόμενο στην κορυφή."
             >
               <div className="grid sm:grid-cols-2 gap-3">
                 {HOME_SECTIONS.filter((s) => s.id !== 'overview').map((s) => (
@@ -1554,7 +1564,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         {designPage === 'home' && section === 'themes' && (
           <PanelCard
             title="Θέματα αρχικής σελίδας"
-            description="Ζωντανή προεπισκόπηση όπως στο /rent — Επισκόπηση ανοίγει την πλήρη αρχική. Ενεργοποίηση αποθηκεύει. Χρώματα στα Γενικά ή με το checkbox προτεινόμενων."
+            description="Το Split δεξιά δείχνει live το draft. «Επισκόπηση» ανοίγει πλήρη οθόνη για σύγκριση θεμάτων. «Ενεργοποίηση» αποθηκεύει. Χρώματα μετά στα Γενικά."
           >
             <ThemeGallery
               activeThemeId={form.homepage_theme_id || 'aegean_classic'}
@@ -1582,7 +1592,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             <PanelCard
               title="Γενικές ρυθμίσεις"
               description="Χρώματα brand, εμφάνιση ενότητων και ενεργό θέμα."
-              action={<SaveButton saving={saving} label="Αποθήκευση" />}
+              action={<SaveButton saving={saving} label="Αποθήκευση γενικών" />}
             >
               <div className="space-y-8">
                 <div>
@@ -1705,7 +1715,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             <PanelCard
               title="Πρότυπα Header"
               description="Η εμφάνιση της κορυφής της αρχικής — λογότυπο, πλοήγηση, στυλ."
-              action={<SaveButton saving={saving} label="Αποθήκευση header" />}
+              action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
             >
               <TemplatePicker
                 category="header"
@@ -1734,7 +1744,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             <PanelCard
               title="Πρότυπα Hero"
               description="Η πρώτη εντύπωση — φωτογραφία, τίτλος και φόρμα αναζήτησης εκδρομών."
-              action={<SaveButton saving={saving} label="Αποθήκευση hero" />}
+              action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
             >
               <TemplatePicker
                 category="hero"
@@ -1788,8 +1798,8 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             <form onSubmit={saveLayout}>
               <PanelCard
                 title="Διάταξη λίστας εκδρομών"
-                description="Πώς εμφανίζονται οι εκδρομές στη μέση της σελίδας — grid, carousel, λίστα κ.λπ."
-                action={<SaveButton saving={saving} label="Αποθήκευση διάταξης" />}
+                description="Πώς εμφανίζονται οι εκδρομές στη μέση της σελίδας — grid, carousel, λίστα κ.λπ. Η επιλογή φαίνεται αμέσως στο Split."
+                action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
               >
                 <TemplatePicker
                   category="trips_layout"
@@ -1817,7 +1827,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               <PanelCard
                 title="Στυλ κάρτας εκδρομής"
                 description="Ίδια εμφάνιση για εκδρομές Ελλάδας και εξωτερικού — premium, minimal, overlay, magazine κ.λπ."
-                action={<SaveButton saving={saving} label="Αποθήκευση καρτών" />}
+                action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
               >
                 <TemplatePicker
                   category="trip_card"
@@ -1839,7 +1849,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               <PanelCard
                 title="Κείμενα ενότητας εκδρομών"
                 description="Τίτλοι πάνω από τις λίστες εγχώριων και διεθνών εκδρομών."
-                action={<SaveButton saving={saving} label="Αποθήκευση κειμένων" />}
+                action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
               >
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-3">
@@ -1969,7 +1979,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             <PanelCard
               title="Μάρκα & λογότυπο"
               description="Επωνυμία γραφείου, λογότυπο και hero φωτογραφία — όλα από εδώ."
-              action={<SaveButton saving={saving} label="Αποθήκευση μάρκας" />}
+              action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
             >
               <div className="space-y-6">
                 <LogoBlock
@@ -2022,7 +2032,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             <PanelCard
               title="Πρότυπα Footer"
               description="Το κάτω μέρος της αρχικής — λογότυπο γραφείου, επωνυμία και κείμενα που επεξεργάζεστε εδώ."
-              action={<SaveButton saving={saving} label="Αποθήκευση footer" />}
+              action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
             >
               <TemplatePicker
                 category="footer"

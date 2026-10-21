@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageDesignLivePreview from './PageDesignLivePreview.jsx';
 
 const COLLAPSE_KEY = 'poreiago_page_design_nav_collapsed';
 const LAYOUT_KEY = 'poreiago_page_design_layout_mode';
+const HINT_KEY = 'poreiago_page_design_hint_dismissed';
+const SPLIT_MIN = 1100;
 
 function readCollapsed() {
   try {
@@ -20,12 +22,68 @@ function readLayoutMode() {
   } catch {
     /* ignore */
   }
-  // Desktop-first: Split on by default when the viewport is wide enough.
-  if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1100px)').matches) {
+  if (typeof window !== 'undefined' && window.matchMedia(`(min-width: ${SPLIT_MIN}px)`).matches) {
     return 'split';
   }
   return 'editor';
 }
+
+function readHintDismissed() {
+  try {
+    return localStorage.getItem(HINT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function useWideEnoughForSplit() {
+  const [wide, setWide] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia(`(min-width: ${SPLIT_MIN}px)`).matches
+      : true,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mq = window.matchMedia(`(min-width: ${SPLIT_MIN}px)`);
+    const onChange = () => setWide(mq.matches);
+    onChange();
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, []);
+
+  return wide;
+}
+
+/** Group labels for clearer left-nav hierarchy (structure only). */
+function sectionGroup(id, designPage) {
+  if (designPage === 'rent') {
+    if (id === 'overview') return null;
+    if (id === 'themes' || id === 'fleet') return 'Εμφάνιση';
+    if (id === 'branding' || id === 'copy') return 'Μάρκα';
+    if (id === 'slider') return 'Περιεχόμενο';
+    return 'Ιστοσελίδα';
+  }
+  if (id === 'overview') return null;
+  if (id === 'themes' || id === 'general' || id === 'header' || id === 'hero') return 'Εμφάνιση';
+  if (id === 'slider' || id === 'trips') return 'Περιεχόμενο';
+  if (id === 'branding' || id === 'footer') return 'Μάρκα';
+  return 'Ιστοσελίδα';
+}
+
+const SECTION_HINTS = {
+  overview: 'Σύνοψη και γρήγορη μετάβαση σε κάθε ενότητα.',
+  themes: 'Διάλεξε θέμα · το Split δείχνει live. Πλήρης οθόνη από «Επισκόπηση».',
+  general: 'Χρώματα brand και ποιες ενότητες εμφανίζονται στην αρχική.',
+  header: 'Πρότυπο κορυφής — λογότυπο, μενού, στυλ.',
+  hero: 'Η πρώτη εντύπωση: φωτογραφία, τίτλοι, αναζήτηση.',
+  slider: 'Carousel διαφανειών πάνω από ή αντί για το στατικό hero.',
+  trips: 'Διάταξη λίστας και στυλ καρτών εκδρομών.',
+  branding: 'Επωνυμία γραφείου, λογότυπο και hero εικόνα.',
+  footer: 'Υποσέλιδο, επικοινωνία και νομικοί σύνδεσμοι.',
+  copy: 'Όνομα και κείμενα της σελίδας /rent.',
+  fleet: 'Διάταξη και στυλ καρτών στόλου ενοικίασης.',
+};
 
 export default function PageDesignWizardShell({
   designPage,
@@ -56,6 +114,9 @@ export default function PageDesignWizardShell({
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [layoutMode, setLayoutMode] = useState(readLayoutMode);
   const [copied, setCopied] = useState(false);
+  const [hintDismissed, setHintDismissed] = useState(readHintDismissed);
+  const [narrowPreviewOpen, setNarrowPreviewOpen] = useState(false);
+  const wideEnough = useWideEnoughForSplit();
 
   useEffect(() => {
     try {
@@ -73,16 +134,39 @@ export default function PageDesignWizardShell({
     }
   }, [layoutMode]);
 
+  // Narrow screens: keep Split preference but fall back to editor + peek preview.
+  const effectiveLayout = useMemo(() => {
+    if (layoutMode === 'split' && !wideEnough) return 'editor';
+    return layoutMode;
+  }, [layoutMode, wideEnough]);
+
+  const wantsSplitButNarrow = layoutMode === 'split' && !wideEnough;
+
   const heroClass =
     designPage === 'rent'
       ? 'page-design-wizard__hero is-rent'
       : 'page-design-wizard__hero';
 
-  const showPreview = layoutMode === 'split' || layoutMode === 'preview';
-  const showEditor = layoutMode === 'split' || layoutMode === 'editor';
+  const showPreview =
+    effectiveLayout === 'split' ||
+    effectiveLayout === 'preview' ||
+    (wantsSplitButNarrow && narrowPreviewOpen);
+  const showEditor = effectiveLayout === 'split' || effectiveLayout === 'editor';
   const activeSection = navSections.find((s) => s.id === section);
+  const activeIndex = Math.max(
+    0,
+    navSections.findIndex((s) => s.id === section),
+  );
+  const prevSection = activeIndex > 0 ? navSections[activeIndex - 1] : null;
+  const nextSection =
+    activeIndex >= 0 && activeIndex < navSections.length - 1
+      ? navSections[activeIndex + 1]
+      : null;
   const liveBadge = 'LIVE';
   const titleBrand = (brandName || '').trim() || siteLabel || 'Γραφείο';
+  const sectionHint =
+    (activeSection && SECTION_HINTS[activeSection.id]) ||
+    'Οι αλλαγές φαίνονται ζωντανά δεξιά. Αποθήκευση πάνω δεξιά για μόνιμη εφαρμογή.';
 
   const copyLink = async () => {
     const href =
@@ -104,12 +188,25 @@ export default function PageDesignWizardShell({
     previewSrc ||
     (designPage === 'rent' ? '/rent?preview=1' : '/storefront?preview=1');
 
+  const dismissHint = () => {
+    setHintDismissed(true);
+    try {
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+      /* ignore */
+    }
+  };
+
+  let lastGroup = null;
+
   return (
     <div
       className={[
         'page-design-wizard__studio',
         collapsed ? 'is-nav-collapsed' : '',
-        `is-layout-${layoutMode}`,
+        `is-layout-${effectiveLayout}`,
+        wantsSplitButNarrow ? 'is-narrow-split' : '',
+        narrowPreviewOpen ? 'is-narrow-preview-open' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -121,7 +218,14 @@ export default function PageDesignWizardShell({
               <p className="page-design-wizard__toolbar-kicker">
                 {designPage === 'rent' ? 'Σελίδα ενοικιάσεων' : 'Ιστοσελίδα γραφείου'}
               </p>
-              <span className="page-design-wizard__live-badge">{liveBadge}</span>
+              <span className="page-design-wizard__live-badge" title="Ζωντανή προεπισκόπηση draft">
+                {liveBadge}
+              </span>
+              {dirty ? (
+                <span className="page-design-wizard__dirty-badge" title="Υπάρχουν μη αποθηκευμένες αλλαγές">
+                  Μη αποθηκευμένα
+                </span>
+              ) : null}
             </div>
             <p className="page-design-wizard__toolbar-title truncate">{titleBrand}</p>
             <p className="page-design-wizard__toolbar-meta truncate">{contractBadge}</p>
@@ -134,27 +238,61 @@ export default function PageDesignWizardShell({
             <span className="hidden sm:inline">Back Office</span>
           </Link>
 
-          <button
-            type="button"
-            className={`page-design-wizard__tool-btn${layoutMode === 'preview' ? ' is-active' : ''}`}
-            onClick={() => setLayoutMode('preview')}
-            aria-pressed={layoutMode === 'preview'}
-            title="Πλήρης προεπισκόπηση"
+          <div
+            className="page-design-wizard__layout-toggle"
+            role="group"
+            aria-label="Διάταξη στούντιο"
           >
-            <span className="material-symbols-outlined text-[18px]">visibility</span>
-            <span className="hidden sm:inline">Προεπισκόπηση</span>
-          </button>
+            <button
+              type="button"
+              className={`page-design-wizard__tool-btn${
+                layoutMode === 'editor' || (wantsSplitButNarrow && !narrowPreviewOpen)
+                  ? ' is-active'
+                  : ''
+              }`}
+              onClick={() => {
+                setLayoutMode('editor');
+                setNarrowPreviewOpen(false);
+              }}
+              aria-pressed={layoutMode === 'editor'}
+              title="Μόνο επεξεργασία"
+            >
+              <span className="material-symbols-outlined text-[18px]">edit_note</span>
+              <span className="hidden lg:inline">Επεξεργασία</span>
+            </button>
 
-          <button
-            type="button"
-            className={`page-design-wizard__tool-btn${layoutMode === 'split' ? ' is-active' : ''}`}
-            onClick={() => setLayoutMode((m) => (m === 'split' ? 'editor' : 'split'))}
-            aria-pressed={layoutMode === 'split'}
-            title="Split · επεξεργασία + ζωντανή προεπισκόπηση"
-          >
-            <span className="material-symbols-outlined text-[18px]">vertical_split</span>
-            <span className="hidden sm:inline">Split</span>
-          </button>
+            <button
+              type="button"
+              className={`page-design-wizard__tool-btn${layoutMode === 'split' ? ' is-active' : ''}`}
+              onClick={() => {
+                setLayoutMode('split');
+                if (!wideEnough) setNarrowPreviewOpen(true);
+              }}
+              aria-pressed={layoutMode === 'split'}
+              title={
+                wideEnough
+                  ? 'Split · επεξεργασία + ζωντανή προεπισκόπηση'
+                  : 'Split · σε στενή οθόνη ανοίγει προεπισκόπηση από κάτω'
+              }
+            >
+              <span className="material-symbols-outlined text-[18px]">vertical_split</span>
+              <span className="hidden sm:inline">Split</span>
+            </button>
+
+            <button
+              type="button"
+              className={`page-design-wizard__tool-btn${layoutMode === 'preview' ? ' is-active' : ''}`}
+              onClick={() => {
+                setLayoutMode('preview');
+                setNarrowPreviewOpen(false);
+              }}
+              aria-pressed={layoutMode === 'preview'}
+              title="Πλήρης προεπισκόπηση"
+            >
+              <span className="material-symbols-outlined text-[18px]">visibility</span>
+              <span className="hidden sm:inline">Προεπισκόπηση</span>
+            </button>
+          </div>
 
           <button
             type="button"
@@ -181,18 +319,64 @@ export default function PageDesignWizardShell({
 
           <button
             type="button"
-            className="page-design-wizard__tool-save"
-            disabled={saving || !onSave}
+            className={`page-design-wizard__tool-save${dirty ? ' is-dirty' : ''}${
+              !dirty && !saving ? ' is-clean' : ''
+            }`}
+            disabled={saving || !onSave || (!dirty && !saving)}
             onClick={() => onSave?.()}
-            title={dirty ? 'Αποθήκευση αλλαγών' : 'Αποθήκευση'}
+            title={
+              dirty
+                ? 'Αποθήκευση όλων των αλλαγών'
+                : 'Δεν υπάρχουν μη αποθηκευμένες αλλαγές'
+            }
           >
             <span className="material-symbols-outlined text-[18px]">
-              {saving ? 'progress_activity' : 'save'}
+              {saving ? 'progress_activity' : dirty ? 'save' : 'check'}
             </span>
-            {saving ? 'Αποθήκευση…' : dirty ? 'Αποθήκευση' : 'Αποθήκευση'}
+            {saving ? 'Αποθήκευση…' : dirty ? 'Αποθήκευση' : 'Αποθηκευμένα'}
           </button>
         </div>
       </header>
+
+      {wantsSplitButNarrow && !narrowPreviewOpen ? (
+        <div className="page-design-wizard__narrow-banner" role="status">
+          <span className="material-symbols-outlined text-[18px]">info</span>
+          <p>
+            Το Split χρειάζεται φαρδύτερη οθόνη. Επεξεργάζεσαι κανονικά — άνοιξε προεπισκόπηση όταν
+            θέλεις.
+          </p>
+          <button
+            type="button"
+            className="page-design-wizard__tool-btn is-active"
+            onClick={() => setNarrowPreviewOpen(true)}
+          >
+            <span className="material-symbols-outlined text-[18px]">visibility</span>
+            Προεπισκόπηση
+          </button>
+        </div>
+      ) : null}
+
+      {!hintDismissed ? (
+        <div className="page-design-wizard__onboard" role="note">
+          <span className="material-symbols-outlined text-[20px] text-[#0071e3]">lightbulb</span>
+          <div className="min-w-0 flex-1">
+            <p className="page-design-wizard__onboard-title">Γρήγορα βήματα</p>
+            <p className="page-design-wizard__onboard-text">
+              Αριστερά διάλεξε ενότητα · στη μέση επεξεργασία · δεξιά ζωντανή προεπισκόπηση. Η μπλε
+              «Αποθήκευση» πάνω δεξιά αποθηκεύει τα πάντα· τα κουμπιά στις κάρτες αποθηκεύουν μόνο την
+              ενότητα.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="page-design-wizard__onboard-dismiss"
+            onClick={dismissHint}
+            aria-label="Κλείσιμο υπόδειξης"
+          >
+            Κατάλαβα
+          </button>
+        </div>
+      ) : null}
 
       <div
         className={`page-design-wizard__layout${collapsed ? ' is-nav-collapsed' : ''}${
@@ -298,23 +482,36 @@ export default function PageDesignWizardShell({
             </div>
 
             <div className="page-design-wizard__nav">
-              <p className="page-design-wizard__nav-group">Ιστοσελίδα</p>
-              {navSections.map((s) => {
+              {navSections.map((s, idx) => {
                 const active = section === s.id;
                 const accent = designPage === 'rent' ? 'teal' : 'violet';
+                const group = sectionGroup(s.id, designPage);
+                const showGroup = group && group !== lastGroup;
+                if (showGroup) lastGroup = group;
                 return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => onSelectSection(s.id)}
-                    data-accent={accent}
-                    className={`page-design-wizard__nav-item${active ? ' is-active' : ''}`}
-                  >
-                    <span className="page-design-wizard__nav-icon">
-                      <span className="material-symbols-outlined text-[18px]">{s.icon}</span>
-                    </span>
-                    {s.label}
-                  </button>
+                  <div key={s.id} className="page-design-wizard__nav-block">
+                    {showGroup ? (
+                      <p className="page-design-wizard__nav-group">{group}</p>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => onSelectSection(s.id)}
+                      data-accent={accent}
+                      className={`page-design-wizard__nav-item${active ? ' is-active' : ''}`}
+                      title={SECTION_HINTS[s.id] || s.label}
+                      aria-current={active ? 'step' : undefined}
+                    >
+                      <span className="page-design-wizard__nav-step" aria-hidden>
+                        {idx + 1}
+                      </span>
+                      <span className="page-design-wizard__nav-icon">
+                        <span className="material-symbols-outlined text-[18px]">{s.icon}</span>
+                      </span>
+                      <span className="page-design-wizard__nav-label">
+                        <span className="page-design-wizard__nav-label-text">{s.label}</span>
+                      </span>
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -325,22 +522,50 @@ export default function PageDesignWizardShell({
           <div className="page-design-wizard__main">
             {activeSection ? (
               <div className="page-design-wizard__section-head">
-                <div>
+                <div className="min-w-0">
+                  <p className="page-design-wizard__section-kicker">
+                    Βήμα {activeIndex + 1} από {navSections.length}
+                  </p>
                   <h3 className="page-design-wizard__section-title">{activeSection.label}</h3>
-                  <p className="page-design-wizard__section-hint">
-                    Οι αλλαγές φαίνονται αμέσως στο Split · πάτα «Αποθήκευση» για μόνιμη εφαρμογή.
+                  <p className="page-design-wizard__section-hint">{sectionHint}</p>
+                  <p className="page-design-wizard__section-save-hint">
+                    {dirty
+                      ? 'Υπάρχουν αλλαγές — πάτα «Αποθήκευση» πάνω δεξιά για όλα, ή το κουμπί της ενότητας.'
+                      : 'Οι αλλαγές φαίνονται αμέσως στο Split · αποθήκευση όταν είσαι έτοιμος.'}
                   </p>
                 </div>
-                {layoutMode === 'editor' ? (
+                <div className="page-design-wizard__section-nav">
                   <button
                     type="button"
                     className="page-design-wizard__tool-btn"
-                    onClick={() => setLayoutMode('split')}
+                    disabled={!prevSection}
+                    onClick={() => prevSection && onSelectSection(prevSection.id)}
+                    title={prevSection ? `Πίσω: ${prevSection.label}` : undefined}
                   >
-                    <span className="material-symbols-outlined text-[18px]">vertical_split</span>
-                    Split
+                    <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                    <span className="hidden sm:inline">Πίσω</span>
                   </button>
-                ) : null}
+                  <button
+                    type="button"
+                    className="page-design-wizard__tool-btn"
+                    disabled={!nextSection}
+                    onClick={() => nextSection && onSelectSection(nextSection.id)}
+                    title={nextSection ? `Επόμενο: ${nextSection.label}` : undefined}
+                  >
+                    <span className="hidden sm:inline">Επόμενο</span>
+                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                  </button>
+                  {effectiveLayout === 'editor' && wideEnough ? (
+                    <button
+                      type="button"
+                      className="page-design-wizard__tool-btn is-active"
+                      onClick={() => setLayoutMode('split')}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">vertical_split</span>
+                      Split
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ) : null}
             {children}
@@ -353,21 +578,44 @@ export default function PageDesignWizardShell({
             previewPathLabel={previewPathLabel}
             designPage={designPage}
             refreshToken={previewRefreshToken}
-            expanded={layoutMode === 'preview'}
+            expanded={effectiveLayout === 'preview'}
+            narrowOverlay={wantsSplitButNarrow && narrowPreviewOpen}
+            onCloseNarrow={
+              wantsSplitButNarrow && narrowPreviewOpen
+                ? () => setNarrowPreviewOpen(false)
+                : undefined
+            }
           />
         ) : null}
 
-        {layoutMode === 'preview' ? (
+        {effectiveLayout === 'preview' ? (
           <button
             type="button"
             className="page-design-wizard__exit-preview"
-            onClick={() => setLayoutMode('split')}
+            onClick={() => setLayoutMode(wideEnough ? 'split' : 'editor')}
           >
             <span className="material-symbols-outlined text-[18px]">edit</span>
             Επιστροφή στην επεξεργασία
           </button>
         ) : null}
       </div>
+
+      {showEditor && dirty ? (
+        <div className="page-design-wizard__mobile-save" role="status">
+          <span className="text-xs font-semibold text-slate-600">Μη αποθηκευμένες αλλαγές</span>
+          <button
+            type="button"
+            className="page-design-wizard__tool-save is-dirty"
+            disabled={saving || !onSave}
+            onClick={() => onSave?.()}
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {saving ? 'progress_activity' : 'save'}
+            </span>
+            {saving ? 'Αποθήκευση…' : 'Αποθήκευση'}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
