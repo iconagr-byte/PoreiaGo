@@ -661,7 +661,7 @@ export async function recordCashPayment(bookingId, payload = {}) {
     } catch (syncErr) {
       console.warn('[cash] ticket re-sync failed', syncErr);
     }
-    notifyPaymentConfirmationSafe(normalized, { event: PAYMENT_NOTIFY_EVENTS.CASH_PAYMENT });
+    // Cash confirmation emails (customer + office) are sent server-side.
     return normalized;
   } catch (err) {
     const msg = String(err?.message || '');
