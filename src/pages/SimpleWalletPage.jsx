@@ -405,6 +405,20 @@ function WalletAuthenticatedApp() {
       new Date(`${b.date}T23:59:59`) >= new Date(),
   );
 
+  /** All upcoming (or featured) bookings for Εισιτήριο — expand to per-seat passes. */
+  const passBookings = useMemo(() => {
+    if (usingOfflinePass && displayBooking) return [displayBooking];
+    const now = new Date();
+    const upcoming = bookings
+      .filter((b) => b.status !== 'Ακυρωμένη')
+      .filter((b) => !b.date || new Date(`${b.date}T23:59:59`) >= now)
+      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    if (upcoming.length) return upcoming;
+    if (featured) return [featured];
+    if (displayBooking) return [displayBooking];
+    return [];
+  }, [bookings, featured, displayBooking, usingOfflinePass]);
+
   // Native Wallet app: always full-bleed phone shell (no tablet/desktop bezel).
   const stageClass = nativeWallet
     ? 'wallet-phone-stage wallet-phone-stage--phone wallet-phone-stage--native'
@@ -498,6 +512,7 @@ function WalletAuthenticatedApp() {
       ) : (
         <WalletBoardingPass
           booking={displayBooking}
+          bookings={passBookings}
           coverImage={displayCover}
           brandLabel={displayBrand}
           passengerName={displayPassenger}
@@ -514,6 +529,7 @@ function WalletAuthenticatedApp() {
           offline={usingOfflinePass}
           layout={isDesktop ? 'desktop' : 'phone'}
           featuredTrips={!displayBooking && isDesktop ? officeTrips : []}
+          tripImageFor={tripImageFor}
         />
       )}
 
