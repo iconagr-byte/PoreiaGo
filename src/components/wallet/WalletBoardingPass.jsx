@@ -2,9 +2,9 @@
  * My Wallet home — boarding pass(es). Multi-seat bookings get one QR per traveler
  * (airline-style), still under a single booker wallet account.
  *
- * All viewports (phone / native / desktop): Apple Wallet fan stack — other passes
- * peek beside/behind the front card; tap a peek to bring that pass (and its QR) forward.
- * Front pass defaults to earliest departure (see expandWalletTickets sort).
+ * Phone / native: Apple Wallet fan stack — peeks beside/behind; tap to bring forward.
+ * Desktop: side-by-side card gallery (not z-stacked fan). Click a card to expand QR.
+ * Tickets stay chronological — earliest departure first (see expandWalletTickets sort).
  */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -362,22 +362,86 @@ export default function WalletBoardingPass({
   const multi = ticketList.length > 1;
   const front = ticketList[Math.min(activeIndex, ticketList.length - 1)] || ticketList[0];
 
-  // Phone / native / desktop: Apple Wallet fan — peeks left/right of the front card
+  // Desktop: side-by-side gallery — every ticket adjacent, not z-stacked behind
+  if (isDesktop && multi) {
+    return (
+      <section className="wallet-pass wallet-pass--gallery" aria-label="Εισιτήρια επιβίβασης">
+        <header className="wallet-pass-gallery-head">
+          <p className="wallet-pass-gallery-kicker">{brandLabel}</p>
+          <h1 className="wallet-pass-gallery-title">Τα εισιτήριά σας</h1>
+          <p className="wallet-pass-gallery-copy">
+            {ticketList.length} εισιτήρια · πατήστε ένα για λεπτομέρειες
+          </p>
+        </header>
+        <div className="wallet-pass-gallery">
+          {ticketList.map((ticket, index) => {
+            const paid = isPaid(ticket.booking);
+            const st = statusStyle(ticket.booking);
+            const pnr = ticket.booking.pnr || ticket.booking.id;
+            const mark = bookingFiscalMark(ticket.booking);
+            const cover = coverForBooking(ticket.booking, coverImage, tripImageFor);
+            const isActive = index === activeIndex;
+            return (
+              <div
+                key={ticket.key}
+                className={`wallet-pass-gallery-item${isActive ? ' is-active' : ''}`}
+                onClick={() => {
+                  if (!isActive) setActiveIndex(index);
+                }}
+                onKeyDown={
+                  isActive
+                    ? undefined
+                    : (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setActiveIndex(index);
+                        }
+                      }
+                }
+                role={isActive ? undefined : 'button'}
+                tabIndex={isActive ? undefined : 0}
+                aria-pressed={isActive}
+              >
+                <PassengerTicketCard
+                  booking={ticket.booking}
+                  passenger={ticket.passenger}
+                  coverImage={cover}
+                  brandLabel={brandLabel}
+                  paid={paid}
+                  status={st}
+                  pnr={pnr}
+                  mark={mark}
+                  offline={offline}
+                  onOpenDetails={onOpenDetails}
+                  onQrChange={isActive ? onQrChange : undefined}
+                  showActions={isActive}
+                  showQr={isActive}
+                  compactHeader
+                  isFront
+                  stackIndex={index}
+                  stackTotal={ticketList.length}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  // Phone / native: Apple Wallet fan — peeks left/right of the front card
   if (multi) {
     const peekCount = Math.min(ticketList.length - 1, 4);
     // Side peeks need a little extra height for depth offset, not a vertical list.
     const fanHeight = `calc(28.5rem + ${Math.min(peekCount, 3) * 0.65}rem)`;
     // Wide enough strips that edges read clearly on a ~390px phone (not ~1.2rem slivers).
-    const sideStep = isDesktop ? 3.35 : 2.85;
-    const depthStep = isDesktop ? 0.62 : 0.55;
+    const sideStep = 2.85;
+    const depthStep = 0.55;
     const layersOut = Math.ceil(peekCount / 2);
     const peekPad = `${layersOut * sideStep + 0.9}rem`;
 
     return (
-      <section
-        className={`wallet-pass wallet-pass--fan${isDesktop ? ' wallet-pass--fan-desktop' : ''}`}
-        aria-label="Εισιτήρια επιβίβασης"
-      >
+      <section className="wallet-pass wallet-pass--fan" aria-label="Εισιτήρια επιβίβασης">
         <p className="wallet-pass-fan-hint" role="status">
           {ticketList.length} εισιτήρια · πατήστε ένα για να έρθει μπροστά
         </p>
