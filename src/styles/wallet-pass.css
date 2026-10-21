@@ -263,18 +263,15 @@
   overflow: hidden;
 }
 
-/* —— Apple Wallet fan (phone / native / desktop multi-ticket) ——
- * Peeks sit left AND right of the front pass — not stacked under an opaque card. */
+/* —— Apple Wallet fan (phone / native multi-ticket only) ——
+ * Peeks sit left AND right of the front pass — not stacked under an opaque card.
+ * Desktop uses .wallet-pass--gallery (side-by-side) instead. */
 .wallet-pass--fan {
   max-width: min(28.5rem, 100%);
   margin-inline: auto;
   width: 100%;
   filter: none;
   overflow: visible;
-}
-
-.wallet-pass--fan-desktop {
-  max-width: min(40rem, 100%);
 }
 
 .wallet-pass-fan-hint {
@@ -478,7 +475,7 @@
   width: 1.05rem;
 }
 
-/* —— Desktop multi-ticket gallery —— */
+/* —— Desktop multi-ticket gallery (side-by-side, not fan) —— */
 .wallet-pass--gallery {
   max-width: none;
   width: 100%;
@@ -515,7 +512,8 @@
 
 .wallet-pass-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
+  /* Prefer a horizontal row when 2–3 tickets fit; wrap only when narrow */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
   gap: 1.15rem;
   align-items: start;
 }
@@ -2800,11 +2798,11 @@
   align-self: center;
 }
 
-/* Desktop fan needs extra width so left+right peeks stay visible */
-.wallet-desktop-pass-col .wallet-pass--fan {
-  width: min(40rem, 100%);
+/* Desktop multi-ticket gallery stretches full pass column (side-by-side cards) */
+.wallet-desktop-pass-col .wallet-pass--gallery {
+  width: 100%;
   max-width: none;
-  align-self: center;
+  align-self: stretch;
 }
 
 .wallet-desktop-pass-col .wallet-start-feed {
