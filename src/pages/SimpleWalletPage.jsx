@@ -59,7 +59,7 @@ import '../styles/wallet-pass.css';
 
 /** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · Εγώ.
  * Desktop → left sidebar; phone → bottom dock.
- * Lookup/book stays on home CTAs + /my-booking links (not a primary tab).
+ * Never add lookup/Κράτηση/search here — use home CTAs + /my-booking.
  * Rent + Lost & Found live under Εγώ (not primary tabs). */
 const ALL_TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
