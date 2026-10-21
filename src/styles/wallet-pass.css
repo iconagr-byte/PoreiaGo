@@ -2105,11 +2105,35 @@
   background: rgba(251, 251, 253, 0.86);
 }
 
-.wallet-phone-stage--desktop .wallet-main {
+.wallet-phone-stage--desktop .wallet-main,
+.wallet-app--desktop .wallet-main {
   width: 100%;
   max-width: none;
   margin: 0;
   padding: 1.15rem 1.65rem 1.75rem;
+}
+
+/* Phone/tablet: keep main scrolling inside the column shell */
+.wallet-body-shell {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wallet-body-shell > .wallet-main {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Desktop: Apple Wallet / SaaS left rail — not the horizontal pill */
+.wallet-desktop-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
 }
 
 .wallet-nav--desktop {
@@ -2119,31 +2143,53 @@
   bottom: auto;
   z-index: 4;
   display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  align-self: stretch;
+  gap: 0.28rem;
   grid-template-columns: none;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin: 0.15rem 1.65rem 0;
-  padding: 0.35rem;
-  width: auto;
+  width: 13.25rem;
+  margin: 0.85rem 0 0.85rem 0.85rem;
+  padding: 0.55rem;
   max-width: none;
-  border-radius: 999px;
-  background: rgba(236, 236, 238, 0.88);
+  border-radius: 1.25rem;
+  background: rgba(236, 236, 238, 0.72);
+  border: 1px solid var(--wallet-stroke);
   box-shadow: none;
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
 }
 
 .wallet-nav--desktop button {
-  flex: 1 1 0;
+  flex: 0 0 auto;
+  width: 100%;
   flex-direction: row;
-  justify-content: center;
-  gap: 0.4rem;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.65rem;
   min-width: 0;
-  padding: 0.62rem 0.85rem;
-  font-size: 0.82rem;
-  border-radius: 999px;
+  padding: 0.72rem 0.85rem;
+  font-size: 0.88rem;
+  letter-spacing: -0.02em;
+  border-radius: 0.85rem;
+  text-align: left;
+}
+
+.wallet-nav--desktop button .wallet-nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .wallet-nav--desktop .material-symbols-outlined {
-  font-size: 1.15rem;
+  flex-shrink: 0;
+  font-size: 1.28rem;
+}
+
+.wallet-app--desktop .wallet-desktop-shell > .wallet-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .wallet-desktop-home {

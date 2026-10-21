@@ -52,7 +52,8 @@ import {
 } from '../lib/wallet/walletTenantSeal.js';
 import '../styles/wallet-pass.css';
 
-/** Match native Wallet IA: Αρχική · Κρατήσεις · Rent? · Εγώ. Lost & Found lives under Εγώ. */
+/** Match native Wallet IA: Αρχική · Κρατήσεις · Rent? · Εγώ.
+ * Desktop → left sidebar; phone → bottom dock. Lost & Found lives under Εγώ. */
 const ALL_TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
@@ -623,11 +624,11 @@ function WalletAuthenticatedApp() {
           </button>
         </header>
 
+        <div className={isDesktop ? 'wallet-desktop-shell' : 'wallet-body-shell'}>
         {isDesktop && !isTicketView ? (
           <nav
             className="wallet-nav wallet-nav--desktop"
             aria-label="My Wallet"
-            style={{ '--wallet-nav-cols': tabs.length }}
           >
             {tabs.map((tab) => (
               <button
@@ -639,7 +640,7 @@ function WalletAuthenticatedApp() {
                 <span className="material-symbols-outlined" aria-hidden>
                   {tab.icon}
                 </span>
-                {tab.label}
+                <span className="wallet-nav-label">{tab.label}</span>
               </button>
             ))}
           </nav>
@@ -862,6 +863,7 @@ function WalletAuthenticatedApp() {
           />
         )}
         </main>
+        </div>
 
         {!isDesktop && !isTicketView ? (
           <nav
