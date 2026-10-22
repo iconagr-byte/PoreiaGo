@@ -105,6 +105,8 @@ export default function PageDesignWizardShell({
   dirty = false,
   onSave,
   previewRefreshToken = 0,
+  /** Middle column has no real editor (e.g. Themes waiting) — give preview the width. */
+  editorSparse = false,
   children,
 }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -148,6 +150,12 @@ export default function PageDesignWizardShell({
     effectiveLayout === 'preview' ||
     (wantsSplitButNarrow && narrowPreviewOpen);
   const showEditor = effectiveLayout === 'split' || effectiveLayout === 'editor';
+  // Split + placeholder-only middle → hide middle, preview grows left (nav stays).
+  const previewDominant =
+    Boolean(editorSparse) &&
+    showPreview &&
+    (effectiveLayout === 'split' || (wantsSplitButNarrow && narrowPreviewOpen));
+  const showMainEditor = showEditor && !previewDominant;
   const liveBadge = 'LIVE';
   const titleBrand = (brandName || '').trim() || siteLabel || 'Γραφείο';
 
@@ -190,6 +198,7 @@ export default function PageDesignWizardShell({
         `is-layout-${effectiveLayout}`,
         wantsSplitButNarrow ? 'is-narrow-split' : '',
         narrowPreviewOpen ? 'is-narrow-preview-open' : '',
+        previewDominant ? 'is-preview-dominant' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -341,7 +350,7 @@ export default function PageDesignWizardShell({
       <div
         className={`page-design-wizard__layout${collapsed ? ' is-nav-collapsed' : ''}${
           showPreview ? ' has-preview' : ''
-        }`}
+        }${previewDominant ? ' is-preview-dominant' : ''}`}
       >
         {collapsed && showEditor ? (
           <button
@@ -478,7 +487,7 @@ export default function PageDesignWizardShell({
           </nav>
         ) : null}
 
-        {showEditor ? (
+        {showMainEditor ? (
           <div className="page-design-wizard__main">{children}</div>
         ) : null}
 
@@ -488,7 +497,7 @@ export default function PageDesignWizardShell({
             previewPathLabel={previewPathLabel}
             designPage={designPage}
             refreshToken={previewRefreshToken}
-            expanded={effectiveLayout === 'preview'}
+            expanded={effectiveLayout === 'preview' || previewDominant}
             narrowOverlay={wantsSplitButNarrow && narrowPreviewOpen}
             onCloseNarrow={
               wantsSplitButNarrow && narrowPreviewOpen

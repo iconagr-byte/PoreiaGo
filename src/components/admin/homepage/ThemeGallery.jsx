@@ -1,3 +1,5 @@
+import { getSelectableHomepageThemes } from '../../../lib/homepage/homepageThemes.js';
+
 /**
  * Homepage Themes panel — waiting for demo website themes.
  * Saved theme id / apply plumbing stays in HomepageSettingsPanel
@@ -5,6 +7,10 @@
  * Selectable catalog remains empty until demos arrive
  * (see getSelectableHomepageThemes in homepageThemes.js).
  */
+export function isHomepageThemesPlaceholder() {
+  return getSelectableHomepageThemes().length === 0;
+}
+
 export default function ThemeGallery({
   // Kept for API stability when demos land (active strip + picker).
   activeThemeId: _activeThemeId,
