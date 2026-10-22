@@ -644,6 +644,10 @@ class TenantSiteAppearanceService:
                 "rent_logo_shadow",
                 "rent_logo_show_name",
                 "rent_header_compact",
+                "hero_image_focal",
+                "hero_overlay_opacity",
+                "hero_image_fit",
+                "hero_height_vh",
             ):
                 if size_key in updated:
                     settings["site_appearance"][size_key] = updated[size_key]
