@@ -16,14 +16,11 @@ export default function FleetShowcaseSection({
       className={`py-24 px-margin-desktop max-w-container-max mx-auto bg-surface-container-lowest border-y border-black/[0.04] ${sectionClassName}`.trim()}
     >
       <div className="text-center mb-16 max-w-2xl mx-auto">
-        <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
-          Ο Στόλος Μας
-        </span>
-        {/* One Builder for the whole fleet section — not per vehicle card. */}
-        <div className="sf-preview-trips-section-head mb-4">
-          <h2 className="font-headline-lg text-4xl md:text-5xl font-bold text-on-surface tracking-tight">
-            Premium λεωφορεία & παροχές
-          </h2>
+        {/* One Builder for the whole fleet card template — beside Ο Στόλος Μας, not per vehicle. */}
+        <div className="sf-preview-trips-section-head mb-3">
+          <span className="text-primary font-semibold tracking-wider uppercase text-sm">
+            Ο Στόλος Μας
+          </span>
           <PreviewBuilderControl
             sectionId="general"
             label="Στόλος"
@@ -32,6 +29,9 @@ export default function FleetShowcaseSection({
             className="sf-preview-trips-section-head__builder"
           />
         </div>
+        <h2 className="font-headline-lg text-4xl md:text-5xl font-bold text-on-surface tracking-tight mb-4">
+          Premium λεωφορεία & παροχές
+        </h2>
         <p className="text-on-surface-variant font-body-md">
           Τα οχήματά μας συγχρονίζονται από τον πίνακα ελέγχου — άνεση, ασφάλεια και σύγχρονες
           παροχές σε κάθε διαδρομή.

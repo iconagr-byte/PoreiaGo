@@ -527,9 +527,19 @@ export default function StorefrontDemoPage() {
         <section className="py-24 bg-surface-bright border-y border-black/[0.05]">
           <div className="max-w-container-max mx-auto px-margin-desktop">
             <div className="text-center max-w-2xl mx-auto mb-16">
-              <h2 className="font-headline-lg font-bold text-on-surface mb-6">
-                Γιατί να μας επιλέξετε
-              </h2>
+              {/* One Builder for the whole why-us card template — not per card. */}
+              <div className="sf-preview-trips-section-head mb-6">
+                <h2 className="font-headline-lg font-bold text-on-surface">
+                  Γιατί να μας επιλέξετε
+                </h2>
+                <PreviewBuilderControl
+                  sectionId="general"
+                  label="Γιατί εμάς"
+                  variant="inline"
+                  instanceId="why-us-section-title"
+                  className="sf-preview-trips-section-head__builder"
+                />
+              </div>
               <p className="font-body-lg text-on-surface-variant">
                 {rentOnly
                   ? 'Online κράτηση ενοικίασης, ξεκάθαροι όροι και υποστήριξη πριν και κατά τη διαδρομή.'
