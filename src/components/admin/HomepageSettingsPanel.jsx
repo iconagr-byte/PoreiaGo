@@ -100,7 +100,6 @@ const DESIGN_PAGES = [
 ];
 
 const HOME_SECTIONS = [
-  { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-violet-500' },
   { id: 'themes', label: 'Θέματα', icon: 'palette', accent: 'bg-fuchsia-500' },
   { id: 'general', label: 'Γενικά', icon: 'tune', accent: 'bg-slate-600' },
   { id: 'header', label: 'Header', icon: 'web_asset', accent: 'bg-sky-500' },
@@ -112,13 +111,14 @@ const HOME_SECTIONS = [
 ];
 
 const RENT_SECTIONS = [
-  { id: 'overview', label: 'Επισκόπηση', icon: 'dashboard', accent: 'bg-teal-600' },
   { id: 'themes', label: 'Θέματα', icon: 'palette', accent: 'bg-fuchsia-500' },
   { id: 'branding', label: 'Μάρκα', icon: 'image', accent: 'bg-amber-500' },
   { id: 'copy', label: 'Κείμενα', icon: 'edit_note', accent: 'bg-cyan-600' },
   { id: 'fleet', label: 'Στόλος', icon: 'directions_car', accent: 'bg-sky-600' },
   { id: 'slider', label: 'Slider', icon: 'slideshow', accent: 'bg-emerald-600' },
 ];
+
+const DEFAULT_SECTION = 'themes';
 
 function sanitizeDesignPage(value) {
   return value === 'rent' ? 'rent' : 'home';
@@ -704,7 +704,8 @@ function HeroTextsBlock({ form, setForm }) {
 
 function sanitizeSection(value, sections) {
   const ids = sections.map((s) => s.id);
-  return ids.includes(value) ? value : 'overview';
+  if (value && value !== 'overview' && ids.includes(value)) return value;
+  return ids.includes(DEFAULT_SECTION) ? DEFAULT_SECTION : ids[0] || DEFAULT_SECTION;
 }
 
 export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
@@ -717,7 +718,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   const [designPage, setDesignPage] = useState(() =>
     sanitizeDesignPage(initialDesignPage || pageFromQuery),
   );
-  const [section, setSection] = useState('overview');
+  const [section, setSection] = useState(DEFAULT_SECTION);
   const [form, setForm] = useState({ ...DEFAULT_SITE_APPEARANCE });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -765,7 +766,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       const next = sanitizeSection(id, navSections);
       setSection(next);
       const params = new URLSearchParams(searchParams);
-      if (next === 'overview') params.delete('section');
+      if (next === DEFAULT_SECTION) params.delete('section');
       else params.set('section', next);
       setSearchParams(params, { replace: true });
     },
@@ -773,17 +774,24 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   );
 
   useEffect(() => {
-    if (!sectionFromQuery) return;
+    const raw = sectionFromQuery || DEFAULT_SECTION;
     setSection((prev) => {
-      const next = sanitizeSection(sectionFromQuery, navSections);
+      const next = sanitizeSection(raw, navSections);
       return prev === next ? prev : next;
     });
   }, [sectionFromQuery, navSections]);
 
+  useEffect(() => {
+    if (sectionFromQuery !== 'overview') return;
+    const params = new URLSearchParams(searchParams);
+    params.delete('section');
+    setSearchParams(params, { replace: true });
+  }, [sectionFromQuery, searchParams, setSearchParams]);
+
   const selectDesignPage = (id) => {
     const next = resolveDesignPageForModules(id, modules);
     setDesignPage(next);
-    setSection('overview');
+    setSection(DEFAULT_SECTION);
     const params = new URLSearchParams(searchParams);
     if (next === 'rent') params.set('page', 'rent');
     else params.delete('page');
@@ -1115,64 +1123,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     <div className="space-y-6 min-w-0">
         {designPage === 'rent' ? (
           <>
-            {section === 'overview' && (
-              <>
-                <PanelCard
-                  title="Τρέχουσα εμφάνιση /rent"
-                  description="Ξεχωριστή παραμετροποίηση σελίδας ενοικίασης — λογότυπο, κείμενα, στόλος, hero."
-                >
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {[
-                      {
-                        label: 'Θέμα σελίδας',
-                        value: getRentThemeById(form.rent_theme_id || 'aegean_coast').nameEl,
-                      },
-                      { label: 'Όνομα γραφείου', value: rentPreview.brandLabel },
-                      {
-                        label: 'Λογότυπο /rent',
-                        value: hasCustomRentLogo
-                          ? 'Προσαρμοσμένο'
-                          : form.logo_url
-                            ? 'Από γραφείο (λεωφορεία)'
-                            : 'Προεπιλογή',
-                      },
-                      { label: 'Τίτλος', value: rentPreview.title },
-                      { label: 'Κουμπί', value: rentPreview.ctaLabel },
-                      {
-                        label: 'Περιγραφή',
-                        value: rentPreview.copy,
-                      },
-                      {
-                        label: 'Διάταξη στόλου',
-                        value: getTemplateById(
-                          RENT_FLEET_LAYOUT_TEMPLATES,
-                          form.rent_fleet_layout_template || 'rent_grid_three',
-                        ).label,
-                      },
-                      {
-                        label: 'Στυλ κάρτας',
-                        value: getTemplateById(
-                          RENT_FLEET_CARD_TEMPLATES,
-                          form.rent_fleet_card_template || 'rent_premium',
-                        ).label,
-                      },
-                    ].map((row) => (
-                      <div
-                        key={row.label}
-                        className="rounded-2xl border border-black/[0.06] bg-slate-50/80 p-4"
-                      >
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                          {row.label}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-gray-900 line-clamp-3">
-                          {row.value || '—'}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </PanelCard>
-              </>
-            )}
             {section === 'themes' && (
               <>
                 <PanelCard
@@ -1403,7 +1353,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
           </>
         ) : null}
 
-        {designPage === 'home' && section === 'overview' && (
+        {designPage === 'home' && section === 'themes' && (
           <>
             {!String(form.footer_brand_name || '').trim() ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
@@ -1422,21 +1372,18 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 </button>
               </div>
             ) : null}
+            <PanelCard
+              title="Θέματα αρχικής σελίδας"
+              description="Το Split δεξιά δείχνει live το draft. «Επισκόπηση» ανοίγει πλήρη οθόνη για σύγκριση θεμάτων. «Ενεργοποίηση» αποθηκεύει. Χρώματα μετά στα Γενικά."
+            >
+              <ThemeGallery
+                activeThemeId={form.homepage_theme_id || 'aegean_classic'}
+                onPreview={handleThemePreview}
+                onApply={handleThemeApply}
+                applying={saving}
+              />
+            </PanelCard>
           </>
-        )}
-
-        {designPage === 'home' && section === 'themes' && (
-          <PanelCard
-            title="Θέματα αρχικής σελίδας"
-            description="Το Split δεξιά δείχνει live το draft. «Επισκόπηση» ανοίγει πλήρη οθόνη για σύγκριση θεμάτων. «Ενεργοποίηση» αποθηκεύει. Χρώματα μετά στα Γενικά."
-          >
-            <ThemeGallery
-              activeThemeId={form.homepage_theme_id || 'aegean_classic'}
-              onPreview={handleThemePreview}
-              onApply={handleThemeApply}
-              applying={saving}
-            />
-          </PanelCard>
         )}
 
         {designPage === 'home' && section === 'general' && (
