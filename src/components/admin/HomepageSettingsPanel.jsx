@@ -1217,7 +1217,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         {designPage === 'home' && isPageDesignBuilderSection(designPage, section) && (
           <PanelCard
             title={`Builder · ${HOME_SECTIONS.find((s) => s.id === section)?.label || section}`}
-            description="Στο Split / Προεπισκόπηση πάτα «Builder» πάνω δεξιά στην ενότητα (π.χ. Πρόγραμμα εκδρομών). Εδώ εμφανίζεται μόνο όταν δεν υπάρχει ζωντανή προεπισκόπηση."
+            description="Στο Split / Προεπισκόπηση πάτα «Builder» δίπλα στον τίτλο εκδρομών ή πάνω σε κάθε κάρτα (Καρτέλες). Εδώ εμφανίζεται μόνο όταν δεν υπάρχει ζωντανή προεπισκόπηση."
           >
             <PageDesignBuilderPanel
               section={section}
