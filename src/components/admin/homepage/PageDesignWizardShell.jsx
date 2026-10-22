@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import PageDesignLivePreview from './PageDesignLivePreview.jsx';
 
 const COLLAPSE_KEY = 'poreiago_page_design_nav_collapsed';
@@ -102,7 +101,6 @@ export default function PageDesignWizardShell({
   brandName,
   openSiteHref,
   copyLinkHref,
-  backOfficeTo = '/admin',
   saving = false,
   dirty = false,
   onSave,
@@ -218,34 +216,11 @@ export default function PageDesignWizardShell({
         </div>
 
         <div className="page-design-wizard__toolbar-actions">
-          <Link to={backOfficeTo} className="page-design-wizard__tool-btn">
-            <span className="material-symbols-outlined text-[18px]">home</span>
-            <span className="hidden sm:inline">Back Office</span>
-          </Link>
-
           <div
             className="page-design-wizard__layout-toggle"
             role="group"
             aria-label="Διάταξη στούντιο"
           >
-            <button
-              type="button"
-              className={`page-design-wizard__tool-btn${
-                layoutMode === 'editor' || (wantsSplitButNarrow && !narrowPreviewOpen)
-                  ? ' is-active'
-                  : ''
-              }`}
-              onClick={() => {
-                setLayoutMode('editor');
-                setNarrowPreviewOpen(false);
-              }}
-              aria-pressed={layoutMode === 'editor'}
-              title="Μόνο επεξεργασία"
-            >
-              <span className="material-symbols-outlined text-[18px]">edit_note</span>
-              <span className="hidden lg:inline">Επεξεργασία</span>
-            </button>
-
             <button
               type="button"
               className={`page-design-wizard__tool-btn${layoutMode === 'split' ? ' is-active' : ''}`}
