@@ -5,6 +5,9 @@ import TemplatePicker from './homepage/TemplatePicker.jsx';
 import ThemeGallery, { isHomepageThemesPlaceholder } from './homepage/ThemeGallery.jsx';
 import RentThemeGallery from './homepage/RentThemeGallery.jsx';
 import PageDesignWizardShell from './homepage/PageDesignWizardShell.jsx';
+import PageDesignBuilderPanel, {
+  isPageDesignBuilderSection,
+} from './homepage/PageDesignBuilderPanel.jsx';
 import '../../styles/page-design-wizard.css';
 import BrandColorEditor from './homepage/BrandColorEditor.jsx';
 import RentAppBrandingEditor from './fleet/RentAppBrandingEditor.jsx';
@@ -12,17 +15,10 @@ import RentBrandDesigner from './RentBrandDesigner.jsx';
 import PageSliderEditor from './homepage/PageSliderEditor.jsx';
 import HeroImageBlock from './homepage/HeroImageBlock.jsx';
 import {
-  FOOTER_TEMPLATES,
-  HEADER_TEMPLATES,
-  HERO_TEMPLATES,
   RENT_FLEET_CARD_TEMPLATES,
   RENT_FLEET_LAYOUT_TEMPLATES,
-  TRIP_CARD_TEMPLATES,
-  TRIPS_LAYOUT_TEMPLATES,
-  getTemplateById,
 } from '../../lib/homepage/homepageTemplates.js';
 import {
-  getHomepageThemeById,
   themeToAppearancePatch,
 } from '../../lib/homepage/homepageThemes.js';
 import {
@@ -530,178 +526,6 @@ function SaveButton({ saving, label = 'Αποθήκευση ενότητας', p
   );
 }
 
-const HERO_TEXT_DEFAULTS = {
-  hero_badge: DEFAULT_SITE_APPEARANCE.hero_badge,
-  hero_title: DEFAULT_SITE_APPEARANCE.hero_title,
-  hero_title_accent: DEFAULT_SITE_APPEARANCE.hero_title_accent,
-  hero_subtitle: DEFAULT_SITE_APPEARANCE.hero_subtitle,
-  hero_search_label: DEFAULT_SITE_APPEARANCE.hero_search_label,
-};
-
-function HeroTextField({
-  label,
-  hint,
-  icon,
-  value,
-  onChange,
-  onReset,
-  placeholder,
-  multiline = false,
-  rows = 3,
-  maxHint,
-}) {
-  const len = String(value || '').length;
-  const softMax = maxHint || 0;
-  const overSoft = softMax > 0 && len > softMax;
-
-  return (
-    <label className="block rounded-2xl border border-black/[0.06] bg-slate-50/60 hover:bg-slate-50 focus-within:bg-white focus-within:border-sky-300 focus-within:ring-2 focus-within:ring-sky-100 transition-all p-3.5 md:p-4">
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="w-8 h-8 rounded-xl bg-white border border-black/[0.06] flex items-center justify-center shrink-0 text-slate-500">
-            <span className="material-symbols-outlined text-[18px]">{icon}</span>
-          </span>
-          <div className="min-w-0">
-            <span className="block text-sm font-bold text-slate-800">{label}</span>
-            {hint ? <span className="block text-[11px] text-slate-500 mt-0.5 leading-snug">{hint}</span> : null}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {softMax > 0 ? (
-            <span
-              className={`text-[10px] font-bold tabular-nums ${
-                overSoft ? 'text-amber-600' : 'text-slate-400'
-              }`}
-            >
-              {len}/{softMax}
-            </span>
-          ) : (
-            <span className="text-[10px] font-bold tabular-nums text-slate-400">{len}</span>
-          )}
-          {onReset ? (
-            <button
-              type="button"
-              onClick={onReset}
-              className="text-[10px] font-bold uppercase tracking-wide text-sky-700 hover:text-sky-900 px-1.5 py-0.5 rounded-md hover:bg-sky-50"
-              title="Επαναφορά προεπιλογής"
-            >
-              Προεπιλογή
-            </button>
-          ) : null}
-        </div>
-      </div>
-      {multiline ? (
-        <textarea
-          rows={rows}
-          className="w-full rounded-xl border border-black/[0.08] bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 resize-y focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
-          value={value}
-          placeholder={placeholder}
-          onChange={onChange}
-        />
-      ) : (
-        <input
-          className="w-full rounded-xl border border-black/[0.08] bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
-          value={value}
-          placeholder={placeholder}
-          onChange={onChange}
-        />
-      )}
-    </label>
-  );
-}
-
-function HeroTextsBlock({ form, setForm }) {
-  const setField = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
-  const resetField = (key) => () =>
-    setForm((p) => ({ ...p, [key]: HERO_TEXT_DEFAULTS[key] ?? '' }));
-  const resetAll = () => {
-    setForm((p) => ({ ...p, ...HERO_TEXT_DEFAULTS }));
-    toast.success('Επαναφορά προεπιλεγμένων κειμένων hero');
-  };
-
-  return (
-    <div className="mt-8 pt-8 border-t border-black/[0.06]">
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
-        <div>
-          <h5 className="font-bold text-slate-900 text-base flex items-center gap-2">
-            <span className="material-symbols-outlined text-sky-600 text-[22px]">title</span>
-            Κείμενα hero
-          </h5>
-          <p className="text-xs text-slate-500 mt-1 max-w-xl">
-            Εμφανίζονται πάνω στη φωτογραφία της αρχικής. Αποθηκεύστε και ανοίξτε την αρχική για
-            έλεγχο.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={resetAll}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 px-3 py-2 rounded-full border border-black/[0.08] bg-white hover:bg-slate-50"
-        >
-          <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-          Όλα στα προεπιλεγμένα
-        </button>
-      </div>
-
-      <div className="space-y-3 max-w-3xl">
-        <HeroTextField
-          label="Badge"
-          hint="Μικρή ετικέτα πάνω από τον τίτλο"
-          icon="sell"
-          value={form.hero_badge}
-          onChange={setField('hero_badge')}
-          onReset={resetField('hero_badge')}
-          placeholder="π.χ. Premium Ταξιδιωτική Εμπειρία"
-          maxHint={42}
-        />
-        <div className="grid sm:grid-cols-2 gap-3">
-          <HeroTextField
-            label="Τίτλος"
-            hint="Κύρια γραμμή τίτλου"
-            icon="format_size"
-            value={form.hero_title}
-            onChange={setField('hero_title')}
-            onReset={resetField('hero_title')}
-            placeholder="π.χ. Η Ελλάδα, όπως δεν την έχεις ξαναδεί:"
-            maxHint={72}
-          />
-          <HeroTextField
-            label="Τίτλος — τονισμένο"
-            hint="Δεύτερη γραμμή με έμφαση (χρώμα)"
-            icon="format_color_text"
-            value={form.hero_title_accent}
-            onChange={setField('hero_title_accent')}
-            onReset={resetField('hero_title_accent')}
-            placeholder="π.χ. Άνεση, ασφάλεια & θέση εξασφαλισμένη."
-            maxHint={72}
-          />
-        </div>
-        <HeroTextField
-          label="Υπότιτλος"
-          hint="Σύντομη περιγραφή κάτω από τον τίτλο"
-          icon="notes"
-          value={form.hero_subtitle}
-          onChange={setField('hero_subtitle')}
-          onReset={resetField('hero_subtitle')}
-          placeholder="Περιγράψτε τι βρίσκει ο επισκέπτης…"
-          multiline
-          rows={3}
-          maxHint={180}
-        />
-        <HeroTextField
-          label="Ετικέτα φόρμας"
-          hint="Επικεφαλίδα πάνω από τη φόρμα / πρόγραμμα εκδρομών"
-          icon="search"
-          value={form.hero_search_label}
-          onChange={setField('hero_search_label')}
-          onReset={resetField('hero_search_label')}
-          placeholder="π.χ. Πρόγραμμα εκδρομών"
-          maxHint={36}
-        />
-      </div>
-    </div>
-  );
-}
-
 function sanitizeSection(value, sections) {
   const ids = sections.map((s) => s.id);
   if (value && value !== 'overview' && ids.includes(value)) return value;
@@ -993,40 +817,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     }
   };
 
-  const saveLayout = patchForm(
-    {
-      header_template: form.header_template,
-      hero_template: form.hero_template,
-      trips_layout_template: form.trips_layout_template,
-      trip_card_template: form.trip_card_template,
-      footer_template: form.footer_template,
-      rent_fleet_layout_template: form.rent_fleet_layout_template,
-      rent_fleet_card_template: form.rent_fleet_card_template,
-      // One card + layout for Greece and abroad (legacy intl_* kept in sync).
-      intl_trips_layout_template: form.trips_layout_template,
-      intl_trip_card_template: form.trip_card_template,
-    },
-    'Τα πρότυπα αποθηκεύτηκαν',
-  );
-
   const saveRentFleetLayout = patchForm(
     {
       rent_fleet_layout_template: form.rent_fleet_layout_template || 'rent_grid_three',
       rent_fleet_card_template: form.rent_fleet_card_template || 'rent_premium',
     },
     'Τα πρότυπα στόλου ενοικίασης αποθηκεύτηκαν',
-  );
-
-  const saveTripsCopy = patchForm(
-    {
-      trips_section_eyebrow: form.trips_section_eyebrow,
-      trips_section_title: form.trips_section_title,
-      trips_section_subtitle: form.trips_section_subtitle,
-      intl_section_eyebrow: form.intl_section_eyebrow,
-      intl_section_title: form.intl_section_title,
-      intl_section_subtitle: form.intl_section_subtitle,
-    },
-    'Τα κείμενα ενότητας αποθηκεύτηκαν',
   );
 
   const assetUrlKey = (kind) =>
@@ -1381,209 +1177,23 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
           </>
         )}
 
-        {designPage === 'home' && section === 'general' && (
-          <form
-            onSubmit={patchForm(
-              {
-                homepage_theme_id: form.homepage_theme_id,
-                accent_color: form.accent_color,
-                secondary_color: form.secondary_color,
-                surface_color: form.surface_color,
-                show_fleet_section: form.show_fleet_section,
-                show_why_us_section: form.show_why_us_section,
-              },
-              'Οι γενικές ρυθμίσεις αποθηκεύτηκαν',
-            )}
-          >
-            <PanelCard
-              title="Γενικές ρυθμίσεις"
-              description="Χρώματα brand, εμφάνιση ενότητων και ενεργό θέμα."
-              action={<SaveButton saving={saving} label="Αποθήκευση γενικών" />}
-            >
-              <div className="space-y-8">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Ενεργό θέμα</p>
-                  <div className="flex flex-wrap items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-black/[0.06]">
-                    <div className="flex -space-x-1.5 shrink-0" aria-hidden>
-                      {[form.accent_color || '#0ea5e9', form.secondary_color || '#1e3a5f', form.surface_color || '#f8fafc'].map(
-                        (c, i) => (
-                          <span
-                            key={`${c}-${i}`}
-                            className="w-10 h-10 rounded-xl border-2 border-white shadow-sm"
-                            style={{ background: c }}
-                          />
-                        ),
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-gray-900">{getHomepageThemeById(form.homepage_theme_id).nameEl}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                        {getHomepageThemeById(form.homepage_theme_id).description}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => selectSection('themes')}
-                        className="text-xs font-bold text-primary hover:underline mt-1"
-                      >
-                        Αλλαγή θέματος →
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <BrandColorEditor
-                  accent={form.accent_color}
-                  secondary={form.secondary_color}
-                  surface={form.surface_color}
-                  themeName={getHomepageThemeById(form.homepage_theme_id).nameEl}
-                  onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
-                  onResetTheme={() => {
-                    const theme = getHomepageThemeById(form.homepage_theme_id);
-                    setForm((p) => ({
-                      ...p,
-                      accent_color: theme.palette.primary,
-                      secondary_color: theme.palette.secondary,
-                      surface_color: theme.palette.surface,
-                    }));
-                    toast.success('Χρώματα από το ενεργό θέμα');
-                  }}
-                />
-
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Ενότητες σελίδας</p>
-                  <div className="space-y-3">
-                    {[
-                      {
-                        key: 'show_fleet_section',
-                        label: 'Εμφάνιση στόλου',
-                        hint: 'Premium λεωφορεία & παροχές',
-                        icon: 'directions_bus',
-                      },
-                      {
-                        key: 'show_why_us_section',
-                        label: 'Εμφάνιση «Γιατί να μας επιλέξετε»',
-                        hint: 'Τα 3 πλεονεκτήματα κάτω από τις εκδρομές',
-                        icon: 'star',
-                      },
-                    ].map(({ key, label, hint, icon }) => {
-                      const on = form[key] !== false;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setForm((p) => ({ ...p, [key]: !on }))}
-                          className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-colors ${
-                            on
-                              ? 'border-primary/25 bg-primary/[0.04]'
-                              : 'border-black/[0.06] bg-white hover:border-primary/20'
-                          }`}
-                        >
-                          <span
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                              on ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-[22px]">{icon}</span>
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <span className="font-bold text-gray-900 text-sm block">{label}</span>
-                            <p className="text-xs text-gray-500 mt-0.5">{hint}</p>
-                          </div>
-                          <span
-                            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-                              on ? 'bg-primary' : 'bg-slate-200'
-                            }`}
-                            aria-hidden
-                          >
-                            <span
-                              className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                                on ? 'translate-x-5' : ''
-                              }`}
-                            />
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </PanelCard>
-          </form>
-        )}
-
-        {designPage === 'home' && section === 'header' && (
-          <form
-            onSubmit={patchForm(
-              { header_template: form.header_template },
-              'Το header αποθηκεύτηκε',
-            )}
-          >
-            <PanelCard
-              title="Πρότυπα Header"
-              description="Η εμφάνιση της κορυφής της αρχικής — λογότυπο, πλοήγηση, στυλ."
-              action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
-            >
-              <TemplatePicker
-                category="header"
-                templates={HEADER_TEMPLATES}
-                value={form.header_template}
-                onChange={(id) => setForm((p) => ({ ...p, header_template: id }))}
-              />
-            </PanelCard>
-          </form>
-        )}
-
-        {designPage === 'home' && section === 'hero' && (
-          <form
-            onSubmit={patchForm(
-              {
-                hero_template: form.hero_template,
-                hero_badge: form.hero_badge,
-                hero_title: form.hero_title,
-                hero_title_accent: form.hero_title_accent,
-                hero_subtitle: form.hero_subtitle,
-                hero_search_label: form.hero_search_label,
-              },
-              'Το hero αποθηκεύτηκε',
-            )}
-          >
-            <PanelCard
-              title="Πρότυπα Hero"
-              description="Η πρώτη εντύπωση — φωτογραφία, τίτλος και φόρμα αναζήτησης εκδρομών."
-              action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
-            >
-              <TemplatePicker
-                category="hero"
-                templates={HERO_TEMPLATES}
-                value={form.hero_template}
-                onChange={(id) => setForm((p) => ({ ...p, hero_template: id }))}
-              />
-
-              <HeroTextsBlock form={form} setForm={setForm} />
-            </PanelCard>
-          </form>
-        )}
-
-        {designPage === 'home' && section === 'slider' && (
+        {/*
+          Builder-on-preview sections (Γενικά / Header / Hero / Slider / Καρτέλες / Footer):
+          bulky middle editors removed — controls live in preview chrome Builder.
+          Fallback below only shows when Split preview is hidden (editor-only / narrow).
+        */}
+        {designPage === 'home' && isPageDesignBuilderSection(designPage, section) && (
           <PanelCard
-            title="Hero Slider · Λεωφορεία"
-            description="Soliloquy-style builder — drag & drop εικόνες, captions/SEO, transitions, thumbnails, lightbox και προγραμματισμός διαφανειών."
+            title={`Builder · ${HOME_SECTIONS.find((s) => s.id === section)?.label || section}`}
+            description="Στο Split / Προεπισκόπηση πάτα «Builder» πάνω δεξιά. Εδώ εμφανίζεται μόνο όταν δεν υπάρχει ζωντανή προεπισκόπηση."
           >
-            <PageSliderEditor
-              page="home"
-              enabled={Boolean(form.home_slider_enabled)}
-              autoplay={form.home_slider_autoplay !== false}
-              intervalSec={form.home_slider_interval_sec}
-              options={form.home_slider_options}
-              slides={form.home_slider_slides}
+            <PageDesignBuilderPanel
+              section={section}
+              form={form}
+              setForm={setForm}
               saving={saving}
-              onChange={(next) =>
-                setForm((p) => ({
-                  ...p,
-                  ...pageSliderPatch('home', next),
-                }))
-              }
-              onSave={() =>
+              onSelectThemes={() => selectSection('themes')}
+              onSaveSlider={() =>
                 patchForm(
                   pageSliderPatch('home', {
                     enabled: Boolean(form.home_slider_enabled),
@@ -1597,112 +1207,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               }
             />
           </PanelCard>
-        )}
-
-        {designPage === 'home' && section === 'trips' && (
-          <>
-            <form onSubmit={saveLayout}>
-              <PanelCard
-                title="Διάταξη λίστας εκδρομών"
-                description="Πώς εμφανίζονται οι εκδρομές στη μέση της σελίδας — grid, carousel, λίστα κ.λπ. Η επιλογή φαίνεται αμέσως στο Split."
-                action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
-              >
-                <TemplatePicker
-                  category="trips_layout"
-                  templates={TRIPS_LAYOUT_TEMPLATES}
-                  value={form.trips_layout_template}
-                  onChange={(id) =>
-                    setForm((p) => ({
-                      ...p,
-                      trips_layout_template: id,
-                      intl_trips_layout_template: id,
-                      // Destination bento pairs with poster cards (bus gallery look).
-                      ...(id === 'destination_bento'
-                        ? {
-                            trip_card_template: 'destination_poster',
-                            intl_trip_card_template: 'destination_poster',
-                          }
-                        : {}),
-                    }))
-                  }
-                />
-              </PanelCard>
-            </form>
-
-            <form onSubmit={saveLayout} className="mt-6">
-              <PanelCard
-                title="Στυλ κάρτας εκδρομής"
-                description="Ίδια εμφάνιση για εκδρομές Ελλάδας και εξωτερικού — premium, minimal, overlay, magazine κ.λπ."
-                action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
-              >
-                <TemplatePicker
-                  category="trip_card"
-                  templates={TRIP_CARD_TEMPLATES}
-                  value={form.trip_card_template}
-                  onChange={(id) =>
-                    setForm((p) => ({
-                      ...p,
-                      trip_card_template: id,
-                      intl_trip_card_template: id,
-                    }))
-                  }
-                  columns={4}
-                />
-              </PanelCard>
-            </form>
-
-            <form onSubmit={saveTripsCopy} className="mt-6">
-              <PanelCard
-                title="Κείμενα ενότητας εκδρομών"
-                description="Τίτλοι πάνω από τις λίστες εγχώριων και διεθνών εκδρομών."
-                action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
-              >
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <p className="text-xs font-bold uppercase tracking-wider text-primary">Ελλάδα</p>
-                    <input
-                      className="w-full rounded-xl border px-3 py-2 text-sm"
-                      placeholder="Eyebrow"
-                      value={form.trips_section_eyebrow}
-                      onChange={(e) => setForm((p) => ({ ...p, trips_section_eyebrow: e.target.value }))}
-                    />
-                    <input
-                      className="w-full rounded-xl border px-3 py-2 text-sm font-bold"
-                      placeholder="Τίτλος"
-                      value={form.trips_section_title}
-                      onChange={(e) => setForm((p) => ({ ...p, trips_section_title: e.target.value }))}
-                    />
-                    <textarea
-                      rows={2}
-                      className="w-full rounded-xl border px-3 py-2 text-sm resize-y"
-                      placeholder="Υπότιτλος"
-                      value={form.trips_section_subtitle}
-                      onChange={(e) => setForm((p) => ({ ...p, trips_section_subtitle: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <p className="text-xs font-bold uppercase tracking-wider text-violet-600">Εξωτερικό</p>
-                    <input
-                      className="w-full rounded-xl border px-3 py-2 text-sm"
-                      value={form.intl_section_eyebrow}
-                      onChange={(e) => setForm((p) => ({ ...p, intl_section_eyebrow: e.target.value }))}
-                    />
-                    <input
-                      className="w-full rounded-xl border px-3 py-2 text-sm font-bold"
-                      value={form.intl_section_title}
-                      onChange={(e) => setForm((p) => ({ ...p, intl_section_title: e.target.value }))}
-                    />
-                    <textarea
-                      rows={2}
-                      className="w-full rounded-xl border px-3 py-2 text-sm resize-y"
-                      value={form.intl_section_subtitle}
-                      onChange={(e) => setForm((p) => ({ ...p, intl_section_subtitle: e.target.value }))}
-                    />
-                  </div>
-                </div>
-              </PanelCard>
-            </form>
-          </>
         )}
 
         {designPage === 'home' && section === 'branding' && (
@@ -1817,126 +1321,33 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
           </form>
         )}
 
-        {designPage === 'home' && section === 'footer' && (
-          <form
-            onSubmit={patchForm(
-              {
-                footer_template: form.footer_template,
-                footer_brand_name: form.footer_brand_name,
-                footer_copyright: form.footer_copyright,
-                footer_privacy_label: form.footer_privacy_label,
-                footer_privacy_url: form.footer_privacy_url,
-                footer_terms_label: form.footer_terms_label,
-                footer_terms_url: form.footer_terms_url,
-                footer_contact_email: form.footer_contact_email,
-                footer_contact_phone: form.footer_contact_phone,
-                footer_address: form.footer_address,
-              },
-              'Το footer αποθηκεύτηκε',
-            )}
-          >
-            <PanelCard
-              title="Πρότυπα Footer"
-              description="Το κάτω μέρος της αρχικής — λογότυπο γραφείου, επωνυμία και κείμενα που επεξεργάζεστε εδώ."
-              action={<SaveButton saving={saving} label="Αποθήκευση ενότητας" />}
-            >
-              <TemplatePicker
-                category="footer"
-                templates={FOOTER_TEMPLATES}
-                value={form.footer_template}
-                onChange={(id) => setForm((p) => ({ ...p, footer_template: id }))}
-              />
-
-              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-                Το <strong>λογότυπο</strong> και η <strong>επωνυμία</strong> στο header έρχονται από
-                «Μάρκα & λογότυπο». Εδώ ρυθμίζετε μόνο footer κείμενα και σύνδεσμους.
-              </div>
-
-              <div className="mt-8 pt-8 border-t border-black/[0.06] grid md:grid-cols-2 gap-4">
-                <label className="block text-sm md:col-span-2">
-                  <span className="font-bold text-gray-700">Επωνυμία γραφείου</span>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    Ίδιο πεδίο με «Μάρκα & λογότυπο» — εμφανίζεται και στο header.
-                  </p>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    placeholder="π.χ. Achillio Travel"
-                    value={form.footer_brand_name}
-                    onChange={(e) => setForm((p) => ({ ...p, footer_brand_name: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm md:col-span-2">
-                  <span className="font-bold text-gray-700">Copyright / κείμενο κάτω</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    placeholder="π.χ. © 2026 Achillio Travel"
-                    value={form.footer_copyright}
-                    onChange={(e) => setForm((p) => ({ ...p, footer_copyright: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Privacy — κείμενο</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.footer_privacy_label}
-                    onChange={(e) => setForm((p) => ({ ...p, footer_privacy_label: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Privacy — URL</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.footer_privacy_url}
-                    onChange={(e) => setForm((p) => ({ ...p, footer_privacy_url: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Όροι — κείμενο</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.footer_terms_label}
-                    onChange={(e) => setForm((p) => ({ ...p, footer_terms_label: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Όροι — URL</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.footer_terms_url}
-                    onChange={(e) => setForm((p) => ({ ...p, footer_terms_url: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Email</span>
-                  <input
-                    type="email"
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.footer_contact_email}
-                    onChange={(e) => setForm((p) => ({ ...p, footer_contact_email: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-bold text-gray-700">Τηλέφωνο</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.footer_contact_phone}
-                    onChange={(e) => setForm((p) => ({ ...p, footer_contact_phone: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm md:col-span-2">
-                  <span className="font-bold text-gray-700">Διεύθυνση</span>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={form.footer_address}
-                    onChange={(e) => setForm((p) => ({ ...p, footer_address: e.target.value }))}
-                  />
-                </label>
-              </div>
-            </PanelCard>
-          </form>
-        )}
       </div>
   );
+
+  const builderActive = isPageDesignBuilderSection(designPage, section);
+  const builderSectionLabel =
+    HOME_SECTIONS.find((s) => s.id === section)?.label || section;
+  const builderPanel = builderActive ? (
+    <PageDesignBuilderPanel
+      section={section}
+      form={form}
+      setForm={setForm}
+      saving={saving}
+      onSelectThemes={() => selectSection('themes')}
+      onSaveSlider={() =>
+        patchForm(
+          pageSliderPatch('home', {
+            enabled: Boolean(form.home_slider_enabled),
+            autoplay: form.home_slider_autoplay !== false,
+            interval_sec: form.home_slider_interval_sec,
+            options: form.home_slider_options,
+            slides: form.home_slider_slides,
+          }),
+          'Το slider λεωφορείων αποθηκεύτηκε',
+        )()
+      }
+    />
+  ) : null;
 
   return (
     <div className="page-design-wizard">
@@ -1964,7 +1375,18 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         onSave={saveAll}
         previewRefreshToken={previewRefreshToken}
         editorSparse={
-          designPage === 'home' && section === 'themes' && isHomepageThemesPlaceholder()
+          builderActive ||
+          (designPage === 'home' && section === 'themes' && isHomepageThemesPlaceholder())
+        }
+        builder={
+          builderActive
+            ? {
+                enabled: true,
+                sectionKey: section,
+                sectionLabel: builderSectionLabel,
+                panel: builderPanel,
+              }
+            : null
         }
       >
         {sectionContent}
