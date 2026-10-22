@@ -1,5 +1,9 @@
 import TripCard from './TripCard.jsx';
 import { tripsGridClass, tripCardWrapperClass } from '../../lib/homepage/homepageTemplates.js';
+import {
+  PreviewBuilderControl,
+  PreviewCardBuilder,
+} from './preview/PreviewDesignMode.jsx';
 
 export default function TripsSection({
   id,
@@ -24,6 +28,7 @@ export default function TripsSection({
   const dense = compact || solo;
   const gridClass = tripsGridClass(layoutId, tripCount, cardId);
   const abroadStrip = cardId === 'abroad_horizontal';
+  const sectionKey = id || 'trips';
 
   return (
     <section
@@ -36,17 +41,27 @@ export default function TripsSection({
             {eyebrow}
           </span>
         )}
-        <h2
-          className={`font-bold text-on-surface tracking-tight ${
-            abroadStrip
-              ? 'text-3xl md:text-4xl'
-              : dense
-                ? 'text-2xl md:text-3xl'
-                : 'font-headline-lg text-4xl md:text-5xl'
-          }`}
-        >
-          {title}
-        </h2>
+        {/* Divi-like: Builder sits right of «Εκδρομές στην Ελλάδα» (Καρτέλες) in ?preview=1. */}
+        <div className="sf-preview-trips-section-head">
+          <h2
+            className={`font-bold text-on-surface tracking-tight ${
+              abroadStrip
+                ? 'text-3xl md:text-4xl'
+                : dense
+                  ? 'text-2xl md:text-3xl'
+                  : 'font-headline-lg text-4xl md:text-5xl'
+            }`}
+          >
+            {title}
+          </h2>
+          <PreviewBuilderControl
+            sectionId="trips"
+            label="Καρτέλες"
+            variant="inline"
+            instanceId={`trips-title-${sectionKey}`}
+            className="sf-preview-trips-section-head__builder"
+          />
+        </div>
         {subtitle && (
           <p
             className={`text-on-surface-variant font-body-md mt-3 mx-auto ${
@@ -66,21 +81,29 @@ export default function TripsSection({
         <p className="text-center text-on-surface-variant py-12 font-body-md">{emptyMessage}</p>
       ) : (
         <div className={gridClass}>
-          {trips.map((trip, index) => (
-            <div
-              key={trip.id}
-              className={tripCardWrapperClass(layoutId, tripCount, index, cardId)}
-            >
-              <TripCard
-                trip={trip}
-                pricingSettings={pricingSettings}
-                templateId={cardId}
-                layoutId={layoutId}
-                index={index}
-                solo={solo}
-              />
-            </div>
-          ))}
+          {trips.map((trip, index) => {
+            const cardKey = String(trip.id ?? index);
+            return (
+              <div
+                key={cardKey}
+                className={`${tripCardWrapperClass(layoutId, tripCount, index, cardId)} relative group sf-preview-card-host`.trim()}
+              >
+                <TripCard
+                  trip={trip}
+                  pricingSettings={pricingSettings}
+                  templateId={cardId}
+                  layoutId={layoutId}
+                  index={index}
+                  solo={solo}
+                />
+                <PreviewCardBuilder
+                  sectionId="trips"
+                  label="Καρτέλες"
+                  instanceId={`trip-card-${sectionKey}-${cardKey}`}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </section>
