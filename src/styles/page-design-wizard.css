@@ -1317,15 +1317,3 @@
   background: #134e4a;
   box-shadow: none;
 }
-
-.pdw-summary-tile {
-  padding: 0.95rem 1rem;
-  border-radius: var(--pdw-radius-sm);
-  border: 1px solid var(--pdw-stroke);
-  background: #fff;
-}
-
-.pdw-summary-tile.is-highlight {
-  border-color: rgba(94, 92, 230, 0.25);
-  background: linear-gradient(145deg, rgba(94, 92, 230, 0.08), rgba(0, 113, 227, 0.04));
-}

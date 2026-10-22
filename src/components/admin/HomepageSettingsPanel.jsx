@@ -702,32 +702,6 @@ function HeroTextsBlock({ form, setForm }) {
   );
 }
 
-function OverviewSummary({ form }) {
-  const theme = getHomepageThemeById(form.homepage_theme_id);
-  const items = [
-    { label: 'Θέμα', value: theme.nameEl, highlight: true },
-    { label: 'Header', value: getTemplateById(HEADER_TEMPLATES, form.header_template).label },
-    { label: 'Hero', value: getTemplateById(HERO_TEMPLATES, form.hero_template).label },
-    { label: 'Διάταξη λίστας', value: getTemplateById(TRIPS_LAYOUT_TEMPLATES, form.trips_layout_template).label },
-    { label: 'Κάρτα εκδρομής', value: getTemplateById(TRIP_CARD_TEMPLATES, form.trip_card_template).label },
-    { label: 'Footer', value: getTemplateById(FOOTER_TEMPLATES, form.footer_template).label },
-  ];
-
-  return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className={`pdw-summary-tile${item.highlight ? ' is-highlight' : ''}`}
-        >
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#86868b]">{item.label}</p>
-          <p className="font-bold text-[#1d1d1f] mt-1">{item.value}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function sanitizeSection(value, sections) {
   const ids = sections.map((s) => s.id);
   return ids.includes(value) ? value : 'overview';
@@ -1448,12 +1422,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 </button>
               </div>
             ) : null}
-            <PanelCard
-              title="Τρέχουσα διάταξη"
-              description="Σύνοψη των ενεργών προτύπων. Αλλάξτε τα από τα μενού στα αριστερά."
-            >
-              <OverviewSummary form={form} />
-            </PanelCard>
           </>
         )}
 
