@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom';
 import CustomerLoginModal from '../auth/CustomerLoginModal.jsx';
 import StorefrontAccountMenu from './StorefrontAccountMenu.jsx';
 import StorefrontBrand from './StorefrontBrand.jsx';
+import {
+  PreviewBuilderControl,
+  usePreviewDesignMode,
+} from './preview/PreviewDesignMode.jsx';
 
 const HEADER_STYLES = {
   glass_dark: {
@@ -109,7 +113,17 @@ export default function StorefrontHeader({
     ? 'md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white'
     : 'md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.08] bg-black/[0.03] text-slate-800';
 
-  const wrapClass = `${style.wrap} ${scrolled ? style.wrapScrolled : style.wrapTop}`.trim();
+  const preview = usePreviewDesignMode();
+  const previewFocused =
+    preview?.enabled &&
+    (preview.focusedSection === 'header' || preview.openSection === 'header');
+  const wrapClass = [
+    style.wrap,
+    scrolled ? style.wrapScrolled : style.wrapTop,
+    preview?.enabled ? 'sf-preview-section' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -119,7 +133,24 @@ export default function StorefrontHeader({
   };
 
   return (
-    <header className={wrapClass}>
+    <header
+      className={wrapClass}
+      data-pdw-editable={preview?.enabled ? 'header' : undefined}
+      data-pdw-focused={previewFocused ? '1' : undefined}
+      onClick={(e) => {
+        if (!preview?.enabled) return;
+        if (e.target.closest?.('a, button, input, select, textarea, label, [role="dialog"]')) {
+          return;
+        }
+        preview.selectSection('header');
+      }}
+    >
+      {preview?.enabled ? (
+        <div className="sf-preview-section__bar">
+          <span className="sf-preview-section__bar-label">Header</span>
+          <PreviewBuilderControl sectionId="header" label="Header" variant="bar" />
+        </div>
+      ) : null}
       <div className={style.inner}>
         <StorefrontBrand siteAppearance={siteAppearance} variant={style.variant} />
 

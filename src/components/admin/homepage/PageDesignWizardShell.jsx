@@ -71,13 +71,13 @@ function sectionGroup(id, designPage) {
 /** Tooltips on left-nav items (middle panel no longer repeats step chrome). */
 const SECTION_HINTS = {
   themes: 'Θέματα από demo ιστοσελίδες — σύντομα.',
-  general: 'Builder στο preview — χρώματα brand και ενότητες.',
-  header: 'Builder στο preview — πρότυπο κορυφής.',
-  hero: 'Builder στο preview — διάταξη και κείμενα hero.',
-  slider: 'Builder στο preview — carousel διαφανειών.',
-  trips: 'Builder στο preview — διάταξη λίστας και στυλ καρτών.',
+  general: 'Inline Builder στο preview — χρώματα brand και ενότητες.',
+  header: 'Inline Builder πάνω στο header του preview.',
+  hero: 'Inline Builder πάνω στο hero του preview.',
+  slider: 'Inline Builder — carousel διαφανειών στο preview.',
+  trips: 'Inline Builder δεξιά στο Πρόγραμμα εκδρομών / κάρτες.',
   branding: 'Επωνυμία γραφείου, λογότυπο και hero εικόνα.',
-  footer: 'Builder στο preview — πρότυπο και κείμενα υποσέλιδου.',
+  footer: 'Inline Builder πάνω στο footer του preview.',
   copy: 'Όνομα και κείμενα της σελίδας /rent.',
   fleet: 'Διάταξη και στυλ καρτών στόλου ενοικίασης.',
 };
@@ -105,10 +105,8 @@ export default function PageDesignWizardShell({
   dirty = false,
   onSave,
   previewRefreshToken = 0,
-  /** Middle column has no real editor (e.g. Themes waiting / Builder-on-preview) — give preview the width. */
+  /** Middle column has no real editor (e.g. Themes waiting / inline Builder-on-preview) — give preview the width. */
   editorSparse = false,
-  /** Builder-on-preview: { enabled, sectionKey, sectionLabel, panel } */
-  builder = null,
   children,
 }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -505,7 +503,6 @@ export default function PageDesignWizardShell({
                 ? () => setNarrowPreviewOpen(false)
                 : undefined
             }
-            builder={builder}
           />
         ) : null}
 
