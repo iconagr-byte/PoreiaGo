@@ -1374,7 +1374,7 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
             ) : null}
             <PanelCard
               title="Θέματα αρχικής σελίδας"
-              description="Το Split δεξιά δείχνει live το draft. «Επισκόπηση» ανοίγει πλήρη οθόνη για σύγκριση θεμάτων. «Ενεργοποίηση» αποθηκεύει. Χρώματα μετά στα Γενικά."
+              description="Ενεργό θέμα σε μία γραμμή. «Επιλογή θέματος» ανοίγει συμπαγή επιλογή — χωρίς μακρύ κατεβατό. Το Split δεξιά μένει live. Χρώματα μετά στα Γενικά."
             >
               <ThemeGallery
                 activeThemeId={form.homepage_theme_id || 'aegean_classic'}
