@@ -71,7 +71,8 @@ function sectionGroup(id, designPage) {
 /** Tooltips on left-nav items (middle panel no longer repeats step chrome). */
 const SECTION_HINTS = {
   themes: 'Θέματα από demo ιστοσελίδες — σύντομα.',
-  general: 'Inline Builder στο preview — χρώματα brand και ενότητες.',
+  general:
+    'Ένα Builder δίπλα στον τίτλο στόλου / rent / γιατί εμάς — κοινό πρότυπο καρτών (χρώματα brand).',
   header: 'Inline Builder πάνω στο header του preview.',
   hero: 'Inline Builder πάνω στο hero του preview.',
   slider: 'Inline Builder — carousel διαφανειών στο preview.',
