@@ -71,13 +71,13 @@ function sectionGroup(id, designPage) {
 /** Tooltips on left-nav items (middle panel no longer repeats step chrome). */
 const SECTION_HINTS = {
   themes: 'Θέματα από demo ιστοσελίδες — σύντομα.',
-  general: 'Χρώματα brand και ποιες ενότητες εμφανίζονται στην αρχική.',
-  header: 'Πρότυπο κορυφής — λογότυπο, μενού, στυλ.',
-  hero: 'Η πρώτη εντύπωση: φωτογραφία, τίτλοι, αναζήτηση.',
-  slider: 'Carousel διαφανειών πάνω από ή αντί για το στατικό hero.',
-  trips: 'Διάταξη λίστας και στυλ καρτών εκδρομών.',
+  general: 'Builder στο preview — χρώματα brand και ενότητες.',
+  header: 'Builder στο preview — πρότυπο κορυφής.',
+  hero: 'Builder στο preview — διάταξη και κείμενα hero.',
+  slider: 'Builder στο preview — carousel διαφανειών.',
+  trips: 'Builder στο preview — διάταξη λίστας και στυλ καρτών.',
   branding: 'Επωνυμία γραφείου, λογότυπο και hero εικόνα.',
-  footer: 'Υποσέλιδο, επικοινωνία και νομικοί σύνδεσμοι.',
+  footer: 'Builder στο preview — πρότυπο και κείμενα υποσέλιδου.',
   copy: 'Όνομα και κείμενα της σελίδας /rent.',
   fleet: 'Διάταξη και στυλ καρτών στόλου ενοικίασης.',
 };
@@ -105,8 +105,10 @@ export default function PageDesignWizardShell({
   dirty = false,
   onSave,
   previewRefreshToken = 0,
-  /** Middle column has no real editor (e.g. Themes waiting) — give preview the width. */
+  /** Middle column has no real editor (e.g. Themes waiting / Builder-on-preview) — give preview the width. */
   editorSparse = false,
+  /** Builder-on-preview: { enabled, sectionKey, sectionLabel, panel } */
+  builder = null,
   children,
 }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -331,9 +333,8 @@ export default function PageDesignWizardShell({
           <div className="min-w-0 flex-1">
             <p className="page-design-wizard__onboard-title">Γρήγορα βήματα</p>
             <p className="page-design-wizard__onboard-text">
-              Αριστερά διάλεξε ενότητα · στη μέση επεξεργασία · δεξιά ζωντανή προεπισκόπηση. Η μπλε
-              «Αποθήκευση» πάνω δεξιά αποθηκεύει τα πάντα· τα κουμπιά στις κάρτες αποθηκεύουν μόνο την
-              ενότητα.
+              Αριστερά διάλεξε ενότητα · στο preview πάτα «Builder» για πρότυπα και ρυθμίσεις · οι
+              αλλαγές φαίνονται ζωντανά στο Split. Η μπλε «Αποθήκευση» πάνω δεξιά αποθηκεύει τα πάντα.
             </p>
           </div>
           <button
@@ -504,6 +505,7 @@ export default function PageDesignWizardShell({
                 ? () => setNarrowPreviewOpen(false)
                 : undefined
             }
+            builder={builder}
           />
         ) : null}
 

@@ -22,6 +22,8 @@ export default function TemplatePicker({
   onChange,
   columns = 3,
   accent = 'sky',
+  /** Denser layout for preview-chrome Builder dropdown. */
+  compact = false,
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('Όλα');
@@ -46,8 +48,9 @@ export default function TemplatePicker({
     });
   }, [templates, filter, query]);
 
-  const colClass =
-    columns === 2
+  const colClass = compact
+    ? 'grid-cols-2'
+    : columns === 2
       ? 'grid-cols-1 sm:grid-cols-2'
       : columns === 4
         ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
@@ -67,11 +70,15 @@ export default function TemplatePicker({
   };
 
   return (
-    <div className="pdw-picker space-y-3">
+    <div className={`pdw-picker space-y-3${compact ? ' is-compact' : ''}`}>
       {selected ? (
-        <div className="pdw-picker__selected">
+        <div className={`pdw-picker__selected${compact ? ' is-compact' : ''}`}>
           <div className="flex items-center gap-3 min-w-0">
-            <span className="w-9 h-9 rounded-xl bg-white border border-black/[0.06] flex items-center justify-center shrink-0">
+            <span
+              className={`${
+                compact ? 'w-8 h-8 rounded-lg' : 'w-9 h-9 rounded-xl'
+              } bg-white border border-black/[0.06] flex items-center justify-center shrink-0`}
+            >
               <span className={`material-symbols-outlined ${accentCheck}`}>{selected.icon}</span>
             </span>
             <div className="min-w-0">
@@ -156,7 +163,9 @@ export default function TemplatePicker({
                 type="button"
                 onClick={() => onChange(tpl.id)}
                 aria-pressed={isSelected}
-                className={`group text-left rounded-[16px] border-2 p-2.5 transition-all ${
+                className={`group text-left border-2 transition-all ${
+                  compact ? 'rounded-xl p-2' : 'rounded-[16px] p-2.5'
+                } ${
                   isSelected
                     ? `${accentRing} shadow-md ring-2`
                     : 'border-black/[0.06] bg-white hover:border-slate-300 hover:shadow-sm'
@@ -166,9 +175,13 @@ export default function TemplatePicker({
                   <TemplatePreviewThumb category={category} templateId={tpl.id} />
                   {isSelected ? (
                     <span
-                      className={`absolute top-2 right-2 w-7 h-7 rounded-full bg-white shadow flex items-center justify-center ${accentCheck}`}
+                      className={`absolute top-2 right-2 rounded-full bg-white shadow flex items-center justify-center ${accentCheck} ${
+                        compact ? 'w-6 h-6' : 'w-7 h-7'
+                      }`}
                     >
-                      <span className="material-symbols-outlined text-[18px]">check</span>
+                      <span className={`material-symbols-outlined ${compact ? 'text-[16px]' : 'text-[18px]'}`}>
+                        check
+                      </span>
                     </span>
                   ) : null}
                   {isPremium ? (
@@ -177,18 +190,26 @@ export default function TemplatePicker({
                     </span>
                   ) : null}
                 </div>
-                <div className="mt-2.5 min-w-0">
-                  <p className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
+                <div className={`${compact ? 'mt-1.5' : 'mt-2.5'} min-w-0`}>
+                  <p
+                    className={`font-bold text-gray-900 flex items-center gap-1.5 ${
+                      compact ? 'text-xs' : 'text-sm'
+                    }`}
+                  >
                     <span className="material-symbols-outlined text-[16px] text-slate-500 shrink-0">
                       {tpl.icon}
                     </span>
                     <span className="truncate">{tpl.label}</span>
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-snug">
+                  <p
+                    className={`text-gray-500 mt-0.5 leading-snug ${
+                      compact ? 'text-[11px] line-clamp-1' : 'text-xs line-clamp-2'
+                    }`}
+                  >
                     {tpl.description}
                   </p>
                 </div>
-                {visibleTags.length > 0 ? (
+                {!compact && visibleTags.length > 0 ? (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {visibleTags.map((tag) => (
                       <span
