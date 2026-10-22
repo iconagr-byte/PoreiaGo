@@ -58,13 +58,11 @@ function useWideEnoughForSplit() {
 /** Group labels for clearer left-nav hierarchy (structure only). */
 function sectionGroup(id, designPage) {
   if (designPage === 'rent') {
-    if (id === 'overview') return null;
     if (id === 'themes' || id === 'fleet') return 'Εμφάνιση';
     if (id === 'branding' || id === 'copy') return 'Μάρκα';
     if (id === 'slider') return 'Περιεχόμενο';
     return 'Ιστοσελίδα';
   }
-  if (id === 'overview') return null;
   if (id === 'themes' || id === 'general' || id === 'header' || id === 'hero') return 'Εμφάνιση';
   if (id === 'slider' || id === 'trips') return 'Περιεχόμενο';
   if (id === 'branding' || id === 'footer') return 'Μάρκα';
@@ -72,7 +70,6 @@ function sectionGroup(id, designPage) {
 }
 
 const SECTION_HINTS = {
-  overview: 'Επιλέξτε ενότητα από το μενού αριστερά για να αλλάξετε τη διάταξη.',
   themes: 'Διάλεξε θέμα · το Split δείχνει live. Πλήρης οθόνη από «Επισκόπηση».',
   general: 'Χρώματα brand και ποιες ενότητες εμφανίζονται στην αρχική.',
   header: 'Πρότυπο κορυφής — λογότυπο, μενού, στυλ.',
