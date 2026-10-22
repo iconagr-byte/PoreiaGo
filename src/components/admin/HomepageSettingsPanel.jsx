@@ -1372,17 +1372,12 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 </button>
               </div>
             ) : null}
-            <PanelCard
-              title="Θέματα αρχικής σελίδας"
-              description="Ενεργό θέμα σε μία γραμμή. «Επιλογή θέματος» ανοίγει συμπαγή επιλογή — χωρίς μακρύ κατεβατό. Το Split δεξιά μένει live. Χρώματα μετά στα Γενικά."
-            >
-              <ThemeGallery
-                activeThemeId={form.homepage_theme_id || 'aegean_classic'}
-                onPreview={handleThemePreview}
-                onApply={handleThemeApply}
-                applying={saving}
-              />
-            </PanelCard>
+            <ThemeGallery
+              activeThemeId={form.homepage_theme_id || 'aegean_classic'}
+              onPreview={handleThemePreview}
+              onApply={handleThemeApply}
+              applying={saving}
+            />
           </>
         )}
 
