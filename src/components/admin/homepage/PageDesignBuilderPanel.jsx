@@ -143,8 +143,8 @@ function CompactHeroTexts({ form, setForm }) {
 }
 
 /**
- * Compact section editors for the preview-chrome Builder dropdown.
- * Keeps the same form fields / template IDs as the former middle panels.
+ * Compact section editors for Divi-like inline Builder (preview module overlays)
+ * and the editor-only fallback panel. Same form fields / template IDs as before.
  */
 export default function PageDesignBuilderPanel({
   section,

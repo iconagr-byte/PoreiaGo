@@ -26,6 +26,11 @@ import {
   rentThemeToAppearancePatch,
 } from '../../lib/rental/rentThemes.js';
 import { pushHomepagePreviewDraft } from '../../lib/homepage/homepagePreview.js';
+import {
+  PDW_BRIDGE,
+  postPdwBridge,
+  subscribePdwBridge,
+} from '../../lib/homepage/pageDesignBridge.js';
 import { pageSliderPatch } from '../../lib/homepage/pageSlider.js';
 import { fileToTripCoverDataUrl, TRIP_COVER_ACCEPT } from '../../lib/trips/tripImage.js';
 import { fileToLogoDataUrl } from '../../lib/branding/logoImage.js';
@@ -596,6 +601,33 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
     },
     [navSections, searchParams, setSearchParams],
   );
+
+  // Sync left-nav ↔ Divi-like inline Builder in the preview iframe.
+  useEffect(() => {
+    if (designPage !== 'home') return undefined;
+    postPdwBridge({ type: PDW_BRIDGE.SECTION_FOCUS, section });
+    return undefined;
+  }, [designPage, section]);
+
+  useEffect(() => {
+    if (designPage !== 'home') return undefined;
+    return subscribePdwBridge((msg) => {
+      if (msg.type === PDW_BRIDGE.SELECT_SECTION && msg.section) {
+        selectSection(msg.section);
+        return;
+      }
+      if (msg.type === PDW_BRIDGE.REQUEST_THEMES) {
+        selectSection('themes');
+        return;
+      }
+      if (msg.type === PDW_BRIDGE.APPEARANCE_SYNC && msg.appearance && typeof msg.appearance === 'object') {
+        setForm((prev) => {
+          const next = { ...prev, ...msg.appearance };
+          return JSON.stringify(next) === JSON.stringify(prev) ? prev : next;
+        });
+      }
+    });
+  }, [designPage, selectSection]);
 
   useEffect(() => {
     const raw = sectionFromQuery || DEFAULT_SECTION;
@@ -1178,14 +1210,14 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         )}
 
         {/*
-          Builder-on-preview sections (Γενικά / Header / Hero / Slider / Καρτέλες / Footer):
-          bulky middle editors removed — controls live in preview chrome Builder.
+          Builder sections (Γενικά / Header / Hero / Slider / Καρτέλες / Footer):
+          primary UI is Divi-like inline Builder on the storefront module in the preview iframe.
           Fallback below only shows when Split preview is hidden (editor-only / narrow).
         */}
         {designPage === 'home' && isPageDesignBuilderSection(designPage, section) && (
           <PanelCard
             title={`Builder · ${HOME_SECTIONS.find((s) => s.id === section)?.label || section}`}
-            description="Στο Split / Προεπισκόπηση πάτα «Builder» πάνω δεξιά. Εδώ εμφανίζεται μόνο όταν δεν υπάρχει ζωντανή προεπισκόπηση."
+            description="Στο Split / Προεπισκόπηση πάτα «Builder» πάνω δεξιά στην ενότητα (π.χ. Πρόγραμμα εκδρομών). Εδώ εμφανίζεται μόνο όταν δεν υπάρχει ζωντανή προεπισκόπηση."
           >
             <PageDesignBuilderPanel
               section={section}
@@ -1325,29 +1357,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
   );
 
   const builderActive = isPageDesignBuilderSection(designPage, section);
-  const builderSectionLabel =
-    HOME_SECTIONS.find((s) => s.id === section)?.label || section;
-  const builderPanel = builderActive ? (
-    <PageDesignBuilderPanel
-      section={section}
-      form={form}
-      setForm={setForm}
-      saving={saving}
-      onSelectThemes={() => selectSection('themes')}
-      onSaveSlider={() =>
-        patchForm(
-          pageSliderPatch('home', {
-            enabled: Boolean(form.home_slider_enabled),
-            autoplay: form.home_slider_autoplay !== false,
-            interval_sec: form.home_slider_interval_sec,
-            options: form.home_slider_options,
-            slides: form.home_slider_slides,
-          }),
-          'Το slider λεωφορείων αποθηκεύτηκε',
-        )()
-      }
-    />
-  ) : null;
 
   return (
     <div className="page-design-wizard">
@@ -1377,16 +1386,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         editorSparse={
           builderActive ||
           (designPage === 'home' && section === 'themes' && isHomepageThemesPlaceholder())
-        }
-        builder={
-          builderActive
-            ? {
-                enabled: true,
-                sectionKey: section,
-                sectionLabel: builderSectionLabel,
-                panel: builderPanel,
-              }
-            : null
         }
       >
         {sectionContent}

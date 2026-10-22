@@ -45,6 +45,11 @@ import StorefrontHero from '../components/storefront/StorefrontHero.jsx';
 import StorefrontFooter from '../components/storefront/StorefrontFooter.jsx';
 import StorefrontRentSection from '../components/storefront/StorefrontRentSection.jsx';
 import TripsSection from '../components/storefront/TripsSection.jsx';
+import {
+  PreviewBuilderControl,
+  PreviewDesignModeProvider,
+  PreviewEditableSection,
+} from '../components/storefront/preview/PreviewDesignMode.jsx';
 
 const RENT_ONLY_HERO = {
   hero_badge: 'Ενοικιάσεις οχημάτων',
@@ -289,9 +294,13 @@ export default function StorefrontDemoPage() {
       onSubmit={handleSearch}
       className="mt-2 p-4 md:p-6 rounded-[28px] bg-white/10 border border-white/20 backdrop-blur-md space-y-4 max-w-2xl"
     >
-      <p className="text-xs font-bold uppercase tracking-wider text-white/70">
-        {siteAppearance.hero_search_label || 'Πρόγραμμα εκδρομών'}
-      </p>
+      <div className="sf-preview-trip-program-head">
+        <p className="text-xs font-bold uppercase tracking-wider text-white/70 min-w-0">
+          {siteAppearance.hero_search_label || 'Πρόγραμμα εκδρομών'}
+        </p>
+        {/* Divi-like: Builder sits top-right of ΠΡΟΓΡΑΜΜΑ ΕΚΔΡΟΜΩΝ (Καρτέλες). */}
+        <PreviewBuilderControl sectionId="trips" label="Καρτέλες" variant="inline" />
+      </div>
       <div className="flex flex-wrap gap-2">
         {[
           { id: MARKET_FILTER_ALL, label: 'Όλες' },
@@ -432,7 +441,10 @@ export default function StorefrontDemoPage() {
     siteAppearance.footer_brand_name || siteAppearance.display_name || '';
   const showBusFleet = tripsEnabled && siteAppearance.show_fleet_section !== false;
 
+  const previewOn = isStorefrontPreviewMode();
+
   return (
+    <PreviewDesignModeProvider appearance={siteAppearance}>
     <div className="storefront-themed min-h-screen" style={themeVars}>
       <StorefrontHeader
         siteAppearance={siteAppearance}
@@ -441,28 +453,36 @@ export default function StorefrontDemoPage() {
         rentEnabled={rentEnabled}
       />
       <main>
-        <StorefrontHero
-          siteAppearance={heroAppearance}
-          templateId={siteAppearance.hero_template || 'fullscreen_overlay'}
-          searchForm={rentOnly ? rentHeroCta : searchForm}
-        />
+        <PreviewEditableSection sectionId="hero" label="Hero">
+          <StorefrontHero
+            siteAppearance={heroAppearance}
+            templateId={siteAppearance.hero_template || 'fullscreen_overlay'}
+            searchForm={rentOnly ? rentHeroCta : searchForm}
+          />
+        </PreviewEditableSection>
 
         {tripsEnabled ? (
           <>
-            <TripsSection
-              id="search-results"
-              eyebrow={siteAppearance.trips_section_eyebrow}
-              title={siteAppearance.trips_section_title}
-              subtitle={siteAppearance.trips_section_subtitle}
-              trips={showDomestic ? filteredDomestic : []}
-              emptyMessage={
-                showDomestic
-                  ? 'Δεν βρέθηκαν εγχώριες εκδρομές με τα κριτήριά σας.'
-                  : 'Επιλέξατε διεθνείς εκδρομές — δείτε παρακάτω.'
-              }
-              siteAppearance={siteAppearance}
-              pricingSettings={pricingSettings}
-            />
+            <PreviewEditableSection
+              sectionId="trips"
+              label="Καρτέλες"
+              hideFloatingBar={previewOn}
+            >
+              <TripsSection
+                id="search-results"
+                eyebrow={siteAppearance.trips_section_eyebrow}
+                title={siteAppearance.trips_section_title}
+                subtitle={siteAppearance.trips_section_subtitle}
+                trips={showDomestic ? filteredDomestic : []}
+                emptyMessage={
+                  showDomestic
+                    ? 'Δεν βρέθηκαν εγχώριες εκδρομές με τα κριτήριά σας.'
+                    : 'Επιλέξατε διεθνείς εκδρομές — δείτε παρακάτω.'
+                }
+                siteAppearance={siteAppearance}
+                pricingSettings={pricingSettings}
+              />
+            </PreviewEditableSection>
 
             <TripsSection
               id="international-trips"
@@ -561,10 +581,20 @@ export default function StorefrontDemoPage() {
 
       </main>
 
-      <StorefrontFooter
-        siteAppearance={siteAppearance}
-        templateId={siteAppearance.footer_template || 'classic_columns'}
-      />
+      <PreviewEditableSection sectionId="footer" label="Footer">
+        <StorefrontFooter
+          siteAppearance={siteAppearance}
+          templateId={siteAppearance.footer_template || 'classic_columns'}
+        />
+      </PreviewEditableSection>
+
+      {previewOn ? (
+        <div className="sf-preview-dock" aria-label="Builder ενότητες σελίδας">
+          <PreviewBuilderControl sectionId="general" label="Γενικά" variant="inline" />
+          <PreviewBuilderControl sectionId="slider" label="Slider" variant="inline" />
+        </div>
+      ) : null}
     </div>
+    </PreviewDesignModeProvider>
   );
 }
