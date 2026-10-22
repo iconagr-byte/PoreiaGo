@@ -69,8 +69,9 @@ function sectionGroup(id, designPage) {
   return 'Ιστοσελίδα';
 }
 
+/** Tooltips on left-nav items (middle panel no longer repeats step chrome). */
 const SECTION_HINTS = {
-  themes: 'Ενεργό θέμα · «Επιλογή θέματος» για συμπαγή επιλογή. Το Split μένει live.',
+  themes: 'Θέματα από demo ιστοσελίδες — σύντομα.',
   general: 'Χρώματα brand και ποιες ενότητες εμφανίζονται στην αρχική.',
   header: 'Πρότυπο κορυφής — λογότυπο, μενού, στυλ.',
   hero: 'Η πρώτη εντύπωση: φωτογραφία, τίτλοι, αναζήτηση.',
@@ -149,21 +150,8 @@ export default function PageDesignWizardShell({
     effectiveLayout === 'preview' ||
     (wantsSplitButNarrow && narrowPreviewOpen);
   const showEditor = effectiveLayout === 'split' || effectiveLayout === 'editor';
-  const activeSection = navSections.find((s) => s.id === section);
-  const activeIndex = Math.max(
-    0,
-    navSections.findIndex((s) => s.id === section),
-  );
-  const prevSection = activeIndex > 0 ? navSections[activeIndex - 1] : null;
-  const nextSection =
-    activeIndex >= 0 && activeIndex < navSections.length - 1
-      ? navSections[activeIndex + 1]
-      : null;
   const liveBadge = 'LIVE';
   const titleBrand = (brandName || '').trim() || siteLabel || 'Γραφείο';
-  const sectionHint =
-    (activeSection && SECTION_HINTS[activeSection.id]) ||
-    'Οι αλλαγές φαίνονται ζωντανά δεξιά. Αποθήκευση πάνω δεξιά για μόνιμη εφαρμογή.';
 
   const copyLink = async () => {
     const href =
@@ -516,57 +504,7 @@ export default function PageDesignWizardShell({
         ) : null}
 
         {showEditor ? (
-          <div className="page-design-wizard__main">
-            {activeSection ? (
-              <div className="page-design-wizard__section-head">
-                <div className="min-w-0">
-                  <p className="page-design-wizard__section-kicker">
-                    Βήμα {activeIndex + 1} από {navSections.length}
-                  </p>
-                  <h3 className="page-design-wizard__section-title">{activeSection.label}</h3>
-                  <p className="page-design-wizard__section-hint">{sectionHint}</p>
-                  <p className="page-design-wizard__section-save-hint">
-                    {dirty
-                      ? 'Υπάρχουν αλλαγές — πάτα «Αποθήκευση» πάνω δεξιά για όλα, ή το κουμπί της ενότητας.'
-                      : 'Οι αλλαγές φαίνονται αμέσως στο Split · αποθήκευση όταν είσαι έτοιμος.'}
-                  </p>
-                </div>
-                <div className="page-design-wizard__section-nav">
-                  <button
-                    type="button"
-                    className="page-design-wizard__tool-btn"
-                    disabled={!prevSection}
-                    onClick={() => prevSection && onSelectSection(prevSection.id)}
-                    title={prevSection ? `Πίσω: ${prevSection.label}` : undefined}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-                    <span className="hidden sm:inline">Πίσω</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="page-design-wizard__tool-btn"
-                    disabled={!nextSection}
-                    onClick={() => nextSection && onSelectSection(nextSection.id)}
-                    title={nextSection ? `Επόμενο: ${nextSection.label}` : undefined}
-                  >
-                    <span className="hidden sm:inline">Επόμενο</span>
-                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                  </button>
-                  {effectiveLayout === 'editor' && wideEnough ? (
-                    <button
-                      type="button"
-                      className="page-design-wizard__tool-btn is-active"
-                      onClick={() => setLayoutMode('split')}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">vertical_split</span>
-                      Split
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-            {children}
-          </div>
+          <div className="page-design-wizard__main">{children}</div>
         ) : null}
 
         {showPreview ? (
