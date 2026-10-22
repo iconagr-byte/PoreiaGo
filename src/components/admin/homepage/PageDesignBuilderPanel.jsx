@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import TemplatePicker from './TemplatePicker.jsx';
 import BrandColorEditor from './BrandColorEditor.jsx';
 import PageSliderEditor from './PageSliderEditor.jsx';
+import CompactHeroPhoto from './CompactHeroPhoto.jsx';
 import {
   FOOTER_TEMPLATES,
   HEADER_TEMPLATES,
@@ -35,7 +36,7 @@ const SECTION_META = {
   },
   hero: {
     title: 'Hero',
-    blurb: 'Διάταξη πρώτης εντύπωσης και κείμενα.',
+    blurb: 'Φωτογραφία φόντου, διάταξη και κείμενα.',
     icon: 'panorama',
   },
   slider: {
@@ -155,7 +156,7 @@ export default function PageDesignBuilderPanel({
   onSaveSlider,
 }) {
   const [tripsTab, setTripsTab] = useState('layout');
-  const [heroTab, setHeroTab] = useState('template');
+  const [heroTab, setHeroTab] = useState('photo');
   const [footerTab, setFooterTab] = useState('template');
   const meta = SECTION_META[section] || SECTION_META.general;
   const theme = getHomepageThemeById(form.homepage_theme_id);
@@ -274,12 +275,16 @@ export default function PageDesignBuilderPanel({
           <div className="pdw-builder__stack">
             <BuilderTabs
               tabs={[
+                { id: 'photo', label: 'Φωτογραφία' },
                 { id: 'template', label: 'Πρότυπο' },
                 { id: 'copy', label: 'Κείμενα' },
               ]}
               value={heroTab}
               onChange={setHeroTab}
             />
+            {heroTab === 'photo' ? (
+              <CompactHeroPhoto form={form} setForm={setForm} />
+            ) : null}
             {heroTab === 'template' ? (
               <TemplatePicker
                 category="hero"
@@ -289,9 +294,10 @@ export default function PageDesignBuilderPanel({
                 columns={2}
                 compact
               />
-            ) : (
+            ) : null}
+            {heroTab === 'copy' ? (
               <CompactHeroTexts form={form} setForm={setForm} />
-            )}
+            ) : null}
           </div>
         ) : null}
 

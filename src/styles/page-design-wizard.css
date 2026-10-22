@@ -1528,3 +1528,119 @@
   /* Keep chrome above iframe while dropdown is open */
   isolation: isolate;
 }
+
+/* Compact hero photo controls (Builder · Φωτογραφία) */
+.pdw-hero-photo__preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  border-radius: 0.85rem;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #0f172a;
+}
+
+.pdw-hero-photo__media {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+}
+
+.pdw-hero-photo__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(2, 6, 23, 0.92) 0%,
+    rgba(15, 23, 42, 0.55) 55%,
+    rgba(15, 23, 42, 0.25) 100%
+  );
+  pointer-events: none;
+}
+
+.pdw-hero-photo__busy {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.pdw-hero-photo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pdw-hero-photo__upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.65rem;
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pdw-hero-photo__upload:hover {
+  background: #1e293b;
+}
+
+.pdw-hero-photo__url-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.pdw-hero-photo__url-btn {
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.pdw-hero-photo__url-btn:hover {
+  background: #f8fafc;
+}
+
+.pdw-hero-photo__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pdw-hero-photo__chip {
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.pdw-hero-photo__chip.is-active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
+}
+
+.pdw-hero-photo__range {
+  width: 100%;
+  accent-color: #0ea5e9;
+  margin-top: 0.25rem;
+}

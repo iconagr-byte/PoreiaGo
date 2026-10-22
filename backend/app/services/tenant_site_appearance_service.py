@@ -108,6 +108,9 @@ _BRAND_LOGO_PATCH_KEYS = frozenset(
         "logo_shadow",
         "logo_show_name",
         "hero_image_focal",
+        "hero_overlay_opacity",
+        "hero_image_fit",
+        "hero_height_vh",
     }
 )
 
@@ -138,6 +141,9 @@ DEFAULT_SITE_APPEARANCE: dict[str, Any] = {
     "logo_show_name": True,
     "hero_image_url": "",
     "hero_image_focal": "center",
+    "hero_overlay_opacity": 100,
+    "hero_image_fit": "cover",
+    "hero_height_vh": 88,
     "hero_badge": "Premium Ταξιδιωτική Εμπειρία",
     "hero_title": "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:",
     "hero_title_accent": "Άνεση, ασφάλεια & θέση εξασφαλισμένη.",
@@ -589,6 +595,25 @@ class TenantSiteAppearanceService:
             updated["logo_shadow"] = bool(updated["logo_shadow"])
         if "logo_show_name" in updated:
             updated["logo_show_name"] = bool(updated["logo_show_name"])
+        try:
+            if "hero_overlay_opacity" in updated:
+                updated["hero_overlay_opacity"] = max(
+                    0, min(100, int(updated["hero_overlay_opacity"]))
+                )
+        except (TypeError, ValueError):
+            updated["hero_overlay_opacity"] = 100
+        try:
+            if "hero_height_vh" in updated:
+                updated["hero_height_vh"] = max(50, min(100, int(updated["hero_height_vh"])))
+        except (TypeError, ValueError):
+            updated["hero_height_vh"] = 88
+        if "hero_image_fit" in updated:
+            fit = str(updated.get("hero_image_fit") or "cover").strip().lower()
+            updated["hero_image_fit"] = "contain" if fit == "contain" else "cover"
+        if "hero_image_focal" in updated:
+            focal = str(updated.get("hero_image_focal") or "center").strip().lower()
+            allowed_focal = {"center", "top", "bottom", "left", "right"}
+            updated["hero_image_focal"] = focal if focal in allowed_focal else "center"
         # Persist only appearance keys — drop enrichment helpers.
         updated.pop("display_name", None)
         updated.pop("storage_source", None)
@@ -619,6 +644,10 @@ class TenantSiteAppearanceService:
                 "rent_logo_shadow",
                 "rent_logo_show_name",
                 "rent_header_compact",
+                "hero_image_focal",
+                "hero_overlay_opacity",
+                "hero_image_fit",
+                "hero_height_vh",
             ):
                 if size_key in updated:
                     settings["site_appearance"][size_key] = updated[size_key]
