@@ -8,6 +8,7 @@ import {
   rentFleetCardWrapperClass,
   rentFleetGridClass,
 } from '../../lib/homepage/homepageTemplates.js';
+import { PreviewCardBuilder } from './preview/PreviewDesignMode.jsx';
 
 function RentVehicleCard({ vehicle, templateId, featured = false }) {
   const v = vehicle;
@@ -182,13 +183,21 @@ export default function StorefrontRentSection({
             <ul className={gridClass}>
               {preview.map((raw, index) => {
                 const v = enrichRentVehicle(raw);
+                const cardKey = String(v.id || v.name || index);
                 return (
-                  <li key={v.id || v.name || index} className={rentFleetCardWrapperClass(layoutId, index)}>
-                    <RentVehicleCard
-                      vehicle={v}
-                      templateId={cardId}
-                      featured={layoutId === 'rent_featured' && index === 0}
-                    />
+                  <li key={cardKey} className={rentFleetCardWrapperClass(layoutId, index)}>
+                    <div className="relative group sf-preview-card-host h-full">
+                      <RentVehicleCard
+                        vehicle={v}
+                        templateId={cardId}
+                        featured={layoutId === 'rent_featured' && index === 0}
+                      />
+                      <PreviewCardBuilder
+                        sectionId="general"
+                        label="Rent"
+                        instanceId={`rent-card-${cardKey}`}
+                      />
+                    </div>
                   </li>
                 );
               })}

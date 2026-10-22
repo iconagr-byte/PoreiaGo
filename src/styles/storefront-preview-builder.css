@@ -160,11 +160,13 @@
   gap: 0.75rem;
 }
 
-/* Dock for sections without a clear module header (Γενικά / Slider) */
+/* Dock for sections without a clear module header (Γενικά / Slider).
+   Bottom-right so it does not look like a Builder glued to the first fleet card. */
 .sf-preview-dock {
   position: fixed;
-  left: 0.75rem;
+  right: 0.75rem;
   bottom: 0.75rem;
+  left: auto;
   z-index: 70;
   display: flex;
   flex-wrap: wrap;
@@ -181,6 +183,49 @@
 }
 
 .sf-preview-dock .sf-preview-builder__popover {
+  top: auto;
+  bottom: calc(100% + 0.4rem);
+  left: auto;
+  right: 0;
+}
+
+/* Per-card Builder (fleet / rent grids) — one chip per card, hover-reveal */
+.sf-preview-card-builder {
+  position: absolute;
+  left: 0.65rem;
+  bottom: 0.65rem;
+  z-index: 35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.group:hover > .sf-preview-card-builder,
+.sf-preview-card-host:hover > .sf-preview-card-builder,
+.sf-preview-card-builder:has(.sf-preview-builder.is-open),
+.sf-preview-card-builder:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.sf-preview-builder.is-card .sf-preview-builder__btn {
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.sf-preview-builder.is-card .sf-preview-builder__btn:hover,
+.sf-preview-builder.is-card .sf-preview-builder__btn.is-open {
+  background: #0071e3;
+  border-color: transparent;
+  box-shadow: 0 2px 10px rgba(0, 113, 227, 0.4);
+}
+
+.sf-preview-builder.is-card .sf-preview-builder__popover {
   top: auto;
   bottom: calc(100% + 0.4rem);
   left: 0;

@@ -48,7 +48,10 @@ export function PreviewDesignModeProvider({ children, appearance }) {
     return draft || appearance || {};
   });
   const [focusedSection, setFocusedSection] = useState(null);
-  const [openSection, setOpenSection] = useState(null);
+  /** `{ section, instance }` — instance distinguishes multiple Builders for the same section (fleet cards). */
+  const [openBuilderState, setOpenBuilderState] = useState({ section: null, instance: null });
+  const openSection = openBuilderState.section;
+  const openInstance = openBuilderState.instance;
   const syncingFromParent = useRef(false);
 
   useEffect(() => {
@@ -98,15 +101,22 @@ export function PreviewDesignModeProvider({ children, appearance }) {
   }, []);
 
   const openBuilder = useCallback(
-    (sectionId) => {
+    (sectionId, instanceId = null) => {
       if (!sectionId) return;
       selectSection(sectionId);
-      setOpenSection((cur) => (cur === sectionId ? null : sectionId));
+      setOpenBuilderState((cur) => {
+        if (cur.section === sectionId && cur.instance === instanceId) {
+          return { section: null, instance: null };
+        }
+        return { section: sectionId, instance: instanceId };
+      });
     },
     [selectSection],
   );
 
-  const closeBuilder = useCallback(() => setOpenSection(null), []);
+  const closeBuilder = useCallback(() => {
+    setOpenBuilderState({ section: null, instance: null });
+  }, []);
 
   const requestThemes = useCallback(() => {
     postPdwBridge({ type: PDW_BRIDGE.REQUEST_THEMES });
@@ -121,11 +131,14 @@ export function PreviewDesignModeProvider({ children, appearance }) {
       setForm,
       focusedSection,
       openSection,
+      openInstance,
       openBuilder,
       closeBuilder,
       selectSection,
       requestThemes,
       sectionLabel: (id) => SECTION_LABELS[id] || id,
+      isBuilderOpen: (sectionId, instanceId = null) =>
+        openSection === sectionId && openInstance === instanceId,
     };
   }, [
     enabled,
@@ -133,6 +146,7 @@ export function PreviewDesignModeProvider({ children, appearance }) {
     setForm,
     focusedSection,
     openSection,
+    openInstance,
     openBuilder,
     closeBuilder,
     selectSection,
@@ -153,19 +167,26 @@ export function PreviewBuilderControl({
   label,
   variant = 'inline',
   className = '',
+  /** Unique key when several controls share the same sectionId (one popover at a time). */
+  instanceId = null,
 }) {
   const ctx = usePreviewDesignMode();
   const wrapRef = useRef(null);
   if (!ctx?.enabled || !sectionId) return null;
 
-  const isOpen = ctx.openSection === sectionId;
+  const isOpen = ctx.isBuilderOpen
+    ? ctx.isBuilderOpen(sectionId, instanceId)
+    : ctx.openSection === sectionId && ctx.openInstance === instanceId;
   const title = label || ctx.sectionLabel(sectionId);
 
   return (
     <div
       ref={wrapRef}
-      className={`sf-preview-builder ${variant === 'bar' ? 'is-bar' : 'is-inline'} ${className}`.trim()}
+      className={`sf-preview-builder ${variant === 'bar' ? 'is-bar' : 'is-inline'} ${
+        variant === 'card' ? 'is-card' : ''
+      } ${isOpen ? 'is-open' : ''} ${className}`.trim()}
       data-pdw-section={sectionId}
+      data-pdw-instance={instanceId || undefined}
     >
       <button
         type="button"
@@ -176,7 +197,7 @@ export function PreviewBuilderControl({
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          ctx.openBuilder(sectionId);
+          ctx.openBuilder(sectionId, instanceId);
         }}
       >
         <span className="material-symbols-outlined sf-preview-builder__icon" aria-hidden>
@@ -198,6 +219,30 @@ export function PreviewBuilderControl({
           anchorRef={wrapRef}
         />
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Divi-like Builder chip anchored on a storefront card (fleet / rent grid).
+ * Renders nothing outside ?preview=1.
+ */
+export function PreviewCardBuilder({
+  sectionId,
+  label,
+  instanceId,
+  className = '',
+}) {
+  const ctx = usePreviewDesignMode();
+  if (!ctx?.enabled || !sectionId || !instanceId) return null;
+  return (
+    <div className={`sf-preview-card-builder ${className}`.trim()}>
+      <PreviewBuilderControl
+        sectionId={sectionId}
+        label={label}
+        variant="card"
+        instanceId={instanceId}
+      />
     </div>
   );
 }
@@ -301,7 +346,12 @@ export function PreviewEditableSection({
       {!hideFloatingBar ? (
         <div className="sf-preview-section__bar" aria-hidden={false}>
           <span className="sf-preview-section__bar-label">{title}</span>
-          <PreviewBuilderControl sectionId={sectionId} label={title} variant="bar" />
+          <PreviewBuilderControl
+            sectionId={sectionId}
+            label={title}
+            variant="bar"
+            instanceId={`section-bar-${sectionId}`}
+          />
         </div>
       ) : null}
       {children}
