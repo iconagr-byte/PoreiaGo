@@ -1197,90 +1197,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                     ))}
                   </div>
                 </PanelCard>
-                <PanelCard
-                  title="Γρήγορη εκκίνηση"
-                  description="Πλήρης παραμετροποίηση /rent — χωρίς να χρειάζεστε ρυθμίσεις λεωφορείων."
-                >
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => selectSection('themes')}
-                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
-                    >
-                      <span className="w-11 h-11 rounded-xl bg-fuchsia-500 text-white flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined">palette</span>
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block font-bold text-slate-900 group-hover:text-teal-800">
-                          Θέματα
-                        </span>
-                        <span className="block text-xs text-slate-500 mt-0.5">
-                          20 πλήρεις σελίδες · μετά χρώματα
-                        </span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => selectSection('branding')}
-                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
-                    >
-                      <span className="w-11 h-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined">image</span>
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block font-bold text-slate-900 group-hover:text-teal-800">
-                          Μάρκα & λογότυπο
-                        </span>
-                        <span className="block text-xs text-slate-500 mt-0.5">
-                          Ξεχωριστό logo για header /rent
-                        </span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => selectSection('fleet')}
-                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
-                    >
-                      <span className="w-11 h-11 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined">directions_car</span>
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block font-bold text-slate-900 group-hover:text-teal-800">
-                          Καρτέλες στόλου
-                        </span>
-                        <span className="block text-xs text-slate-500 mt-0.5">
-                          Διάταξη & στυλ οχημάτων στην αρχική
-                        </span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => selectSection('copy')}
-                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
-                    >
-                      <span className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
-                        <span className="material-symbols-outlined">edit_note</span>
-                      </span>
-                      <span>
-                        <span className="font-bold text-gray-900 block">Όνομα & κείμενα</span>
-                        <span className="text-xs text-gray-500">Συνδεδεμένος / επισκέπτης · CTA</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => selectSection('slider')}
-                      className="flex items-center gap-3 p-4 rounded-2xl border border-black/[0.06] hover:border-teal-500/30 hover:shadow-md text-left transition-all bg-white group w-full"
-                    >
-                      <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
-                        <span className="material-symbols-outlined">slideshow</span>
-                      </span>
-                      <span>
-                        <span className="font-bold text-gray-900 block">Slider</span>
-                        <span className="text-xs text-gray-500">Hero φωτογραφίες · autoplay</span>
-                      </span>
-                    </button>
-                  </div>
-                </PanelCard>
               </>
             )}
             {section === 'themes' && (
@@ -1537,26 +1453,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
               description="Σύνοψη των ενεργών προτύπων. Αλλάξτε τα από τα μενού στα αριστερά."
             >
               <OverviewSummary form={form} />
-            </PanelCard>
-            <PanelCard
-              title="Γρήγορη εκκίνηση"
-              description="Προτεινόμενη σειρά: Θέματα → Γενικά → Header → Hero → Καρτέλες → Μάρκα → Footer. Χρησιμοποίησε Πίσω/Επόμενο στην κορυφή."
-            >
-              <div className="grid sm:grid-cols-2 gap-3">
-                {HOME_SECTIONS.filter((s) => s.id !== 'overview').map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => selectSection(s.id)}
-                    className="pdw-quick-tile w-full"
-                  >
-                    <span className="pdw-quick-tile__icon">
-                      <span className="material-symbols-outlined">{s.icon}</span>
-                    </span>
-                    <span className="font-bold text-[#1d1d1f]">{s.label}</span>
-                  </button>
-                ))}
-              </div>
             </PanelCard>
           </>
         )}
