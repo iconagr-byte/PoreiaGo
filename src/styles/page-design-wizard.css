@@ -591,6 +591,16 @@
     overscroll-behavior: contain;
     padding-right: 0.15rem;
   }
+
+  /* Placeholder-only middle (e.g. Themes waiting): preview fills beside nav */
+  .page-design-wizard__layout.has-preview.is-preview-dominant .page-design-wizard__main {
+    display: none;
+  }
+
+  .page-design-wizard__layout.has-preview.is-preview-dominant .page-design-wizard__preview-pane {
+    flex: 1 1 100%;
+    max-width: none;
+  }
 }
 
 /* Right live preview pane */
@@ -622,6 +632,14 @@
     position: relative;
     top: auto;
     height: calc(100vh - 6.5rem);
+  }
+
+  /* Dominant preview beside nav — sticky full remaining width */
+  .page-design-wizard__layout.has-preview.is-preview-dominant .page-design-wizard__preview-pane.is-expanded {
+    position: sticky;
+    top: 4.25rem;
+    align-self: stretch;
+    height: calc(100vh - 7.5rem);
   }
 }
 

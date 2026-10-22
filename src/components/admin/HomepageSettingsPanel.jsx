@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TemplatePicker from './homepage/TemplatePicker.jsx';
-import ThemeGallery from './homepage/ThemeGallery.jsx';
+import ThemeGallery, { isHomepageThemesPlaceholder } from './homepage/ThemeGallery.jsx';
 import RentThemeGallery from './homepage/RentThemeGallery.jsx';
 import PageDesignWizardShell from './homepage/PageDesignWizardShell.jsx';
 import '../../styles/page-design-wizard.css';
@@ -1963,6 +1963,9 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         dirty={dirty}
         onSave={saveAll}
         previewRefreshToken={previewRefreshToken}
+        editorSparse={
+          designPage === 'home' && section === 'themes' && isHomepageThemesPlaceholder()
+        }
       >
         {sectionContent}
       </PageDesignWizardShell>
