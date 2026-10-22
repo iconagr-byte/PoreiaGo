@@ -1,6 +1,6 @@
 import { amenityIcon } from '../services/fleetPublicApi.js';
 import { fleetCategoryLabel, fleetCategoryMeta } from '../lib/fleet/fleetVehicleCategories.js';
-import { PreviewCardBuilder } from './storefront/preview/PreviewDesignMode.jsx';
+import { PreviewBuilderControl } from './storefront/preview/PreviewDesignMode.jsx';
 
 export default function FleetShowcaseSection({
   vehicles,
@@ -19,9 +19,19 @@ export default function FleetShowcaseSection({
         <span className="text-primary font-semibold tracking-wider uppercase text-sm mb-3 block">
           Ο Στόλος Μας
         </span>
-        <h2 className="font-headline-lg text-4xl md:text-5xl font-bold text-on-surface tracking-tight mb-4">
-          Premium λεωφορεία & παροχές
-        </h2>
+        {/* One Builder for the whole fleet section — not per vehicle card. */}
+        <div className="sf-preview-trips-section-head mb-4">
+          <h2 className="font-headline-lg text-4xl md:text-5xl font-bold text-on-surface tracking-tight">
+            Premium λεωφορεία & παροχές
+          </h2>
+          <PreviewBuilderControl
+            sectionId="general"
+            label="Στόλος"
+            variant="inline"
+            instanceId="fleet-section-title"
+            className="sf-preview-trips-section-head__builder"
+          />
+        </div>
         <p className="text-on-surface-variant font-body-md">
           Τα οχήματά μας συγχρονίζονται από τον πίνακα ελέγχου — άνεση, ασφάλεια και σύγχρονες
           παροχές σε κάθε διαδρομή.
@@ -43,7 +53,7 @@ export default function FleetShowcaseSection({
             const cardKey = String(bus.id ?? bus.name ?? categoryLabel);
             return (
               <div key={cardKey} className="h-full">
-                <article className="relative group sf-preview-card-host h-full bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-visible">
+                <article className="group h-full bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden">
                   <div className="relative h-52 w-full overflow-hidden shrink-0">
                     <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent z-10" />
                     <img
@@ -95,13 +105,6 @@ export default function FleetShowcaseSection({
                       </ul>
                     </div>
                   </div>
-
-                  {/* Divi-like: one Builder per fleet card in ?preview=1 (opens Γενικά / στόλος). */}
-                  <PreviewCardBuilder
-                    sectionId="general"
-                    label="Στόλος"
-                    instanceId={`fleet-card-${cardKey}`}
-                  />
                 </article>
               </div>
             );

@@ -75,7 +75,7 @@ const SECTION_HINTS = {
   header: 'Inline Builder πάνω στο header του preview.',
   hero: 'Inline Builder πάνω στο hero του preview.',
   slider: 'Inline Builder — carousel διαφανειών στο preview.',
-  trips: 'Inline Builder δεξιά στον τίτλο «Εκδρομές» και σε κάθε κάρτα εκδρομής.',
+  trips: 'Ένα Builder δεξιά στον τίτλο «Εκδρομές» — διάταξη και πρότυπο για όλες τις κάρτες.',
   branding: 'Επωνυμία γραφείου, λογότυπο και hero εικόνα.',
   footer: 'Inline Builder πάνω στο footer του preview.',
   copy: 'Όνομα και κείμενα της σελίδας /rent.',

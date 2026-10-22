@@ -224,7 +224,8 @@ export function PreviewBuilderControl({
 }
 
 /**
- * Divi-like Builder chip anchored on a storefront card (fleet / rent grid).
+ * Optional per-card Builder chip (hover-reveal). Prefer section-level
+ * PreviewBuilderControl for shared card templates (trips / fleet / rent).
  * Renders nothing outside ?preview=1.
  */
 export function PreviewCardBuilder({
