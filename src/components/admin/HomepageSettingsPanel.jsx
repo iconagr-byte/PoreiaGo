@@ -1957,7 +1957,6 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
         previewPathLabel={previewPathLabel}
         openSiteHref={openSiteHref}
         copyLinkHref={copyLinkHref}
-        backOfficeTo="/admin"
         siteLabel={designPage === 'rent' ? 'Ενοικιάσεις' : 'Ιστοσελίδα γραφείου'}
         brandName={brandName}
         saving={saving}
