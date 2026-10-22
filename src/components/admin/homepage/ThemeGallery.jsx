@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  HOMEPAGE_THEMES,
-  THEME_CATEGORIES,
-  filterThemes,
   getHomepageThemeById,
+  getSelectableHomepageThemes,
 } from '../../../lib/homepage/homepageThemes.js';
 import ThemeMiniPreview from './ThemeMiniPreview.jsx';
 
@@ -15,7 +13,8 @@ const VIEWPORTS = [
 ];
 
 /**
- * Full-window live preview of the office storefront — same UX as /rent themes.
+ * Full-window live preview of the office storefront.
+ * Kept for the active (saved) theme — not for browsing the retired gallery.
  */
 function HomepageThemeLivePreview({
   theme,
@@ -36,6 +35,7 @@ function HomepageThemeLivePreview({
   const idx = Math.max(0, themes.findIndex((t) => t.id === theme.id));
   const hasPrev = idx > 0;
   const hasNext = idx >= 0 && idx < themes.length - 1;
+  const canBrowse = themes.length > 1;
 
   useEffect(() => {
     onPreview?.(theme, { includeColors });
@@ -46,8 +46,8 @@ function HomepageThemeLivePreview({
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') onClose?.();
-      if (e.key === 'ArrowLeft' && hasPrev) onSelectTheme?.(themes[idx - 1]);
-      if (e.key === 'ArrowRight' && hasNext) onSelectTheme?.(themes[idx + 1]);
+      if (canBrowse && e.key === 'ArrowLeft' && hasPrev) onSelectTheme?.(themes[idx - 1]);
+      if (canBrowse && e.key === 'ArrowRight' && hasNext) onSelectTheme?.(themes[idx + 1]);
     };
     window.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -56,7 +56,7 @@ function HomepageThemeLivePreview({
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose, onSelectTheme, themes, idx, hasPrev, hasNext]);
+  }, [onClose, onSelectTheme, themes, idx, hasPrev, hasNext, canBrowse]);
 
   const liveHref = `/storefront?preview=1&theme=${encodeURIComponent(theme.id)}`;
 
@@ -74,31 +74,33 @@ function HomepageThemeLivePreview({
           className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white"
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-          <span className="hidden sm:inline">Πίσω στη λίστα</span>
+          <span className="hidden sm:inline">Πίσω</span>
         </button>
 
-        <div className="inline-flex items-center gap-0.5 rounded-lg bg-white/10 p-0.5">
-          <button
-            type="button"
-            disabled={!hasPrev}
-            onClick={() => hasPrev && onSelectTheme?.(themes[idx - 1])}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-white/80 hover:bg-white/10 disabled:opacity-30"
-            aria-label="Προηγούμενο θέμα"
-            title="← Προηγούμενο"
-          >
-            <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-          </button>
-          <button
-            type="button"
-            disabled={!hasNext}
-            onClick={() => hasNext && onSelectTheme?.(themes[idx + 1])}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-white/80 hover:bg-white/10 disabled:opacity-30"
-            aria-label="Επόμενο θέμα"
-            title="Επόμενο →"
-          >
-            <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-          </button>
-        </div>
+        {canBrowse ? (
+          <div className="inline-flex items-center gap-0.5 rounded-lg bg-white/10 p-0.5">
+            <button
+              type="button"
+              disabled={!hasPrev}
+              onClick={() => hasPrev && onSelectTheme?.(themes[idx - 1])}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-white/80 hover:bg-white/10 disabled:opacity-30"
+              aria-label="Προηγούμενο θέμα"
+              title="← Προηγούμενο"
+            >
+              <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+            </button>
+            <button
+              type="button"
+              disabled={!hasNext}
+              onClick={() => hasNext && onSelectTheme?.(themes[idx + 1])}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-white/80 hover:bg-white/10 disabled:opacity-30"
+              aria-label="Επόμενο θέμα"
+              title="Επόμενο →"
+            >
+              <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+            </button>
+          </div>
+        ) : null}
 
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-bold uppercase tracking-wider text-sky-300/80">
@@ -106,9 +108,11 @@ function HomepageThemeLivePreview({
           </p>
           <h2 id="home-live-preview-title" className="truncate text-sm font-bold sm:text-base">
             {theme.nameEl}
-            <span className="ml-2 font-normal text-white/45">
-              {idx + 1}/{themes.length || 1}
-            </span>
+            {canBrowse ? (
+              <span className="ml-2 font-normal text-white/45">
+                {idx + 1}/{themes.length}
+              </span>
+            ) : null}
           </h2>
         </div>
 
@@ -206,9 +210,140 @@ function HomepageThemeLivePreview({
   return createPortal(ui, document.body);
 }
 
+function ThemePickerDrawer({
+  open,
+  onClose,
+  selectableThemes,
+  activeThemeId,
+  includeColors,
+  applying,
+  onApply,
+  onOpenPreview,
+}) {
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (!open || typeof document === 'undefined') return null;
+
+  const hasChoices = selectableThemes.length > 0;
+
+  const ui = (
+    <div className="fixed inset-0 z-[1900] flex items-end justify-center sm:items-center" role="presentation">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+        aria-label="Κλείσιμο"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="pdw-theme-drawer relative z-10 flex max-h-[min(88vh,560px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-black/[0.08] bg-white shadow-2xl sm:mx-4 sm:rounded-2xl"
+      >
+        <header className="flex shrink-0 items-start gap-3 border-b border-black/[0.06] px-4 py-3.5 sm:px-5">
+          <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="text-base font-bold text-[#1d1d1f]">
+              Επιλογή θέματος
+            </h2>
+            <p className="mt-0.5 text-xs leading-relaxed text-[#6e6e73]">
+              Σύντομα θα προστεθούν θέματα από demo ιστοσελίδες. Το ενεργό θέμα παραμένει αποθηκευμένο.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#6e6e73] hover:bg-black/[0.04] hover:text-[#1d1d1f]"
+            aria-label="Κλείσιμο"
+          >
+            <span className="material-symbols-outlined text-[22px]">close</span>
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          {hasChoices ? (
+            <div className="pdw-theme-thumb-row" role="list">
+              {selectableThemes.map((theme) => {
+                const selected = theme.id === activeThemeId;
+                return (
+                  <article
+                    key={theme.id}
+                    role="listitem"
+                    className={`pdw-theme-thumb${selected ? ' is-selected' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className="w-full text-left"
+                      onClick={() => onOpenPreview?.(theme)}
+                      title="Προεπισκόπηση"
+                    >
+                      <ThemeMiniPreview theme={theme} selected={selected} />
+                      <p className="mt-1.5 truncate text-[11px] font-bold text-[#1d1d1f]">
+                        {theme.nameEl}
+                      </p>
+                      <p className="truncate text-[10px] text-[#6e6e73]">
+                        {theme.layoutLabel || theme.mood || ''}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={applying || selected}
+                      onClick={() => onApply?.(theme, { includeColors })}
+                      className={`pdw-theme-thumb__apply${selected ? ' is-active' : ''}`}
+                    >
+                      {selected ? 'Ενεργό' : applying ? '…' : 'Εφαρμογή'}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="pdw-theme-waiting">
+              <span className="material-symbols-outlined pdw-theme-waiting__icon" aria-hidden>
+                web_asset
+              </span>
+              <p className="text-sm font-bold text-[#1d1d1f]">Θέματα από demos — σύντομα</p>
+              <p className="mt-1 max-w-sm text-xs leading-relaxed text-[#6e6e73]">
+                Θα αντιγράψουμε εμφάνιση από demo ιστοσελίδες που θα μας στείλετε και θα εμφανιστούν
+                εδώ ως συμπαγής επιλογή — χωρίς μακρύ κατεβατό καρτών.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-black/[0.06] px-4 py-3 sm:px-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl px-3.5 py-2 text-xs font-bold text-[#1d1d1f] hover:bg-black/[0.04]"
+          >
+            Κλείσιμο
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+
+  return createPortal(ui, document.body);
+}
+
 /**
- * Homepage theme gallery — live full-page preview like /rent themes.
- * Applies LAYOUT only by default; optional checkbox applies suggested palette.
+ * Discreet homepage Themes panel — active strip + compact picker drawer.
+ * Old long card gallery retired; selectable catalog is empty until demo themes arrive.
+ * Saved theme id / apply plumbing stay intact via getHomepageThemeById + onApply.
  */
 export default function ThemeGallery({
   activeThemeId,
@@ -216,184 +351,114 @@ export default function ThemeGallery({
   onApply,
   applying = false,
 }) {
-  const [category, setCategory] = useState('all');
-  const [query, setQuery] = useState('');
   const [includeColors, setIncludeColors] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [previewTheme, setPreviewTheme] = useState(null);
 
-  const themes = useMemo(() => filterThemes({ category, query }), [category, query]);
   const active = getHomepageThemeById(activeThemeId);
+  const selectableThemes = getSelectableHomepageThemes();
+  const previewThemes =
+    selectableThemes.length > 0
+      ? selectableThemes
+      : active
+        ? [active]
+        : [];
 
   const openPreview = (theme) => {
     onPreview?.(theme, { includeColors });
     setPreviewTheme(theme);
+    setPickerOpen(false);
   };
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-[#0071e3]/15 bg-[#0071e3]/[0.06] px-4 py-3 text-sm text-[#1d1d1f]">
-        <p className="font-bold">1. Επίλεξε διάταξη</p>
-        <p className="text-xs text-[#6e6e73] mt-0.5 leading-relaxed">
-          Κάθε θέμα αλλάζει header, hero, κάρτες και footer — όχι απαραίτητα τα χρώματα. Τα χρώματα τα
-          ρυθμίζεις μετά στα <span className="font-semibold">Γενικά</span>.
-        </p>
-        <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-[#0071e3]">
-          <span className="material-symbols-outlined text-[15px]">visibility</span>
-          Επισκόπηση = ζωντανή αρχική · Ενεργοποίηση = αποθήκευση θέματος
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="pdw-theme-search relative flex-1">
-            <span className="material-symbols-outlined">search</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Αναζήτηση θέματος ή διάταξης…"
-            />
-          </div>
-          <p className="text-xs font-semibold text-[#6e6e73] tabular-nums shrink-0">
-            {themes.length}/{HOMEPAGE_THEMES.length}
-          </p>
-        </div>
-
-        <div className="pdw-theme-chips">
-          {THEME_CATEGORIES.map((cat) => {
-            const on = category === cat.id;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setCategory(cat.id)}
-                className={`pdw-theme-chip${on ? ' is-active' : ''}`}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <label className="flex items-start gap-3 rounded-2xl border border-black/[0.06] bg-white px-4 py-3 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          className="mt-1 h-4 w-4 rounded border-gray-300 text-[#0071e3] focus:ring-[#0071e3]"
-          checked={includeColors}
-          onChange={(e) => setIncludeColors(e.target.checked)}
-        />
-        <span>
-          <span className="block text-sm font-bold text-[#1d1d1f]">Και τα προτεινόμενα χρώματα</span>
-          <span className="block text-xs text-[#6e6e73] mt-0.5">
-            Αν είναι off, κρατάς τα τρέχοντα brand χρώματα και αλλάζει μόνο η διάταξη.
-          </span>
-        </span>
-      </label>
-
-      {active && (
-        <div className="pdw-theme-active">
+    <div className="pdw-theme-discreet space-y-3">
+      {active ? (
+        <div className="pdw-theme-active pdw-theme-active--compact">
           <button
             type="button"
             className="pdw-theme-active__preview text-left"
             onClick={() => openPreview(active)}
-            title="Άνοιγμα πλήρους preview"
+            title="Άνοιγμα προεπισκόπησης"
           >
             <ThemeMiniPreview theme={active} selected />
           </button>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#86868b]">Ενεργό</p>
-            <p className="font-bold text-[#1d1d1f] truncate text-base">{active.nameEl}</p>
-            <p className="text-xs text-[#6e6e73] truncate mt-0.5">
+            <p className="truncate text-sm font-bold text-[#1d1d1f]">{active.nameEl}</p>
+            <p className="mt-0.5 truncate text-[11px] text-[#6e6e73]">
               {active.layoutLabel || active.mood || active.description}
             </p>
             <button
               type="button"
               onClick={() => openPreview(active)}
-              className="mt-2 text-xs font-bold text-[#0071e3] hover:underline"
+              className="mt-1.5 text-[11px] font-bold text-[#0071e3] hover:underline"
             >
-              Άνοιγμα πλήρους σελίδας →
+              Άνοιγμα προεπισκόπησης →
             </button>
           </div>
-        </div>
-      )}
-
-      <div className="pdw-theme-grid">
-        {themes.map((theme) => {
-          const selected = theme.id === activeThemeId;
-          return (
-            <article
-              key={theme.id}
-              className={`pdw-theme-card group${selected ? ' is-selected' : ''}`}
-            >
-              <button
-                type="button"
-                className="w-full text-left"
-                onClick={() => openPreview(theme)}
-                title="Επισκόπηση πλήρους σελίδας"
-              >
-                <ThemeMiniPreview theme={theme} selected={selected} />
-                <div className="mt-2.5 px-0.5">
-                  <p className="font-bold text-sm text-[#1d1d1f] leading-snug truncate">{theme.nameEl}</p>
-                  <p className="text-[11px] text-[#6e6e73] truncate mt-0.5">
-                    {theme.layoutLabel || theme.mood}
-                  </p>
-                  {theme.badge ? (
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#5e5ce6] mt-0.5">
-                      {theme.badge}
-                    </p>
-                  ) : null}
-                </div>
-              </button>
-
-              <div className="pdw-theme-actions">
-                <button
-                  type="button"
-                  onClick={() => openPreview(theme)}
-                  className="pdw-theme-btn pdw-theme-btn--preview"
-                >
-                  <span className="material-symbols-outlined" aria-hidden>
-                    visibility
-                  </span>
-                  Επισκόπηση
-                </button>
-                <button
-                  type="button"
-                  disabled={applying || selected}
-                  onClick={() => onApply?.(theme, { includeColors })}
-                  className={`pdw-theme-btn pdw-theme-btn--activate${selected ? ' is-active' : ''}`}
-                >
-                  <span className="material-symbols-outlined" aria-hidden>
-                    {selected ? 'check_circle' : 'bolt'}
-                  </span>
-                  {selected ? 'Ενεργό' : applying ? '…' : 'Ενεργοποίηση'}
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
-      {themes.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-[rgba(0,0,0,0.08)] py-12 text-center bg-white/60">
-          <p className="text-sm font-bold text-[#1d1d1f]">Κανένα αποτέλεσμα</p>
           <button
             type="button"
-            onClick={() => {
-              setCategory('all');
-              setQuery('');
-            }}
-            className="mt-2 text-xs font-bold text-[#0071e3] hover:underline"
+            onClick={() => setPickerOpen(true)}
+            className="pdw-theme-pick-btn shrink-0"
           >
-            Καθαρισμός φίλτρων
+            <span className="material-symbols-outlined text-[18px]" aria-hidden>
+              palette
+            </span>
+            Επιλογή θέματος
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-black/[0.08] bg-white/80 px-4 py-4 text-center">
+          <p className="text-sm font-bold text-[#1d1d1f]">Κανένα ενεργό θέμα</p>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="pdw-theme-pick-btn mt-3 inline-flex"
+          >
+            Επιλογή θέματος
           </button>
         </div>
       )}
 
+      <label className="pdw-theme-colors-line">
+        <input
+          type="checkbox"
+          className="h-3.5 w-3.5 rounded border-gray-300 text-[#0071e3] focus:ring-[#0071e3]"
+          checked={includeColors}
+          onChange={(e) => setIncludeColors(e.target.checked)}
+        />
+        <span className="min-w-0">
+          <span className="text-xs font-semibold text-[#1d1d1f]">Εφαρμογή προτεινόμενων χρωμάτων</span>
+          <span className="mt-0.5 block text-[11px] leading-snug text-[#6e6e73]">
+            Off = μόνο διάταξη · τα brand χρώματα μένουν όπως είναι.
+          </span>
+        </span>
+      </label>
+
+      {!active ? null : (
+        <p className="px-0.5 text-[11px] leading-relaxed text-[#86868b]">
+          Νέα θέματα από demo ιστοσελίδες θα εμφανιστούν στο «Επιλογή θέματος» — χωρίς μακρύ κατεβατό.
+        </p>
+      )}
+
+      <ThemePickerDrawer
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selectableThemes={selectableThemes}
+        activeThemeId={activeThemeId}
+        includeColors={includeColors}
+        applying={applying}
+        onApply={async (theme, opts) => {
+          await onApply?.(theme, opts);
+          setPickerOpen(false);
+        }}
+        onOpenPreview={openPreview}
+      />
+
       {previewTheme ? (
         <HomepageThemeLivePreview
           theme={previewTheme}
-          themes={themes.length ? themes : HOMEPAGE_THEMES}
+          themes={previewThemes}
           activeThemeId={activeThemeId}
           includeColors={includeColors}
           applying={applying}

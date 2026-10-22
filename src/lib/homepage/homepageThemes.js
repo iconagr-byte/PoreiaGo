@@ -2,6 +2,10 @@
  * Θέματα αρχικής = ΔΙΑΤΑΞΗ (header × hero × trips × cards × footer).
  * Τα χρώματα είναι προτεινόμενα και εφαρμόζονται χωριστά (Γενικά → Brand colors),
  * εκτός αν ζητηθεί ρητά includeColors στο themeToAppearancePatch.
+ *
+ * HOMEPAGE_THEMES remains the layout catalog for resolving saved theme ids.
+ * Page Design picker shows only SELECTABLE_HOMEPAGE_THEME_IDS (empty until
+ * demo websites are copied in) — see getSelectableHomepageThemes().
  */
 
 export const THEME_CATEGORIES = [
@@ -417,6 +421,19 @@ export const HOMEPAGE_THEMES = [
 ];
 
 export const DEFAULT_HOMEPAGE_THEME_ID = 'aegean_classic';
+
+/**
+ * Themes shown in the Page Design picker.
+ * Empty until demo websites are copied in — keep HOMEPAGE_THEMES for
+ * resolving saved theme ids + layout apply (getHomepageThemeById).
+ */
+export const SELECTABLE_HOMEPAGE_THEME_IDS = [];
+
+export function getSelectableHomepageThemes() {
+  return SELECTABLE_HOMEPAGE_THEME_IDS.map((id) => getHomepageThemeById(id)).filter(
+    (t, i, arr) => t && arr.findIndex((x) => x.id === t.id) === i,
+  );
+}
 
 export function getHomepageThemeById(id) {
   return HOMEPAGE_THEMES.find((t) => t.id === id) || HOMEPAGE_THEMES[0];
