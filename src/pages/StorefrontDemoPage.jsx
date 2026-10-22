@@ -47,7 +47,6 @@ import StorefrontRentSection from '../components/storefront/StorefrontRentSectio
 import TripsSection from '../components/storefront/TripsSection.jsx';
 import {
   PreviewBuilderControl,
-  PreviewCardBuilder,
   PreviewDesignModeProvider,
   PreviewEditableSection,
 } from '../components/storefront/preview/PreviewDesignMode.jsx';
@@ -570,7 +569,7 @@ export default function StorefrontDemoPage() {
               ].map((card) => (
                 <div
                   key={card.id}
-                  className="relative group sf-preview-card-host bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform"
+                  className="bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform"
                 >
                   <div
                     className={`w-16 h-16 rounded-full ${card.iconWrap} flex items-center justify-center mb-6`}
@@ -579,11 +578,6 @@ export default function StorefrontDemoPage() {
                   </div>
                   <h3 className="font-headline-sm font-bold text-on-surface mb-3">{card.title}</h3>
                   <p className="text-on-surface-variant font-body-md">{card.body}</p>
-                  <PreviewCardBuilder
-                    sectionId="general"
-                    label="Γιατί εμάς"
-                    instanceId={`why-us-card-${card.id}`}
-                  />
                 </div>
               ))}
             </div>

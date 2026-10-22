@@ -1,9 +1,6 @@
 import TripCard from './TripCard.jsx';
 import { tripsGridClass, tripCardWrapperClass } from '../../lib/homepage/homepageTemplates.js';
-import {
-  PreviewBuilderControl,
-  PreviewCardBuilder,
-} from './preview/PreviewDesignMode.jsx';
+import { PreviewBuilderControl } from './preview/PreviewDesignMode.jsx';
 
 export default function TripsSection({
   id,
@@ -41,7 +38,7 @@ export default function TripsSection({
             {eyebrow}
           </span>
         )}
-        {/* Divi-like: Builder sits right of «Εκδρομές στην Ελλάδα» (Καρτέλες) in ?preview=1. */}
+        {/* One Builder for the whole card template (Καρτέλες) — not per trip card. */}
         <div className="sf-preview-trips-section-head">
           <h2
             className={`font-bold text-on-surface tracking-tight ${
@@ -81,29 +78,21 @@ export default function TripsSection({
         <p className="text-center text-on-surface-variant py-12 font-body-md">{emptyMessage}</p>
       ) : (
         <div className={gridClass}>
-          {trips.map((trip, index) => {
-            const cardKey = String(trip.id ?? index);
-            return (
-              <div
-                key={cardKey}
-                className={`${tripCardWrapperClass(layoutId, tripCount, index, cardId)} relative group sf-preview-card-host`.trim()}
-              >
-                <TripCard
-                  trip={trip}
-                  pricingSettings={pricingSettings}
-                  templateId={cardId}
-                  layoutId={layoutId}
-                  index={index}
-                  solo={solo}
-                />
-                <PreviewCardBuilder
-                  sectionId="trips"
-                  label="Καρτέλες"
-                  instanceId={`trip-card-${sectionKey}-${cardKey}`}
-                />
-              </div>
-            );
-          })}
+          {trips.map((trip, index) => (
+            <div
+              key={String(trip.id ?? index)}
+              className={tripCardWrapperClass(layoutId, tripCount, index, cardId)}
+            >
+              <TripCard
+                trip={trip}
+                pricingSettings={pricingSettings}
+                templateId={cardId}
+                layoutId={layoutId}
+                index={index}
+                solo={solo}
+              />
+            </div>
+          ))}
         </div>
       )}
     </section>
