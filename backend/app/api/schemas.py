@@ -445,6 +445,9 @@ class TenantSiteAppearanceResponse(BaseModel):
     logo_show_name: bool = True
     hero_image_url: str = ""
     hero_image_focal: str = "center"
+    hero_overlay_opacity: int = 100
+    hero_image_fit: str = "cover"
+    hero_height_vh: int = 88
     hero_badge: str = ""
     hero_title: str = ""
     hero_title_accent: str = ""
@@ -532,6 +535,9 @@ class TenantSiteAppearanceUpdate(BaseModel):
     logo_show_name: bool | None = None
     hero_image_url: str | None = None
     hero_image_focal: str | None = None
+    hero_overlay_opacity: int | None = None
+    hero_image_fit: str | None = None
+    hero_height_vh: int | None = None
     hero_badge: str | None = None
     hero_title: str | None = None
     hero_title_accent: str | None = None

@@ -95,6 +95,9 @@ DEFAULT_SITE_APPEARANCE = {
     "logo_show_name": True,
     "hero_image_url": "",
     "hero_image_focal": "center",
+    "hero_overlay_opacity": 100,
+    "hero_image_fit": "cover",
+    "hero_height_vh": 88,
     "hero_badge": "Premium Ταξιδιωτική Εμπειρία",
     "hero_title": "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:",
     "hero_title_accent": "Άνεση, ασφάλεια & θέση εξασφαλισμένη.",
@@ -215,6 +218,9 @@ class SiteAppearanceResponse(BaseModel):
     logo_show_name: bool = True
     hero_image_url: str = ""
     hero_image_focal: str = "center"
+    hero_overlay_opacity: int = 100
+    hero_image_fit: str = "cover"
+    hero_height_vh: int = 88
     hero_badge: str = "Premium Ταξιδιωτική Εμπειρία"
     hero_title: str = "Η Ελλάδα, όπως δεν την έχεις ξαναδεί:"
     hero_title_accent: str = "Άνεση, ασφάλεια & θέση εξασφαλισμένη."
@@ -344,6 +350,9 @@ class SiteAppearanceUpdate(BaseModel):
     logo_show_name: bool | None = None
     hero_image_url: str | None = None
     hero_image_focal: str | None = None
+    hero_overlay_opacity: int | None = None
+    hero_image_fit: str | None = None
+    hero_height_vh: int | None = None
     hero_badge: str | None = None
     hero_title: str | None = None
     hero_title_accent: str | None = None
@@ -463,6 +472,23 @@ def _clamp_logo_fields(data: dict) -> dict:
         out["logo_shadow"] = bool(out["logo_shadow"])
     if "logo_show_name" in out and out["logo_show_name"] is not None:
         out["logo_show_name"] = bool(out["logo_show_name"])
+    if "hero_overlay_opacity" in out and out["hero_overlay_opacity"] is not None:
+        try:
+            out["hero_overlay_opacity"] = max(0, min(100, int(out["hero_overlay_opacity"])))
+        except (TypeError, ValueError):
+            out["hero_overlay_opacity"] = 100
+    if "hero_height_vh" in out and out["hero_height_vh"] is not None:
+        try:
+            out["hero_height_vh"] = max(50, min(100, int(out["hero_height_vh"])))
+        except (TypeError, ValueError):
+            out["hero_height_vh"] = 88
+    if "hero_image_fit" in out and out["hero_image_fit"] is not None:
+        fit = str(out.get("hero_image_fit") or "cover").strip().lower()
+        out["hero_image_fit"] = "contain" if fit == "contain" else "cover"
+    if "hero_image_focal" in out and out["hero_image_focal"] is not None:
+        focal = str(out.get("hero_image_focal") or "center").strip().lower()
+        allowed = {"center", "top", "bottom", "left", "right"}
+        out["hero_image_focal"] = focal if focal in allowed else "center"
     if "rent_logo_height_px" in out and out["rent_logo_height_px"] is not None:
         try:
             out["rent_logo_height_px"] = max(20, min(96, int(out["rent_logo_height_px"])))

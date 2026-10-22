@@ -1259,6 +1259,10 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                 logo_shadow: form.logo_shadow === true,
                 logo_show_name: form.logo_show_name !== false,
                 hero_image_focal: form.hero_image_focal || 'center',
+                hero_overlay_opacity:
+                  form.hero_overlay_opacity == null ? 100 : Number(form.hero_overlay_opacity),
+                hero_image_fit: form.hero_image_fit === 'contain' ? 'contain' : 'cover',
+                hero_height_vh: form.hero_height_vh == null ? 88 : Number(form.hero_height_vh),
               };
               let logo = String(form.logo_url || '');
               let hero = String(form.hero_image_url || '');
@@ -1297,6 +1301,9 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
                     logo_shadow: patch.logo_shadow,
                     logo_show_name: patch.logo_show_name,
                     hero_image_focal: patch.hero_image_focal,
+                    hero_overlay_opacity: patch.hero_overlay_opacity,
+                    hero_image_fit: patch.hero_image_fit,
+                    hero_height_vh: patch.hero_height_vh,
                   };
                   if (logo && !logo.startsWith('data:')) sizeOnly.logo_url = logo;
                   result = await updateSiteAppearance(sizeOnly).catch(() => {
