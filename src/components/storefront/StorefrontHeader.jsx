@@ -148,7 +148,12 @@ export default function StorefrontHeader({
       {preview?.enabled ? (
         <div className="sf-preview-section__bar">
           <span className="sf-preview-section__bar-label">Header</span>
-          <PreviewBuilderControl sectionId="header" label="Header" variant="bar" />
+          <PreviewBuilderControl
+            sectionId="header"
+            label="Header"
+            variant="bar"
+            instanceId="header-bar"
+          />
         </div>
       ) : null}
       <div className={style.inner}>

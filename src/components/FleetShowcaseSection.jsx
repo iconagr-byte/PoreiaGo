@@ -1,5 +1,6 @@
 import { amenityIcon } from '../services/fleetPublicApi.js';
 import { fleetCategoryLabel, fleetCategoryMeta } from '../lib/fleet/fleetVehicleCategories.js';
+import { PreviewCardBuilder } from './storefront/preview/PreviewDesignMode.jsx';
 
 export default function FleetShowcaseSection({
   vehicles,
@@ -39,9 +40,10 @@ export default function FleetShowcaseSection({
             const categoryLabel =
               bus.category_label || fleetCategoryLabel(bus.category);
             const categoryIcon = fleetCategoryMeta(bus.category)?.icon || 'directions_bus';
+            const cardKey = String(bus.id ?? bus.name ?? categoryLabel);
             return (
-              <div key={bus.id} className="h-full">
-                <article className="relative group h-full bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-hidden">
+              <div key={cardKey} className="h-full">
+                <article className="relative group sf-preview-card-host h-full bg-gradient-to-b from-white to-[#f8f9fa] rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] transition-all duration-300 flex flex-col overflow-visible">
                   <div className="relative h-52 w-full overflow-hidden shrink-0">
                     <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent z-10" />
                     <img
@@ -81,7 +83,7 @@ export default function FleetShowcaseSection({
                       <ul className="flex flex-wrap gap-2 content-start">
                         {(bus.amenities || []).map((item) => (
                           <li
-                            key={`${bus.id}-${item}`}
+                            key={`${cardKey}-${item}`}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-black/[0.06] text-xs font-medium text-on-surface shadow-sm"
                           >
                             <span className="material-symbols-outlined text-[16px] text-primary">
@@ -93,6 +95,13 @@ export default function FleetShowcaseSection({
                       </ul>
                     </div>
                   </div>
+
+                  {/* Divi-like: one Builder per fleet card in ?preview=1 (opens Γενικά / στόλος). */}
+                  <PreviewCardBuilder
+                    sectionId="general"
+                    label="Στόλος"
+                    instanceId={`fleet-card-${cardKey}`}
+                  />
                 </article>
               </div>
             );

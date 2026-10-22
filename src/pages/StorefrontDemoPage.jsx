@@ -47,6 +47,7 @@ import StorefrontRentSection from '../components/storefront/StorefrontRentSectio
 import TripsSection from '../components/storefront/TripsSection.jsx';
 import {
   PreviewBuilderControl,
+  PreviewCardBuilder,
   PreviewDesignModeProvider,
   PreviewEditableSection,
 } from '../components/storefront/preview/PreviewDesignMode.jsx';
@@ -299,7 +300,12 @@ export default function StorefrontDemoPage() {
           {siteAppearance.hero_search_label || 'Πρόγραμμα εκδρομών'}
         </p>
         {/* Divi-like: Builder sits top-right of ΠΡΟΓΡΑΜΜΑ ΕΚΔΡΟΜΩΝ (Καρτέλες). */}
-        <PreviewBuilderControl sectionId="trips" label="Καρτέλες" variant="inline" />
+        <PreviewBuilderControl
+          sectionId="trips"
+          label="Καρτέλες"
+          variant="inline"
+          instanceId="trips-header"
+        />
       </div>
       <div className="flex flex-wrap gap-2">
         {[
@@ -533,47 +539,53 @@ export default function StorefrontDemoPage() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              <div className="bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform">
-                <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-6">
-                  <span className="material-symbols-outlined text-[32px]">
-                    {rentOnly ? 'smartphone' : 'event_available'}
-                  </span>
-                </div>
-                <h3 className="font-headline-sm font-bold text-on-surface mb-3">
-                  {rentOnly ? 'Κράτηση από το κινητό' : 'Εύκολη Κράτηση'}
-                </h3>
-                <p className="text-on-surface-variant font-body-md">
-                  {rentOnly
+              {[
+                {
+                  id: 'booking',
+                  icon: rentOnly ? 'smartphone' : 'event_available',
+                  iconWrap: 'bg-primary/10 text-primary',
+                  title: rentOnly ? 'Κράτηση από το κινητό' : 'Εύκολη Κράτηση',
+                  body: rentOnly
                     ? 'Διάλεξε όχημα και ημερομηνίες στο Rent app — χωρίς τηλεφωνική αναμονή.'
-                    : 'Διαλέξτε ημερομηνία και κλείστε τη θέση σας με λίγα μόνο κλικ.'}
-                </p>
-              </div>
-              <div className="bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform">
-                <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-6">
-                  <span className="material-symbols-outlined text-[32px]">
-                    {rentOnly ? 'directions_car' : 'airline_seat_recline_extra'}
-                  </span>
-                </div>
-                <h3 className="font-headline-sm font-bold text-on-surface mb-3">
-                  {rentOnly ? 'Στόλος σε ετοιμότητα' : 'Άνεση & Πολυτέλεια'}
-                </h3>
-                <p className="text-on-surface-variant font-body-md">
-                  {rentOnly
+                    : 'Διαλέξτε ημερομηνία και κλείστε τη θέση σας με λίγα μόνο κλικ.',
+                },
+                {
+                  id: 'comfort',
+                  icon: rentOnly ? 'directions_car' : 'airline_seat_recline_extra',
+                  iconWrap: 'bg-blue-50 text-blue-600',
+                  title: rentOnly ? 'Στόλος σε ετοιμότητα' : 'Άνεση & Πολυτέλεια',
+                  body: rentOnly
                     ? 'Οχήματα συντηρημένα και έτοιμα για παραλαβή με καθαρό ιστορικό.'
-                    : 'Ταξιδέψτε με υπερσύγχρονα οχήματα και αναπαυτικά καθίσματα.'}
-                </p>
-              </div>
-              <div className="bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform">
-                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6">
-                  <span className="material-symbols-outlined text-[32px]">shield_person</span>
-                </div>
-                <h3 className="font-headline-sm font-bold text-on-surface mb-3">Απόλυτη Ασφάλεια</h3>
-                <p className="text-on-surface-variant font-body-md">
-                  {rentOnly
+                    : 'Ταξιδέψτε με υπερσύγχρονα οχήματα και αναπαυτικά καθίσματα.',
+                },
+                {
+                  id: 'safety',
+                  icon: 'shield_person',
+                  iconWrap: 'bg-emerald-50 text-emerald-600',
+                  title: 'Απόλυτη Ασφάλεια',
+                  body: rentOnly
                     ? 'Υποστήριξη διαδρομής, όροι ενοικίασης και βοήθεια όταν τη χρειάζεσαι.'
-                    : 'Έμπειροι οδηγοί και αυστηρά μέτρα προστασίας σε κάθε διαδρομή.'}
-                </p>
-              </div>
+                    : 'Έμπειροι οδηγοί και αυστηρά μέτρα προστασίας σε κάθε διαδρομή.',
+                },
+              ].map((card) => (
+                <div
+                  key={card.id}
+                  className="relative group sf-preview-card-host bg-surface-container-lowest p-8 rounded-3xl border border-black/[0.03] shadow-sm flex flex-col items-center text-center hover:-translate-y-1 transition-transform"
+                >
+                  <div
+                    className={`w-16 h-16 rounded-full ${card.iconWrap} flex items-center justify-center mb-6`}
+                  >
+                    <span className="material-symbols-outlined text-[32px]">{card.icon}</span>
+                  </div>
+                  <h3 className="font-headline-sm font-bold text-on-surface mb-3">{card.title}</h3>
+                  <p className="text-on-surface-variant font-body-md">{card.body}</p>
+                  <PreviewCardBuilder
+                    sectionId="general"
+                    label="Γιατί εμάς"
+                    instanceId={`why-us-card-${card.id}`}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -590,8 +602,18 @@ export default function StorefrontDemoPage() {
 
       {previewOn ? (
         <div className="sf-preview-dock" aria-label="Builder ενότητες σελίδας">
-          <PreviewBuilderControl sectionId="general" label="Γενικά" variant="inline" />
-          <PreviewBuilderControl sectionId="slider" label="Slider" variant="inline" />
+          <PreviewBuilderControl
+            sectionId="general"
+            label="Γενικά"
+            variant="inline"
+            instanceId="dock-general"
+          />
+          <PreviewBuilderControl
+            sectionId="slider"
+            label="Slider"
+            variant="inline"
+            instanceId="dock-slider"
+          />
         </div>
       ) : null}
     </div>
