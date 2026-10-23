@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 import {
   fetchPushConfig,
   fetchPushStatus,
@@ -8,15 +9,23 @@ import {
   unsubscribePushNotifications,
 } from '../../services/pushNotificationApi.js';
 
+/**
+ * Customer Web Push (service worker / VAPID) panel.
+ * Capacitor WebViews often fail PushManager / secure-context checks — never show the
+ * browser “HTTPS ή localhost” warning inside the native app.
+ */
 export default function PushNotificationsPanel({ email }) {
+  const native = typeof window !== 'undefined' && isNativeApp();
   const [supported, setSupported] = useState(false);
   const [serverEnabled, setServerEnabled] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [devices, setDevices] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!native);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (native) return undefined;
+
     let cancelled = false;
     const load = async () => {
       const pushSupported = isPushSupported();
@@ -42,7 +51,7 @@ export default function PushNotificationsPanel({ email }) {
     return () => {
       cancelled = true;
     };
-  }, [email]);
+  }, [email, native]);
 
   const handleEnable = async () => {
     setBusy(true);
@@ -71,6 +80,34 @@ export default function PushNotificationsPanel({ email }) {
       setBusy(false);
     }
   };
+
+  // Native Capacitor shell: Web Push is a browser API — hide subscribe UI and the
+  // misleading insecure-context banner. FCM / native push can replace this later.
+  if (native) {
+    return (
+      <section className="wallet-panel">
+        <div className="wallet-panel-head">
+          <span className="wallet-panel-head-icon is-sunset" aria-hidden>
+            <span className="material-symbols-outlined">notifications_active</span>
+          </span>
+          <div>
+            <h3>Push ειδοποιήσεις</h3>
+            <p>
+              Στην εφαρμογή κινητού οι ειδοποιήσεις θα έρχονται μέσω της native εφαρμογής (όχι
+              browser Web Push).
+            </p>
+          </div>
+        </div>
+        <div className="wallet-notice wallet-notice-muted">
+          <span className="material-symbols-outlined">smartphone</span>
+          <p>
+            Οι native ειδοποιήσεις θα ενεργοποιηθούν σε επόμενη ενημέρωση. Δεν χρειάζεται HTTPS /
+            Web Push από το browser.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="wallet-panel">

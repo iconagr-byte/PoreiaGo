@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
 import {
   fetchDriverPushConfig,
   fetchDriverPushStatus,
@@ -13,6 +14,7 @@ import {
 
 /** Ενεργοποίηση push — «Άνοιξε βάρδια» από το γραφείο. */
 export default function DriverPushPanel() {
+  const native = typeof window !== 'undefined' && isNativeApp();
   const [supported, setSupported] = useState(false);
   const [enabled, setEnabled] = useState(null); // null = loading
   const [subscribed, setSubscribed] = useState(false);
@@ -20,9 +22,14 @@ export default function DriverPushPanel() {
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
+    // Capacitor shell: skip Web Push (VAPID / service worker) — native FCM later.
+    if (native) {
+      setSupported(false);
+      return undefined;
+    }
     const ok = isDriverPushSupported();
     setSupported(ok);
-    if (!ok) return;
+    if (!ok) return undefined;
 
     let cancelled = false;
     (async () => {
@@ -100,7 +107,7 @@ export default function DriverPushPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [native]);
 
   const onSubscribe = async () => {
     setBusy(true);
@@ -155,6 +162,22 @@ export default function DriverPushPanel() {
       setBusy(false);
     }
   };
+
+  // Native app: do not show browser Web Push UI or insecure-context warnings.
+  if (native) {
+    return (
+      <div className="driver-card space-y-2">
+        <h3 className="font-bold text-base flex items-center gap-2">
+          <span className="material-symbols-outlined text-[var(--driver-yellow)]">notifications</span>
+          Ειδοποιήσεις βάρδιας
+        </h3>
+        <p className="text-xs text-[var(--driver-muted)] leading-relaxed">
+          Στην native εφαρμογή οι ειδοποιήσεις θα έρχονται μέσω της εφαρμογής (όχι browser Web
+          Push). Θα ενεργοποιηθούν σε επόμενη ενημέρωση.
+        </p>
+      </div>
+    );
+  }
 
   if (!supported) return null;
 
