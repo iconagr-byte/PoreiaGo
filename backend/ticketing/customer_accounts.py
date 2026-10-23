@@ -165,6 +165,74 @@ async def change_account_password(email: str, current_password: str, new_passwor
     await db.commit()
 
 
+async def change_account_email(
+    email: str, new_email: str, current_password: str
+) -> dict:
+    """Rename login email (PRIMARY KEY) and retarget booking/lost-found rows."""
+    old_key = email.strip().lower()
+    new_key = new_email.strip().lower()
+    if not old_key or "@" not in old_key:
+        raise ValueError("Μη έγκυρο τρέχον email")
+    if not new_key or "@" not in new_key:
+        raise ValueError("Μη έγκυρο νέο email")
+    if old_key == new_key:
+        raise ValueError("Το νέο email είναι ίδιο με το τρέχον")
+
+    db = get_db()
+    cursor = await db.execute("SELECT * FROM customer_accounts WHERE email = ?", (old_key,))
+    row = await cursor.fetchone()
+    if not row:
+        raise ValueError("Δεν βρέθηκε λογαριασμός")
+
+    stored = row["password_hash"]
+    if not stored:
+        raise ValueError(
+            "Ορίστε πρώτα κωδικό πρόσβασης πριν αλλάξετε email (λογαριασμός Google)."
+        )
+    if not verify_password(current_password, stored):
+        raise ValueError("Ο τρέχων κωδικός είναι λάθος")
+
+    clash = await get_account(new_key)
+    if clash:
+        raise ValueError("Υπάρχει ήδη λογαριασμός με αυτό το email")
+
+    now = _now_iso()
+    await db.execute(
+        """
+        INSERT INTO customer_accounts
+          (email, password_hash, name, phone, picture, auth_provider, customer_id,
+           wallet_tenant_id, reset_token, reset_expires_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
+        """,
+        (
+            new_key,
+            row["password_hash"],
+            row["name"] or "",
+            row["phone"] or "",
+            row["picture"] or "",
+            row["auth_provider"] or "email",
+            row["customer_id"],
+            row["wallet_tenant_id"] if "wallet_tenant_id" in row.keys() else None,
+            row["created_at"] or now,
+            now,
+        ),
+    )
+    await db.execute(
+        "UPDATE customer_bookings SET customer_email = ? WHERE customer_email = ?",
+        (new_key, old_key),
+    )
+    await db.execute(
+        "UPDATE lost_items SET customer_email = ? WHERE customer_email = ?",
+        (new_key, old_key),
+    )
+    await db.execute("DELETE FROM customer_accounts WHERE email = ?", (old_key,))
+    await db.commit()
+    account = await get_account(new_key)
+    if not account:
+        raise ValueError("Αποτυχία αλλαγής email")
+    return account
+
+
 async def create_password_reset_token(email: str) -> str | None:
     """Returns reset token if account exists and can reset password."""
     key = email.strip().lower()

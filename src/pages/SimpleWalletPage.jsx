@@ -70,7 +70,7 @@ import '../styles/wallet-pass.css';
 /** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · Περισσότερα.
  * Desktop → left sidebar; phone → bottom dock.
  * Never add lookup/Κράτηση/search here — use home CTAs + /my-booking.
- * Account / Lost & Found / Rent / logout live in the header person menu. */
+ * Account / Lost & Found / logout live in the header person menu. */
 const ALL_TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
   { id: 'pass', label: 'Εισιτήριο', icon: 'confirmation_number' },
@@ -179,7 +179,8 @@ function WalletAuthenticatedApp() {
   );
   const [offlineSnap, setOfflineSnap] = useState(() => loadLastPass());
 
-  const profile = useMemo(() => resolveCustomerProfile(), []);
+  const [profileTick, setProfileTick] = useState(0);
+  const profile = useMemo(() => resolveCustomerProfile(), [profileTick]);
   const email = profile.email;
 
   useEffect(() => {
@@ -716,10 +717,16 @@ function WalletAuthenticatedApp() {
         <header className="wallet-topbar">
           <WalletAccountMenu
             profile={profile}
-            rentAvailable={rentAvailable}
-            onOpenAccount={() => switchTab('account')}
+            onOpenAccount={() => {
+              switchTab('account');
+              requestAnimationFrame(() => {
+                document.getElementById('wallet-security')?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                });
+              });
+            }}
             onOpenLostFound={() => switchTab('lost_found')}
-            onOpenRentals={() => switchTab('rentals')}
             onLogout={handleLogout}
           />
           <div className="wallet-topbar-brand">
@@ -984,7 +991,11 @@ function WalletAuthenticatedApp() {
               </section>
             ) : null}
             <PushNotificationsPanel email={profile.email} />
-            <CustomerSecurityPanel email={profile.email} authProvider={profile.provider} />
+            <CustomerSecurityPanel
+              email={profile.email}
+              authProvider={profile.provider}
+              onEmailChanged={() => setProfileTick((n) => n + 1)}
+            />
             <button
               type="button"
               className="wallet-btn wallet-btn-danger wallet-btn-block"
