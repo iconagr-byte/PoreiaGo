@@ -13,6 +13,8 @@ export default function StorefrontBrand({ siteAppearance, variant = 'dark', clas
   return (
     <Link
       to="/"
+      id="pdw-brand"
+      data-pdw-brand=""
       className={`group inline-flex items-center gap-2.5 shrink-0 transition-opacity hover:opacity-95 ${className}`}
       aria-label={name}
     >
