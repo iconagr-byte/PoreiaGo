@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr, Field
 from ticketing.email_dispatch import send_email
 from ticketing.customer_accounts import (
     authenticate_account,
+    change_account_email,
     change_account_password,
     create_password_reset_token,
     get_account,
@@ -45,6 +46,11 @@ class LoginRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(default="", max_length=128)
     new_password: str = Field(min_length=6, max_length=128)
+
+
+class ChangeEmailRequest(BaseModel):
+    new_email: EmailStr
+    current_password: str = Field(min_length=1, max_length=128)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -216,6 +222,24 @@ async def change_password(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"ok": True, "message": "Ο κωδικός ενημερώθηκε"}
+
+
+@router.post("/change-email")
+async def change_email(
+    request: Request,
+    body: ChangeEmailRequest,
+    account: dict = Depends(get_current_customer),
+):
+    try:
+        updated = await change_account_email(
+            account["email"], body.new_email, body.current_password
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    token, tid, updated = await _issue_customer_token(
+        request, updated["email"], account=updated
+    )
+    return _profile_response(updated, token, tenant_id=tid)
 
 
 @router.post("/forgot-password")

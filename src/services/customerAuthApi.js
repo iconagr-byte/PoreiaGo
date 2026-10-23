@@ -1,5 +1,5 @@
 import { getApiBase } from '../config/api.js';
-import { getCustomerToken, setCustomerToken } from '../lib/auth.js';
+import { getCustomerToken, loginAsCustomer, setCustomerToken } from '../lib/auth.js';
 import { setWalletTenantId } from '../lib/wallet/walletTenantSeal.js';
 
 function parseError(data) {
@@ -73,6 +73,19 @@ export async function changeCustomerPasswordApi({ currentPassword, newPassword }
     { current_password: currentPassword, new_password: newPassword },
     true,
   );
+}
+
+export async function changeCustomerEmailApi({ newEmail, currentPassword }) {
+  const data = await postJson(
+    '/api/auth/change-email',
+    { new_email: newEmail, current_password: currentPassword },
+    true,
+  );
+  persistCustomerSession(data);
+  if (data?.email) {
+    loginAsCustomer(data.email, data, data.access_token || null);
+  }
+  return data;
 }
 
 export async function forgotCustomerPassword(email) {

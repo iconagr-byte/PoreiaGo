@@ -1,14 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 /**
- * Wallet top-left person menu — account panels + logout (former Εγώ + Έξοδος).
+ * Wallet top-left person menu — account + lost & found + logout.
+ * Rent lives on /rent (not in this menu).
  */
 export default function WalletAccountMenu({
   profile,
-  rentAvailable = false,
   onOpenAccount,
   onOpenLostFound,
-  onOpenRentals,
   onLogout,
 }) {
   const menuId = useId();
@@ -98,19 +97,6 @@ export default function WalletAccountMenu({
             </span>
             Απωλεσθέντα
           </button>
-          {rentAvailable ? (
-            <button
-              type="button"
-              role="menuitem"
-              className="wallet-topbar-menu-item"
-              onClick={() => go(onOpenRentals)}
-            >
-              <span className="material-symbols-outlined" aria-hidden>
-                directions_car
-              </span>
-              Ενοικίαση
-            </button>
-          ) : null}
           <button
             type="button"
             role="menuitem"
