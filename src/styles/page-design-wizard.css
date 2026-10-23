@@ -1221,7 +1221,14 @@
 }
 
 .pdw-picker__filters.is-compact {
-  gap: 0.35rem;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pdw-picker__filters.is-compact .pdw-picker__chips {
+  flex: 1 1 auto;
 }
 
 .pdw-picker__popular {
