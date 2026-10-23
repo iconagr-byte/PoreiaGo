@@ -128,11 +128,15 @@
 }
 
 .sf-preview-builder__popover {
+  /* Roomier 2-col template reading; clamp so small admin viewports still fit */
+  --sf-builder-popover-w: 36rem;
+  --sf-builder-popover-max-h: 44rem;
   position: absolute;
   top: calc(100% + 0.4rem);
   right: 0;
-  width: min(27.5rem, calc(100vw - 1.5rem));
-  max-height: min(72vh, 36rem);
+  width: min(var(--sf-builder-popover-w), calc(100vw - 2rem));
+  max-width: min(var(--sf-builder-popover-w), calc(100vw - 2rem));
+  max-height: min(84vh, var(--sf-builder-popover-max-h));
   display: flex;
   flex-direction: column;
   border-radius: 16px;

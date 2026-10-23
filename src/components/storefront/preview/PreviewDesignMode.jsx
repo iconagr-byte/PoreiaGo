@@ -294,6 +294,11 @@ function PreviewBuilderPopover({
       className="sf-preview-builder__popover"
       role="dialog"
       aria-label={`Builder · ${title}`}
+      /* Comfortable 2-col template reading; CSS clamps with vw/vh on small admins */
+      style={{
+        ['--sf-builder-popover-w']: '36rem',
+        ['--sf-builder-popover-max-h']: '44rem',
+      }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
