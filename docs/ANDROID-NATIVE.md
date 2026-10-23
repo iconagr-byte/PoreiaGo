@@ -39,7 +39,8 @@ Users who already have Wallet keep one icon. Users who installed Driver should u
 
 ## Windows rebuild (PowerShell)
 
-**Always build from `main` (or this feature branch while landing).**
+**Always build from `main` (or this feature branch while landing).**  
+**Prefer `wallet-run.ps1` over Android Studio Run** (Studio Run fights Gradle caches / can toast `Unknown error`).
 
 ```powershell
 cd C:\Users\User\poreiago
@@ -57,6 +58,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -WaitMinutes 5
 ```
 
 `driver-run.ps1` without flags does the same (unified app).
+
+### Android Studio (debug / Logcat only)
+
+1. After a successful `wallet-run.ps1` (app already on the device), optional:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1
+   ```
+2. File → Open → `C:\Users\User\poreiago\android` (not repo root)
+3. Gradle: **wrapper 8.14.3** + JDK **jbr-21** (not 25)
+4. Toolbar: select a running emulator/phone
+5. Use **Logcat**; avoid Run unless you need the debugger
+
+If Studio shows **Error running 'app' / Unknown error**: no device, wrong Run module (`poreiago.app.main`), or opened wrong folder — see `docs/ANDROID-WALLET.md` § Unknown error.
 
 ### Legacy second APK (avoid)
 

@@ -30,6 +30,12 @@ deploy/.vapid_public.key
 .vscode/*
 !.vscode/extensions.json
 .idea
+# Keep shared Android Studio Gradle + Run config (Capacitor android/ project)
+!android/.idea/
+android/.idea/**
+!android/.idea/gradle.xml
+!android/.idea/runConfigurations/
+!android/.idea/runConfigurations/**
 .DS_Store
 
 # Android / Capacitor local machine
