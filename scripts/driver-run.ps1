@@ -1,21 +1,21 @@
 # PoreiaGo Driver - build + install on emulator/USB device
-# Usage (from repo root):
+# Usage (from repo root; ALWAYS pull main first if this file is stale):
 #   cd C:\Users\User\poreiago
-#   git fetch origin cursor/driver-native-app-5ffb
-#   git checkout cursor/driver-native-app-5ffb
-#   git pull origin cursor/driver-native-app-5ffb
+#   git fetch origin main; git checkout main; git pull origin main
 #   powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1
 # Optional:
-#   -Branch cursor/driver-native-app-5ffb   (default until merged to main)
-#   -WaitMinutes 5
-#   -StartEmulator
+#   -Branch main          (default; do NOT use old feature branches)
+#   -WaitMinutes 5        (adb device wait timeout; default 3)
+#   -StartEmulator        (auto-start first AVD if adb devices is empty)
 #   -SkipGit
 # ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.
 
 param(
   [string]$Sdk = "",
   [string]$JavaHome = "",
-  [string]$Branch = "cursor/driver-native-app-5ffb",
+  # Always default to main (#836 merged). Old hardcode cursor/driver-native-app-5ffb
+  # was deleted after merge and breaks git fetch on Windows.
+  [string]$Branch = "main",
   [double]$WaitMinutes = 3,
   [switch]$StartEmulator,
   [switch]$SkipGit
@@ -125,11 +125,19 @@ Write-Host ("ANDROID_HOME=" + $env:ANDROID_HOME)
 $sdkSlash = $Sdk -replace '\\', '/'
 $androidDriver = Join-Path $repo "android-driver"
 if (-not (Test-Path -LiteralPath $androidDriver)) {
-  throw "Missing android-driver/ - pull cursor/driver-native-app-5ffb"
+  throw "Missing android-driver/ - pull main (git checkout main; git pull origin main)"
 }
 Set-Content -Path (Join-Path $androidDriver "local.properties") -Value ("sdk.dir=" + $sdkSlash) -Encoding ASCII
 
 if (-not $SkipGit) {
+  if ($Branch -ne "main") {
+    Write-Host ("WARNING: -Branch is '" + $Branch + "' (not main).") -ForegroundColor Yellow
+    Write-Host "You will get an OLD Driver build. Prefer: -Branch main (default)." -ForegroundColor Yellow
+    if ($Branch -match 'driver-native-app') {
+      Write-Host "cursor/driver-native-app-5ffb was deleted after merge to main (#836). Use main." -ForegroundColor Red
+    }
+  }
+
   Write-Host ("==> git fetch/reset (" + $Branch + ")") -ForegroundColor Cyan
   git fetch origin $Branch
   if ($LASTEXITCODE -ne 0) { throw ("git fetch failed for " + $Branch) }
@@ -244,8 +252,9 @@ $online = Get-OnlineAdbDevice
 if (-not $online -or $online.Count -eq 0) {
   Write-Host ""
   Write-Host "NO DEVICE: adb devices is empty." -ForegroundColor Yellow
-  Write-Host "  1) Android Studio -> Device Manager -> Play on an AVD" -ForegroundColor Yellow
-  Write-Host "  2) OR plug a phone with USB debugging ON" -ForegroundColor Yellow
+  Write-Host "  1) Android Studio -> Device Manager -> Play on an AVD (e.g. Medium Phone)" -ForegroundColor Yellow
+  Write-Host "  2) OR plug a phone with USB debugging ON (Developer options)" -ForegroundColor Yellow
+  Write-Host "  3) OR: powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1 -StartEmulator" -ForegroundColor Yellow
   Write-Host ("APK ready at: " + $apk) -ForegroundColor DarkYellow
   Write-Host ""
 
@@ -254,6 +263,8 @@ if (-not $online -or $online.Count -eq 0) {
     if ($avds -and $avds.Count -gt 0) {
       Write-Host ("==> -StartEmulator: launching AVD " + $avds[0]) -ForegroundColor Cyan
       Start-Process -FilePath $emu -ArgumentList @("-avd", $avds[0], "-netdelay", "none", "-netspeed", "full")
+    } else {
+      Write-Host "No AVDs found to auto-start. Create one in Device Manager." -ForegroundColor Yellow
     }
   }
 }
@@ -263,6 +274,7 @@ if ($waitMins -lt 0.5) { $waitMins = 0.5 }
 Write-Host ("==> waiting for adb device (up to " + $waitMins + " min)...") -ForegroundColor Cyan
 $deadline = (Get-Date).AddMinutes($waitMins)
 $online = $null
+$emptyHintShown = $false
 while ((Get-Date) -lt $deadline) {
   $devs = & $adb devices
   $devs | Out-Host
@@ -270,12 +282,20 @@ while ((Get-Date) -lt $deadline) {
     $devs | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
   )
   if ($online -and $online.Count -gt 0) { break }
+  if (-not $emptyHintShown) {
+    Write-Host "Still empty - leave this window open, start the emulator, wait for home screen..." -ForegroundColor DarkYellow
+    $emptyHintShown = $true
+  }
   Start-Sleep -Seconds 3
 }
 if (-not $online -or $online.Count -eq 0) {
-  Write-Host ("APK built OK: " + $apk) -ForegroundColor Yellow
-  Write-Host "Install later: powershell -ExecutionPolicy Bypass -File .\scripts\driver-install.ps1" -ForegroundColor Cyan
-  throw "No adb device online after build."
+  Write-Host ""
+  Write-Host "Timed out: no emulator/phone in 'adb devices'." -ForegroundColor Red
+  Write-Host "APK was built OK. Install later with either:" -ForegroundColor Yellow
+  Write-Host ("  adb install -r `"$apk`"") -ForegroundColor Cyan
+  Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\driver-install.ps1" -ForegroundColor Cyan
+  Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1 -StartEmulator" -ForegroundColor Cyan
+  throw "No adb device online after build. Start AVD / USB phone, then install (commands above)."
 }
 
 Write-Host "==> wipe old Driver app + reinstall" -ForegroundColor Cyan

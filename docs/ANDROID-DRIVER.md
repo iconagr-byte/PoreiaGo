@@ -30,26 +30,49 @@ Wallet `android/` is untouched. Sync briefly swaps folders, then restores Wallet
 
 ## Windows rebuild (PowerShell)
 
+**Always build from `main`.** Do not use old feature branches (e.g. `cursor/driver-native-app-5ffb` was deleted after merge #836). `driver-run.ps1` defaults to `-Branch main`.
+
 1. Close Android Studio (optional).
-2. Start an emulator or plug a phone with USB debugging.
+2. **Start a device first** (or the script will wait / fail with a clear message):
+   - Android Studio → **Device Manager** → Play on an AVD → wait until you see the **home screen**, **or**
+   - Plug a phone with **USB debugging** on (Developer options), **or**
+   - Pass `-StartEmulator` to auto-start the first AVD.
 3. From the repo:
 
 ```powershell
 cd C:\Users\User\poreiago
-git fetch origin cursor/driver-native-app-5ffb
-git checkout cursor/driver-native-app-5ffb
-git pull origin cursor/driver-native-app-5ffb
+git fetch origin main
+git checkout main
+git pull origin main
 powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1
 ```
 
 Optional:
 
 ```powershell
+# Auto-start first AVD if adb devices is empty
 powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1 -StartEmulator
+
+# Longer wait (minutes) for slow cold boots
 powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1 -WaitMinutes 5
 ```
 
-What the script does: optional git reset → wipe stale driver assets → `npm install` + `cap:driver:sync:packaged` → Gradle `assembleDebug` in `android-driver` → uninstall old Driver APK → install → launch `com.poreiago.driver/.MainActivity`.
+What the script does: `git reset` to **`main`** (default) → wipe stale driver assets → `npm install` + `cap:driver:sync:packaged` → Gradle `assembleDebug` in `android-driver` → uninstall old Driver APK → install → launch `com.poreiago.driver/.MainActivity`.
+
+### If build succeeds but install hangs / “waiting for emulator”
+
+`adb devices` is empty — nothing to install onto.
+
+```powershell
+# Check
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
+
+# Install already-built APK after Device Manager Play + home screen
+powershell -ExecutionPolicy Bypass -File .\scripts\driver-install.ps1
+
+# Or rebuild and auto-start first AVD
+powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1 -StartEmulator
+```
 
 ### Install an already-built APK
 
