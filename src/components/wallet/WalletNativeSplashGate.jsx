@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
+import { isNativeApp, isNativeDriverApp } from '../../lib/capacitor/isNativeApp.js';
 import {
   hasSeenWalletBrandSplash,
   markWalletBrandSplashSeen,
@@ -8,15 +8,15 @@ import WalletBrandSplash from './WalletBrandSplash.jsx';
 
 /**
  * Capacitor cold start: show PoreiaGo Qatar-style splash before any Wallet UI
- * (login fields or tickets). Website is unchanged.
+ * (login fields or tickets). Website is unchanged. Skipped for Driver native.
  */
 export default function WalletNativeSplashGate({ children }) {
   const [showSplash, setShowSplash] = useState(() => {
-    if (!isNativeApp()) return false;
+    if (!isNativeApp() || isNativeDriverApp()) return false;
     return !hasSeenWalletBrandSplash();
   });
 
-  if (!isNativeApp()) return children;
+  if (!isNativeApp() || isNativeDriverApp()) return children;
 
   if (showSplash) {
     return (

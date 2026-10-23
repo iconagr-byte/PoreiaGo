@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
+import { isNativeApp, isNativeDriverApp } from '../../lib/capacitor/isNativeApp.js';
 
 /** Capacitor chrome outside /wallet — tickets only.
  * Do NOT add search/Κράτηση here (or in SimpleWalletPage ALL_TABS).
@@ -14,7 +14,7 @@ const TABS = [
  */
 export default function WalletNativeShell() {
   const { pathname } = useLocation();
-  const native = isNativeApp();
+  const native = isNativeApp() && !isNativeDriverApp();
 
   if (!native) return null;
 

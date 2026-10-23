@@ -56,7 +56,8 @@ import WalletNativeBoot from './components/wallet/WalletNativeBoot.jsx';
 import WalletNativeShell from './components/wallet/WalletNativeShell.jsx';
 import WalletNativeSplashGate from './components/wallet/WalletNativeSplashGate.jsx';
 import WalletNativeGoogleBridgePage from './pages/WalletNativeGoogleBridgePage.jsx';
-import { isNativeApp } from './lib/capacitor/isNativeApp.js';
+import DriverNativeBoot from './components/driver/DriverNativeBoot.jsx';
+import { isNativeApp, isNativeDriverApp } from './lib/capacitor/isNativeApp.js';
 
 function RentalCustomerAppGated() {
   return (
@@ -124,8 +125,9 @@ function UiLangBoot() {
   return null;
 }
 
-/** Capacitor Wallet: never mount marketing HomePage on `/`. */
+/** Capacitor shells: never mount marketing HomePage on `/`. */
 function NativeAwareHome() {
+  if (isNativeApp() && isNativeDriverApp()) return <Navigate to="/driver" replace />;
   if (isNativeApp()) return <Navigate to="/wallet" replace />;
   return <HomePage />;
 }
@@ -141,6 +143,7 @@ function App() {
         <ScrollToTop />
         <MaintenanceGate>
           <Toaster position="top-center" />
+          <DriverNativeBoot />
           <WalletNativeBoot />
           <WalletNativeShell />
           <WalletNativeSplashGate>

@@ -1,0 +1,33 @@
+{
+  "appId": "com.poreiago.driver",
+  "appName": "PoreiaGo Driver",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#ffffff"
+  },
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": [
+      "https://www.achilliotravel.com/*",
+      "https://achilliotravel.com/*",
+      "https://www.poreiago.com/*",
+      "https://*.poreiago.com/*"
+    ]
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#ffffff",
+      "showSpinner": false,
+      "launchFadeOutDuration": 150
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#ffffff"
+    }
+  }
+}
