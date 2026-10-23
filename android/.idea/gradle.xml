@@ -5,6 +5,7 @@
       <GradleProjectSettings>
         <option name="testRunner" value="CHOOSE_PER_TEST" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <!-- Prefer Studio embedded JBR 21; user must not pick JDK 25. -->
         <option name="gradleJvm" value="#GRADLE_LOCAL_JAVA_HOME" />
         <option name="modules">
           <set>
@@ -13,6 +14,7 @@
             <option value="$PROJECT_DIR$/capacitor-cordova-android-plugins" />
           </set>
         </option>
+        <!-- CRITICAL: wrapper 8.14.3 — not a local Gradle 9.6 install. -->
         <option name="distributionType" value="DEFAULT_WRAPPED" />
       </GradleProjectSettings>
     </option>

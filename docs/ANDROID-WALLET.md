@@ -32,19 +32,19 @@ No office picker. No “scan QR to find office” as the main path.
 - Packaged app enables `CapacitorHttp` so native `fetch` bypasses WebView CORS until/while API CORS is deployed
 - Switching offices requires a different account (or logout + first bind elsewhere is blocked if home already set)
 
-## Windows rebuild
+## Windows rebuild (preferred)
 
-Rebuild native whenever Wallet UI/nav changes land on `main` (e.g. remove Κράτηση tab, multi-ticket stack, PWA v4). Stale `android/app/src/main/assets/public` is gitignored — only a fresh `npm run build` + `npx cap sync android` (or `wallet-run.ps1`) picks up the new WebView bundle. Current packaged app version: **1.0.10** (`versionCode` 10).
+Rebuild native whenever Wallet UI/nav changes land on `main`. Stale `android/app/src/main/assets/public` is gitignored — only a fresh `npm run build` + `npx cap sync android` (or `wallet-run.ps1`) picks up the new WebView bundle. Current packaged app version: **1.0.10** (`versionCode` 10).
 
-**Always build from `main`.** Do not use old feature branches (e.g. `cursor/wallet-splash-apple-5ffb` = stale v1.0.9). `wallet-run.ps1` defaults to `-Branch main`.
+**Always build from `main`.** Do not use old feature branches. `wallet-run.ps1` defaults to `-Branch main`.
 
-### Steps (PowerShell)
+### Preferred path: `wallet-run.ps1` (not Studio Run)
 
-1. **Close** Android Studio (optional but avoids Gradle fights).
-2. **Start a device first** (or the script will wait / fail with a clear message):
-   - Android Studio → **Device Manager** → Play on an AVD (e.g. Medium Phone) → wait until you see the **home screen**, **or**
-   - Plug a phone with **USB debugging** on (Developer options → USB debugging), accept the RSA prompt.
-3. Pull `main` and run the script:
+1. **Close** Android Studio (avoids Gradle cache fights).
+2. **Start a device** (or the script waits / fails with a clear message):
+   - Android Studio → **Device Manager** → ▶ on an AVD → wait for **home screen**, **or**
+   - USB phone with **USB debugging** on.
+3. Pull `main` and run:
 
 ```powershell
 cd C:\Users\User\poreiago
@@ -54,68 +54,82 @@ git pull origin main
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 ```
 
-Optional flags:
+Optional:
 
 ```powershell
-# Auto-start first AVD if adb devices is empty
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -StartEmulator
-
-# Longer wait (minutes) for slow cold boots
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -WaitMinutes 5
 ```
 
-What the script does: `git reset` to **`main`** (default) → wipe stale `dist`/assets → `npm install` + `cap:sync:packaged` → Gradle `assembleDebug` → uninstall old app → install new APK → launch.
+What the script does: reset to **`main`** → wipe stale `dist`/assets → `npm install` + `cap:sync:packaged` → Gradle `assembleDebug` → uninstall → install → launch.
 
-### If build succeeds but install hangs / “waiting for emulator”
+**After DONE:** do **not** press Studio **Run** (reinstalls a stale/cached APK). Open Studio only for **Logcat / debug** on the already-running app.
 
-`adb devices` is empty — nothing to install onto.
+### If build OK but install hangs
+
+`adb devices` is empty.
 
 ```powershell
-# Check
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
-
-# Start AVD + install already-built APK
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
-
-# Or install manually after Device Manager Play + home screen
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r .\android\app\build\outputs\apk\debug\app-debug.apk
 ```
 
-### Linux / CI (assets only — no APK without Android SDK)
+### Linux / CI (assets only)
 
 ```bash
-npm ci   # or npm install
-npm run cap:sync:packaged   # vite build + npx cap sync android
-# Then on a machine with SDK:
+npm ci
+npm run cap:sync:packaged
 cd android && ./gradlew assembleDebug
-# APK: android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Πρέπει να εμφανίσει και: `OK: Google Sign-In present in packaged assets`.
+Expect: `OK: Google Sign-In present in packaged assets` then `DONE`.
 
-Πρέπει να εμφανίσει: `OK: new My Wallet login assets (no ticket/QR subtitle)` και μετά `DONE`.
+## Android Studio — when you need it
 
-**Μην πατήσεις Run στο Studio** μετά — ξαναβάζει παλιό cache. Άνοιξε μόνο για να δεις logs αν χρειάζεται.
+Use Studio for **debugger / Logcat**. Prefer `wallet-run.ps1` for install.
 
-## Android Studio Gradle (important)
+### Open the right folder
 
-If Studio shows:
-`Plugin ... InternalProblems ... removed in Gradle 9.6.0`
+1. File → **Close Project** (if repo root is open)
+2. File → **Open** → `C:\Users\User\poreiago\android` (**only** `android`, not `poreiago`)
+3. Wait for Gradle sync
+4. Settings → Build Tools → **Gradle**:
+   - **Use Gradle from** = `gradle-wrapper.properties` (**8.14.3**, not local 9.6)
+   - **Gradle JDK** = `jbr-21` (17 or 21 — **not 25**)
+5. Toolbar: pick a **device** (not «No Devices»)
+6. Optional: Run ▶ — or attach Logcat to the app already launched by `wallet-run.ps1`
 
-Studio is using **Gradle 9.6** instead of the project wrapper (**8.14.3**).
+Prep helper (clears stale Run configs):
 
-Fix:
-1. Settings → Build, Execution, Deployment → Build Tools → **Gradle**
-2. **Use Gradle from** = `gradle-wrapper.properties` (not a local Gradle install)
-3. **Gradle JDK** = `jbr-21` (17 or 21 only)
-4. File → Sync Project with Gradle Files
-
-Or skip Studio Run and use:
 ```powershell
-cd C:\Users\User\poreiago; powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1
 ```
 
-Gradle JDK must be **17 or 21** (not 25). Wrapper = **8.14.3**.
+### `Error running 'app'` / `Unknown error`
+
+Studio often shows that toast with **no details**. Usual causes for this project:
+
+| Cause | What to do |
+|-------|------------|
+| No device selected | Device Manager → ▶ AVD → wait home screen → pick it in toolbar |
+| Wrong/stale Run module | Run → Edit Configurations… → **app** → Module = `poreiago.app.main` → Apply |
+| Opened repo root | Close → Open folder `android\` only |
+| Gradle JDK 25 / Gradle 9.6 | Wrapper + `jbr-21` (see above) |
+| Empty `assets/public` | Run `wallet-run.ps1` or `wallet-studio-prep.ps1 -SyncFirst` first |
+| Studio Run after script | Skip Run; use Logcat on the installed app |
+
+Quick recovery (PowerShell):
+
+```powershell
+cd C:\Users\User\poreiago
+git fetch origin main; git checkout main; git pull origin main
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -StartEmulator
+powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1
+```
+
+Then Studio → Open `android\` → pick device → debug only.
+
+If Gradle says `InternalProblems ... removed in Gradle 9.6.0`: force **wrapper** (8.14.3), not a local Gradle install.
 
 ## Security checklist
 

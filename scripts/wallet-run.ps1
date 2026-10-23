@@ -459,4 +459,7 @@ if (Test-Path -LiteralPath $shaScript) {
 } else {
   Write-Host "Run: keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android"
 }
-Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Native Google Sign-In. Do NOT press Studio Run.") -ForegroundColor Green
+Write-Host ("DONE - Wallet running (pid " + $pidLine.Trim() + "). Native Google Sign-In.") -ForegroundColor Green
+Write-Host "Do NOT press Studio Run (cache fight / Unknown error). For Logcat only:" -ForegroundColor Yellow
+Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-studio-prep.ps1" -ForegroundColor Cyan
+Write-Host "  then File → Open → android\  (not repo root)" -ForegroundColor Cyan
