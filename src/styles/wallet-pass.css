@@ -565,8 +565,9 @@
 
 /* —— Classic Apple Wallet vertical stack (phone + desktop) ——
  * Back passes: header strip only (~64–88px). Front pass expands with QR.
- * Phone/native: scroll-snap unfurl (scroll drives expand/collapse).
- * Desktop: tap a peek header to bring that pass to the front. */
+ * Phone web: scroll-snap unfurl (scroll drives expand/collapse).
+ * Native Capacitor + desktop: tap a peek header to bring that pass to the front
+ * (no nested snap scroller — Capacitor WebView fights .wallet-main). */
 .wallet-pass--vstack {
   max-width: min(26.5rem, 100%);
   margin-inline: auto;
@@ -617,8 +618,61 @@
 }
 
 .wallet-pass--vstack-native .wallet-pass-vstack--unfurl {
-  /* Extra room under Capacitor safe areas + tab bar */
+  /* Extra room under Capacitor safe areas + tab bar (legacy / phone-web path) */
   --wallet-unfurl-max: calc(100dvh - 11.5rem - env(safe-area-inset-bottom, 0px));
+}
+
+/* Native tap stack: use page scroll only — never nest another overflow scroller. */
+.wallet-pass--vstack-native.wallet-pass--vstack-tap .wallet-pass-vstack {
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: auto;
+  scroll-snap-type: none;
+  touch-action: manipulation;
+  padding-bottom: 0.5rem;
+}
+
+.wallet-pass--vstack-native.wallet-pass--vstack-tap .wallet-pass-vstack-slot {
+  will-change: auto;
+  /* Clearer separation so peek headers stay tappable above the expanded card */
+  flex-shrink: 0;
+}
+
+.wallet-pass--vstack-native.wallet-pass--vstack-tap .wallet-pass-vstack-slot + .wallet-pass-vstack-slot {
+  margin-top: -0.35rem;
+}
+
+.wallet-pass--vstack-native.wallet-pass--vstack-tap .wallet-pass-vstack-slot.is-peek {
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  /* Prefer taps over accidental page-drag starting on the peek strip */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.wallet-pass--vstack-native.wallet-pass--vstack-tap .wallet-pass-vstack-slot.is-peek .wallet-pass-card.is-peek-collapsed {
+  /* Slightly taller native hit target (~82px) */
+  --wallet-peek-height: 5.15rem;
+  height: var(--wallet-peek-height);
+  min-height: var(--wallet-peek-height);
+  max-height: var(--wallet-peek-height);
+  pointer-events: none; /* slot receives the tap */
+}
+
+.wallet-pass--vstack-native.wallet-pass--vstack-tap .wallet-pass-vstack-slot.is-front .wallet-pass-card {
+  pointer-events: auto;
+}
+
+.wallet-pass--vstack-tap .wallet-pass-vstack-slot.is-peek:focus-visible {
+  outline: none;
+}
+
+.wallet-pass--vstack-tap .wallet-pass-vstack-slot.is-peek:focus-visible .wallet-pass-card {
+  box-shadow:
+    0 0 0 3px rgba(0, 113, 227, 0.28),
+    0 -2px 0 rgba(255, 255, 255, 0.35) inset,
+    0 10px 22px rgba(15, 23, 42, 0.18);
 }
 
 .wallet-pass-vstack-slot {
