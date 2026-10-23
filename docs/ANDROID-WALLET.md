@@ -67,12 +67,38 @@ What the script does: reset to **`main`** → wipe stale `dist`/assets → `npm 
 
 ### If build OK but install hangs
 
-`adb devices` is empty.
+`adb devices` is empty **or** shows `emulator-5554   offline`.
+
+**Important:** `offline` is **not** ready. Only state `device` can install. Scripts wait for `device` + `sys.boot_completed=1`, and will try `adb kill-server` / relaunch the AVD if stuck offline.
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+& $adb devices
+# If you see "offline" for many minutes:
+& $adb kill-server; & $adb start-server; & $adb devices
+# Close emulator window -> Device Manager -> Cold Boot Now (or Wipe Data) -> wait for home screen
 powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1
 ```
+
+**APK already built?** Install without rebuilding:
+
+```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+$apk = "C:\Users\User\poreiago\android\app\build\outputs\apk\debug\app-debug.apk"
+& $adb wait-for-device
+& $adb shell getprop sys.boot_completed   # expect: 1
+& $adb install -r $apk
+& $adb shell am start -n com.poreiago.wallet/com.poreiago.wallet.MainActivity
+```
+
+#### Stuck `emulator-5554 offline` (EN / EL)
+
+| EN | EL |
+|----|----|
+| `offline` ≠ ready; wait for `device` | Το `offline` **δεν** είναι έτοιμο· περιμένετε `device` |
+| Kill/restart adb, then Cold Boot | `adb kill-server` / `start-server`, μετά Cold Boot |
+| Wipe Data if Cold Boot fails | Wipe Data αν αποτύχει το Cold Boot |
+| Install with exact path above | Εγκατάσταση με την ακριβή διαδρομή APK παραπάνω |
 
 ### Linux / CI (assets only)
 
