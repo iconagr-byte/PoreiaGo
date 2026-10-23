@@ -3,8 +3,11 @@
  * (airline-style), still under a single booker wallet account.
  *
  * Classic Apple Wallet vertical stack: back passes show only a header peek.
- * Phone / native: scroll-snap unfurl — scroll drives which pass is expanded
- * (QR + actions); tap a peek still jumps to that pass. Desktop: tap-to-front.
+ * Phone (web): optional scroll-snap unfurl — scroll drives which pass is expanded
+ * (QR + actions); tap a peek still jumps to that pass.
+ * Native Capacitor: tap-to-expand only — nested scroll-snap fights .wallet-main
+ * in WebView (stuck front, clipped peeks, untappable headers).
+ * Desktop: tap-to-front.
  * Tickets stay chronological — earliest departure first (expandWalletTickets).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -301,8 +304,12 @@ export default function WalletBoardingPass({
   };
 
   const multi = ticketList.length > 1;
-  /** Phone + native: scroll-driven expand/collapse. Desktop keeps tap stack. */
-  const scrollUnfurl = multi && !isDesktop;
+  /**
+   * Phone web: scroll-driven expand/collapse.
+   * Native Capacitor: always tap-to-expand (no nested snap scroller).
+   * Desktop: tap stack.
+   */
+  const scrollUnfurl = multi && !isDesktop && !nativeApp;
   const unfurlRef = useRef(null);
   const slotRefs = useRef([]);
   const skipScrollSync = useRef(false);
@@ -317,14 +324,27 @@ export default function WalletBoardingPass({
     root.scrollTo({ top: Math.max(0, nextTop), behavior });
   };
 
+  const scrollSlotIntoPage = (index) => {
+    const el = slotRefs.current[index];
+    if (!el || typeof el.scrollIntoView !== 'function') return;
+    window.requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  };
+
   const selectPass = (index, { scroll = true } = {}) => {
     setActiveIndex(index);
-    if (!scrollUnfurl || !scroll) return;
-    skipScrollSync.current = true;
-    scrollSlotIntoUnfurl(index, 'smooth');
-    window.setTimeout(() => {
-      skipScrollSync.current = false;
-    }, 420);
+    if (!scroll) return;
+    if (scrollUnfurl) {
+      skipScrollSync.current = true;
+      scrollSlotIntoUnfurl(index, 'smooth');
+      window.setTimeout(() => {
+        skipScrollSync.current = false;
+      }, 420);
+      return;
+    }
+    // Tap stack (native / desktop): keep the expanded pass in the page scrollport.
+    scrollSlotIntoPage(index);
   };
 
   // Scroll-snap + IntersectionObserver → active pass (Apple Wallet unfurl feel).
@@ -442,14 +462,14 @@ export default function WalletBoardingPass({
   const front = ticketList[Math.min(activeIndex, ticketList.length - 1)] || ticketList[0];
 
   // Multi-ticket: Apple Wallet vertical stack
-  // Phone/native — scroll-snap unfurl; desktop — tap-to-front.
+  // Phone web — scroll-snap unfurl; native Capacitor + desktop — tap-to-front.
   if (multi) {
     return (
       <section
         className={[
           'wallet-pass',
           'wallet-pass--vstack',
-          scrollUnfurl ? 'wallet-pass--vstack-scroll' : '',
+          scrollUnfurl ? 'wallet-pass--vstack-scroll' : 'wallet-pass--vstack-tap',
           nativeApp ? 'wallet-pass--vstack-native' : '',
         ]
           .filter(Boolean)
@@ -479,6 +499,7 @@ export default function WalletBoardingPass({
               : index < activeIndex
                 ? index + 1
                 : ticketList.length - index + ticketList.length;
+            const bringForward = () => selectPass(index);
             return (
               <div
                 key={ticket.key}
@@ -488,6 +509,24 @@ export default function WalletBoardingPass({
                 data-unfurl-index={index}
                 className={`wallet-pass-vstack-slot${isFront ? ' is-front' : ' is-peek'}`}
                 style={{ zIndex: z }}
+                onClick={!isFront ? bringForward : undefined}
+                onKeyDown={
+                  !isFront
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          bringForward();
+                        }
+                      }
+                    : undefined
+                }
+                role={!isFront ? 'button' : undefined}
+                tabIndex={!isFront ? 0 : undefined}
+                aria-label={
+                  !isFront
+                    ? `Άνοιγμα εισιτηρίου ${ticket.passenger?.name || ticket.passenger?.seat || index + 1}`
+                    : undefined
+                }
               >
                 <PassengerTicketCard
                   booking={ticket.booking}
@@ -505,7 +544,8 @@ export default function WalletBoardingPass({
                   showQr={isFront}
                   compactHeader
                   isFront={isFront}
-                  onSelect={() => selectPass(index)}
+                  /* Slot handles tap on native/peek — avoid double-fire. */
+                  onSelect={undefined}
                   stackIndex={index}
                   stackTotal={ticketList.length}
                 />
