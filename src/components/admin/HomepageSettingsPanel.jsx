@@ -29,6 +29,7 @@ import { pushHomepagePreviewDraft } from '../../lib/homepage/homepagePreview.js'
 import {
   PDW_BRIDGE,
   postPdwBridge,
+  postPdwScrollToSection,
   subscribePdwBridge,
 } from '../../lib/homepage/pageDesignBridge.js';
 import { pageSliderPatch } from '../../lib/homepage/pageSlider.js';
@@ -598,14 +599,19 @@ export default function HomepageSettingsPanel({ initialDesignPage } = {}) {
       if (next === DEFAULT_SECTION) params.delete('section');
       else params.set('section', next);
       setSearchParams(params, { replace: true });
+      // Always ask the Split preview to smooth-scroll (even when re-clicking the same item).
+      if (designPage === 'home') {
+        postPdwScrollToSection(next);
+      }
     },
-    [navSections, searchParams, setSearchParams],
+    [designPage, navSections, searchParams, setSearchParams],
   );
 
-  // Sync left-nav ↔ Divi-like inline Builder in the preview iframe.
+  // Sync left-nav ↔ Divi-like inline Builder in the preview iframe (focus + scroll).
   useEffect(() => {
     if (designPage !== 'home') return undefined;
     postPdwBridge({ type: PDW_BRIDGE.SECTION_FOCUS, section });
+    postPdwScrollToSection(section);
     return undefined;
   }, [designPage, section]);
 

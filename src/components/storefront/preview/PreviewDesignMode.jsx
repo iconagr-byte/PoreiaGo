@@ -16,6 +16,7 @@ import {
 import {
   PDW_BRIDGE,
   postPdwBridge,
+  scrollPreviewToSection,
   subscribePdwBridge,
 } from '../../../lib/homepage/pageDesignBridge.js';
 import PageDesignBuilderPanel from '../../admin/homepage/PageDesignBuilderPanel.jsx';
@@ -30,8 +31,14 @@ const SECTION_LABELS = {
   hero: 'Hero',
   slider: 'Slider',
   trips: 'Καρτέλες',
+  branding: 'Μάρκα',
   footer: 'Footer',
 };
+
+/** Nav sections that should outline the hero block when focused. */
+const HERO_FOCUS_ALIASES = new Set(['slider', 'themes', 'general']);
+/** Nav sections that should outline the header / brand when focused. */
+const HEADER_FOCUS_ALIASES = new Set(['branding']);
 
 export function usePreviewDesignMode() {
   return useContext(PreviewDesignCtx);
@@ -79,6 +86,11 @@ export function PreviewDesignModeProvider({ children, appearance }) {
     return subscribePdwBridge((msg) => {
       if (msg.type === PDW_BRIDGE.SECTION_FOCUS && msg.section) {
         setFocusedSection(msg.section);
+      }
+      // Left-nav → live preview: smooth-scroll to the mapped storefront section.
+      // Re-fires when the same nav item is clicked again (parent always posts SCROLL).
+      if (msg.type === PDW_BRIDGE.SCROLL_TO_SECTION && msg.section) {
+        scrollPreviewToSection(msg.section, { behavior: 'smooth', block: 'start' });
       }
     });
   }, [enabled]);
@@ -319,17 +331,24 @@ export function PreviewEditableSection({
     );
   }
 
-  // Slider edits live on the hero canvas — highlight Hero when Slider is selected.
+  // Slider / themes / general map onto the hero canvas for outline + scroll.
   const focused =
     ctx.focusedSection === sectionId ||
-    (sectionId === 'hero' && ctx.focusedSection === 'slider');
+    (sectionId === 'hero' && HERO_FOCUS_ALIASES.has(ctx.focusedSection)) ||
+    (sectionId === 'header' && HEADER_FOCUS_ALIASES.has(ctx.focusedSection));
   const open =
     ctx.openSection === sectionId ||
     (sectionId === 'hero' && ctx.openSection === 'slider');
   const title = label || ctx.sectionLabel(sectionId);
+  // Stable anchors for left-nav → preview scrollIntoView (also keep data-pdw-editable).
+  const anchorId =
+    sectionId === 'hero' || sectionId === 'footer' || sectionId === 'trips'
+      ? sectionId
+      : `pdw-${sectionId}`;
 
   return (
     <Tag
+      id={anchorId}
       className={`sf-preview-section ${className}`.trim()}
       data-pdw-editable={sectionId}
       data-pdw-focused={focused || open ? '1' : undefined}

@@ -116,7 +116,9 @@ export default function StorefrontHeader({
   const preview = usePreviewDesignMode();
   const previewFocused =
     preview?.enabled &&
-    (preview.focusedSection === 'header' || preview.openSection === 'header');
+    (preview.focusedSection === 'header' ||
+      preview.focusedSection === 'branding' ||
+      preview.openSection === 'header');
   const wrapClass = [
     style.wrap,
     scrolled ? style.wrapScrolled : style.wrapTop,
@@ -134,6 +136,7 @@ export default function StorefrontHeader({
 
   return (
     <header
+      id="header"
       className={wrapClass}
       data-pdw-editable={preview?.enabled ? 'header' : undefined}
       data-pdw-focused={previewFocused ? '1' : undefined}
