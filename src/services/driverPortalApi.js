@@ -8,7 +8,7 @@ import {
   sealDriverOffice,
 } from '../lib/driver/driverSession.js';
 import { getApiBase } from '../config/api.js';
-import { isNativeDriverApp } from '../lib/capacitor/nativeAppId.js';
+import { shouldPersistNativeDriverSession } from '../lib/capacitor/isNativeApp.js';
 import { fetchBoardingManifest, adminScanTicket } from './ticketingApi.js';
 
 export { adminScanTicket, fetchBoardingManifest };
@@ -37,7 +37,7 @@ function mapSessionPayload(data) {
 function saveMappedSession(data) {
   const session = mapSessionPayload(data);
   saveDriverSession(session);
-  if (isNativeDriverApp() && session.tenantId) {
+  if (shouldPersistNativeDriverSession() && session.tenantId) {
     sealDriverOffice({ tenantId: session.tenantId, apiHost: getApiBase() });
   }
   return session;

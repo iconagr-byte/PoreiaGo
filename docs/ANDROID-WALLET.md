@@ -1,9 +1,13 @@
-# PoreiaGo Wallet — unified native app (buses + rent)
+# PoreiaGo Wallet — customer path inside the native app
 
-One My Wallet app for **λεωφορεία + ενοικιάσεις**.  
+> **Canonical native doc:** [`ANDROID-NATIVE.md`](./ANDROID-NATIVE.md)  
+> Package `com.poreiago.wallet` is now the **one** PoreiaGo Android app (driver + My Wallet + rent).  
+> This page covers customer wallet tenant sealing / Google Sign-In.
+
+One My Wallet surface for **λεωφορεία** (rent customers open `/rent/wallet` after role detection).  
 Office binding comes from the **customer account** (`wallet_tenant_id` + JWT `tenant_id`), not from a directory of offices.
 
-App id: `com.poreiago.wallet` · name: **PoreiaGo Wallet**
+App id: `com.poreiago.wallet` · name: **PoreiaGo** (display)
 
 ## How office isolation works
 
@@ -21,7 +25,7 @@ No office picker. No “scan QR to find office” as the main path.
 
 - One login → one sealed office
 - Tabs: tickets (bus) + rentals (when office has Rent) + account
-- Marketing site / admin / driver stay blocked in Capacitor
+- Marketing site / admin stay blocked in Capacitor; **driver** is reachable in the same app after driver login (`/driver`)
 - Native visual theme is separate (`src/styles/wallet-native-theme.css`, loaded only in Capacitor) — website `/wallet` keeps its own blue-card look
 - Google Sign-In always on login/register; native API → office host (`VITE_NATIVE_API_BASE` or `https://www.achilliotravel.com`)
 - API CORS must allow `https://localhost` / `capacitor://localhost` (Capacitor WebView origin) or login shows «σύνδεση με τον server απέτυχε»

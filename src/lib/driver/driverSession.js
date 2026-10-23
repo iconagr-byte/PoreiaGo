@@ -2,15 +2,20 @@
  * Driver Command Center session — bound to trip/day via password / Master QR.
  *
  * Web / PWA: auth is NOT sticky across launches (sessionStorage + fresh marker).
- * Native Driver app (Capacitor): JWT persists in localStorage so a valid session
- * opens straight to the command center menu on cold start.
+ * Native Capacitor (unified PoreiaGo app + legacy driver package): JWT persists
+ * in localStorage so a valid session opens the command center on cold start.
  */
 
-import { isNativeDriverApp } from '../capacitor/nativeAppId.js';
+import { shouldPersistNativeDriverSession } from '../capacitor/isNativeApp.js';
+import { rememberNativeRoleHome, NATIVE_ROLE_DRIVER } from '../capacitor/nativeRoleHome.js';
 
 const STORAGE_KEY = 'driver_command_session';
 const FRESH_AUTH_KEY = 'driver_auth_fresh';
 const OFFICE_SEAL_KEY = 'driver_native_office_seal';
+
+function persistNativeDriver() {
+  return shouldPersistNativeDriverSession();
+}
 
 function readSessionRaw() {
   try {
@@ -19,8 +24,8 @@ function readSessionRaw() {
   } catch {
     /* ignore */
   }
-  // Native driver: restore sealed JWT across process death.
-  if (isNativeDriverApp()) {
+  // Native: restore sealed JWT across process death.
+  if (persistNativeDriver()) {
     try {
       return localStorage.getItem(STORAGE_KEY);
     } catch {
@@ -36,7 +41,7 @@ function writeSessionRaw(value) {
   } catch {
     /* private mode / quota */
   }
-  if (isNativeDriverApp()) {
+  if (persistNativeDriver()) {
     try {
       localStorage.setItem(STORAGE_KEY, value);
     } catch {
@@ -60,7 +65,7 @@ function removeSessionRaw() {
 
 /** Persist office host + tenant so Achillio drivers stay on Achillio APIs. */
 export function sealDriverOffice({ tenantId, apiHost } = {}) {
-  if (!isNativeDriverApp()) return;
+  if (!persistNativeDriver()) return;
   try {
     const host =
       String(apiHost || '').trim().replace(/\/$/, '') ||
@@ -143,15 +148,18 @@ export function getDriverSession() {
 
 export function saveDriverSession(session) {
   writeSessionRaw(JSON.stringify(session));
-  if (!isNativeDriverApp()) {
+  if (!persistNativeDriver()) {
     // Web: never keep a sticky copy — reopen must ask for credentials again.
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
       /* ignore */
     }
-  } else if (session?.tenantId) {
-    sealDriverOffice({ tenantId: session.tenantId });
+  } else {
+    if (session?.tenantId) {
+      sealDriverOffice({ tenantId: session.tenantId });
+    }
+    rememberNativeRoleHome(NATIVE_ROLE_DRIVER);
   }
   try {
     localStorage.setItem('userRole', 'driver');
@@ -191,11 +199,11 @@ export function isSessionValid() {
 
 /**
  * Cold-open gate.
- * - Native Driver: valid persisted JWT → command center; else login.
+ * - Native (unified or legacy driver package): valid persisted JWT → command center.
  * - Web/PWA: only right after login/QR in this visit (fresh marker).
  */
 export function resolveDriverAuthOnLaunch() {
-  if (isNativeDriverApp()) {
+  if (persistNativeDriver()) {
     // Drop legacy web sticky leftovers that are not our sealed JWT shape.
     try {
       localStorage.removeItem('driverActiveTripId');
@@ -204,6 +212,7 @@ export function resolveDriverAuthOnLaunch() {
     }
     if (isSessionValid()) {
       markDriverAuthFresh();
+      rememberNativeRoleHome(NATIVE_ROLE_DRIVER);
       return true;
     }
     clearDriverSession();

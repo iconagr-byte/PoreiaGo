@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Sync PoreiaGo Wallet Android project.
+ * Sync the canonical PoreiaGo Android app (com.poreiago.wallet).
+ * One install — cold start routes by role (driver / My Wallet / rent).
+ *
  * Usage:
  *   node scripts/cap-wallet-sync.mjs              # packaged dist (default)
  *   node scripts/cap-wallet-sync.mjs --packaged   # same
@@ -8,6 +10,8 @@
  *
  * Google Sign-In on Android uses native Credential Manager (@capgo/capacitor-social-login),
  * not GIS inside the WebView — so packaged https://localhost is fine for auth.
+ *
+ * Deprecated: android-driver / VITE_NATIVE_APP=driver (separate package). Use this sync.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -76,13 +80,46 @@ if (existsSync(configureDeps)) {
   }
 }
 
-const build = spawnSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit', shell: true });
+const env = {
+  ...process.env,
+  // Unified role-routed shell (not legacy driver-only).
+  VITE_NATIVE_APP: process.env.VITE_NATIVE_APP || 'app',
+  VITE_NATIVE_API_BASE:
+    process.env.VITE_NATIVE_API_BASE || 'https://www.achilliotravel.com',
+};
+
+console.log(`==> vite build (VITE_NATIVE_APP=${env.VITE_NATIVE_APP})`);
+const build = spawnSync('npm', ['run', 'build'], {
+  cwd: root,
+  stdio: 'inherit',
+  shell: true,
+  env,
+});
 if (build.status !== 0) process.exit(build.status || 1);
+
+// Ensure early-boot marker is unified app (role router), not legacy driver.
+const indexHtml = path.join(root, 'dist', 'index.html');
+if (existsSync(indexHtml)) {
+  let html = readFileSync(indexHtml, 'utf8');
+  html = html.replace(
+    /window\.__POREIAGO_NATIVE_APP__\s*=\s*['"][^'"]*['"]/,
+    "window.__POREIAGO_NATIVE_APP__ = 'app'",
+  );
+  if (!html.includes("__POREIAGO_NATIVE_APP__ = 'app'")) {
+    html = html.replace(
+      '<head>',
+      "<head>\n    <script>window.__POREIAGO_NATIVE_APP__ = 'app';</script>",
+    );
+  }
+  writeFileSync(indexHtml, html);
+  console.log('OK: dist/index.html marked native app = app (unified role router)');
+}
 
 const sync = spawnSync('npx', ['cap', 'sync', 'android'], {
   cwd: root,
   stdio: 'inherit',
   shell: true,
+  env,
 });
 if (sync.status !== 0) process.exit(sync.status || 1);
 
@@ -103,4 +140,15 @@ if (
   process.exit(1);
 }
 console.log('OK: SocialLogin native plugin registered in Android');
+
+const assetsCfg = path.join(root, 'android/app/src/main/assets/capacitor.config.json');
+if (existsSync(assetsCfg)) {
+  const assets = JSON.parse(readFileSync(assetsCfg, 'utf8'));
+  if (assets.appId !== 'com.poreiago.wallet') {
+    console.error(`ERROR: Expected appId com.poreiago.wallet, got ${assets.appId}`);
+    process.exit(1);
+  }
+  console.log('OK: canonical package com.poreiago.wallet');
+}
+
 process.exit(0);

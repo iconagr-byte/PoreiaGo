@@ -1,6 +1,6 @@
 {
   "appId": "com.poreiago.wallet",
-  "appName": "PoreiaGo Wallet",
+  "appName": "PoreiaGo",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false,

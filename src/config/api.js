@@ -27,7 +27,7 @@ function resolveApiBase() {
 
     const markedApp =
       typeof document !== 'undefined' &&
-      ['wallet', 'driver'].includes(
+      ['wallet', 'driver', 'app'].includes(
         String(document.documentElement?.getAttribute('data-poreiago-app') || ''),
       );
 
@@ -35,18 +35,22 @@ function resolveApiBase() {
       .trim()
       .toLowerCase();
 
-    if (nativePlatform || markedApp || buildFlavor === 'wallet' || buildFlavor === 'driver') {
-      // Native Driver may seal a specific office host after first login.
+    if (
+      nativePlatform ||
+      markedApp ||
+      buildFlavor === 'wallet' ||
+      buildFlavor === 'driver' ||
+      buildFlavor === 'app'
+    ) {
+      // Driver office seal (unified app or legacy driver package).
       try {
-        if (buildFlavor === 'driver' || document.documentElement?.dataset?.poreiagoApp === 'driver') {
-          const raw = localStorage.getItem('driver_native_office_seal');
-          if (raw) {
-            const seal = JSON.parse(raw);
-            const sealedHost = String(seal?.apiHost || '')
-              .trim()
-              .replace(/\/$/, '');
-            if (sealedHost) return sealedHost;
-          }
+        const raw = localStorage.getItem('driver_native_office_seal');
+        if (raw) {
+          const seal = JSON.parse(raw);
+          const sealedHost = String(seal?.apiHost || '')
+            .trim()
+            .replace(/\/$/, '');
+          if (sealedHost) return sealedHost;
         }
       } catch {
         /* ignore */

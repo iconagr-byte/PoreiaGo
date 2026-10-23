@@ -1,4 +1,9 @@
-# PoreiaGo Wallet - build + install on emulator/USB device
+# PoreiaGo native app (canonical) - build + install on emulator/USB device
+# Package: com.poreiago.wallet — ONE install, role-routed after login:
+#   driver JWT      -> /driver (CommandCenter)
+#   bus customer    -> /wallet (My Wallet)
+#   rent customer   -> /rent/wallet (Rent menu)
+#
 # Usage (from repo root; ALWAYS pull main first if this file is stale):
 #   cd C:\Users\User\poreiago
 #   git fetch origin main; git checkout main; git pull origin main

@@ -17,11 +17,15 @@
     <meta name="twitter:title" content="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία" />
     <meta name="application-name" content="PoreiaGo" />
     <script>
-      // Build-time flavor for Capacitor shells (wallet | driver). Vite/sync may rewrite.
+      // Build-time flavor for Capacitor shells (app | wallet | driver). Vite/sync may rewrite.
+      // Canonical install: app/wallet → com.poreiago.wallet (role-routed). driver = legacy only.
       window.__POREIAGO_NATIVE_APP__ = window.__POREIAGO_NATIVE_APP__ || '__POREIAGO_NATIVE_APP_PLACEHOLDER__';
     </script>
     <style id="poreiago-wallet-native-boot">
-      /* Full-bleed My Wallet / Driver in Capacitor — no website chrome, fast fade */
+      /* Full-bleed My Wallet / Driver / Rent in Capacitor — no website chrome, fast fade */
+      html[data-poreiago-app='app'],
+      html[data-poreiago-app='app'] body,
+      html[data-poreiago-app='app'] #root,
       html[data-poreiago-app='wallet'],
       html[data-poreiago-app='wallet'] body,
       html[data-poreiago-app='wallet'] #root,
@@ -35,6 +39,11 @@
         background: #ffffff !important;
         overflow-x: hidden !important;
       }
+      html[data-poreiago-app='app'] .wallet-auth-stage,
+      html[data-poreiago-app='app'] .wallet-auth-shell,
+      html[data-poreiago-app='app'] .wallet-auth-scroll,
+      html[data-poreiago-app='app'] .wallet-auth-panel,
+      html[data-poreiago-app='app'] .wallet-auth-card,
       html[data-poreiago-app='wallet'] .wallet-auth-stage,
       html[data-poreiago-app='wallet'] .wallet-auth-shell,
       html[data-poreiago-app='wallet'] .wallet-auth-scroll,
@@ -47,6 +56,7 @@
         width: 100% !important;
         max-width: none !important;
       }
+      html[data-poreiago-app='app'] .wallet-auth-stage,
       html[data-poreiago-app='wallet'] .wallet-auth-stage {
         min-height: 100dvh !important;
         animation: pgWalletFade 160ms ease-out;
@@ -55,13 +65,14 @@
         from { opacity: 0; }
         to { opacity: 1; }
       }
+      html[data-poreiago-app='app'] .wallet-auth-back,
       html[data-poreiago-app='wallet'] .wallet-auth-back {
         display: none !important;
       }
     </style>
     <script>
       (function () {
-        // Capacitor Wallet / Driver Android/iOS — mark app shell ASAP for full-bleed CSS
+        // Capacitor unified / Wallet / Driver — mark app shell ASAP for full-bleed CSS
         try {
           var cap = window.Capacitor;
           var ua = String(navigator.userAgent || '');
@@ -79,11 +90,60 @@
           if (native) {
             var flavor = String(window.__POREIAGO_NATIVE_APP__ || '').toLowerCase();
             // Ignore unresolved Vite placeholder in web builds.
-            if (flavor.indexOf('placeholder') >= 0) flavor = 'wallet';
-            if (flavor !== 'driver' && flavor !== 'wallet') flavor = 'wallet';
-            document.documentElement.setAttribute('data-poreiago-app', flavor);
-            // Cold-start on / must become /wallet or /driver before React mounts.
-            // history.replaceState (not location.replace) so Capacitor does not re-fetch a missing file.
+            if (flavor.indexOf('placeholder') >= 0) flavor = 'app';
+            if (flavor !== 'driver' && flavor !== 'wallet' && flavor !== 'app') flavor = 'app';
+            // Treat wallet marker as unified app shell.
+            var shell = flavor === 'driver' ? 'driver' : 'app';
+            document.documentElement.setAttribute('data-poreiago-app', shell);
+
+            function driverSessionOk() {
+              try {
+                var raw = localStorage.getItem('driver_command_session');
+                if (!raw) return false;
+                var s = JSON.parse(raw);
+                if (!s || !s.accessToken) return false;
+                if (s.expiresAt && Date.now() > s.expiresAt * 1000) return false;
+                return true;
+              } catch (e) { return false; }
+            }
+            function customerSessionOk() {
+              try {
+                return (
+                  localStorage.getItem('userRole') === 'customer' &&
+                  !!localStorage.getItem('customer_access_token')
+                );
+              } catch (e) { return false; }
+            }
+            function resolveRoleHome() {
+              if (driverSessionOk()) return '/driver';
+              if (customerSessionOk()) {
+                try {
+                  var remembered = String(localStorage.getItem('poreiago_native_role_home_v1') || '')
+                    .trim()
+                    .toLowerCase();
+                  if (remembered === 'rent') return '/rent/wallet';
+                } catch (e) { /* ignore */ }
+                return '/wallet';
+              }
+              return '/login';
+            }
+            function pathAllowed(path0) {
+              return (
+                path0 === '/driver' || path0.indexOf('/driver/') === 0 ||
+                path0 === '/wallet' || path0.indexOf('/wallet/') === 0 ||
+                path0 === '/rent' || path0.indexOf('/rent/') === 0 ||
+                path0 === '/login' || path0 === '/register' ||
+                path0.indexOf('/forgot-password') === 0 ||
+                path0.indexOf('/reset-password') === 0 ||
+                path0 === '/my-booking' || path0.indexOf('/my-booking/') === 0 ||
+                path0.indexOf('/ticket/') === 0 ||
+                path0.indexOf('/passenger-checkin') === 0 ||
+                path0.indexOf('/sign/') === 0
+              );
+            }
+
+            // Cold-start: role home (or keep an allowed deep link). history.replaceState
+            // so Capacitor does not re-fetch a missing file.
             var path0 = location.pathname || '/';
             if (flavor === 'driver') {
               var driverOk =
@@ -92,22 +152,9 @@
               if (!driverOk) {
                 history.replaceState(null, '', '/driver' + (location.search || '') + (location.hash || ''));
               }
-            } else {
-              var walletOk =
-                path0 === '/wallet' ||
-                path0.indexOf('/wallet/') === 0 ||
-                path0 === '/my-booking' ||
-                path0.indexOf('/my-booking/') === 0 ||
-                path0 === '/login' ||
-                path0 === '/register' ||
-                path0.indexOf('/forgot-password') === 0 ||
-                path0.indexOf('/reset-password') === 0 ||
-                path0.indexOf('/ticket/') === 0 ||
-                path0.indexOf('/passenger-checkin') === 0 ||
-                path0.indexOf('/wallet/native-google') === 0;
-              if (!walletOk) {
-                history.replaceState(null, '', '/wallet' + (location.search || '') + (location.hash || ''));
-              }
+            } else if (!pathAllowed(path0)) {
+              var home = resolveRoleHome();
+              history.replaceState(null, '', home + (location.search || '') + (location.hash || ''));
             }
           }
         } catch (e) { /* ignore */ }

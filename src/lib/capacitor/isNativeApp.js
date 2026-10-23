@@ -1,16 +1,28 @@
-import { getNativeAppId, isNativeDriverApp, isNativeWalletApp } from './nativeAppId.js';
+import {
+  getNativeAppId,
+  isNativeDriverApp,
+  isNativeUnifiedApp,
+  isNativeWalletApp,
+} from './nativeAppId.js';
 
-/** True when running inside Capacitor (Android / iOS shell). */
+/**
+ * True when running inside Capacitor (Android / iOS shell).
+ * Do not trust VITE_NATIVE_APP / window flavor alone — web production builds
+ * also inject a marker into index.html for Capacitor sync.
+ */
 export function isNativeApp() {
   if (typeof window === 'undefined') return false;
+
+  // Early index.html boot sets data-poreiago-app only after Capacitor/localhost detection.
   try {
-    const marked = getNativeAppId();
-    if (marked === 'wallet' || marked === 'driver') {
-      return true;
-    }
+    const ds = String(document.documentElement?.dataset?.poreiagoApp || '')
+      .trim()
+      .toLowerCase();
+    if (ds === 'wallet' || ds === 'driver' || ds === 'app') return true;
   } catch {
     /* ignore */
   }
+
   try {
     const cap = window.Capacitor;
     if (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) {
@@ -23,9 +35,10 @@ export function isNativeApp() {
   } catch {
     /* ignore */
   }
-  // Capacitor WebView user-agent / origin fallbacks
+
   const ua = String(navigator.userAgent || '');
   if (/Capacitor/i.test(ua)) return true;
+
   try {
     const host = String(window.location?.hostname || '').toLowerCase();
     if (host === 'localhost' && /^https?:$/.test(window.location?.protocol || '')) {
@@ -36,11 +49,26 @@ export function isNativeApp() {
   } catch {
     /* ignore */
   }
+
   return false;
 }
 
+/** Packaged My Wallet / unified PoreiaGo app (not legacy driver-only APK). */
 export function isWalletAndroidApp() {
   return isNativeApp() && !isNativeDriverApp();
 }
 
-export { isNativeDriverApp, isNativeWalletApp, getNativeAppId };
+/**
+ * Persist driver JWT across process death in any Capacitor shell
+ * (unified app + legacy driver package). Web/PWA stays session-only.
+ */
+export function shouldPersistNativeDriverSession() {
+  return isNativeApp();
+}
+
+export {
+  isNativeDriverApp,
+  isNativeWalletApp,
+  isNativeUnifiedApp,
+  getNativeAppId,
+};

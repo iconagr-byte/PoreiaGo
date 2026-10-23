@@ -123,12 +123,12 @@ function WalletAuthGate() {
     return <WalletAuthenticatedApp />;
   }
 
-  // Native Wallet app: stay in My Wallet (no driver/admin platform).
-  if (!isNativeApp() && isDriver()) {
+  // Driver accounts belong on /driver (unified native + web).
+  if (isDriver()) {
     return <Navigate to="/driver" replace />;
   }
 
-  if (isAdmin() || (isNativeApp() && isDriver())) {
+  if (isAdmin()) {
     return <Navigate to="/login" replace state={{ from: '/wallet', walletClaim: true }} />;
   }
 
