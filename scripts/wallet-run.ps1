@@ -10,8 +10,8 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1
 # Optional:
 #   -Branch main          (default; do NOT use old feature branches)
-#   -WaitMinutes 5        (adb device wait timeout; default 3)
-#   -StartEmulator        (auto-start first AVD if adb devices is empty)
+#   -WaitMinutes 8        (adb "device" wait timeout; default 5 - offline is NOT ready)
+#   -StartEmulator        (auto-start first AVD if empty/offline; relaunches if stuck offline)
 # ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.
 
 param(
@@ -20,7 +20,7 @@ param(
   # Always default to main (v1.0.10+). Old hardcode cursor/wallet-splash-apple-5ffb
   # produced stale APKs (v1.0.9) missing recent Wallet UI fixes (tabs / multi-ticket).
   [string]$Branch = "main",
-  [double]$WaitMinutes = 3,
+  [double]$WaitMinutes = 5,
   [switch]$StartEmulator
 )
 
@@ -342,61 +342,196 @@ if ($debugSha) {
 & $adb start-server
 $emu = Join-Path $Sdk "emulator\emulator.exe"
 
+# Only "device" is ready. "offline" / "unauthorized" are NOT ready.
 function Get-OnlineAdbDevice {
   return @(
     & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
   )
 }
 
-$online = Get-OnlineAdbDevice
-if (-not $online -or $online.Count -eq 0) {
+function Get-AdbDeviceRows {
+  return @(
+    & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\S" }
+  )
+}
+
+function Test-AdbHasOffline {
+  $rows = Get-AdbDeviceRows
+  foreach ($r in $rows) {
+    if ($r -match "\toffline$" -or $r -match "\tunauthorized$") { return $true }
+  }
+  return $false
+}
+
+function Restart-AdbServer {
+  Write-Host "==> adb kill-server / start-server (clears stuck offline)" -ForegroundColor DarkYellow
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  & $adb kill-server 2>$null | Out-Null
+  Start-Sleep -Seconds 2
+  & $adb start-server 2>$null | Out-Null
+  Start-Sleep -Seconds 2
+  $ErrorActionPreference = $prevEap
+}
+
+function Stop-EmulatorProcesses {
+  Write-Host "==> killing stuck emulator / qemu processes..." -ForegroundColor DarkYellow
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  Get-Process -Name "emulator","qemu-system-x86_64","qemu-system-aarch64","crashpad_handler" -ErrorAction SilentlyContinue |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Seconds 3
+  $ErrorActionPreference = $prevEap
+}
+
+function Start-FirstAvd([string]$reason) {
+  if (-not (Test-Path -LiteralPath $emu)) {
+    Write-Host "emulator.exe missing - start AVD from Device Manager." -ForegroundColor Yellow
+    return $false
+  }
+  $avds = @(& $emu -list-avds 2>$null | Where-Object { $_.Trim() -ne "" })
+  if (-not $avds -or $avds.Count -eq 0) {
+    Write-Host "No AVDs found. Create Medium Phone in Device Manager." -ForegroundColor Yellow
+    return $false
+  }
+  Write-Host ("==> " + $reason + ": launching AVD " + $avds[0]) -ForegroundColor Cyan
+  Start-Process -FilePath $emu -ArgumentList @("-avd", $avds[0], "-netdelay", "none", "-netspeed", "full")
+  return $true
+}
+
+function Wait-ForBootCompleted([int]$minutes = 2) {
+  Write-Host "==> waiting for sys.boot_completed=1 ..." -ForegroundColor Cyan
+  $deadline = (Get-Date).AddMinutes($minutes)
+  while ((Get-Date) -lt $deadline) {
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $boot = (& $adb shell getprop sys.boot_completed 2>$null | Out-String).Trim()
+    $ErrorActionPreference = $prevEap
+    if ($boot -eq "1") {
+      Write-Host "OK: boot_completed=1" -ForegroundColor Green
+      return $true
+    }
+    Start-Sleep -Seconds 3
+  }
+  Write-Host "WARN: boot_completed not set yet - install may still work" -ForegroundColor Yellow
+  return $false
+}
+
+function Show-InstallTimeoutHelp([string]$apkPath) {
   Write-Host ""
-  Write-Host "NO DEVICE: adb devices is empty." -ForegroundColor Yellow
-  Write-Host "  1) Android Studio -> Device Manager -> Play on an AVD (e.g. Medium Phone)" -ForegroundColor Yellow
-  Write-Host "  2) OR plug a phone with USB debugging ON (Developer options)" -ForegroundColor Yellow
-  Write-Host "  3) OR: powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Yellow
+  Write-Host "=== TIMEOUT: no adb device in state 'device' ===" -ForegroundColor Red
+  Write-Host "EN: emulator-5554 offline is NOT ready. Wait for home screen, or recover below." -ForegroundColor Yellow
+  Write-Host "EL: to emulator-5554 offline DEN einai etoimo. Perimenete home screen, i kanete recover." -ForegroundColor Yellow
+  Write-Host ""
+  Write-Host ("APK ready (build OK): " + $apkPath) -ForegroundColor Green
+  Write-Host "Exact install (after device is online):" -ForegroundColor Cyan
+  Write-Host ("  & `"$adb`" install -r `"$apkPath`"") -ForegroundColor Cyan
+  Write-Host ("  & `"$adb`" shell am start -n com.poreiago.wallet/com.poreiago.wallet.MainActivity") -ForegroundColor Cyan
+  Write-Host ""
+  Write-Host "If stuck OFFLINE (emulator-5554 offline for minutes):" -ForegroundColor Yellow
+  Write-Host "  1) Close emulator window" -ForegroundColor Yellow
+  Write-Host "  2) Device Manager -> Cold Boot Now (or Wipe Data if Cold Boot fails)" -ForegroundColor Yellow
+  Write-Host "  3) Wait for home screen, then:" -ForegroundColor Yellow
+  Write-Host "     powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Cyan
+  Write-Host "  Or adb recovery:" -ForegroundColor Yellow
+  Write-Host ("     & `"$adb`" kill-server; & `"$adb`" start-server; & `"$adb`" devices") -ForegroundColor Cyan
+  Write-Host ""
+}
+
+$online = Get-OnlineAdbDevice
+$hasOffline = Test-AdbHasOffline
+if ((-not $online -or $online.Count -eq 0) -or $hasOffline) {
+  Write-Host ""
+  if ($hasOffline) {
+    Write-Host "adb shows OFFLINE (not ready). Only state 'device' can install." -ForegroundColor Yellow
+    Write-Host "EL: to emulator einai offline - den einai etoimo gia install." -ForegroundColor Yellow
+    Restart-AdbServer
+  } else {
+    Write-Host "NO DEVICE: adb devices empty (or no 'device' row)." -ForegroundColor Yellow
+    Write-Host "  1) Android Studio -> Device Manager -> Play on an AVD (e.g. Medium Phone)" -ForegroundColor Yellow
+    Write-Host "  2) OR plug a phone with USB debugging ON (Developer options)" -ForegroundColor Yellow
+    Write-Host "  3) OR: powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Yellow
+  }
   Write-Host ("APK ready at: " + $apk) -ForegroundColor DarkYellow
   Write-Host ""
 
-  if ($StartEmulator -and (Test-Path -LiteralPath $emu)) {
-    $avds = @(& $emu -list-avds 2>$null | Where-Object { $_.Trim() -ne "" })
-    if ($avds -and $avds.Count -gt 0) {
-      Write-Host ("==> -StartEmulator: launching AVD " + $avds[0]) -ForegroundColor Cyan
-      Start-Process -FilePath $emu -ArgumentList @("-avd", $avds[0], "-netdelay", "none", "-netspeed", "full")
-    } else {
-      Write-Host "No AVDs found to auto-start. Create one in Device Manager." -ForegroundColor Yellow
+  if ($StartEmulator -or $hasOffline) {
+    if ($hasOffline) {
+      Stop-EmulatorProcesses
+      Restart-AdbServer
+      [void](Start-FirstAvd "relaunch after offline")
+    } elseif ($StartEmulator) {
+      [void](Start-FirstAvd "-StartEmulator")
     }
   }
 }
 
 $waitMins = $WaitMinutes
 if ($waitMins -lt 0.5) { $waitMins = 0.5 }
-Write-Host ("==> waiting for adb device (up to " + $waitMins + " min)...") -ForegroundColor Cyan
+Write-Host ("==> waiting for adb state 'device' (up to " + $waitMins + " min)...") -ForegroundColor Cyan
+Write-Host "    (offline / unauthorized do NOT count as ready)" -ForegroundColor DarkGray
 $deadline = (Get-Date).AddMinutes($waitMins)
 $online = $null
 $emptyHintShown = $false
+$offlineHintShown = $false
+$adbRestartedOnce = $false
+$emuRelaunchedOnce = $false
+$lastWaitForDevice = (Get-Date).AddSeconds(-30)
 while ((Get-Date) -lt $deadline) {
   $devs = & $adb devices
   $devs | Out-Host
-  $online = @(
-    $devs | Select-Object -Skip 1 | Where-Object { $_ -match "\tdevice$" }
-  )
+  $online = Get-OnlineAdbDevice
   if ($online -and $online.Count -gt 0) { break }
-  if (-not $emptyHintShown) {
+
+  $stuckOffline = Test-AdbHasOffline
+  if ($stuckOffline) {
+    if (-not $offlineHintShown) {
+      Write-Host "Still OFFLINE - not ready. Will try adb restart / emulator relaunch..." -ForegroundColor DarkYellow
+      Write-Host "EL: akoma offline - den einai etoimo." -ForegroundColor DarkYellow
+      $offlineHintShown = $true
+    }
+    if (-not $adbRestartedOnce) {
+      Restart-AdbServer
+      $adbRestartedOnce = $true
+      continue
+    }
+    if (-not $emuRelaunchedOnce -and ($StartEmulator -or $stuckOffline)) {
+      Stop-EmulatorProcesses
+      Restart-AdbServer
+      [void](Start-FirstAvd "cold relaunch (was stuck offline)")
+      $emuRelaunchedOnce = $true
+      Start-Sleep -Seconds 5
+      continue
+    }
+  } elseif (-not $emptyHintShown) {
     Write-Host "Still empty - leave this window open, start the emulator, wait for home screen..." -ForegroundColor DarkYellow
     $emptyHintShown = $true
   }
+
+  # Periodically nudge adb wait-for-device (short poll; do not hang forever).
+  if (((Get-Date) - $lastWaitForDevice).TotalSeconds -ge 20) {
+    Write-Host "==> adb wait-for-device (20s nudge)..." -ForegroundColor DarkGray
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $wJob = Start-Job -ScriptBlock {
+      param($adbPath)
+      & $adbPath wait-for-device
+    } -ArgumentList $adb
+    Wait-Job $wJob -Timeout 18 | Out-Null
+    if ($wJob.State -eq "Running") { Stop-Job $wJob -ErrorAction SilentlyContinue }
+    Remove-Job $wJob -Force -ErrorAction SilentlyContinue
+    $ErrorActionPreference = $prevEap
+    $lastWaitForDevice = Get-Date
+  }
+
   Start-Sleep -Seconds 3
 }
 if (-not $online -or $online.Count -eq 0) {
-  Write-Host ""
-  Write-Host "Timed out: no emulator/phone in 'adb devices'." -ForegroundColor Red
-  Write-Host "APK was built OK. Install later with either:" -ForegroundColor Yellow
-  Write-Host ("  adb install -r `"$apk`"") -ForegroundColor Cyan
-  Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-boot-and-install.ps1" -ForegroundColor Cyan
-  Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -StartEmulator" -ForegroundColor Cyan
-  throw "No adb device online after build. Start AVD / USB phone, then install (commands above)."
+  Show-InstallTimeoutHelp $apk
+  throw "No adb device online after build (offline is not ready). Start AVD / USB phone, then install (commands above)."
 }
+
+[void](Wait-ForBootCompleted 2)
 
 Write-Host "==> wipe old app + reinstall (user 0)" -ForegroundColor Cyan
 # adb writes "Failed" to stderr when the package is already gone; with

@@ -59,6 +59,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\wallet-run.ps1 -WaitMinutes 5
 
 `driver-run.ps1` without flags does the same (unified app).
 
+### Stuck emulator `offline` (not ready)
+
+If Gradle succeeds but install fails with **No adb device online** and `adb devices` shows `emulator-5554   offline`:
+
+- `offline` / `unauthorized` are **not** installable — only state `device`.
+- Scripts (`wallet-run.ps1`, `wallet-boot-and-install.ps1`) restart adb, may kill/relaunch the AVD, and wait for `boot_completed`.
+- Manual recovery: close emulator → Device Manager → **Cold Boot Now** (or **Wipe Data**) → wait for home → install existing APK.
+
+Full steps + exact `adb install` command: `docs/ANDROID-WALLET.md` § *If build OK but install hangs*.
+
 ### Android Studio (debug / Logcat only)
 
 1. After a successful `wallet-run.ps1` (app already on the device), optional:
