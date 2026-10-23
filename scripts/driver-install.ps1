@@ -1,5 +1,6 @@
 # Install already-built PoreiaGo Driver APK onto a running emulator.
-# Usage:
+# Usage (build from main first if APK is missing):
+#   powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1
 #   powershell -ExecutionPolicy Bypass -File .\scripts\driver-install.ps1
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +12,7 @@ $apk = Join-Path $repo "android-driver\app\build\outputs\apk\debug\app-debug.apk
 
 if (-not (Test-Path -LiteralPath $adb)) { throw "adb not found: $adb" }
 if (-not (Test-Path -LiteralPath $apk)) {
-  throw "APK missing. Build first: powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1"
+  throw "APK missing. Build first: powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1 (defaults to -Branch main)"
 }
 
 & $adb start-server
@@ -25,12 +26,15 @@ while ((Get-Date) -lt $deadline) {
   if ($online) { break }
   if (-not $emptyHintShown) {
     Write-Host "NO DEVICE yet. Device Manager -> Play (home screen), or USB phone + debugging." -ForegroundColor Yellow
+    Write-Host "Or rebuild with: powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1 -StartEmulator" -ForegroundColor Yellow
     $emptyHintShown = $true
   }
   Start-Sleep -Seconds 3
 }
 if (-not $online) {
-  throw "No emulator/phone online."
+  Write-Host "Timed out: adb devices is empty." -ForegroundColor Red
+  Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1 -StartEmulator" -ForegroundColor Cyan
+  throw "No emulator/phone online. Start AVD / USB phone, then retry."
 }
 
 Write-Host "==> install + launch Driver" -ForegroundColor Cyan
