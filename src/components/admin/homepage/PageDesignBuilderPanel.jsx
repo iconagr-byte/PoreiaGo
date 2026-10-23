@@ -143,6 +143,82 @@ function CompactHeroTexts({ form, setForm }) {
   );
 }
 
+function CompactTripsTexts({ form, setForm }) {
+  const setField = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+
+  return (
+    <div className="pdw-builder__stack">
+      <section className="pdw-builder__copy-block" aria-labelledby="pdw-trips-el">
+        <p id="pdw-trips-el" className="pdw-builder__subhead">
+          Ελλάδα
+        </p>
+        <label className="pdw-builder__field">
+          <span className="pdw-builder__field-label">Eyebrow</span>
+          <input
+            className="pdw-builder__input"
+            placeholder="π.χ. Εκδρομές"
+            value={form.trips_section_eyebrow || ''}
+            onChange={setField('trips_section_eyebrow')}
+          />
+        </label>
+        <label className="pdw-builder__field">
+          <span className="pdw-builder__field-label">Τίτλος</span>
+          <input
+            className="pdw-builder__input pdw-builder__input--strong"
+            placeholder="Τίτλος ενότητας"
+            value={form.trips_section_title || ''}
+            onChange={setField('trips_section_title')}
+          />
+        </label>
+        <label className="pdw-builder__field">
+          <span className="pdw-builder__field-label">Υπότιτλος</span>
+          <textarea
+            rows={2}
+            className="pdw-builder__input"
+            placeholder="Σύντομη περιγραφή"
+            value={form.trips_section_subtitle || ''}
+            onChange={setField('trips_section_subtitle')}
+          />
+        </label>
+      </section>
+
+      <section className="pdw-builder__copy-block" aria-labelledby="pdw-trips-intl">
+        <p id="pdw-trips-intl" className="pdw-builder__subhead">
+          Εξωτερικό
+        </p>
+        <label className="pdw-builder__field">
+          <span className="pdw-builder__field-label">Eyebrow</span>
+          <input
+            className="pdw-builder__input"
+            placeholder="π.χ. Abroad"
+            value={form.intl_section_eyebrow || ''}
+            onChange={setField('intl_section_eyebrow')}
+          />
+        </label>
+        <label className="pdw-builder__field">
+          <span className="pdw-builder__field-label">Τίτλος</span>
+          <input
+            className="pdw-builder__input pdw-builder__input--strong"
+            placeholder="Τίτλος ενότητας"
+            value={form.intl_section_title || ''}
+            onChange={setField('intl_section_title')}
+          />
+        </label>
+        <label className="pdw-builder__field">
+          <span className="pdw-builder__field-label">Υπότιτλος</span>
+          <textarea
+            rows={2}
+            className="pdw-builder__input"
+            placeholder="Σύντομη περιγραφή"
+            value={form.intl_section_subtitle || ''}
+            onChange={setField('intl_section_subtitle')}
+          />
+        </label>
+      </section>
+    </div>
+  );
+}
+
 /**
  * Compact section editors for Divi-like inline Builder (preview module overlays)
  * and the editor-only fallback panel. Same form fields / template IDs as before.
@@ -167,7 +243,7 @@ export default function PageDesignBuilderPanel({
         <span className="pdw-builder__head-icon" aria-hidden>
           <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="pdw-builder__head-copy min-w-0 flex-1">
           <p className="pdw-builder__kicker">Builder</p>
           <h3 className="pdw-builder__title">{meta.title}</h3>
           <p className="pdw-builder__blurb">{meta.blurb}</p>
@@ -369,54 +445,7 @@ export default function PageDesignBuilderPanel({
                 compact
               />
             ) : null}
-            {tripsTab === 'copy' ? (
-              <div className="pdw-builder__stack">
-                <p className="pdw-builder__subhead text-sky-700">Ελλάδα</p>
-                <input
-                  className="pdw-builder__input"
-                  placeholder="Eyebrow"
-                  value={form.trips_section_eyebrow || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, trips_section_eyebrow: e.target.value }))}
-                />
-                <input
-                  className="pdw-builder__input font-bold"
-                  placeholder="Τίτλος"
-                  value={form.trips_section_title || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, trips_section_title: e.target.value }))}
-                />
-                <textarea
-                  rows={2}
-                  className="pdw-builder__input"
-                  placeholder="Υπότιτλος"
-                  value={form.trips_section_subtitle || ''}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, trips_section_subtitle: e.target.value }))
-                  }
-                />
-                <p className="pdw-builder__subhead text-violet-700 mt-2">Εξωτερικό</p>
-                <input
-                  className="pdw-builder__input"
-                  placeholder="Eyebrow"
-                  value={form.intl_section_eyebrow || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, intl_section_eyebrow: e.target.value }))}
-                />
-                <input
-                  className="pdw-builder__input font-bold"
-                  placeholder="Τίτλος"
-                  value={form.intl_section_title || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, intl_section_title: e.target.value }))}
-                />
-                <textarea
-                  rows={2}
-                  className="pdw-builder__input"
-                  placeholder="Υπότιτλος"
-                  value={form.intl_section_subtitle || ''}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, intl_section_subtitle: e.target.value }))
-                  }
-                />
-              </div>
-            ) : null}
+            {tripsTab === 'copy' ? <CompactTripsTexts form={form} setForm={setForm} /> : null}
           </div>
         ) : null}
 
