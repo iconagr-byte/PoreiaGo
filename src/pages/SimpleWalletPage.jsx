@@ -37,8 +37,11 @@ import CustomerSecurityPanel from '../components/wallet/CustomerSecurityPanel.js
 import PushNotificationsPanel from '../components/wallet/PushNotificationsPanel.jsx';
 import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
 import RentalCatalogPanel from '../components/wallet/RentalCatalogPanel.jsx';
+import WalletAccountMenu from '../components/wallet/WalletAccountMenu.jsx';
 import WalletBoardingPass from '../components/wallet/WalletBoardingPass.jsx';
 import WalletInstallPrompt from '../components/wallet/WalletInstallPrompt.jsx';
+import WalletMorePanel from '../components/wallet/WalletMorePanel.jsx';
+import WalletNotificationBell from '../components/wallet/WalletNotificationBell.jsx';
 import WalletStartFeed from '../components/wallet/WalletStartFeed.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
@@ -64,24 +67,19 @@ import {
 } from '../lib/wallet/walletOfficeTrips.js';
 import '../styles/wallet-pass.css';
 
-/** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · Εγώ.
+/** Match native Wallet bottom bar: Αρχική · Εισιτήριο · Κρατήσεις · Περισσότερα.
  * Desktop → left sidebar; phone → bottom dock.
  * Never add lookup/Κράτηση/search here — use home CTAs + /my-booking.
- * Rent + Lost & Found live under Εγώ (not primary tabs). */
+ * Account / Lost & Found / Rent / logout live in the header person menu. */
 const ALL_TABS = [
   { id: 'home', label: 'Αρχική', icon: 'home' },
   { id: 'pass', label: 'Εισιτήριο', icon: 'confirmation_number' },
   { id: 'bookings', label: 'Κρατήσεις', icon: 'event_note' },
-  { id: 'account', label: 'Εγώ', icon: 'person' },
+  { id: 'more', label: 'Περισσότερα', icon: 'travel_explore' },
 ];
 
 function tabIsActive(activeTab, tabId) {
-  if (activeTab === tabId) return true;
-  // Nested under Εγώ — keep Me highlighted.
-  if ((activeTab === 'lost_found' || activeTab === 'rentals') && tabId === 'account') {
-    return true;
-  }
-  return false;
+  return activeTab === tabId;
 }
 
 function resolveCustomerProfile() {
@@ -224,7 +222,14 @@ function WalletAuthenticatedApp() {
 
   useEffect(() => {
     const tab = location.state?.walletTab;
-    if (tab === 'account' || tab === 'bookings' || tab === 'home' || tab === 'rentals') {
+    if (
+      tab === 'account' ||
+      tab === 'bookings' ||
+      tab === 'home' ||
+      tab === 'rentals' ||
+      tab === 'more' ||
+      tab === 'lost_found'
+    ) {
       setActiveTab(tab);
       setSelectedBookingId(null);
     }
@@ -342,7 +347,7 @@ function WalletAuthenticatedApp() {
   }, [sealedTenantId]);
 
   const nativeWallet = isNativeApp();
-  // Rent opens from Εγώ when the sealed office has Rent — not a primary tab.
+  // Rent opens from the header account menu when the sealed office has Rent.
   const rentAvailable = shouldShowRentStorefront(officeModules);
   const tabs = ALL_TABS;
 
@@ -351,6 +356,11 @@ function WalletAuthenticatedApp() {
       setActiveTab('account');
     }
   }, [rentAvailable, activeTab]);
+
+  const handleLogout = () => {
+    logoutCustomer();
+    navigate('/login', { replace: true, state: { from: '/wallet' } });
+  };
 
   const tripCatalog = useMemo(() => {
     let local = [];
@@ -472,6 +482,27 @@ function WalletAuthenticatedApp() {
   const switchTab = (id) => {
     setActiveTab(id);
     setSelectedBookingId(null);
+  };
+
+  const handleNotifOpen = (item) => {
+    if (item?.bookingId) {
+      const hit = bookings.find((b) => b.id === item.bookingId) || getBookingById(item.bookingId);
+      const type = String(item.type || '');
+      if (
+        hit &&
+        (item.tab === 'pass' || type.includes('fiscal') || type.includes('trip'))
+      ) {
+        openTicket(hit);
+        return;
+      }
+    }
+    if (item?.tab === 'bookings') switchTab('bookings');
+    else if (item?.tab === 'pass') switchTab('pass');
+    else if (item?.tab === 'more') switchTab('more');
+    else if (item?.tab === 'account') switchTab('account');
+    else if (item?.url && item.url !== '/wallet' && !String(item.url).startsWith('/wallet')) {
+      window.location.assign(item.url);
+    }
   };
 
   const onNavTabClick = (tab) => {
@@ -683,18 +714,14 @@ function WalletAuthenticatedApp() {
         }`}
       >
         <header className="wallet-topbar">
-          {nativeWallet ? (
-            <span className="wallet-topbar-btn" aria-hidden style={{ visibility: 'hidden' }}>
-              <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-            </span>
-          ) : (
-            <button type="button" className="wallet-topbar-btn" onClick={() => navigate('/')}>
-              <span className="material-symbols-outlined text-[20px]" aria-hidden>
-                arrow_back
-              </span>
-              <span className="wallet-topbar-btn-label">Εκδρομές</span>
-            </button>
-          )}
+          <WalletAccountMenu
+            profile={profile}
+            rentAvailable={rentAvailable}
+            onOpenAccount={() => switchTab('account')}
+            onOpenLostFound={() => switchTab('lost_found')}
+            onOpenRentals={() => switchTab('rentals')}
+            onLogout={handleLogout}
+          />
           <div className="wallet-topbar-brand">
             <OfficeBrandMark
               className="h-8"
@@ -705,19 +732,11 @@ function WalletAuthenticatedApp() {
               tenantId={sealedTenantId}
             />
           </div>
-          <button
-            type="button"
-            className="wallet-topbar-btn"
-            onClick={() => {
-              logoutCustomer();
-              navigate('/login', { replace: true, state: { from: '/wallet' } });
-            }}
-          >
-            <span className="material-symbols-outlined text-[20px]" aria-hidden>
-              logout
-            </span>
-            <span className="wallet-topbar-btn-label">Έξοδος</span>
-          </button>
+          <WalletNotificationBell
+            email={profile.email}
+            bookings={bookings}
+            onOpenItem={handleNotifOpen}
+          />
         </header>
 
         <div className={isDesktop ? 'wallet-desktop-shell' : 'wallet-body-shell'}>
@@ -850,7 +869,7 @@ function WalletAuthenticatedApp() {
               <span className="material-symbols-outlined" aria-hidden>
                 arrow_back
               </span>
-              Εγώ
+              Λογαριασμός
             </button>
             <section className="wallet-panel">
               <div className="wallet-panel-head">
@@ -871,6 +890,16 @@ function WalletAuthenticatedApp() {
             </section>
             <RentalCatalogPanel />
           </div>
+        ) : null}
+
+        {activeTab === 'more' && !isTicketView ? (
+          <WalletMorePanel
+            bookings={bookings}
+            brandLabel={brandLabel}
+            nativeWallet={nativeWallet}
+            onOpenBookings={() => switchTab('bookings')}
+            onOpenPass={() => switchTab('pass')}
+          />
         ) : null}
 
         {activeTab === 'lost_found' && (
@@ -956,6 +985,16 @@ function WalletAuthenticatedApp() {
             ) : null}
             <PushNotificationsPanel email={profile.email} />
             <CustomerSecurityPanel email={profile.email} authProvider={profile.provider} />
+            <button
+              type="button"
+              className="wallet-btn wallet-btn-danger wallet-btn-block"
+              onClick={handleLogout}
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden>
+                logout
+              </span>
+              Έξοδος
+            </button>
           </div>
         )}
 

@@ -70,7 +70,7 @@ export default function LostFoundPanel({ bookings = [], onBack }) {
           <span className="material-symbols-outlined" aria-hidden>
             arrow_back
           </span>
-          Εγώ
+          Λογαριασμός
         </button>
       ) : null}
       <section className="wallet-panel">
