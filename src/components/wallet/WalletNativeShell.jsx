@@ -10,7 +10,7 @@ const TABS = [
 
 /**
  * Bottom chrome for the Capacitor Wallet Android app (customer traveler only).
- * Primary tabs live in SimpleWalletPage (Αρχική · Εισιτήριο · Κρατήσεις · Εγώ).
+ * Primary tabs live in SimpleWalletPage (Αρχική · Εισιτήριο · Κρατήσεις · Περισσότερα).
  */
 export default function WalletNativeShell() {
   const { pathname } = useLocation();
