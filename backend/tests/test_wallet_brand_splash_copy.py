@@ -27,6 +27,16 @@ class WalletBrandSplashCopyTests(unittest.TestCase):
         app = (ROOT / "src" / "App.jsx").read_text(encoding="utf-8")
         self.assertIn("WalletNativeSplashGate", app)
 
+    def test_unified_splash_gate_not_skipped_on_driver_path(self):
+        """After unify (#838), cold start may land on /driver — still show brand splash."""
+        gate = (
+            ROOT / "src" / "components" / "wallet" / "WalletNativeSplashGate.jsx"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("isDriverSurface", gate)
+        self.assertIn("isNativeDriverApp", gate)
+        self.assertIn("hideNativeSplash", gate)
+        self.assertIn("SPLASH_FAILSAFE_MS", gate)
+
 
 if __name__ == "__main__":
     unittest.main()

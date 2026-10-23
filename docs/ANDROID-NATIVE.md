@@ -78,6 +78,7 @@ cd android && ./gradlew assembleDebug
 - Web / PWA routes and sticky-session behaviour are unchanged.
 - Native driver JWT persists across process death; web `/driver` still clears sticky auth.
 - Marketing home, admin, and platform chrome stay blocked in Capacitor.
+- Cold start shows the PoreiaGo brand splash once (`WalletNativeSplashGate`), then the role home — including when early boot rewrote `/` → `/driver`. Legacy `com.poreiago.driver` APK skips the React splash.
 - Achillio office seals stay on the sealed host (`VITE_NATIVE_API_BASE` default `https://www.achilliotravel.com`).
 
 ## Related docs
