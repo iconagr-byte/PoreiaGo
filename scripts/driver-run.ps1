@@ -1,13 +1,14 @@
-# PoreiaGo Driver - build + install on emulator/USB device
-# Usage (from repo root; ALWAYS pull main first if this file is stale):
-#   cd C:\Users\User\poreiago
-#   git fetch origin main; git checkout main; git pull origin main
+# DEPRECATED: separate com.poreiago.driver package.
+# Canonical native app is ONE install: com.poreiago.wallet (role-routed).
+# By default this script forwards to wallet-run.ps1.
+#
+# Usage (unified app — preferred):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1
-# Optional:
-#   -Branch main          (default; do NOT use old feature branches)
-#   -WaitMinutes 5        (adb device wait timeout; default 3)
-#   -StartEmulator        (auto-start first AVD if adb devices is empty)
-#   -SkipGit
+#   (same as wallet-run.ps1)
+#
+# Legacy second APK only when you explicitly need android-driver:
+#   powershell -ExecutionPolicy Bypass -File .\scripts\driver-run.ps1 -LegacyDriver
+#
 # ASCII-only file (no BOM) so Windows PowerShell 5.1 always parses.
 
 param(
@@ -18,12 +19,35 @@ param(
   [string]$Branch = "main",
   [double]$WaitMinutes = 3,
   [switch]$StartEmulator,
-  [switch]$SkipGit
+  [switch]$SkipGit,
+  # Build deprecated com.poreiago.driver (android-driver/) instead of unified app.
+  [switch]$LegacyDriver
 )
 
 $ErrorActionPreference = "Stop"
 $repo = "C:\Users\User\poreiago"
 Set-Location $repo
+
+if (-not $LegacyDriver) {
+  Write-Host "NOTE: driver-run.ps1 now builds the UNIFIED PoreiaGo app (com.poreiago.wallet)." -ForegroundColor Yellow
+  Write-Host "      Driver / Wallet / Rent share one install; login opens the right menu." -ForegroundColor Yellow
+  Write-Host "      Pass -LegacyDriver only if you still need com.poreiago.driver." -ForegroundColor DarkYellow
+  $walletRun = Join-Path $repo "scripts\wallet-run.ps1"
+  if (-not (Test-Path -LiteralPath $walletRun)) {
+    throw "Missing scripts/wallet-run.ps1"
+  }
+  $fwd = @{
+    Branch = $Branch
+    WaitMinutes = $WaitMinutes
+  }
+  if ($Sdk) { $fwd.Sdk = $Sdk }
+  if ($JavaHome) { $fwd.JavaHome = $JavaHome }
+  if ($StartEmulator) { $fwd.StartEmulator = $true }
+  & $walletRun @fwd
+  exit $LASTEXITCODE
+}
+
+Write-Host "WARN: -LegacyDriver builds deprecated com.poreiago.driver (second install)." -ForegroundColor Yellow
 
 Remove-Item Env:ANDROID_HOME -ErrorAction SilentlyContinue
 Remove-Item Env:ANDROID_SDK_ROOT -ErrorAction SilentlyContinue

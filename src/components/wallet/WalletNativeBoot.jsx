@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { isNativeApp, isNativeDriverApp } from '../../lib/capacitor/isNativeApp.js';
+import { isNativeUnifiedApp } from '../../lib/capacitor/nativeAppId.js';
 
 /**
- * Unified My Wallet (buses + rentals) — no marketing site / admin / driver.
- * Rent browse/book stays on office web; app shows sealed wallet passes only.
+ * Legacy wallet-only path seal.
+ * Unified Capacitor app (com.poreiago.wallet with role router) uses NativeUnifiedBoot —
+ * this component no-ops there so /driver and /rent stay reachable.
  */
 const WALLET_APP_PREFIXES = [
   '/wallet',
@@ -24,15 +26,14 @@ export function isWalletAppPath(pathname) {
 }
 
 /**
- * Capacitor Wallet app: traveler My Wallet only.
- * Blocks marketing home, trip browse, admin, driver, rent.
- * Render-time Navigate so HomePage never paints on cold start.
- * Skipped entirely when the Driver native shell is active.
+ * Capacitor Wallet app (legacy flavor only): traveler My Wallet.
+ * Skipped for unified role app and for Driver native shell.
  */
 export default function WalletNativeBoot() {
   const location = useLocation();
   const navigate = useNavigate();
-  const native = isNativeApp() && !isNativeDriverApp();
+  // Unified shell owns path seals; legacy driver package also skips.
+  const native = isNativeApp() && !isNativeDriverApp() && !isNativeUnifiedApp();
 
   useEffect(() => {
     if (!native) return;

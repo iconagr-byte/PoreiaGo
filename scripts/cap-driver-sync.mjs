@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 /**
+ * DEPRECATED — legacy com.poreiago.driver package only.
+ * Prefer scripts/cap-wallet-sync.mjs (unified com.poreiago.wallet + role router).
+ * See docs/ANDROID-NATIVE.md.
+ *
  * Sync PoreiaGo Driver Android project (parallel to Wallet).
  *
  * Usage:

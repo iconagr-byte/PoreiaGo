@@ -21,6 +21,12 @@ import {
 } from '../lib/wallet/walletClaim.js';
 import { useRentPhone } from '../lib/rental/rentDevice.js';
 import { isNativeApp } from '../lib/capacitor/isNativeApp.js';
+import { isNativeUnifiedApp } from '../lib/capacitor/nativeAppId.js';
+import {
+  rememberNativeRoleHome,
+  NATIVE_ROLE_RENT,
+  NATIVE_ROLE_WALLET,
+} from '../lib/capacitor/nativeRoleHome.js';
 import { takeGoogleCredentialFromLocation } from '../lib/capacitor/nativeGoogleBridge.js';
 import '../styles/wallet-pass.css';
 import '../styles/rental-pwa.css';
@@ -43,9 +49,11 @@ export default function LoginPage({ rentEntrance = false } = {}) {
   const location = useLocation();
   const isPhone = useRentPhone();
   // Path / prop wins over shared /login — rent entrance must never look like bus My Wallet.
-  // Native Wallet Android app: always bus My Wallet (never rent chrome).
+  // Unified native app: allow /rent/login (and rentEntrance) so rent customers open Rent menu.
+  const allowNativeRent =
+    isNativeApp() && isNativeUnifiedApp() && (rentEntrance || isRentAuthPath(location.pathname));
   const pathRent =
-    !isNativeApp() && (rentEntrance || isRentAuthPath(location.pathname));
+    (!isNativeApp() || allowNativeRent) && (rentEntrance || isRentAuthPath(location.pathname));
   const bookingPayContinue =
     typeof location.state?.from === 'string' &&
     (location.state.from.includes('/rent/book/payment') || location.state?.rentBookingPay);
@@ -54,7 +62,8 @@ export default function LoginPage({ rentEntrance = false } = {}) {
       ? location.state.from
       : '/rent/wallet'
     : location.state?.from || '/wallet';
-  const rentIntent = !isNativeApp() && (pathRent || isRentReturn(redirectTo));
+  const rentIntent =
+    (pathRent || isRentReturn(redirectTo)) && (!isNativeApp() || allowNativeRent);
   const walletIntent =
     !rentIntent && (location.state?.from === '/wallet' || Boolean(location.state?.walletClaim));
   const [error, setError] = useState('');
@@ -108,6 +117,9 @@ export default function LoginPage({ rentEntrance = false } = {}) {
 
   const finishLogin = (email, profile = {}, accessToken = null) => {
     loginAsCustomer(email, profile, accessToken);
+    if (isNativeApp()) {
+      rememberNativeRoleHome(rentIntent ? NATIVE_ROLE_RENT : NATIVE_ROLE_WALLET);
+    }
     const hadClaim = Boolean(claim);
     clearWalletClaim();
     const homeState = walletHomeNavState({
@@ -362,7 +374,23 @@ export default function LoginPage({ rentEntrance = false } = {}) {
           {rentIntent ? 'Δημιουργία λογαριασμού' : 'Εγγραφή'}
         </Link>
       </p>
-      {!isNativeApp() ? (
+      {isNativeApp() && isNativeUnifiedApp() ? (
+        <p className="text-xs text-center mt-4 space-y-2">
+          {!rentIntent ? (
+            <Link to="/rent/login" state={{ from: '/rent/wallet', rentEntrance: true }} className={linkClass}>
+              Είσοδος ενοικιάσεων
+            </Link>
+          ) : (
+            <Link to="/login" state={{ from: '/wallet', walletClaim: true }} className={linkClass}>
+              Είσοδος My Wallet (λεωφορεία)
+            </Link>
+          )}
+          <br />
+          <Link to="/driver" className={linkClass}>
+            Είσοδος οδηγού
+          </Link>
+        </p>
+      ) : !isNativeApp() ? (
         !rentIntent ? (
           <p className="text-xs text-center mt-3">
             <Link to="/my-booking" className={linkClass}>

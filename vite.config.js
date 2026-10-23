@@ -70,10 +70,13 @@ export default defineConfig({
     {
       name: 'poreiago-native-app-flavor',
       transformIndexHtml(html) {
-        const flavor = String(process.env.VITE_NATIVE_APP || 'wallet')
+        // Canonical Capacitor install: app (unified role router).
+        // Legacy: driver (com.poreiago.driver only). wallet accepted as alias of app.
+        const flavor = String(process.env.VITE_NATIVE_APP || 'app')
           .trim()
           .toLowerCase()
-        const app = flavor === 'driver' ? 'driver' : 'wallet'
+        const app =
+          flavor === 'driver' ? 'driver' : flavor === 'wallet' ? 'wallet' : 'app'
         return html
           .split('__POREIAGO_NATIVE_APP_PLACEHOLDER__')
           .join(app)
