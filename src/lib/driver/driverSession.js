@@ -1,20 +1,33 @@
 /**
  * Driver Command Center session — bound to trip/day via password / Master QR.
  *
- * Auth is intentionally NOT sticky across app launches: localStorage leftovers
- * are ignored/cleared so reopening /driver always shows the login gate unless
- * this visit just authenticated (sessionStorage fresh marker).
+ * Web / PWA: auth is NOT sticky across launches (sessionStorage + fresh marker).
+ * Native Driver app (Capacitor): JWT persists in localStorage so a valid session
+ * opens straight to the command center menu on cold start.
  */
+
+import { isNativeDriverApp } from '../capacitor/nativeAppId.js';
 
 const STORAGE_KEY = 'driver_command_session';
 const FRESH_AUTH_KEY = 'driver_auth_fresh';
+const OFFICE_SEAL_KEY = 'driver_native_office_seal';
 
 function readSessionRaw() {
   try {
-    return sessionStorage.getItem(STORAGE_KEY);
+    const fromSession = sessionStorage.getItem(STORAGE_KEY);
+    if (fromSession) return fromSession;
   } catch {
-    return null;
+    /* ignore */
   }
+  // Native driver: restore sealed JWT across process death.
+  if (isNativeDriverApp()) {
+    try {
+      return localStorage.getItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
 }
 
 function writeSessionRaw(value) {
@@ -22,6 +35,13 @@ function writeSessionRaw(value) {
     sessionStorage.setItem(STORAGE_KEY, value);
   } catch {
     /* private mode / quota */
+  }
+  if (isNativeDriverApp()) {
+    try {
+      localStorage.setItem(STORAGE_KEY, value);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -33,6 +53,43 @@ function removeSessionRaw() {
   }
   try {
     localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Persist office host + tenant so Achillio drivers stay on Achillio APIs. */
+export function sealDriverOffice({ tenantId, apiHost } = {}) {
+  if (!isNativeDriverApp()) return;
+  try {
+    const host =
+      String(apiHost || '').trim().replace(/\/$/, '') ||
+      String(import.meta.env.VITE_NATIVE_API_BASE || '').trim().replace(/\/$/, '') ||
+      'https://www.achilliotravel.com';
+    const seal = {
+      tenantId: tenantId || null,
+      apiHost: host,
+      sealedAt: Date.now(),
+    };
+    localStorage.setItem(OFFICE_SEAL_KEY, JSON.stringify(seal));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getDriverOfficeSeal() {
+  try {
+    const raw = localStorage.getItem(OFFICE_SEAL_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function clearDriverOfficeSeal() {
+  try {
+    localStorage.removeItem(OFFICE_SEAL_KEY);
   } catch {
     /* ignore */
   }
@@ -86,11 +143,15 @@ export function getDriverSession() {
 
 export function saveDriverSession(session) {
   writeSessionRaw(JSON.stringify(session));
-  // Never keep a sticky copy — reopen must ask for credentials again.
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
+  if (!isNativeDriverApp()) {
+    // Web: never keep a sticky copy — reopen must ask for credentials again.
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  } else if (session?.tenantId) {
+    sealDriverOffice({ tenantId: session.tenantId });
   }
   try {
     localStorage.setItem('userRole', 'driver');
@@ -121,6 +182,7 @@ export function clearDriverSession() {
   } catch {
     /* ignore */
   }
+  // Keep office seal on logout so the next login still hits the same office host.
 }
 
 export function isSessionValid() {
@@ -128,10 +190,25 @@ export function isSessionValid() {
 }
 
 /**
- * Cold-open gate: allow through only right after login/QR in this visit.
- * Otherwise wipe any residual session and force the login screen.
+ * Cold-open gate.
+ * - Native Driver: valid persisted JWT → command center; else login.
+ * - Web/PWA: only right after login/QR in this visit (fresh marker).
  */
 export function resolveDriverAuthOnLaunch() {
+  if (isNativeDriverApp()) {
+    // Drop legacy web sticky leftovers that are not our sealed JWT shape.
+    try {
+      localStorage.removeItem('driverActiveTripId');
+    } catch {
+      /* ignore */
+    }
+    if (isSessionValid()) {
+      markDriverAuthFresh();
+      return true;
+    }
+    clearDriverSession();
+    return false;
+  }
   purgeStickyDriverSession();
   if (consumeDriverAuthFresh() && isSessionValid()) {
     return true;

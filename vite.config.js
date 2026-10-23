@@ -68,6 +68,22 @@ export default defineConfig({
     react(),
     tailwindcss(),
     {
+      name: 'poreiago-native-app-flavor',
+      transformIndexHtml(html) {
+        const flavor = String(process.env.VITE_NATIVE_APP || 'wallet')
+          .trim()
+          .toLowerCase()
+        const app = flavor === 'driver' ? 'driver' : 'wallet'
+        return html
+          .split('__POREIAGO_NATIVE_APP_PLACEHOLDER__')
+          .join(app)
+          .replace(
+            /window\.__POREIAGO_NATIVE_APP__\s*=\s*window\.__POREIAGO_NATIVE_APP__\s*\|\|\s*['"][^'"]*['"]/,
+            `window.__POREIAGO_NATIVE_APP__ = '${app}'`,
+          )
+      },
+    },
+    {
       name: 'pwa-service-worker-allowed',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {

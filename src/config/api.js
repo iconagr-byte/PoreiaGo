@@ -25,11 +25,32 @@ function resolveApiBase() {
       /Capacitor/i.test(String(navigator.userAgent || '')) ||
       (host === 'localhost' && (!port || port === '80' || port === '443'));
 
-    const markedWallet =
+    const markedApp =
       typeof document !== 'undefined' &&
-      document.documentElement?.getAttribute('data-poreiago-app') === 'wallet';
+      ['wallet', 'driver'].includes(
+        String(document.documentElement?.getAttribute('data-poreiago-app') || ''),
+      );
 
-    if (nativePlatform || markedWallet) {
+    const buildFlavor = String(import.meta.env.VITE_NATIVE_APP || '')
+      .trim()
+      .toLowerCase();
+
+    if (nativePlatform || markedApp || buildFlavor === 'wallet' || buildFlavor === 'driver') {
+      // Native Driver may seal a specific office host after first login.
+      try {
+        if (buildFlavor === 'driver' || document.documentElement?.dataset?.poreiagoApp === 'driver') {
+          const raw = localStorage.getItem('driver_native_office_seal');
+          if (raw) {
+            const seal = JSON.parse(raw);
+            const sealedHost = String(seal?.apiHost || '')
+              .trim()
+              .replace(/\/$/, '');
+            if (sealedHost) return sealedHost;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
       const native =
         String(import.meta.env.VITE_NATIVE_API_BASE || '')
           .trim()

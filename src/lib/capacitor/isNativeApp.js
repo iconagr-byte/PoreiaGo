@@ -1,8 +1,11 @@
+import { getNativeAppId, isNativeDriverApp, isNativeWalletApp } from './nativeAppId.js';
+
 /** True when running inside Capacitor (Android / iOS shell). */
 export function isNativeApp() {
   if (typeof window === 'undefined') return false;
   try {
-    if (document?.documentElement?.dataset?.poreiagoApp === 'wallet') {
+    const marked = getNativeAppId();
+    if (marked === 'wallet' || marked === 'driver') {
       return true;
     }
   } catch {
@@ -37,5 +40,7 @@ export function isNativeApp() {
 }
 
 export function isWalletAndroidApp() {
-  return isNativeApp();
+  return isNativeApp() && !isNativeDriverApp();
 }
+
+export { isNativeDriverApp, isNativeWalletApp, getNativeAppId };

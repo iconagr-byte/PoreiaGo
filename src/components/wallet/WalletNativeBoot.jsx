@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { isNativeApp } from '../../lib/capacitor/isNativeApp.js';
+import { isNativeApp, isNativeDriverApp } from '../../lib/capacitor/isNativeApp.js';
 
 /**
  * Unified My Wallet (buses + rentals) — no marketing site / admin / driver.
@@ -27,11 +27,12 @@ export function isWalletAppPath(pathname) {
  * Capacitor Wallet app: traveler My Wallet only.
  * Blocks marketing home, trip browse, admin, driver, rent.
  * Render-time Navigate so HomePage never paints on cold start.
+ * Skipped entirely when the Driver native shell is active.
  */
 export default function WalletNativeBoot() {
   const location = useLocation();
   const navigate = useNavigate();
-  const native = isNativeApp();
+  const native = isNativeApp() && !isNativeDriverApp();
 
   useEffect(() => {
     if (!native) return;

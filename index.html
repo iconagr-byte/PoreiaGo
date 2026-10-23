@@ -16,11 +16,18 @@
     <meta property="og:site_name" content="PoreiaGo" />
     <meta name="twitter:title" content="PoreiaGo — Πλατφόρμα για ταξιδιωτικά γραφεία" />
     <meta name="application-name" content="PoreiaGo" />
+    <script>
+      // Build-time flavor for Capacitor shells (wallet | driver). Vite/sync may rewrite.
+      window.__POREIAGO_NATIVE_APP__ = window.__POREIAGO_NATIVE_APP__ || '__POREIAGO_NATIVE_APP_PLACEHOLDER__';
+    </script>
     <style id="poreiago-wallet-native-boot">
-      /* Full-bleed My Wallet in Capacitor — no website chrome, fast fade */
+      /* Full-bleed My Wallet / Driver in Capacitor — no website chrome, fast fade */
       html[data-poreiago-app='wallet'],
       html[data-poreiago-app='wallet'] body,
-      html[data-poreiago-app='wallet'] #root {
+      html[data-poreiago-app='wallet'] #root,
+      html[data-poreiago-app='driver'],
+      html[data-poreiago-app='driver'] body,
+      html[data-poreiago-app='driver'] #root {
         margin: 0 !important;
         padding: 0 !important;
         width: 100% !important;
@@ -54,7 +61,7 @@
     </style>
     <script>
       (function () {
-        // Capacitor Wallet Android/iOS — mark app shell ASAP for full-bleed CSS
+        // Capacitor Wallet / Driver Android/iOS — mark app shell ASAP for full-bleed CSS
         try {
           var cap = window.Capacitor;
           var ua = String(navigator.userAgent || '');
@@ -70,24 +77,37 @@
               /^https?:$/.test(location.protocol || '') &&
               (!port0 || port0 === '80' || port0 === '443'));
           if (native) {
-            document.documentElement.setAttribute('data-poreiago-app', 'wallet');
-            // Cold-start on / must become /wallet before React mounts — no marketing homepage.
+            var flavor = String(window.__POREIAGO_NATIVE_APP__ || '').toLowerCase();
+            // Ignore unresolved Vite placeholder in web builds.
+            if (flavor.indexOf('placeholder') >= 0) flavor = 'wallet';
+            if (flavor !== 'driver' && flavor !== 'wallet') flavor = 'wallet';
+            document.documentElement.setAttribute('data-poreiago-app', flavor);
+            // Cold-start on / must become /wallet or /driver before React mounts.
             // history.replaceState (not location.replace) so Capacitor does not re-fetch a missing file.
             var path0 = location.pathname || '/';
-            var walletOk =
-              path0 === '/wallet' ||
-              path0.indexOf('/wallet/') === 0 ||
-              path0 === '/my-booking' ||
-              path0.indexOf('/my-booking/') === 0 ||
-              path0 === '/login' ||
-              path0 === '/register' ||
-              path0.indexOf('/forgot-password') === 0 ||
-              path0.indexOf('/reset-password') === 0 ||
-              path0.indexOf('/ticket/') === 0 ||
-              path0.indexOf('/passenger-checkin') === 0 ||
-              path0.indexOf('/wallet/native-google') === 0;
-            if (!walletOk) {
-              history.replaceState(null, '', '/wallet' + (location.search || '') + (location.hash || ''));
+            if (flavor === 'driver') {
+              var driverOk =
+                path0 === '/driver' ||
+                path0.indexOf('/driver/') === 0;
+              if (!driverOk) {
+                history.replaceState(null, '', '/driver' + (location.search || '') + (location.hash || ''));
+              }
+            } else {
+              var walletOk =
+                path0 === '/wallet' ||
+                path0.indexOf('/wallet/') === 0 ||
+                path0 === '/my-booking' ||
+                path0.indexOf('/my-booking/') === 0 ||
+                path0 === '/login' ||
+                path0 === '/register' ||
+                path0.indexOf('/forgot-password') === 0 ||
+                path0.indexOf('/reset-password') === 0 ||
+                path0.indexOf('/ticket/') === 0 ||
+                path0.indexOf('/passenger-checkin') === 0 ||
+                path0.indexOf('/wallet/native-google') === 0;
+              if (!walletOk) {
+                history.replaceState(null, '', '/wallet' + (location.search || '') + (location.hash || ''));
+              }
             }
           }
         } catch (e) { /* ignore */ }
