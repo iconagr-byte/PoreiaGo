@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import TicketQrCode from '../TicketQrCode.jsx';
-import PassengerTrackCTA from '../passenger/PassengerTrackCTA.jsx';
 import WalletDeviceSave from './WalletDeviceSave.jsx';
 import { useCustomerFiscalPoll } from '../../lib/fiscal/useCustomerFiscalPoll.js';
 import {
