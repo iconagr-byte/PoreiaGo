@@ -13,4 +13,15 @@ describe('isPlatformSeatBookingDemo', () => {
     assert.equal(isPlatformSeatBookingDemo('demo.poreiago.com'), false);
     assert.equal(isPlatformSeatBookingDemo('www.achilliotravel.com'), false);
   });
+
+  it('is false on localhost when My Wallet is sealed to an office', () => {
+    assert.equal(
+      isPlatformSeatBookingDemo('localhost', { sealedWallet: true }),
+      false,
+    );
+    assert.equal(
+      isPlatformSeatBookingDemo('www.poreiago.com', { sealedWallet: true }),
+      false,
+    );
+  });
 });

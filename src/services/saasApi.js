@@ -343,7 +343,14 @@ export async function saasLookupGuestBooking({ tenantId, email, referenceCode })
 }
 
 export async function saasCreateGuestBooking(payload) {
-  const tenantId = payload.tenantId || getSaasTenantId();
+  let sealedWalletTenant = null;
+  try {
+    const { getWalletTenantId } = await import('../lib/wallet/walletTenantSeal.js');
+    sealedWalletTenant = getWalletTenantId();
+  } catch {
+    sealedWalletTenant = null;
+  }
+  const tenantId = payload.tenantId || sealedWalletTenant || getSaasTenantId();
   if (!tenantId) {
     throw new Error('Δεν έχει οριστεί tenant (VITE_SAAS_TENANT_ID)');
   }
@@ -390,7 +397,14 @@ export async function saasCreateGuestBooking(payload) {
 
 /** Public B2C — occupied seat codes for a trip (no passenger PII). */
 export async function fetchOccupiedSeats(externalTripId, tenantId) {
-  const tid = tenantId || getSaasTenantId();
+  let sealedWalletTenant = null;
+  try {
+    const { getWalletTenantId } = await import('../lib/wallet/walletTenantSeal.js');
+    sealedWalletTenant = getWalletTenantId();
+  } catch {
+    sealedWalletTenant = null;
+  }
+  const tid = tenantId || sealedWalletTenant || getSaasTenantId();
   const params = new URLSearchParams({
     external_trip_id: String(externalTripId),
   });

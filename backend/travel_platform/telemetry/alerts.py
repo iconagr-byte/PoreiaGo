@@ -16,6 +16,31 @@ class TelemetryAlertBus:
     _cleared_ids: set[str] = set()
 
     @classmethod
+    def push_generic(
+        cls,
+        *,
+        alert_type: str,
+        tenant_id: str,
+        message: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Office bell row for non-fleet events (e.g. NEW_BOOKING from Wallet)."""
+        meta = dict(metadata or {})
+        row = {
+            "id": str(uuid4()),
+            "alert_type": str(alert_type or "INFO"),
+            "tenant_id": str(tenant_id),
+            "vehicle_id": meta.get("bus_plate") or meta.get("vehicle_id"),
+            "trip_id": meta.get("trip_id"),
+            "message": message,
+            "metadata": meta,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        cls._recent.appendleft(row)
+        cls._notify_ws(row)
+        return row
+
+    @classmethod
     def push_driver_shift(
         cls,
         *,
@@ -24,19 +49,12 @@ class TelemetryAlertBus:
         message: str,
         metadata: dict[str, Any],
     ) -> dict[str, Any]:
-        row = {
-            "id": str(uuid4()),
-            "alert_type": alert_type,
-            "tenant_id": str(tenant_id),
-            "vehicle_id": metadata.get("bus_plate"),
-            "trip_id": metadata.get("trip_id"),
-            "message": message,
-            "metadata": metadata,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        cls._recent.appendleft(row)
-        cls._notify_ws(row)
-        return row
+        return cls.push_generic(
+            alert_type=alert_type,
+            tenant_id=tenant_id,
+            message=message,
+            metadata=metadata,
+        )
 
     @classmethod
     def push_route_deviation(cls, alert: RouteDeviationAlert) -> dict[str, Any]:

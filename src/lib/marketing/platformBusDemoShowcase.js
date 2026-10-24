@@ -6,12 +6,32 @@
 import { mockTrips } from '../../data/mockData.js';
 import { isPlatformMarketingHost, isTenantStorefrontHost } from '../platform/tenantHost.js';
 import { normalizeTrip } from '../trips/tripMarket.js';
+import { getWalletTenantId } from '../wallet/walletTenantSeal.js';
+
+/**
+ * My Wallet (incl. Capacitor on localhost) is sealed to a real office —
+ * never treat that checkout as marketing demo simulation.
+ */
+export function isSealedWalletLiveBooking() {
+  return Boolean(getWalletTenantId());
+}
 
 /**
  * Seat map + checkout on poreiago.com (and localhost) are a walkthrough only —
  * no real fleet block, booking, wallet claim, or charge.
+ *
+ * Exception: sealed My Wallet office (Achillio etc.) always uses the live
+ * booking/payment path so the office gets the κρατηση + email + bell.
+ *
+ * @param {string} [hostname]
+ * @param {{ sealedWallet?: boolean }} [options] optional override for tests
  */
-export function isPlatformSeatBookingDemo(hostname) {
+export function isPlatformSeatBookingDemo(hostname, options = {}) {
+  const sealed =
+    typeof options.sealedWallet === 'boolean'
+      ? options.sealedWallet
+      : isSealedWalletLiveBooking();
+  if (sealed) return false;
   return isPlatformMarketingHost(hostname) && !isTenantStorefrontHost(hostname);
 }
 

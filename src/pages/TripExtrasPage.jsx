@@ -31,7 +31,10 @@ export default function TripExtrasPage() {
   const fromWallet = isWalletBookFlow(location.state);
   const bookState = fromWallet ? location.state : undefined;
   const seedTrip = officeTripFromWalletState(location.state, tripId);
-  const { trip, loading: tripLoading } = usePublicOfficeTrip(tripId, { seedTrip });
+  const { trip, loading: tripLoading } = usePublicOfficeTrip(tripId, {
+    seedTrip,
+    fromWallet,
+  });
   const [pending, setPending] = useState(() => loadPendingCheckout());
   const [catalog, setCatalog] = useState([]);
   const [selection, setSelection] = useState({});
