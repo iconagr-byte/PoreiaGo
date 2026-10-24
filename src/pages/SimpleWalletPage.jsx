@@ -32,7 +32,6 @@ import { loadTrips } from '../lib/trips/tripStore.js';
 import { bookingCoverUrl } from '../lib/trips/tripPhotos.js';
 import { isPaid, statusStyle } from '../lib/bookingDisplay.js';
 import { bookingFiscalMark } from '../lib/fiscal/fiscalDisplay.js';
-import PassengerTrackCTA from '../components/passenger/PassengerTrackCTA.jsx';
 import CustomerSecurityPanel from '../components/wallet/CustomerSecurityPanel.jsx';
 import PushNotificationsPanel from '../components/wallet/PushNotificationsPanel.jsx';
 import LostFoundPanel from '../components/wallet/LostFoundPanel.jsx';
