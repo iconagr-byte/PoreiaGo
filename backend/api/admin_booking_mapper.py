@@ -238,7 +238,17 @@ def booking_to_admin_dict(
     checked_in = bool(meta.get("checked_in")) or status == BookingStatus.BOARDED
     check_in_status = meta.get("check_in_status") or ("CHECKED_IN" if checked_in else "NONE")
 
-    trip_id = meta.get("external_trip_id") or meta.get("trip_id") or 0
+    trip_id = (
+        meta.get("external_trip_id")
+        or meta.get("trip_id")
+        or getattr(booking, "trip_id", None)
+        or 0
+    )
+    try:
+        if trip_id is not None and trip_id != "":
+            trip_id = int(trip_id)
+    except (TypeError, ValueError):
+        trip_id = trip_id or 0
     total_eur = float(booking.total_price or meta.get("total_eur") or booking.amount_eur)
     amount_paid = float(booking.amount_paid if booking.amount_paid is not None else meta.get("amount_paid") or booking.amount_eur)
     balance_due = float(meta.get("balance_due") or 0)

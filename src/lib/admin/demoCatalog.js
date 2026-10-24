@@ -43,7 +43,22 @@ export function isDemoBooking(booking) {
   if (keys.some((k) => DEMO_BOOKING_REFS.has(k))) {
     return true;
   }
-  return isDemoTripTitle(booking.tripTitle);
+  const tripId = Number(booking.tripId ?? booking.trip_id);
+  // Achillio office-seed trips reuse PoreiaGo marketing titles (Μετέωρα etc.) —
+  // real guest/wallet bookings on those ids must stay in Κρατήσεις.
+  if (Number.isFinite(tripId) && OFFICE_SEED_TRIP_IDS.has(tripId)) {
+    return false;
+  }
+  if (Number.isFinite(tripId) && DEMO_TRIP_IDS.has(tripId)) {
+    return true;
+  }
+  // Title-only strip for legacy platform demos (small ids / missing trip).
+  if (isDemoTripTitle(booking.tripTitle)) {
+    if (!Number.isFinite(tripId) || tripId <= 0 || tripId < 1000) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Achillio Travel starter ids (PoreiaGo demo content adopted as office catalog). */
