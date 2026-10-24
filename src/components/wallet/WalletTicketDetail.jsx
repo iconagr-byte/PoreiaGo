@@ -178,11 +178,6 @@ export default function WalletTicketDetail({
             {mark ? <p className="wallet-pass-mark">MARK {mark}</p> : null}
           </div>
 
-          {paid && booking.tripId ? (
-            <div className="wallet-ticket-track">
-              <PassengerTrackCTA booking={booking} showEta />
-            </div>
-          ) : null}
         </div>
       </section>
 
