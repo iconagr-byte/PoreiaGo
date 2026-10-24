@@ -116,18 +116,8 @@ export default function WalletAccountMenu({
   // Skip Google’s generated letter tiles (crude colored circle + glyph).
   const pictureOk = Boolean(rawPicture) && !isGeneratedLetterAvatar(rawPicture);
 
-  // Topbar: office logo (brand) → real photo → monogram — avoids crude Google letter tiles.
-  let avatarSrc = '';
-  let avatarKind = 'mono';
-  if (resolvedLogo) {
-    avatarSrc = resolvedLogo;
-    avatarKind = 'logo';
-  } else if (pictureOk) {
-    avatarSrc = rawPicture;
-    avatarKind = 'photo';
-  }
-
   // Sheet identity: prefer the person (photo), else office logo, else monogram.
+  // Topbar trigger stays a person icon (user request).
   const sheetSrc = pictureOk ? rawPicture : resolvedLogo || '';
   const sheetKind = pictureOk ? 'photo' : resolvedLogo ? 'logo' : 'mono';
   const brandLabel = String(officeName || '').trim();
@@ -147,7 +137,7 @@ export default function WalletAccountMenu({
       <button
         ref={triggerRef}
         type="button"
-        className={`wallet-topbar-btn wallet-topbar-btn--avatar${open ? ' is-open' : ''}`}
+        className={`wallet-topbar-btn wallet-topbar-btn--account${open ? ' is-open' : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
@@ -155,7 +145,9 @@ export default function WalletAccountMenu({
         title={email || name}
         onClick={() => setOpen((v) => !v)}
       >
-        <WalletAvatarFace src={avatarSrc} kind={avatarKind} initials={initials} size="sm" />
+        <span className="material-symbols-outlined wallet-topbar-person" aria-hidden>
+          person
+        </span>
       </button>
 
       {open ? (
