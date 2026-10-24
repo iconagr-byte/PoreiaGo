@@ -1184,6 +1184,16 @@ class OfficeCustomersReplaceIn(BaseModel):
     customers: list[OfficeCustomerIn] = Field(default_factory=list)
 
 
+@router.get("/wallet-registrations")
+async def list_wallet_registrations(request: Request):
+    """My Wallet account signups sealed to this office (home office)."""
+    from ticketing.customer_accounts import list_accounts_for_tenant
+
+    tid = _request_tenant_id(request)
+    items = await list_accounts_for_tenant(tid)
+    return {"items": items, "count": len(items)}
+
+
 @router.get("/customers")
 async def list_office_customers(
     request: Request,

@@ -23,6 +23,14 @@ export async function fetchOfficeCustomers(serviceScope) {
   return Array.isArray(data?.customers) ? data.customers : Array.isArray(data) ? data : [];
 }
 
+/** My Wallet account signups for this office (wallet_tenant_id seal). */
+export async function fetchWalletRegistrations() {
+  const res = await adminFetch('/api/admin/platform/wallet-registrations', { retries: 3 });
+  if (!res.ok) await parseError(res);
+  const data = await res.json();
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
 export async function createOfficeCustomer(payload) {
   const res = await adminFetch('/api/admin/platform/customers', {
     method: 'POST',

@@ -68,6 +68,23 @@ async def list_all_accounts() -> list[dict]:
     return [_row_to_account(r) for r in await cursor.fetchall()]
 
 
+async def list_accounts_for_tenant(tenant_id: str | None) -> list[dict]:
+    """Wallet accounts sealed to one office (home office)."""
+    tid = str(tenant_id or "").strip()
+    if not tid:
+        return []
+    db = get_db()
+    cursor = await db.execute(
+        """
+        SELECT * FROM customer_accounts
+        WHERE wallet_tenant_id = ?
+        ORDER BY created_at DESC
+        """,
+        (tid,),
+    )
+    return [_row_to_account(r) for r in await cursor.fetchall()]
+
+
 async def register_account(email: str, password: str, name: str | None = None) -> dict:
     key = email.strip().lower()
     if not key or "@" not in key:
