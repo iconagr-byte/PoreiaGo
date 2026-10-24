@@ -13,7 +13,10 @@ import {
 } from '../lib/trips/tripBookingExtras.js';
 import { loadPendingCheckout, savePendingCheckout } from '../lib/ticketing/pendingCheckout.js';
 import { usePublicOfficeTrip } from '../hooks/usePublicOfficeTrip.js';
-import { isWalletBookFlow } from '../lib/wallet/walletBookTrip.js';
+import {
+  isWalletBookFlow,
+  officeTripFromWalletState,
+} from '../lib/wallet/walletBookTrip.js';
 import { fetchSiteAppearance } from '../services/siteAppearanceApi.js';
 import '../styles/trip-extras.css';
 
@@ -27,7 +30,8 @@ export default function TripExtrasPage() {
   const location = useLocation();
   const fromWallet = isWalletBookFlow(location.state);
   const bookState = fromWallet ? location.state : undefined;
-  const { trip, loading: tripLoading } = usePublicOfficeTrip(tripId);
+  const seedTrip = officeTripFromWalletState(location.state, tripId);
+  const { trip, loading: tripLoading } = usePublicOfficeTrip(tripId, { seedTrip });
   const [pending, setPending] = useState(() => loadPendingCheckout());
   const [catalog, setCatalog] = useState([]);
   const [selection, setSelection] = useState({});

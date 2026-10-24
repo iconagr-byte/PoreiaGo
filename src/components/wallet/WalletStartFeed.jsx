@@ -113,13 +113,14 @@ export default function WalletStartFeed({
   const startBooking = (trip) => {
     const id = trip?.id;
     if (!id) return;
-    navigate(walletSelectSeatPath(id), { state: walletBookNavState() });
+    // Seed trip in nav state so seat page never depends only on a second API hit.
+    navigate(walletSelectSeatPath(id), { state: walletBookNavState(trip) });
   };
 
   const openTripInfo = (trip) => {
     const id = trip?.id;
     if (!id) return;
-    navigate(`/trip/${id}`, { state: walletBookNavState() });
+    navigate(`/trip/${id}`, { state: walletBookNavState(trip) });
   };
 
   return (

@@ -28,19 +28,25 @@ import {
   getSeatMapHeaderClasses,
   resolveTripSeatMapTheme,
 } from '../lib/seats/seatMapThemes.js';
-import { isWalletBookFlow } from '../lib/wallet/walletBookTrip.js';
+import {
+  isWalletBookFlow,
+  officeTripFromWalletState,
+} from '../lib/wallet/walletBookTrip.js';
 
 export default function SeatSelection() {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const fromWallet = isWalletBookFlow(location.state);
+  const seedTrip = officeTripFromWalletState(location.state, tripId);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [fleetCheck, setFleetCheck] = useState({ loading: true, available: true, reason: null, warning: null });
   const [seatPricingConfig, setSeatPricingConfig] = useState(null);
   const [occupiedSeats, setOccupiedSeats] = useState([]);
   const [occupancyLoading, setOccupancyLoading] = useState(true);
-  const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId);
+  const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId, {
+    seedTrip,
+  });
 
   const { pricePerSeat, quote } = useTripPricing(trip);
   const tripBasePrice = quote?.finalPrice ?? trip?.price ?? 0;
@@ -133,6 +139,16 @@ export default function SeatSelection() {
     );
   };
 
+  useEffect(() => {
+    if (tripLoading || trip) return;
+    toast.error(
+      fromWallet
+        ? 'Η εκδρομή δεν φορτώθηκε. Μείνετε στο Wallet / δοκιμάστε ξανά.'
+        : 'Η εκδρομή δεν βρέθηκε.',
+      { id: 'seat-trip-missing' },
+    );
+  }, [tripLoading, trip, fromWallet]);
+
   if (tripLoading) {
     return (
       <div className="relative min-h-screen bg-surface flex items-center justify-center p-6">
@@ -149,6 +165,10 @@ export default function SeatSelection() {
         <div className="relative z-10 bg-surface-container-lowest/95 backdrop-blur-sm rounded-2xl p-8 text-center max-w-sm shadow-sm border border-black/[0.05]">
           <span className="material-symbols-outlined text-4xl text-error mb-3">error</span>
           <h1 className="font-bold text-lg text-on-surface mb-2">Η εκδρομή δεν βρέθηκε</h1>
+          <p className="text-sm text-on-surface-variant mb-4 leading-relaxed">
+            Δεν φορτώθηκε ο χάρτης θέσεων. Επιστρέψτε στο Wallet και δοκιμάστε ξανά — όχι στην
+            αρχική της πλατφόρμας.
+          </p>
           <Link
             to={fromWallet ? '/wallet' : '/'}
             className="text-primary font-bold text-sm hover:underline"

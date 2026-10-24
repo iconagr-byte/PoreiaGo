@@ -138,7 +138,13 @@
                 path0 === '/my-booking' || path0.indexOf('/my-booking/') === 0 ||
                 path0.indexOf('/ticket/') === 0 ||
                 path0.indexOf('/passenger-checkin') === 0 ||
-                path0.indexOf('/sign/') === 0
+                path0.indexOf('/sign/') === 0 ||
+                // Wallet Κράτηση → seat → extras → checkout (keep deep link / reload)
+                path0 === '/select-seat' || path0.indexOf('/select-seat/') === 0 ||
+                path0.indexOf('/book/') === 0 ||
+                path0.indexOf('/checkout') === 0 ||
+                path0.indexOf('/trip/') === 0 ||
+                path0.indexOf('/track/') === 0
               );
             }
 
