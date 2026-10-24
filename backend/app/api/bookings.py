@@ -52,6 +52,28 @@ def _normalize_reference(code: str) -> str:
     return c
 
 
+def _safe_audit_ip(raw: str | None) -> str | None:
+    """AuditLog.ip_address is INET — reject garbage (proxies sometimes send hostnames)."""
+    if not raw:
+        return None
+    ip = str(raw).strip().split("%")[0]  # strip IPv6 zone id
+    if not ip or ip.lower() in {"unknown", "null", "undefined"}:
+        return None
+    # IPv4
+    if ip.count(".") == 3:
+        parts = ip.split(".")
+        if all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+            return ip
+        return None
+    # IPv6 (very light — letters only a-f)
+    if ":" in ip:
+        cleaned = ip.replace(":", "")
+        if cleaned and all(c in "0123456789abcdefABCDEF" for c in cleaned):
+            return ip[:64]
+        return None
+    return None
+
+
 async def _resolve_guest_tenant(request: Request, body_tenant_id: UUID | None) -> UUID:
     """
     Bind public checkout/lookup to the office Host when resolvable.
@@ -224,8 +246,16 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
     passenger_name = (body.passenger_name or "").strip()
     passenger_phone = (body.phone or "").strip() or None
 
+    # Always store int for office manifest / occupied-seats matching (91001 etc.).
+    external_trip_id: int | None = None
+    if body.external_trip_id is not None:
+        try:
+            external_trip_id = int(body.external_trip_id)
+        except (TypeError, ValueError):
+            external_trip_id = None
+
     metadata = {
-        "external_trip_id": body.external_trip_id,
+        "external_trip_id": external_trip_id,
         "trip_title": body.trip_title,
         "seats": requested_seats,
         "payment_method": pay_method,
@@ -259,13 +289,26 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         booking_status = BookingStatus.CONFIRMED
         payment_status = PaymentStatus.PENDING
 
-    async with AsyncSessionLocal() as db:
+    async def _persist_guest_booking(db, *, heal: bool = False):
+        from app.services.ensure_audit_logs_schema import ensure_audit_logs_schema
+        from app.services.ensure_bookings_schema import ensure_bookings_schema
+
+        if heal:
+            await ensure_bookings_schema(db, force=True)
+            await ensure_audit_logs_schema(db, force=True)
+        else:
+            await ensure_bookings_schema(db)
+            try:
+                await ensure_audit_logs_schema(db)
+            except Exception:
+                pass
+
         await apply_tenant_rls(db, tenant_id)
-        if body.external_trip_id is not None and requested_seats:
+        if external_trip_id is not None and requested_seats:
             occupied = await load_occupied_seats_for_trip(
                 db,
                 tenant_id=tenant_id,
-                external_trip_id=int(body.external_trip_id),
+                external_trip_id=external_trip_id,
                 for_update=True,
             )
             clashes = conflicting_seats(requested_seats, occupied)
@@ -278,9 +321,10 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
                         "seats": clashes,
                     },
                 )
-        booking = Booking(
+        row = Booking(
             tenant_id=tenant_id,
-            trip_id=None,
+            # Contabo office trips use integer ids (91001) — also keep in metadata.
+            trip_id=external_trip_id,
             customer_user_id=None,
             reference_code=ref,
             status=booking_status,
@@ -293,16 +337,19 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
             amount_eur=total,
             metadata_json=metadata,
         )
-        db.add(booking)
+        db.add(row)
         await db.flush()
 
-        metadata["transaction_id"] = f"TXN-{booking.id}"
-        metadata["invoice_number"] = f"INV-{ref.replace('BK-', '')}"
+        meta = dict(metadata)
+        meta["transaction_id"] = f"TXN-{row.id}"
+        meta["invoice_number"] = f"INV-{ref.replace('BK-', '')}"
         if paid_now > 0:
             from datetime import datetime, timezone
 
-            metadata["payment_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        booking.metadata_json = dict(metadata)
+            meta["payment_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        row.metadata_json = meta
+        metadata.clear()
+        metadata.update(meta)
 
         if paid_now > 0:
             try:
@@ -311,7 +358,7 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
                 vat_base = float(paid_now) / 1.24
                 await AadeQueueService(db).enqueue_invoice(
                     tenant_id=tenant_id,
-                    booking_id=booking.id,
+                    booking_id=row.id,
                     payload={
                         "amount_eur": float(paid_now),
                         "vat_rate": 24.0,
@@ -323,147 +370,249 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
                             }
                         ],
                     },
-                    idempotency_key=f"guest-{booking.id}",
+                    idempotency_key=f"guest-{row.id}",
                 )
             except Exception:
                 pass
 
-        await AuditService(db).record(
-            tenant_id=tenant_id,
-            actor_id=None,
-            actor_email=body.passenger_email,
-            action=AuditAction.CREATE,
-            resource_type="booking",
-            resource_id=str(booking.id),
-            ip_address=await get_client_ip(request),
-            user_agent=request.headers.get("User-Agent"),
-            after_state={"status": booking.status.value, "reference_code": ref, "guest": True, "source": source},
-        )
-        await db.commit()
-        await db.refresh(booking)
-
+        # Never fail the booking if audit_logs schema/INET drifts (Contabo).
         try:
-            from api.admin_booking_mapper import local_id_from_reference
-            from ticketing.saas_sync import upsert_ticket_booking
-
-            meta = metadata
-            trip_id = int(meta.get("external_trip_id") or 1)
-            seats = meta.get("seats") or []
-            ticket_seat = seat_label or (", ".join(seats) if seats else "—")
-            ticket_pay = (
-                "PAID"
-                if paid_now >= total and total > 0
-                else ("DEPOSIT" if paid_now > 0 else "PENDING")
+            await AuditService(db).record(
+                tenant_id=tenant_id,
+                actor_id=None,
+                actor_email=body.passenger_email,
+                action=AuditAction.CREATE,
+                resource_type="booking",
+                resource_id=str(row.id),
+                ip_address=_safe_audit_ip(await get_client_ip(request)),
+                user_agent=(request.headers.get("User-Agent") or "")[:512] or None,
+                after_state={
+                    "status": row.status.value,
+                    "reference_code": ref,
+                    "guest": True,
+                    "source": source,
+                },
             )
-            await upsert_ticket_booking(
-                local_id=local_id_from_reference(ref),
-                trip_id=trip_id,
-                customer_name=body.passenger_name,
-                seat_number=ticket_seat,
-                payment_status=ticket_pay,
-                phone=body.phone,
-                saas_booking_id=str(booking.id),
-                email=body.passenger_email,
-                special_requirements={
-                    "passengers": meta.get("passengers") or [],
-                }
-                if meta.get("passengers")
-                else None,
+        except Exception as audit_exc:
+            logger.warning(
+                "Guest booking audit skipped ref=%s tenant=%s: %s",
+                ref,
+                tenant_id,
+                audit_exc,
             )
-        except Exception:
-            pass
 
-        # Guest website checkout → mint one-shot activate token (not stored on booking).
-        activate_token: str | None = None
-        src_l = source.lower()
-        is_office_desk = (
-            "office" in src_l
-            or "walk-in" in src_l
-            or "walk_in" in src_l
-            or "desk" in src_l
-            or "γκισέ" in src_l
-        )
-        if not wallet_email and passenger_email and not is_office_desk:
-            try:
-                from ticketing.wallet_magic import create_wallet_magic_token
+        await db.commit()
+        await db.refresh(row)
+        return row
 
-                activate_token = await create_wallet_magic_token(
-                    email=passenger_email,
-                    booking_id=str(booking.id),
-                    name=passenger_name,
-                    phone=passenger_phone,
-                )
-            except Exception:
-                activate_token = None
+    booking = None
+    async with AsyncSessionLocal() as db:
+        try:
+            booking = await _persist_guest_booking(db, heal=False)
+        except HTTPException:
+            await db.rollback()
+            raise
+        except Exception as exc:
+            await db.rollback()
+            from app.services.ensure_bookings_schema import is_bookings_schema_drift_error
+            from app.services.ensure_audit_logs_schema import is_audit_logs_schema_drift_error
 
-        # Mandatory server-side office (+ customer) payment emails when money was taken.
-        # Do not rely on frontend fire-and-forget notifyPaymentConfirmationSafe.
-        if paid_now > 0:
-            notify_payload = None
-            try:
-                from api.admin_booking_mapper import booking_to_admin_dict
-                from ticketing.payment_confirmation_email import (
-                    send_payment_confirmation_notifications,
-                )
-
-                notify_payload = booking_to_admin_dict(booking)
-                notify_payload.setdefault("tenant_id", str(tenant_id))
-                await send_payment_confirmation_notifications(
-                    notify_payload,
-                    require_office=True,
-                )
-            except Exception as exc:
-                logger.error(
-                    "Guest booking office payment email failed ref=%s tenant=%s: %s",
-                    ref,
+            if is_bookings_schema_drift_error(exc) or is_audit_logs_schema_drift_error(exc):
+                try:
+                    booking = await _persist_guest_booking(db, heal=True)
+                except HTTPException:
+                    await db.rollback()
+                    raise
+                except Exception as retry_exc:
+                    await db.rollback()
+                    logger.exception(
+                        "Guest booking retry after schema heal failed tenant=%s",
+                        tenant_id,
+                    )
+                    raise HTTPException(
+                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=(
+                            "Αποτυχία καταχώρησης κράτησης μετά από επισκευή σχήματος: "
+                            f"{retry_exc.__class__.__name__}: {retry_exc}"
+                        ),
+                    ) from retry_exc
+            else:
+                logger.exception(
+                    "Guest booking persist failed tenant=%s ref=%s",
                     tenant_id,
-                    exc,
-                )
-
-            # Admin bell + Web Push (καμπανάκι) for Wallet / B2C paid bookings.
-            try:
-                from travel_platform.notifications.excursion_booking_push import (
-                    notify_excursion_booking_to_office,
-                )
-
-                push_payload = notify_payload or {
-                    "id": str(booking.id),
-                    "pnr": ref,
-                    "tenant_id": str(tenant_id),
-                    "passenger_name": passenger_name,
-                    "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
-                    "seat_label": seat_label,
-                    "amount_paid": float(paid_now),
-                }
-                push_payload.setdefault("tenant_id", str(tenant_id))
-                await notify_excursion_booking_to_office(push_payload)
-            except Exception as exc:
-                logger.warning(
-                    "Guest booking office bell/push failed ref=%s tenant=%s: %s",
                     ref,
-                    tenant_id,
-                    exc,
                 )
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Αποτυχία καταχώρησης κράτησης: "
+                        f"{exc.__class__.__name__}: {exc}"
+                    ),
+                ) from exc
 
-        return GuestBookingResponse(
-            id=booking.id,
-            tenant_id=booking.tenant_id,
-            reference_code=booking.reference_code,
-            status=booking.status.value if hasattr(booking.status, "value") else str(booking.status),
-            payment_status=(
+        # Snapshot before session closes (expire_on_commit would otherwise break access).
+        booking_snapshot = {
+            "id": booking.id,
+            "tenant_id": booking.tenant_id,
+            "reference_code": booking.reference_code,
+            "status": booking.status.value
+            if hasattr(booking.status, "value")
+            else str(booking.status),
+            "payment_status": (
                 booking.payment_status.value
                 if hasattr(booking.payment_status, "value")
                 else str(booking.payment_status)
             ),
-            total_price=booking.total_price,
-            amount_paid=booking.amount_paid,
-            amount_eur=booking.amount_eur,
-            passenger_name=booking.passenger_name,
-            passenger_email=booking.passenger_email,
-            seat_label=booking.seat_label,
-            metadata_json=booking.metadata_json,
-            wallet_activate_token=activate_token,
+            "total_price": booking.total_price,
+            "amount_paid": booking.amount_paid,
+            "amount_eur": booking.amount_eur,
+            "passenger_name": booking.passenger_name,
+            "passenger_email": booking.passenger_email,
+            "seat_label": booking.seat_label,
+            "metadata_json": dict(booking.metadata_json or {}),
+        }
+
+    # Post-commit side effects — never roll back the κρατηση.
+    try:
+        from api.admin_booking_mapper import local_id_from_reference
+        from ticketing.saas_sync import upsert_ticket_booking
+
+        meta = metadata
+        trip_id = int(meta.get("external_trip_id") or external_trip_id or 1)
+        seats = meta.get("seats") or []
+        ticket_seat = seat_label or (", ".join(seats) if seats else "—")
+        ticket_pay = (
+            "PAID"
+            if paid_now >= total and total > 0
+            else ("DEPOSIT" if paid_now > 0 else "PENDING")
         )
+        await upsert_ticket_booking(
+            local_id=local_id_from_reference(ref),
+            trip_id=trip_id,
+            customer_name=body.passenger_name,
+            seat_number=ticket_seat,
+            payment_status=ticket_pay,
+            phone=body.phone,
+            saas_booking_id=str(booking_snapshot["id"]),
+            email=body.passenger_email,
+            special_requirements={
+                "passengers": meta.get("passengers") or [],
+            }
+            if meta.get("passengers")
+            else None,
+        )
+    except Exception:
+        pass
+
+    # Guest website checkout → mint one-shot activate token (not stored on booking).
+    activate_token: str | None = None
+    src_l = source.lower()
+    is_office_desk = (
+        "office" in src_l
+        or "walk-in" in src_l
+        or "walk_in" in src_l
+        or "desk" in src_l
+        or "γκισέ" in src_l
+    )
+    if not wallet_email and passenger_email and not is_office_desk:
+        try:
+            from ticketing.wallet_magic import create_wallet_magic_token
+
+            activate_token = await create_wallet_magic_token(
+                email=passenger_email,
+                booking_id=str(booking_snapshot["id"]),
+                name=passenger_name,
+                phone=passenger_phone,
+            )
+        except Exception:
+            activate_token = None
+
+    # Mandatory server-side office (+ customer) payment emails when money was taken.
+    # Do not rely on frontend fire-and-forget notifyPaymentConfirmationSafe.
+    if paid_now > 0:
+        notify_payload = None
+        try:
+            from api.admin_booking_mapper import booking_to_admin_dict
+            from ticketing.payment_confirmation_email import (
+                send_payment_confirmation_notifications,
+            )
+
+            # Prefer snapshot dict — ORM instance may be expired after session close.
+            notify_payload = {
+                "id": str(booking_snapshot["id"]),
+                "pnr": booking_snapshot["reference_code"],
+                "reference_code": booking_snapshot["reference_code"],
+                "tenant_id": str(tenant_id),
+                "customerName": passenger_name,
+                "passenger_name": passenger_name,
+                "email": passenger_email,
+                "tripTitle": (body.trip_title or "").strip() or "Εκδρομή",
+                "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
+                "seat": seat_label,
+                "seat_label": seat_label,
+                "seats": requested_seats,
+                "amountPaid": float(paid_now),
+                "amount_paid": float(paid_now),
+                "price": float(total),
+                "metadata_json": booking_snapshot["metadata_json"],
+            }
+            try:
+                notify_payload = booking_to_admin_dict(booking) or notify_payload
+                notify_payload.setdefault("tenant_id", str(tenant_id))
+            except Exception:
+                pass
+            await send_payment_confirmation_notifications(
+                notify_payload,
+                require_office=True,
+            )
+        except Exception as exc:
+            logger.error(
+                "Guest booking office payment email failed ref=%s tenant=%s: %s",
+                ref,
+                tenant_id,
+                exc,
+            )
+
+        # Admin bell + Web Push (καμπανάκι) for Wallet / B2C paid bookings.
+        try:
+            from travel_platform.notifications.excursion_booking_push import (
+                notify_excursion_booking_to_office,
+            )
+
+            push_payload = notify_payload or {
+                "id": str(booking_snapshot["id"]),
+                "pnr": ref,
+                "tenant_id": str(tenant_id),
+                "passenger_name": passenger_name,
+                "trip_title": (body.trip_title or "").strip() or "Εκδρομή",
+                "seat_label": seat_label,
+                "amount_paid": float(paid_now),
+            }
+            push_payload.setdefault("tenant_id", str(tenant_id))
+            await notify_excursion_booking_to_office(push_payload)
+        except Exception as exc:
+            logger.warning(
+                "Guest booking office bell/push failed ref=%s tenant=%s: %s",
+                ref,
+                tenant_id,
+                exc,
+            )
+
+    return GuestBookingResponse(
+        id=booking_snapshot["id"],
+        tenant_id=booking_snapshot["tenant_id"],
+        reference_code=booking_snapshot["reference_code"],
+        status=booking_snapshot["status"],
+        payment_status=booking_snapshot["payment_status"],
+        total_price=booking_snapshot["total_price"],
+        amount_paid=booking_snapshot["amount_paid"],
+        amount_eur=booking_snapshot["amount_eur"],
+        passenger_name=booking_snapshot["passenger_name"],
+        passenger_email=booking_snapshot["passenger_email"],
+        seat_label=booking_snapshot["seat_label"],
+        metadata_json=booking_snapshot["metadata_json"],
+        wallet_activate_token=activate_token,
+    )
 
 
 @router.post(

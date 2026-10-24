@@ -208,7 +208,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (demoDone || tripLoading) return;
-    if (!trip || !pending || pending.tripId !== trip.id) {
+    if (!trip || !pending || String(pending.tripId) !== String(trip.id)) {
       if (trip) navigate(`/select-seat/${trip.id}`, { replace: true, state: bookState });
       else navigate(fromWallet ? '/wallet' : '/', { replace: true });
     }

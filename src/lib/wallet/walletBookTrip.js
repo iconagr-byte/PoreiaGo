@@ -24,7 +24,17 @@ export function walletSelectSeatPath(tripId) {
 }
 
 export function isWalletBookFlow(locationState) {
-  return Boolean(locationState && locationState.fromWallet);
+  if (locationState && locationState.fromWallet) return true;
+  // Pending checkout stamped during seat select (survives lost nav state).
+  try {
+    if (typeof sessionStorage === 'undefined') return false;
+    const raw = sessionStorage.getItem('pendingCheckout');
+    if (!raw) return false;
+    const pending = JSON.parse(raw);
+    return Boolean(pending?.fromWallet);
+  } catch {
+    return false;
+  }
 }
 
 /**

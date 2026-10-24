@@ -224,6 +224,8 @@ export default function SeatSelection() {
       extrasTotal: 0,
       extrasSelection: {},
       demo: isDemo,
+      // Survive refresh / lost React Router state on Capacitor WebView.
+      fromWallet: Boolean(fromWallet),
     });
     if (!isDemo) {
       trackAbandonedCheckout({

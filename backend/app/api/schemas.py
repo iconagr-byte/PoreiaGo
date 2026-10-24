@@ -63,9 +63,13 @@ class GuestBookingLookup(BaseModel):
 
 
 class GuestBookingCreate(BaseModel):
-    """B2C / office checkout — no JWT; tenant_id scopes the organization."""
+    """B2C / office checkout — no JWT; tenant_id scopes the organization.
 
-    tenant_id: UUID
+    ``tenant_id`` is optional when the request Host resolves to an office
+    (Achillio custom domain / Capacitor → www.achilliotravel.com).
+    """
+
+    tenant_id: UUID | None = None
     passenger_name: str
     passenger_email: EmailStr | None = None
     seat_label: str | None = None

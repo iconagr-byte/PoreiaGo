@@ -1,7 +1,16 @@
 /**
  * Multi-tenant SaaS API (/api/v1) — JWT auth, bookings, API keys.
  */
-import { API_BASE } from '../config/api.js';
+import { API_BASE, getApiBase } from '../config/api.js';
+
+/** Prefer live resolve (Capacitor boot) over import-time snapshot. */
+function apiBase() {
+  try {
+    return getApiBase() || API_BASE || '';
+  } catch {
+    return API_BASE || '';
+  }
+}
 import { clearSaasRoles, decodeJwtPayload, getSaasRoles, storeSaasRoles, storeSaasRolesFromToken } from '../lib/saasJwt.js';
 import { handleAuthFailure, isAuthFailureStatus } from '../lib/authSession.js';
 import { localIdFromReference } from '../lib/ticketing/bookingIds.js';
@@ -350,17 +359,13 @@ export async function saasCreateGuestBooking(payload) {
   } catch {
     sealedWalletTenant = null;
   }
-  const tenantId = payload.tenantId || sealedWalletTenant || getSaasTenantId();
-  if (!tenantId) {
-    throw new Error('Δεν έχει οριστεί tenant (VITE_SAAS_TENANT_ID)');
-  }
+  const tenantId = payload.tenantId || sealedWalletTenant || getSaasTenantId() || null;
+  // Host (Achillio / Capacitor → www.achilliotravel.com) can resolve tenant when omitted.
   const body = {
-      tenant_id: tenantId,
       passenger_name: payload.passengerName,
       passenger_email: payload.passengerEmail,
       seat_label: payload.seatLabel,
       amount_eur: payload.amountEur,
-      external_trip_id: payload.externalTripId ?? null,
       trip_title: payload.tripTitle ?? null,
       payment_method: payload.paymentMethod ?? null,
       phone: payload.phone ?? null,
@@ -373,6 +378,11 @@ export async function saasCreateGuestBooking(payload) {
       agent_name: payload.agentName ?? null,
       departure_at: payload.departureAt ?? null,
     };
+  if (tenantId) body.tenant_id = tenantId;
+  const tripNum = Number(payload.externalTripId);
+  if (Number.isFinite(tripNum) && tripNum > 0) {
+    body.external_trip_id = Math.trunc(tripNum);
+  }
   if (Array.isArray(payload.passengers) && payload.passengers.length) {
     body.passengers = payload.passengers;
   }
@@ -386,7 +396,7 @@ export async function saasCreateGuestBooking(payload) {
   } catch {
     /* ignore */
   }
-  const res = await fetch(`${API_BASE}/api/v1/bookings/guest`, {
+  const res = await fetch(`${apiBase()}/api/v1/bookings/guest`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -409,7 +419,7 @@ export async function fetchOccupiedSeats(externalTripId, tenantId) {
     external_trip_id: String(externalTripId),
   });
   if (tid) params.set('tenant_id', tid);
-  const res = await fetch(`${API_BASE}/api/v1/bookings/occupied-seats?${params}`);
+  const res = await fetch(`${apiBase()}/api/v1/bookings/occupied-seats?${params}`);
   if (!res.ok) await parseError(res);
   return res.json();
 }
@@ -428,7 +438,7 @@ export async function syncTicketForBoarding(booking) {
     ? `${booking.date}T${booking.time || '08:00'}:00`
     : new Date().toISOString();
   const canonicalId = localIdFromReference(booking.pnr || booking.id) || booking.id;
-  const res = await fetch(`${API_BASE}/api/tickets/sync`, {
+  const res = await fetch(`${apiBase()}/api/tickets/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

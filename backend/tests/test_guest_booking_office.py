@@ -28,6 +28,19 @@ class GuestBookingCreateTests(unittest.TestCase):
         self.assertEqual(body.amount_eur, Decimal("0"))
         self.assertEqual(body.source, "Office Walk-in")
 
+    def test_tenant_id_optional_for_host_resolve(self):
+        """Capacitor / Achillio Host can resolve office without body.tenant_id."""
+        body = GuestBookingCreate(
+            passenger_name="Wallet Guest",
+            passenger_email="w@example.com",
+            amount_eur=Decimal("45"),
+            total_eur=Decimal("45"),
+            external_trip_id=91001,
+            source="My Wallet",
+        )
+        self.assertIsNone(body.tenant_id)
+        self.assertEqual(body.external_trip_id, 91001)
+
     def test_rejects_zero_total(self):
         with self.assertRaises(ValidationError):
             GuestBookingCreate(

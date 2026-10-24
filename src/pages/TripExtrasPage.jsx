@@ -44,7 +44,7 @@ export default function TripExtrasPage() {
     if (tripLoading) return;
     const p = loadPendingCheckout();
     setPending(p);
-    if (!p || !trip || p.tripId !== trip.id) {
+    if (!p || !trip || String(p.tripId) !== String(trip.id)) {
       if (trip) navigate(`/select-seat/${trip.id}`, { replace: true, state: bookState });
       else navigate(fromWallet ? '/wallet' : '/', { replace: true });
     }
@@ -116,7 +116,7 @@ export default function TripExtrasPage() {
     goCheckout(cleared);
   };
 
-  if (tripLoading || !trip || !pending || pending.tripId !== trip.id || loading) {
+  if (tripLoading || !trip || !pending || String(pending.tripId) !== String(trip.id) || loading) {
     return (
       <div className="relative min-h-screen bg-surface flex items-center justify-center">
         <MinimalPageBackground />
