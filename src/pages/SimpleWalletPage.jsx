@@ -45,7 +45,11 @@ import WalletNotificationBell from '../components/wallet/WalletNotificationBell.
 import WalletStartFeed from '../components/wallet/WalletStartFeed.jsx';
 import WalletTicketDetail from '../components/wallet/WalletTicketDetail.jsx';
 import OfficeBrandMark from '../components/storefront/OfficeBrandMark.jsx';
-import { DEFAULT_SITE_APPEARANCE, fetchSiteAppearance } from '../services/siteAppearanceApi.js';
+import {
+  DEFAULT_SITE_APPEARANCE,
+  fetchSiteAppearance,
+  resolveSiteAssetUrl,
+} from '../services/siteAppearanceApi.js';
 import { fetchCustomerMe } from '../services/customerAuthApi.js';
 import {
   DEFAULT_OFFICE_MODULES,
@@ -180,8 +184,15 @@ function WalletAuthenticatedApp() {
   const [offlineSnap, setOfflineSnap] = useState(() => loadLastPass());
 
   const [profileTick, setProfileTick] = useState(0);
+  /** Deep-link into CustomerSecurityPanel action from the account sheet. */
+  const [securityFocus, setSecurityFocus] = useState(null);
   const profile = useMemo(() => resolveCustomerProfile(), [profileTick]);
   const email = profile.email;
+  const officeBrand = useMemo(() => resolveOfficeBrand(siteAppearance || {}), [siteAppearance]);
+  const officeLogoUrl = useMemo(
+    () => (officeBrand.hasLogo ? resolveSiteAssetUrl(officeBrand.logoUrl) : ''),
+    [officeBrand],
+  );
 
   useEffect(() => {
     document.documentElement.dataset.walletSurface = isPhone
@@ -485,6 +496,17 @@ function WalletAuthenticatedApp() {
     setSelectedBookingId(null);
   };
 
+  const openAccountSecurity = (action = null) => {
+    setSecurityFocus(action || 'panel');
+    switchTab('account');
+    requestAnimationFrame(() => {
+      document.getElementById('wallet-security')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
+
   const handleNotifOpen = (item) => {
     if (item?.bookingId) {
       const hit = bookings.find((b) => b.id === item.bookingId) || getBookingById(item.bookingId);
@@ -717,15 +739,13 @@ function WalletAuthenticatedApp() {
         <header className="wallet-topbar">
           <WalletAccountMenu
             profile={profile}
-            onOpenAccount={() => {
-              switchTab('account');
-              requestAnimationFrame(() => {
-                document.getElementById('wallet-security')?.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'start',
-                });
-              });
-            }}
+            officeLogoUrl={officeLogoUrl}
+            officeName={
+              officeBrand.displayName ||
+              (brandLabel && brandLabel !== 'My Wallet' ? brandLabel : '')
+            }
+            onOpenAccount={() => switchTab('account')}
+            onOpenSecurity={() => openAccountSecurity()}
             onOpenLostFound={() => switchTab('lost_found')}
             onLogout={handleLogout}
           />
@@ -994,6 +1014,9 @@ function WalletAuthenticatedApp() {
             <CustomerSecurityPanel
               email={profile.email}
               authProvider={profile.provider}
+              initialAction={
+                securityFocus && securityFocus !== 'panel' ? securityFocus : null
+              }
               onEmailChanged={() => setProfileTick((n) => n + 1)}
             />
             <button
