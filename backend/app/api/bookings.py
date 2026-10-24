@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +19,6 @@ from app.api.schemas import (
     BookingResponse,
     GuestBookingCreate,
     GuestBookingLookup,
-    GuestBookingResponse,
     OccupiedSeatsResponse,
 )
 from app.core.auth_deps import (
@@ -368,6 +368,50 @@ async def _guest_booking_side_effects(
             )
 
 
+def _json_safe(value):
+    """Coerce booking payloads for JSONResponse (Decimal/UUID never leak)."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(v) for v in value]
+    if hasattr(value, "value"):
+        return _json_safe(getattr(value, "value"))
+    return str(value)
+
+
+def _schedule_guest_booking_side_effects(**kwargs) -> None:
+    """Fire-and-forget notify work.
+
+    Do **not** use FastAPI BackgroundTasks here: uvicorn awaits them before the
+    ASGI cycle ends, so slow SMTP (office + customer mail) exceeds the edge
+    proxy read timeout and the client sees text/plain 500 after a durable insert.
+    """
+
+    async def _run() -> None:
+        try:
+            await _guest_booking_side_effects(**kwargs)
+        except Exception as exc:
+            logger.exception(
+                "Guest booking side-effects crashed ref=%s: %s",
+                kwargs.get("ref"),
+                exc,
+            )
+
+    try:
+        asyncio.get_running_loop().create_task(_run())
+    except RuntimeError:
+        logger.warning(
+            "Guest booking side-effects not scheduled (no running loop) ref=%s",
+            kwargs.get("ref"),
+        )
+
+
 @router.post(
     "/guest",
     status_code=status.HTTP_201_CREATED,
@@ -375,7 +419,6 @@ async def _guest_booking_side_effects(
 async def create_guest_booking(
     body: GuestBookingCreate,
     request: Request,
-    background_tasks: BackgroundTasks,
 ):
     """Public B2C / office checkout — tenant from Host when possible; body.tenant_id must match.
 
@@ -692,8 +735,9 @@ async def create_guest_booking(
             "metadata_json": dict(booking.metadata_json or {}),
         }
 
-    # Notify + magic-token in background. Return plain JSON 201 immediately so a
-    # side-effect crash can never become nginx text/plain 500 after commit.
+    # Notify + magic-token off the request path (asyncio.create_task — not
+    # BackgroundTasks). Return plain JSON 201 immediately so slow SMTP / AADE
+    # can never become nginx text/plain 500 after commit.
     src_l = source.lower()
     is_office_desk = (
         "office" in src_l
@@ -712,13 +756,12 @@ async def create_guest_booking(
         client_ip = None
     user_agent = request.headers.get("User-Agent")
 
-    background_tasks.add_task(
-        _guest_booking_side_effects,
+    _schedule_guest_booking_side_effects(
         booking_snapshot={
             "id": str(booking_snapshot["id"]),
             "reference_code": str(booking_snapshot["reference_code"]),
             "status": str(booking_snapshot["status"]),
-            "metadata_json": dict(booking_snapshot.get("metadata_json") or {}),
+            "metadata_json": _json_safe(dict(booking_snapshot.get("metadata_json") or {})),
         },
         tenant_id=str(tenant_id),
         ref=ref,
@@ -731,27 +774,29 @@ async def create_guest_booking(
         source=source,
         seat_label=seat_label or "",
         requested_seats=list(requested_seats),
-        metadata=dict(metadata or {}),
+        metadata=_json_safe(dict(metadata or {})),
         client_ip=client_ip,
         user_agent=user_agent,
         mint_wallet_token=mint_wallet_token,
     )
 
-    payload = {
-        "id": str(booking_snapshot["id"]),
-        "tenant_id": str(booking_snapshot["tenant_id"]),
-        "reference_code": str(booking_snapshot["reference_code"]),
-        "status": str(booking_snapshot["status"]),
-        "payment_status": str(booking_snapshot["payment_status"]),
-        "total_price": float(booking_snapshot["total_price"] or 0),
-        "amount_paid": float(booking_snapshot["amount_paid"] or 0),
-        "amount_eur": float(booking_snapshot["amount_eur"] or 0),
-        "passenger_name": booking_snapshot.get("passenger_name"),
-        "passenger_email": booking_snapshot.get("passenger_email"),
-        "seat_label": booking_snapshot.get("seat_label"),
-        "metadata_json": dict(booking_snapshot.get("metadata_json") or {}),
-        "wallet_activate_token": None,
-    }
+    payload = _json_safe(
+        {
+            "id": str(booking_snapshot["id"]),
+            "tenant_id": str(booking_snapshot["tenant_id"]),
+            "reference_code": str(booking_snapshot["reference_code"]),
+            "status": str(booking_snapshot["status"]),
+            "payment_status": str(booking_snapshot["payment_status"]),
+            "total_price": float(booking_snapshot["total_price"] or 0),
+            "amount_paid": float(booking_snapshot["amount_paid"] or 0),
+            "amount_eur": float(booking_snapshot["amount_eur"] or 0),
+            "passenger_name": booking_snapshot.get("passenger_name"),
+            "passenger_email": booking_snapshot.get("passenger_email"),
+            "seat_label": booking_snapshot.get("seat_label"),
+            "metadata_json": dict(booking_snapshot.get("metadata_json") or {}),
+            "wallet_activate_token": None,
+        }
+    )
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=payload)
 
 
