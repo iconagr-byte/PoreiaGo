@@ -74,6 +74,9 @@ describe('nativeRoleHome', () => {
     expect(isUnifiedNativeAppPath('/wallet')).toBe(true);
     expect(isUnifiedNativeAppPath('/rent/wallet')).toBe(true);
     expect(isUnifiedNativeAppPath('/login')).toBe(true);
+    expect(isUnifiedNativeAppPath('/select-seat/42')).toBe(true);
+    expect(isUnifiedNativeAppPath('/book/extras/42')).toBe(true);
+    expect(isUnifiedNativeAppPath('/checkout/42')).toBe(true);
     expect(isUnifiedNativeAppPath('/admin')).toBe(false);
     expect(isUnifiedNativeAppPath('/')).toBe(false);
   });

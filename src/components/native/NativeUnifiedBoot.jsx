@@ -22,7 +22,19 @@ function roleFromPath(pathname) {
   const p = pathname || '/';
   if (p === '/driver' || p.startsWith('/driver/')) return NATIVE_ROLE_DRIVER;
   if (p === '/rent' || p.startsWith('/rent/')) return NATIVE_ROLE_RENT;
-  if (p === '/wallet' || p.startsWith('/wallet/') || p === '/login' || p === '/register') {
+  if (
+    p === '/wallet' ||
+    p.startsWith('/wallet/') ||
+    p === '/login' ||
+    p === '/register' ||
+    p === '/select-seat' ||
+    p.startsWith('/select-seat/') ||
+    p.startsWith('/book/') ||
+    p.startsWith('/checkout') ||
+    p.startsWith('/trip/') ||
+    p === '/my-booking' ||
+    p.startsWith('/my-booking/')
+  ) {
     return NATIVE_ROLE_WALLET;
   }
   return resolveNativeRole() || NATIVE_ROLE_WALLET;
