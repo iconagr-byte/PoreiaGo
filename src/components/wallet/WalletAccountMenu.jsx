@@ -100,6 +100,15 @@ export default function WalletAccountMenu({
     };
   }, [open]);
 
+  // Lift .wallet-app stacking so the sheet stays above ticket peeks (Capacitor WebView).
+  useEffect(() => {
+    const app = rootRef.current?.closest?.('.wallet-app');
+    if (!app) return undefined;
+    if (open) app.classList.add('wallet-app--account-open');
+    else app.classList.remove('wallet-app--account-open');
+    return () => app.classList.remove('wallet-app--account-open');
+  }, [open]);
+
   const go = (fn) => {
     setOpen(false);
     fn?.();
