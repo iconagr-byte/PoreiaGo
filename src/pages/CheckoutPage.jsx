@@ -18,7 +18,10 @@ import {
   walletClaimNavState,
   walletHomeNavState,
 } from '../lib/wallet/walletClaim.js';
-import { isWalletBookFlow } from '../lib/wallet/walletBookTrip.js';
+import {
+  isWalletBookFlow,
+  officeTripFromWalletState,
+} from '../lib/wallet/walletBookTrip.js';
 import { createBookingFromCheckout } from '../lib/ticketing/bookingStore.js';
 import {
   buildBookingPassengers,
@@ -59,7 +62,10 @@ export default function CheckoutPage() {
   const location = useLocation();
   const fromWallet = isWalletBookFlow(location.state);
   const bookState = fromWallet ? location.state : undefined;
-  const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId);
+  const seedTrip = officeTripFromWalletState(location.state, tripId);
+  const { trip, loading: tripLoading, isDemo } = usePublicOfficeTrip(tripId, {
+    seedTrip,
+  });
   const [processing, setProcessing] = useState(false);
   const [demoDone, setDemoDone] = useState(null);
   const [paymentPlan, setPaymentPlan] = useState(PAYMENT_PLAN_FULL);

@@ -616,7 +616,9 @@ function WalletAuthenticatedApp() {
               openOfficeTrips();
               return;
             }
-            navigate(`/select-seat/${trip.id}`, { state: { fromWallet: true } });
+            navigate(`/select-seat/${trip.id}`, {
+              state: { fromWallet: true, officeTrip: trip },
+            });
           }}
           onQrChange={handleQrChange}
           offline={usingOfflinePass}

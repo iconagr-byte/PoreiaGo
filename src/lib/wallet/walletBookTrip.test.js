@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isWalletBookFlow,
+  officeTripFromWalletState,
   walletBookNavState,
   walletSelectSeatPath,
 } from './walletBookTrip.js';
@@ -15,10 +16,21 @@ describe('walletBookTrip', () => {
     expect(walletSelectSeatPath(null)).toBe('/wallet');
   });
 
-  it('marks nav state as fromWallet for back navigation', () => {
+  it('marks nav state as fromWallet and seeds office trip', () => {
     expect(walletBookNavState()).toEqual({ fromWallet: true });
+    const trip = { id: 7, title: 'Μετεωρα' };
+    expect(walletBookNavState(trip)).toEqual({ fromWallet: true, officeTrip: trip });
     expect(isWalletBookFlow({ fromWallet: true })).toBe(true);
     expect(isWalletBookFlow({})).toBe(false);
     expect(isWalletBookFlow(null)).toBe(false);
+  });
+
+  it('reads seeded office trip only when ids match', () => {
+    const trip = { id: 42, title: 'Ιωάννινα' };
+    expect(officeTripFromWalletState({ fromWallet: true, officeTrip: trip }, 42)).toEqual(trip);
+    expect(officeTripFromWalletState({ fromWallet: true, officeTrip: trip }, '42')).toEqual(trip);
+    expect(officeTripFromWalletState({ fromWallet: true, officeTrip: trip }, 99)).toBeNull();
+    expect(officeTripFromWalletState({ fromWallet: true }, 42)).toBeNull();
+    expect(officeTripFromWalletState(null, 42)).toBeNull();
   });
 });

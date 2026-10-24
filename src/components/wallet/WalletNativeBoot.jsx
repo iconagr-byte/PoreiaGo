@@ -2,30 +2,15 @@ import { useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { isNativeApp, isNativeDriverApp } from '../../lib/capacitor/isNativeApp.js';
 import { isNativeUnifiedApp } from '../../lib/capacitor/nativeAppId.js';
+import { isWalletAppPath } from '../../lib/capacitor/walletNativePaths.js';
+
+export { isWalletAppPath } from '../../lib/capacitor/walletNativePaths.js';
 
 /**
  * Legacy wallet-only path seal.
  * Unified Capacitor app (com.poreiago.wallet with role router) uses NativeUnifiedBoot —
  * this component no-ops there so /driver and /rent stay reachable.
- */
-const WALLET_APP_PREFIXES = [
-  '/wallet',
-  '/my-booking',
-  '/login',
-  '/register',
-  '/forgot-password',
-  '/reset-password',
-  '/ticket/',
-  '/passenger-checkin',
-  '/wallet/native-google',
-];
-
-export function isWalletAppPath(pathname) {
-  const p = pathname || '/';
-  return WALLET_APP_PREFIXES.some((prefix) => p === prefix || p.startsWith(prefix));
-}
-
-/**
+ *
  * Capacitor Wallet app (legacy flavor only): traveler My Wallet.
  * Skipped for unified role app and for Driver native shell.
  */
