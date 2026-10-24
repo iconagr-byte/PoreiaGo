@@ -61,7 +61,7 @@ class WalletPwaOfflineContractTests(unittest.TestCase):
         self.assertIn("label: 'Αρχική'", page)
         self.assertIn("label: 'Εισιτήριο'", page)
         self.assertIn("label: 'Κρατήσεις'", page)
-        self.assertIn("label: 'Εγώ'", page)
+        self.assertIn("label: 'Περισσότερα'", page)
         self.assertNotIn("label: 'Κράτηση'", shell)
         self.assertNotIn("icon: 'search'", shell)
         self.assertNotIn("to: '/my-booking'", shell)
