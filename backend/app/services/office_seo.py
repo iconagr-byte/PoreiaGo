@@ -241,10 +241,13 @@ def spa_shell_internal_url(*, is_platform: bool) -> str:
     if is_platform:
         return os.getenv(
             "SPA_SHELL_POREIAGO_URL",
-            "http://frontend/index.poreiago.html",
+            "http://frontend/index.html",
         )
-    # Default Achillio / tenant-safe shell (title rewritten again by inject).
-    return os.getenv("SPA_SHELL_INTERNAL_URL", "http://frontend/index.html")
+    # Tenant / Achillio shell — never the PoreiaGo default index.html.
+    return os.getenv(
+        "SPA_SHELL_INTERNAL_URL",
+        "http://frontend/index.achillio.html",
+    )
 
 
 def public_origin_from_request_headers(
