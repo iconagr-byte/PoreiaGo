@@ -290,18 +290,13 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         payment_status = PaymentStatus.PENDING
 
     async def _persist_guest_booking(db, *, heal: bool = False):
-        from app.services.ensure_audit_logs_schema import ensure_audit_logs_schema
+        """Persist booking only — AADE/audit run post-commit (never poison this txn)."""
         from app.services.ensure_bookings_schema import ensure_bookings_schema
 
         if heal:
             await ensure_bookings_schema(db, force=True)
-            await ensure_audit_logs_schema(db, force=True)
         else:
             await ensure_bookings_schema(db)
-            try:
-                await ensure_audit_logs_schema(db)
-            except Exception:
-                pass
 
         await apply_tenant_rls(db, tenant_id)
         if external_trip_id is not None and requested_seats:
@@ -351,56 +346,8 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         metadata.clear()
         metadata.update(meta)
 
-        if paid_now > 0:
-            try:
-                from app.services.aade_queue_service import AadeQueueService
-
-                vat_base = float(paid_now) / 1.24
-                await AadeQueueService(db).enqueue_invoice(
-                    tenant_id=tenant_id,
-                    booking_id=row.id,
-                    payload={
-                        "amount_eur": float(paid_now),
-                        "vat_rate": 24.0,
-                        "customer_country": "GR",
-                        "line_items": [
-                            {
-                                "description": body.trip_title or "Εισιτήριο εκδρομής",
-                                "amount": round(vat_base, 2),
-                            }
-                        ],
-                    },
-                    idempotency_key=f"guest-{row.id}",
-                )
-            except Exception:
-                pass
-
-        # Never fail the booking if audit_logs schema/INET drifts (Contabo).
-        try:
-            await AuditService(db).record(
-                tenant_id=tenant_id,
-                actor_id=None,
-                actor_email=body.passenger_email,
-                action=AuditAction.CREATE,
-                resource_type="booking",
-                resource_id=str(row.id),
-                ip_address=_safe_audit_ip(await get_client_ip(request)),
-                user_agent=(request.headers.get("User-Agent") or "")[:512] or None,
-                after_state={
-                    "status": row.status.value,
-                    "reference_code": ref,
-                    "guest": True,
-                    "source": source,
-                },
-            )
-        except Exception as audit_exc:
-            logger.warning(
-                "Guest booking audit skipped ref=%s tenant=%s: %s",
-                ref,
-                tenant_id,
-                audit_exc,
-            )
-
+        # Commit κρατηση alone. AADE + audit_logs must NOT share this transaction:
+        # a failed flush (schema/INET/queue) aborts Postgres and would roll back the booking.
         await db.commit()
         await db.refresh(row)
         return row
@@ -415,9 +362,8 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         except Exception as exc:
             await db.rollback()
             from app.services.ensure_bookings_schema import is_bookings_schema_drift_error
-            from app.services.ensure_audit_logs_schema import is_audit_logs_schema_drift_error
 
-            if is_bookings_schema_drift_error(exc) or is_audit_logs_schema_drift_error(exc):
+            if is_bookings_schema_drift_error(exc):
                 try:
                     booking = await _persist_guest_booking(db, heal=True)
                 except HTTPException:
@@ -473,6 +419,69 @@ async def create_guest_booking(body: GuestBookingCreate, request: Request):
         }
 
     # Post-commit side effects — never roll back the κρατηση.
+    if paid_now > 0:
+        try:
+            async with AsyncSessionLocal() as aade_db:
+                from app.services.aade_queue_service import AadeQueueService
+
+                vat_base = float(paid_now) / 1.24
+                await AadeQueueService(aade_db).enqueue_invoice(
+                    tenant_id=tenant_id,
+                    booking_id=booking_snapshot["id"],
+                    payload={
+                        "amount_eur": float(paid_now),
+                        "vat_rate": 24.0,
+                        "customer_country": "GR",
+                        "line_items": [
+                            {
+                                "description": body.trip_title or "Εισιτήριο εκδρομής",
+                                "amount": round(vat_base, 2),
+                            }
+                        ],
+                    },
+                    idempotency_key=f"guest-{booking_snapshot['id']}",
+                )
+                await aade_db.commit()
+        except Exception as aade_exc:
+            logger.warning(
+                "Guest booking AADE enqueue skipped ref=%s: %s",
+                ref,
+                aade_exc,
+            )
+
+    try:
+        async with AsyncSessionLocal() as audit_db:
+            from app.services.ensure_audit_logs_schema import ensure_audit_logs_schema
+
+            try:
+                await ensure_audit_logs_schema(audit_db)
+            except Exception:
+                pass
+            await AuditService(audit_db).record(
+                tenant_id=tenant_id,
+                actor_id=None,
+                actor_email=body.passenger_email,
+                action=AuditAction.CREATE,
+                resource_type="booking",
+                resource_id=str(booking_snapshot["id"]),
+                ip_address=_safe_audit_ip(await get_client_ip(request)),
+                user_agent=(request.headers.get("User-Agent") or "")[:512] or None,
+                after_state={
+                    "status": booking_snapshot["status"],
+                    "reference_code": ref,
+                    "guest": True,
+                    "source": source,
+                },
+            )
+            await audit_db.commit()
+    except Exception as audit_exc:
+        logger.warning(
+            "Guest booking audit skipped ref=%s tenant=%s: %s",
+            ref,
+            tenant_id,
+            audit_exc,
+        )
+
     try:
         from api.admin_booking_mapper import local_id_from_reference
         from ticketing.saas_sync import upsert_ticket_booking
